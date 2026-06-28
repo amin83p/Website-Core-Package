@@ -1029,7 +1029,11 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
                 status: session?.status,
                 notes: session?.notes
             });
-            const isInstructorEvent = !excludeTeacher && (classHasInstructor || (deliveredBy && idsEqual(deliveredBy, normalizedPersonId)));
+            const isInstructorEvent = !excludeTeacher && (
+                deliveredBy
+                    ? idsEqual(deliveredBy, normalizedPersonId)
+                    : classHasInstructor
+            );
             const isStudentEvent = !excludeStudent && (await isStudentActiveOnDate({
                 classId,
                 classRow: classDef,

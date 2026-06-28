@@ -285,6 +285,7 @@
         }),
         admin: () => GenericPickerPresets.person({
           title: 'Select Person',
+          apiEndpoint: '/school/identity/api/persons',
           searchFields: 'id,firstName,lastName,name.first,name.last,email,personId',
           context
         })

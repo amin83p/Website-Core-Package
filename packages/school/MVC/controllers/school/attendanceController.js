@@ -9,6 +9,7 @@ const sessionStatusPolicyService = require('../../services/school/sessionStatusP
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
+const schoolFileService = require('../../services/school/schoolFileService');
 const { userCanManageAttendanceMatrixPolicy } = requireCoreModule('MVC/middleware/attendanceMatrixPolicyAdminMiddleware');
 const accessService = requireCoreModule('MVC/services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -283,6 +284,7 @@ async function getAttendanceData(req, res) {
                     lateMinutes: rosterRecord?.lateMinutes || 0,
                     earlyLeaveMinutes: rosterRecord?.earlyLeaveMinutes || 0,
                     excuseRef: rosterRecord?.excuseRef || '',
+                    excuseAttachment: rosterRecord?.excuseAttachment || null,
                     teacherNotes: (rosterRecord?.notes) || ses.notes || '',
                     rosterStudentNotes: rosterRecord?.notes || '',
                     sessionLevelNote: ses.notes || '',
@@ -319,7 +321,7 @@ async function getAttendanceData(req, res) {
 // --- Interactive Comment Engine with Chat Integration ---
 async function addAttendanceComment(req, res) {
     try {
-        const { classId, sessionId, studentPersonId, text, mentions } = req.body;
+        const { classId, sessionId, studentPersonId, text, mentions, attachment } = req.body;
         if (!classId || !sessionId || !studentPersonId || !text) throw new Error('Missing required fields.');
 
         const classData = await schoolDataService.getDataById('classes', classId, req.user);
@@ -345,14 +347,15 @@ async function addAttendanceComment(req, res) {
             authorName: req.user.identity?.displayName || req.user.name || req.user.username || 'Admin',
             text: text.trim(),
             timestamp: new Date().toISOString(),
-            mentions: mentions || [] 
+            mentions: mentions || [],
+            attachment: attachment && typeof attachment === 'object' ? attachment : null
         };
 
         rosterRecord.comments.push(newComment);
         await schoolDataService.saveClassSessions(classId, sessions, req.user);
 
         // =========================================================================
-        // NEW: AUTOMATIC CHAT NOTIFICATION ENGINE
+        // NEW: AUTOMATIC CHAT MESSAGE ENGINE
         // =========================================================================
         if (mentions && mentions.length > 0) {
             const className = classData ? classData.title : 'a class';
@@ -360,7 +363,7 @@ async function addAttendanceComment(req, res) {
             // Format the message with HTML to include a styled, clickable link!
             // Format the message with HTML to include a styled, clickable link!
             const chatMsgContent = `
-                ðŸ“ <b>System Notification:</b> I mentioned you in an attendance note for <b>${className}</b> (Date: ${session.date}):
+                ðŸ“ <b>System Message:</b> I mentioned you in an attendance note for <b>${className}</b> (Date: ${session.date}):
                 <br><br>
                 <div style="border-left: 3px solid #0d6efd; padding-left: 10px; color: #6c757d; font-style: italic;">
                     "${text.trim()}"
@@ -395,7 +398,7 @@ async function addAttendanceComment(req, res) {
                         // Ignore socket errors (e.g., if the user is currently offline)
                     }
                 } catch (chatErr) {
-                    console.error(`Failed to send chat notification to ${mention.id}:`, chatErr);
+                    console.error(`Failed to send chat message to ${mention.id}:`, chatErr);
                 }
             }
         }
@@ -404,6 +407,35 @@ async function addAttendanceComment(req, res) {
         res.json({ status: 'success', message: 'Note added successfully.', comment: newComment });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function uploadAttendanceFile(req, res) {
+    try {
+        const classId = String(req.body?.classId || '').trim();
+        const sessionId = String(req.body?.sessionId || '').trim();
+        const studentPersonId = String(req.body?.studentPersonId || '').trim();
+        const kind = String(req.body?.kind || 'attendance').trim() || 'attendance';
+        if (!classId || !sessionId) throw new Error('classId and sessionId are required.');
+        if (!req.file) throw new Error('No file was uploaded.');
+
+        const classData = await schoolDataService.getDataById('classes', classId, req.user);
+        if (!classData) throw new Error('Class not found.');
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const session = (Array.isArray(sessions) ? sessions : []).find((row) => idsEqual(row?.sessionId, sessionId));
+        if (!session) throw new Error('Session not found.');
+
+        const file = schoolFileService.normalizeUploadedFile(req.file, {
+            kind,
+            classId,
+            sessionId,
+            studentPersonId,
+            uploadedBy: req.user?.id
+        });
+
+        return res.json({ status: 'success', message: 'File uploaded.', file });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
     }
 }
 
@@ -463,6 +495,11 @@ async function updateAttendanceRosterCell(req, res) {
         if (req.body?.excuseRef !== undefined) {
             rosterRecord.excuseRef = String(req.body.excuseRef || '').trim();
         }
+        if (req.body?.excuseAttachment !== undefined) {
+            rosterRecord.excuseAttachment = req.body.excuseAttachment && typeof req.body.excuseAttachment === 'object'
+                ? req.body.excuseAttachment
+                : null;
+        }
         if (req.body?.notes !== undefined) {
             rosterRecord.notes = String(req.body.notes || '').trim();
         }
@@ -487,6 +524,7 @@ async function updateAttendanceRosterCell(req, res) {
                 lateMinutes: rosterRecord.lateMinutes || 0,
                 earlyLeaveMinutes: rosterRecord.earlyLeaveMinutes || 0,
                 excuseRef: rosterRecord.excuseRef || '',
+                excuseAttachment: rosterRecord.excuseAttachment || null,
                 notes: rosterRecord.notes || ''
             }
         });
@@ -501,6 +539,7 @@ module.exports = {
     saveAttendanceMatrixSettings,
     listActiveAttendanceClasses,
     getAttendanceData,
+    uploadAttendanceFile,
     addAttendanceComment,
     updateAttendanceRosterCell
 };

@@ -265,6 +265,7 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
                 const isLookupMiss = /Action state not found/i.test(errorMessage);
                 const allowInactiveTokenFallback = options.allowInactiveTokenFallback === true;
                 const isOperationMismatch = /Action State Token does not belong to this operation/i.test(errorMessage);
+                const isSectionMismatch = /Action State Token does not belong to this section/i.test(errorMessage);
                 const isTargetMismatch = /Action State Token is not valid for this record/i.test(errorMessage);
                 const isInactiveOrExpiredToken =
                     /Action State is no longer active/i.test(errorMessage) ||
@@ -276,7 +277,12 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
                     requiresToken &&
                     clientProvidedId &&
                     options.allowOperationTokenFallback === true &&
-                    (isOperationMismatch || isTargetMismatch || (allowInactiveTokenFallback && isInactiveOrExpiredToken));
+                    (
+                        isOperationMismatch ||
+                        isTargetMismatch ||
+                        (options.allowSectionTokenFallback === true && isSectionMismatch) ||
+                        (allowInactiveTokenFallback && isInactiveOrExpiredToken)
+                    );
 
                 if (canFallbackOperationToken) {
                     try {
@@ -292,7 +298,9 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
                                 actionStateFallback: {
                                     reason: isOperationMismatch
                                         ? 'operation_token_mismatch'
-                                        : (isTargetMismatch ? 'target_token_mismatch' : 'inactive_or_expired_token'),
+                                        : (isSectionMismatch
+                                            ? 'section_token_mismatch'
+                                            : (isTargetMismatch ? 'target_token_mismatch' : 'inactive_or_expired_token')),
                                     inboundActionStateId: String(clientProvidedId || '').trim()
                                 }
                             }

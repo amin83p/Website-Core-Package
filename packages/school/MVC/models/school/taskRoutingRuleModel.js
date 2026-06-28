@@ -5,14 +5,14 @@ const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
-const dataPath = path.join(resolveCoreRoot(), 'data/school/notificationRoutingRules.json');
+const dataPath = path.join(resolveCoreRoot(), 'data/school/taskRoutingRules.json');
 
 fsSync.mkdirSync(path.dirname(dataPath), { recursive: true });
 if (!fsSync.existsSync(dataPath)) {
   fsSync.writeFileSync(dataPath, '[]');
 }
 
-const NOTIFICATION_ROUTING_SOURCE_TYPES = Object.freeze(['leave_request', 'student_session_case', 'timesheet', 'manual']);
+const TASK_ROUTING_SOURCE_TYPES = Object.freeze(['leave_request', 'student_session_case', 'timesheet', 'manual']);
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -35,7 +35,7 @@ function cleanId(value, { max = 120, allowEmpty = false } = {}) {
 
 function normalizeSourceType(value, fallback = 'leave_request') {
   const token = cleanString(value, { max: 80, allowEmpty: true }).toLowerCase();
-  return NOTIFICATION_ROUTING_SOURCE_TYPES.includes(token) ? token : fallback;
+  return TASK_ROUTING_SOURCE_TYPES.includes(token) ? token : fallback;
 }
 
 function normalizeBoolean(value, fallback = true) {
@@ -55,7 +55,7 @@ function generateRoutingRuleId(existingIds = new Set()) {
 }
 
 function sanitizeRoutingRuleInput(input, { isUpdate = false } = {}) {
-  if (!isPlainObject(input)) throw new Error('Invalid notification routing rule payload.');
+  if (!isPlainObject(input)) throw new Error('Invalid task routing rule payload.');
   const out = {
     orgId: cleanId(input.orgId, { max: 120, allowEmpty: isUpdate }) || '',
     sourceType: normalizeSourceType(input.sourceType, 'leave_request'),
@@ -67,12 +67,12 @@ function sanitizeRoutingRuleInput(input, { isUpdate = false } = {}) {
   };
 
   if (!isUpdate && !out.orgId) throw new Error('Organization is required.');
-  if (!out.sourceType) throw new Error('Notification source type is required.');
+  if (!out.sourceType) throw new Error('Task source type is required.');
   if (input.id) out.id = cleanId(input.id, { max: 120, allowEmpty: false });
   return out;
 }
 
-async function getAllNotificationRoutingRules() {
+async function getAllTaskRoutingRules() {
   try {
     const data = await fs.readFile(dataPath, 'utf8');
     const trimmed = String(data || '').trim();
@@ -82,10 +82,10 @@ async function getAllNotificationRoutingRules() {
   } catch (error) {
     if (error.code === 'ENOENT') return [];
     if (error instanceof SyntaxError) {
-      console.error('School notification routing rules JSON parse error:', error.message);
+      console.error('School task routing rules JSON parse error:', error.message);
       return [];
     }
-    throw new Error('Failed to retrieve school notification routing rules.');
+    throw new Error('Failed to retrieve school task routing rules.');
   }
 }
 
@@ -94,13 +94,13 @@ async function saveAll(rows) {
   await queueWrite(async () => fs.writeFile(dataPath, payload));
 }
 
-async function getNotificationRoutingRuleById(id) {
-  const all = await getAllNotificationRoutingRules();
+async function getTaskRoutingRuleById(id) {
+  const all = await getAllTaskRoutingRules();
   return all.find((row) => idsEqual(row?.id, id)) || null;
 }
 
-async function addNotificationRoutingRule(input) {
-  const all = await getAllNotificationRoutingRules();
+async function addTaskRoutingRule(input) {
+  const all = await getAllTaskRoutingRules();
   const existingIds = new Set(all.map((row) => cleanString(row?.id, { max: 120, allowEmpty: true })).filter(Boolean));
   const sanitized = sanitizeRoutingRuleInput(input, { isUpdate: false });
   const now = new Date().toISOString();
@@ -119,8 +119,8 @@ async function addNotificationRoutingRule(input) {
   return row;
 }
 
-async function updateNotificationRoutingRule(id, input) {
-  const all = await getAllNotificationRoutingRules();
+async function updateTaskRoutingRule(id, input) {
+  const all = await getAllTaskRoutingRules();
   const idx = all.findIndex((row) => idsEqual(row?.id, id));
   if (idx === -1) return null;
   const existing = all[idx];
@@ -140,8 +140,8 @@ async function updateNotificationRoutingRule(id, input) {
   return merged;
 }
 
-async function deleteNotificationRoutingRule(id) {
-  const all = await getAllNotificationRoutingRules();
+async function deleteTaskRoutingRule(id) {
+  const all = await getAllTaskRoutingRules();
   const before = all.length;
   const kept = all.filter((row) => !idsEqual(row?.id, id));
   if (kept.length === before) return false;
@@ -149,8 +149,8 @@ async function deleteNotificationRoutingRule(id) {
   return true;
 }
 
-async function clearNotificationRoutingRulesByOrg(orgId) {
-  const all = await getAllNotificationRoutingRules();
+async function clearTaskRoutingRulesByOrg(orgId) {
+  const all = await getAllTaskRoutingRules();
   const kept = all.filter((row) => !idsEqual(row?.orgId, orgId));
   if (kept.length === all.length) return 0;
   await saveAll(kept);
@@ -158,12 +158,12 @@ async function clearNotificationRoutingRulesByOrg(orgId) {
 }
 
 module.exports = {
-  NOTIFICATION_ROUTING_SOURCE_TYPES,
+  TASK_ROUTING_SOURCE_TYPES,
   sanitizeRoutingRuleInput,
-  getAllNotificationRoutingRules,
-  getNotificationRoutingRuleById,
-  addNotificationRoutingRule,
-  updateNotificationRoutingRule,
-  deleteNotificationRoutingRule,
-  clearNotificationRoutingRulesByOrg
+  getAllTaskRoutingRules,
+  getTaskRoutingRuleById,
+  addTaskRoutingRule,
+  updateTaskRoutingRule,
+  deleteTaskRoutingRule,
+  clearTaskRoutingRulesByOrg
 };

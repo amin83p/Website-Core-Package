@@ -8,6 +8,7 @@ const { isAjax, buildDataServiceQuery, inferSearchableFields, normalizeSearchKey
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { COMPENSATION_METHODS } = require('../../models/school/teacherModel');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function getActiveOrgIdOrThrow(reqUser) {
@@ -81,38 +82,45 @@ async function resolveOwnerForPerson({ reqUser, activeOrgId, personId, personRol
 
 async function getEligiblePayRatePersons(req) {
   const activeOrgId = getActiveOrgIdOrThrow(req.user);
-  const persons = await dataService1.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS);
+  const personPayload = await schoolIdentityLookupService.listSchoolPersons({
+    reqUser: req.user,
+    requireSchoolRole: true,
+    query: { limit: 1000 }
+  });
+  const persons = personPayload.allRows || personPayload.rows || [];
   const teachers = await dataService.fetchData('teachers', {}, req.user);
   const staff = await dataService.fetchData('staff', {}, req.user);
 
-  const personById = new Map((persons || []).map((p) => [String(p.id), p]));
+  const personById = new Map((persons || []).map((p) => [String(p.id || p.personId), p]));
   const results = [];
 
   (teachers || []).forEach((t) => {
     if (!idsEqual(t.orgId || '', activeOrgId)) return;
     const person = personById.get(String(t.personId || ''));
-    if (resolvePersonRoleInOrg(person, activeOrgId) !== 'teacher') return;
+    const roles = Array.isArray(person?.schoolRoles || person?.roles) ? (person.schoolRoles || person.roles) : [];
+    if (!roles.includes('school_teacher')) return;
     results.push({
       id: String(t.personId || ''),
       personId: String(t.personId || ''),
       ownerId: String(t.id || ''),
       ownerType: 'teacher',
       matchedRole: 'teacher',
-      displayName: person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : String(t.personId || '')
+      displayName: person?.displayName || person?.name || String(t.personId || '')
     });
   });
 
   (staff || []).forEach((s) => {
     if (!idsEqual(s.orgId || '', activeOrgId)) return;
     const person = personById.get(String(s.personId || ''));
-    if (resolvePersonRoleInOrg(person, activeOrgId) !== 'staff') return;
+    const roles = Array.isArray(person?.schoolRoles || person?.roles) ? (person.schoolRoles || person.roles) : [];
+    if (!roles.includes('school_staff')) return;
     results.push({
       id: String(s.personId || ''),
       personId: String(s.personId || ''),
       ownerId: String(s.id || ''),
       ownerType: 'staff',
       matchedRole: 'staff',
-      displayName: person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : String(s.personId || '')
+      displayName: person?.displayName || person?.name || String(s.personId || '')
     });
   });
 
@@ -128,10 +136,15 @@ exports.listPayRates = async (req, res) => {
 
     const teachers = await dataService.fetchData('teachers', {}, req.user);
     const staff = await dataService.fetchData('staff', {}, req.user);
-    const persons = await dataService1.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS);
+    const personPayload = await schoolIdentityLookupService.listSchoolPersons({
+      reqUser: req.user,
+      requireSchoolRole: false,
+      query: { limit: 1000 }
+    });
+    const persons = personPayload.allRows || personPayload.rows || [];
     const departments = await dataService.fetchData('departments', {}, req.user);
 
-    const personById = new Map((persons || []).map((p) => [String(p.id), p]));
+    const personById = new Map((persons || []).map((p) => [String(p.id || p.personId), p]));
     const deptById = new Map((departments || []).map((d) => [String(d.id), `${d.code || d.id} - ${d.name || ''}`.trim()]));
 
     const profiles = [];
@@ -139,7 +152,7 @@ exports.listPayRates = async (req, res) => {
       if (!idsEqual(owner?.orgId || '', activeOrgId)) return;
       const personId = String(owner?.personId || '');
       const person = personById.get(personId);
-      const personName = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : personId;
+      const personName = person?.displayName || person?.name || personId;
       const comp = Array.isArray(owner?.compensationProfiles) ? owner.compensationProfiles : [];
       const deptNames = [...new Set(comp.map((c) => deptById.get(String(c.departmentId || '')) || String(c.departmentId || '')).filter(Boolean))];
 

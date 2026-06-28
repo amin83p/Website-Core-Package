@@ -229,7 +229,7 @@ async function sendEmail({ to, subject, html, text, replyTo, from, meta } = {}) 
   }
 }
 
-async function sendContactNotification(contactRecord = {}) {
+async function sendContactTask(contactRecord = {}) {
   const cfg = getConfig();
   if (!cfg.defaultContactRecipients.length) {
     return { skipped: true, reason: 'No contact recipients configured.' };
@@ -331,6 +331,6 @@ module.exports = {
   hasDefaultSender,
   isConfigured,
   sendEmail,
-  sendContactNotification,
+  sendContactTask,
   sendNewsletterWelcome
 };

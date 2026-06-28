@@ -1,7 +1,7 @@
 const schoolRepositories = require('../../repositories/school');
-const notificationModel = require('../../models/school/notificationModel');
+const taskModel = require('../../models/school/taskModel');
 const personDisplayNameService = require('./personDisplayNameService');
-const notificationRoutingRuleService = require('./notificationRoutingRuleService');
+const taskRoutingRuleService = require('./taskRoutingRuleService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
@@ -38,12 +38,12 @@ function firstLifecyclePersonId(...values) {
 
 function normalizeStatus(value, fallback = 'open') {
   const token = cleanString(value, 40).toLowerCase();
-  return notificationModel.NOTIFICATION_STATUSES.includes(token) ? token : fallback;
+  return taskModel.TASK_STATUSES.includes(token) ? token : fallback;
 }
 
 function normalizeTaskStatus(value, fallback = 'open') {
   const token = cleanString(value, 40).toLowerCase();
-  return notificationModel.NOTIFICATION_TASK_STATUSES.includes(token) ? token : fallback;
+  return taskModel.TASK_ASSIGNMENT_STATUSES.includes(token) ? token : fallback;
 }
 
 function getActiveOrgId(user) {
@@ -114,21 +114,21 @@ async function resolvePersonName(personId, fallback = '') {
 }
 
 function isAdminViewer(user) {
-  return Boolean(adminChekersService.isAdminForRequest(user, SECTIONS.SCHOOL_NOTIFICATIONS, OPERATIONS.READ_ALL, {
+  return Boolean(adminChekersService.isAdminForRequest(user, SECTIONS.SCHOOL_TASKS, OPERATIONS.READ_ALL, {
     orgId: getActiveOrgId(user),
-    section: { id: SECTIONS.SCHOOL_NOTIFICATIONS, category: 'SCHOOL' }
+    section: { id: SECTIONS.SCHOOL_TASKS, category: 'SCHOOL' }
   }));
 }
 
-function canManageNotificationWorkflow(user, notification) {
+function canManageTaskWorkflow(user, task) {
   if (isAdminViewer(user)) return true;
-  if (isAssignedToActor(notification, user)) return true;
-  const assignedRole = cleanString(notification?.assignedRole, 120).toLowerCase();
+  if (isAssignedToActor(task, user)) return true;
+  const assignedRole = cleanString(task?.assignedRole, 120).toLowerCase();
   return Boolean(assignedRole && getActorOrgRoleTokens(user).has(assignedRole));
 }
 
-function assertNotificationWorkflowOwner(user, notification, action = 'manage this notification workflow') {
-  if (canManageNotificationWorkflow(user, notification)) return;
+function assertTaskWorkflowOwner(user, task, action = 'manage this task workflow') {
+  if (canManageTaskWorkflow(user, task)) return;
   const error = new Error(`You are not authorized to ${action}.`);
   error.statusCode = 403;
   throw error;
@@ -150,17 +150,17 @@ function assertAdminViewer(user, action = 'delete this item') {
   throw error;
 }
 
-function isAssignedToActor(notification, user) {
-  return idsEqual(notification?.assignedPersonId || '', getActorPersonId(user));
+function isAssignedToActor(task, user) {
+  return idsEqual(task?.assignedPersonId || '', getActorPersonId(user));
 }
 
 function isTaskAssignedToActor(task, user) {
   return idsEqual(task?.assignedPersonId || '', getActorPersonId(user));
 }
 
-function assertNotificationOwnership(user, notification, action = 'update this notification') {
+function assertTaskOwnership(user, task, action = 'update this task') {
   if (isAdminViewer(user)) return;
-  if (!notification || !isAssignedToActor(notification, user)) {
+  if (!task || !isAssignedToActor(task, user)) {
     const error = new Error(`You are not authorized to ${action}.`);
     error.statusCode = 403;
     throw error;
@@ -204,13 +204,13 @@ async function buildLifecycleEvent({
   const resolvedTargetPersonId = firstLifecyclePersonId(
     targetPersonId,
     safeSnapshot.targetPersonId,
-    safeSnapshot.taskAssignedPersonId,
+    safeSnapshot.assignmentAssignedPersonId,
     safeSnapshot.assignedPersonId,
     safeSnapshot.requesterPersonId
   );
   const resolvedTargetPersonName = await resolvePersonName(
     resolvedTargetPersonId,
-    targetPersonName || safeSnapshot.targetPersonName || safeSnapshot.taskAssignedPersonName || safeSnapshot.assignedPersonName || safeSnapshot.requesterName || resolvedTargetPersonId
+    targetPersonName || safeSnapshot.targetPersonName || safeSnapshot.assignmentAssignedPersonName || safeSnapshot.assignedPersonName || safeSnapshot.requesterName || resolvedTargetPersonId
   );
   const resolvedPersonId = firstLifecyclePersonId(personId, resolvedTargetPersonId, actorPersonId);
   const resolvedPersonName = await resolvePersonName(
@@ -236,7 +236,7 @@ async function buildLifecycleEvent({
   };
 }
 
-function buildNotificationSummary(row) {
+function buildTaskSummary(row) {
   return {
     id: toPublicId(row?.id),
     orgId: toPublicId(row?.orgId),
@@ -255,10 +255,10 @@ function buildNotificationSummary(row) {
 }
 
 function assertSameOrg(row, reqUser) {
-  if (!row) throw new Error('Notification was not found.');
+  if (!row) throw new Error('Task was not found.');
   const orgId = getActiveOrgId(reqUser);
   if (!orgId || idsEqual(row?.orgId, orgId)) return;
-  const error = new Error('Notification is outside the active organization.');
+  const error = new Error('Task is outside the active organization.');
   error.statusCode = 403;
   throw error;
 }
@@ -289,7 +289,7 @@ async function enrichLifecycleForDisplay(lifecycle = [], row = {}) {
     const targetPersonId = firstLifecyclePersonId(
       event?.targetPersonId,
       snapshot.targetPersonId,
-      snapshot.taskAssignedPersonId,
+      snapshot.assignmentAssignedPersonId,
       snapshot.assignedPersonId,
       taskContext?.assignedPersonId,
       row?.assignedPersonId,
@@ -300,7 +300,7 @@ async function enrichLifecycleForDisplay(lifecycle = [], row = {}) {
       targetPersonId,
       event?.targetPersonName
         || snapshot.targetPersonName
-        || snapshot.taskAssignedPersonName
+        || snapshot.assignmentAssignedPersonName
         || snapshot.assignedPersonName
         || taskContext?.assignedPersonName
         || row?.assignedPersonName
@@ -352,7 +352,7 @@ async function enrichTaskForDisplay(task = {}) {
   };
 }
 
-async function enrichNotificationForDisplay(row) {
+async function enrichTaskForDisplay(row) {
   if (!row || typeof row !== 'object') return row;
   const assignedPersonId = toPublicId(row.assignedPersonId || '');
   const next = {
@@ -436,7 +436,7 @@ function buildCompletedAssignmentHistoryEntry(task = {}, reassignedAt = new Date
   const previousPersonId = toPublicId(task.assignedPersonId || '');
   if (!previousPersonId) return null;
   return {
-    id: `SNTA-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+    id: `STAA-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
     assignedRole: cleanString(task.assignedRole, 120),
     assignedPersonId: previousPersonId,
     assignedPersonName: cleanString(task.assignedPersonName || previousPersonId, 160),
@@ -470,7 +470,7 @@ async function applyRoutingRule(input = {}, actorUser = null) {
   const explicitPersonId = toPublicId(input.assignedPersonId || '');
   if (explicitPersonId || sourceType !== 'leave_request') return input;
 
-  const rule = await notificationRoutingRuleService.getActiveRuleForSource({
+  const rule = await taskRoutingRuleService.getActiveRuleForSource({
     orgId: input.orgId || getActiveOrgId(actorUser),
     sourceType,
     reqUser: actorUser
@@ -492,43 +492,43 @@ async function applyRoutingRule(input = {}, actorUser = null) {
   };
 }
 
-async function getNotificationById(id, reqUser, options = {}) {
-  const row = await schoolRepositories.notifications.getById(id, options);
+async function getTaskById(id, reqUser, options = {}) {
+  const row = await schoolRepositories.tasks.getById(id, options);
   if (!row) return null;
   assertSameOrg(row, reqUser);
-  return enrichNotificationForDisplay(row);
+  return enrichTaskForDisplay(row);
 }
 
-async function deleteSourceNotification(input = {}, reqUser = null) {
+async function deleteSourceTask(input = {}, reqUser = null) {
   const orgId = toPublicId(input.orgId || getActiveOrgId(reqUser));
   const sourceType = cleanString(input.sourceType, 80).toLowerCase();
   const sourceId = toPublicId(input.sourceId || '');
   if (!reqUser) {
-    const error = new Error('Request user is required to delete source notifications.');
+    const error = new Error('Request user is required to delete source tasks.');
     error.statusCode = 403;
     throw error;
   }
-  assertAdminViewer(reqUser, 'remove source notification');
+  assertAdminViewer(reqUser, 'remove source task');
   if (!orgId || !sourceType || !sourceId) return false;
   const existing = await findBySource({ orgId, sourceType, sourceId });
   if (!existing) return false;
-  const row = await getNotificationById(existing.id, reqUser);
+  const row = await getTaskById(existing.id, reqUser);
   if (!row) return false;
-  const removed = await schoolRepositories.notifications.remove(existing.id, normalizeQueryScope(reqUser));
+  const removed = await schoolRepositories.tasks.remove(existing.id, normalizeQueryScope(reqUser));
   return removed !== false;
 }
 
-async function deleteNotification(reqUser, id) {
-  assertAdminViewer(reqUser, 'delete this notification');
-  const existing = await getNotificationById(id, reqUser);
+async function deleteTask(reqUser, id) {
+  assertAdminViewer(reqUser, 'delete this task');
+  const existing = await getTaskById(id, reqUser);
   if (!existing) {
-    const error = new Error('Notification was not found.');
+    const error = new Error('Task was not found.');
     error.statusCode = 404;
     throw error;
   }
-  const removed = await schoolRepositories.notifications.remove(existing.id, normalizeQueryScope(reqUser));
+  const removed = await schoolRepositories.tasks.remove(existing.id, normalizeQueryScope(reqUser));
   if (removed === false) {
-    const error = new Error('Notification could not be deleted.');
+    const error = new Error('Task could not be deleted.');
     error.statusCode = 404;
     throw error;
   }
@@ -538,7 +538,7 @@ async function deleteNotification(reqUser, id) {
   };
 }
 
-async function listVisibleNotifications(reqUser, filters = {}) {
+async function listVisibleTasks(reqUser, filters = {}) {
   const query = {};
   const status = cleanString(filters.status, 40).toLowerCase();
   if (status) query.status = status;
@@ -555,7 +555,7 @@ async function listVisibleNotifications(reqUser, filters = {}) {
   if (assignment === 'mine' && !currentPersonId) return [];
   if (assignment === 'mine' && currentPersonId) query.assignedPersonId = currentPersonId;
 
-  const rows = await schoolRepositories.notifications.list(normalizeQueryScope(reqUser, query));
+  const rows = await schoolRepositories.tasks.list(normalizeQueryScope(reqUser, query));
   const statusWeight = { open: 0, in_progress: 1, resolved: 2, dismissed: 3 };
   const sorted = (Array.isArray(rows) ? rows : [])
     .filter((row) => {
@@ -576,7 +576,7 @@ async function listVisibleNotifications(reqUser, filters = {}) {
       if (aWeight !== bWeight) return aWeight - bWeight;
       return String(b?.audit?.lastUpdateDateTime || b?.createdAt || '').localeCompare(String(a?.audit?.lastUpdateDateTime || a?.createdAt || ''));
     });
-  return Promise.all(sorted.map(enrichNotificationForDisplay));
+  return Promise.all(sorted.map(enrichTaskForDisplay));
 }
 
 async function findBySource({ orgId, sourceType, sourceId } = {}) {
@@ -586,7 +586,7 @@ async function findBySource({ orgId, sourceType, sourceId } = {}) {
   };
   const targetOrgId = toPublicId(orgId);
   if (!targetOrgId || !query.sourceType || !query.sourceId) return null;
-  const rows = await schoolRepositories.notifications.list({
+  const rows = await schoolRepositories.tasks.list({
     query,
     scope: { activeOrgId: targetOrgId },
     skipExecutor: true
@@ -607,7 +607,7 @@ async function buildDefaultReviewTask(input = {}) {
     now
   });
   return {
-    title: cleanString(input.taskTitle, 220) || 'Review notification',
+    title: cleanString(input.taskTitle, 220) || 'Review task',
     description: cleanString(input.taskDescription || input.message, 2000),
     status: startedTiming.status,
     assignedRole: assignment.assignedRole,
@@ -621,7 +621,7 @@ async function buildDefaultReviewTask(input = {}) {
   };
 }
 
-async function upsertSourceNotification(input = {}, actorUser = null) {
+async function upsertSourceTask(input = {}, actorUser = null) {
   const routedInput = await applyRoutingRule(input, actorUser);
   const orgId = toPublicId(routedInput.orgId || getActiveOrgId(actorUser));
   const sourceType = cleanString(routedInput.sourceType, 80).toLowerCase();
@@ -630,7 +630,7 @@ async function upsertSourceNotification(input = {}, actorUser = null) {
 
   const existing = await findBySource({ orgId, sourceType, sourceId });
   const now = new Date().toISOString();
-  const lifecycleAction = existing ? 'source_notification_reopened' : 'source_notification_created';
+  const lifecycleAction = existing ? 'source_task_reopened' : 'source_task_created';
   const nextStatus = OPEN_STATUSES.has(String(existing?.status || '').toLowerCase()) ? (existing.status || 'open') : 'open';
   const base = existing || {};
   const baseTasks = Array.isArray(base.tasks) ? base.tasks : [];
@@ -645,7 +645,7 @@ async function upsertSourceNotification(input = {}, actorUser = null) {
     sourceType,
     sourceId,
     sourceUrl: cleanString(routedInput.sourceUrl, 500),
-    title: cleanString(routedInput.title, 220) || base.title || 'School notification',
+    title: cleanString(routedInput.title, 220) || base.title || 'School task',
     message: cleanString(routedInput.message, 5000) || base.message || '',
     severity: cleanString(routedInput.severity, 40).toLowerCase() || base.severity || 'info',
     status: nextStatus,
@@ -680,16 +680,16 @@ async function upsertSourceNotification(input = {}, actorUser = null) {
       note: cleanString(routedInput.note || '', 1000),
       targetPersonId: assignment.assignedPersonId || routedInput?.metadata?.requesterPersonId,
       targetPersonName: assignment.assignedPersonName || routedInput?.metadata?.requesterName,
-      snapshot: buildNotificationSummary(next)
+      snapshot: buildTaskSummary(next)
     })
   ];
 
-  if (existing) return schoolRepositories.notifications.update(existing.id, next, normalizeQueryScope(actorUser));
+  if (existing) return schoolRepositories.tasks.update(existing.id, next, normalizeQueryScope(actorUser));
   next.audit.createdBy = getActorId(actorUser);
-  return schoolRepositories.notifications.create(next, normalizeQueryScope(actorUser));
+  return schoolRepositories.tasks.create(next, normalizeQueryScope(actorUser));
 }
 
-async function resolveSourceNotification(input = {}, actorUser = null) {
+async function resolveSourceTask(input = {}, actorUser = null) {
   const orgId = toPublicId(input.orgId || getActiveOrgId(actorUser));
   const sourceType = cleanString(input.sourceType, 80).toLowerCase();
   const sourceId = toPublicId(input.sourceId || '');
@@ -726,22 +726,22 @@ async function resolveSourceNotification(input = {}, actorUser = null) {
     lifecycle: [
       ...(Array.isArray(existing.lifecycle) ? existing.lifecycle : []),
       await buildLifecycleEvent({
-        action: cleanString(input.action || 'source_notification_resolved', 80),
+        action: cleanString(input.action || 'source_task_resolved', 80),
         actorUser,
         oldStatus,
         newStatus: nextStatus,
         note: cleanString(input.note || '', 1000),
         targetPersonId: existing.assignedPersonId || existing?.metadata?.requesterPersonId,
         targetPersonName: existing.assignedPersonName || existing?.metadata?.requesterName,
-        snapshot: buildNotificationSummary({ ...existing, status: nextStatus })
+        snapshot: buildTaskSummary({ ...existing, status: nextStatus })
       })
     ]
   };
 
-  return schoolRepositories.notifications.update(existing.id, next, normalizeQueryScope(actorUser));
+  return schoolRepositories.tasks.update(existing.id, next, normalizeQueryScope(actorUser));
 }
 
-async function upsertLeaveRequestNotification(leaveRequest = {}, actorUser = null, options = {}) {
+async function upsertLeaveRequestTask(leaveRequest = {}, actorUser = null, options = {}) {
   const id = toPublicId(leaveRequest?.id);
   if (!id) return null;
   const requesterPersonId = toPublicId(leaveRequest.requesterPersonId || '');
@@ -749,7 +749,7 @@ async function upsertLeaveRequestNotification(leaveRequest = {}, actorUser = nul
     fallback: cleanString(leaveRequest.requesterName || requesterPersonId || 'Requester', 160)
   }) || 'Requester';
   const status = cleanString(leaveRequest.status, 40).replace(/_/g, ' ') || 'submitted';
-  return upsertSourceNotification({
+  return upsertSourceTask({
     orgId: leaveRequest.orgId,
     sourceType: 'leave_request',
     sourceId: id,
@@ -769,10 +769,10 @@ async function upsertLeaveRequestNotification(leaveRequest = {}, actorUser = nul
   }, actorUser);
 }
 
-async function resolveLeaveRequestNotification(leaveRequest = {}, actorUser = null, options = {}) {
+async function resolveLeaveRequestTask(leaveRequest = {}, actorUser = null, options = {}) {
   const id = toPublicId(leaveRequest?.id);
   if (!id) return null;
-  return resolveSourceNotification({
+  return resolveSourceTask({
     orgId: leaveRequest.orgId,
     sourceType: 'leave_request',
     sourceId: id,
@@ -782,10 +782,10 @@ async function resolveLeaveRequestNotification(leaveRequest = {}, actorUser = nu
   }, actorUser);
 }
 
-async function updateNotificationStatus(reqUser, id, input = {}) {
-  const existing = await getNotificationById(id, reqUser);
-  if (!existing) throw new Error('Notification was not found.');
-  assertNotificationOwnership(reqUser, existing, 'change this notification status');
+async function updateTaskStatus(reqUser, id, input = {}) {
+  const existing = await getTaskById(id, reqUser);
+  if (!existing) throw new Error('Task was not found.');
+  assertTaskOwnership(reqUser, existing, 'change this task status');
   const nextStatus = normalizeStatus(input.status, existing.status || 'open');
   const now = new Date().toISOString();
   const next = {
@@ -802,30 +802,30 @@ async function updateNotificationStatus(reqUser, id, input = {}) {
     lifecycle: [
       ...(Array.isArray(existing.lifecycle) ? existing.lifecycle : []),
       await buildLifecycleEvent({
-        action: `notification_${nextStatus}`,
+        action: `task_${nextStatus}`,
         actorUser: reqUser,
         oldStatus: existing.status,
         newStatus: nextStatus,
         note: cleanString(input.note, 1000),
         targetPersonId: existing.assignedPersonId || existing?.metadata?.requesterPersonId,
         targetPersonName: existing.assignedPersonName || existing?.metadata?.requesterName,
-        snapshot: buildNotificationSummary({ ...existing, status: nextStatus })
+        snapshot: buildTaskSummary({ ...existing, status: nextStatus })
       })
     ]
   };
-  return schoolRepositories.notifications.update(id, next, normalizeQueryScope(reqUser));
+  return schoolRepositories.tasks.update(id, next, normalizeQueryScope(reqUser));
 }
 
-async function reassignNotification(reqUser, id, input = {}) {
-  const existing = await getNotificationById(id, reqUser);
-  if (!existing) throw new Error('Notification was not found.');
-  assertNotificationOwnership(reqUser, existing, 'reassign this notification');
+async function reassignTask(reqUser, id, input = {}) {
+  const existing = await getTaskById(id, reqUser);
+  if (!existing) throw new Error('Task was not found.');
+  assertTaskOwnership(reqUser, existing, 'reassign this task');
   const assignment = await resolveAssignmentInput(input);
   const now = new Date().toISOString();
   const nextAssignedPersonId = assignment.assignedPersonId;
   const previousAssignedPersonId = toPublicId(existing.assignedPersonId || '');
   const shouldAutoStart = !!nextAssignedPersonId && !idsEqual(nextAssignedPersonId, previousAssignedPersonId);
-  const tasks = notificationModel.sanitizeTasks(Array.isArray(existing.tasks) ? existing.tasks : [], { existingTasks: existing.tasks || [] }).map((task) => {
+  const tasks = taskModel.sanitizeTasks(Array.isArray(existing.tasks) ? existing.tasks : [], { existingTasks: existing.tasks || [] }).map((task) => {
     if (task.assignedPersonId === nextAssignedPersonId) return task;
     const nextStatus = shouldAutoStart && ['open', ''].includes(String(task.status || '').toLowerCase())
       ? 'in_progress'
@@ -854,14 +854,14 @@ async function reassignNotification(reqUser, id, input = {}) {
     lifecycle: [
       ...(Array.isArray(existing.lifecycle) ? existing.lifecycle : []),
       await buildLifecycleEvent({
-        action: 'notification_reassigned',
+        action: 'task_reassigned',
         actorUser: reqUser,
         oldStatus: existing.status,
         newStatus: existing.status,
-        note: assignment.assignedPersonId ? `Assigned to ${assignment.assignedPersonName || assignment.assignedPersonId}.` : 'Notification was unassigned.',
+        note: assignment.assignedPersonId ? `Assigned to ${assignment.assignedPersonName || assignment.assignedPersonId}.` : 'Task was unassigned.',
         targetPersonId: assignment.assignedPersonId || previousAssignedPersonId || existing?.metadata?.requesterPersonId,
         targetPersonName: assignment.assignedPersonName || existing.assignedPersonName || existing?.metadata?.requesterName,
-        snapshot: buildNotificationSummary({
+        snapshot: buildTaskSummary({
           ...existing,
           assignedRole: assignment.assignedRole,
           assignedPersonId: assignment.assignedPersonId,
@@ -870,13 +870,13 @@ async function reassignNotification(reqUser, id, input = {}) {
       })
     ]
   };
-  return schoolRepositories.notifications.update(id, next, normalizeQueryScope(reqUser));
+  return schoolRepositories.tasks.update(id, next, normalizeQueryScope(reqUser));
 }
 
-async function addNotificationTask(reqUser, id, input = {}) {
-  const existing = await getNotificationById(id, reqUser);
-  if (!existing) throw new Error('Notification was not found.');
-  assertNotificationWorkflowOwner(reqUser, existing, 'assign tasks for this notification');
+async function addTaskAssignment(reqUser, id, input = {}) {
+  const existing = await getTaskById(id, reqUser);
+  if (!existing) throw new Error('Task was not found.');
+  assertTaskWorkflowOwner(reqUser, existing, 'assign assignments for this task');
   const assignment = await resolveAssignmentInput(input);
   assertTaskAssigneeSelected(assignment);
   const now = new Date().toISOString();
@@ -889,7 +889,7 @@ async function addNotificationTask(reqUser, id, input = {}) {
     status: assignment.assignedPersonId ? 'in_progress' : 'open',
     now
   });
-  const tasks = notificationModel.sanitizeTasks([
+  const tasks = taskModel.sanitizeTasks([
     ...(Array.isArray(existing.tasks) ? existing.tasks : []),
     {
       title: input.title,
@@ -918,7 +918,7 @@ async function addNotificationTask(reqUser, id, input = {}) {
     lifecycle: [
       ...(Array.isArray(existing.lifecycle) ? existing.lifecycle : []),
       await buildLifecycleEvent({
-        action: 'task_added',
+        action: 'assignment_added',
         actorUser: reqUser,
         oldStatus: existing.status,
         newStatus: existing.status === 'open' ? 'in_progress' : existing.status,
@@ -926,20 +926,20 @@ async function addNotificationTask(reqUser, id, input = {}) {
         targetPersonId: assignment.assignedPersonId,
         targetPersonName: assignment.assignedPersonName,
         snapshot: {
-          ...buildNotificationSummary(existing),
-          taskAssignedPersonId: assignment.assignedPersonId,
-          taskAssignedPersonName: assignment.assignedPersonName
+          ...buildTaskSummary(existing),
+          assignmentAssignedPersonId: assignment.assignedPersonId,
+          assignmentAssignedPersonName: assignment.assignedPersonName
         }
       })
     ]
   };
-  return schoolRepositories.notifications.update(id, next, normalizeQueryScope(reqUser));
+  return schoolRepositories.tasks.update(id, next, normalizeQueryScope(reqUser));
 }
 
-async function updateNotificationTask(reqUser, id, taskId, input = {}) {
-  const existing = await getNotificationById(id, reqUser);
-  if (!existing) throw new Error('Notification was not found.');
-  const canManageWorkflow = canManageNotificationWorkflow(reqUser, existing);
+async function updateTaskAssignment(reqUser, id, taskId, input = {}) {
+  const existing = await getTaskById(id, reqUser);
+  if (!existing) throw new Error('Task was not found.');
+  const canManageWorkflow = canManageTaskWorkflow(reqUser, existing);
   const targetTaskId = toPublicId(taskId);
   const now = new Date().toISOString();
   const rejectTaskWorkflowChange = (message, statusCode = 400) => {
@@ -1055,7 +1055,7 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
     lifecyclePreviousAssignedPersonName = taskCopy.assignedPersonName || previousAssignedPersonId;
     tasks.push(updated);
     }
-  if (!found) throw new Error('Notification task was not found.');
+  if (!found) throw new Error('Task assignment was not found.');
 
   const hasOpenTask = tasks.some((task) => ['open', 'in_progress'].includes(normalizeTaskStatus(task?.status, 'open')));
   const nextStatus = hasOpenTask && existing.status === 'open' ? 'in_progress' : existing.status;
@@ -1071,7 +1071,7 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
     lifecycle: [
       ...(Array.isArray(existing.lifecycle) ? existing.lifecycle : []),
       await buildLifecycleEvent({
-        action: 'task_updated',
+        action: 'assignment_updated',
         actorUser: reqUser,
         oldStatus: existing.status,
         newStatus: nextStatus,
@@ -1080,15 +1080,15 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
         targetPersonName: lifecycleTargetPersonName,
         snapshot: {
           taskId: targetTaskId,
-          taskAssignedPersonId: lifecycleTargetPersonId,
-          taskAssignedPersonName: lifecycleTargetPersonName,
+          assignmentAssignedPersonId: lifecycleTargetPersonId,
+          assignmentAssignedPersonName: lifecycleTargetPersonName,
           previousAssignedPersonId: lifecyclePreviousAssignedPersonId,
           previousAssignedPersonName: lifecyclePreviousAssignedPersonName
         }
       })
     ]
   };
-  return schoolRepositories.notifications.update(id, next, normalizeQueryScope(reqUser));
+  return schoolRepositories.tasks.update(id, next, normalizeQueryScope(reqUser));
 }
 
 module.exports = {
@@ -1098,22 +1098,22 @@ module.exports = {
   getActorId,
   getActorName,
   isAdminViewer,
-  canManageNotificationWorkflow,
-  listVisibleNotifications,
-  getNotificationById,
-  upsertSourceNotification,
-  resolveSourceNotification,
-  upsertLeaveRequestNotification,
-  resolveLeaveRequestNotification,
-  deleteSourceNotification,
-  deleteNotification,
-  updateNotificationStatus,
-  reassignNotification,
-  addNotificationTask,
-  updateNotificationTask,
+  canManageTaskWorkflow,
+  listVisibleTasks,
+  getTaskById,
+  upsertSourceTask,
+  resolveSourceTask,
+  upsertLeaveRequestTask,
+  resolveLeaveRequestTask,
+  deleteSourceTask,
+  deleteTask,
+  updateTaskStatus,
+  reassignTask,
+  addTaskAssignment,
+  updateTaskAssignment,
   _private: {
     buildLifecycleEvent,
-    buildNotificationSummary,
+    buildTaskSummary,
     enrichLifecycleForDisplay,
     findBySource,
     applyRoutingRule,

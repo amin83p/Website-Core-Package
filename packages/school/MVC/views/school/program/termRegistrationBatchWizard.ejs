@@ -266,7 +266,7 @@
   const showWait = (l) => { if (typeof showLoading === 'function') showLoading(l || 'Working...'); };
   const hideWait = () => { if (typeof hideLoading === 'function') hideLoading(); };
 
-  async function readJsonResponse(response, fallbackMessage) {
+  async function readJsonResponse(response, fallbackMessage, options = {}) {
     const raw = await response.text();
     let data = null;
     try {
@@ -285,7 +285,11 @@
         return { status: 'busy', _guardStop: true };
       }
     }
-    if (!response.ok || data?.status === 'error') {
+    const allowBusinessErrorPreview = options.allowBusinessErrorPreview === true
+      && data
+      && data.preview
+      && typeof data.preview === 'object';
+    if (!response.ok || (data?.status === 'error' && !allowBusinessErrorPreview)) {
       throw new Error(String(data?.message || fallbackMessage || 'Request failed.'));
     }
     return data || {};
@@ -393,6 +397,58 @@
     return Array.from(new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean)));
   }
 
+  function buildPreviewIssueGroups(preview) {
+    const groups = [];
+    const aggregateIssues = dedupeStrings(Array.isArray(preview?.aggregateIssues) ? preview.aggregateIssues : []);
+    const effectiveDateIssue = String(preview?.effectiveDateIssue || '').trim();
+    if (effectiveDateIssue) {
+      groups.push({
+        label: 'Effective Date',
+        meta: '',
+        issues: [effectiveDateIssue],
+        warnings: []
+      });
+    }
+    if (aggregateIssues.length) {
+      groups.push({
+        label: 'Course Capacity / Selection',
+        meta: '',
+        issues: aggregateIssues,
+        warnings: []
+      });
+    }
+    (Array.isArray(preview?.rows) ? preview.rows : []).forEach((row) => {
+      const issues = dedupeStrings(Array.isArray(row?.issues) ? row.issues : []);
+      const warnings = dedupeStrings(Array.isArray(row?.warnings) ? row.warnings : []);
+      if (!issues.length && !warnings.length) return;
+      groups.push({
+        label: String(row?.studentName || row?.studentId || row?.programRegistrationId || 'Student').trim(),
+        meta: [row?.studentId, row?.programRegistrationId].map((value) => String(value || '').trim()).filter(Boolean).join(' | '),
+        issues,
+        warnings
+      });
+    });
+    return groups;
+  }
+
+  function summarizePreviewIssues(preview) {
+    const rows = Array.isArray(preview?.rows) ? preview.rows : [];
+    const blockedStudents = rows.filter((row) => String(row?.status || '').toLowerCase() === 'error').length;
+    const warningStudents = rows.filter((row) => String(row?.status || '').toLowerCase() === 'warning').length;
+    const groups = buildPreviewIssueGroups(preview);
+    const totalIssues = groups.reduce((sum, group) => sum + group.issues.length, 0);
+    const totalWarnings = groups.reduce((sum, group) => sum + group.warnings.length, 0);
+    const courseIssues = Array.isArray(preview?.aggregateIssues) ? preview.aggregateIssues.length : 0;
+    return {
+      blockedStudents,
+      warningStudents,
+      courseIssues,
+      totalIssues,
+      totalWarnings,
+      groups
+    };
+  }
+
   function resetClassGate(summaryText) {
     state.classGate.status = 'idle';
     state.classGate.checkedSignature = '';
@@ -402,31 +458,8 @@
   }
 
   function collectClassGateIssues(preview) {
-    const issues = [];
-    if (String(preview?.effectiveDateIssue || '').trim()) {
-      issues.push(String(preview.effectiveDateIssue).trim());
-    }
-    if (Array.isArray(preview?.aggregateIssues)) {
-      preview.aggregateIssues.forEach((issue) => {
-        const clean = String(issue || '').trim();
-        if (clean) issues.push(clean);
-      });
-    }
-    (Array.isArray(preview?.rows) ? preview.rows : []).forEach((row) => {
-      if (String(row?.status || '').toLowerCase() !== 'error') return;
-      const studentLabel = String(row?.studentName || row?.studentId || row?.programRegistrationId || 'Student').trim();
-      const rowIssues = Array.isArray(row?.issues) ? row.issues : [];
-      if (!rowIssues.length) {
-        issues.push(studentLabel + ': validation failed.');
-        return;
-      }
-      rowIssues.forEach((issue) => {
-        const clean = String(issue || '').trim();
-        if (!clean) return;
-        issues.push(studentLabel + ': ' + clean);
-      });
-    });
-    return dedupeStrings(issues);
+    const summary = summarizePreviewIssues(preview);
+    return dedupeStrings(summary.groups.flatMap((group) => group.issues.map((issue) => group.label + ': ' + issue)));
   }
 
   function renderClassGate() {
@@ -471,7 +504,31 @@
       badge.textContent = 'Blocked';
       summary.textContent = state.classGate.summary || 'Fix the issues below before moving to Step 5.';
       box.classList.add('is-error');
-      errors.innerHTML = '<ul class="mb-0 ps-3">' + state.classGate.issues.map((issue) => '<li class="small text-danger">' + esc(issue) + '</li>').join('') + '</ul>';
+      const previewSummary = summarizePreviewIssues(state.preview);
+      const groups = previewSummary.groups.length
+        ? previewSummary.groups
+        : [{ label: 'Request', meta: '', issues: state.classGate.issues, warnings: [] }];
+      errors.innerHTML = [
+        '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">',
+        '<div class="small text-muted">After fixing the listed items, run the eligibility check again to refresh this result.</div>',
+        '<button type="button" class="btn btn-outline-primary btn-sm" data-run-step4-eligibility-again><i class="bi bi-arrow-repeat me-1"></i>Run Eligibility Check Again</button>',
+        '</div>',
+        '<div class="d-flex flex-wrap gap-2 mb-2">',
+        '<span class="badge bg-danger">' + esc(previewSummary.blockedStudents || 0) + ' student(s) blocked</span>',
+        '<span class="badge bg-warning text-dark">' + esc(previewSummary.warningStudents || 0) + ' warning row(s)</span>',
+        '<span class="badge bg-secondary">' + esc(previewSummary.courseIssues || 0) + ' course issue(s)</span>',
+        '<span class="badge bg-light text-dark border">' + esc(previewSummary.totalIssues || state.classGate.issues.length) + ' total issue(s)</span>',
+        '</div>',
+        groups.map((group) => [
+          '<div class="border rounded bg-white p-2 mb-2">',
+          '<div class="fw-bold">' + esc(group.label) + '</div>',
+          group.meta ? '<div class="small text-muted mb-1">' + esc(group.meta) + '</div>' : '',
+          group.issues.length ? '<ul class="mb-1 ps-3">' + group.issues.map((issue) => '<li class="small text-danger">' + esc(issue) + '</li>').join('') + '</ul>' : '',
+          group.warnings.length ? '<ul class="mb-0 ps-3">' + group.warnings.map((warning) => '<li class="small text-warning-emphasis">' + esc(warning) + '</li>').join('') + '</ul>' : '',
+          '</div>'
+        ].join('')).join('')
+      ].join('');
+      errors.querySelector('[data-run-step4-eligibility-again]')?.addEventListener('click', runStep4EligibilityCheck);
       return;
     }
     badge.textContent = 'Passed';
@@ -499,16 +556,17 @@
         credentials: 'same-origin',
         body: payload().toString()
       });
-      const result = await readJsonResponse(response, 'Eligibility validation failed.');
+      const result = await readJsonResponse(response, 'Eligibility validation failed.', { allowBusinessErrorPreview: true });
       if (result?._guardStop) return;
       const preview = result.preview || null;
       const issues = collectClassGateIssues(preview);
+      const previewSummary = summarizePreviewIssues(preview);
 
       state.classGate.checkedSignature = buildClassGateSignature();
       state.classGate.issues = issues;
       state.classGate.status = issues.length ? 'error' : 'ok';
       state.classGate.summary = issues.length
-        ? ('Resolve ' + issues.length + ' issue(s) before moving to Step 5.')
+        ? ([previewSummary.blockedStudents + ' student(s) blocked', previewSummary.courseIssues + ' course issue(s)', issues.length + ' total issue(s)'].join(' | '))
         : ('Eligibility check passed for ' + state.selectedStudents.length + ' student(s) across ' + state.selectedClasses.length + ' class(es).');
       state.preview = preview;
       renderClassGate();
@@ -516,6 +574,7 @@
     } catch (error) {
       state.classGate.checkedSignature = buildClassGateSignature();
       state.classGate.status = 'error';
+      state.preview = null;
       state.classGate.issues = [String(error?.message || 'Eligibility validation failed.')];
       state.classGate.summary = 'Validation failed. Fix request errors and retry.';
       renderClassGate();
@@ -803,7 +862,7 @@
         credentials: 'same-origin',
         body: payload().toString()
       });
-      const result = await readJsonResponse(response, 'Preview failed.');
+      const result = await readJsonResponse(response, 'Preview failed.', { allowBusinessErrorPreview: true });
       if (result?._guardStop) return;
 
       state.preview = result.preview || null;
@@ -811,8 +870,8 @@
       hideWait();
       return showMsg({
         title: 'Preview Ready',
-        message: 'Ready: ' + Number(state.preview?.summary?.readyRows || 0) + ' / ' + Number(state.preview?.summary?.totalRows || 0),
-        type: result.status === 'warning' ? 'warning' : 'success'
+        message: 'Ready: ' + Number(state.preview?.summary?.readyRows || 0) + ' / ' + Number(state.preview?.summary?.totalRows || 0) + (Number(state.preview?.summary?.errorRows || 0) ? '. Review blocked rows in the table.' : ''),
+        type: result.status === 'error' ? 'error' : (result.status === 'warning' ? 'warning' : 'success')
       });
     } catch (error) {
       state.preview = null;

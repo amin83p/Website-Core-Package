@@ -1,0 +1,49 @@
+const express = require('express');
+const router = express.Router();
+const ctrl = require('../controllers/school/schoolIdentityController');
+const {
+  requireAuth,
+  requireAccess,
+  requireAccessAny,
+  trackActionState,
+  SECTIONS,
+  OPERATIONS
+} = require('./schoolRouteDependencies');
+
+const SCHOOL_IDENTITY_READ_SECTIONS = [
+  SECTIONS.SCHOOL,
+  SECTIONS.SCHOOL_SESSIONS,
+  SECTIONS.SCHOOL_TASKS,
+  SECTIONS.SCHOOL_ACTIVITIES,
+  SECTIONS.SCHOOL_SCHEDULES,
+  SECTIONS.SCHOOL_ATTENDANCES,
+  SECTIONS.SCHOOL_TIMESHEETS,
+  SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT,
+  SECTIONS.SCHOOL_STUDENTS,
+  SECTIONS.SCHOOL_TEACHERS,
+  SECTIONS.SCHOOL_STAFF
+].filter(Boolean);
+
+router.use(requireAuth);
+
+router.get('/api/persons',
+  requireAccessAny(SCHOOL_IDENTITY_READ_SECTIONS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL || SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.listSchoolPersons);
+
+router.get('/api/users',
+  requireAccessAny(SCHOOL_IDENTITY_READ_SECTIONS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL || SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.listSchoolUsers);
+
+router.get('/api/taggable-users',
+  requireAccessAny([
+    SECTIONS.SCHOOL_SESSIONS,
+    SECTIONS.SCHOOL_ATTENDANCES,
+    SECTIONS.SCHOOL_TASKS,
+    SECTIONS.SCHOOL_ACTIVITIES
+  ].filter(Boolean), OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.listTaggableUsers);
+
+module.exports = router;

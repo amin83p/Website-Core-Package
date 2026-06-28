@@ -442,7 +442,11 @@ document.addEventListener('DOMContentLoaded', () => {
             teacher: () => GenericPickerPresets.teacher({ title: 'Select Teacher', context }),
             student: () => GenericPickerPresets.student({ title: 'Select Student', context }),
             staff: () => GenericPickerPresets.staff({ title: 'Select Staff', context }),
-            person: () => GenericPickerPresets.person({ title: 'Select Person', context })
+            person: () => GenericPickerPresets.person({
+                title: 'Select Person',
+                apiEndpoint: '/school/identity/api/persons',
+                context
+            })
         };
 
         const configBuilder = configFactory[selectedType] || configFactory.person;

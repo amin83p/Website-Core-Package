@@ -5,17 +5,17 @@ const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
-const dataPath = path.join(resolveCoreRoot(), 'data/school/notifications.json');
+const dataPath = path.join(resolveCoreRoot(), 'data/school/tasks.json');
 
 fsSync.mkdirSync(path.dirname(dataPath), { recursive: true });
 if (!fsSync.existsSync(dataPath)) {
   fsSync.writeFileSync(dataPath, '[]');
 }
 
-const NOTIFICATION_STATUSES = Object.freeze(['open', 'in_progress', 'resolved', 'dismissed']);
-const NOTIFICATION_SEVERITIES = Object.freeze(['info', 'warning', 'urgent', 'error']);
-const NOTIFICATION_SOURCE_TYPES = Object.freeze(['leave_request', 'student_session_case', 'timesheet', 'manual']);
-const NOTIFICATION_TASK_STATUSES = Object.freeze(['open', 'in_progress', 'done', 'cancelled']);
+const TASK_STATUSES = Object.freeze(['open', 'in_progress', 'resolved', 'dismissed']);
+const TASK_SEVERITIES = Object.freeze(['info', 'warning', 'urgent', 'error']);
+const TASK_SOURCE_TYPES = Object.freeze(['leave_request', 'student_session_case', 'timesheet', 'manual']);
+const TASK_ASSIGNMENT_STATUSES = Object.freeze(['open', 'in_progress', 'done', 'cancelled']);
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -61,35 +61,35 @@ function normalizeEnum(value, allowed, fallback) {
 }
 
 function normalizeStatus(value, fallback = 'open') {
-  return normalizeEnum(value, NOTIFICATION_STATUSES, fallback);
+  return normalizeEnum(value, TASK_STATUSES, fallback);
 }
 
 function normalizeSeverity(value, fallback = 'info') {
-  return normalizeEnum(value, NOTIFICATION_SEVERITIES, fallback);
+  return normalizeEnum(value, TASK_SEVERITIES, fallback);
 }
 
 function normalizeSourceType(value, fallback = 'manual') {
-  return normalizeEnum(value, NOTIFICATION_SOURCE_TYPES, fallback);
+  return normalizeEnum(value, TASK_SOURCE_TYPES, fallback);
 }
 
 function normalizeTaskStatus(value, fallback = 'open') {
-  return normalizeEnum(value, NOTIFICATION_TASK_STATUSES, fallback);
+  return normalizeEnum(value, TASK_ASSIGNMENT_STATUSES, fallback);
 }
 
-function generateNotificationId(existingIds = new Set()) {
+function generateTaskAssignmentId(existingIds = new Set()) {
   for (let i = 0; i < 50; i++) {
-    const candidate = `SN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const candidate = `ST-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     if (!existingIds.has(candidate)) return candidate;
   }
-  return `SN-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  return `ST-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
-function generateTaskId(existingIds = new Set()) {
+function generateTaskAssignmentId(existingIds = new Set()) {
   for (let i = 0; i < 50; i++) {
-    const candidate = `SNT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const candidate = `STA-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     if (!existingIds.has(candidate)) return candidate;
   }
-  return `SNT-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  return `STA-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
 function sanitizeLifecycleEvents(events) {
@@ -116,7 +116,7 @@ function sanitizeLifecycleEvents(events) {
 function sanitizeTaskAssignmentHistory(history) {
   return (Array.isArray(history) ? history : [])
     .map((entry) => ({
-      id: cleanId(entry?.id, { max: 120, allowEmpty: true }) || `SNTA-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      id: cleanId(entry?.id, { max: 120, allowEmpty: true }) || `STAA-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
       assignedRole: cleanString(entry?.assignedRole, { max: 120, allowEmpty: true }),
       assignedPersonId: cleanId(entry?.assignedPersonId, { max: 120, allowEmpty: true }) || '',
       assignedPersonName: cleanString(entry?.assignedPersonName, { max: 160, allowEmpty: true }),
@@ -134,11 +134,11 @@ function sanitizeTasks(tasks, { existingTasks = [] } = {}) {
   const existingIds = new Set((existingTasks || []).map((task) => cleanString(task?.id, { max: 120, allowEmpty: true })).filter(Boolean));
   return (Array.isArray(tasks) ? tasks : [])
     .map((task) => {
-      const id = cleanId(task?.id, { max: 120, allowEmpty: true }) || generateTaskId(existingIds);
+      const id = cleanId(task?.id, { max: 120, allowEmpty: true }) || generateTaskAssignmentId(existingIds);
       existingIds.add(id);
       return {
         id,
-        title: cleanString(task?.title, { max: 220, allowEmpty: true }) || 'Review notification',
+        title: cleanString(task?.title, { max: 220, allowEmpty: true }) || 'Review task assignment',
         description: cleanString(task?.description, { max: 2000, allowEmpty: true }),
         status: normalizeTaskStatus(task?.status, 'open'),
         assignedRole: cleanString(task?.assignedRole, { max: 120, allowEmpty: true }),
@@ -157,8 +157,8 @@ function sanitizeTasks(tasks, { existingTasks = [] } = {}) {
     });
 }
 
-function sanitizeNotificationInput(input, { isUpdate = false, existing = null } = {}) {
-  if (!isPlainObject(input)) throw new Error('Invalid notification payload.');
+function sanitizeTaskInput(input, { isUpdate = false, existing = null } = {}) {
+  if (!isPlainObject(input)) throw new Error('Invalid task payload.');
 
   const out = {
     orgId: cleanId(input.orgId, { max: 120, allowEmpty: isUpdate }) || '',
@@ -185,14 +185,14 @@ function sanitizeNotificationInput(input, { isUpdate = false, existing = null } 
 
   if (!isUpdate) {
     if (!out.orgId) throw new Error('Organization is required.');
-    if (!out.title) throw new Error('Notification title is required.');
+    if (!out.title) throw new Error('Task title is required.');
   }
 
   if (input.id) out.id = cleanId(input.id, { max: 120, allowEmpty: false });
   return out;
 }
 
-async function getAllNotifications() {
+async function getAllTasks() {
   try {
     const data = await fs.readFile(dataPath, 'utf8');
     const trimmed = String(data || '').trim();
@@ -202,10 +202,10 @@ async function getAllNotifications() {
   } catch (error) {
     if (error.code === 'ENOENT') return [];
     if (error instanceof SyntaxError) {
-      console.error('School notification JSON parse error:', error.message);
+      console.error('School task JSON parse error:', error.message);
       return [];
     }
-    throw new Error('Failed to retrieve school notifications.');
+    throw new Error('Failed to retrieve school tasks.');
   }
 }
 
@@ -214,19 +214,19 @@ async function saveAll(rows) {
   await queueWrite(async () => fs.writeFile(dataPath, payload));
 }
 
-async function getNotificationById(id) {
-  const all = await getAllNotifications();
+async function getTaskById(id) {
+  const all = await getAllTasks();
   return all.find((row) => idsEqual(row?.id, id)) || null;
 }
 
-async function addNotification(input) {
-  const all = await getAllNotifications();
+async function addTask(input) {
+  const all = await getAllTasks();
   const existingIds = new Set(all.map((row) => cleanString(row?.id, { max: 120, allowEmpty: true })).filter(Boolean));
-  const sanitized = sanitizeNotificationInput(input, { isUpdate: false });
+  const sanitized = sanitizeTaskInput(input, { isUpdate: false });
   const now = new Date().toISOString();
   const row = {
     ...sanitized,
-    id: sanitized.id || generateNotificationId(existingIds),
+    id: sanitized.id || generateTaskAssignmentId(existingIds),
     audit: {
       createDateTime: now,
       lastUpdateDateTime: now,
@@ -239,12 +239,12 @@ async function addNotification(input) {
   return row;
 }
 
-async function updateNotification(id, input) {
-  const all = await getAllNotifications();
+async function updateTask(id, input) {
+  const all = await getAllTasks();
   const idx = all.findIndex((row) => idsEqual(row?.id, id));
   if (idx === -1) return null;
   const existing = all[idx];
-  const sanitized = sanitizeNotificationInput(input, { isUpdate: true, existing });
+  const sanitized = sanitizeTaskInput(input, { isUpdate: true, existing });
   const merged = {
     ...existing,
     ...Object.fromEntries(Object.entries(sanitized).filter(([, value]) => value !== null && value !== undefined)),
@@ -263,8 +263,8 @@ async function updateNotification(id, input) {
   return merged;
 }
 
-async function deleteNotification(id) {
-  const all = await getAllNotifications();
+async function deleteTask(id) {
+  const all = await getAllTasks();
   const before = all.length;
   const kept = all.filter((row) => !idsEqual(row?.id, id));
   if (kept.length === before) return false;
@@ -272,8 +272,8 @@ async function deleteNotification(id) {
   return true;
 }
 
-async function clearNotificationsByOrg(orgId) {
-  const all = await getAllNotifications();
+async function clearTasksByOrg(orgId) {
+  const all = await getAllTasks();
   const kept = all.filter((row) => !idsEqual(row?.orgId, orgId));
   if (kept.length === all.length) return 0;
   await saveAll(kept);
@@ -281,16 +281,16 @@ async function clearNotificationsByOrg(orgId) {
 }
 
 module.exports = {
-  NOTIFICATION_STATUSES,
-  NOTIFICATION_SEVERITIES,
-  NOTIFICATION_SOURCE_TYPES,
-  NOTIFICATION_TASK_STATUSES,
-  sanitizeNotificationInput,
+  TASK_STATUSES,
+  TASK_SEVERITIES,
+  TASK_SOURCE_TYPES,
+  TASK_ASSIGNMENT_STATUSES,
+  sanitizeTaskInput,
   sanitizeTasks,
-  getAllNotifications,
-  getNotificationById,
-  addNotification,
-  updateNotification,
-  deleteNotification,
-  clearNotificationsByOrg
+  getAllTasks,
+  getTaskById,
+  addTask,
+  updateTask,
+  deleteTask,
+  clearTasksByOrg
 };

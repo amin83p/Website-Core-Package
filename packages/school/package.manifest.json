@@ -2812,16 +2812,16 @@
     },
     {
       "id": "445576",
-      "name": "SCHOOL_NOTIFICATIONS",
+      "name": "SCHOOL_TASKS",
       "category": "SCHOOL",
-      "description": "Review school notifications and manage embedded follow-up tasks for package workflows.",
+      "description": "Review school tasks and manage embedded follow-up assignments for package workflows.",
       "active": true,
       "trackState": true,
       "minimumAccessRequirement": 5,
       "dashboardDisplay": true,
       "mainDashboardDisplay": false,
       "navigatorSection": false,
-      "homeURL": "/school/notifications",
+      "homeURL": "/school/tasks",
       "inactiveMessage": "",
       "message": "",
       "operations": [
@@ -2882,7 +2882,7 @@
       "id": "445577",
       "name": "SCHOOL_MASTER_ACADEMIA_HUB",
       "category": "SCHOOL",
-      "description": "Full-width Master Academia Hub for reviewing people, attendance, schedules, sessions, classes, notifications, and leave requests from one workspace.",
+      "description": "Full-width Master Academia Hub for reviewing people, attendance, schedules, sessions, classes, tasks, and leave requests from one workspace.",
       "active": true,
       "trackState": true,
       "minimumAccessRequirement": 5,
@@ -7271,14 +7271,14 @@
       "collectionName": "schoolLeaveRequests"
     },
     {
-      "entityType": "notifications",
-      "label": "Notifications",
-      "collectionName": "schoolNotifications"
+      "entityType": "tasks",
+      "label": "Tasks",
+      "collectionName": "schoolTasks"
     },
     {
-      "entityType": "notificationRoutingRules",
-      "label": "Notification Routing Rules",
-      "collectionName": "schoolNotificationRoutingRules"
+      "entityType": "taskRoutingRules",
+      "label": "Task Routing Rules",
+      "collectionName": "schoolTaskRoutingRules"
     },
     {
       "entityType": "sessionStudentCases",
@@ -7393,9 +7393,9 @@
       "active": true
     },
     {
-      "id": "school-menu-notifications",
-      "label": "Notifications",
-      "href": "/school/notifications",
+      "id": "school-menu-tasks",
+      "label": "Tasks",
+      "href": "/school/tasks",
       "icon": "bi bi-bell-fill",
       "visibility": "authenticated",
       "target": "_self",
@@ -7543,11 +7543,11 @@
       "active": true
     },
     {
-      "id": "school-dashboard-notifications",
-      "label": "Notifications",
-      "href": "/school/notifications",
+      "id": "school-dashboard-tasks",
+      "label": "Tasks",
+      "href": "/school/tasks",
       "icon": "bi bi-bell-fill",
-      "description": "Review school notifications and manage embedded follow-up tasks.",
+      "description": "Review school tasks and manage embedded follow-up assignments.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",
@@ -7558,7 +7558,7 @@
       "label": "Master Academia Hub",
       "href": "/school/master-hub",
       "icon": "bi bi-grid-1x2-fill",
-      "description": "Open the Master Academia Hub for people, attendance, schedules, sessions, classes, notifications, and leave requests.",
+      "description": "Open the Master Academia Hub for people, attendance, schedules, sessions, classes, tasks, and leave requests.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",

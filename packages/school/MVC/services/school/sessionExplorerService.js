@@ -140,6 +140,8 @@ async function listSessions(req, query = {}) {
         ? `${teacher.name?.first || ''} ${teacher.name?.last || ''}`.trim()
         : (session?.delivery?.deliveredByName || 'Unassigned');
       const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(session?.status, session?.notes);
+      const statusDefinition = (Array.isArray(statusMeta) ? statusMeta : [])
+        .find((row) => normalizeStatusCode(row?.code) === normalizedStatus) || null;
       const sessionId = resolveSessionId(session);
 
       rows.push({
@@ -153,8 +155,13 @@ async function listSessions(req, query = {}) {
         endTime: session?.endTime || '00:00',
         status: normalizedStatus,
         locked: session?.locked === true || String(session?.locked) === 'true',
+        teacherId: sessionTeacherId || '',
         teacherName,
+        room: session?.room || '',
         notes: session?.notes || '',
+        makeUpRequired: statusDefinition?.makeUpRequired === true,
+        makeup: session?.makeup && typeof session.makeup === 'object' ? session.makeup : null,
+        makeupHistory: Array.isArray(session?.makeupHistory) ? session.makeupHistory : [],
         hasComments: (Array.isArray(session?.roster) ? session.roster : []).some((row) => row?.comments && row.comments.length > 0)
       });
     });

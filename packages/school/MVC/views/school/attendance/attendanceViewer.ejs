@@ -165,9 +165,18 @@
                             <label class="form-label fw-bold small mb-0">Left early (mins)</label>
                             <input type="number" class="form-control form-control-sm" id="inp_cellLeaveMins" placeholder="0" min="0">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small mb-0">Excuse / file link</label>
-                            <input type="text" class="form-control form-control-sm" id="inp_cellExcuseRef" placeholder="URL">
+                        <div class="col-12">
+                            <label class="form-label fw-bold small mb-0">Excuse / reference notes</label>
+                            <div class="row g-2 align-items-start">
+                                <div class="col-md-8">
+                                    <textarea class="form-control form-control-sm" id="inp_cellExcuseRef" rows="3" placeholder="Add details..."></textarea>
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="file" class="form-control form-control-sm" id="inp_cellExcuseFile">
+                                    <div class="small text-muted mt-1">Attach supporting file if needed.</div>
+                                </div>
+                            </div>
+                            <div class="small mt-2" id="inp_cellExcuseAttachmentPreview"></div>
                         </div>
                     </div>
 
@@ -190,6 +199,7 @@
                     <div class="border rounded p-2 bg-white">
                         <div class="d-flex flex-wrap gap-1 mb-2" id="pendingMentionsArea"></div>
                         <textarea class="form-control border-0 bg-transparent p-0 mb-2" id="inp_newComment" rows="2" placeholder="Write a note..."></textarea>
+                        <input type="file" class="form-control form-control-sm mb-2" id="inp_newCommentFile">
                         <div class="d-flex justify-content-between align-items-center border-top pt-2">
                             <button class="btn btn-sm btn-outline-secondary" id="btn_mentionUser"><i class="bi bi-at"></i> Tag User</button>
                             <button class="btn btn-sm btn-primary fw-bold" id="btn_saveComment">Save Note</button>
@@ -217,6 +227,43 @@ let currentMentions = [];
 let detailsModalInstance = null;
 let attendanceMatrixBusyToken = null;
 let attendanceMatrixBusyDepth = 0;
+
+const attendanceAttachmentEscape = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+async function uploadAttendanceFile(input, category, classId, sessionId, studentPersonId = '') {
+    const file = input?.files && input.files[0];
+    if (!file) return null;
+    const body = new FormData();
+    body.append('kind', category || 'attendance');
+    body.append('classId', classId || '');
+    body.append('sessionId', sessionId || '');
+    body.append('studentPersonId', studentPersonId || '');
+    body.append('actionStateId', window.ATTENDANCE_ACTION_STATE_ID || '');
+    body.append('file', file);
+    const res = await fetch('/school/attendances/api/files/upload', {
+        method: 'POST',
+        headers: { 'X-AJAX-Request': 'true' },
+        body
+    });
+    const result = await res.json().catch(() => null);
+    if (!res.ok || !result || result.status !== 'success') {
+        throw new Error(result?.message || 'File upload failed.');
+    }
+    return result.file || null;
+}
+
+function renderAttendanceAttachmentLink(attachment, emptyText = '') {
+    const att = attachment && typeof attachment === 'object' ? attachment : null;
+    if (!att) return emptyText;
+    const href = att.dataUrl || att.url || att.uploadUrl || att.storagePath || att.path || '';
+    if (!href) return `<span class="text-muted">${attendanceAttachmentEscape(att.name || 'Attached file')}</span>`;
+    return `<a href="${attendanceAttachmentEscape(href)}" target="_blank" rel="noopener" class="text-decoration-none"><i class="bi bi-paperclip me-1"></i>${attendanceAttachmentEscape(att.name || att.originalName || 'Open attachment')}</a>`;
+}
 
 function showAttendanceMatrixMessage({ title = 'Attendance Matrix', icon = 'info', message = '', buttons = null } = {}) {
     try { hideAttendanceMatrixBusy(true); } catch (_) {}
@@ -270,6 +317,7 @@ window.ATTENDANCE_PAGE_INITIAL = <%- JSON.stringify({
 
 document.addEventListener('DOMContentLoaded', () => {
     const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+    window.ATTENDANCE_ACTION_STATE_ID = actionStateId;
     window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
     window.CAN_OVERRIDE_SESSION_LOCK = <%= (typeof canOverrideSessionLock !== 'undefined' && canOverrideSessionLock) ? 'true' : 'false' %>;
 
@@ -358,18 +406,19 @@ document.addEventListener('DOMContentLoaded', () => {
         GenericPicker.open(GenericPickerPresets.user({
             title: 'Tag User',
             icon: 'bi-at',
-            apiEndpoint: '/chat/users/search',
+            apiEndpoint: '/school/identity/api/taggable-users',
             placeholder: 'Search for a user...',
             onSelect: (item) => {
-                const name = item.name || item.email || item.id;
-                if (item.id && item.id !== 'undefined' && !currentMentions.find(m => m.id === item.id)) {
-                    currentMentions.push({ id: item.id, name: name });
+                const mentionId = item.userId || item.id;
+                const name = item.displayName || item.name || item.email || mentionId;
+                if (mentionId && mentionId !== 'undefined' && !currentMentions.find(m => m.id === mentionId)) {
+                    currentMentions.push({ id: mentionId, name: name });
                     renderMentions();
-                } else if (!item.id || item.id === 'undefined') {
+                } else if (!mentionId || mentionId === 'undefined') {
                     showAttendanceMatrixMessage({
                         title: 'Tag User',
                         icon: 'error',
-                        message: 'Could not retrieve a valid Person ID.'
+                        message: 'Could not retrieve a valid user ID.'
                     });
                 }
             }
@@ -573,6 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 studentPersonId: personId,
                 text: text,
                 mentions: currentMentions,
+                attachment: await uploadAttendanceFile(document.getElementById('inp_newCommentFile'), 'comment', classId, sessionId, personId),
                 actionStateId
             };
 
@@ -588,8 +638,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (guarded.stop) return;
 
             if (result.status !== 'success') throw new Error(result.message);
-
+            
             document.getElementById('inp_newComment').value = '';
+            const savedCommentFileInput = document.getElementById('inp_newCommentFile');
+            if (savedCommentFileInput) savedCommentFileInput.value = '';
             currentMentions = [];
             renderMentions();
             
@@ -602,11 +654,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const thread = document.getElementById('det_commentsThread');
             let mentionHtml = '';
             result.comment.mentions.forEach(m => mentionHtml += `<span class="mention-badge me-1">@${m.name}</span>`);
+            const attachmentHtml = result.comment.attachment ? `<div class="small mt-1">${renderAttendanceAttachmentLink(result.comment.attachment)}</div>` : '';
             thread.innerHTML += `
                 <div class="comment-bubble">
                     <span class="comment-time">${new Date(result.comment.timestamp).toLocaleString()}</span>
                     <div class="comment-author">${result.comment.authorName}</div>
                     <div class="mt-1">${mentionHtml} ${result.comment.text}</div>
+                    ${attachmentHtml}
                 </div>
             `;
             thread.scrollTop = thread.scrollHeight;
@@ -659,6 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     lateMinutes: document.getElementById('inp_cellLateMins').value,
                     earlyLeaveMinutes: document.getElementById('inp_cellLeaveMins').value,
                     excuseRef: document.getElementById('inp_cellExcuseRef').value,
+                    excuseAttachment: await uploadAttendanceFile(document.getElementById('inp_cellExcuseFile'), 'excuse', classId, sessionId, personId) || window.currentAttendanceExcuseAttachment || null,
                     notes: document.getElementById('inp_rosterStudentNote').value,
                     actionStateId
                 };
@@ -774,6 +829,11 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     document.getElementById('inp_cellLateMins').value = record.lateMinutes != null && record.lateMinutes !== '' ? record.lateMinutes : '';
     document.getElementById('inp_cellLeaveMins').value = record.earlyLeaveMinutes != null && record.earlyLeaveMinutes !== '' ? record.earlyLeaveMinutes : '';
     document.getElementById('inp_cellExcuseRef').value = record.excuseRef || '';
+    window.currentAttendanceExcuseAttachment = record.excuseAttachment || null;
+    const excuseFileInput = document.getElementById('inp_cellExcuseFile');
+    if (excuseFileInput) excuseFileInput.value = '';
+    const excusePreview = document.getElementById('inp_cellExcuseAttachmentPreview');
+    if (excusePreview) excusePreview.innerHTML = renderAttendanceAttachmentLink(record.excuseAttachment, '<span class="text-muted">No file attached.</span>');
     document.getElementById('inp_rosterStudentNote').value = record.rosterStudentNotes != null ? record.rosterStudentNotes : '';
 
     const sessionNote = record.sessionLevelNote || '';
@@ -805,12 +865,14 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
         record.comments.forEach(c => {
             let mentionHtml = '';
             (c.mentions || []).forEach(m => mentionHtml += `<span class="mention-badge me-1">@${m.name}</span>`);
+            const attachmentHtml = c.attachment ? `<div class="small mt-1">${renderAttendanceAttachmentLink(c.attachment)}</div>` : '';
             
             thread.innerHTML += `
                 <div class="comment-bubble">
                     <span class="comment-time">${new Date(c.timestamp).toLocaleString()}</span>
                     <div class="comment-author">${c.authorName}</div>
                     <div class="mt-1">${mentionHtml} ${c.text}</div>
+                    ${attachmentHtml}
                 </div>
             `;
         });
@@ -818,8 +880,10 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
         thread.innerHTML = '<div class="text-muted small text-center py-2">No administrative notes yet. Be the first to comment.</div>';
     }
 
-    document.getElementById('inp_newComment').value = '';
-    currentMentions = [];
+            document.getElementById('inp_newComment').value = '';
+            const commentFileInput = document.getElementById('inp_newCommentFile');
+            if (commentFileInput) commentFileInput.value = '';
+            currentMentions = [];
     document.getElementById('pendingMentionsArea').innerHTML = '';
 
     if (detailsModalInstance) detailsModalInstance.show();

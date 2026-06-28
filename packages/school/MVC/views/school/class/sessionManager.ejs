@@ -91,15 +91,45 @@
         font-weight: 500;
         font-size: 0.9rem;
     }
-    #sessionStatusSelect.session-status-select-compact {
+    .session-status-button {
         width: 100%;
         max-width: 100%;
         font-weight: 600;
         font-size: 0.875rem;
         border-radius: 8px;
         border: 1px solid #cbd5e1;
-        padding: 0.35rem 2rem 0.35rem 0.5rem;
+        padding: 0.45rem 0.7rem;
         box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        text-align: left;
+    }
+    .session-status-modal-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 0.75rem;
+    }
+    .session-status-option-btn {
+        border-radius: 14px;
+        min-height: 76px;
+        text-align: left;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        font-weight: 700;
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+        transition: transform 0.14s ease, box-shadow 0.14s ease;
+    }
+    .session-status-option-btn:hover,
+    .session-status-option-btn:focus {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+    }
+    .session-status-option-btn.is-selected {
+        outline: 3px solid rgba(13, 110, 253, 0.25);
     }
     .session-manager-field-placeholder {
         min-height: calc(1.5em + 0.75rem + 2px);
@@ -221,6 +251,7 @@
 
     .session-panel { display: none; animation: sessionPanelIn 0.2s ease; }
     .session-panel.active { display: block; }
+    .session-inactive-workspace .session-panel { display: none !important; }
     @keyframes sessionPanelIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
     .session-placeholder-card {
@@ -285,6 +316,12 @@
         const currentSessionStatus = availableStatusRows.some((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus)
             ? normalizedSessionStatus
             : fallbackStatusCode;
+        const currentSessionStatusMeta = availableStatusRows.find((row) => normalizeStatusCode(row?.code) === currentSessionStatus) || null;
+        const isMakeupRequiredInactive = currentSessionStatusMeta && currentSessionStatusMeta.makeUpRequired === true;
+        const canCreateMakeupSession = !isReadOnly && currentSessionStatusMeta && currentSessionStatusMeta.makeUpRequired === true;
+        const existingMakeupHistory = Array.isArray(session.makeupHistory) ? session.makeupHistory : [];
+        const isMakeupSession = session.makeup && session.makeup.isMakeup === true;
+        const workDisabledAttr = (isReadOnly || isMakeupRequiredInactive) ? 'disabled' : '';
         const attendanceMatrixHref = '/school/attendances?classId=' + encodeURIComponent(classData.id) + '&range=allTime';
         const gradesMatrixHref = '/school/grades-matrix?classId=' + encodeURIComponent(classData.id) + '&range=allTime';
         const smRegMode = String(classData.registrationMode || 'term_based').trim().toLowerCase();
@@ -328,7 +365,10 @@
         </div>
         <a href="<%= attendanceMatrixHref %>" class="btn btn-outline-primary btn-md  fw-semibold session-manager-nav-away shadow-md" id="linkAttendanceMatrix" data-matrix-href="<%= attendanceMatrixHref %>" data-confirm-title="Open attendance matrix?" data-confirm-message="Open the attendance matrix? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-grid-3x3 me-1"></i>Attendance matrix</a>
         <a href="<%= gradesMatrixHref %>" class="btn btn-outline-primary btn-md fw-semibold session-manager-nav-away shadow-md" id="linkGradesMatrix" data-matrix-href="<%= gradesMatrixHref %>" data-confirm-title="Open grades matrix?" data-confirm-message="Open the grades matrix? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-table me-1"></i>Grades matrix</a>
-        <% if (!isReadOnly) { %>
+        <% if (canCreateMakeupSession) { %>
+            <button type="button" class="btn btn-outline-warning btn-md fw-semibold shadow-md" id="btnCreateMakeupSession"><i class="bi bi-calendar-plus me-1"></i>Create make-up session</button>
+        <% } %>
+        <% if (!isReadOnly && !isMakeupRequiredInactive) { %>
             <button type="button" class="btn btn-primary btn-md btn-filled btn-save-session shadow-md" id="btnSaveSession"><i class="bi bi-save me-1"></i>Save session</button>
         <% } %>
         <button type="button" class="btn btn-warning btn-md btn-filled btn-close-session" id="btnCloseSessionManager"><i class="bi bi-x-lg me-1"></i>Close</button>
@@ -376,7 +416,11 @@
             <div class="row g-2 align-items-end">
                 <div class="col-md-4">
                     <label class="info-label d-block" for="sessionStatusSelect">Session status</label>
-                    <select id="sessionStatusSelect" class="form-select form-select-sm session-status-select-compact" <%= disabledAttr ? 'disabled' : '' %>>
+                    <button type="button" id="sessionStatusButton" class="btn session-status-button" <%= disabledAttr ? 'disabled' : '' %>>
+                        <span id="sessionStatusButtonLabel">Session status</span>
+                        <i class="bi bi-grid-3x3-gap-fill"></i>
+                    </button>
+                    <select id="sessionStatusSelect" class="d-none" aria-hidden="true" tabindex="-1" <%= disabledAttr ? 'disabled' : '' %>>
                         <% availableStatusRows.forEach((statusRow) => { %>
                             <% const statusCode = normalizeStatusCode(statusRow?.code); %>
                             <% if (statusCode) { %>
@@ -394,8 +438,18 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="info-label d-block text-muted">Reserved</label>
-                    <div class="session-manager-field-placeholder" title="Reserved for future session fields">—</div>
+                    <label class="info-label d-block text-muted">Make-up</label>
+                    <div class="session-manager-field-placeholder justify-content-start px-2 text-start" title="Make-up session links">
+                        <% if (isMakeupSession) { %>
+                            <span><i class="bi bi-arrow-return-left me-1 text-warning"></i>For <%= session.makeup.originalSessionId || 'original session' %></span>
+                        <% } else if (existingMakeupHistory.length) { %>
+                            <span><i class="bi bi-calendar-check me-1 text-success"></i><%= existingMakeupHistory.length %> created</span>
+                        <% } else if (canCreateMakeupSession) { %>
+                            <span><i class="bi bi-calendar-plus me-1 text-warning"></i>Available</span>
+                        <% } else { %>
+                            <span>—</span>
+                        <% } %>
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <label class="info-label d-block text-muted">Reserved</label>
@@ -420,6 +474,24 @@
             </div>
         </div>
     <% } %>
+    <% if (isMakeupRequiredInactive) { %>
+        <div class="alert alert-warning border-warning shadow-sm d-flex align-items-start mb-3">
+            <i class="bi bi-calendar-plus fs-3 me-3 text-warning"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Original session requires a make-up</h6>
+                <div class="small">
+                    This session is inactive for attendance, class conduct, gradebook, content, student cases, and file work because its current status requires a make-up session.
+                    Create or open the make-up session to complete instructional work.
+                </div>
+                <% if (existingMakeupHistory.length) { %>
+                    <div class="small mt-2">
+                        <strong>Existing make-up session(s):</strong>
+                        <%= existingMakeupHistory.map((row) => row.makeupSessionId || row.sessionId || '').filter(Boolean).join(', ') %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    <% } %>
 
     <div class="session-manager-shell" id="sessionManagerShell">
         <aside class="session-manager-sidebar" id="sessionManagerSidebar" aria-label="Session sections">
@@ -430,34 +502,46 @@
                 </button>
             </div>
             <nav class="session-manager-sidebar-nav" role="tablist">
-                <button type="button" class="session-manager-nav-item active" data-session-panel="attendance" role="tab" aria-selected="true">
+                <button type="button" class="session-manager-nav-item active" data-session-panel="attendance" role="tab" aria-selected="true" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-people-fill fs-5"></i><span class="session-manager-nav-label">Attendance</span>
                 </button>
-                <button type="button" class="session-manager-nav-item" data-session-panel="conduct" role="tab" aria-selected="false">
+                <button type="button" class="session-manager-nav-item" data-session-panel="conduct" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-person-hearts fs-5"></i><span class="session-manager-nav-label">Class Conduct</span>
                 </button>
-                <button type="button" class="session-manager-nav-item" data-session-panel="session" role="tab" aria-selected="false">
+                <button type="button" class="session-manager-nav-item" data-session-panel="session" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-journal-text fs-5"></i><span class="session-manager-nav-label">Session &amp; notes</span>
                 </button>
-                <button type="button" class="session-manager-nav-item" data-session-panel="curriculum" role="tab" aria-selected="false">
+                <button type="button" class="session-manager-nav-item" data-session-panel="curriculum" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-book fs-5"></i><span class="session-manager-nav-label">Curriculum</span>
                 </button>
-                <button type="button" class="session-manager-nav-item" data-session-panel="content" title="Coming soon">
+                <button type="button" class="session-manager-nav-item" data-session-panel="content" title="<%= isMakeupRequiredInactive ? 'Inactive original session' : 'Coming soon' %>" <%= isMakeupRequiredInactive ? 'disabled' : '' %>>
                     <i class="bi bi-folder2-open fs-5"></i><span class="session-manager-nav-label">Content</span>
                 </button>
-                <button type="button" class="session-manager-nav-item" data-session-panel="assignments">
+                <button type="button" class="session-manager-nav-item" data-session-panel="assignments" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-clipboard-check fs-5"></i><span class="session-manager-nav-label">Assignments</span>
                 </button>
-                <button type="button" class="session-manager-nav-item" data-session-panel="student-cases">
+                <button type="button" class="session-manager-nav-item" data-session-panel="student-cases" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-folder-check fs-5"></i><span class="session-manager-nav-label">Student Cases</span>
                 </button>
-                <button type="button" class="session-manager-nav-item" data-session-panel="gradebook" title="Coming soon">
+                <button type="button" class="session-manager-nav-item" data-session-panel="gradebook" title="<%= isMakeupRequiredInactive ? 'Inactive original session' : 'Coming soon' %>" <%= isMakeupRequiredInactive ? 'disabled' : '' %>>
                     <i class="bi bi-journal-bookmark fs-5"></i><span class="session-manager-nav-label">Grade book</span>
                 </button>
             </nav>
         </aside>
 
-        <main class="session-manager-main">
+        <main class="session-manager-main <%= isMakeupRequiredInactive ? 'session-inactive-workspace' : '' %>">
+            <% if (isMakeupRequiredInactive) { %>
+                <div class="session-placeholder-card">
+                    <i class="bi bi-calendar-plus fs-1 text-warning d-block mb-3"></i>
+                    <h5 class="fw-bold text-dark mb-2">Instructional work is paused for this original session</h5>
+                    <p class="text-muted mb-3">
+                        Attendance, class conduct, gradebook, content, assignments, and student cases belong on the make-up session, not this original session.
+                    </p>
+                    <% if (canCreateMakeupSession) { %>
+                        <button type="button" class="btn btn-warning fw-bold" id="btnCreateMakeupSessionInline"><i class="bi bi-calendar-plus me-1"></i>Create make-up session</button>
+                    <% } %>
+                </div>
+            <% } %>
             <div class="session-panel active" id="session-panel-attendance" role="tabpanel">
                 <div class="row g-2 mb-3">
                     <div class="col-6 col-md-3">
@@ -533,7 +617,7 @@
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="a_<%= i %>" value="absent" <%= student.attendance === 'absent' ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="a_<%= i %>" title="Absent"><i class="bi bi-x-lg"></i> Absent</label>
                                                         </div>
-                                                        <% const hasDetails = student.lateMinutes || student.earlyLeaveMinutes || student.excuseRef || (student.comments && student.comments.length > 0); %>
+                                                        <% const hasDetails = student.lateMinutes || student.earlyLeaveMinutes || student.excuseRef || student.excuseAttachment || (student.comments && student.comments.length > 0); %>
                                                         <% if (!isReadOnly) { %>
                                                         <button type="button" class="btn btn-sm btn-outline-primary btn-open-student-case" title="Open student case" data-person-id="<%= student.personId %>" data-student-name="<%= student.name.replace(/'/g, "\\'") %>">
                                                             <i class="bi bi-folder-plus"></i>
@@ -549,7 +633,8 @@
                                                     <input type="hidden" class="att-late" value="<%= student.lateMinutes || '' %>">
                                                     <input type="hidden" class="att-leave" value="<%= student.earlyLeaveMinutes || '' %>">
                                                     <input type="hidden" class="att-excuse" value="<%= student.excuseRef || '' %>">
-                                                    <input type="hidden" class="att-comments" value='<%- JSON.stringify(student.comments || []) %>'>
+                                                    <input type="hidden" class="att-excuse-attachment" value='<%- JSON.stringify(student.excuseAttachment || null).replace(/</g, "\\u003c").replace(/'/g, "&#39;") %>'>
+                                                    <input type="hidden" class="att-comments" value='<%- JSON.stringify(student.comments || []).replace(/</g, "\\u003c").replace(/'/g, "&#39;") %>'>
                                                 </td>
                                             </tr>
                                         <% }) %>
@@ -798,9 +883,18 @@
                         <label class="form-label fw-bold small">Left Early (Mins)</label>
                         <input type="number" class="form-control" id="modalLeaveMins" placeholder="e.g. 30" min="0" <%- disabledAttr %>>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold small">Excuse / File Link</label>
-                        <input type="text" class="form-control" id="modalExcuseRef" placeholder="URL Reference" <%- disabledAttr %>>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Excuse / reference notes</label>
+                        <div class="row g-2 align-items-start">
+                            <div class="col-md-8">
+                                <textarea class="form-control" id="modalExcuseRef" rows="3" placeholder="Add details..." <%- disabledAttr %>></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="file" class="form-control form-control-sm" id="modalExcuseFile" <%- disabledAttr %>>
+                                <div class="small text-muted mt-1">Attach supporting file if needed.</div>
+                            </div>
+                        </div>
+                        <div class="small mt-2" id="modalExcuseAttachmentPreview"></div>
                     </div>
                     <div class="col-12">
                         <p class="small text-muted mb-0" id="attendanceMatrixThresholdHint"></p>
@@ -815,6 +909,7 @@
                     <div class="border rounded p-2 bg-white shadow-sm">
                         <div class="d-flex flex-wrap gap-1 mb-2" id="pendingMentionsArea"></div>
                         <textarea class="form-control border-0 bg-transparent p-0 mb-2" id="inp_newComment" rows="2" placeholder="Write a note or tag someone..."></textarea>
+                        <input type="file" class="form-control form-control-sm mb-2" id="inp_newCommentFile" <%- disabledAttr %>>
                         <div class="d-flex justify-content-between align-items-center border-top pt-2">
                             <button class="btn btn-sm btn-outline-secondary" id="btn_mentionUser"><i class="bi bi-at"></i> Tag User</button>
                             <button class="btn btn-sm btn-primary fw-bold" id="btn_saveComment">Save Note Directly</button>
@@ -895,8 +990,10 @@
                         <textarea class="form-control" id="contentModalHtmlInput" rows="9" placeholder="Paste HTML content"></textarea>
                     </div>
                     <div class="col-12 d-none" id="contentModalFileWrap">
-                        <label class="form-label fw-bold" for="contentModalFileUrlInput">File URL</label>
-                        <input type="url" class="form-control" id="contentModalFileUrlInput" placeholder="https://...">
+                        <label class="form-label fw-bold" for="contentModalFileUrlInput">File link or uploaded file</label>
+                        <input type="url" class="form-control mb-2" id="contentModalFileUrlInput" placeholder="Paste an external link, or upload a file below">
+                        <input type="file" class="form-control" id="contentModalFileInput">
+                        <div class="form-text">Uploaded files are stored in the School class workspace.</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label fw-bold" for="contentModalNotesInput">Notes (optional)</label>
@@ -946,9 +1043,225 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionManagerClassId = <%- jsonForScript(classData.id) %>;
     const sessionManagerSessionId = <%- jsonForScript(session.sessionId) %>;
     const sessionStatusMeta = <%- jsonForScript(availableStatusRows || []) %>;
+    const sessionMakeupHistory = <%- jsonForScript(existingMakeupHistory || []) %>;
+    const sessionCanCreateMakeup = <%- jsonForScript(Boolean(canCreateMakeupSession)) %>;
+    const sessionInstructionalInactive = <%- jsonForScript(Boolean(isMakeupRequiredInactive)) %>;
+    const sessionDefaultTeacherId = <%- jsonForScript(session.delivery?.deliveredBy || '') %>;
+    const sessionDefaultTeacherName = <%- jsonForScript(session.delivery?.deliveredByName || '') %>;
+    const sessionDefaultRoom = <%- jsonForScript(session.room || '') %>;
+    const sessionDefaultStartTime = <%- jsonForScript(session.startTime || '') %>;
+    const sessionDefaultEndTime = <%- jsonForScript(session.endTime || '') %>;
     const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     const sessionStatusMap = new Map((sessionStatusMeta || []).map((row) => [normalizeStatusCode(row.code), row]));
     const resolveStatusMeta = (statusCode) => sessionStatusMap.get(normalizeStatusCode(statusCode)) || null;
+    const attendanceAttachmentEscape = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    function parseAttendanceAttachment(value) {
+        if (!value) return null;
+        if (typeof value === 'object') return value;
+        try {
+            const parsed = JSON.parse(String(value || 'null'));
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (_error) {
+            return null;
+        }
+    }
+    async function uploadSchoolSessionFile(input, category, personId = '') {
+        const file = input?.files && input.files[0];
+        if (!file) return null;
+        const body = new FormData();
+        body.append('kind', category || 'file');
+        body.append('classId', sessionManagerClassId);
+        body.append('sessionId', sessionManagerSessionId);
+        if (personId) body.append('studentPersonId', personId);
+        body.append('actionStateId', actionStateId);
+        body.append('file', file);
+        const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/files/upload`, {
+            method: 'POST',
+            headers: { 'X-AJAX-Request': 'true' },
+            body
+        });
+        const result = await res.json().catch(() => null);
+        if (!res.ok || !result || result.status !== 'success') {
+            throw new Error(result?.message || 'File upload failed.');
+        }
+        return result.file || null;
+    }
+    function renderAttendanceAttachmentLink(attachment, emptyText = '') {
+        const att = parseAttendanceAttachment(attachment);
+        if (!att) return emptyText;
+        const href = att.dataUrl || att.url || att.uploadUrl || att.storagePath || att.path || '';
+        if (!href) return `<span class="text-muted">${attendanceAttachmentEscape(att.name || 'Attached file')}</span>`;
+        return `<a href="${attendanceAttachmentEscape(href)}" target="_blank" rel="noopener" class="text-decoration-none"><i class="bi bi-paperclip me-1"></i>${attendanceAttachmentEscape(att.name || att.originalName || 'Open attachment')}</a>`;
+    }
+    window.parseAttendanceAttachment = parseAttendanceAttachment;
+    window.renderAttendanceAttachmentLink = renderAttendanceAttachmentLink;
+
+    function showMakeupMessage(options) {
+        if (typeof window.showMessageModal === 'function') return window.showMessageModal(options || {});
+        if (options?.message) window.alert(options.message);
+        return Promise.resolve('');
+    }
+
+    function ensureMakeupSessionModal() {
+        let modal = document.getElementById('makeupSessionModal');
+        if (modal) return modal;
+        modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'makeupSessionModal';
+        modal.tabIndex = -1;
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML = [
+            '<div class="modal-dialog modal-lg modal-dialog-scrollable">',
+            '<div class="modal-content">',
+            '<div class="modal-header bg-warning text-dark">',
+            '<h5 class="modal-title fw-bold"><i class="bi bi-calendar-plus me-2"></i>Create Make-up Session</h5>',
+            '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>',
+            '</div>',
+            '<div class="modal-body">',
+            '<div class="alert alert-light border small" id="makeupSessionContext"></div>',
+            '<input type="hidden" id="makeupSessionTeacherId">',
+            '<div class="row g-3">',
+            '<div class="col-md-4"><label class="form-label fw-bold">Date</label><input type="date" class="form-control" id="makeupSessionDate"></div>',
+            '<div class="col-md-4"><label class="form-label fw-bold">Start Time</label><input type="time" class="form-control" id="makeupSessionStart"></div>',
+            '<div class="col-md-4"><label class="form-label fw-bold">End Time</label><input type="time" class="form-control" id="makeupSessionEnd"></div>',
+            '<div class="col-md-6"><label class="form-label fw-bold">Teacher</label><div class="input-group"><input type="text" class="form-control bg-white" id="makeupSessionTeacherName" readonly><button type="button" class="btn btn-outline-primary" id="makeupSessionPickTeacher"><i class="bi bi-person-check"></i></button></div></div>',
+            '<div class="col-md-6"><label class="form-label fw-bold">Location</label><input type="text" class="form-control" id="makeupSessionRoom" maxlength="200"></div>',
+            '<div class="col-12"><label class="form-label fw-bold">Reason</label><textarea class="form-control" id="makeupSessionReason" rows="3" maxlength="1000" placeholder="Why is this make-up session needed?"></textarea></div>',
+            '</div>',
+            '</div>',
+            '<div class="modal-footer bg-light">',
+            '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>',
+            '<button type="button" class="btn btn-warning fw-bold" id="makeupSessionCreate"><i class="bi bi-calendar-plus me-1"></i>Create Make-up Session</button>',
+            '</div>',
+            '</div>',
+            '</div>'
+        ].join('');
+        document.body.appendChild(modal);
+        modal.querySelector('#makeupSessionPickTeacher')?.addEventListener('click', function () {
+            if (!window.GenericPicker || !window.GenericPickerPresets) {
+                showMakeupMessage({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+                return;
+            }
+            window.GenericPicker.open(window.GenericPickerPresets.teacher({
+                title: 'Select Make-up Teacher',
+                placeholder: 'Search teachers...',
+                context: window.GenericPickerContexts
+                    ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+                    : undefined,
+                onSelect: function (item) {
+                    const id = String(item?.id || item?.personId || item?.value || '').trim();
+                    const name = String(item?.name || item?.label || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || id).trim();
+                    modal.querySelector('#makeupSessionTeacherId').value = id;
+                    modal.querySelector('#makeupSessionTeacherName').value = name;
+                }
+            }));
+        });
+        modal.querySelector('#makeupSessionCreate')?.addEventListener('click', createMakeupSessionFromModal);
+        return modal;
+    }
+
+    function openMakeupSessionModal() {
+        const modal = ensureMakeupSessionModal();
+        modal.querySelector('#makeupSessionDate').value = '';
+        modal.querySelector('#makeupSessionStart').value = sessionDefaultStartTime || '';
+        modal.querySelector('#makeupSessionEnd').value = sessionDefaultEndTime || '';
+        modal.querySelector('#makeupSessionTeacherId').value = sessionDefaultTeacherId || '';
+        modal.querySelector('#makeupSessionTeacherName').value = sessionDefaultTeacherName || sessionDefaultTeacherId || '';
+        modal.querySelector('#makeupSessionRoom').value = sessionDefaultRoom || '';
+        modal.querySelector('#makeupSessionReason').value = '';
+        const historyNote = sessionMakeupHistory.length
+            ? '<div class="mt-2 text-warning"><i class="bi bi-exclamation-triangle me-1"></i>' + sessionMakeupHistory.length + ' make-up session(s) already exist for this original session.</div>'
+            : '';
+        modal.querySelector('#makeupSessionContext').innerHTML = '<strong>Original session:</strong> ' + attendanceAttachmentEscape(sessionManagerSessionId) + historyNote;
+        if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).show();
+    }
+
+    async function createMakeupSessionFromModal() {
+        const modal = ensureMakeupSessionModal();
+        const button = modal.querySelector('#makeupSessionCreate');
+        const oldHtml = button ? button.innerHTML : '';
+        const payload = {
+            date: modal.querySelector('#makeupSessionDate')?.value || '',
+            startTime: modal.querySelector('#makeupSessionStart')?.value || '',
+            endTime: modal.querySelector('#makeupSessionEnd')?.value || '',
+            teacherId: modal.querySelector('#makeupSessionTeacherId')?.value || '',
+            teacherName: modal.querySelector('#makeupSessionTeacherName')?.value || '',
+            room: modal.querySelector('#makeupSessionRoom')?.value || '',
+            reason: modal.querySelector('#makeupSessionReason')?.value || '',
+            actionStateId
+        };
+        if (!payload.date) {
+            await showMakeupMessage({ title: 'Date Required', icon: 'warning', message: 'Please select the make-up session date.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+            return;
+        }
+        try {
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating...';
+            }
+            if (typeof window.showLoading === 'function') window.showLoading('Creating make-up session...');
+            const submitMakeup = async (bodyPayload) => {
+                const response = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/makeup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(bodyPayload)
+                });
+                const parsed = await response.json().catch(() => ({ status: 'error', message: 'Unable to read server response.' }));
+                return { response, parsed };
+            };
+            let { response, parsed: result } = await submitMakeup(payload);
+            if (result.status === 'warning' && result.code === 'MAKEUP_SESSION_WARNINGS') {
+                const warningList = Array.isArray(result?.data?.warnings) && result.data.warnings.length
+                    ? '<ul>' + result.data.warnings.map((w) => '<li>' + attendanceAttachmentEscape(w) + '</li>').join('') + '</ul>'
+                    : '';
+                if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+                const selected = await showMakeupMessage({
+                    title: 'Review Make-up Warnings',
+                    icon: 'warning',
+                    message: (result.message || 'Review warnings before creating this make-up session.') + warningList,
+                    buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: 'Create Anyway', class: 'btn-warning' }]
+                });
+                if (selected !== 'Create Anyway') return;
+                if (typeof window.showLoading === 'function') window.showLoading('Creating make-up session...');
+                ({ response, parsed: result } = await submitMakeup({ ...payload, force: true }));
+            }
+            if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Could not create make-up session.');
+            if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).hide();
+            const warnings = Array.isArray(result?.data?.warnings) && result.data.warnings.length
+                ? '<hr><strong>Warnings</strong><ul>' + result.data.warnings.map((w) => '<li>' + attendanceAttachmentEscape(w) + '</li>').join('') + '</ul>'
+                : '';
+            const selected = await showMakeupMessage({
+                title: 'Make-up Session Created',
+                icon: result?.data?.warnings?.length ? 'warning' : 'success',
+                message: (result.message || 'Make-up session created.') + warnings,
+                buttons: [{ text: 'Open Make-up Session', class: 'btn-primary' }, { text: 'Close', class: 'btn-secondary' }]
+            });
+            const newSessionId = result?.data?.makeupSession?.sessionId;
+            if (selected === 'Open Make-up Session' && newSessionId) {
+                window.open(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(newSessionId))}`, '_blank', 'noopener');
+            }
+            window.location.reload();
+        } catch (error) {
+            await showMakeupMessage({ title: 'Make-up Session Failed', icon: 'error', message: error.message || 'Could not create make-up session.', buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+        } finally {
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+        }
+    }
+
+    if (sessionCanCreateMakeup) {
+        document.getElementById('btnCreateMakeupSession')?.addEventListener('click', openMakeupSessionModal);
+        document.getElementById('btnCreateMakeupSessionInline')?.addEventListener('click', openMakeupSessionModal);
+    }
 
     window.__attendanceMatrixPolicy = <%- JSON.stringify(typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved ? attendanceMatrixPolicyResolved : { disqualifyLateMinutes: 30, disqualifyEarlyLeaveMinutes: 30, disqualifyCombinedMissedMinutes: null, scheduledMinutes: 180 }) %>;
     let studentCasesState = <%- jsonForScript(Array.isArray(sessionStudentCases) ? sessionStudentCases : []) %>;
@@ -1355,22 +1668,88 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const statusSelect = document.getElementById('sessionStatusSelect');
+    const statusButton = document.getElementById('sessionStatusButton');
+    const statusButtonLabel = document.getElementById('sessionStatusButtonLabel');
+    let sessionStatusModalInstance = null;
+    let sessionStatusModalEl = null;
     function getSelectedSessionStatus() {
         return normalizeStatusCode(statusSelect?.value || defaultSessionStatusCode) || 'scheduled';
     }
     function styleSessionStatusSelect() {
-        if (!statusSelect) return;
+        if (!statusSelect || !statusButton) return;
         const opt = statusSelect.selectedOptions && statusSelect.selectedOptions[0];
         const bg = opt?.getAttribute('data-color-bg') || '#f8fafc';
         const fg = opt?.getAttribute('data-color-text') || '#0f172a';
         const border = opt?.getAttribute('data-color-border') || '#cbd5e1';
-        statusSelect.style.backgroundColor = bg;
-        statusSelect.style.color = fg;
-        statusSelect.style.borderColor = border;
+        const label = opt?.getAttribute('data-label') || opt?.textContent || getSelectedSessionStatus();
+        statusButton.style.backgroundColor = bg;
+        statusButton.style.color = fg;
+        statusButton.style.borderColor = border;
+        if (statusButtonLabel) statusButtonLabel.textContent = label;
+        renderSessionStatusButtons();
+    }
+    function ensureSessionStatusModal() {
+        if (sessionStatusModalEl) return sessionStatusModalEl;
+        sessionStatusModalEl = document.createElement('div');
+        sessionStatusModalEl.className = 'modal fade';
+        sessionStatusModalEl.id = 'sessionStatusPickerModal';
+        sessionStatusModalEl.tabIndex = -1;
+        sessionStatusModalEl.setAttribute('aria-hidden', 'true');
+        sessionStatusModalEl.innerHTML = `
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="bi bi-grid-3x3-gap-fill me-2"></i>Choose Session Status</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="small text-muted mb-3">Select the current workflow state for this session.</div>
+                        <div class="session-status-modal-grid" id="sessionStatusModalGrid"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(sessionStatusModalEl);
+        return sessionStatusModalEl;
+    }
+    function renderSessionStatusButtons() {
+        const modalEl = sessionStatusModalEl;
+        if (!modalEl || !statusSelect) return;
+        const grid = modalEl.querySelector('#sessionStatusModalGrid');
+        if (!grid) return;
+        const selected = getSelectedSessionStatus();
+        grid.innerHTML = '';
+        Array.from(statusSelect.options || []).forEach((opt) => {
+            const code = normalizeStatusCode(opt.value);
+            if (!code) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `btn session-status-option-btn${selected === code ? ' is-selected' : ''}`;
+            btn.style.backgroundColor = opt.getAttribute('data-color-bg') || '#f8fafc';
+            btn.style.color = opt.getAttribute('data-color-text') || '#0f172a';
+            btn.style.borderColor = opt.getAttribute('data-color-border') || '#cbd5e1';
+            btn.innerHTML = `<span>${opt.getAttribute('data-label') || opt.textContent || code}</span><i class="bi ${selected === code ? 'bi-check-circle-fill' : 'bi-circle'}"></i>`;
+            btn.addEventListener('click', () => {
+                statusSelect.value = code;
+                styleSessionStatusSelect();
+                if (sessionStatusModalInstance) sessionStatusModalInstance.hide();
+            });
+            grid.appendChild(btn);
+        });
     }
     if (statusSelect) {
         statusSelect.addEventListener('change', () => styleSessionStatusSelect());
         styleSessionStatusSelect();
+    }
+    if (statusButton) {
+        statusButton.addEventListener('click', () => {
+            ensureSessionStatusModal();
+            renderSessionStatusButtons();
+            if (window.bootstrap?.Modal) {
+                sessionStatusModalInstance = window.bootstrap.Modal.getOrCreateInstance(sessionStatusModalEl);
+                sessionStatusModalInstance.show();
+            }
+        });
     }
 
     const btnMentionUser = document.getElementById('btn_mentionUser');
@@ -1379,12 +1758,13 @@ document.addEventListener('DOMContentLoaded', () => {
             GenericPicker.open(GenericPickerPresets.user({
                 title: 'Tag User',
                 icon: 'bi-at',
-                apiEndpoint: '/chat/users/search',
+                apiEndpoint: '/school/identity/api/taggable-users',
                 placeholder: 'Search for a user...',
                 onSelect: (item) => {
-                    const name = item.name || item.email || item.id;
-                    if (item.id && item.id !== 'undefined' && !currentMentions.find(m => m.id === item.id)) {
-                        currentMentions.push({ id: item.id, name: name });
+                    const mentionId = item.userId || item.id;
+                    const name = item.displayName || item.name || item.email || mentionId;
+                    if (mentionId && mentionId !== 'undefined' && !currentMentions.find(m => m.id === mentionId)) {
+                        currentMentions.push({ id: mentionId, name: name });
                         renderMentions();
                     }
                 }
@@ -1424,6 +1804,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     studentPersonId: studentId,
                     text: text,
                     mentions: currentMentions,
+                    attachment: await uploadSchoolSessionFile(document.getElementById('inp_newCommentFile'), 'comment', studentId),
                     actionStateId
                 };
 
@@ -1449,17 +1830,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const thread = document.getElementById('det_commentsThread');
                 let mentionHtml = '';
                 (result.comment.mentions || []).forEach(m => mentionHtml += `<span class="mention-badge me-1">@${m.name}</span>`);
+                const attachmentHtml = result.comment.attachment ? `<div class="small mt-1">${renderAttendanceAttachmentLink(result.comment.attachment)}</div>` : '';
 
                 thread.innerHTML += `
                     <div class="comment-bubble">
                         <span class="comment-time">${new Date(result.comment.timestamp).toLocaleString()}</span>
                         <div class="comment-author">${result.comment.authorName}</div>
                         <div class="mt-1">${mentionHtml} ${result.comment.text}</div>
+                        ${attachmentHtml}
                     </div>
                 `;
                 thread.scrollTop = thread.scrollHeight;
 
                 document.getElementById('inp_newComment').value = '';
+                const commentFileInput = document.getElementById('inp_newCommentFile');
+                if (commentFileInput) commentFileInput.value = '';
                 currentMentions = [];
                 const area = document.getElementById('pendingMentionsArea');
                 if(area) area.innerHTML = '';
@@ -1504,7 +1889,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const btnSaveDetails = document.getElementById('btnSaveDetails');
     if (btnSaveDetails) {
-        btnSaveDetails.addEventListener('click', () => {
+        btnSaveDetails.addEventListener('click', async () => {
             const personId = document.getElementById('modalPersonId').value;
             const row = document.querySelector(`.roster-row[data-personid="${personId}"]`);
 
@@ -1513,10 +1898,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const leaveVal = document.getElementById('modalLeaveMins').value;
                 const excuseVal = document.getElementById('modalExcuseRef').value;
                 const commentsStr = row.querySelector('.att-comments').value;
+                const excuseAttachmentInput = row.querySelector('.att-excuse-attachment');
+                const selectedExcuseAttachment = await uploadSchoolSessionFile(document.getElementById('modalExcuseFile'), 'excuse', personId);
+                const currentExcuseAttachment = parseAttendanceAttachment(excuseAttachmentInput?.value);
+                const excuseAttachment = selectedExcuseAttachment || currentExcuseAttachment;
 
                 row.querySelector('.att-late').value = lateVal;
                 row.querySelector('.att-leave').value = leaveVal;
                 row.querySelector('.att-excuse').value = excuseVal;
+                if (excuseAttachmentInput) excuseAttachmentInput.value = JSON.stringify(excuseAttachment || null);
 
                 applyAttendanceRulesToRow(row);
                 if (typeof gbOnAttendanceChanged === 'function') gbOnAttendanceChanged();
@@ -1525,7 +1915,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const icon = btn.querySelector('i');
 
                 const hasComments = (JSON.parse(commentsStr) || []).length > 0;
-                if (lateVal || leaveVal || excuseVal || hasComments) {
+                if (lateVal || leaveVal || excuseVal || excuseAttachment || hasComments) {
                     btn.className = 'btn btn-sm btn-details btn-warning text-dark';
                     icon.className = 'bi bi-sticky-fill';
                 } else {
@@ -1546,7 +1936,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* --- Session content stream (manual content + linked exams) --- */
-    const contentReadOnly = <%= JSON.stringify(!!isReadOnly) %>;
+    const contentReadOnly = <%= JSON.stringify(!!isReadOnly || !!isMakeupRequiredInactive) %>;
     let manualSessionContentState = <%- jsonForScript(sessionContentItems || []) %>;
     const sessionExamContentItems = <%- jsonForScript(sessionExamContentItems || []) %>;
     let sessionContentOrderState = <%- jsonForScript(sessionContentOrder || []) %>;
@@ -1685,7 +2075,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 : `<div class="small text-muted mt-2">
                       ${item?.type === 'html'
                         ? `HTML content${item?.notes ? ` | ${contentEscapeHtml(item.notes)}` : ''}`
-                        : `${item?.fileUrl ? `<a href="${contentEscapeHtml(String(item.fileUrl))}" target="_blank" rel="noopener">Open file</a>` : 'File link not set'}${item?.notes ? ` | ${contentEscapeHtml(item.notes)}` : ''}`}
+                        : `${(item?.file?.url || item?.fileUrl) ? `<a href="${contentEscapeHtml(String(item?.file?.url || item.fileUrl))}" target="_blank" rel="noopener">Open file</a>` : 'File link not set'}${item?.file?.originalName ? ` | ${contentEscapeHtml(item.file.originalName)}` : ''}${item?.notes ? ` | ${contentEscapeHtml(item.notes)}` : ''}`}
                     </div>`;
 
             return `<div class="card border shadow-sm mb-2" data-content-id="${contentEscapeHtml(id)}">
@@ -1743,6 +2133,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('contentModalTimeInput').value = editing ? String(current?.time || '') : '';
         document.getElementById('contentModalHtmlInput').value = editing ? String(current?.html || '') : '';
         document.getElementById('contentModalFileUrlInput').value = editing ? String(current?.fileUrl || '') : '';
+        const contentFileInput = document.getElementById('contentModalFileInput');
+        if (contentFileInput) contentFileInput.value = '';
         document.getElementById('contentModalNotesInput').value = editing ? String(current?.notes || '') : '';
         const activeType = String(document.getElementById('contentModalType').value || '').trim().toLowerCase();
         document.getElementById('contentModalHtmlWrap').classList.toggle('d-none', activeType !== 'html');
@@ -1752,14 +2144,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sessionContentModal) sessionContentModal.show();
     }
 
-    function saveSessionContentModal() {
+    async function saveSessionContentModal() {
         if (contentReadOnly) return;
         const editId = String(document.getElementById('contentModalEditId').value || '').trim();
+        const editing = !!editId;
+        const current = editing
+            ? (Array.isArray(manualSessionContentState) ? manualSessionContentState.find((row) => String(row?.id || '').trim() === editId) : null)
+            : null;
         const type = String(document.getElementById('contentModalType').value || '').trim().toLowerCase();
         const title = String(document.getElementById('contentModalTitleInput').value || '').trim();
         const time = String(document.getElementById('contentModalTimeInput').value || '').trim();
         const html = String(document.getElementById('contentModalHtmlInput').value || '').trim();
         const fileUrl = String(document.getElementById('contentModalFileUrlInput').value || '').trim();
+        const contentFileInput = document.getElementById('contentModalFileInput');
+        const hasSelectedFile = Boolean(contentFileInput?.files && contentFileInput.files[0]);
+        const existingFile = editing && current?.file ? current.file : null;
+        let uploadedFile = null;
         const notes = String(document.getElementById('contentModalNotesInput').value || '').trim();
         if (!title) {
             if (typeof showMessageModal === 'function') {
@@ -1777,13 +2177,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return;
         }
-        if (type === 'file' && !fileUrl) {
+        if (type === 'file' && !fileUrl && !hasSelectedFile && !existingFile) {
             if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'File URL Required', icon: 'warning', message: 'Please provide a file URL.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+                showMessageModal({ title: 'File Required', icon: 'warning', message: 'Please provide a file link or upload a file.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
             } else {
-                alert('Please provide a file URL.');
+                alert('Please provide a file link or upload a file.');
             }
             return;
+        }
+        if (type === 'file' && hasSelectedFile) {
+            uploadedFile = await uploadSchoolSessionFile(contentFileInput, 'content');
         }
         const item = {
             id: editId || `CNT_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -1791,7 +2194,8 @@ document.addEventListener('DOMContentLoaded', () => {
             title,
             time,
             html: type === 'html' ? html : '',
-            fileUrl: type === 'file' ? fileUrl : '',
+            fileUrl: type === 'file' ? (fileUrl || uploadedFile?.url || uploadedFile?.storagePath || '') : '',
+            file: type === 'file' ? (uploadedFile || existingFile || null) : null,
             notes
         };
         if (editId) {
@@ -1896,7 +2300,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btnAddHtmlContent')?.addEventListener('click', () => openSessionContentModal('html'));
     document.getElementById('btnAddFileContent')?.addEventListener('click', () => openSessionContentModal('file'));
-    document.getElementById('contentModalSaveBtn')?.addEventListener('click', () => saveSessionContentModal());
+    document.getElementById('contentModalSaveBtn')?.addEventListener('click', async () => {
+        const button = document.getElementById('contentModalSaveBtn');
+        const oldHtml = button ? button.innerHTML : '';
+        try {
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+            }
+            await saveSessionContentModal();
+        } catch (error) {
+            if (typeof showMessageModal === 'function') {
+                showMessageModal({ title: 'Content File', icon: 'error', message: error.message || 'Could not save content file.', buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+            } else {
+                alert(error.message || 'Could not save content file.');
+            }
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+        }
+    });
 
     document.getElementById('sessionContentList')?.addEventListener('change', (event) => {
         if (event.target.classList.contains('content-allocation-open-toggle')) {
@@ -1918,7 +2343,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSessionContentList();
 
     /* --- Session gradebook (multiple activities per session) --- */
-    const gbReadOnly = <%= JSON.stringify(!!isReadOnly) %>;
+    const gbReadOnly = <%= JSON.stringify(!!isReadOnly || !!isMakeupRequiredInactive) %>;
     const gbClassId = sessionManagerClassId;
     const gbSessionId = sessionManagerSessionId;
     const gradebookRoster = <%- jsonForScript((session.roster || []).map((r) => ({ personId: String(r.personId), name: r.name || 'Student' }))) %>;
@@ -2432,6 +2857,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const lateMinutes = row.querySelector('.att-late').value || null;
                 const earlyLeaveMinutes = row.querySelector('.att-leave').value || null;
                 const excuseRef = row.querySelector('.att-excuse').value || '';
+                const excuseAttachment = parseAttendanceAttachment(row.querySelector('.att-excuse-attachment')?.value);
                 const conductRow = conductRowsByPersonId.get(personId);
 
                 roster.push({
@@ -2440,6 +2866,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     lateMinutes,
                     earlyLeaveMinutes,
                     excuseRef,
+                    excuseAttachment,
                     notes: '',
                     classEffortPercent: readConductRating(conductRow, '.conduct-class-effort'),
                     classParticipationPercent: readConductRating(conductRow, '.conduct-class-participation'),
@@ -2512,6 +2939,11 @@ function openDetailsModal(personId, name) {
         document.getElementById('modalLateMins').value = row.querySelector('.att-late').value;
         document.getElementById('modalLeaveMins').value = row.querySelector('.att-leave').value;
         document.getElementById('modalExcuseRef').value = row.querySelector('.att-excuse').value;
+        const excuseAttachment = parseAttendanceAttachment(row.querySelector('.att-excuse-attachment')?.value);
+        const excuseFileInput = document.getElementById('modalExcuseFile');
+        if (excuseFileInput) excuseFileInput.value = '';
+        const excusePreview = document.getElementById('modalExcuseAttachmentPreview');
+        if (excusePreview) excusePreview.innerHTML = renderAttendanceAttachmentLink(excuseAttachment, '<span class="text-muted">No file attached.</span>');
 
         const commentsStr = row.querySelector('.att-comments').value;
         const comments = JSON.parse(commentsStr || "[]");
@@ -2522,12 +2954,14 @@ function openDetailsModal(personId, name) {
             comments.forEach(c => {
                 let mentionHtml = '';
                 (c.mentions || []).forEach(m => mentionHtml += `<span class="mention-badge me-1">@${m.name}</span>`);
+                const attachmentHtml = c.attachment ? `<div class="small mt-1">${renderAttendanceAttachmentLink(c.attachment)}</div>` : '';
 
                 thread.innerHTML += `
                     <div class="comment-bubble">
                         <span class="comment-time">${new Date(c.timestamp).toLocaleString()}</span>
                         <div class="comment-author">${c.authorName}</div>
                         <div class="mt-1">${mentionHtml} ${c.text}</div>
+                        ${attachmentHtml}
                     </div>
                 `;
             });

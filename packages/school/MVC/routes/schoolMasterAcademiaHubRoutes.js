@@ -23,7 +23,7 @@ const WORKSPACE_READ_SECTIONS = Object.freeze([
   SECTIONS.SCHOOL_ATTENDANCES,
   SECTIONS.SCHOOL_GRADEBOOK,
   SECTIONS.SCHOOL_TIMESHEET_PERIODS,
-  SECTIONS.SCHOOL_NOTIFICATIONS,
+  SECTIONS.SCHOOL_TASKS,
   SECTIONS.SCHOOL_LEAVE_REQUESTS,
   SECTIONS.SCHOOL_HOLIDAYS
 ]);
@@ -40,14 +40,24 @@ router.get('/api/list',
   trackActionState(SECTIONS.SCHOOL_MASTER_ACADEMIA_HUB, OPERATIONS.READ_ALL),
   ctrl.listPeoplePanel);
 
-router.get('/api/notification-count',
-  requireAccess(SECTIONS.SCHOOL_NOTIFICATIONS, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_NOTIFICATIONS, OPERATIONS.READ_ALL),
-  ctrl.getNotificationCount);
+router.get('/api/task-count',
+  requireAccess(SECTIONS.SCHOOL_TASKS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_TASKS, OPERATIONS.READ_ALL),
+  ctrl.getTaskCount);
 
 router.get('/api/workspace/:sectionKey',
   requireAccessAny(WORKSPACE_READ_SECTIONS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_MASTER_ACADEMIA_HUB, OPERATIONS.READ_ALL),
   ctrl.getWorkspaceSection);
+
+router.post('/api/workspace/sessions/lock',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.lockWorkspaceSessions);
+
+router.post('/api/workspace/sessions/update',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.updateWorkspaceSession);
 
 module.exports = router;

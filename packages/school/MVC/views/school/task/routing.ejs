@@ -3,18 +3,18 @@
   newUrl: null,
   newLabel: null,
   user,
-  tableName: 'school_notification_routing',
+  tableName: 'school_task_routing',
   btn_export: false,
   print: false,
   headerManageBtns: [
     '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary mb-2 btn-md"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>',
-    '<a href="/school/notifications" class="school-navigator-dashboard btn btn-outline-secondary mb-2 btn-md"><i class="bi bi-bell me-1"></i> Notifications</a>'
+    '<a href="/school/tasks" class="school-navigator-dashboard btn btn-outline-secondary mb-2 btn-md"><i class="bi bi-bell me-1"></i> Tasks</a>'
   ]
 }) %>
 
 <div class="card-container size-md mb-3">
-  <form id="notificationRoutingForm">
+  <form id="taskRoutingForm">
     <input type="hidden" name="id" id="routingRuleId" value="">
     <input type="hidden" name="assigneePersonId" id="routingAssigneePersonId" value="">
     <input type="hidden" name="assigneePersonName" id="routingAssigneePersonName" value="">
@@ -72,7 +72,7 @@
     </thead>
     <tbody>
       <% if (!rules || rules.length === 0) { %>
-        <tr><td colspan="6" class="text-center py-4 text-muted">No notification routing rules are configured.</td></tr>
+        <tr><td colspan="6" class="text-center py-4 text-muted">No task routing rules are configured.</td></tr>
       <% } %>
       <% (rules || []).forEach((rule) => { %>
         <tr>
@@ -119,13 +119,13 @@
   </table>
 </div>
 
-<span id="urlRef" data-id="school/notifications/routing" hidden></span>
+<span id="urlRef" data-id="school/tasks/routing" hidden></span>
 <%- include('partials/modal_GenericPicker', { user }) %>
 <%- include('partials/tablePages-end') %>
 
 <script>
   (function () {
-    const form = document.getElementById('notificationRoutingForm');
+    const form = document.getElementById('taskRoutingForm');
     const ruleId = document.getElementById('routingRuleId');
     const sourceType = document.getElementById('routingSourceType');
     const assigneeId = document.getElementById('routingAssigneePersonId');
@@ -148,14 +148,14 @@
     async function showRoutingMessage({ title, message, icon = 'info', buttons, size = 'md' } = {}) {
       if (typeof window.showMessageModal === 'function') {
         return window.showMessageModal({
-          title: title || 'Notification Routing',
+          title: title || 'Task Routing',
           icon,
           message: message || '',
           size,
           buttons: buttons && buttons.length ? buttons : [{ text: 'OK', class: 'btn-primary' }]
         });
       }
-      console.warn(`${title || 'Notification Routing'}: ${message || ''}`);
+      console.warn(`${title || 'Task Routing'}: ${message || ''}`);
       return buttons?.[0]?.text || 'OK';
     }
 
@@ -209,7 +209,7 @@
         : undefined;
       const config = GenericPickerPresets.person({
         title: 'Select Primary Assignee',
-        apiEndpoint: '/school/notifications/api/eligible-persons',
+        apiEndpoint: '/school/tasks/api/eligible-persons',
         searchFields: 'id,firstName,lastName,name.first,name.last,name.preferred,preferredName,email,personId',
         context
       });
@@ -227,7 +227,7 @@
     }
 
     async function postRule(payload) {
-      const response = await fetch('/school/notifications/api/routing', {
+      const response = await fetch('/school/tasks/api/routing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -238,7 +238,7 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.status === 'error') {
         await showRoutingMessage({
-          title: 'Notification Routing',
+          title: 'Task Routing',
           icon: 'error',
           message: escapeHtml(data.message || 'The routing rule could not be saved.'),
           buttons: [{ text: 'OK', class: 'btn-danger' }]
@@ -267,7 +267,7 @@
         const result = await showRoutingMessage({
           title: `${action} Routing Rule`,
           icon: 'warning',
-          message: `${action} this notification routing rule?`,
+          message: `${action} this task routing rule?`,
           buttons: [
             { text: 'Cancel', class: 'btn-secondary' },
             { text: action, class: button.dataset.active === 'false' ? 'btn-warning' : 'btn-primary' }

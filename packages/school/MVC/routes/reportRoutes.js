@@ -118,7 +118,7 @@ router.get('/templates/new',
 
 router.post('/templates/new',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
-  upload('reports').single('docxTemplate'),
+  upload('school-reports').single('docxTemplate'),
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, { requireToken: true }),
   ctrl.saveTemplate);
 
@@ -129,7 +129,7 @@ router.get('/templates/edit/:id',
 
 router.post('/templates/edit/:id',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
-  upload('reports').single('docxTemplate'),
+  upload('school-reports').single('docxTemplate'),
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
   ctrl.saveTemplate);
 

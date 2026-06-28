@@ -286,7 +286,7 @@ async function assertNoAssignmentScheduleConflicts({
           const sessionDate = String(session?.date || '').trim();
           if (!sessionDate || sessionDate !== target.date) continue;
           const deliveredBy = String(session?.delivery?.deliveredBy || '').trim();
-          const teacherAssigned = instructorSet.has(teacherId) || (deliveredBy && deliveredBy === teacherId);
+          const teacherAssigned = deliveredBy ? deliveredBy === teacherId : instructorSet.has(teacherId);
           if (!teacherAssigned) continue;
 
           const sessionStart = normalizeTimeValue(session?.startTime);

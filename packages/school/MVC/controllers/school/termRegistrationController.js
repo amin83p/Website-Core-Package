@@ -889,8 +889,14 @@ exports.previewBatchRegistration = async (req, res) => {
     const payload = normalizeTermBatchPayload(req.body);
 
     const preview = await buildTermBatchPreview(req.user, activeOrgId, payload);
+    const status = preview.summary.errorRows ? (preview.summary.readyRows ? 'warning' : 'error') : 'success';
     return res.json({
-      status: preview.summary.errorRows ? (preview.summary.readyRows ? 'warning' : 'error') : 'success',
+      status,
+      message: status === 'success'
+        ? 'Batch term registration preview completed.'
+        : (status === 'warning'
+          ? 'Batch term registration preview completed with warnings or blocked rows.'
+          : 'Batch term registration preview found blocking eligibility issues.'),
       preview: {
         effectiveDate: preview.effectiveDate,
         effectiveDateIssue: preview.effectiveDateIssue,
@@ -902,7 +908,15 @@ exports.previewBatchRegistration = async (req, res) => {
       }
     });
   } catch (error) {
-    return res.status(400).json({ status: 'error', message: error.message });
+    return res.status(400).json({
+      status: 'error',
+      message: String(error?.message || 'Batch term registration preview failed.'),
+      details: {
+        effectiveDateIssue: '',
+        aggregateIssues: [String(error?.message || 'Batch term registration preview failed.')],
+        rows: []
+      }
+    });
   }
 };
 

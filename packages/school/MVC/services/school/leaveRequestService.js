@@ -1,6 +1,6 @@
 const schoolRepositories = require('../../repositories/school');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
-const notificationService = require('./notificationService');
+const taskService = require('./taskService');
 const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -403,7 +403,7 @@ async function buildCreatePayload(reqUser, input = {}) {
 async function createRequest(reqUser, input = {}) {
   const payload = await buildCreatePayload(reqUser, input);
   const created = await schoolRepositories.leaveRequests.create(payload, normalizeQueryScope(reqUser));
-  await syncLeaveRequestNotification('upsert', created, reqUser, {
+  await syncLeaveRequestTask('upsert', created, reqUser, {
     note: 'Leave request submitted.'
   });
   return created;
@@ -473,12 +473,12 @@ async function updateRequest(reqUser, id, input = {}, options = {}) {
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
   if (String(updated?.status || '').toLowerCase() === 'pending_reapproval') {
-    await syncLeaveRequestNotification('upsert', updated, reqUser, {
+    await syncLeaveRequestTask('upsert', updated, reqUser, {
       severity: 'warning',
       note: 'Approved leave request was modified and needs reapproval.'
     });
   } else if (String(updated?.status || '').toLowerCase() === 'submitted') {
-    await syncLeaveRequestNotification('upsert', updated, reqUser, {
+    await syncLeaveRequestTask('upsert', updated, reqUser, {
       note: 'Leave request was modified.'
     });
   }
@@ -527,7 +527,7 @@ async function approveRequest(reqUser, id, note = '') {
   ];
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
-  await syncLeaveRequestNotification('resolve', updated, reqUser, {
+  await syncLeaveRequestTask('resolve', updated, reqUser, {
     action: 'leave_request_approved',
     note: cleanString(note || 'Leave request approved.', 1000)
   });
@@ -573,7 +573,7 @@ async function rejectRequest(reqUser, id, note = '') {
   };
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
-  await syncLeaveRequestNotification('resolve', updated, reqUser, {
+  await syncLeaveRequestTask('resolve', updated, reqUser, {
     action: 'leave_request_rejected',
     note: cleanString(note || 'Leave request rejected.', 1000)
   });
@@ -621,7 +621,7 @@ async function cancelRequest(reqUser, id, note = '') {
   };
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
-  await syncLeaveRequestNotification('resolve', updated, reqUser, {
+  await syncLeaveRequestTask('resolve', updated, reqUser, {
     action: 'leave_request_cancelled',
     note: cleanString(note || 'Leave request cancelled.', 1000)
   });
@@ -637,13 +637,13 @@ async function deleteRequest(reqUser, id) {
     throw error;
   }
   try {
-    await notificationService.deleteSourceNotification({
+    await taskService.deleteSourceTask({
       orgId: existing.orgId,
       sourceType: 'leave_request',
       sourceId: existing.id
     }, reqUser);
   } catch (error) {
-    console.warn(`School notification sync skipped for delete leave request ${existing.id || ''}: ${error.message}`);
+    console.warn(`School task sync skipped for delete leave request ${existing.id || ''}: ${error.message}`);
   }
   const removed = await schoolRepositories.leaveRequests.remove(existing.id, normalizeQueryScope(reqUser));
   if (removed === false) {
@@ -657,15 +657,15 @@ async function deleteRequest(reqUser, id) {
   };
 }
 
-async function syncLeaveRequestNotification(action, row, reqUser, options = {}) {
+async function syncLeaveRequestTask(action, row, reqUser, options = {}) {
   try {
     if (action === 'resolve') {
-      await notificationService.resolveLeaveRequestNotification(row, reqUser, options);
+      await taskService.resolveLeaveRequestTask(row, reqUser, options);
       return;
     }
-    await notificationService.upsertLeaveRequestNotification(row, reqUser, options);
+    await taskService.upsertLeaveRequestTask(row, reqUser, options);
   } catch (error) {
-    console.warn(`School notification sync skipped for leave request ${row?.id || ''}: ${error.message}`);
+    console.warn(`School task sync skipped for leave request ${row?.id || ''}: ${error.message}`);
   }
 }
 

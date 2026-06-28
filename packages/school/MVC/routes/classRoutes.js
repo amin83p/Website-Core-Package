@@ -2,11 +2,13 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/school/classController');
+const programRegistrationCtrl = require('../controllers/school/programRegistrationController');
 const { requireCoreModule } = require('../services/school/schoolCoreContracts');
 const accessService = requireCoreModule('MVC/services/security/index');
 const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
 const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
 const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
+const upload = requireCoreModule('MVC/middleware/upload');
 const { SECTIONS, OPERATIONS } = require('./schoolRouteDependencies');
 
 router.use(requireAuth);
@@ -204,6 +206,10 @@ router.post('/api/check-conflicts',
   requireAnyClassMutationAccess(),
   ctrl.checkConflicts);
 
+router.post('/api/:classId/teacher-assignment-impact',
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
+  ctrl.previewTeacherAssignmentImpact);
+
 // --- Class Enrollment Periods & Rolling Cycle API ---
 router.get('/api/:classId/enrollment-periods',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL),
@@ -214,6 +220,27 @@ router.get('/api/:classId/rolling-eligibility',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL, { keepActive: true }),
   ctrl.previewRollingEnrollmentEligibility);
+
+router.post('/api/:classId/rolling-program-registration/preview',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  ctrl.assertRollingProgramRegistrationShortcutContext,
+  programRegistrationCtrl.previewBatchRegistration);
+
+router.post('/api/:classId/rolling-program-registration/apply',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  ctrl.assertRollingProgramRegistrationShortcutContext,
+  programRegistrationCtrl.applyBatchRegistration);
+
+router.post('/api/:classId/rolling-program-registration/approve/:registrationId',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  ctrl.assertRollingProgramRegistrationShortcutContext,
+  programRegistrationCtrl.approveRegistration);
 
 router.post('/api/enrollment-periods/preview-create',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
@@ -309,6 +336,20 @@ router.get('/:id/sessions/:sessionId',
 router.get('/:id/sessions/:sessionId/cases',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
   ctrl.listSessionStudentCases);
+router.post('/:id/sessions/:sessionId/files/upload',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  upload('school-class-workspace', true).single('file'),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
+  ctrl.uploadSessionFile);
+router.post('/:id/sessions/:sessionId/makeup',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, {
+    requireToken: false,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.createMakeupSession);
 router.post('/:id/sessions/:sessionId/cases',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, {
@@ -335,7 +376,8 @@ router.post('/:id/sessions/:sessionId/cases/:caseId/status',
     allowOperationTokenFallback: true,
     allowInactiveTokenFallback: true
   }),
-  ctrl.updateSessionStudentCaseStatus);router.post('/:id/sessions/:sessionId/gradebooks/save',
+  ctrl.updateSessionStudentCaseStatus);
+router.post('/:id/sessions/:sessionId/gradebooks/save',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),
   ctrl.saveSessionGradebooks);

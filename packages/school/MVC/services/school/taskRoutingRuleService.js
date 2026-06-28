@@ -1,5 +1,5 @@
 const schoolRepositories = require('../../repositories/school');
-const routingRuleModel = require('../../models/school/notificationRoutingRuleModel');
+const routingRuleModel = require('../../models/school/taskRoutingRuleModel');
 const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -14,7 +14,7 @@ function cleanString(value, max = 5000) {
 
 function normalizeSourceType(value, fallback = 'leave_request') {
   const token = cleanString(value, 80).toLowerCase();
-  return routingRuleModel.NOTIFICATION_ROUTING_SOURCE_TYPES.includes(token) ? token : fallback;
+  return routingRuleModel.TASK_ROUTING_SOURCE_TYPES.includes(token) ? token : fallback;
 }
 
 function getActiveOrgId(user) {
@@ -26,15 +26,15 @@ function getActorId(user) {
 }
 
 function isAdminViewer(user) {
-  return Boolean(adminChekersService.isAdminForRequest(user, SECTIONS.SCHOOL_NOTIFICATIONS, OPERATIONS.CONFIGURE, {
+  return Boolean(adminChekersService.isAdminForRequest(user, SECTIONS.SCHOOL_TASKS, OPERATIONS.CONFIGURE, {
     orgId: getActiveOrgId(user),
-    section: { id: SECTIONS.SCHOOL_NOTIFICATIONS, category: 'SCHOOL' }
+    section: { id: SECTIONS.SCHOOL_TASKS, category: 'SCHOOL' }
   }));
 }
 
 function assertAdmin(user) {
   if (isAdminViewer(user)) return;
-  const error = new Error('Only school administrators can manage notification routing rules.');
+  const error = new Error('Only school administrators can manage task routing rules.');
   error.statusCode = 403;
   throw error;
 }
@@ -76,7 +76,7 @@ async function listRoutingRules(reqUser, filters = {}) {
     if (['true', '1', 'active'].includes(token)) query.active = true;
     if (['false', '0', 'inactive'].includes(token)) query.active = false;
   }
-  const rows = await schoolRepositories.notificationRoutingRules.list(normalizeScope(reqUser, query));
+  const rows = await schoolRepositories.taskRoutingRules.list(normalizeScope(reqUser, query));
   return Promise.all((Array.isArray(rows) ? rows : [])
     .sort((a, b) => String(a.sourceType || '').localeCompare(String(b.sourceType || '')))
     .map(enrichRuleForDisplay));
@@ -86,7 +86,7 @@ async function getActiveRuleForSource({ orgId, sourceType, reqUser } = {}) {
   const targetOrgId = toPublicId(orgId || getActiveOrgId(reqUser));
   const normalizedSource = normalizeSourceType(sourceType, '');
   if (!targetOrgId || !normalizedSource) return null;
-  const rows = await schoolRepositories.notificationRoutingRules.list({
+  const rows = await schoolRepositories.taskRoutingRules.list({
     query: {
       sourceType: normalizedSource,
       active: true
@@ -135,20 +135,20 @@ async function saveRoutingRule(reqUser, input = {}) {
 
   const requestedId = toPublicId(input.id || '');
   const existingById = requestedId
-    ? await schoolRepositories.notificationRoutingRules.getById(requestedId, { skipExecutor: true })
+    ? await schoolRepositories.taskRoutingRules.getById(requestedId, { skipExecutor: true })
     : null;
   if (existingById) {
     if (!idsEqual(existingById.orgId, orgId)) {
-      const error = new Error('Notification routing rule is outside the active organization.');
+      const error = new Error('Task routing rule is outside the active organization.');
       error.statusCode = 403;
       throw error;
     }
     return enrichRuleForDisplay(
-      await schoolRepositories.notificationRoutingRules.update(existingById.id, payload, normalizeScope(reqUser))
+      await schoolRepositories.taskRoutingRules.update(existingById.id, payload, normalizeScope(reqUser))
     );
   }
 
-  const existingRows = await schoolRepositories.notificationRoutingRules.list({
+  const existingRows = await schoolRepositories.taskRoutingRules.list({
     query: { sourceType },
     scope: { activeOrgId: orgId },
     skipExecutor: true
@@ -159,13 +159,13 @@ async function saveRoutingRule(reqUser, input = {}) {
 
   if (existingForSource) {
     return enrichRuleForDisplay(
-      await schoolRepositories.notificationRoutingRules.update(existingForSource.id, payload, normalizeScope(reqUser))
+      await schoolRepositories.taskRoutingRules.update(existingForSource.id, payload, normalizeScope(reqUser))
     );
   }
 
   payload.audit.createdBy = getActorId(reqUser);
   return enrichRuleForDisplay(
-    await schoolRepositories.notificationRoutingRules.create(payload, normalizeScope(reqUser))
+    await schoolRepositories.taskRoutingRules.create(payload, normalizeScope(reqUser))
   );
 }
 

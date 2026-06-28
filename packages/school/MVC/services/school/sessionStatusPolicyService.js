@@ -231,21 +231,21 @@ function shouldExcludeFromAttendanceByMap(statusMap, { status, notes = '' } = {}
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
   if (normalized === 'holiday') return true;
   if (!definition) return normalized === 'cancelled';
-  return definition.excludeFromAttendance === true;
+  return definition.excludeFromAttendance === true || definition.makeUpRequired === true;
 }
 
 function shouldExcludeFromTeacherIndexByMap(statusMap, { status, notes = '' } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
   if (normalized === 'holiday') return true;
   if (!definition) return normalized === 'cancelled';
-  return definition.excludeFromTeacherIndex === true;
+  return definition.excludeFromTeacherIndex === true || definition.makeUpRequired === true;
 }
 
 function shouldExcludeFromStudentIndexByMap(statusMap, { status, notes = '' } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
   if (normalized === 'holiday') return true;
   if (!definition) return normalized === 'cancelled';
-  return definition.excludeFromStudentIndex === true;
+  return definition.excludeFromStudentIndex === true || definition.makeUpRequired === true;
 }
 
 function evaluateTimesheetFormula(formula, durationHours) {

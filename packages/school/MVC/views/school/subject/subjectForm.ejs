@@ -40,6 +40,7 @@
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-config" type="button">Configuration & Req.</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-scoreRules" type="button">Default Score Rules</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-fees" type="button">Fee Rules</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-attachments" type="button">Attachments</button></li>
       </ul>
 
       <div class="tab-content">
@@ -188,6 +189,38 @@
            </div>
         </div>
 
+        <div class="tab-pane fade" id="tab-attachments">
+           <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h6 class="fw-bold text-primary mb-1">Subject Attachments</h6>
+                <div class="small text-muted">Files are stored in the School subject workspace on the shared upload volume.</div>
+              </div>
+           </div>
+           <% if (!isEdit) { %>
+             <div class="alert alert-info">Save the subject first, then reopen it to upload subject attachments.</div>
+           <% } else { %>
+             <div class="row g-2 align-items-end mb-3">
+               <div class="col-md-8">
+                 <label class="form-label fw-bold" for="subjectAttachmentFile">Upload attachment</label>
+                 <input type="file" class="form-control" id="subjectAttachmentFile">
+               </div>
+               <div class="col-md-4">
+                 <button type="button" class="btn btn-outline-primary w-100" id="btnUploadSubjectAttachment"><i class="bi bi-upload me-1"></i>Upload</button>
+               </div>
+             </div>
+           <% } %>
+           <div class="table-responsive border rounded bg-white">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr><th>File</th><th style="width:140px;">Size</th><th style="width:190px;">Uploaded</th><th style="width:120px;"></th></tr>
+                </thead>
+                <tbody id="subjectAttachmentsTbody">
+                  <tr><td colspan="4" class="text-center text-muted py-4">No attachments.</td></tr>
+                </tbody>
+              </table>
+           </div>
+        </div>
+
       </div>
 
       <div class="button-row mt-4 pt-3 border-top">
@@ -208,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dConf = JSON.parse(document.getElementById('hid_configuration').value);
     const dPre = JSON.parse(document.getElementById('hid_prerequisites').value);
     let feeRulesState = JSON.parse(document.getElementById('hid_feeRules').value || '[]');
+    let attachmentsState = JSON.parse(document.getElementById('hid_attachments').value || '[]');
     const defaultScoreRulesState = JSON.parse(document.getElementById('hid_defaultScoreRules').value || '{}');
     const feeCategories = <%- JSON.stringify(typeof feeCategories !== 'undefined' ? feeCategories : []) %>;
     const allFeeCategoryKey = <%- JSON.stringify(typeof allFeeCategoryKey !== 'undefined' ? allFeeCategoryKey : '__ALL__') %>;
@@ -328,6 +362,105 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderFeeRules();
 
+    function attachmentEscape(value) {
+        return String(value || '').replace(/[&<>"']/g, function (m) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+        });
+    }
+
+    function formatAttachmentSize(size) {
+        const n = Number(size || 0);
+        if (!Number.isFinite(n) || n <= 0) return '-';
+        if (n < 1024) return `${n} B`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+        return `${(n / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function renderSubjectAttachments() {
+        const tbody = document.getElementById('subjectAttachmentsTbody');
+        if (!tbody) return;
+        document.getElementById('hid_attachments').value = JSON.stringify(Array.isArray(attachmentsState) ? attachmentsState : []);
+        if (!Array.isArray(attachmentsState) || !attachmentsState.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No attachments.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = attachmentsState.map((att, index) => {
+            const href = String(att?.url || att?.uploadUrl || att?.storagePath || att?.path || '').trim();
+            const label = attachmentEscape(att?.originalName || att?.name || att?.filename || 'Attachment');
+            return `<tr>
+                <td>${href ? `<a href="${attachmentEscape(href)}" target="_blank" rel="noopener"><i class="bi bi-paperclip me-1"></i>${label}</a>` : label}</td>
+                <td>${attachmentEscape(formatAttachmentSize(att?.size))}</td>
+                <td class="small text-muted">${attachmentEscape(att?.uploadedAt ? new Date(att.uploadedAt).toLocaleString() : '-')}</td>
+                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger btn-delete-subject-attachment" data-id="${attachmentEscape(att?.id || index)}"><i class="bi bi-trash"></i></button></td>
+            </tr>`;
+        }).join('');
+    }
+
+    renderSubjectAttachments();
+
+    const uploadSubjectAttachmentBtn = document.getElementById('btnUploadSubjectAttachment');
+    if (uploadSubjectAttachmentBtn) {
+        uploadSubjectAttachmentBtn.addEventListener('click', async () => {
+            const input = document.getElementById('subjectAttachmentFile');
+            const file = input?.files && input.files[0];
+            if (!file) return;
+            const original = uploadSubjectAttachmentBtn.innerHTML;
+            uploadSubjectAttachmentBtn.disabled = true;
+            uploadSubjectAttachmentBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Uploading...';
+            try {
+                const body = new FormData();
+                body.append('file', file);
+                body.append('subjectId', <%- JSON.stringify(s.id || '') %>);
+                body.append('actionStateId', <%- JSON.stringify(asid) %>);
+                const res = await fetch(`/school/subjects/${encodeURIComponent(<%- JSON.stringify(s.id || '') %>)}/attachments/upload`, {
+                    method: 'POST',
+                    headers: { 'X-AJAX-Request': 'true' },
+                    body
+                });
+                const result = await res.json().catch(() => null);
+                if (!res.ok || !result || result.status !== 'success') throw new Error(result?.message || 'Upload failed.');
+                attachmentsState = Array.isArray(result.attachments) ? result.attachments : attachmentsState.concat(result.attachment || []);
+                if (input) input.value = '';
+                renderSubjectAttachments();
+            } catch (error) {
+                if (typeof showMessageModal === 'function') {
+                    showMessageModal({ title: 'Subject Attachment', icon: 'error', message: error.message || 'Could not upload attachment.', buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+                } else {
+                    alert(error.message || 'Could not upload attachment.');
+                }
+            } finally {
+                uploadSubjectAttachmentBtn.disabled = false;
+                uploadSubjectAttachmentBtn.innerHTML = original;
+            }
+        });
+    }
+
+    document.getElementById('subjectAttachmentsTbody')?.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-delete-subject-attachment');
+        if (!btn) return;
+        const attId = String(btn.dataset.id || '').trim();
+        if (!attId) return;
+        btn.disabled = true;
+        try {
+            const res = await fetch(`/school/subjects/${encodeURIComponent(<%- JSON.stringify(s.id || '') %>)}/attachments/${encodeURIComponent(attId)}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify({ actionStateId: <%- JSON.stringify(asid) %> })
+            });
+            const result = await res.json().catch(() => null);
+            if (!res.ok || !result || result.status !== 'success') throw new Error(result?.message || 'Delete failed.');
+            attachmentsState = Array.isArray(result.attachments) ? result.attachments : attachmentsState.filter((att, index) => String(att?.id || index) !== attId);
+            renderSubjectAttachments();
+        } catch (error) {
+            btn.disabled = false;
+            if (typeof showMessageModal === 'function') {
+                showMessageModal({ title: 'Subject Attachment', icon: 'error', message: error.message || 'Could not delete attachment.', buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+            } else {
+                alert(error.message || 'Could not delete attachment.');
+            }
+        }
+    });
+
     // NEW: Department Picker
     const deptBtn = document.getElementById('openDeptPickerBtn');
     if(deptBtn) {
@@ -440,6 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const rawPre = document.getElementById('inp_prereq').value;
             const prereqs = rawPre.split(',').map(s => s.trim()).filter(Boolean);
             document.getElementById('hid_prerequisites').value = JSON.stringify(prereqs);
+            document.getElementById('hid_attachments').value = JSON.stringify(Array.isArray(attachmentsState) ? attachmentsState : []);
             document.getElementById('hid_feeRules').value = JSON.stringify(feeRulesState);
             document.getElementById('hid_defaultScoreRules').value = JSON.stringify({
                 minPassingScore: document.getElementById('inp_defaultMinPassingScore').value.trim() === '' ? null : Number(document.getElementById('inp_defaultMinPassingScore').value),

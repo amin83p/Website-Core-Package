@@ -76,6 +76,11 @@ async function buildCurrentPayableIndex({ teacherId, periodStartDate, periodEndD
             const sessionId = normalizeId(sessionRow?.sessionId);
             if (!sessionId) return;
             const rawDurationHours = parseFloat(sessionRow?.durationHours) || 0;
+            const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
+                status: sessionRow?.status,
+                notes: sessionRow?.notes
+            });
+            if (!isFinalStatus) return;
             const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                 status: sessionRow?.status,
                 notes: sessionRow?.notes,

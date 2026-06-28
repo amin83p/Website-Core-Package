@@ -24,7 +24,7 @@ const SECTION_DOC = Object.freeze({
   id: SECTION_ID,
   name: SECTION_NAME,
   category: 'SCHOOL',
-  description: 'Full-width Master Academia Hub for reviewing people, attendance, schedules, sessions, classes, notifications, and leave requests from one workspace.',
+  description: 'Full-width Master Academia Hub for reviewing people, attendance, schedules, sessions, classes, tasks, and leave requests from one workspace.',
   active: true,
   trackState: true,
   minimumAccessRequirement: 5,

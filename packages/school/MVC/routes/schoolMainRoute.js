@@ -2,8 +2,11 @@ const express = require('express');
 
 const router = express.Router();
 const { SECTIONS } = require('./schoolRouteDependencies');
+const { registerSchoolUploadCategoryResolvers } = require('../services/school/schoolUploadCategoryRegistration');
 
 const SCHOOL_MOUNT_GUARD_KEY = '__schoolMainRouteMounted';
+
+registerSchoolUploadCategoryResolvers();
 
 router.use((req, _res, next) => {
   if (req?.[SCHOOL_MOUNT_GUARD_KEY]) return next('router');
@@ -17,6 +20,7 @@ router.use((req, res, next) => {
 });
 
 router.use('/master-hub', require('./schoolMasterAcademiaHubRoutes'));
+router.use('/identity', require('./schoolIdentityRoutes'));
 router.use('/students', require('./studentRoutes'));
 router.use('/teachers', require('./teacherRoutes'));
 router.use('/staff', require('./staffRoutes'));
@@ -45,7 +49,7 @@ router.use('/sessions', require('./sessionRoutes'));
 router.use('/reports', require('./reportRoutes'));
 router.use('/exams', require('./examRoutes'));
 router.use('/leave-requests', require('./leaveRequestRoutes'));
-router.use('/notifications', require('./notificationRoutes'));
+router.use('/tasks', require('./taskRoutes'));
 router.use('/withdrawal', require('./withdrawalRoutes'));
 router.use('/', require('./schoolRoutes'));
 

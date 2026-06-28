@@ -1,9 +1,10 @@
 const dataService = require('./schoolDataService');
 const schoolRepositories = require('../../repositories/school');
-const notificationService = require('./notificationService');
+const taskService = require('./taskService');
 const leaveRequestService = require('./leaveRequestService');
 const personDisplayNameService = require('./personDisplayNameService');
 const sessionExplorerService = require('./sessionExplorerService');
+const schoolIndexService = require('./schoolIndexService');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -51,6 +52,38 @@ const PEOPLE_MODULES = Object.freeze([
 
 function normalizeText(value = '') {
   return String(value || '').trim();
+}
+
+function normalizeDateOnly(value, label = 'date') {
+  const token = normalizeText(value);
+  if (!token) return '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) throw new Error(`Invalid ${label}. Use YYYY-MM-DD.`);
+  return token;
+}
+
+function normalizeClock(value, label = 'time') {
+  const token = normalizeText(value);
+  if (!token) return '';
+  if (!/^\d{2}:\d{2}$/.test(token)) throw new Error(`Invalid ${label}. Use HH:mm.`);
+  return token;
+}
+
+function normalizeBooleanInput(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return Boolean(fallback);
+  if (typeof value === 'boolean') return value;
+  const token = String(value || '').trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(token)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(token)) return false;
+  return Boolean(fallback);
+}
+
+function parseSessionRefs(input) {
+  return (Array.isArray(input) ? input : [])
+    .map((row) => ({
+      classId: toPublicId(row?.classId),
+      sessionId: toPublicId(row?.sessionId)
+    }))
+    .filter((row) => row.classId && row.sessionId);
 }
 
 function lower(value = '') {
@@ -155,8 +188,9 @@ function rowMatchesSearch(row, searchTerm) {
 async function evaluateModuleAccess(req, moduleConfig) {
   const user = req?.user;
   if (!user || !moduleConfig?.sectionId) return { allowed: false, scopeId: '' };
+  const operationId = moduleConfig.operationId || OPERATIONS.READ_ALL;
 
-  if (await adminAuthorityService.isAdminForRequestAsync(user, moduleConfig.sectionId, OPERATIONS.READ_ALL, {
+  if (await adminAuthorityService.isAdminForRequestAsync(user, moduleConfig.sectionId, operationId, {
     section: { id: moduleConfig.sectionId }
   })) {
     return { allowed: true, scopeId: '' };
@@ -165,7 +199,7 @@ async function evaluateModuleAccess(req, moduleConfig) {
   const evaluation = await accessService.evaluateAccess({
     user,
     sectionId: moduleConfig.sectionId,
-    operationId: OPERATIONS.READ_ALL,
+    operationId,
     ipAddress: req?.ip
   });
 
@@ -275,25 +309,25 @@ async function getPeoplePanelRows(type, queryInput, req) {
   };
 }
 
-const COMPLETE_NOTIFICATION_STATUSES = new Set(['resolved', 'dismissed']);
-const COMPLETE_TASK_STATUSES = new Set(['done', 'cancelled']);
+const COMPLETE_TASK_STATUSES = new Set(['resolved', 'dismissed']);
+const COMPLETE_TASK_ASSIGNMENT_STATUSES = new Set(['done', 'cancelled']);
 
-function hasIncompleteNotificationWork(notification) {
-  if (!notification || typeof notification !== 'object') {
+function hasIncompleteTaskWork(task) {
+  if (!task || typeof task !== 'object') {
     return false;
   }
 
-  if (!COMPLETE_NOTIFICATION_STATUSES.has(lower(notification.status || 'open'))) {
+  if (!COMPLETE_TASK_STATUSES.has(lower(task.status || 'open'))) {
     return true;
   }
 
-  const tasks = Array.isArray(notification.tasks) ? notification.tasks : [];
-  return tasks.some((task) => !COMPLETE_TASK_STATUSES.has(lower(task?.status || 'open')));
+  const assignments = Array.isArray(task.tasks) ? task.tasks : [];
+  return assignments.some((assignment) => !COMPLETE_TASK_ASSIGNMENT_STATUSES.has(lower(assignment?.status || 'open')));
 }
 
-function buildNotificationActionLinks(row) {
+function buildTaskActionLinks(row) {
   const id = normalizeText(row?.id);
-  const detailUrl = `/school/notifications/detail/${encodeURIComponent(id)}`;
+  const detailUrl = `/school/tasks/detail/${encodeURIComponent(id)}`;
   const status = lower(row?.status || 'open');
   const actions = [
     { label: 'Details', href: detailUrl, icon: 'bi bi-eye', tone: 'secondary' },
@@ -382,10 +416,10 @@ function rowMatchesWorkspaceSearch(row, searchTerm) {
   return lower(objectSearchText(row)).includes(term);
 }
 
-function normalizeNotificationRows(rows) {
+function normalizeTaskRows(rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => ({
     id: normalizeText(row?.id),
-    title: normalizeText(row?.title || row?.id || 'Notification'),
+    title: normalizeText(row?.title || row?.id || 'Task'),
     status: normalizeText(row?.status || 'open'),
     severity: normalizeText(row?.severity || 'info'),
     sourceType: normalizeText(row?.sourceType || ''),
@@ -396,7 +430,7 @@ function normalizeNotificationRows(rows) {
     taskCount: Array.isArray(row?.tasks) ? row.tasks.length : 0,
     incompleteTaskCount: (Array.isArray(row?.tasks) ? row.tasks : [])
       .filter((task) => !COMPLETE_TASK_STATUSES.has(lower(task?.status || 'open'))).length,
-    actions: buildNotificationActionLinks(row)
+    actions: buildTaskActionLinks(row)
   }));
 }
 
@@ -661,7 +695,7 @@ function getActiveUserRoleTokens(user) {
   return tokens;
 }
 
-function isNotificationRelatedToActiveUser(row, user) {
+function isTaskRelatedToActiveUser(row, user) {
   const personId = normalizeText(personDisplayNameService.getUserPersonId(user));
   const assignedPersonId = normalizeText(row?.assignedPersonId);
   if (personId && assignedPersonId && idsEqual(personId, assignedPersonId)) {
@@ -676,20 +710,20 @@ function isNotificationRelatedToActiveUser(row, user) {
   return false;
 }
 
-async function getActiveUserNotifications(req, filters = {}) {
+async function getActiveUserTasks(req, filters = {}) {
   const query = { ...(filters || {}) };
   delete query.assignment;
-  const visibleNotifications = await notificationService.listVisibleNotifications(req.user, query);
-  return (Array.isArray(visibleNotifications) ? visibleNotifications : [])
-    .filter((row) => isNotificationRelatedToActiveUser(row, req.user));
+  const visibleTasks = await taskService.listVisibleTasks(req.user, query);
+  return (Array.isArray(visibleTasks) ? visibleTasks : [])
+    .filter((row) => isTaskRelatedToActiveUser(row, req.user));
 }
 
-async function getNotificationSummary(req) {
-  const rows = await getActiveUserNotifications(req, { limit: 5000 });
+async function getTaskSummary(req) {
+  const rows = await getActiveUserTasks(req, { limit: 5000 });
 
   return {
     totalCount: rows.length,
-    unresolvedCount: rows.filter(hasIncompleteNotificationWork).length,
+    unresolvedCount: rows.filter(hasIncompleteTaskWork).length,
     checkedAt: new Date().toISOString()
   };
 }
@@ -739,6 +773,11 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       error.statusCode = 403;
       throw error;
     }
+    const updateAccess = await evaluateModuleAccess(req, {
+      label: 'Sessions',
+      sectionId: SECTIONS.SCHOOL_SESSIONS,
+      operationId: OPERATIONS.UPDATE
+    });
     const result = await sessionExplorerService.listSessions(req, queryInput || {});
     const rows = Array.isArray(result.rows) ? result.rows : [];
     return {
@@ -752,6 +791,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       total: rows.length,
       pagination: result.pagination,
       statusMeta: result.statusMeta,
+      canUpdateSessions: updateAccess.allowed === true,
       filters: result.filters,
       searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()
@@ -987,43 +1027,171 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     };
   }
 
-  if (key !== 'notifications') {
+  if (key !== 'tasks') {
     const error = new Error('This Master Academia Hub section is not available on-page yet.');
     error.statusCode = 404;
     throw error;
   }
 
   const access = await evaluateModuleAccess(req, {
-    label: 'Notifications',
-    sectionId: SECTIONS.SCHOOL_NOTIFICATIONS
+    label: 'Tasks',
+    sectionId: SECTIONS.SCHOOL_TASKS
   });
   if (!access.allowed) {
-    const error = new Error('You do not have access to Notifications.');
+    const error = new Error('You do not have access to Tasks.');
     error.statusCode = 403;
     throw error;
   }
 
-  const notificationRows = await getActiveUserNotifications(req, queryInput || {});
-  const rows = notificationRows.filter((row) => rowMatchesWorkspaceSearch(row, query.q || ''));
+  const taskRows = await getActiveUserTasks(req, queryInput || {});
+  const rows = taskRows.filter((row) => rowMatchesWorkspaceSearch(row, query.q || ''));
 
   return {
     section: {
-      key: 'notifications',
-      label: 'Notifications',
+      key: 'tasks',
+      label: 'Tasks',
       icon: 'bi bi-bell-fill',
-      sourceUrl: '/school/notifications'
+      sourceUrl: '/school/tasks'
     },
-    rows: normalizeNotificationRows(rows),
+    rows: normalizeTaskRows(rows),
     total: rows.length,
-    unresolvedCount: rows.filter(hasIncompleteNotificationWork).length,
+    unresolvedCount: rows.filter(hasIncompleteTaskWork).length,
     searchQuery: normalizeText(query.q || ''),
     refreshedAt: new Date().toISOString()
   };
 }
 
+async function assertSessionsUpdateAccess(req) {
+  const access = await evaluateModuleAccess(req, {
+    label: 'Sessions',
+    sectionId: SECTIONS.SCHOOL_SESSIONS,
+    operationId: OPERATIONS.UPDATE
+  });
+  if (!access.allowed) {
+    const error = new Error('You do not have permission to update sessions.');
+    error.statusCode = 403;
+    throw error;
+  }
+  return access;
+}
+
+async function lockWorkspaceSessions(input = {}, req = {}) {
+  await assertSessionsUpdateAccess(req);
+  const refs = parseSessionRefs(input.sessionRefs);
+  if (!refs.length) throw new Error('Select at least one session to lock.');
+
+  const grouped = new Map();
+  refs.forEach((ref) => {
+    if (!grouped.has(ref.classId)) grouped.set(ref.classId, new Set());
+    grouped.get(ref.classId).add(ref.sessionId);
+  });
+
+  const summary = {
+    requested: refs.length,
+    locked: 0,
+    alreadyLocked: 0,
+    missing: [],
+    classesUpdated: []
+  };
+
+  for (const [classId, sessionIds] of grouped.entries()) {
+    // eslint-disable-next-line no-await-in-loop
+    const classRow = await dataService.getDataById('classes', classId, req.user);
+    if (!classRow) {
+      sessionIds.forEach((sessionId) => summary.missing.push({ classId, sessionId }));
+      continue;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    const sessions = await dataService.getClassSessions(classId, req.user);
+    let changed = false;
+    (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+      const currentSessionId = toPublicId(session?.sessionId || session?.id);
+      if (!sessionIds.has(currentSessionId)) return;
+      if (session.locked === true || String(session.locked) === 'true') {
+        summary.alreadyLocked += 1;
+        return;
+      }
+      session.locked = true;
+      session.lockedAt = new Date().toISOString();
+      session.lockedBy = toPublicId(req.user?.id);
+      summary.locked += 1;
+      changed = true;
+    });
+    sessionIds.forEach((sessionId) => {
+      const found = (Array.isArray(sessions) ? sessions : []).some((session) => idsEqual(session?.sessionId || session?.id, sessionId));
+      if (!found) summary.missing.push({ classId, sessionId });
+    });
+    if (changed) {
+      // eslint-disable-next-line no-await-in-loop
+      await dataService.saveClassSessions(classId, sessions, req.user);
+      // eslint-disable-next-line no-await-in-loop
+      await schoolIndexService.rebuildIndexesForClass(classId);
+      summary.classesUpdated.push(classId);
+    }
+  }
+
+  return summary;
+}
+
+async function updateWorkspaceSession(input = {}, req = {}) {
+  await assertSessionsUpdateAccess(req);
+  const classId = toPublicId(input.classId);
+  const sessionId = toPublicId(input.sessionId);
+  if (!classId || !sessionId) throw new Error('classId and sessionId are required.');
+
+  const classRow = await dataService.getDataById('classes', classId, req.user);
+  if (!classRow) throw new Error('Class not found.');
+  const sessions = await dataService.getClassSessions(classId, req.user);
+  const index = (Array.isArray(sessions) ? sessions : []).findIndex((session) => idsEqual(session?.sessionId || session?.id, sessionId));
+  if (index < 0) throw new Error('Session not found.');
+
+  const session = sessions[index];
+  const nextDate = normalizeDateOnly(input.date, 'date') || session.date;
+  const nextStart = normalizeClock(input.startTime, 'startTime') || session.startTime || '';
+  const nextEnd = normalizeClock(input.endTime, 'endTime') || session.endTime || '';
+  if (nextStart && nextEnd && nextStart >= nextEnd) throw new Error('Start time must be before end time.');
+
+  session.date = nextDate;
+  session.startTime = nextStart;
+  session.endTime = nextEnd;
+  if (input.status !== undefined) session.status = normalizeText(input.status) || session.status;
+  if (input.room !== undefined) session.room = normalizeText(input.room).slice(0, 200);
+  if (input.notes !== undefined) session.notes = normalizeText(input.notes).slice(0, 2000);
+  if (input.locked !== undefined) {
+    const nextLocked = normalizeBooleanInput(input.locked, session.locked === true || String(session.locked) === 'true');
+    const wasLocked = session.locked === true || String(session.locked) === 'true';
+    session.locked = nextLocked;
+    if (nextLocked && !wasLocked) {
+      session.lockedAt = new Date().toISOString();
+      session.lockedBy = toPublicId(req.user?.id);
+    } else if (!nextLocked && wasLocked) {
+      session.unlockedAt = new Date().toISOString();
+      session.unlockedBy = toPublicId(req.user?.id);
+    }
+  }
+  if (input.teacherId !== undefined || input.teacherName !== undefined) {
+    const teacherId = toPublicId(input.teacherId);
+    if (!session.delivery || typeof session.delivery !== 'object') session.delivery = {};
+    session.delivery.deliveredBy = teacherId;
+    session.delivery.deliveredByName = normalizeText(input.teacherName).slice(0, 180);
+  }
+  session.audit = {
+    ...(session.audit || {}),
+    lastUpdateUser: toPublicId(req.user?.id),
+    lastUpdateDateTime: new Date().toISOString()
+  };
+
+  await dataService.saveClassSessions(classId, sessions, req.user);
+  await schoolIndexService.rebuildIndexesForClass(classId);
+
+  return { classId, sessionId, session };
+}
+
 module.exports = {
   resolveAccessibleModules,
   getPeoplePanelRows,
-  getNotificationSummary,
-  getWorkspaceSection
+  getTaskSummary,
+  getWorkspaceSection,
+  lockWorkspaceSessions,
+  updateWorkspaceSession
 };

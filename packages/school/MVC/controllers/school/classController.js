@@ -36,6 +36,8 @@ const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
+const schoolFileService = require('../../services/school/schoolFileService');
+const schoolRepositories = require('../../repositories/school');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { isRollingClassWorkflowEnabledForClass } = require('../../services/school/phase2FeatureFlagService');
 const {
@@ -1095,6 +1097,7 @@ function normalizeSessionContentItems(raw = []) {
             time: normalizeClockTime(row.time || ''),
             html: type === 'html' ? String(row.html || '').trim().slice(0, 120000) : '',
             fileUrl: type === 'file' ? String(row.fileUrl || '').trim().slice(0, 2000) : '',
+            file: type === 'file' && row.file && typeof row.file === 'object' ? schoolFileService.normalizeExistingAttachment(row.file) : null,
             notes: String(row.notes || '').trim().slice(0, 2000)
         });
     });
@@ -1494,6 +1497,213 @@ async function detectSessionConflicts({ classId = '', sessions = [], activeOrgId
     return conflicts;
 }
 
+function normalizeTeacherAssignmentTarget(value, fallback = '') {
+    const raw = String(value || '').trim();
+    if (raw === 'all') return 'all';
+    return sessionStatusPolicyService.normalizeStatusCode(raw) || sessionStatusPolicyService.normalizeStatusCode(fallback) || 'scheduled';
+}
+
+function sessionMatchesTeacherAssignmentCriteria(session = {}, criteria = {}) {
+    const oldTeacherId = cleanPersonId(criteria.oldTeacherId || criteria.oldTeacher || '');
+    const oldTeacherName = String(criteria.oldTeacherName || criteria.oldTeacher || '').trim();
+    const currentTeacherId = cleanPersonId(session?.delivery?.deliveredBy || '');
+    const currentTeacherName = String(session?.delivery?.deliveredByName || '').trim();
+    const selectedSessionIds = new Set((Array.isArray(criteria.sessionIds) ? criteria.sessionIds : [])
+        .map((id) => toPublicId(id))
+        .filter(Boolean));
+
+    if (selectedSessionIds.size) {
+        const sid = toPublicId(session?.sessionId || session?.id);
+        if (!sid || !selectedSessionIds.has(sid)) return false;
+    } else {
+        const teacherMatches = (oldTeacherId && currentTeacherId && idsEqual(currentTeacherId, oldTeacherId))
+            || (oldTeacherName && currentTeacherName === oldTeacherName)
+            || (!currentTeacherId && oldTeacherName && currentTeacherName === oldTeacherName);
+        if (!teacherMatches) return false;
+    }
+
+    const target = normalizeTeacherAssignmentTarget(criteria.targetStatus, 'scheduled');
+    const sessionStatus = sessionStatusPolicyService.normalizeStatusCode(session?.status) || sessionStatusPolicyService.normalizeStatusCode('scheduled');
+    if (target !== 'all' && sessionStatus !== target) return false;
+    if (!parseBoolean(criteria.includeLocked, false) && (session?.locked === true || String(session?.locked) === 'true')) return false;
+    return true;
+}
+
+function summarizeImpactRows(rows = [], label = 'item', limit = 5, mapper = null) {
+    const list = Array.isArray(rows) ? rows : [];
+    return {
+        label,
+        count: list.length,
+        samples: list.slice(0, limit).map((row) => (typeof mapper === 'function' ? mapper(row) : {
+            id: toPublicId(row?.id || row?._id || row?.sessionId || ''),
+            title: String(row?.title || row?.name || row?.status || '').trim()
+        }))
+    };
+}
+
+function rowReferencesAnySession(row = {}, refs = []) {
+    if (!row || typeof row !== 'object') return false;
+    const text = JSON.stringify(row);
+    return refs.some((ref) => {
+        const classId = String(ref?.classId || '').trim();
+        const sessionId = String(ref?.sessionId || '').trim();
+        if (!classId || !sessionId) return false;
+        return text.includes(classId) && text.includes(sessionId);
+    });
+}
+
+async function listImpactRows(entityType, repositoryName, reqUser) {
+    try {
+        const rows = await schoolDataService.fetchData(entityType, {}, reqUser);
+        if (Array.isArray(rows)) return rows;
+    } catch (_) { /* fallback below */ }
+    try {
+        const repo = schoolRepositories?.[repositoryName];
+        if (repo && typeof repo.list === 'function') {
+            const rows = await repo.list({ query: {}, scope: { canViewAll: true } });
+            if (Array.isArray(rows)) return rows;
+        }
+    } catch (_) { /* no-op */ }
+    return [];
+}
+
+async function previewTeacherAssignmentImpact(req, res) {
+    try {
+        const classId = toPublicId(req.params.classId || req.body.classId || '');
+        if (!classId) throw new Error('Class id is required.');
+        const { classData, activeOrgId } = await getClassByIdWithOrgCheck(classId, req.user);
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const criteria = {
+            oldTeacher: req.body.oldTeacher || '',
+            oldTeacherId: req.body.oldTeacherId || req.body.oldTeacher || '',
+            oldTeacherName: req.body.oldTeacherName || '',
+            newTeacherId: req.body.newTeacherId || '',
+            newTeacherName: req.body.newTeacherName || '',
+            targetStatus: req.body.targetStatus || 'scheduled',
+            includeLocked: req.body.includeLocked,
+            sessionIds: parseData(req.body.sessionIds) || []
+        };
+
+        const affectedSessions = (Array.isArray(sessions) ? sessions : [])
+            .filter((session) => sessionMatchesTeacherAssignmentCriteria(session, criteria))
+            .map((session) => ({
+                classId,
+                sessionId: toPublicId(session?.sessionId || session?.id),
+                date: String(session?.date || '').trim(),
+                startTime: String(session?.startTime || '').trim(),
+                endTime: String(session?.endTime || '').trim(),
+                status: sessionStatusPolicyService.normalizeStatusCode(session?.status) || String(session?.status || '').trim(),
+                locked: session?.locked === true || String(session?.locked) === 'true',
+                rosterCount: Array.isArray(session?.roster) ? session.roster.length : 0,
+                gradebookCount: Array.isArray(session?.gradebook) ? session.gradebook.length : 0,
+                hasAttendanceOrGradebook: Array.isArray(session?.roster) && session.roster.some((row) => (
+                    String(row?.attendanceStatus || row?.attendance || row?.comment || row?.notes || '').trim()
+                    || row?.classEffortPercent !== undefined
+                    || row?.classParticipationPercent !== undefined
+                ))
+            }));
+
+        const refs = affectedSessions.map((session) => ({ classId, sessionId: session.sessionId })).filter((ref) => ref.sessionId);
+        const [timesheets, reportAssignments, reportInstances, cases, tasks] = await Promise.all([
+            listImpactRows('timesheets', 'timesheets', req.user),
+            listImpactRows('reportAssignments', 'reportAssignments', req.user),
+            listImpactRows('reportInstances', 'reportInstances', req.user),
+            listImpactRows('sessionStudentCases', 'sessionStudentCases', req.user),
+            listImpactRows('tasks', 'tasks', req.user)
+        ]);
+
+        const oldTeacherId = cleanPersonId(criteria.oldTeacherId);
+        const newTeacherId = cleanPersonId(criteria.newTeacherId);
+        const impactedAssignments = (Array.isArray(reportAssignments) ? reportAssignments : []).filter((row) => {
+            if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) return false;
+            const teacherIds = Array.isArray(row?.teacherIds) ? row.teacherIds.map((id) => cleanPersonId(id)).filter(Boolean) : [];
+            const teacherMatch = oldTeacherId && teacherIds.some((id) => idsEqual(id, oldTeacherId));
+            const sessionMatch = affectedSessions.some((session) => reportAssignmentSessionUtils.reportAssignmentMatchesSession(row, {
+                classId,
+                sessionId: session.sessionId,
+                sessionDate: session.date
+            }));
+            return teacherMatch || sessionMatch;
+        });
+        const impactedCases = (Array.isArray(cases) ? cases : []).filter((row) => refs.some((ref) => idsEqual(row?.classId, ref.classId) && idsEqual(row?.sessionId, ref.sessionId)));
+        const impactedTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((row) => {
+            if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) return false;
+            const teacherId = cleanPersonId(row?.teacherId || row?.personId || row?.ownerPersonId || '');
+            const teacherMatch = oldTeacherId && (!teacherId || idsEqual(teacherId, oldTeacherId));
+            return teacherMatch && rowReferencesAnySession(row, refs);
+        });
+        const impactedInstances = (Array.isArray(reportInstances) ? reportInstances : []).filter((row) => rowReferencesAnySession(row, refs)
+            || impactedAssignments.some((assignment) => idsEqual(row?.assignmentId, assignment?.id)));
+        const impactedTasks = (Array.isArray(tasks) ? tasks : []).filter((row) => rowReferencesAnySession(row, refs)
+            || impactedCases.some((caseRow) => idsEqual(row?.sourceId, caseRow?.id)));
+        const sessionsWithAttendanceOrGradebook = affectedSessions.filter((session) => session.hasAttendanceOrGradebook || session.rosterCount || session.gradebookCount);
+
+        let leaveConflicts = [];
+        if (newTeacherId && affectedSessions.length) {
+            leaveConflicts = await leaveRequestService.findApprovedLeaveConflicts({
+                orgId: activeOrgId || classData?.orgId || '',
+                windows: affectedSessions
+                    .filter((session) => session.date && session.startTime && session.endTime)
+                    .map((session, index) => ({
+                        sessionIndex: index,
+                        personId: newTeacherId,
+                        personName: String(criteria.newTeacherName || newTeacherId),
+                        date: session.date,
+                        startTime: session.startTime,
+                        endTime: session.endTime
+                    })),
+                reqUser: req.user
+            });
+        }
+
+        return res.json({
+            status: 'success',
+            message: 'Teacher assignment impact preview is ready.',
+            impact: {
+                classId,
+                classTitle: String(classData?.title || classId).trim(),
+                oldTeacherId,
+                oldTeacherName: String(criteria.oldTeacherName || criteria.oldTeacher || oldTeacherId).trim(),
+                newTeacherId,
+                newTeacherName: String(criteria.newTeacherName || newTeacherId).trim(),
+                affectedSessions,
+                summaries: {
+                    timesheets: summarizeImpactRows(impactedTimesheets, 'timesheet', 5, (row) => ({
+                        id: toPublicId(row?.id),
+                        title: [row?.periodName || row?.periodId, row?.status].filter(Boolean).join(' | ')
+                    })),
+                    reportAssignments: summarizeImpactRows(impactedAssignments, 'report assignment', 5, (row) => ({
+                        id: toPublicId(row?.id),
+                        title: [row?.title || row?.templateId || 'Report assignment', row?.status].filter(Boolean).join(' | ')
+                    })),
+                    reportInstances: summarizeImpactRows(impactedInstances, 'report instance', 5, (row) => ({
+                        id: toPublicId(row?.id),
+                        title: [row?.title || row?.assignmentId || 'Report instance', row?.status].filter(Boolean).join(' | ')
+                    })),
+                    sessionCases: summarizeImpactRows(impactedCases, 'student case', 5, (row) => ({
+                        id: toPublicId(row?.id),
+                        title: [row?.summary || row?.category || 'Student case', row?.status].filter(Boolean).join(' | ')
+                    })),
+                    tasks: summarizeImpactRows(impactedTasks, 'task', 5, (row) => ({
+                        id: toPublicId(row?.id),
+                        title: [row?.title || row?.sourceType || 'Task', row?.status].filter(Boolean).join(' | ')
+                    })),
+                    attendanceGradebook: summarizeImpactRows(sessionsWithAttendanceOrGradebook, 'session with attendance/gradebook', 5, (row) => ({
+                        id: row.sessionId,
+                        title: `${row.date || ''} ${row.startTime || ''}-${row.endTime || ''}`.trim()
+                    })),
+                    newTeacherLeaveConflicts: summarizeImpactRows(leaveConflicts, 'approved leave conflict', 5, (row) => ({
+                        id: toPublicId(row?.leaveRequestId),
+                        title: `${row.date || ''} ${row.leaveLabel || ''}`.trim()
+                    }))
+                }
+            }
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
 function buildConflictBlockingMessage(conflicts = []) {
     if (!Array.isArray(conflicts) || !conflicts.length) return '';
     const lines = conflicts.slice(0, 5).map((c) =>
@@ -1579,6 +1789,120 @@ function assertRollingSessionsWithinCycleWindowOrThrow(input = {}) {
     throw new Error(parts.join(' '));
 }
 
+function resolveTermInstructionWindow(term = {}) {
+    const start = normalizeDateOnlyValue(term?.classesStartDate) || normalizeDateOnlyValue(term?.startDate);
+    const end = normalizeDateOnlyValue(term?.classesEndDate) || normalizeDateOnlyValue(term?.endDate);
+    return {
+        start,
+        end,
+        label: [term?.code || term?.termCode || term?.id, term?.name || term?.termName].filter(Boolean).join(' - ') || String(term?.id || 'Term')
+    };
+}
+
+async function resolveTermBasedSessionWindowOrThrow(classData = {}, reqUser) {
+    const allowedRows = Array.isArray(classData?.allowedProgramTerms) ? classData.allowedProgramTerms : [];
+    const termIds = [...new Set(allowedRows.map((row) => toPublicId(row?.termId)).filter(Boolean))];
+    if (!termIds.length) {
+        throw new Error('Term-based classes require at least one allowed program-term row before sessions can be scheduled.');
+    }
+
+    const activeOrgId = toPublicId(classData?.orgId || getActiveOrgIdOrThrow(reqUser));
+    const terms = await schoolDataService.fetchData('terms', {}, reqUser);
+    const termMap = new Map((Array.isArray(terms) ? terms : []).map((term) => [toPublicId(term?.id), term]));
+    const windows = termIds.map((termId) => {
+        const term = termMap.get(termId);
+        if (!term) throw new Error(`Selected term ${termId} is not accessible for session date validation.`);
+        if (activeOrgId && term?.orgId && !idsEqual(term.orgId, activeOrgId)) {
+            throw new Error(`Selected term ${termId} belongs to another organization.`);
+        }
+        const window = resolveTermInstructionWindow(term);
+        if (!window.start || !window.end) {
+            throw new Error(`Term ${window.label} needs start and end dates before sessions can be scheduled.`);
+        }
+        return { ...window, termId };
+    });
+
+    const startToken = windows.reduce((max, row) => (!max || row.start > max ? row.start : max), '');
+    const endToken = windows.reduce((min, row) => (!min || row.end < min ? row.end : min), '');
+    if (startToken && endToken && startToken > endToken) {
+        throw new Error('Term-based class session window has no overlap across the selected allowed terms. Review the Program / terms tab.');
+    }
+
+    return {
+        mode: 'term_based',
+        startToken,
+        endToken,
+        termCount: windows.length
+    };
+}
+
+async function assertClassSessionsWithinDateWindowOrThrow(classData = {}, sessions = [], reqUser) {
+    const rows = Array.isArray(sessions) ? sessions : [];
+    const hasSessionDates = rows.some((row) => String(row?.date || '').trim());
+    const mode = String(classData?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
+
+    if (mode === 'rolling') {
+        assertRollingSessionsWithinCycleWindowOrThrow({
+            registrationMode: classData?.registrationMode || 'term_based',
+            cycleStartDate: classData?.cycleStartDate || '',
+            cycleEndDate: classData?.cycleEndDate || '',
+            sessions: rows
+        });
+        return;
+    }
+
+    if (!hasSessionDates) return;
+
+    const window = await resolveTermBasedSessionWindowOrThrow(classData, reqUser);
+    const violations = [];
+    rows.forEach((row, index) => {
+        const dateToken = String(row?.date || '').trim();
+        if (!dateToken) return;
+        const normalizedDate = normalizeDateOnlyValue(dateToken);
+        if (!normalizedDate) {
+            violations.push({
+                type: 'invalid_session_date',
+                index,
+                date: dateToken,
+                sessionId: String(row?.sessionId || '').trim()
+            });
+            return;
+        }
+        if (normalizedDate < window.startToken || normalizedDate > window.endToken) {
+            violations.push({
+                type: 'out_of_term_window',
+                index,
+                date: normalizedDate,
+                sessionId: String(row?.sessionId || '').trim()
+            });
+        }
+    });
+
+    if (!violations.length) return;
+
+    const invalidDateCount = violations.filter((row) => row.type === 'invalid_session_date').length;
+    const outsideRows = violations.filter((row) => row.type === 'out_of_term_window');
+    const outsideSample = outsideRows.slice(0, 5).map((row) => {
+        const sid = String(row?.sessionId || '').trim();
+        return sid ? `${row.date} (${sid})` : row.date;
+    }).join(', ');
+    const outsideSuffix = outsideRows.length > 5 ? ` (+${outsideRows.length - 5} more)` : '';
+    const parts = [
+        `Term-based class sessions must stay within the selected term instructional window (${window.startToken} to ${window.endToken}).`
+    ];
+    if (invalidDateCount > 0) {
+        parts.push(`${invalidDateCount} session(s) have invalid date format.`);
+    }
+    if (outsideRows.length > 0) {
+        parts.push(`Out-of-window session date(s): ${outsideSample}${outsideSuffix}.`);
+    }
+    throw new Error(parts.join(' '));
+}
+
+async function assertSessionManagerSessionWithinClassWindowOrThrow(classData = {}, session = {}, reqUser) {
+    await assertClassSessionsWithinDateWindowOrThrow(classData, [session], reqUser);
+}
+
 function assertSessionManagerSessionWithinCycleWindowOrThrow(classData = {}, session = {}) {
     assertRollingSessionsWithinCycleWindowOrThrow({
         registrationMode: classData?.registrationMode || 'term_based',
@@ -1586,6 +1910,148 @@ function assertSessionManagerSessionWithinCycleWindowOrThrow(classData = {}, ses
         cycleEndDate: classData?.cycleEndDate || '',
         sessions: [session]
     });
+}
+
+function calculateSessionDurationHours(startTime = '', endTime = '', fallback = 0) {
+    const start = normalizeClockTime(startTime);
+    const end = normalizeClockTime(endTime);
+    if (!start || !end || start >= end) {
+        const fallbackNumber = Number(fallback);
+        return Number.isFinite(fallbackNumber) && fallbackNumber > 0 ? Number(fallbackNumber.toFixed(2)) : 0;
+    }
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    const minutes = ((eh * 60) + em) - ((sh * 60) + sm);
+    return minutes > 0 ? Number((minutes / 60).toFixed(2)) : 0;
+}
+
+function generateMakeupSessionId(existingSessions = []) {
+    const used = new Set((Array.isArray(existingSessions) ? existingSessions : [])
+        .map((row) => toPublicId(row?.sessionId || row?.id))
+        .filter(Boolean));
+    let id = '';
+    do {
+        id = `SES_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    } while (used.has(id));
+    return id;
+}
+
+function resetRosterForMakeup(roster = []) {
+    return (Array.isArray(roster) ? roster : [])
+        .map((row) => {
+            const personId = cleanPersonId(row?.personId);
+            if (!personId) return null;
+            return {
+                personId,
+                attendance: 'present',
+                lateMinutes: null,
+                earlyLeaveMinutes: null,
+                excuseRef: '',
+                excuseAttachment: null,
+                notes: '',
+                comments: [],
+                classEffortPercent: 100,
+                classParticipationPercent: 100,
+                respectsTeachersPercent: 100,
+                respectsStudentsPercent: 100
+            };
+        })
+        .filter(Boolean);
+}
+
+function resetGradebooksForMakeup(gradebooks = []) {
+    return (Array.isArray(gradebooks) ? gradebooks : []).map((row, index) => ({
+        id: String(row?.id || `GB_${Date.now()}_${index}`).trim(),
+        name: String(row?.name || '').trim(),
+        skillFocus: String(row?.skillFocus || '').trim(),
+        totalScore: Number(row?.totalScore || 0),
+        activityContent: String(row?.activityContent || ''),
+        includeInGradeCalculation: Boolean(row?.includeInGradeCalculation),
+        scores: {}
+    }));
+}
+
+async function assertCanCreateMakeupSession(req, classData, originalSession) {
+    if (isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE)) return;
+    const activePersonId = cleanPersonId(req.user?.personId);
+    const deliveredBy = cleanPersonId(originalSession?.delivery?.deliveredBy);
+    if (activePersonId && deliveredBy && idsEqual(activePersonId, deliveredBy)) return;
+    if (!deliveredBy && isUserInstructorOnClass(classData, activePersonId)) return;
+    throw new Error('Only the assigned teacher or a session administrator can create a make-up session for this session.');
+}
+
+function buildMakeupSession({ originalSession, classId, input, reqUser, defaultStatus }) {
+    const now = new Date().toISOString();
+    const date = normalizeDateOnlyValue(input?.date);
+    const startTime = normalizeClockTime(input?.startTime || originalSession?.startTime);
+    const endTime = normalizeClockTime(input?.endTime || originalSession?.endTime);
+    if (!date) throw new Error('Make-up session date is required.');
+    if (!startTime || !endTime || startTime >= endTime) throw new Error('Make-up session start time must be before end time.');
+
+    const teacherId = cleanPersonId(input?.teacherId || originalSession?.delivery?.deliveredBy || '');
+    const teacherName = String(input?.teacherName || originalSession?.delivery?.deliveredByName || teacherId || '').trim().slice(0, 180);
+    const originalSessionId = toPublicId(originalSession?.sessionId || originalSession?.id);
+    const newSession = {
+        sessionId: '',
+        date,
+        startTime,
+        endTime,
+        durationHours: calculateSessionDurationHours(startTime, endTime, originalSession?.durationHours),
+        status: String(defaultStatus || 'scheduled').trim() || 'scheduled',
+        notes: String(input?.notes || '').trim().slice(0, 2000),
+        room: String(input?.room || originalSession?.room || '').trim().slice(0, 200),
+        delivery: {
+            ...(originalSession?.delivery && typeof originalSession.delivery === 'object' ? originalSession.delivery : {}),
+            deliveredBy: teacherId,
+            deliveredByName: teacherName
+        },
+        roster: resetRosterForMakeup(originalSession?.roster),
+        contentItems: normalizeSessionContentItems(originalSession?.contentItems || []),
+        contentOrder: normalizeSessionContentOrder(originalSession?.contentOrder || []),
+        gradebooks: resetGradebooksForMakeup(originalSession?.gradebooks || []),
+        locked: false,
+        makeup: {
+            isMakeup: true,
+            originalClassId: toPublicId(classId),
+            originalSessionId,
+            originalStatus: sessionStatusPolicyService.normalizeSessionStatus(originalSession?.status, originalSession?.notes),
+            createdAt: now,
+            createdBy: toPublicId(reqUser?.id || reqUser?.username || ''),
+            createdByPersonId: cleanPersonId(reqUser?.personId),
+            reason: String(input?.reason || '').trim().slice(0, 1000)
+        },
+        audit: {
+            createUser: toPublicId(reqUser?.id || reqUser?.username || ''),
+            createDateTime: now,
+            lastUpdateUser: toPublicId(reqUser?.id || reqUser?.username || ''),
+            lastUpdateDateTime: now
+        }
+    };
+    if (!newSession.notes) newSession.notes = `Make-up for session ${originalSessionId}`;
+    return newSession;
+}
+
+function isMakeUpRequiredSessionByMap(statusMap, session = {}) {
+    const resolved = sessionStatusPolicyService.resolveStatusDefinition(statusMap, {
+        status: session?.status,
+        notes: session?.notes
+    });
+    return resolved?.definition?.makeUpRequired === true;
+}
+
+async function assertSessionInstructionalActiveForRequest(classId, sessionId, reqUser) {
+    const { classData } = await getClassByIdWithOrgCheck(classId, reqUser);
+    const sessions = await schoolDataService.getClassSessions(classId, reqUser);
+    const sessionIndex = (Array.isArray(sessions) ? sessions : [])
+        .findIndex((row) => idsEqual(row?.sessionId || row?.id, sessionId));
+    if (sessionIndex < 0) throw new Error('Session not found.');
+    const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(reqUser), {
+        includeInactive: true
+    });
+    if (isMakeUpRequiredSessionByMap(statusMap, sessions[sessionIndex])) {
+        throw new Error('This original session is inactive because its status requires a make-up session. Attendance, gradebook, content, cases, and files are not available for this session. Create or open the make-up session instead.');
+    }
+    return { classData, sessions, sessionIndex, session: sessions[sessionIndex], statusMap };
 }
 function buildClassFromBody(body, reqUserId, isNew = false, activeOrgId = '', existingRecord = null) {
   const now = new Date().toISOString();
@@ -1734,6 +2200,10 @@ async function resolveAllowedProgramTermsOrThrow(rows, activeOrgId, reqUser, opt
             programName: String(program.name || row?.programName || programId).trim(),
             termCode: String(allowedOnProgram.termCode || term.code || row?.termCode || '').trim().toUpperCase(),
             termName: String(allowedOnProgram.termName || term.name || row?.termName || termId).trim(),
+            startDate: String(term.startDate || row?.startDate || '').trim(),
+            endDate: String(term.endDate || row?.endDate || '').trim(),
+            classesStartDate: String(term.classesStartDate || row?.classesStartDate || '').trim(),
+            classesEndDate: String(term.classesEndDate || row?.classesEndDate || '').trim(),
             notes: String(row?.notes || '').trim()
         };
     }).sort((a, b) => a.order - b.order).map((item, index) => ({ ...item, order: index + 1 }));
@@ -2101,12 +2571,7 @@ async function addClass(req, res) {
     });
     assertRollingClassHasAllowedProgramOrThrow(item);
     assertRollingClassConfigAllowed(req, item, activeOrgId);
-    assertRollingSessionsWithinCycleWindowOrThrow({
-        registrationMode: item.registrationMode,
-        cycleStartDate: item.cycleStartDate,
-        cycleEndDate: item.cycleEndDate,
-        sessions
-    });
+    await assertClassSessionsWithinDateWindowOrThrow(item, sessions, req.user);
     if (item.billingMode === 'chargeable') {
         validateChargeablePostingTemplatesOrThrow(item.postingTemplates);
         item.postingTemplates = await resolvePostingPoliciesOrThrow(item.postingTemplates, activeOrgId, req.user);
@@ -2317,6 +2782,7 @@ async function showRollingEnrollmentPage(req, res) {
       studentOptions,
       periodRows,
       enrollmentProgramChoices: buildRollingEnrollmentProgramChoices(classData),
+      canCreateProgramRegistrations: await canCreateOrgScopedItem(req.user, { scopeLabel: 'program registrations' }),
       tableName: ROLLING_ENROLLMENT_TABLE_NAME,
       searchableFields: [...ROLLING_ENROLLMENT_SEARCHABLE_FIELDS],
       includeModal: true,
@@ -2414,12 +2880,7 @@ async function editClass(req, res) {
     });
     assertRollingClassHasAllowedProgramOrThrow(updates);
     assertRollingClassConfigAllowed(req, updates, existing?.orgId || activeOrgId);
-    assertRollingSessionsWithinCycleWindowOrThrow({
-        registrationMode: updates.registrationMode,
-        cycleStartDate: updates.cycleStartDate,
-        cycleEndDate: updates.cycleEndDate,
-        sessions
-    });
+    await assertClassSessionsWithinDateWindowOrThrow(updates, sessions, req.user);
     if (updates.billingMode === 'chargeable') {
         validateChargeablePostingTemplatesOrThrow(updates.postingTemplates);
         updates.postingTemplates = await resolvePostingPoliciesOrThrow(updates.postingTemplates, existing?.orgId || activeOrgId, req.user);
@@ -2508,12 +2969,15 @@ async function checkConflicts(req, res) {
     const requestedMode = String(req.body?.registrationMode || classData?.registrationMode || 'term_based').trim().toLowerCase();
     const requestedCycleStart = String(req.body?.cycleStartDate || classData?.cycleStartDate || '').trim();
     const requestedCycleEnd = String(req.body?.cycleEndDate || classData?.cycleEndDate || '').trim();
-    assertRollingSessionsWithinCycleWindowOrThrow({
+    const requestedAllowedProgramTerms = parseData(req.body?.allowedProgramTerms) || classData?.allowedProgramTerms || [];
+    await assertClassSessionsWithinDateWindowOrThrow({
+        ...(classData || {}),
         registrationMode: requestedMode,
         cycleStartDate: requestedCycleStart,
         cycleEndDate: requestedCycleEnd,
-        sessions: parsedSessions
-    });
+        orgId: classData?.orgId || activeOrgId,
+        allowedProgramTerms: requestedAllowedProgramTerms
+    }, parsedSessions, req.user);
     const fallbackTeacherId = cleanPersonId(defaultTeacherId || primaryTeacherId || resolveFallbackTeacherIdFromBody(req.body));
     const conflicts = await detectSessionConflicts({
         classId: resolvedClassId,
@@ -2607,6 +3071,74 @@ function buildRollingEnrollmentProgramChoices(classData) {
   return out;
 }
 
+function parseShortcutIdArray(value) {
+  if (Array.isArray(value)) return value.map((id) => toPublicId(id)).filter(Boolean);
+  if (typeof value === 'string') {
+    const raw = value.trim();
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((id) => toPublicId(id)).filter(Boolean);
+    } catch (_) {}
+    return [toPublicId(raw)].filter(Boolean);
+  }
+  return [];
+}
+
+async function assertRollingProgramRegistrationShortcutContext(req, res, next) {
+  try {
+    const classId = toPublicId(req.params?.classId || req.body?.classId || '');
+    if (!classId) throw new Error('classId is required.');
+
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    assertRollingWorkflowEnabledForClass(req, classData);
+
+    const choices = buildRollingEnrollmentProgramChoices(classData);
+    if (!choices.length) {
+      throw new Error('This class has no allowed programs configured. Add programs on the class Program / terms tab before registering students.');
+    }
+
+    const allowedProgramIds = new Set(choices.map((choice) => toPublicId(choice.programId)).filter(Boolean));
+    const registrationId = toPublicId(req.params?.registrationId || req.params?.id || '');
+
+    if (registrationId) {
+      const registration = await schoolDataService.getDataById('studentProgramRegistrations', registrationId, req.user);
+      if (!registration) throw new Error('Program registration draft was not found.');
+      if (!idsEqual(registration?.orgId, classData?.orgId)) {
+        throw new Error('Program registration is outside this class organization.');
+      }
+      if (!allowedProgramIds.has(toPublicId(registration?.programId))) {
+        throw new Error('Program registration does not match an allowed program on this class.');
+      }
+      req.params.id = registrationId;
+      return next();
+    }
+
+    const programId = toPublicId(req.body?.programId || '');
+    const studentIds = parseShortcutIdArray(req.body?.studentIds);
+    if (!programId) throw new Error('Program is required.');
+    if (!allowedProgramIds.has(programId)) {
+      throw new Error('Selected program is not allowed for this class.');
+    }
+    if (studentIds.length !== 1) {
+      throw new Error('Rolling Enrollment shortcut supports one selected student at a time.');
+    }
+
+    const student = await schoolDataService.getDataById('students', studentIds[0], req.user);
+    if (!student) throw new Error('Student not found.');
+    if (!idsEqual(student?.orgId, classData?.orgId)) {
+      throw new Error('Student organization does not match the class organization.');
+    }
+
+    req.body.classId = classId;
+    req.body.programId = programId;
+    req.body.studentIds = studentIds;
+    return next();
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to prepare program registration shortcut.' });
+  }
+}
+
 function isApprovedTermRegistrationStatus(status) {
   return String(status || '').trim().toLowerCase() === 'registered';
 }
@@ -2663,12 +3195,14 @@ async function resolveRollingEnrollmentProgramFromStudentRegistrations(req, clas
 
   const candidates = [];
   const seen = new Set();
+  let hasAllowedProgramRegistration = false;
 
   for (const progReg of progRegs) {
     const pid = toPublicId(progReg?.programId);
     const prId = toPublicId(progReg?.id);
     if (!pid || !allowedProgramIds.has(pid)) continue;
     if (explicitPrId && !idsEqual(prId, explicitPrId)) continue;
+    hasAllowedProgramRegistration = true;
 
     const regDate = String(progReg?.registrationDate || '');
     const programChoices = choices.filter((c) => idsEqual(c.programId, pid));
@@ -2720,6 +3254,11 @@ async function resolveRollingEnrollmentProgramFromStudentRegistrations(req, clas
   }
 
   if (!candidates.length) {
+    if (hasAllowedProgramRegistration) {
+      throw new Error(
+        'This student has an approved program registration for an allowed program, but the required term registration is missing. Register the student in the required term, then try Rolling Enrollment again.'
+      );
+    }
     throw new Error(
       'This student has no active program registration linked to this class. Register the student in a program listed under this class\'s allowed programs (and in the required term, if the class specifies one), then try again.'
     );
@@ -4300,9 +4839,11 @@ async function saveSession1(req, res) {
         const { id: classId, sessionId } = req.params;
         const { status, notes, room, roster } = req.body; // <--- EXTRACT ROOM 
 
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
         if (sessionIndex === -1) throw new Error('Session not found');
+        await assertSessionManagerSessionWithinClassWindowOrThrow(classData, sessions[sessionIndex], req.user);
 
         // Update general session data
         sessions[sessionIndex].status = status || sessions[sessionIndex].status;
@@ -4328,6 +4869,7 @@ async function saveSession1(req, res) {
                     lateMinutes: incRec.lateMinutes,
                     earlyLeaveMinutes: incRec.earlyLeaveMinutes,
                     excuseRef: incRec.excuseRef,
+                    excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
                     classEffortPercent: incRec.classEffortPercent === undefined
                         ? existingClassEffort
                         : normalizeSessionRatingPercent(incRec.classEffortPercent, existingClassEffort),
@@ -4724,6 +5266,7 @@ async function listSessionStudentCases(req, res) {
 async function saveSessionStudentCase(req, res) {
     try {
         const { id: classId, sessionId, caseId = '' } = req.params;
+        await assertSessionInstructionalActiveForRequest(classId, sessionId, req.user);
         const saved = await sessionStudentCaseService.saveCase({
             classId,
             sessionId,
@@ -4743,6 +5286,7 @@ async function saveSessionStudentCase(req, res) {
 async function updateSessionStudentCaseStatus(req, res) {
     try {
         const { id: classId, sessionId, caseId } = req.params;
+        await assertSessionInstructionalActiveForRequest(classId, sessionId, req.user);
         const saved = await sessionStudentCaseService.updateStatus({
             classId,
             sessionId,
@@ -4756,6 +5300,152 @@ async function updateSessionStudentCaseStatus(req, res) {
         return res.status(400).json({ status: 'error', message: error.message });
     }
 }
+
+async function uploadSessionFile(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const studentPersonId = String(req.body?.studentPersonId || req.body?.personId || '').trim();
+        const kind = String(req.body?.kind || 'file').trim() || 'file';
+        if (!classId || !sessionId) throw new Error('classId and sessionId are required.');
+        if (!req.file) throw new Error('No file was uploaded.');
+
+        const { classData, session } = await assertSessionInstructionalActiveForRequest(classId, sessionId, req.user);
+        await assertSessionManagerSessionWithinClassWindowOrThrow(classData, session, req.user);
+
+        const file = schoolFileService.normalizeUploadedFile(req.file, {
+            kind,
+            classId,
+            sessionId,
+            studentPersonId,
+            uploadedBy: req.user?.id
+        });
+
+        return res.json({ status: 'success', message: 'File uploaded.', file });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function createMakeupSession(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const originalIndex = (Array.isArray(sessions) ? sessions : [])
+            .findIndex((row) => idsEqual(row?.sessionId || row?.id, sessionId));
+        if (originalIndex < 0) throw new Error('Original session not found.');
+
+        const originalSession = sessions[originalIndex];
+        await assertCanCreateMakeupSession(req, classData, originalSession);
+
+        const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
+            includeInactive: true
+        });
+        const resolvedStatus = sessionStatusPolicyService.resolveStatusDefinition(statusMap, {
+            status: originalSession?.status,
+            notes: originalSession?.notes
+        });
+        const statusDefinition = resolvedStatus.definition || null;
+        if (statusDefinition?.makeUpRequired !== true) {
+            throw new Error(`Session status "${statusDefinition?.label || resolvedStatus.normalized || 'Unknown'}" does not allow a make-up session.`);
+        }
+
+        const statusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
+        const makeupSession = buildMakeupSession({
+            originalSession,
+            classId,
+            input: req.body || {},
+            reqUser: req.user,
+            defaultStatus: resolveDefaultSessionStatusCode(statusMeta)
+        });
+        makeupSession.sessionId = generateMakeupSessionId(sessions);
+        await assertSessionManagerSessionWithinClassWindowOrThrow(classData, makeupSession, req.user);
+
+        if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE)) {
+            const currentPersonId = cleanPersonId(req.user?.personId);
+            const targetTeacherId = cleanPersonId(makeupSession?.delivery?.deliveredBy);
+            if (targetTeacherId && currentPersonId && !idsEqual(targetTeacherId, currentPersonId)) {
+                throw new Error('Teachers can create make-up sessions only for themselves. Ask an administrator to assign another teacher.');
+            }
+        }
+
+        const warnings = [];
+        const existingMakeups = (Array.isArray(sessions) ? sessions : []).filter((row) => (
+            row?.makeup?.isMakeup === true
+            && idsEqual(row?.makeup?.originalClassId, classId)
+            && idsEqual(row?.makeup?.originalSessionId, sessionId)
+        ));
+        if (existingMakeups.length) {
+            warnings.push(`${existingMakeups.length} make-up session(s) already exist for this original session.`);
+        }
+        try {
+            const conflicts = await detectSessionConflicts({
+                classId,
+                sessions: [makeupSession],
+                activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+                reqUser: req.user,
+                fallbackTeacherId: cleanPersonId(makeupSession?.delivery?.deliveredBy)
+            });
+            if (Array.isArray(conflicts) && conflicts.length) {
+                warnings.push(...conflicts.slice(0, 6).map((row) => `${row.teacherName || 'Teacher'} has a conflict on ${row.date || makeupSession.date}: ${row.conflictClass || 'schedule conflict'} ${row.existTime ? `(${row.existTime})` : ''}`.trim()));
+                if (conflicts.length > 6) warnings.push(`${conflicts.length - 6} more conflict warning(s) were detected.`);
+            }
+        } catch (warningError) {
+            warnings.push(`Conflict preview was not available: ${warningError.message}`);
+        }
+
+        if (warnings.length && !parseBoolean(req.body?.force, false)) {
+            return res.status(409).json({
+                status: 'warning',
+                code: 'MAKEUP_SESSION_WARNINGS',
+                message: 'Review make-up session warnings before creating this session.',
+                data: {
+                    requiresConfirmation: true,
+                    warnings
+                }
+            });
+        }
+
+        const historyRow = {
+            makeupSessionId: makeupSession.sessionId,
+            makeupDate: makeupSession.date,
+            makeupStartTime: makeupSession.startTime,
+            makeupEndTime: makeupSession.endTime,
+            teacherId: makeupSession.delivery?.deliveredBy || '',
+            teacherName: makeupSession.delivery?.deliveredByName || '',
+            createdAt: makeupSession.makeup.createdAt,
+            createdBy: makeupSession.makeup.createdBy,
+            reason: makeupSession.makeup.reason
+        };
+        originalSession.makeupHistory = Array.isArray(originalSession.makeupHistory)
+            ? [...originalSession.makeupHistory, historyRow]
+            : [historyRow];
+        originalSession.audit = {
+            ...(originalSession.audit || {}),
+            lastUpdateUser: toPublicId(req.user?.id || req.user?.username || ''),
+            lastUpdateDateTime: new Date().toISOString()
+        };
+
+        sessions.push(makeupSession);
+        await schoolDataService.saveClassSessions(classId, sessions, req.user);
+        await indexService.rebuildIndexesForClass(classId);
+
+        return res.json({
+            status: 'success',
+            message: 'Make-up session created.',
+            data: {
+                classId: toPublicId(classId),
+                originalSessionId: toPublicId(sessionId),
+                makeupSession,
+                makeupHistory: originalSession.makeupHistory,
+                warnings
+            }
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
 async function saveSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -4764,7 +5454,7 @@ async function saveSession(req, res) {
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
         if (sessionIndex === -1) throw new Error('Session not found');
-        assertSessionManagerSessionWithinCycleWindowOrThrow(classData, sessions[sessionIndex]);
+        await assertSessionManagerSessionWithinClassWindowOrThrow(classData, sessions[sessionIndex], req.user);
 
         const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
             includeInactive: true
@@ -4787,6 +5477,14 @@ async function saveSession(req, res) {
         const normalizedStatus = sessionStatusPolicyService.normalizeStatusCode(status || sessions[sessionIndex].status || '');
         if (!normalizedStatus || !statusMap.has(normalizedStatus)) {
             throw new Error('Invalid session status.');
+        }
+        const currentMakeupInactive = isMakeUpRequiredSessionByMap(statusMap, sessions[sessionIndex]);
+        const nextMakeupInactive = isMakeUpRequiredSessionByMap(statusMap, {
+            ...sessions[sessionIndex],
+            status: normalizedStatus
+        });
+        if ((currentMakeupInactive || nextMakeupInactive) && (roster !== undefined || contentItems !== undefined || contentOrder !== undefined)) {
+            throw new Error('This original session is inactive because its status requires a make-up session. Attendance, gradebook, content, cases, and files are not available for this session. Change the status from Master Hub first, or create/open the make-up session.');
         }
 
         const normalizedNotes = notes !== undefined ? String(notes || '').trim() : sessions[sessionIndex].notes;
@@ -4832,6 +5530,7 @@ async function saveSession(req, res) {
                     lateMinutes: incRec.lateMinutes,
                     earlyLeaveMinutes: incRec.earlyLeaveMinutes,
                     excuseRef: incRec.excuseRef,
+                    excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
                     classEffortPercent: incRec.classEffortPercent === undefined
                         ? existingClassEffort
                         : normalizeSessionRatingPercent(incRec.classEffortPercent, existingClassEffort),
@@ -4872,7 +5571,14 @@ async function saveSessionGradebooks(req, res) {
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const sessionIndex = sessions.findIndex((s) => s.sessionId === sessionId);
         if (sessionIndex === -1) throw new Error('Session not found');
-        assertSessionManagerSessionWithinCycleWindowOrThrow(classData, sessions[sessionIndex]);
+        await assertSessionManagerSessionWithinClassWindowOrThrow(classData, sessions[sessionIndex], req.user);
+
+        const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
+            includeInactive: true
+        });
+        if (isMakeUpRequiredSessionByMap(statusMap, sessions[sessionIndex])) {
+            throw new Error('This original session is inactive because its status requires a make-up session. Gradebook is not available for this session. Create or open the make-up session instead.');
+        }
 
         const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
         let canOverride = await adminChekersService.isAdminForRequestAsync(
@@ -5119,6 +5825,8 @@ module.exports = {
   checkConflicts,
   listClassEnrollmentPeriods,
   previewRollingEnrollmentEligibility,
+  previewTeacherAssignmentImpact,
+  assertRollingProgramRegistrationShortcutContext,
   previewClassEnrollmentWithTransactions,
   createClassEnrollmentWithTransactions,
   saveClassEnrollmentDraft,
@@ -5135,7 +5843,7 @@ module.exports = {
   createNextClassCycleFromTemplate,
   carryForwardClassCycleStudents,
   splitClassEnrollmentPeriodsForCycleBoundary,
-  saveSession, saveSessionGradebooks, manageSession, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus,
+  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus,
   showFinalGradesPage,
   postOfficialFinalGradesWorkflow,
   showEnrollmentOutcomesPage,

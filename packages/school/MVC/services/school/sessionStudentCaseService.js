@@ -1,6 +1,6 @@
 const schoolRepositories = require('../../repositories/school');
 const schoolDataService = require('./schoolDataService');
-const notificationService = require('./notificationService');
+const taskService = require('./taskService');
 const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -159,7 +159,7 @@ function buildLifecycleEvent({ action, reqUser, oldStatus = '', newStatus = '', 
   };
 }
 
-function caseNotificationPayload(row = {}) {
+function caseTaskPayload(row = {}) {
   const studentName = cleanString(row.studentName || row.studentPersonId || 'Student', 180);
   const classTitle = cleanString(row.classTitle || row.classId || 'Class', 220);
   const summary = cleanString(row.summary || 'Student session case', 260);
@@ -289,7 +289,7 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
     : await schoolRepositories.sessionStudentCases.create(payload, normalizeScope(reqUser));
 
   if (status === 'resolved' || status === 'cancelled') {
-    await notificationService.resolveSourceNotification({
+    await taskService.resolveSourceTask({
       orgId: saved.orgId,
       sourceType: 'student_session_case',
       sourceId: saved.id,
@@ -297,7 +297,7 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
       note: input.resolutionNote || input.details || input.summary || 'Student session case was resolved.'
     }, reqUser);
   } else {
-    await notificationService.upsertSourceNotification(caseNotificationPayload(saved), reqUser);
+    await taskService.upsertSourceTask(caseTaskPayload(saved), reqUser);
   }
   return saved;
 }
@@ -330,7 +330,7 @@ async function updateStatus({ classId, sessionId, caseId, status, note = '', req
   };
   const saved = await schoolRepositories.sessionStudentCases.update(existing.id, next, normalizeScope(reqUser));
   if (nextStatus === 'resolved' || nextStatus === 'cancelled') {
-    await notificationService.resolveSourceNotification({
+    await taskService.resolveSourceTask({
       orgId: saved.orgId,
       sourceType: 'student_session_case',
       sourceId: saved.id,
@@ -338,7 +338,7 @@ async function updateStatus({ classId, sessionId, caseId, status, note = '', req
       note: note || 'Student session case was resolved.'
     }, reqUser);
   } else {
-    await notificationService.upsertSourceNotification(caseNotificationPayload(saved), reqUser);
+    await taskService.upsertSourceTask(caseTaskPayload(saved), reqUser);
   }
   return saved;
 }
@@ -351,7 +351,7 @@ module.exports = {
   saveCase,
   updateStatus,
   _private: {
-    caseNotificationPayload,
+    caseTaskPayload,
     findRosterStudent,
     normalizeCaseSeverity,
     normalizeCaseStatus

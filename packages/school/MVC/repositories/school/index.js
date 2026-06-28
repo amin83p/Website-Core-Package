@@ -34,8 +34,8 @@ const studentProgramPriorSubjectModel = require('../../models/school/studentProg
 const studentTermRegistrationModel = require('../../models/school/studentTermRegistrationModel');
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
-const notificationModel = require('../../models/school/notificationModel');
-const notificationRoutingRuleModel = require('../../models/school/notificationRoutingRuleModel');
+const taskModel = require('../../models/school/taskModel');
+const taskRoutingRuleModel = require('../../models/school/taskRoutingRuleModel');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
@@ -971,14 +971,14 @@ const schoolRepositories = {
       'additionalComments'
     ],
     dateFields: ['sessionDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
-  }),  notifications: createSchoolRepository({
-    entityName: 'notifications',
-    collectionName: 'schoolNotifications',
-    getAll: notificationModel.getAllNotifications,
-    getById: notificationModel.getNotificationById,
-    create: notificationModel.addNotification,
-    update: notificationModel.updateNotification,
-    remove: notificationModel.deleteNotification,
+  }),  tasks: createSchoolRepository({
+    entityName: 'tasks',
+    collectionName: 'schoolTasks',
+    getAll: taskModel.getAllTasks,
+    getById: taskModel.getTaskById,
+    create: taskModel.addTask,
+    update: taskModel.updateTask,
+    remove: taskModel.deleteTask,
     defaultSearchFields: [
       'id',
       'orgId',
@@ -994,14 +994,14 @@ const schoolRepositories = {
     ],
     dateFields: ['dueDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
   }),
-  notificationRoutingRules: createSchoolRepository({
-    entityName: 'notificationRoutingRules',
-    collectionName: 'schoolNotificationRoutingRules',
-    getAll: notificationRoutingRuleModel.getAllNotificationRoutingRules,
-    getById: notificationRoutingRuleModel.getNotificationRoutingRuleById,
-    create: notificationRoutingRuleModel.addNotificationRoutingRule,
-    update: notificationRoutingRuleModel.updateNotificationRoutingRule,
-    remove: notificationRoutingRuleModel.deleteNotificationRoutingRule,
+  taskRoutingRules: createSchoolRepository({
+    entityName: 'taskRoutingRules',
+    collectionName: 'schoolTaskRoutingRules',
+    getAll: taskRoutingRuleModel.getAllTaskRoutingRules,
+    getById: taskRoutingRuleModel.getTaskRoutingRuleById,
+    create: taskRoutingRuleModel.addTaskRoutingRule,
+    update: taskRoutingRuleModel.updateTaskRoutingRule,
+    remove: taskRoutingRuleModel.deleteTaskRoutingRule,
     defaultSearchFields: [
       'id',
       'orgId',
@@ -1327,36 +1327,36 @@ schoolRepositories.leaveRequests.clearByOrg = async (orgId, options = {}) => {
   }, 'school.leaveRequests.clearByOrg');
 };
 
-schoolRepositories.notifications.clearByOrg = async (orgId, options = {}) => {
+schoolRepositories.tasks.clearByOrg = async (orgId, options = {}) => {
   const targetOrgId = toPublicId(orgId);
-  if (!targetOrgId) throw new Error('orgId is required to clear notifications.');
+  if (!targetOrgId) throw new Error('orgId is required to clear tasks.');
   return runByRepositoryBackend(options, {
-    json: async () => notificationModel.clearNotificationsByOrg(targetOrgId),
+    json: async () => taskModel.clearTasksByOrg(targetOrgId),
     mongo: async () => {
-      const collection = getMongoCollection('schoolNotifications');
+      const collection = getMongoCollection('schoolTasks');
       const result = await collection.deleteMany({ orgId: targetOrgId });
       return {
         removed: Number(result?.deletedCount || 0),
         remaining: await collection.countDocuments({})
       };
     }
-  }, 'school.notifications.clearByOrg');
+  }, 'school.tasks.clearByOrg');
 };
 
-schoolRepositories.notificationRoutingRules.clearByOrg = async (orgId, options = {}) => {
+schoolRepositories.taskRoutingRules.clearByOrg = async (orgId, options = {}) => {
   const targetOrgId = toPublicId(orgId);
-  if (!targetOrgId) throw new Error('orgId is required to clear notification routing rules.');
+  if (!targetOrgId) throw new Error('orgId is required to clear task routing rules.');
   return runByRepositoryBackend(options, {
-    json: async () => notificationRoutingRuleModel.clearNotificationRoutingRulesByOrg(targetOrgId),
+    json: async () => taskRoutingRuleModel.clearTaskRoutingRulesByOrg(targetOrgId),
     mongo: async () => {
-      const collection = getMongoCollection('schoolNotificationRoutingRules');
+      const collection = getMongoCollection('schoolTaskRoutingRules');
       const result = await collection.deleteMany({ orgId: targetOrgId });
       return {
         removed: Number(result?.deletedCount || 0),
         remaining: await collection.countDocuments({})
       };
     }
-  }, 'school.notificationRoutingRules.clearByOrg');
+  }, 'school.taskRoutingRules.clearByOrg');
 };
 
 schoolRepositories.reportInstances.clearByOrg = async (orgId, options = {}) => {
@@ -1913,8 +1913,8 @@ assertQueryableCrudRepository('schoolRepositories.studentTermRegistrations', sch
 assertQueryableCrudRepository('schoolRepositories.classEnrollmentPeriods', schoolRepositories.classEnrollmentPeriods);
 assertQueryableCrudRepository('schoolRepositories.leaveRequests', schoolRepositories.leaveRequests);
 assertQueryableCrudRepository('schoolRepositories.sessionStudentCases', schoolRepositories.sessionStudentCases);
-assertQueryableCrudRepository('schoolRepositories.notifications', schoolRepositories.notifications);
-assertQueryableCrudRepository('schoolRepositories.notificationRoutingRules', schoolRepositories.notificationRoutingRules);
+assertQueryableCrudRepository('schoolRepositories.tasks', schoolRepositories.tasks);
+assertQueryableCrudRepository('schoolRepositories.taskRoutingRules', schoolRepositories.taskRoutingRules);
 
 module.exports = schoolRepositories;
 

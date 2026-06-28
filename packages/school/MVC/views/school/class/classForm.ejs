@@ -763,6 +763,18 @@
               <label class="form-check-label small" for="bulk_includeLocked">Include locked sessions</label>
             </div>
           </div>
+          <div class="col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="bulk_addNewInstructor" checked>
+              <label class="form-check-label small" for="bulk_addNewInstructor">Add new teacher to class instructor roster</label>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="bulk_inactivateOldInstructor" checked>
+              <label class="form-check-label small" for="bulk_inactivateOldInstructor">Mark old teacher inactive when no sessions remain</label>
+            </div>
+          </div>
         </div>
 
         <div class="mt-3 small text-muted" id="bulk_preview"></div>
@@ -1062,6 +1074,11 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshRollingSessionDateBounds();
     }
 
+    function normalizeDateToken(value) {
+        const token = String(value || '').trim();
+        return /^\d{4}-\d{2}-\d{2}$/.test(token) ? token : '';
+    }
+
     function validateLifecycleInputs() {
         const rolling = isRollingMode();
         const cycleNo = Number.parseInt(String(cycleNoInput?.value || '').trim(), 10);
@@ -1106,16 +1123,68 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function getTermInstructionBoundsFromRow(row) {
+        return {
+            startToken: normalizeDateToken(row?.classesStartDate) || normalizeDateToken(row?.startDate),
+            endToken: normalizeDateToken(row?.classesEndDate) || normalizeDateToken(row?.endDate)
+        };
+    }
+
+    function getTermBasedSessionBounds() {
+        if (isRollingMode()) return null;
+        const rows = (Array.isArray(allowedProgramTermsState) ? allowedProgramTermsState : [])
+            .filter((row) => String(row?.termId || '').trim());
+        if (!rows.length) {
+            return { error: 'Add at least one program-term row before generating sessions for a term-based class.' };
+        }
+
+        const windows = [];
+        const missing = [];
+        rows.forEach((row) => {
+            const bounds = getTermInstructionBoundsFromRow(row);
+            if (!bounds.startToken || !bounds.endToken) {
+                missing.push(row.termName || row.termCode || row.termId);
+            } else {
+                windows.push(bounds);
+            }
+        });
+
+        if (missing.length) {
+            return {
+                warning: 'Term date details are not available on this form for ' + missing.slice(0, 3).join(', ') + (missing.length > 3 ? ` (+${missing.length - 3} more)` : '') + '. The server will validate current term dates when saving.'
+            };
+        }
+
+        const startToken = windows.reduce((max, row) => (!max || row.startToken > max ? row.startToken : max), '');
+        const endToken = windows.reduce((min, row) => (!min || row.endToken < min ? row.endToken : min), '');
+        if (startToken && endToken && startToken > endToken) {
+            return { error: 'The selected program-term rows have no overlapping instructional date window.' };
+        }
+        return { startToken, endToken };
+    }
+
     function refreshRollingSessionDateBounds() {
-        const bounds = getRollingCycleBounds();
+        const rolling = isRollingMode();
+        const bounds = rolling ? getRollingCycleBounds() : getTermBasedSessionBounds();
         if (!bounds || bounds.error) {
             rollingSessionDateInputs.forEach((input) => {
                 input.removeAttribute('min');
                 input.removeAttribute('max');
             });
             if (rollingSessionWindowHint) {
-                rollingSessionWindowHint.className = 'alert alert-warning border small py-2 mb-3' + (isRollingMode() ? '' : ' d-none');
+                rollingSessionWindowHint.className = 'alert alert-warning border small py-2 mb-3';
                 rollingSessionWindowHint.textContent = bounds?.error || '';
+            }
+            return;
+        }
+        if (bounds.warning) {
+            rollingSessionDateInputs.forEach((input) => {
+                input.removeAttribute('min');
+                input.removeAttribute('max');
+            });
+            if (rollingSessionWindowHint) {
+                rollingSessionWindowHint.className = 'alert alert-warning border small py-2 mb-3';
+                rollingSessionWindowHint.textContent = bounds.warning;
             }
             return;
         }
@@ -1126,15 +1195,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (rollingSessionWindowHint) {
             rollingSessionWindowHint.className = 'alert alert-info border small py-2 mb-3';
-            rollingSessionWindowHint.textContent = `Rolling sessions must be scheduled from ${bounds.startToken}${bounds.endToken ? ` to ${bounds.endToken}` : ' onward'}.`;
+            rollingSessionWindowHint.textContent = rolling
+                ? `Rolling sessions must be scheduled from ${bounds.startToken}${bounds.endToken ? ` to ${bounds.endToken}` : ' onward'}.`
+                : `Term-based sessions must be scheduled from ${bounds.startToken} to ${bounds.endToken}.`;
         }
     }
     function findSessionCycleWindowViolations(sessionRows = []) {
-        if (!isRollingMode()) return [];
-        const bounds = getRollingCycleBounds();
+        const rolling = isRollingMode();
+        const bounds = rolling ? getRollingCycleBounds() : getTermBasedSessionBounds();
         if (bounds?.error) {
-            return [{ type: 'cycle_error', message: bounds.error }];
+            return [{ type: rolling ? 'cycle_error' : 'term_error', message: bounds.error }];
         }
+        if (!bounds || bounds.warning) return [];
 
         const rows = Array.isArray(sessionRows) ? sessionRows : [];
         const violations = [];
@@ -1147,7 +1219,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             if (dateToken < bounds.startToken || (bounds.endToken && dateToken > bounds.endToken)) {
-                violations.push({ type: 'outside_cycle', index, date: dateToken, sessionId: String(row?.sessionId || '').trim() });
+                violations.push({ type: rolling ? 'outside_cycle' : 'outside_term', index, date: dateToken, sessionId: String(row?.sessionId || '').trim() });
             }
         });
         return violations;
@@ -1157,15 +1229,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!Array.isArray(violations) || !violations.length) return '';
         const cycleError = violations.find((row) => row.type === 'cycle_error');
         if (cycleError) return String(cycleError.message || 'Rolling cycle dates are invalid.');
+        const termError = violations.find((row) => row.type === 'term_error');
+        if (termError) return String(termError.message || 'Term instructional dates are invalid.');
 
         const invalidCount = violations.filter((row) => row.type === 'invalid_date').length;
-        const outside = violations.filter((row) => row.type === 'outside_cycle');
+        const outside = violations.filter((row) => row.type === 'outside_cycle' || row.type === 'outside_term');
+        const isTermViolation = outside.some((row) => row.type === 'outside_term');
         const sample = outside.slice(0, 5).map((row) => {
             const sid = String(row?.sessionId || '').trim();
             return sid ? `${row.date} (${sid})` : row.date;
         }).join(', ');
         const suffix = outside.length > 5 ? ` (+${outside.length - 5} more)` : '';
-        const parts = ['Rolling class sessions must stay within cycle dates.'];
+        const parts = [isTermViolation ? 'Term-based class sessions must stay within the selected term instructional window.' : 'Rolling class sessions must stay within cycle dates.'];
         if (invalidCount > 0) parts.push(`${invalidCount} session(s) have invalid date format.`);
         if (outside.length > 0) parts.push(`Out-of-window session date(s): ${sample}${suffix}.`);
         return parts.join(' ');
@@ -2151,6 +2226,10 @@ document.addEventListener('DOMContentLoaded', () => {
             programName: String(item?.programName || item?.programId || '').trim(),
             termCode: String(item?.termCode || '').trim().toUpperCase(),
             termName: String(item?.termName || item?.termId || '').trim(),
+            startDate: String(item?.startDate || '').trim(),
+            endDate: String(item?.endDate || '').trim(),
+            classesStartDate: String(item?.classesStartDate || '').trim(),
+            classesEndDate: String(item?.classesEndDate || '').trim(),
             notes: String(item?.notes || '').trim()
         })).filter((item) => {
             if (!item.programId) return false;
@@ -2173,6 +2252,10 @@ document.addEventListener('DOMContentLoaded', () => {
             programName: item.programName,
             termCode: item.termCode,
             termName: item.termName,
+            startDate: item.startDate,
+            endDate: item.endDate,
+            classesStartDate: item.classesStartDate,
+            classesEndDate: item.classesEndDate,
             notes: item.notes
         })));
     }
@@ -2278,6 +2361,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 allowedProgramTermsState.splice(idx, 1);
                 normalizeAllowedProgramTermsState();
                 renderAllowedProgramTerms();
+                refreshRollingSessionDateBounds();
             });
         });
 
@@ -2434,6 +2518,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 programName: String(row?.programName || '').trim(),
                 termCode: String(row?.termCode || '').trim().toUpperCase(),
                 termName: String(row?.termName || '').trim(),
+                startDate: String(row?.startDate || '').trim(),
+                endDate: String(row?.endDate || '').trim(),
+                classesStartDate: String(row?.classesStartDate || '').trim(),
+                classesEndDate: String(row?.classesEndDate || '').trim(),
                 notes: String(row?.notes || '').trim()
             })).filter((row) => row.programId && (isRollingMode() || row.termId))
             : [];
@@ -2644,10 +2732,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     programName: pendingEligibilityProgram.programName,
                     termCode: programTerm ? String(programTerm.termCode || programTerm.code || '').trim().toUpperCase() : '',
                     termName: programTerm ? String(programTerm.termName || programTerm.name || selectedTermId).trim() : '',
+                    startDate: programTerm ? String(programTerm.startDate || '').trim() : '',
+                    endDate: programTerm ? String(programTerm.endDate || '').trim() : '',
+                    classesStartDate: programTerm ? String(programTerm.classesStartDate || '').trim() : '',
+                    classesEndDate: programTerm ? String(programTerm.classesEndDate || '').trim() : '',
                     notes: ''
                 });
                 normalizeAllowedProgramTermsState();
                 renderAllowedProgramTerms();
+                refreshRollingSessionDateBounds();
             } catch (error) {
                 await uiAlert(error.message || 'Could not add the selected program-term row.', 'Eligibility');
             }
@@ -3222,11 +3315,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 || ''
             ).trim();
             const instructorId = String(document.getElementById('inp_instructorId')?.value || '').trim();
-            const instructorName = String(document.getElementById('inp_instructorName')?.value || '').trim();
-            const instructorRole = String(document.getElementById('inp_instructorRole')?.value || 'Primary').trim();
-            const instructorsPayload = instructorId
-                ? JSON.stringify([{ personId: instructorId, name: instructorName, role: instructorRole, status: 'active' }])
-                : '[]';
+            const instructorsPayload = JSON.stringify(getInstructorRowsForSubmit());
             const params = new URLSearchParams();
             params.append('classId', classId);
             if (classId) params.append('id', classId);
@@ -3235,6 +3324,7 @@ document.addEventListener('DOMContentLoaded', () => {
             params.append('registrationMode', isRollingMode() ? 'rolling' : 'term_based');
             params.append('cycleStartDate', String(cycleStartDateInput?.value || '').trim());
             params.append('cycleEndDate', String(cycleEndDateInput?.value || '').trim());
+            params.append('allowedProgramTerms', hidAllowedProgramTerms.value || '[]');
             params.append('instructors', instructorsPayload);
             params.append('actionStateId', document.getElementById('hid_actionStateId')?.value || '');
 
@@ -3551,10 +3641,7 @@ form.addEventListener('submit', async (e) => {
             params.append('postingTemplates', hidPostingTemplates.value || '[]');
             params.append('billingMode', hidBillingMode?.value || 'chargeable');
             
-            const instId = document.getElementById('inp_instructorId').value;
-            const instName = document.getElementById('inp_instructorName').value;
-            const instRole = document.getElementById('inp_instructorRole').value;
-            params.append('instructors', JSON.stringify(instId ? [{ personId: instId, name: instName, role: instRole, status: 'active' }] : []));
+            params.append('instructors', JSON.stringify(getInstructorRowsForSubmit()));
             
             const dEnrl = JSON.parse(document.getElementById('hid_enrollment').value || '{}');
             dEnrl.maxCapacity = parseInt(document.getElementById('inp_capacity').value) || 30;
@@ -3768,6 +3855,8 @@ const bulkPickNewTeacherBtn = document.getElementById('bulk_pickNewTeacher');
 const bulkClearNewTeacherBtn = document.getElementById('bulk_clearNewTeacher');
 const bulkStatusSel = document.getElementById('bulk_targetStatus');
 const bulkIncludeLockedCb = document.getElementById('bulk_includeLocked');
+const bulkAddNewInstructorCb = document.getElementById('bulk_addNewInstructor');
+const bulkInactivateOldInstructorCb = document.getElementById('bulk_inactivateOldInstructor');
 const bulkPreview = document.getElementById('bulk_preview');
 const bulkApplyBtn = document.getElementById('bulk_applyBtn');
 
@@ -3807,19 +3896,17 @@ function statusMatches(s, target) {
 
 function isLocked(s) { return !!s?.locked; }
 
-function computeBulkPreview() {
-    if (!bulkPreview) return;
+function getBulkTargetStatus() {
+    const raw = String(bulkStatusSel?.value || '').trim();
+    if (raw === 'all') return 'all';
+    return normalizeStatusCode(raw || defaultSessionStatusCode) || normalizeStatusCode(defaultSessionStatusCode) || 'scheduled';
+}
+
+function getBulkAffectedSessions() {
     const oldVal = bulkOldSel?.value || '';
-    const newVal = (bulkNewTeacherId?.value || bulkNewTeacherName?.value || '').trim();
-    const target = normalizeStatusCode(bulkStatusSel?.value || defaultSessionStatusCode) || normalizeStatusCode(defaultSessionStatusCode) || 'scheduled';
+    const target = getBulkTargetStatus();
     const includeLocked = !!bulkIncludeLockedCb?.checked;
-
-    if (!oldVal || !newVal) {
-        bulkPreview.textContent = 'Select current teacher and new teacher to preview changes.';
-        return;
-    }
-
-    const affected = (sessionsState || []).filter(s => {
+    return (sessionsState || []).filter(s => {
         const curId = s?.delivery?.deliveredBy || '';
         const curName = s?.delivery?.deliveredByName || '';
         const match = (curId && curId === oldVal) || (curName === oldVal) || (!curId && curName && curName === oldVal);
@@ -3828,12 +3915,190 @@ function computeBulkPreview() {
         if (!includeLocked && isLocked(s)) return false;
         return true;
     });
+}
+
+function computeBulkPreview() {
+    if (!bulkPreview) return;
+    const oldVal = bulkOldSel?.value || '';
+    const newVal = (bulkNewTeacherId?.value || bulkNewTeacherName?.value || '').trim();
+
+    if (!oldVal || !newVal) {
+        bulkPreview.textContent = 'Select current teacher and new teacher to preview changes.';
+        return;
+    }
+
+    const affected = getBulkAffectedSessions();
 
     bulkPreview.innerHTML = `
       <div class="fw-bold">Preview</div>
       <div>Affected sessions: <span class="fw-bold text-primary">${affected.length}</span></div>
+      <div>Roster sync: ${bulkAddNewInstructorCb?.checked ? 'new teacher will be added' : 'new teacher will not be added'}; ${bulkInactivateOldInstructorCb?.checked ? 'old teacher can be marked inactive' : 'old teacher stays unchanged'}.</div>
       <div class="text-muted">Changes are in-memory until you click <span class="fw-bold">Save Class & Ledger</span>.</div>
     `;
+}
+
+function parseInstructorRowsFromHidden() {
+    try {
+        const parsed = JSON.parse(document.getElementById('hid_instructors')?.value || '[]');
+        return Array.isArray(parsed) ? parsed.filter(Boolean).map((row) => ({ ...row })) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function writeInstructorRowsToHidden(rows = []) {
+    const cleaned = [];
+    const seen = new Set();
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+        const personId = String(row?.personId || '').trim();
+        if (!personId || seen.has(personId)) return;
+        seen.add(personId);
+        cleaned.push({
+            personId,
+            name: String(row?.name || personId).trim(),
+            role: String(row?.role || 'Instructor').trim(),
+            status: String(row?.status || 'active').trim() || 'active',
+            assignedAt: row?.assignedAt || null,
+            unassignedAt: row?.unassignedAt || null
+        });
+    });
+    const hidden = document.getElementById('hid_instructors');
+    if (hidden) hidden.value = JSON.stringify(cleaned);
+    return cleaned;
+}
+
+function getInstructorRowsForSubmit() {
+    const rows = parseInstructorRowsFromHidden();
+    const instId = String(document.getElementById('inp_instructorId')?.value || '').trim();
+    const instName = String(document.getElementById('inp_instructorName')?.value || '').trim();
+    const instRole = String(document.getElementById('inp_instructorRole')?.value || 'Primary').trim();
+    if (instId && !rows.some((row) => String(row?.personId || '').trim() === instId)) {
+        rows.push({ personId: instId, name: instName || instId, role: instRole || 'Primary', status: 'active' });
+    }
+    return writeInstructorRowsToHidden(rows);
+}
+
+function syncInstructorRosterAfterBulkTeacherChange({ oldTeacherId = '', oldTeacherName = '', newTeacherId = '', newTeacherName = '', changedSessions = [] } = {}) {
+    const now = new Date().toISOString();
+    const oldId = String(oldTeacherId || '').trim();
+    const newId = String(newTeacherId || '').trim();
+    let rows = parseInstructorRowsFromHidden();
+
+    if (bulkAddNewInstructorCb?.checked && newId && !rows.some((row) => String(row?.personId || '').trim() === newId)) {
+        rows.push({
+            personId: newId,
+            name: String(newTeacherName || newId).trim(),
+            role: 'Instructor',
+            status: 'active',
+            assignedAt: now,
+            unassignedAt: null
+        });
+    }
+
+    if (bulkInactivateOldInstructorCb?.checked && oldId) {
+        const oldStillHasSessions = (sessionsState || []).some((session) => String(session?.delivery?.deliveredBy || '').trim() === oldId);
+        if (!oldStillHasSessions) {
+            rows = rows.map((row) => {
+                if (String(row?.personId || '').trim() !== oldId) return row;
+                return {
+                    ...row,
+                    name: String(row?.name || oldTeacherName || oldId).trim(),
+                    status: 'inactive',
+                    unassignedAt: row?.unassignedAt || now
+                };
+            });
+        }
+    }
+
+    writeInstructorRowsToHidden(rows);
+
+    const primaryId = document.getElementById('inp_instructorId');
+    const primaryName = document.getElementById('inp_instructorName');
+    const primaryRole = document.getElementById('inp_instructorRole');
+    if (primaryId && oldId && primaryId.value === oldId && newId) {
+        primaryId.value = newId;
+        if (primaryName) primaryName.value = String(newTeacherName || newId).trim();
+        if (primaryRole && !String(primaryRole.value || '').trim()) primaryRole.value = 'Primary';
+    }
+}
+
+function renderImpactSummaryHtml(impact = {}) {
+    const summaries = impact?.summaries || {};
+    const rows = [
+        ['Timesheets', summaries.timesheets],
+        ['Report Assignments', summaries.reportAssignments],
+        ['Report Instances', summaries.reportInstances],
+        ['Student Cases', summaries.sessionCases],
+        ['Tasks', summaries.tasks],
+        ['Attendance / Gradebook', summaries.attendanceGradebook],
+        ['New Teacher Approved Leave', summaries.newTeacherLeaveConflicts]
+    ];
+    const sessionRows = (impact?.affectedSessions || []).slice(0, 10).map((session) => (
+        `<li>${session.date || 'No date'} ${session.startTime || ''}-${session.endTime || ''} | ${session.status || 'status'}${session.locked ? ' | locked' : ''}</li>`
+    )).join('');
+    const usageRows = rows.map(([label, summary]) => {
+        const count = Number(summary?.count || 0);
+        const samples = (summary?.samples || []).slice(0, 3).map((sample) => `<div class="text-muted">${sample.id || ''} ${sample.title || ''}</div>`).join('');
+        return `<tr><td class="fw-semibold">${label}</td><td>${count}</td><td>${samples || '<span class="text-muted">None found</span>'}</td></tr>`;
+    }).join('');
+    return `
+        <div class="text-start">
+          <p class="mb-2">Review these affected sessions and downstream references before applying the teacher change.</p>
+          <div class="mb-2"><strong>Affected sessions:</strong> ${Number(impact?.affectedSessions?.length || 0)}</div>
+          <ul class="small mb-3">${sessionRows || '<li>No matching saved sessions found.</li>'}</ul>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>Area</th><th>Count</th><th>Examples</th></tr></thead>
+              <tbody>${usageRows}</tbody>
+            </table>
+          </div>
+          <p class="small text-muted mb-0">If you continue, changes remain in-memory until you click Save Class & Ledger.</p>
+        </div>
+    `;
+}
+
+async function fetchBulkTeacherImpactPreview() {
+    if (!classId) return null;
+    const oldOption = bulkOldSel?.selectedOptions?.[0] || null;
+    const oldTeacherId = String(oldOption?.dataset?.teacherId || bulkOldSel?.value || '').trim();
+    const oldTeacherName = String(oldOption?.dataset?.teacherName || bulkOldSel?.value || '').trim();
+    const affected = getBulkAffectedSessions();
+    const params = new URLSearchParams();
+    params.append('oldTeacher', bulkOldSel?.value || '');
+    params.append('oldTeacherId', oldTeacherId);
+    params.append('oldTeacherName', oldTeacherName);
+    params.append('newTeacherId', String(bulkNewTeacherId?.value || '').trim());
+    params.append('newTeacherName', String(bulkNewTeacherName?.value || '').trim());
+    params.append('targetStatus', getBulkTargetStatus());
+    params.append('includeLocked', bulkIncludeLockedCb?.checked ? 'true' : 'false');
+    params.append('sessionIds', JSON.stringify(affected.map((session) => session?.sessionId || session?.id).filter(Boolean)));
+    const response = await fetch(`/school/classes/api/${encodeURIComponent(classId)}/teacher-assignment-impact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+        body: params.toString()
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result || result.status !== 'success') {
+        throw new Error(result?.message || 'Could not preview teacher assignment impact.');
+    }
+    return result.impact || null;
+}
+
+async function confirmBulkTeacherImpact(impact) {
+    const html = renderImpactSummaryHtml(impact || {});
+    if (typeof showMessageModal === 'function') {
+        const result = await showMessageModal({
+            title: 'Teacher Assignment Impact',
+            icon: 'warning',
+            message: html,
+            buttons: [
+                { text: 'Cancel', class: 'btn-light border', value: false },
+                { text: 'Apply In Form', class: 'btn-warning', value: true }
+            ]
+        });
+        return result === true || result?.value === true || result === 'true' || result === 'Apply In Form';
+    }
+    return uiConfirm('Teacher assignment has downstream references. Continue applying the change in this form?', 'Teacher Assignment Impact');
 }
 
 async function openBulkTeacherModal() {
@@ -3897,7 +4162,7 @@ if (bulkNewTeacherName) bulkNewTeacherName.value = '';
 async function applyBulkTeacherChange() {
     const oldVal = bulkOldSel?.value || '';
     const newVal = (bulkNewTeacherId?.value || bulkNewTeacherName?.value || '').trim();
-    const target = normalizeStatusCode(bulkStatusSel?.value || defaultSessionStatusCode) || normalizeStatusCode(defaultSessionStatusCode) || 'scheduled';
+    const target = getBulkTargetStatus();
     const includeLocked = !!bulkIncludeLockedCb?.checked;
 
     if (!oldVal || !newVal) { await uiAlert('Please select both current and new teacher.', 'Missing fields'); return; }
@@ -3905,8 +4170,23 @@ async function applyBulkTeacherChange() {
 
     const newTeacherId = (bulkNewTeacherId?.value || '').trim();
 const newTeacherName = (bulkNewTeacherName?.value || newTeacherId || '').trim();
+    const oldOption = bulkOldSel?.selectedOptions?.[0] || null;
+    const oldTeacherId = String(oldOption?.dataset?.teacherId || oldVal || '').trim();
+    const oldTeacherName = String(oldOption?.dataset?.teacherName || oldVal || '').trim();
+    let impact = null;
+    try {
+        impact = await fetchBulkTeacherImpactPreview();
+    } catch (error) {
+        await uiAlert(error.message || 'Could not preview teacher assignment impact.', 'Preview Failed');
+        return;
+    }
+    if (impact) {
+        const confirmed = await confirmBulkTeacherImpact(impact);
+        if (!confirmed) return;
+    }
 
     let changed = 0;
+    const changedSessions = [];
     (sessionsState || []).forEach(s => {
         const curId = s?.delivery?.deliveredBy || '';
         const curName = s?.delivery?.deliveredByName || '';
@@ -3920,9 +4200,17 @@ const newTeacherName = (bulkNewTeacherName?.value || newTeacherId || '').trim();
         s.delivery.deliveredByName = newTeacherName;
         s.conflictMsg = null;
         s._isSaved = false;
+        changedSessions.push(s);
         changed++;
     });
 
+    syncInstructorRosterAfterBulkTeacherChange({
+        oldTeacherId,
+        oldTeacherName,
+        newTeacherId,
+        newTeacherName,
+        changedSessions
+    });
     renderSessions();
     computeBulkPreview();
 
@@ -3939,6 +4227,8 @@ if (bulkOldSel) bulkOldSel.addEventListener('change', computeBulkPreview);
 if (bulkNewTeacherName) bulkNewTeacherName.addEventListener('change', computeBulkPreview);
 if (bulkStatusSel) bulkStatusSel.addEventListener('change', computeBulkPreview);
 if (bulkIncludeLockedCb) bulkIncludeLockedCb.addEventListener('change', computeBulkPreview);
+if (bulkAddNewInstructorCb) bulkAddNewInstructorCb.addEventListener('change', computeBulkPreview);
+if (bulkInactivateOldInstructorCb) bulkInactivateOldInstructorCb.addEventListener('change', computeBulkPreview);
 if (bulkApplyBtn) bulkApplyBtn.addEventListener('click', applyBulkTeacherChange);
 
     // Initial Render

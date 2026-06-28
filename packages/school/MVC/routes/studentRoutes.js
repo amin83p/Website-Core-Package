@@ -61,7 +61,7 @@ router.get('/new',
 router.post('/new',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE, { requireToken: true }),
-  upload('students', true).array('files', 5),
+  upload('school-students', true).array('files', 5),
   ctrl.saveStudent);
 
 router.get('/edit/:id',
@@ -71,7 +71,7 @@ router.get('/edit/:id',
 router.post('/edit/:id',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }),
-  upload('students', true).array('files', 5),
+  upload('school-students', true).array('files', 5),
   ctrl.saveStudent);
 
 router.get('/delete/:id',

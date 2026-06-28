@@ -95,7 +95,7 @@
     direction: ltr;
   }
 
-  .school-master-hub .hub-notification-count {
+  .school-master-hub .hub-task-count {
     position: absolute;
     top: 0.42rem;
     left: 0.42rem;
@@ -113,12 +113,12 @@
     box-shadow: 0 8px 18px rgba(239, 68, 68, 0.24);
   }
 
-  .school-master-hub .hub-notification-count.is-muted {
+  .school-master-hub .hub-task-count.is-muted {
     background: #94a3b8;
     box-shadow: none;
   }
 
-  .school-master-hub .hub-notification-gear {
+  .school-master-hub .hub-task-gear {
     position: absolute;
     top: 0.42rem;
     right: 0.42rem;
@@ -135,7 +135,7 @@
     transition: transform 160ms ease, background 160ms ease;
   }
 
-  .school-master-hub .hub-notification-gear:hover {
+  .school-master-hub .hub-task-gear:hover {
     transform: rotate(32deg);
     background: #ffffff;
   }
@@ -827,12 +827,12 @@
 
   <div class="hub-section-panel" aria-label="School Master Hub sections">
     <div class="hub-section-panel-inner">
-      <div class="hub-section-segment hub-notification-segment">
-        <span class="hub-notification-count is-muted" id="schoolMasterHubNotificationCount">-</span>
-        <button type="button" class="hub-section-main-link" data-hub-workspace-section="notifications">
-          <span><i class="bi bi-bell-fill me-1"></i> Notification</span>
+      <div class="hub-section-segment hub-task-segment">
+        <span class="hub-task-count is-muted" id="schoolMasterHubTaskCount">-</span>
+        <button type="button" class="hub-section-main-link" data-hub-workspace-section="tasks">
+          <span><i class="bi bi-bell-fill me-1"></i> Task</span>
         </button>
-        <button type="button" class="hub-notification-gear" id="schoolMasterHubNotificationSettings" aria-label="Notification refresh settings">
+        <button type="button" class="hub-task-gear" id="schoolMasterHubTaskSettings" aria-label="Task refresh settings">
           <i class="bi bi-gear-fill"></i>
         </button>
       </div>
@@ -1002,8 +1002,8 @@
     refreshCurrent: document.getElementById('schoolMasterHubRefreshCurrent'),
     openDirectory: document.getElementById('schoolMasterHubOpenDirectory'),
     collapseSidebar: document.getElementById('schoolMasterHubCollapseSidebar'),
-    notificationCount: document.getElementById('schoolMasterHubNotificationCount'),
-    notificationSettings: document.getElementById('schoolMasterHubNotificationSettings'),
+    taskCount: document.getElementById('schoolMasterHubTaskCount'),
+    taskSettings: document.getElementById('schoolMasterHubTaskSettings'),
     workspace: document.getElementById('schoolMasterHubWorkspace'),
     workspaceButtons: root.querySelectorAll('[data-hub-workspace-section]')
   };
@@ -1048,73 +1048,73 @@
     });
   }
 
-  const notificationState = {
+  const taskState = {
     intervalSeconds: 60,
     timer: null,
     loading: false
   };
 
-  function setNotificationCount(value, muted) {
-    if (!els.notificationCount) return;
-    els.notificationCount.textContent = String(value == null ? '-' : value);
-    els.notificationCount.classList.toggle('is-muted', Boolean(muted));
+  function setTaskCount(value, muted) {
+    if (!els.taskCount) return;
+    els.taskCount.textContent = String(value == null ? '-' : value);
+    els.taskCount.classList.toggle('is-muted', Boolean(muted));
   }
 
-  async function refreshNotificationCount() {
-    if (notificationState.loading || !els.notificationCount) return;
-    notificationState.loading = true;
+  async function refreshTaskCount() {
+    if (taskState.loading || !els.taskCount) return;
+    taskState.loading = true;
 
     try {
-      const response = await fetch('/school/master-hub/api/notification-count', {
+      const response = await fetch('/school/master-hub/api/task-count', {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin'
       });
       const payload = await response.json().catch(function () {
-        return { status: 'error', message: 'Unable to read notification count.' };
+        return { status: 'error', message: 'Unable to read task count.' };
       });
       if (!response.ok || payload.status !== 'success') {
-        throw new Error(payload.message || 'Unable to read notification count.');
+        throw new Error(payload.message || 'Unable to read task count.');
       }
-      setNotificationCount(payload.unresolvedCount || 0, false);
+      setTaskCount(payload.unresolvedCount || 0, false);
     } catch (error) {
-      setNotificationCount('-', true);
+      setTaskCount('-', true);
     } finally {
-      notificationState.loading = false;
+      taskState.loading = false;
     }
   }
 
-  function restartNotificationTimer() {
-    if (notificationState.timer) {
-      window.clearInterval(notificationState.timer);
-      notificationState.timer = null;
+  function restartTaskTimer() {
+    if (taskState.timer) {
+      window.clearInterval(taskState.timer);
+      taskState.timer = null;
     }
 
-    refreshNotificationCount();
-    notificationState.timer = window.setInterval(refreshNotificationCount, Math.max(10, notificationState.intervalSeconds) * 1000);
+    refreshTaskCount();
+    taskState.timer = window.setInterval(refreshTaskCount, Math.max(10, taskState.intervalSeconds) * 1000);
   }
 
-  function applyNotificationInterval(value) {
+  function applyTaskInterval(value) {
     const parsed = Number(value);
-    notificationState.intervalSeconds = Number.isFinite(parsed) && parsed >= 10 ? parsed : 60;
-    restartNotificationTimer();
+    taskState.intervalSeconds = Number.isFinite(parsed) && parsed >= 10 ? parsed : 60;
+    restartTaskTimer();
   }
 
-  async function openNotificationSettings() {
+  async function openTaskSettings() {
     if (typeof window.showMessageModal !== 'function') {
       renderWorkspaceStatus('Message modal is not available on this page.', 'bi-exclamation-triangle', 'danger');
       return;
     }
 
-    const inputId = 'schoolMasterHubNotificationIntervalInput';
+    const inputId = 'schoolMasterHubTaskIntervalInput';
     const selected = await window.showMessageModal({
-      title: 'Notification refresh timer',
+      title: 'Task refresh timer',
       icon: 'info',
       size: 'md',
       message: [
-        '<p class="mb-3">Set how often Master Hub checks unresolved or incomplete notifications while this page remains open.</p>',
+        '<p class="mb-3">Set how often Master Hub checks unresolved or incomplete tasks while this page remains open.</p>',
         '<label class="form-label fw-semibold" for="' + inputId + '">Interval timer, in seconds</label>',
         '<div class="input-group">',
-        '<input type="number" class="form-control" id="' + inputId + '" min="10" step="5" value="' + escapeHtml(notificationState.intervalSeconds || 60) + '">',
+        '<input type="number" class="form-control" id="' + inputId + '" min="10" step="5" value="' + escapeHtml(taskState.intervalSeconds || 60) + '">',
         '<span class="input-group-text">seconds</span>',
         '</div>',
         '<div class="form-text">Default is 60 seconds. Minimum allowed value is 10 seconds.</div>'
@@ -1127,7 +1127,7 @@
 
     if (selected === 'Save Timer') {
       const input = document.getElementById(inputId);
-      applyNotificationInterval(input ? input.value : 60);
+      applyTaskInterval(input ? input.value : 60);
     }
   }
 
@@ -1135,8 +1135,9 @@
     currentSection: '',
     loading: false,
     serverSearch: {
-      notifications: '',
+      tasks: '',
       classes: '',
+      sessions: '',
       'session-issues': '',
       'timesheet-periods': '',
       'timesheet-management': '',
@@ -1146,10 +1147,10 @@
   };
 
   const workspaceSections = {
-    notifications: {
-      label: 'Notifications',
-      endpoint: '/school/master-hub/api/workspace/notifications',
-      sourceUrl: '/school/notifications',
+    tasks: {
+      label: 'Tasks',
+      endpoint: '/school/master-hub/api/workspace/tasks',
+      sourceUrl: '/school/tasks',
       icon: 'bi bi-bell-fill'
     },
     classes: {
@@ -1279,8 +1280,8 @@
     }
   }
 
-  function renderNotificationWorkspace(payload) {
-    const section = payload && payload.section ? payload.section : workspaceSections.notifications;
+  function renderTaskWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : workspaceSections.tasks;
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
     const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
     const body = rows.length
@@ -1306,7 +1307,7 @@
         return [
           '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
           '<td class="ps-4">',
-          '<div class="fw-semibold">' + escapeHtml(row.title || row.id || 'Notification') + '</div>',
+          '<div class="fw-semibold">' + escapeHtml(row.title || row.id || 'Task') + '</div>',
           '<div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div>',
           '</td>',
           '<td><span class="badge ' + statusBadgeClass(row.status) + '">' + escapeHtml(String(row.status || 'open').replace(/_/g, ' ')) + '</span></td>',
@@ -1319,27 +1320,27 @@
           '</tr>'
         ].join('');
       }).join('')
-      : '<tr><td colspan="8" class="text-center text-muted py-5">No notifications assigned to you.</td></tr>';
+      : '<tr><td colspan="8" class="text-center text-muted py-5">No tasks assigned to you.</td></tr>';
 
     els.workspace.innerHTML = [
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
       '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
-      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-bell-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Notifications') + '</h2>',
-      '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' notification(s) related to you. Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-bell-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Tasks') + '</h2>',
+      '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' task(s) related to you. Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
       '</div>',
       '<div class="d-flex gap-2">',
-      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="notifications"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>',
-      '<a href="' + escapeHtml(section.sourceUrl || '/school/notifications') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="tasks"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>',
+      '<a href="' + escapeHtml(section.sourceUrl || '/school/tasks') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
       '</div>',
       '</div>',
-      workspaceToolbarHtml('notifications', { label: 'notifications' }),
+      workspaceToolbarHtml('tasks', { label: 'tasks' }),
       '<div class="table-responsive">',
       '<table class="table align-middle hub-workspace-table">',
       '<thead class="table-light">',
       '<tr>',
-      '<th class="ps-4">Notification</th>',
+      '<th class="ps-4">Task</th>',
       '<th>Status</th>',
       '<th>Severity</th>',
       '<th>Source</th>',
@@ -1361,15 +1362,15 @@
     if (reload) {
       reload.addEventListener('click', async function () {
         const shouldReload = await confirmHubReload({
-          title: 'Reload Notifications',
-          message: 'Reload the notifications list inside Master Hub?'
+          title: 'Reload Tasks',
+          message: 'Reload the tasks list inside Master Hub?'
         });
         if (shouldReload) {
-          loadWorkspaceSection(reload.getAttribute('data-hub-workspace-reload') || 'notifications');
+          loadWorkspaceSection(reload.getAttribute('data-hub-workspace-reload') || 'tasks');
         }
       });
     }
-    bindWorkspaceSearchControls('notifications');
+    bindWorkspaceSearchControls('tasks');
   }
 
   function classStatusBadgeClass(status) {
@@ -1559,6 +1560,20 @@
     return '<span class="badge border ms-1 ' + (classMap[tone] || classMap.muted) + '" title="' + escapeHtml(title) + '"><i class="bi bi-exclamation-diamond-fill me-1"></i>' + escapeHtml(label) + '</span>';
   }
 
+  function buildSessionMakeupBadgeHtml(row) {
+    if (row && row.makeup && row.makeup.isMakeup) {
+      return '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1"><i class="bi bi-arrow-return-left me-1"></i>Make-up</span>';
+    }
+    const count = Array.isArray(row && row.makeupHistory) ? row.makeupHistory.length : 0;
+    if (count > 0) {
+      return '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle ms-1"><i class="bi bi-calendar-check me-1"></i>' + escapeHtml(String(count)) + ' make-up</span>';
+    }
+    if (row && row.makeUpRequired === true) {
+      return '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1"><i class="bi bi-calendar-plus me-1"></i>Make-up available</span>';
+    }
+    return '';
+  }
+
   function buildSessionRowStyle(status, locked, statusMap) {
     const normalized = normalizeSessionStatusCode(status);
     const meta = statusMap.get(normalized);
@@ -1584,6 +1599,9 @@
   let hubSessionIssueTeacherSelections = [];
   let hubSessionIssueStudentSelections = [];
   let hubSessionIssueClassSelections = [];
+  let hubSessionRowsByKey = new Map();
+  let hubSessionStatusMeta = [];
+  let hubSessionCanUpdateSessions = false;
 
   function resolveHubTeacherId(item) {
     if (!item || typeof item !== 'object') return '';
@@ -1819,12 +1837,466 @@
       });
     }
 
+    const selectAll = document.getElementById('hubSessionSelectAllVisible');
+    if (selectAll) {
+      selectAll.addEventListener('change', function () {
+        els.workspace.querySelectorAll('.hub-session-select').forEach(function (input) {
+          const row = input.closest('[data-hub-workspace-row]');
+          if (row && !row.classList.contains('d-none')) input.checked = selectAll.checked;
+        });
+      });
+    }
+
+    const lockSelected = document.getElementById('hubSessionLockSelected');
+    if (lockSelected) lockSelected.addEventListener('click', lockSelectedHubSessions);
+
+    els.workspace.querySelectorAll('[data-hub-session-edit]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const key = btn.getAttribute('data-hub-session-edit') || '';
+        openHubSessionEditModal(hubSessionRowsByKey.get(key));
+      });
+    });
+    els.workspace.querySelectorAll('[data-hub-session-makeup]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const key = btn.getAttribute('data-hub-session-makeup') || '';
+        openHubSessionMakeupModal(hubSessionRowsByKey.get(key));
+      });
+    });
+
     bindWorkspaceSearchControls('sessions');
+  }
+
+  function getVisibleSelectedSessionRefs() {
+    return Array.from(els.workspace.querySelectorAll('.hub-session-select:checked'))
+      .filter(function (input) {
+        const row = input.closest('[data-hub-workspace-row]');
+        return row && !row.classList.contains('d-none');
+      })
+      .map(function (input) {
+        return {
+          classId: input.getAttribute('data-class-id') || '',
+          sessionId: input.getAttribute('data-session-id') || ''
+        };
+      })
+      .filter(function (ref) { return ref.classId && ref.sessionId; });
+  }
+
+  async function postHubSessionMutation(url, payload, loadingMessage) {
+    if (typeof window.showLoading === 'function') window.showLoading(loadingMessage || 'Updating sessions...');
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-AJAX-Request': 'true'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload || {})
+      });
+      const result = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to read server response.' };
+      });
+      if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Operation failed.');
+      return result;
+    } finally {
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+    }
+  }
+
+  async function lockSelectedHubSessions() {
+    const refs = getVisibleSelectedSessionRefs();
+    if (!refs.length) {
+      await showHubMessage({ title: 'Lock Sessions', icon: 'warning', message: 'Select at least one visible session first.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      return;
+    }
+    const selected = await showHubMessage({
+      title: 'Lock Selected Sessions',
+      icon: 'warning',
+      message: 'Lock ' + refs.length + ' selected session(s)? Locked sessions cannot be edited from attendance/session screens unless the user can override locks.',
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Lock Sessions', class: 'btn-danger' }
+      ]
+    });
+    if (selected !== 'Lock Sessions') return;
+    try {
+      const result = await postHubSessionMutation('/school/master-hub/api/workspace/sessions/lock', { sessionRefs: refs }, 'Locking selected sessions...');
+      await showHubMessage({ title: 'Sessions Locked', icon: 'success', message: result.message || 'Selected sessions were locked.', buttons: [{ text: 'OK', class: 'btn-success' }] });
+      hubWorkspaceNodeCache.delete('sessions');
+      loadWorkspaceSection('sessions');
+    } catch (error) {
+      await showHubMessage({ title: 'Lock Sessions Failed', icon: 'error', message: error.message || 'Could not lock selected sessions.', buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+    }
+  }
+
+  function ensureHubSessionMakeupModal() {
+    let modal = document.getElementById('hubSessionMakeupModal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'hubSessionMakeupModal';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = [
+      '<div class="modal-dialog modal-lg modal-dialog-scrollable">',
+      '<div class="modal-content">',
+      '<div class="modal-header bg-warning text-dark">',
+      '<h5 class="modal-title fw-bold"><i class="bi bi-calendar-plus me-2"></i>Create Make-up Session</h5>',
+      '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>',
+      '</div>',
+      '<div class="modal-body">',
+      '<input type="hidden" id="hubMakeupSessionClassId">',
+      '<input type="hidden" id="hubMakeupSessionSessionId">',
+      '<input type="hidden" id="hubMakeupSessionTeacherId">',
+      '<div class="alert alert-light border small" id="hubMakeupSessionContext"></div>',
+      '<div class="row g-3">',
+      '<div class="col-md-4"><label class="form-label fw-bold">Date</label><input type="date" class="form-control" id="hubMakeupSessionDate"></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold">Start Time</label><input type="time" class="form-control" id="hubMakeupSessionStart"></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold">End Time</label><input type="time" class="form-control" id="hubMakeupSessionEnd"></div>',
+      '<div class="col-md-6"><label class="form-label fw-bold">Teacher</label><div class="input-group"><input type="text" class="form-control bg-white" id="hubMakeupSessionTeacherName" readonly><button type="button" class="btn btn-outline-primary" id="hubMakeupSessionPickTeacher"><i class="bi bi-person-check"></i></button></div></div>',
+      '<div class="col-md-6"><label class="form-label fw-bold">Location</label><input type="text" class="form-control" id="hubMakeupSessionRoom" maxlength="200"></div>',
+      '<div class="col-12"><label class="form-label fw-bold">Reason</label><textarea class="form-control" id="hubMakeupSessionReason" rows="3" maxlength="1000"></textarea></div>',
+      '</div>',
+      '</div>',
+      '<div class="modal-footer bg-light">',
+      '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>',
+      '<button type="button" class="btn btn-warning fw-bold" id="hubMakeupSessionCreate"><i class="bi bi-calendar-plus me-1"></i>Create Make-up Session</button>',
+      '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(modal);
+    modal.querySelector('#hubMakeupSessionPickTeacher')?.addEventListener('click', function () {
+      if (!window.GenericPicker || !window.GenericPickerPresets) {
+        showHubMessage({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.' });
+        return;
+      }
+      window.GenericPicker.open(window.GenericPickerPresets.teacher({
+        title: 'Select Make-up Teacher',
+        placeholder: 'Search teachers...',
+        context: window.GenericPickerContexts
+          ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+          : undefined,
+        onSelect: function (item) {
+          const teacherId = resolveHubTeacherId(item);
+          const teacherName = formatHubTeacherName(item, teacherId);
+          modal.querySelector('#hubMakeupSessionTeacherId').value = teacherId;
+          modal.querySelector('#hubMakeupSessionTeacherName').value = teacherName;
+        }
+      }));
+    });
+    modal.querySelector('#hubMakeupSessionCreate')?.addEventListener('click', createHubMakeupSessionFromModal);
+    return modal;
+  }
+
+  function openHubSessionMakeupModal(row) {
+    if (!row) return;
+    const modal = ensureHubSessionMakeupModal();
+    modal.querySelector('#hubMakeupSessionClassId').value = row.classId || '';
+    modal.querySelector('#hubMakeupSessionSessionId').value = row.sessionId || '';
+    modal.querySelector('#hubMakeupSessionTeacherId').value = row.teacherId || '';
+    modal.querySelector('#hubMakeupSessionDate').value = '';
+    modal.querySelector('#hubMakeupSessionStart').value = row.startTime || '';
+    modal.querySelector('#hubMakeupSessionEnd').value = row.endTime || '';
+    modal.querySelector('#hubMakeupSessionTeacherName').value = row.teacherName || '';
+    modal.querySelector('#hubMakeupSessionRoom').value = row.room || '';
+    modal.querySelector('#hubMakeupSessionReason').value = '';
+    const count = Array.isArray(row.makeupHistory) ? row.makeupHistory.length : 0;
+    modal.querySelector('#hubMakeupSessionContext').innerHTML = '<strong>' + escapeHtml(row.className || row.classId || 'Class') + '</strong><div class="text-muted font-monospace">' + escapeHtml(row.sessionId || '') + '</div>' + (count ? '<div class="text-warning mt-2"><i class="bi bi-exclamation-triangle me-1"></i>' + escapeHtml(String(count)) + ' make-up session(s) already exist for this original session.</div>' : '');
+    if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).show();
+  }
+
+  async function createHubMakeupSessionFromModal() {
+    const modal = ensureHubSessionMakeupModal();
+    const button = modal.querySelector('#hubMakeupSessionCreate');
+    const oldHtml = button ? button.innerHTML : '';
+    const classId = hubInputValue('hubMakeupSessionClassId');
+    const sessionId = hubInputValue('hubMakeupSessionSessionId');
+    const payload = {
+      date: hubInputValue('hubMakeupSessionDate'),
+      startTime: hubInputValue('hubMakeupSessionStart'),
+      endTime: hubInputValue('hubMakeupSessionEnd'),
+      teacherId: hubInputValue('hubMakeupSessionTeacherId'),
+      teacherName: hubInputValue('hubMakeupSessionTeacherName'),
+      room: hubInputValue('hubMakeupSessionRoom'),
+      reason: hubInputValue('hubMakeupSessionReason')
+    };
+    if (!payload.date) {
+      await showHubMessage({ title: 'Date Required', icon: 'warning', message: 'Please select the make-up session date.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      return;
+    }
+    try {
+      if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating...';
+      }
+      if (typeof window.showLoading === 'function') window.showLoading('Creating make-up session...');
+      const submitMakeup = async function (bodyPayload) {
+        const response = await fetch('/school/classes/' + encodeURIComponent(classId) + '/sessions/' + encodeURIComponent(sessionId) + '/makeup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-AJAX-Request': 'true'
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify(bodyPayload || {})
+        });
+        const parsed = await response.json().catch(function () {
+          return { status: 'error', message: 'Unable to read server response.' };
+        });
+        return { response, parsed };
+      };
+      let responseAndPayload = await submitMakeup(payload);
+      let result = responseAndPayload.parsed;
+      if (result.status === 'warning' && result.code === 'MAKEUP_SESSION_WARNINGS') {
+        const warningList = Array.isArray(result?.data?.warnings) && result.data.warnings.length
+          ? '<ul>' + result.data.warnings.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>'
+          : '';
+        if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+        const selected = await showHubMessage({
+          title: 'Review Make-up Warnings',
+          icon: 'warning',
+          message: (result.message || 'Review warnings before creating this make-up session.') + warningList,
+          buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: 'Create Anyway', class: 'btn-warning' }]
+        });
+        if (selected !== 'Create Anyway') return;
+        if (typeof window.showLoading === 'function') window.showLoading('Creating make-up session...');
+        responseAndPayload = await submitMakeup({ ...payload, force: true });
+        result = responseAndPayload.parsed;
+      }
+      if (!responseAndPayload.response.ok || result.status !== 'success') throw new Error(result.message || 'Could not create make-up session.');
+      if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).hide();
+      const warnings = Array.isArray(result?.data?.warnings) && result.data.warnings.length
+        ? '<hr><strong>Warnings</strong><ul>' + result.data.warnings.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>'
+        : '';
+      await showHubMessage({ title: 'Make-up Session Created', icon: result?.data?.warnings?.length ? 'warning' : 'success', message: (result.message || 'Make-up session created.') + warnings, buttons: [{ text: 'OK', class: 'btn-success' }] });
+      hubWorkspaceNodeCache.delete('sessions');
+      loadWorkspaceSection('sessions');
+    } catch (error) {
+      await showHubMessage({ title: 'Make-up Session Failed', icon: 'error', message: error.message || 'Could not create make-up session.', buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+    } finally {
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = oldHtml;
+      }
+    }
+  }
+
+  function ensureHubSessionEditModal() {
+    let modal = document.getElementById('hubSessionEditModal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'hubSessionEditModal';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = [
+      '<div class="modal-dialog modal-lg modal-dialog-scrollable">',
+      '<div class="modal-content">',
+      '<div class="modal-header bg-primary text-white">',
+      '<h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Session</h5>',
+      '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>',
+      '</div>',
+      '<div class="modal-body">',
+      '<input type="hidden" id="hubEditSessionClassId">',
+      '<input type="hidden" id="hubEditSessionSessionId">',
+      '<input type="hidden" id="hubEditSessionTeacherId">',
+      '<div class="alert alert-light border small" id="hubEditSessionContext"></div>',
+      '<div class="row g-3">',
+      '<div class="col-md-4"><label class="form-label fw-bold">Date</label><input type="date" class="form-control" id="hubEditSessionDate"></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold">Start Time</label><input type="time" class="form-control" id="hubEditSessionStart"></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold">End Time</label><input type="time" class="form-control" id="hubEditSessionEnd"></div>',
+      '<div class="col-md-6"><label class="form-label fw-bold">Teacher</label><div class="input-group"><input type="text" class="form-control bg-white" id="hubEditSessionTeacherName" readonly><button type="button" class="btn btn-outline-primary" id="hubEditSessionPickTeacher"><i class="bi bi-person-check"></i></button></div></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Status</label><select class="form-select" id="hubEditSessionStatus"></select></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Location</label><input type="text" class="form-control" id="hubEditSessionRoom" maxlength="200"></div>',
+      '<div class="col-12"><div class="form-check form-switch border rounded bg-light px-3 py-2"><input class="form-check-input ms-0 me-2" type="checkbox" role="switch" id="hubEditSessionLocked"><label class="form-check-label fw-bold" for="hubEditSessionLocked"><i class="bi bi-lock-fill me-1"></i>Lock this session</label><div class="small text-muted mt-1">Locked sessions cannot be edited from attendance/session screens unless the user can override locks.</div></div></div>',
+      '<div class="col-12"><label class="form-label fw-bold">Notes</label><textarea class="form-control" id="hubEditSessionNotes" rows="4" maxlength="2000"></textarea></div>',
+      '</div>',
+      '</div>',
+      '<div class="modal-footer bg-light">',
+      '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>',
+      '<button type="button" class="btn btn-primary fw-bold" id="hubEditSessionSave"><i class="bi bi-save me-1"></i>Save Session</button>',
+      '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(modal);
+    modal.querySelector('#hubEditSessionPickTeacher')?.addEventListener('click', function () {
+      if (!window.GenericPicker || !window.GenericPickerPresets) {
+        showHubMessage({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.' });
+        return;
+      }
+      window.GenericPicker.open(window.GenericPickerPresets.teacher({
+        title: 'Select Session Teacher',
+        placeholder: 'Search teachers...',
+        context: window.GenericPickerContexts
+          ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+          : undefined,
+        onSelect: function (item) {
+          const teacherId = resolveHubTeacherId(item);
+          const teacherName = formatHubTeacherName(item, teacherId);
+          modal.querySelector('#hubEditSessionTeacherId').value = teacherId;
+          modal.querySelector('#hubEditSessionTeacherName').value = teacherName;
+        }
+      }));
+    });
+    modal.querySelector('#hubEditSessionSave')?.addEventListener('click', saveHubSessionEditModal);
+    return modal;
+  }
+
+  function openHubSessionEditModal(row) {
+    if (!row) return;
+    const modal = ensureHubSessionEditModal();
+    modal.querySelector('#hubEditSessionClassId').value = row.classId || '';
+    modal.querySelector('#hubEditSessionSessionId').value = row.sessionId || '';
+    modal.querySelector('#hubEditSessionTeacherId').value = row.teacherId || '';
+    modal.querySelector('#hubEditSessionDate').value = row.date || '';
+    modal.querySelector('#hubEditSessionStart').value = row.startTime || '';
+    modal.querySelector('#hubEditSessionEnd').value = row.endTime || '';
+    modal.querySelector('#hubEditSessionTeacherName').value = row.teacherName || '';
+    modal.querySelector('#hubEditSessionRoom').value = row.room || '';
+    modal.querySelector('#hubEditSessionNotes').value = row.notes || '';
+    modal.querySelector('#hubEditSessionLocked').checked = row.locked === true || String(row.locked) === 'true';
+    modal.querySelector('#hubEditSessionContext').innerHTML = '<strong>' + escapeHtml(row.className || row.classId || 'Class') + '</strong><div class="text-muted font-monospace">' + escapeHtml(row.sessionId || '') + '</div>';
+    const statusSelect = modal.querySelector('#hubEditSessionStatus');
+    const selectedStatus = normalizeSessionStatusCode(row.status || '');
+    const statusOptions = (Array.isArray(hubSessionStatusMeta) ? hubSessionStatusMeta : []).slice().sort(function (a, b) {
+      const ao = Number(a?.sortOrder ?? a?.order ?? 999);
+      const bo = Number(b?.sortOrder ?? b?.order ?? 999);
+      if (ao !== bo) return ao - bo;
+      return String(a?.label || a?.code || '').localeCompare(String(b?.label || b?.code || ''));
+    }).map(function (meta) {
+      const code = normalizeSessionStatusCode(meta && meta.code);
+      return code ? '<option value="' + escapeHtml(code) + '"' + (code === selectedStatus ? ' selected' : '') + '>' + escapeHtml(meta.label || toSessionStatusLabel(code)) + '</option>' : '';
+    }).join('');
+    statusSelect.innerHTML = statusOptions || '<option value="' + escapeHtml(selectedStatus || 'scheduled') + '">' + escapeHtml(toSessionStatusLabel(selectedStatus || 'scheduled')) + '</option>';
+    if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).show();
+  }
+
+  function buildHubSessionActionHtml(rowKey, row) {
+    const detailUrl = '/school/classes/' + encodeURIComponent(row.classId || '') + '/sessions/' + encodeURIComponent(row.sessionId || '');
+    return '<div class="btn-group btn-group-sm">'
+      + (hubSessionCanUpdateSessions && row.makeUpRequired === true ? '<button type="button" class="btn btn-light border text-warning" data-hub-session-makeup="' + escapeHtml(rowKey) + '"><i class="bi bi-calendar-plus me-1"></i>Make-up</button>' : '')
+      + (hubSessionCanUpdateSessions ? '<button type="button" class="btn btn-light border text-primary" data-hub-session-edit="' + escapeHtml(rowKey) + '"><i class="bi bi-pencil-square me-1"></i>Edit</button>' : '')
+      + '<a class="btn btn-light border text-primary" href="' + escapeHtml(detailUrl) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-in-right me-1"></i>Open</a>'
+      + '</div>';
+  }
+
+  function bindHubSessionRowActions(rowEl) {
+    if (!rowEl) return;
+    rowEl.querySelectorAll('[data-hub-session-edit]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const key = btn.getAttribute('data-hub-session-edit') || '';
+        openHubSessionEditModal(hubSessionRowsByKey.get(key));
+      });
+    });
+    rowEl.querySelectorAll('[data-hub-session-makeup]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const key = btn.getAttribute('data-hub-session-makeup') || '';
+        openHubSessionMakeupModal(hubSessionRowsByKey.get(key));
+      });
+    });
+  }
+
+  function patchHubSessionTableRow(rowKey, updatedRow) {
+    const rowEl = Array.from(document.querySelectorAll('[data-session-key]')).find(function (node) {
+      return node.getAttribute('data-session-key') === rowKey;
+    });
+    if (!rowEl || !updatedRow) return;
+    const statusMap = buildSessionStatusMetaMap(hubSessionStatusMeta);
+    const dateLabel = updatedRow.date
+      ? new Date(updatedRow.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+      : '-';
+    const commentsIcon = updatedRow.hasComments ? '<i class="bi bi-chat-dots-fill text-primary ms-1" title="Interactive notes inside"></i>' : '';
+    const searchText = [
+      updatedRow.sessionId,
+      updatedRow.classId,
+      updatedRow.className,
+      updatedRow.teacherName,
+      updatedRow.date,
+      updatedRow.startTime,
+      updatedRow.endTime,
+      updatedRow.status,
+      updatedRow.notes
+    ].join(' ');
+    rowEl.setAttribute('data-search-text', searchText);
+    rowEl.setAttribute('style', buildSessionRowStyle(updatedRow.status, updatedRow.locked === true, statusMap));
+    rowEl.classList.toggle('session-row-locked', updatedRow.locked === true);
+    const cells = rowEl.children;
+    if (cells[1]) cells[1].innerHTML = escapeHtml(dateLabel) + '<div class="small text-muted">' + escapeHtml(updatedRow.date || '') + '</div>';
+    if (cells[2]) cells[2].innerHTML = '<i class="bi bi-clock me-1"></i>' + escapeHtml(updatedRow.startTime || '00:00') + ' - ' + escapeHtml(updatedRow.endTime || '00:00');
+    if (cells[4]) cells[4].innerHTML = escapeHtml(updatedRow.teacherName || 'Unassigned');
+    if (cells[5]) cells[5].innerHTML = buildSessionStatusBadgeHtml(updatedRow.status, statusMap)
+      + buildSessionCaseBadgeHtml(updatedRow.caseSummary)
+      + buildSessionMakeupBadgeHtml(updatedRow)
+      + (updatedRow.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : '');
+    if (cells[6]) cells[6].innerHTML = escapeHtml(truncateHubText(updatedRow.notes, 42)) + commentsIcon;
+    if (cells[7]) cells[7].innerHTML = buildHubSessionActionHtml(rowKey, updatedRow);
+    bindHubSessionRowActions(rowEl);
+  }
+
+  async function saveHubSessionEditModal() {
+    const modal = ensureHubSessionEditModal();
+    const button = modal.querySelector('#hubEditSessionSave');
+    const oldHtml = button ? button.innerHTML : '';
+    const payload = {
+      classId: hubInputValue('hubEditSessionClassId'),
+      sessionId: hubInputValue('hubEditSessionSessionId'),
+      date: hubInputValue('hubEditSessionDate'),
+      startTime: hubInputValue('hubEditSessionStart'),
+      endTime: hubInputValue('hubEditSessionEnd'),
+      teacherId: hubInputValue('hubEditSessionTeacherId'),
+      teacherName: hubInputValue('hubEditSessionTeacherName'),
+      status: hubInputValue('hubEditSessionStatus'),
+      room: hubInputValue('hubEditSessionRoom'),
+      notes: hubInputValue('hubEditSessionNotes'),
+      locked: document.getElementById('hubEditSessionLocked')?.checked === true
+    };
+    try {
+      if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+      }
+      const result = await postHubSessionMutation('/school/master-hub/api/workspace/sessions/update', payload, 'Saving session...');
+      if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).hide();
+      await showHubMessage({ title: 'Session Updated', icon: 'success', message: result.message || 'Session updated.', buttons: [{ text: 'OK', class: 'btn-success' }] });
+      const rowKey = String(payload.classId || '') + '::' + String(payload.sessionId || '');
+      const existingRow = hubSessionRowsByKey.get(rowKey) || {};
+      const sessionRow = result?.result?.session || {};
+      const updatedRow = {
+        ...existingRow,
+        date: sessionRow.date || payload.date,
+        startTime: sessionRow.startTime || payload.startTime,
+        endTime: sessionRow.endTime || payload.endTime,
+        status: sessionRow.status || payload.status,
+        locked: sessionRow.locked === true || String(sessionRow.locked) === 'true',
+        teacherId: sessionRow?.delivery?.deliveredBy || payload.teacherId,
+        teacherName: sessionRow?.delivery?.deliveredByName || payload.teacherName,
+        room: sessionRow.room || payload.room,
+        notes: sessionRow.notes || payload.notes
+      };
+      hubSessionRowsByKey.set(rowKey, updatedRow);
+      patchHubSessionTableRow(rowKey, updatedRow);
+    } catch (error) {
+      await showHubMessage({ title: 'Session Update Failed', icon: 'error', message: error.message || 'Could not update session.', buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = oldHtml;
+      }
+    }
   }
 
   function renderSessionWorkspace(payload) {
     const section = payload && payload.section ? payload.section : {};
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
+    const canUpdateSessions = payload && payload.canUpdateSessions === true;
+    hubSessionCanUpdateSessions = canUpdateSessions;
     const notLoaded = payload && payload.notLoaded === true;
     const filters = payload && payload.filters ? payload.filters : {};
     const filterTeacherIds = splitHubIdList(filters.teacherId || '');
@@ -1839,10 +2311,17 @@
       hubSessionTeacherSelections = [];
     }
     const statusMeta = Array.isArray(payload && payload.statusMeta) ? payload.statusMeta : [];
+    hubSessionStatusMeta = statusMeta.slice();
+    hubSessionRowsByKey = new Map();
     const statusMap = buildSessionStatusMetaMap(statusMeta);
     const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
     const selectedStatus = normalizeSessionStatusCode(filters.status || '');
-    const statusOptions = statusMeta.map(function (row) {
+    const statusOptions = statusMeta.slice().sort(function (a, b) {
+      const ao = Number(a && (a.sortOrder ?? a.order ?? 999));
+      const bo = Number(b && (b.sortOrder ?? b.order ?? 999));
+      if (ao !== bo) return ao - bo;
+      return String(a?.label || a?.code || '').localeCompare(String(b?.label || b?.code || ''));
+    }).map(function (row) {
       const code = normalizeSessionStatusCode(row && row.code);
       if (!code) return '';
       return '<option value="' + escapeHtml(code) + '"' + (code === selectedStatus ? ' selected' : '') + '>' + escapeHtml(row.label || toSessionStatusLabel(code)) + '</option>';
@@ -1850,11 +2329,14 @@
 
     const body = rows.length
       ? rows.map(function (row) {
+        const rowKey = String(row.classId || '') + '::' + String(row.sessionId || '');
+        hubSessionRowsByKey.set(rowKey, row);
         const dateLabel = row.date
           ? new Date(row.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
           : '-';
         const badgeHtml = buildSessionStatusBadgeHtml(row.status, statusMap);
         const caseBadgeHtml = buildSessionCaseBadgeHtml(row.caseSummary);
+        const makeupBadgeHtml = buildSessionMakeupBadgeHtml(row);
         const rowStyle = buildSessionRowStyle(row.status, row.locked === true, statusMap);
         const commentsIcon = row.hasComments ? '<i class="bi bi-chat-dots-fill text-primary ms-1" title="Interactive notes inside"></i>' : '';
         const detailUrl = '/school/classes/' + encodeURIComponent(row.classId || '') + '/sessions/' + encodeURIComponent(row.sessionId || '');
@@ -1870,20 +2352,21 @@
           row.notes
         ].join(' ');
         return [
-          '<tr class="session-row ' + (row.locked ? 'session-row-locked' : '') + '" data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '" style="' + escapeHtml(rowStyle) + '">',
-          '<td class="ps-4 fw-bold text-dark">' + escapeHtml(dateLabel) + '<div class="small text-muted">' + escapeHtml(row.date || '') + '</div></td>',
+          '<tr class="session-row ' + (row.locked ? 'session-row-locked' : '') + '" data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '" data-session-key="' + escapeHtml(rowKey) + '" style="' + escapeHtml(rowStyle) + '">',
+          '<td class="ps-4 text-center"><input type="checkbox" class="form-check-input hub-session-select" data-class-id="' + escapeHtml(row.classId || '') + '" data-session-id="' + escapeHtml(row.sessionId || '') + '"></td>',
+          '<td class="fw-bold text-dark">' + escapeHtml(dateLabel) + '<div class="small text-muted">' + escapeHtml(row.date || '') + '</div></td>',
           '<td class="text-muted small"><i class="bi bi-clock me-1"></i>' + escapeHtml(row.startTime || '00:00') + ' - ' + escapeHtml(row.endTime || '00:00') + '</td>',
           '<td><div class="fw-semibold text-primary">' + escapeHtml(row.className || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.classId || '') + '</div></td>',
           '<td>' + escapeHtml(row.teacherName || 'Unassigned') + '</td>',
-          '<td>' + badgeHtml + caseBadgeHtml + (row.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : '') + '</td>',
+          '<td>' + badgeHtml + caseBadgeHtml + makeupBadgeHtml + (row.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : '') + '</td>',
           '<td class="text-muted small fst-italic">' + escapeHtml(truncateHubText(row.notes, 42)) + commentsIcon + '</td>',
-          '<td class="pe-4 text-end"><a class="btn btn-sm btn-light border text-primary" href="' + escapeHtml(detailUrl) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-in-right me-1"></i>Open</a></td>',
+          '<td class="pe-4 text-end">' + buildHubSessionActionHtml(rowKey, row) + '</td>',
           '</tr>'
         ].join('');
       }).join('')
       : (notLoaded
-        ? '<tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-arrow-clockwise d-block fs-2 mb-2"></i>Set filters if needed, then click <strong>Filter</strong> or <strong>Load Sessions</strong>.</td></tr>'
-        : '<tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-search d-block fs-2 mb-2"></i>No sessions found matching these filters.</td></tr>');
+        ? '<tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-arrow-clockwise d-block fs-2 mb-2"></i>Set filters if needed, then click <strong>Filter</strong> or <strong>Load Sessions</strong>.</td></tr>'
+        : '<tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-search d-block fs-2 mb-2"></i>No sessions found matching these filters.</td></tr>');
 
     els.workspace.innerHTML = [
       '<div class="hub-workspace-card">',
@@ -1894,21 +2377,22 @@
       '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' session(s). Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
       '</div>',
       '<div class="d-flex gap-2">',
+      (canUpdateSessions ? '<button type="button" class="btn btn-outline-danger btn-sm" id="hubSessionLockSelected" ' + (rows.length ? '' : 'disabled') + '><i class="bi bi-lock-fill me-1"></i> Lock Selected</button>' : ''),
       '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="sessions"><i class="bi bi-arrow-clockwise me-1"></i> ' + (notLoaded ? 'Load Sessions' : 'Refresh') + '</button>',
       '<a href="' + escapeHtml(section.sourceUrl || '/school/sessions') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
       '</div>',
       '</div>',
       '<div class="hub-workspace-toolbar">',
       '<div class="row g-3 align-items-end">',
-      '<div class="col-md-2"><label class="form-label fw-bold small">Start Date</label><input type="date" id="hubSessionStartDate" class="form-control form-control-sm" value="' + escapeHtml(filters.startDate || '') + '"></div>',
-      '<div class="col-md-2"><label class="form-label fw-bold small">End Date</label><input type="date" id="hubSessionEndDate" class="form-control form-control-sm" value="' + escapeHtml(filters.endDate || '') + '"></div>',
-      '<div class="col-md-2"><label class="form-label fw-bold small">Start Time</label><input type="time" id="hubSessionStartTime" class="form-control form-control-sm" value="' + escapeHtml(filters.startTime || '') + '"></div>',
-      '<div class="col-md-2"><label class="form-label fw-bold small">End Time</label><input type="time" id="hubSessionEndTime" class="form-control form-control-sm" value="' + escapeHtml(filters.endTime || '') + '"></div>',
-      '<div class="col-md-2"><label class="form-label fw-bold small">Status</label><select id="hubSessionStatus" class="form-select form-select-sm"><option value="">All Statuses</option>' + statusOptions + '</select></div>',
-      '<div class="col-md-2"><label class="form-label fw-bold small">Cases</label><div class="form-check form-switch pt-1"><input class="form-check-input" type="checkbox" role="switch" id="hubSessionHasCases" ' + (filters.hasCases ? 'checked' : '') + '><label class="form-check-label small fw-semibold" for="hubSessionHasCases">With cases only</label></div></div>',
-      '<div class="col-md-2"><button type="button" id="hubSessionFilterLoad" class="btn btn-primary btn-sm w-100 fw-bold"><i class="bi bi-funnel-fill me-1"></i> Filter</button></div>',
-      '<div class="col-md-6"><label class="form-label fw-bold small">Filter by Teachers</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionTeacherId" value="' + escapeHtml(filters.teacherId || '') + '"><input type="text" id="hubSessionTeacherName" class="form-control bg-white" placeholder="All Teachers..." value="' + escapeHtml(getHubSessionTeacherDisplay(filters.teacherId || '')) + '" readonly><button type="button" class="btn btn-outline-danger" id="hubSessionClearTeacher" title="Clear All"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionOpenTeacherPicker" title="Select Teachers"><i class="bi bi-people-fill"></i></button></div><div id="hubSessionTeacherChips" class="mt-2"></div><div class="form-text">Use the picker checkbox list to add multiple teachers. Remove individual teachers from the chips below.</div></div>',
-      '<div class="col-md-6"><label class="form-label fw-bold small">Filter by Class</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionClassId" value="' + escapeHtml(filters.classId || '') + '"><input type="text" id="hubSessionClassName" class="form-control bg-white" placeholder="All Classes..." value="' + escapeHtml(filters.classId || '') + '" readonly><button type="button" class="btn btn-outline-danger" id="hubSessionClearClass" title="Clear"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionOpenClassPicker"><i class="bi bi-book"></i></button></div></div>',
+      '<div class="col-lg-2 col-md-4"><label class="form-label fw-bold small">Start Date</label><input type="date" id="hubSessionStartDate" class="form-control form-control-sm" value="' + escapeHtml(filters.startDate || '') + '"></div>',
+      '<div class="col-lg-2 col-md-4"><label class="form-label fw-bold small">End Date</label><input type="date" id="hubSessionEndDate" class="form-control form-control-sm" value="' + escapeHtml(filters.endDate || '') + '"></div>',
+      '<div class="col-lg-2 col-md-4"><label class="form-label fw-bold small">Start Time</label><input type="time" id="hubSessionStartTime" class="form-control form-control-sm" value="' + escapeHtml(filters.startTime || '') + '"></div>',
+      '<div class="col-lg-2 col-md-4"><label class="form-label fw-bold small">End Time</label><input type="time" id="hubSessionEndTime" class="form-control form-control-sm" value="' + escapeHtml(filters.endTime || '') + '"></div>',
+      '<div class="col-lg-2 col-md-4"><label class="form-label fw-bold small">Status</label><select id="hubSessionStatus" class="form-select form-select-sm"><option value="">All Statuses</option>' + statusOptions + '</select></div>',
+      '<div class="col-lg-2 col-md-4"><label class="form-label fw-bold small">Case Filter</label><div class="border rounded bg-white px-2 py-1 d-flex align-items-center" style="min-height:31px;"><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" id="hubSessionHasCases" ' + (filters.hasCases ? 'checked' : '') + '><label class="form-check-label small fw-semibold" for="hubSessionHasCases">With cases only</label></div></div></div>',
+      '<div class="col-lg-5 align-self-start"><label class="form-label fw-bold small mb-1">Filter by Teachers</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionTeacherId" value="' + escapeHtml(filters.teacherId || '') + '"><input type="text" id="hubSessionTeacherName" class="form-control bg-white" placeholder="All Teachers..." value="' + escapeHtml(getHubSessionTeacherDisplay(filters.teacherId || '')) + '" readonly><button type="button" class="btn btn-outline-danger" id="hubSessionClearTeacher" title="Clear All"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionOpenTeacherPicker" title="Select Teachers"><i class="bi bi-people-fill"></i></button></div><div id="hubSessionTeacherChips" class="mt-2"></div><div class="form-text mb-0">Use the picker checkbox list to add multiple teachers. Remove individual teachers from the chips below.</div></div>',
+      '<div class="col-lg-5 align-self-start"><label class="form-label fw-bold small mb-1">Filter by Class</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionClassId" value="' + escapeHtml(filters.classId || '') + '"><input type="text" id="hubSessionClassName" class="form-control bg-white" placeholder="All Classes..." value="' + escapeHtml(filters.classId || '') + '" readonly><button type="button" class="btn btn-outline-danger" id="hubSessionClearClass" title="Clear"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionOpenClassPicker"><i class="bi bi-book"></i></button></div><div class="form-text mb-0 invisible">Class filter spacer</div></div>',
+      '<div class="col-lg-2 align-self-start"><label class="form-label fw-bold small mb-1">&nbsp;</label><button type="button" id="hubSessionFilterLoad" class="btn btn-primary btn-sm w-100 fw-bold"><i class="bi bi-funnel-fill me-1"></i> Filter / Load</button></div>',
       '</div>',
       '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
       '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-session-range="today">Today</button>',
@@ -1922,7 +2406,8 @@
       '<table class="table table-hover align-middle hub-workspace-table">',
       '<thead class="table-light">',
       '<tr>',
-      '<th class="ps-4">Date</th>',
+      '<th class="ps-4 text-center" style="width:46px;"><input type="checkbox" class="form-check-input" id="hubSessionSelectAllVisible" ' + (rows.length ? '' : 'disabled') + '></th>',
+      '<th>Date</th>',
       '<th>Time</th>',
       '<th>Class</th>',
       '<th>Teacher</th>',
@@ -4759,9 +5244,9 @@
         throw new Error(payload.message || 'Unable to load this section.');
       }
 
-      if (key === 'notifications') {
-        renderNotificationWorkspace(payload);
-        setNotificationCount(payload.unresolvedCount || 0, false);
+      if (key === 'tasks') {
+        renderTaskWorkspace(payload);
+        setTaskCount(payload.unresolvedCount || 0, false);
       } else if (key === 'classes') {
         renderClassWorkspace(payload);
       } else if (key === 'sessions') {
@@ -5167,11 +5652,11 @@
     els.refreshCurrent.addEventListener('click', searchCurrent);
   }
 
-  if (els.notificationSettings) {
-    els.notificationSettings.addEventListener('click', function (event) {
+  if (els.taskSettings) {
+    els.taskSettings.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopPropagation();
-      openNotificationSettings();
+      openTaskSettings();
     });
   }
 
@@ -5259,7 +5744,7 @@
   window.onbeforeunload = confirmMasterHubUnload;
 
   if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
-  restartNotificationTimer();
+  restartTaskTimer();
   syncSidebarToggle();
   syncActiveTab();
   renderSearchPrompt();

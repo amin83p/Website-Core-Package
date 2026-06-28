@@ -184,6 +184,21 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         return '';
       }
+    },
+    {
+      target: '#tab-attachments',
+      title: 'Attachments',
+      helper: [
+        'Upload syllabi, reading lists, or supporting subject files after the subject has been saved.',
+        'Files are stored in the School subject workspace on the shared upload volume.',
+        'Existing subjects can add or remove attachments without changing subject configuration.'
+      ],
+      impacts: [
+        'Subject attachments can travel with package-managed upload references.',
+        'Keeping files in the shared upload layer avoids inline records and server-specific paths.',
+        'New subjects must be saved first so the workspace can be resolved safely.'
+      ],
+      required: []
     }
   ];
 

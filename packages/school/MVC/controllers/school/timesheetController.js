@@ -2,7 +2,6 @@
 const dataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
-const dataService1 = requireCoreModule('MVC/services/dataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
@@ -13,6 +12,7 @@ const idempotencyGuardService = require('../../services/school/idempotencyGuardS
 const { buildReportReflectionLiveSessions } = require('../../services/school/reportTimesheetReflectionService');
 const activityService = require('../../services/school/activityService');
 const priorPeriodAdjustmentService = require('../../services/school/timesheetPriorPeriodAdjustmentService');
+const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const { sanitizeSnapshotEntry } = require('../../models/school/timesheetModel');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
@@ -60,7 +60,9 @@ function sendGuardedResponse(req, res, guardResult, duplicateMessage, duplicateS
 }
 
 function buildPersonName(person) {
-    return `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim() || String(person?.id || '');
+    return String(person?.displayName || person?.name || '').trim()
+        || `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim()
+        || String(person?.id || person?.personId || '');
 }
 
 function normalizeOrgRoles(orgMembership) {
@@ -77,6 +79,9 @@ function personHasTeacherOrStaffRoleInOrg(person, orgId) {
     const targetOrgId = String(orgId || '').trim();
     if (!targetOrgId || !person) return false;
 
+    const directRoles = Array.isArray(person.schoolRoles || person.roles) ? (person.schoolRoles || person.roles) : [];
+    if (directRoles.includes('school_teacher') || directRoles.includes('school_staff')) return true;
+
     const memberships = Array.isArray(person.organizations) ? person.organizations : [];
     return memberships.some((org) => {
         if (String(org?.orgId || '') !== targetOrgId) return false;
@@ -92,6 +97,10 @@ function getTimesheetRolesForPersonInOrg(person, orgId) {
     if (!targetOrgId || !person) return [];
 
     const rolesOut = new Set();
+    const directRoles = Array.isArray(person.schoolRoles || person.roles) ? (person.schoolRoles || person.roles) : [];
+    if (directRoles.includes('school_teacher')) rolesOut.add('teacher');
+    if (directRoles.includes('school_staff')) rolesOut.add('staff');
+
     const memberships = Array.isArray(person.organizations) ? person.organizations : [];
     memberships.forEach((org) => {
         if (!idsEqual(org?.orgId, targetOrgId)) return;
@@ -253,12 +262,17 @@ async function loadTimesheetManagementPeriods(req, query = {}) {
 }
 
 async function loadTimesheetEligiblePeople(activeOrgId, reqUser) {
-    const [persons, teachers, staff, departments] = await Promise.all([
-        dataService1.fetchData('persons', {}, reqUser, { enrichment: { includeSchoolRoles: false } }),
+    const [personPayload, teachers, staff, departments] = await Promise.all([
+        schoolIdentityLookupService.listSchoolPersons({
+            reqUser,
+            requireSchoolRole: true,
+            query: { limit: 1000 }
+        }),
         dataService.fetchData('teachers', { orgId__eq: activeOrgId }, reqUser),
         dataService.fetchData('staff', { orgId__eq: activeOrgId }, reqUser),
         dataService.fetchData('departments', {}, reqUser)
     ]);
+    const persons = personPayload.allRows || personPayload.rows || [];
 
     const departmentMap = buildDepartmentMap(departments);
     const profileRowsByPerson = new Map();
@@ -293,7 +307,7 @@ async function loadTimesheetEligiblePeople(activeOrgId, reqUser) {
                 person,
                 personId,
                 name: buildPersonName(person),
-                email: String(person?.contact?.email || person?.contact?.emails?.[0]?.email || '').trim(),
+                email: String(person?.email || person?.contact?.email || person?.contact?.emails?.[0]?.email || '').trim(),
                 roles,
                 profileRows,
                 departmentHint: departmentHints.join(', ')
@@ -306,13 +320,13 @@ async function loadTimesheetEligiblePeople(activeOrgId, reqUser) {
 async function getPersonById(personId, reqUser) {
     const id = String(personId || '').trim();
     if (!id) return null;
-    const personQueryOptions = { enrichment: { includeSchoolRoles: false } };
-
-    const direct = await dataService1.getDataById('persons', id, reqUser, personQueryOptions);
-    if (direct) return direct;
-
-    const all = await dataService1.fetchData('persons', {}, reqUser, personQueryOptions);
-    return (all || []).find((p) => idsEqual(p?.id, id)) || null;
+    const payload = await schoolIdentityLookupService.listSchoolPersons({
+        reqUser,
+        requireSchoolRole: false,
+        query: { limit: 1000 }
+    });
+    const all = payload.allRows || payload.rows || [];
+    return (all || []).find((p) => idsEqual(p?.id || p?.personId, id)) || null;
 }
 
 async function resolveSelfTeacherOrThrow(req) {
@@ -408,13 +422,17 @@ exports.listEligibleTimesheetPersons = async (req, res) => {
         const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
         if (query.q === searchDefaultKeyword) query.q = '';
 
-        const persons = await dataService1.fetchData('persons', {
+        const payload = await schoolIdentityLookupService.listSchoolPersons({
+            reqUser: req.user,
             q: query.q || '',
-            type: query.type || 'contains',
-            searchFields: 'id,name.first,name.last,contact.email,contact.emails[0].email'
-        }, req.user, { enrichment: { includeSchoolRoles: false } });
-
-        const eligible = (persons || []).filter((p) => personHasTeacherOrStaffRoleInOrg(p, activeOrgId));
+            query: { ...query, limit: 1000 },
+            requireSchoolRole: true
+        });
+        const persons = payload.allRows || payload.rows || [];
+        const eligible = (persons || []).filter((p) => {
+            const roles = Array.isArray(p.schoolRoles || p.roles) ? (p.schoolRoles || p.roles) : [];
+            return roles.includes('school_teacher') || roles.includes('school_staff') || personHasTeacherOrStaffRoleInOrg(p, activeOrgId);
+        });
         const { data, pagination } = paginate(eligible, query);
         return res.json({ status: 'success', results: data, pagination });
     } catch (error) {
@@ -534,14 +552,15 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
             .forEach((sessionRow) => {
                 const rawDurationHours = parseFloat(sessionRow?.durationHours) || 0;
                 const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(sessionRow?.status, sessionRow?.notes);
+                const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
+                    status: sessionRow?.status,
+                    notes: sessionRow?.notes
+                });
+                if (!isFinalStatus) return;
                 const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                     status: sessionRow?.status,
                     notes: sessionRow?.notes,
                     durationHours: rawDurationHours
-                });
-                const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
-                    status: sessionRow?.status,
-                    notes: sessionRow?.notes
                 });
                 liveSessions.push({
                     sessionId: sessionRow?.sessionId,
@@ -867,14 +886,15 @@ exports.viewTimesheet = async (req, res) => {
             myClassSessions.forEach((s) => {
                 const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(s.status, s.notes);
                 const rawDurationHours = parseFloat(s.durationHours) || 0;
+                const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
+                    status: s.status,
+                    notes: s.notes
+                });
+                if (!isFinalStatus) return;
                 const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                     status: s.status,
                     notes: s.notes,
                     durationHours: rawDurationHours
-                });
-                const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
-                    status: s.status,
-                    notes: s.notes
                 });
                 liveSessions.push({
                     sessionId: s.sessionId,
@@ -1008,6 +1028,11 @@ exports.saveTimesheet = async (req, res) => {
                 if (sessionRow.date < period.startDate || sessionRow.date > period.endDate) return;
                 const key = String(sessionRow?.sessionId || '').trim();
                 if (!key) return;
+                const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
+                    status: sessionRow?.status,
+                    notes: sessionRow?.notes
+                });
+                if (!isFinalStatus) return;
                 liveSessionById.set(key, {
                     classId: String(classRow?.id || ''),
                     className: String(classRow?.title || classRow?.name || ''),
@@ -1044,7 +1069,13 @@ exports.saveTimesheet = async (req, res) => {
             }
 
             const sessionRef = liveSessionById.get(sessionId);
-            if (!sessionRef) return entry;
+            if (!sessionRef) {
+                return {
+                    sessionId,
+                    isDeleted: true,
+                    ignoredReason: 'non_final_or_missing_session'
+                };
+            }
 
             const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(sessionRef.status, sessionRef.notes);
             const hours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {

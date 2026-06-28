@@ -358,7 +358,7 @@ function initChatSystem() {
             scrollToBottom();
             if (socket && socket.connected) socket.emit('mark_read', { convId: data.convId, messageId: data.message.id });
         } else {
-            // Background notification
+            // Background task
             if (socket && socket.connected) socket.emit('mark_delivered', { convId: data.convId, messageId: data.message.id });
             updateUnreadCount(1); // ✅ This adds the red number
             if(isModalOpen) refreshInbox(); // Refresh sidebar list if modal is open (looking at other chat)

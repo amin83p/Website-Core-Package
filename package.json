@@ -68,7 +68,9 @@
     "ielts:freeze:check": "node scripts/ielts/scoringBaselineGuardCheck.js",
     "ielts:preflight": "node scripts/ielts/tuningPreflight.js",
     "test:ielts:freeze": "node test/ielts.behavior-freeze.step6t.test.js",
-    "test:ielts:gate": "node scripts/ielts/runIeltsGate.js"
+    "test:ielts:gate": "node scripts/ielts/runIeltsGate.js",
+    "school:tasks:migrate:dry-run": "node scripts/school/migration/migrateTaskDomainFromLegacy.js",
+    "school:tasks:migrate:apply": "node scripts/school/migration/migrateTaskDomainFromLegacy.js --apply"
   },
   "keywords": [],
   "author": "",

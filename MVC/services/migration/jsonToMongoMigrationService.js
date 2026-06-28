@@ -300,6 +300,8 @@ function buildCatalog() {
     { key: 'school.staff', domain: 'School', section: 'Staff', source: 'school/staff.json', collection: 'schoolStaff' },
     { key: 'school.payRates', domain: 'School', section: 'Pay Rates', source: 'school/payRates.json', collection: 'schoolPayRates' },
     { key: 'school.sessionStatuses', domain: 'School', section: 'Session Statuses', source: 'school/sessionStatuses.json', collection: 'schoolSessionStatuses' },
+    { key: 'school.tasks', domain: 'School', section: 'Tasks', source: 'school/tasks.json', collection: 'schoolTasks' },
+    { key: 'school.taskRoutingRules', domain: 'School', section: 'Task Routing Rules', source: 'school/taskRoutingRules.json', collection: 'schoolTaskRoutingRules' },
     { key: 'school.timesheetPeriods', domain: 'School', section: 'Timesheet Periods', source: 'school/timesheetPeriods.json', collection: 'schoolTimesheetPeriods' },
     { key: 'school.timesheets', domain: 'School', section: 'Timesheets', source: 'school/timesheets.json', collection: 'schoolTimesheets' },
     { key: 'school.studentProgramRegistrations', domain: 'School', section: 'Program Registrations', source: 'school/studentProgramRegistrations.json', collection: 'schoolStudentProgramRegistrations' },

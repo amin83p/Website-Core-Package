@@ -1,6 +1,6 @@
 const SECTION_ID = '445576';
-const SECTION_NAME = 'SCHOOL_NOTIFICATIONS';
-const SECTION_HOME_URL = '/school/notifications';
+const SECTION_NAME = 'SCHOOL_TASKS';
+const SECTION_HOME_URL = '/school/tasks';
 const PARENT_SECTION_ID = '139382';
 const PARENT_SECTION_NAME = 'SCHOOL_ACADEMIA';
 const SYMBOL_ID = 'SYM_SYSTEM_060';
@@ -18,7 +18,7 @@ const sectionRow = {
   id: SECTION_ID,
   name: SECTION_NAME,
   category: 'SCHOOL',
-  description: 'Review school notifications and manage embedded follow-up tasks for package workflows.',
+  description: 'Review school tasks and manage embedded follow-up assignments for package workflows.',
   active: true,
   trackState: true,
   minimumAccessRequirement: 5,
@@ -96,7 +96,7 @@ function ensureParentSubsection() {
     ]
   });
   if (!parent) {
-    print(`Parent section ${PARENT_SECTION_NAME} was not found; notification section was not attached.`);
+    print(`Parent section ${PARENT_SECTION_NAME} was not found; task section was not attached.`);
     return;
   }
 
@@ -173,4 +173,4 @@ upsertSymbol();
 ensureParentSubsection();
 ACCESS_PROFILES.forEach(ensureAccessProfile);
 
-print('School notification section seed complete.');
+print('School task section seed complete.');

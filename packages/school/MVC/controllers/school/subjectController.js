@@ -18,6 +18,7 @@ const {
   canCreateOrgScopedItem,
   assertOrgAccess
 } = requireCoreModule('MVC/utils/orgContextUtils');
+const schoolFileService = require('../../services/school/schoolFileService');
 
 // Helpers
 function parseData(input) {
@@ -194,6 +195,66 @@ async function editSubject(req, res) {
   }
 }
 
+async function uploadSubjectAttachment(req, res) {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const subject = await dataService.getDataById('subjects', req.params.id, req.user);
+    if (!subject) throw new Error('Subject not found');
+    assertSubjectOrgAccess(subject, activeOrgId, req.user);
+    if (!req.file) throw new Error('No file was uploaded.');
+
+    const attachment = schoolFileService.normalizeUploadedFile(req.file, {
+      kind: 'subject_attachment',
+      subjectId: subject.id,
+      uploadedBy: req.user?.id
+    });
+
+    const attachments = Array.isArray(subject.attachments) ? subject.attachments.slice() : [];
+    attachments.push(attachment);
+    await dataService.updateData('subjects', subject.id, {
+      attachments,
+      audit: {
+        ...(subject.audit || {}),
+        lastUpdateUser: req.user?.id,
+        lastUpdateDateTime: new Date().toISOString()
+      }
+    }, req.user);
+
+    return res.json({ status: 'success', message: 'Subject attachment uploaded.', attachment, attachments });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function deleteSubjectAttachment(req, res) {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const subject = await dataService.getDataById('subjects', req.params.id, req.user);
+    if (!subject) throw new Error('Subject not found');
+    assertSubjectOrgAccess(subject, activeOrgId, req.user);
+
+    const attId = String(req.params.attId || '').trim();
+    const attachments = Array.isArray(subject.attachments) ? subject.attachments.slice() : [];
+    const index = attachments.findIndex((row, idx) => String(row?.id || idx) === attId || String(idx) === attId);
+    if (index < 0) throw new Error('Attachment not found.');
+    const [removed] = attachments.splice(index, 1);
+
+    await dataService.updateData('subjects', subject.id, {
+      attachments,
+      audit: {
+        ...(subject.audit || {}),
+        lastUpdateUser: req.user?.id,
+        lastUpdateDateTime: new Date().toISOString()
+      }
+    }, req.user);
+    await schoolFileService.deleteAttachmentFile(removed).catch(() => {});
+
+    return res.json({ status: 'success', message: 'Subject attachment deleted.', attachments });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function deleteSubject(req, res) {
   try {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
@@ -218,6 +279,8 @@ module.exports = {
   showEditForm,
   showEditWizardForm,
   editSubject,
+  uploadSubjectAttachment,
+  deleteSubjectAttachment,
   deleteSubject
 };
 

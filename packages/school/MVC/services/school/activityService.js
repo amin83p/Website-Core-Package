@@ -1,9 +1,9 @@
 const schoolDataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const coreDataService = requireCoreModule('MVC/services/dataService');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const activityModel = require('../../models/school/activityModel');
 const activityCategoryModel = require('../../models/school/activityCategoryModel');
+const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 
 function normalizeId(value) {
   return String(value || '').trim();
@@ -41,7 +41,12 @@ async function enrichActivityAttendeeNames(activity = {}, reqUser) {
   if (!personIds.length) return activity;
   let persons = [];
   try {
-    persons = await coreDataService.fetchData('persons', {}, reqUser, { enrichment: { includeSchoolRoles: false } });
+    const payload = await schoolIdentityLookupService.listSchoolPersons({
+      reqUser,
+      requireSchoolRole: false,
+      query: { limit: 1000 }
+    });
+    persons = payload.allRows || payload.rows || [];
   } catch (_error) {
     persons = [];
   }
@@ -167,12 +172,17 @@ async function saveActivityCategory(payload = {}, reqUser) {
   return schoolDataService.addData('activityCategories', data, reqUser);
 }
 async function getEligiblePersons({ orgId, reqUser, q = '' } = {}) {
-  const [persons, students, teachers, staff] = await Promise.all([
-    coreDataService.fetchData('persons', {}, reqUser, { enrichment: { includeSchoolRoles: false } }),
+  const [personPayload, students, teachers, staff] = await Promise.all([
+    schoolIdentityLookupService.listSchoolPersons({
+      reqUser,
+      requireSchoolRole: false,
+      query: { limit: 1000 }
+    }),
     schoolDataService.fetchData('students', {}, reqUser),
     schoolDataService.fetchData('teachers', {}, reqUser),
     schoolDataService.fetchData('staff', {}, reqUser)
   ]);
+  const persons = personPayload.allRows || personPayload.rows || [];
   const personMap = new Map((Array.isArray(persons) ? persons : []).map((person) => [normalizeId(person.id || person.personId), person]));
   const outputByPerson = new Map();
   const query = String(q || '').trim().toLowerCase();

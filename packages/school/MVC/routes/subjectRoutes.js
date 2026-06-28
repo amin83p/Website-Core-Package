@@ -8,6 +8,8 @@ const {
   SECTIONS,
   OPERATIONS
 } = require('./schoolRouteDependencies');
+const { requireCoreModule } = require('../services/school/schoolCoreContracts');
+const upload = requireCoreModule('MVC/middleware/upload');
 
 router.use(requireAuth);
 
@@ -34,6 +36,17 @@ router.get('/edit/:id',
   requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE),
   ctrl.showEditForm);
+
+router.post('/:id/attachments/upload',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE),
+  upload('school-subject-workspace', true).single('file'),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE, { requireToken: true, keepActive: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true }),
+  ctrl.uploadSubjectAttachment);
+
+router.delete('/:id/attachments/:attId',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE, { requireToken: true, keepActive: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true }),
+  ctrl.deleteSubjectAttachment);
 
 router.get('/edit-wizard/:id',
   requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE),

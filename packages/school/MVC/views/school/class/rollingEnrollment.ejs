@@ -6,6 +6,7 @@
   const initialRowsJson = JSON.stringify(Array.isArray(periodRows) ? periodRows : []);
   const studentOptionsJson = JSON.stringify(Array.isArray(studentOptions) ? studentOptions : []);
   const enrollmentProgramChoicesJson = JSON.stringify(Array.isArray(enrollmentProgramChoices) ? enrollmentProgramChoices : []);
+  const canCreateProgramRegistrationsJson = JSON.stringify(Boolean(typeof canCreateProgramRegistrations !== 'undefined' && canCreateProgramRegistrations));
 %>
 
 <style>
@@ -204,6 +205,58 @@
         <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_addPeriod" <%= isRolling ? '' : 'disabled' %>>
           <i class="bi bi-plus-circle me-1"></i>Add Period
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="programRegistrationShortcutModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-journal-plus me-1"></i>Register Student In Program</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="shortcut_registrationId">
+        <div class="alert alert-info border small">
+          Create a program registration draft for this student, approve/finalize it, then retry Rolling Enrollment eligibility.
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Student</label>
+          <input type="text" id="shortcut_studentLabel" class="form-control bg-light" readonly>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-7">
+            <label class="form-label">Allowed Program *</label>
+            <select id="shortcut_programId" class="form-select"></select>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Registration Date *</label>
+            <input type="date" id="shortcut_registrationDate" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">External Reference</label>
+            <input type="text" id="shortcut_externalReference" class="form-control" placeholder="Optional">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Note</label>
+            <input type="text" id="shortcut_note" class="form-control" placeholder="Optional">
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="fw-semibold small mb-1">Preview / Result</div>
+          <div id="shortcut_previewPanel" class="border rounded bg-light p-2 small text-muted">
+            Choose a program and click Preview.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer flex-wrap gap-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_shortcutPreview"><i class="bi bi-eye me-1"></i>Preview</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn_shortcutSaveDraft"><i class="bi bi-save me-1"></i>Save Draft</button>
+        <button type="button" class="btn btn-success btn-sm" id="btn_shortcutApprove" disabled><i class="bi bi-check2-circle me-1"></i>Approve &amp; Finalize</button>
+        <button type="button" class="btn btn-outline-success btn-sm" id="btn_shortcutRetry"><i class="bi bi-arrow-clockwise me-1"></i>Retry Enrollment</button>
       </div>
     </div>
   </div>
@@ -482,12 +535,14 @@
   const actionStateId = <%- JSON.stringify(String(asid || '')) %>;
   const studentOptions = <%- studentOptionsJson %>;
   const enrollmentProgramChoices = <%- enrollmentProgramChoicesJson %>;
+  const canCreateProgramRegistrations = <%- canCreateProgramRegistrationsJson %>;
   const studentMap = new Map((Array.isArray(studentOptions) ? studentOptions : []).map((row) => [String(row.id || ''), row]));
   let periodRows = <%- initialRowsJson %>;
   let pendingEnrollmentPayload = null;
   let pendingDraftTransactionItems = [];
   let manualRows = [];
   let chargeActionInProgress = false;
+  let shortcutActionInProgress = false;
   let draftReviewMode = 'create';
   let lastRollingEligibility = null;
 
@@ -499,6 +554,7 @@
   const reentryModalEl = qs('reentryModal');
   const editModalEl = qs('editPeriodModal');
   const chargeModalEl = qs('enrollmentChargeModal');
+  const programShortcutModalEl = qs('programRegistrationShortcutModal');
   const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
 
   function createModalController(modalEl) {
@@ -571,11 +627,228 @@
   const reentryModal = createModalController(reentryModalEl);
   const editModal = createModalController(editModalEl);
   const chargeModal = createModalController(chargeModalEl);
+  const programShortcutModal = createModalController(programShortcutModalEl);
   const addButton = qs('btn_addPeriod');
 
   function setRollingRegistrationPanelHtml(html) {
     const panel = qs('roll_enrollmentRegistrationPanel');
     if (panel) panel.innerHTML = html;
+  }
+
+  function isMissingProgramRegistrationMessage(message) {
+    const text = String(message || '').toLowerCase();
+    return text.includes('no active program registration') || text.includes('register the student in a program listed under this class');
+  }
+
+  function isMissingTermRegistrationMessage(message) {
+    const text = String(message || '').toLowerCase();
+    return text.includes('required term registration is missing') || text.includes('register the student in the required term');
+  }
+
+  function renderTermRegistrationShortcutPanel(message) {
+    const student = getSelectedShortcutStudent();
+    const params = new URLSearchParams();
+    if (student.id) params.set('studentId', student.id);
+    params.set('returnTo', window.location.pathname);
+    setRollingRegistrationPanelHtml(
+      '<div class="text-danger small mb-2">' + htmlEscape(message || 'Required term registration is missing.') + '</div>' +
+      '<a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" href="/school/programs/register-terms-batch-wizard?' + htmlEscape(params.toString()) + '">' +
+        '<i class="bi bi-box-arrow-up-right me-1"></i>Go To Term Registration' +
+      '</a>' +
+      '<span class="small text-muted ms-2">Finalize the term registration, then click Retry Enrollment here.</span>'
+    );
+  }
+
+  function getSelectedShortcutStudent() {
+    const studentId = String(qs('inp_studentId')?.value || '').trim();
+    const typedLabel = String(qs('inp_studentLabel')?.value || '').trim();
+    const student = studentMap.get(studentId) || {};
+    return {
+      id: studentId,
+      label: typedLabel || String(student.label || student.name || studentId || '').trim()
+    };
+  }
+
+  function renderProgramRegistrationShortcutPanel(message) {
+    const issue = htmlEscape(message || 'This student needs an approved program registration before Rolling Enrollment can continue.');
+    if (!canCreateProgramRegistrations) {
+      setRollingRegistrationPanelHtml(
+        '<div class="text-danger small mb-2">' + issue + '</div>' +
+        '<div class="alert alert-warning border py-2 mb-0 small">You need Program Registration create access to register and finalize the student from here.</div>'
+      );
+      return;
+    }
+    const choices = Array.isArray(enrollmentProgramChoices) ? enrollmentProgramChoices : [];
+    const choiceText = choices.length === 1
+      ? 'The class has 1 allowed program available for this shortcut.'
+      : 'The class has ' + choices.length + ' allowed programs available for this shortcut.';
+    setRollingRegistrationPanelHtml(
+      '<div class="text-danger small mb-2">' + issue + '</div>' +
+      '<div class="d-flex flex-wrap align-items-center gap-2">' +
+        '<button type="button" class="btn btn-sm btn-primary" id="btn_openProgramRegistrationShortcut">' +
+          '<i class="bi bi-journal-plus me-1"></i>Register Student In Program' +
+        '</button>' +
+        '<span class="small text-muted">' + htmlEscape(choiceText) + '</span>' +
+      '</div>'
+    );
+  }
+
+  function renderShortcutPreviewHtml(rows, message) {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+      return '<div class="text-muted">' + htmlEscape(message || 'No preview rows returned.') + '</div>';
+    }
+    return list.map(function (row) {
+      const issues = Array.isArray(row?.issues) ? row.issues : [];
+      const status = String(row?.status || '').trim().toLowerCase();
+      const badge = status === 'ready' || status === 'draft' || status === 'success'
+        ? 'bg-success'
+        : (status === 'warning' ? 'bg-warning text-dark' : 'bg-danger');
+      return ''
+        + '<div class="border rounded p-2 bg-white mb-2">'
+        +   '<div class="d-flex justify-content-between gap-2">'
+        +     '<div class="fw-semibold">' + htmlEscape(row?.studentName || row?.studentId || 'Student') + '</div>'
+        +     '<span class="badge ' + badge + '">' + htmlEscape(status || '-') + '</span>'
+        +   '</div>'
+        +   '<div class="small text-muted">Fee Category: ' + htmlEscape(row?.feeCategory || '-') + ' | Account: <span class="font-monospace">' + htmlEscape(row?.studentAccountId || '-') + '</span></div>'
+        +   '<div class="small text-muted">Total Fee: <span class="fw-semibold">' + htmlEscape(Number(row?.totalAmount || 0).toFixed(2)) + '</span> | Transactions: <span class="fw-semibold">' + htmlEscape(row?.transactionCount || 0) + '</span></div>'
+        +   (issues.length ? '<div class="text-danger small mt-1">' + issues.map((issue) => htmlEscape(issue)).join('<br>') + '</div>' : '')
+        +   (row?.message ? '<div class="small mt-1">' + htmlEscape(row.message) + '</div>' : '')
+        + '</div>';
+    }).join('');
+  }
+
+  function resetProgramRegistrationShortcutModal() {
+    const student = getSelectedShortcutStudent();
+    if (qs('shortcut_registrationId')) qs('shortcut_registrationId').value = '';
+    if (qs('shortcut_studentLabel')) qs('shortcut_studentLabel').value = student.label || student.id || '';
+    if (qs('shortcut_registrationDate')) {
+      qs('shortcut_registrationDate').value = String(qs('inp_startDate')?.value || '').trim() || new Date().toISOString().slice(0, 10);
+    }
+    if (qs('shortcut_externalReference')) qs('shortcut_externalReference').value = '';
+    if (qs('shortcut_note')) qs('shortcut_note').value = 'Created from Rolling Enrollment shortcut';
+    const select = qs('shortcut_programId');
+    if (select) {
+      const options = (Array.isArray(enrollmentProgramChoices) ? enrollmentProgramChoices : []).map(function (choice) {
+        return '<option value="' + htmlEscape(String(choice?.programId || '')) + '">' + htmlEscape(String(choice?.label || choice?.programId || 'Program')) + '</option>';
+      });
+      select.innerHTML = options.length ? options.join('') : '<option value="">No allowed programs</option>';
+      select.disabled = options.length === 0;
+    }
+    if (qs('shortcut_previewPanel')) qs('shortcut_previewPanel').innerHTML = 'Choose a program and click Preview.';
+    if (qs('btn_shortcutApprove')) qs('btn_shortcutApprove').disabled = true;
+  }
+
+  function getProgramShortcutPayload() {
+    const student = getSelectedShortcutStudent();
+    return {
+      classId,
+      programId: String(qs('shortcut_programId')?.value || '').trim(),
+      studentIds: [student.id],
+      effectiveDate: String(qs('shortcut_registrationDate')?.value || '').trim(),
+      externalReference: String(qs('shortcut_externalReference')?.value || '').trim(),
+      note: String(qs('shortcut_note')?.value || '').trim()
+    };
+  }
+
+  async function openProgramRegistrationShortcutModal() {
+    if (!canCreateProgramRegistrations) {
+      await showMsg('Access Required', 'warning', 'You need Program Registration create access to register and finalize the student from here.');
+      return;
+    }
+    const student = getSelectedShortcutStudent();
+    if (!student.id) {
+      await showMsg('Select Student', 'warning', 'Select a student first.');
+      return;
+    }
+    resetProgramRegistrationShortcutModal();
+    programShortcutModal?.show();
+  }
+
+  async function previewProgramRegistrationShortcut() {
+    if (shortcutActionInProgress) return;
+    const payload = getProgramShortcutPayload();
+    if (!payload.programId || !payload.studentIds[0] || !payload.effectiveDate) {
+      await showMsg('Missing Fields', 'warning', 'Student, allowed program, and registration date are required.');
+      return;
+    }
+    shortcutActionInProgress = true;
+    try {
+      showBusy('Previewing program registration...');
+      const result = await requestJson('/school/classes/api/' + encodeURIComponent(classId) + '/rolling-program-registration/preview', 'POST', payload);
+      if (!result) return;
+      const rows = Array.isArray(result.previews) ? result.previews : [];
+      if (qs('shortcut_previewPanel')) qs('shortcut_previewPanel').innerHTML = renderShortcutPreviewHtml(rows, result.message);
+    } catch (error) {
+      await showMsg('Preview Failed', 'error', error.message || 'Unable to preview program registration.');
+    } finally {
+      shortcutActionInProgress = false;
+      hideBusy();
+    }
+  }
+
+  async function saveProgramRegistrationShortcutDraft() {
+    if (shortcutActionInProgress) return;
+    const payload = getProgramShortcutPayload();
+    if (!payload.programId || !payload.studentIds[0] || !payload.effectiveDate) {
+      await showMsg('Missing Fields', 'warning', 'Student, allowed program, and registration date are required.');
+      return;
+    }
+    shortcutActionInProgress = true;
+    try {
+      showBusy('Saving program registration draft...');
+      const result = await requestJson('/school/classes/api/' + encodeURIComponent(classId) + '/rolling-program-registration/apply', 'POST', payload);
+      if (!result) return;
+      const draft = (Array.isArray(result.results) ? result.results : []).find((row) => String(row?.status || '').toLowerCase() === 'draft');
+      if (draft?.registrationId && qs('shortcut_registrationId')) {
+        qs('shortcut_registrationId').value = String(draft.registrationId);
+      }
+      if (qs('shortcut_previewPanel')) qs('shortcut_previewPanel').innerHTML = renderShortcutPreviewHtml(result.results, result.message);
+      if (qs('btn_shortcutApprove')) qs('btn_shortcutApprove').disabled = !draft?.registrationId;
+      await showMsg('Draft Saved', result.status === 'warning' ? 'warning' : 'success', result.message || 'Program registration draft saved.');
+    } catch (error) {
+      await showMsg('Draft Failed', 'error', error.message || 'Unable to save program registration draft.');
+    } finally {
+      shortcutActionInProgress = false;
+      hideBusy();
+    }
+  }
+
+  async function approveProgramRegistrationShortcutDraft() {
+    if (shortcutActionInProgress) return;
+    const registrationId = String(qs('shortcut_registrationId')?.value || '').trim();
+    if (!registrationId) {
+      await showMsg('Missing Draft', 'warning', 'Save the draft before approving and finalizing it.');
+      return;
+    }
+    let confirmed = true;
+    if (typeof window.showMessageModal === 'function') {
+      confirmed = (await window.showMessageModal({
+        title: 'Approve Program Registration?',
+        icon: 'warning',
+        message: 'Approve and finalize this program registration now? This will post finance transactions and academic entries.',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Approve & Finalize', class: 'btn-success' }
+        ]
+      })) === 'Approve & Finalize';
+    }
+    if (!confirmed) return;
+    shortcutActionInProgress = true;
+    try {
+      showBusy('Approving program registration...');
+      const result = await requestJson('/school/classes/api/' + encodeURIComponent(classId) + '/rolling-program-registration/approve/' + encodeURIComponent(registrationId), 'POST', {
+        note: String(qs('shortcut_note')?.value || 'Approved from Rolling Enrollment shortcut').trim()
+      });
+      if (!result) return;
+      await showMsg('Finalized', result.status === 'warning' ? 'warning' : 'success', result.message || 'Program registration finalized.');
+      await refreshRollingEligibility();
+    } catch (error) {
+      await showMsg('Approval Failed', 'error', error.message || 'Unable to approve program registration.');
+    } finally {
+      shortcutActionInProgress = false;
+      hideBusy();
+    }
   }
 
   async function refreshRollingEligibility() {
@@ -601,6 +874,15 @@
       if (data.prerequisite && !data.resolved) {
         const issues = (data.prerequisite.issues || []).map((t) => htmlEscape(t)).join('<br>');
         const msg = issues || htmlEscape(data.message || 'Not eligible for this class.');
+        const rawIssueMessage = data.message || (data.prerequisite.issues || []).join(' ');
+        if (isMissingTermRegistrationMessage(rawIssueMessage)) {
+          renderTermRegistrationShortcutPanel(rawIssueMessage);
+          return;
+        }
+        if (isMissingProgramRegistrationMessage(rawIssueMessage)) {
+          renderProgramRegistrationShortcutPanel(rawIssueMessage);
+          return;
+        }
         setRollingRegistrationPanelHtml('<div class="text-danger small">' + msg + '</div>');
         return;
       }
@@ -617,11 +899,28 @@
         return;
       }
       if (data.message) {
+        if (isMissingTermRegistrationMessage(data.message)) {
+          renderTermRegistrationShortcutPanel(data.message);
+          return;
+        }
+        if (isMissingProgramRegistrationMessage(data.message)) {
+          renderProgramRegistrationShortcutPanel(data.message);
+          return;
+        }
         setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(data.message) + '</div>');
       }
     } catch (err) {
       lastRollingEligibility = null;
-      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(err?.message || 'Check failed.') + '</div>');
+      const message = err?.message || 'Check failed.';
+      if (isMissingTermRegistrationMessage(message)) {
+        renderTermRegistrationShortcutPanel(message);
+        return;
+      }
+      if (isMissingProgramRegistrationMessage(message)) {
+        renderProgramRegistrationShortcutPanel(message);
+        return;
+      }
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(message) + '</div>');
     }
   }
 
@@ -1792,6 +2091,13 @@
       return;
     }
 
+    const programShortcutBtn = event.target.closest('#btn_openProgramRegistrationShortcut');
+    if (programShortcutBtn) {
+      event.preventDefault();
+      openProgramRegistrationShortcutModal();
+      return;
+    }
+
     const editBtn = event.target.closest('.btn-row-edit');
     if (editBtn) {
       closeAllActionMenus();
@@ -1842,6 +2148,10 @@
   qs('btn_openAddEnrollmentModal')?.addEventListener('click', openAddEnrollmentModal);
   qs('btn_pickStudent')?.addEventListener('click', pickStudent);
   qs('btn_addPeriod')?.addEventListener('click', addPeriod);
+  qs('btn_shortcutPreview')?.addEventListener('click', previewProgramRegistrationShortcut);
+  qs('btn_shortcutSaveDraft')?.addEventListener('click', saveProgramRegistrationShortcutDraft);
+  qs('btn_shortcutApprove')?.addEventListener('click', approveProgramRegistrationShortcutDraft);
+  qs('btn_shortcutRetry')?.addEventListener('click', refreshRollingEligibility);
   qs('inp_startDate')?.addEventListener('change', () => { refreshRollingEligibility(); });
   qs('btn_confirmClosePeriod')?.addEventListener('click', submitClosePeriod);
   qs('btn_confirmReentry')?.addEventListener('click', submitReentry);

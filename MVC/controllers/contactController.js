@@ -130,7 +130,7 @@ async function submitContact(req, res) {
     };
     if (resendEmailService.isConfigured()) {
       try {
-        await resendEmailService.sendContactNotification(contactRecord);
+        await resendEmailService.sendContactTask(contactRecord);
       } catch (notifyError) {
         console.warn('[CONTACT][EMAIL_NOTIFY_FAIL]', notifyError?.message || notifyError);
       }
