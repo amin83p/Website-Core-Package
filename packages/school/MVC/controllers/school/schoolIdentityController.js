@@ -13,8 +13,34 @@ function sendPickerRows(res, payload = {}) {
     status: 'success',
     data: rows,
     results: rows,
+    items: rows,
     pagination: payload.pagination || {}
   });
+}
+
+function parseAllowedSchoolRoles(reqQuery = {}) {
+  const candidates = [
+    reqQuery.allowedSchoolRoles,
+    reqQuery.allowedRoles,
+    reqQuery.role,
+    reqQuery.roles
+  ];
+  const out = [];
+  candidates.forEach((value) => {
+    if (Array.isArray(value)) {
+      value.forEach((entry) => {
+        const token = String(entry || '').trim();
+        if (token) out.push(token);
+      });
+      return;
+    }
+    String(value || '')
+      .split(/[\s,;|]+/)
+      .map((entry) => String(entry || '').trim())
+      .filter(Boolean)
+      .forEach((entry) => out.push(entry));
+  });
+  return [...new Set(out)];
 }
 
 async function listSchoolPersons(req, res) {
@@ -24,7 +50,8 @@ async function listSchoolPersons(req, res) {
       reqUser: req.user,
       q: query.q || req.query.q || '',
       query,
-      requireSchoolRole: String(req.query.requireSchoolRole || 'true').toLowerCase() !== 'false'
+      requireSchoolRole: String(req.query.requireSchoolRole || 'true').toLowerCase() !== 'false',
+      allowedSchoolRoles: parseAllowedSchoolRoles(req.query || {})
     });
     return sendPickerRows(res, payload);
   } catch (error) {

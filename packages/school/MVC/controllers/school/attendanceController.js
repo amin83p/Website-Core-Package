@@ -1,8 +1,8 @@
 // MVC/controllers/school/attendanceController.js
 const schoolDataService = require('../../services/school/schoolDataService');
+const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
-const dataService = requireCoreModule('MVC/services/dataService'); 
 const chatRepository = requireCoreModule('MVC/repositories/chatRepository');
 const socketService = requireCoreModule('MVC/services/socketService'); // IMPORT SOCKET SERVICE
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
@@ -14,7 +14,6 @@ const { userCanManageAttendanceMatrixPolicy } = requireCoreModule('MVC/middlewar
 const accessService = requireCoreModule('MVC/services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function normalizeDateOnly(value) {
     const token = String(value || '').trim();
@@ -210,7 +209,11 @@ async function getAttendanceData(req, res) {
         filteredSessions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         const [persons, students] = await Promise.all([
-            dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
+            schoolIdentityLookupService.listSchoolPersonRecords({
+                reqUser: req.user,
+                requireSchoolRole: false,
+                query: { limit: 1000 }
+            }).then((payload) => payload.allRows || payload.rows || []),
             schoolDataService.fetchData('students', {}, req.user)
         ]);
 

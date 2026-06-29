@@ -1,9 +1,9 @@
 // MVC/controllers/school/scheduleController.js
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
-const dataService = requireCoreModule('MVC/services/dataService');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const schoolDataService = require('../../services/school/schoolDataService'); 
 const schoolRepositories = require('../../repositories/school');
+const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
@@ -11,7 +11,6 @@ const sessionStudentCaseService = require('../../services/school/sessionStudentC
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const activityService = require('../../services/school/activityService');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
     day: 'Daily',
@@ -269,6 +268,17 @@ function getUserPersonId(reqUser = {}) {
     );
 }
 
+async function listSchoolPersonRecords(reqUser, { q = '', query = {}, requireSchoolRole = false, allowedSchoolRoles = [] } = {}) {
+    const payload = await schoolIdentityLookupService.listSchoolPersonRecords({
+        reqUser,
+        q,
+        query,
+        requireSchoolRole,
+        allowedSchoolRoles
+    });
+    return payload?.allRows || payload?.rows || [];
+}
+
 function rowBelongsToActiveOrg(row = {}, activeOrgId = '') {
     const orgId = normalizeId(activeOrgId);
     if (!orgId) return true;
@@ -334,7 +344,7 @@ async function buildScheduleViewerAccess(reqUser = {}) {
 
             let persons = [];
             try {
-                persons = await dataService.fetchData('persons', {}, reqUser);
+                persons = await listSchoolPersonRecords(reqUser, { query: { limit: 1000 } });
             } catch (lookupError) {
                 persons = [];
             }
@@ -408,7 +418,7 @@ async function buildScheduleRoleOptionsForPerson({ personId, activeOrgId, reqUse
     }
 
     try {
-        const persons = await dataService.fetchData('persons', {}, reqUser);
+        const persons = await listSchoolPersonRecords(reqUser, { query: { limit: 1000 } });
         const person = (Array.isArray(persons) ? persons : []).find((row) => idsEqual(row?.id, normalizedPersonId) || idsEqual(row?._id, normalizedPersonId)) || null;
         const orgRoles = person ? extractPersonRolesInOrg(person, activeOrgId) : [];
         (Array.isArray(orgRoles) ? orgRoles : []).forEach((roleToken) => {
@@ -442,7 +452,7 @@ async function buildSchoolSchedulePersonPickerRows({ activeOrgId, reqUser }) {
         schoolDataService.fetchData('students', {}, reqUser),
         schoolDataService.fetchData('teachers', {}, reqUser),
         schoolDataService.fetchData('staff', {}, reqUser),
-        dataService.fetchData('persons', {}, reqUser, PERSON_QUERY_OPTIONS),
+        listSchoolPersonRecords(reqUser, { query: { limit: 1000 } }),
     ]);
 
     const roleMapByPersonId = new Map();
@@ -857,16 +867,10 @@ function summarizeEvents(events, statusMeta = []) {
 async function getPersonById(personId, reqUser) {
     const targetPersonId = normalizeId(personId);
     if (!targetPersonId) return null;
-
-    const direct = await dataService.getDataById('persons', targetPersonId, reqUser, PERSON_QUERY_OPTIONS);
-    if (direct) return direct;
-
-    const persons = await dataService.fetchData('persons', {
+    const persons = await listSchoolPersonRecords(reqUser, {
         q: targetPersonId,
-        type: 'exact_match',
-        searchFields: 'id'
-    }, reqUser, PERSON_QUERY_OPTIONS);
-
+        query: { q: targetPersonId, limit: 1000 }
+    });
     return (persons || []).find((row) => idsEqual(row?.id, targetPersonId)) || null;
 }
 
@@ -1349,14 +1353,25 @@ async function pickerSchoolSchedulePersons(req, res) {
             : rows;
         const start = (page - 1) * pageSize;
         const items = filtered.slice(start, start + pageSize).map(({ searchText, ...row }) => row);
+        const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+        const pagination = {
+            page,
+            currentPage: page,
+            limit: pageSize,
+            pageSize,
+            totalItems: filtered.length,
+            totalPages
+        };
         res.json({
             status: 'success',
             items,
             data: items,
+            results: items,
             total: filtered.length,
             page,
             pageSize,
-            totalPages: Math.max(1, Math.ceil(filtered.length / pageSize)),
+            totalPages,
+            pagination
         });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
@@ -1368,7 +1383,7 @@ async function listActiveTeacherSchedulePersons(req, res) {
         const activeOrgId = getActiveScheduleOrgId(req.user);
         const [teachers, persons] = await Promise.all([
             schoolDataService.fetchData('teachers', {}, req.user),
-            dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
+            listSchoolPersonRecords(req.user, { query: { limit: 1000 } }),
         ]);
 
         const personMap = new Map((Array.isArray(persons) ? persons : [])
@@ -1402,12 +1417,22 @@ async function listActiveTeacherSchedulePersons(req, res) {
         });
 
         items.sort((a, b) => String(a.displayName || a.id).localeCompare(String(b.displayName || b.id)));
+        const pagination = {
+            page: 1,
+            currentPage: 1,
+            limit: items.length,
+            pageSize: items.length,
+            totalItems: items.length,
+            totalPages: 1
+        };
 
         res.json({
             status: 'success',
             items,
             data: items,
-            total: items.length
+            results: items,
+            total: items.length,
+            pagination
         });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });

@@ -268,13 +268,15 @@
         ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
         : undefined;
       const presetFactory = {
-        teacher: () => GenericPickerPresets.teacher({
+        teacher: () => GenericPickerPresets.person({
           title: 'Select Teacher',
+          apiEndpoint: '/school/identity/api/persons?allowedSchoolRoles=teacher',
           searchFields: 'id,firstName,lastName,name.first,name.last,teacherCode,email,personId',
           context
         }),
-        staff: () => GenericPickerPresets.staff({
+        staff: () => GenericPickerPresets.person({
           title: 'Select Staff',
+          apiEndpoint: '/school/identity/api/persons?allowedSchoolRoles=staff',
           searchFields: 'id,firstName,lastName,name.first,name.last,staffCode,email,personId',
           context
         })

@@ -215,10 +215,18 @@
 
       function openPickerByScope(scope) {
         if (!window.GenericPicker || !window.GenericPickerPresets) return null;
-        if (scope === 'teacher') return GenericPickerPresets.teacher({ title: 'Select Teacher', placeholder: 'Search teachers...' });
-        if (scope === 'staff') return GenericPickerPresets.staff({ title: 'Select Staff', placeholder: 'Search staff...' });
-        if (scope === 'student') return GenericPickerPresets.student({ title: 'Select Student', placeholder: 'Search students...' });
-        return null;
+        const endpointByScope = {
+          teacher: '/school/identity/api/persons?allowedSchoolRoles=teacher',
+          staff: '/school/identity/api/persons?allowedSchoolRoles=staff',
+          student: '/school/identity/api/persons?allowedSchoolRoles=student'
+        };
+        const endpoint = endpointByScope[String(scope || '').trim().toLowerCase()];
+        if (!endpoint) return null;
+        return GenericPickerPresets.person({
+          title: `Select ${String(scope || '').trim().charAt(0).toUpperCase()}${String(scope || '').trim().slice(1)}`,
+          placeholder: `Search ${scope}s...`,
+          apiEndpoint: endpoint
+        });
       }
 
       btnPickPerson?.addEventListener('click', function () {

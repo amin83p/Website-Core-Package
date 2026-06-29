@@ -30,11 +30,11 @@ router.get('/api/person-schedule',
   ctrl.getPersonSchedule);
 router.get('/api/school-person-picker',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.pickerSchoolSchedulePersons);
 router.get('/api/active-teachers',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.listActiveTeacherSchedulePersons);
 
 router.get('/global',

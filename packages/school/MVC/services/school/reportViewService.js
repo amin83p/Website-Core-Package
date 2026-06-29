@@ -1,14 +1,13 @@
 const schoolDataService = require('./schoolDataService');
 const reportRuleEngineService = require('./reportRuleEngineService');
+const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function isSchoolReportAdminViewer(reqUser) {
   return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL, {
@@ -304,7 +303,12 @@ function buildPlaceholderMapFromPayload(body) {
 }
 
 async function buildPersonNameMap(reqUser) {
-  const persons = await dataServiceGlobal.fetchData('persons', {}, reqUser, PERSON_QUERY_OPTIONS);
+  const payload = await schoolIdentityLookupService.listSchoolPersonRecords({
+    reqUser,
+    requireSchoolRole: false,
+    query: { limit: 1000 }
+  });
+  const persons = payload.allRows || payload.rows || [];
   const map = new Map();
   persons.forEach((person) => {
     const id = toPublicId(person?.id);

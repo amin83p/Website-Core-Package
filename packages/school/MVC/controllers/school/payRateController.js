@@ -311,7 +311,19 @@ exports.eligiblePersons = async (req, res) => {
           const hay = `${p.personId} ${p.displayName} ${p.matchedRole}`.toLowerCase();
           return hay.includes(q);
         });
-    return res.json({ status: 'success', results: filtered });
+    return res.json({
+      status: 'success',
+      data: filtered,
+      results: filtered,
+      items: filtered,
+      pagination: {
+        page: 1,
+        currentPage: 1,
+        totalPages: 1,
+        limit: filtered.length,
+        totalItems: filtered.length
+      }
+    });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
   }

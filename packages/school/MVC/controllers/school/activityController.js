@@ -234,7 +234,19 @@ exports.eligiblePersons = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
     const results = await activityService.getEligiblePersons({ orgId, reqUser: req.user, q: req.query.q || '' });
-    res.json({ status: 'success', results });
+    res.json({
+      status: 'success',
+      data: results,
+      results,
+      items: results,
+      pagination: {
+        page: 1,
+        currentPage: 1,
+        totalPages: 1,
+        limit: results.length,
+        totalItems: results.length
+      }
+    });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }

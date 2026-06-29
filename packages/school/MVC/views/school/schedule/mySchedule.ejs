@@ -437,11 +437,29 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!state.isAdminViewer) return;
         const selectedType = getSelectedPersonType();
         const context = GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' });
+        const identityEndpointForRole = (role) => {
+            const roleToken = String(role || '').trim().toLowerCase();
+            const params = new URLSearchParams();
+            if (roleToken) params.set('allowedSchoolRoles', roleToken);
+            return `/school/identity/api/persons?${params.toString()}`;
+        };
 
         const configFactory = {
-            teacher: () => GenericPickerPresets.teacher({ title: 'Select Teacher', context }),
-            student: () => GenericPickerPresets.student({ title: 'Select Student', context }),
-            staff: () => GenericPickerPresets.staff({ title: 'Select Staff', context }),
+            teacher: () => GenericPickerPresets.person({
+                title: 'Select Teacher',
+                apiEndpoint: identityEndpointForRole('teacher'),
+                context
+            }),
+            student: () => GenericPickerPresets.person({
+                title: 'Select Student',
+                apiEndpoint: identityEndpointForRole('student'),
+                context
+            }),
+            staff: () => GenericPickerPresets.person({
+                title: 'Select Staff',
+                apiEndpoint: identityEndpointForRole('staff'),
+                context
+            }),
             person: () => GenericPickerPresets.person({
                 title: 'Select Person',
                 apiEndpoint: '/school/identity/api/persons',

@@ -144,6 +144,20 @@ function rowMatchesQuery(row = {}, q = '') {
   ].join(' ').toLowerCase().includes(query);
 }
 
+function personMatchesQuery(person = {}, q = '', activeOrgId = '') {
+  const query = normalizeText(q).toLowerCase();
+  if (!query) return true;
+  const personId = normalizeId(person.id || person.personId);
+  const roles = extractSchoolRoles(person, activeOrgId);
+  const searchBlob = [
+    personId,
+    formatPersonName(person, personId),
+    readPersonEmail(person),
+    ...(Array.isArray(roles) ? roles : [])
+  ].join(' ').toLowerCase();
+  return searchBlob.includes(query);
+}
+
 function paginateRows(rows = [], query = {}) {
   const page = Math.max(1, Number.parseInt(String(query.page || '1'), 10) || 1);
   const limit = Math.max(1, Math.min(100, Number.parseInt(String(query.limit || '20'), 10) || 20));
@@ -163,7 +177,7 @@ async function fetchCoreRows(entityType, query = {}, options = {}) {
   return dataService.fetchData(entityType, query, SYSTEM_CONTEXT, options);
 }
 
-async function listSchoolPersons({ reqUser, q = '', query = {}, requireSchoolRole = false, allowedSchoolRoles = [] } = {}) {
+async function listSchoolPersonRecords({ reqUser, q = '', query = {}, requireSchoolRole = false, allowedSchoolRoles = [] } = {}) {
   const activeOrgId = getActiveOrgId(reqUser);
   if (!activeOrgId) return { rows: [], pagination: paginateRows([], query).pagination };
   const allowedRoles = normalizeAllowedSchoolRoles(allowedSchoolRoles);
@@ -174,27 +188,51 @@ async function listSchoolPersons({ reqUser, q = '', query = {}, requireSchoolRol
     .map((person) => {
       const personId = normalizeId(person.id || person.personId);
       const roles = extractSchoolRoles(person, activeOrgId);
-      const firstName = normalizeText(person.firstName || person.name?.first);
-      const lastName = normalizeText(person.lastName || person.name?.last);
-      const preferredName = normalizeText(person.preferredName || person.name?.preferred);
       return {
-        id: personId,
+        person,
         personId,
-        displayName: formatPersonName(person, personId),
-        name: formatPersonName(person, personId),
-        firstName,
-        lastName,
-        preferredName,
-        email: readPersonEmail(person),
-        roles,
-        schoolRoles: roles,
-        status: readStatus(person) || 'active'
+        roles
       };
     })
-    .filter((row) => row.id)
-    .filter((row) => !requireSchoolRole || row.roles.length > 0)
-    .filter((row) => hasAllowedSchoolRole(row, allowedRoles))
-    .filter((row) => rowMatchesQuery(row, q || query.q));
+    .filter((entry) => entry.personId)
+    .filter((entry) => !requireSchoolRole || entry.roles.length > 0)
+    .filter((entry) => hasAllowedSchoolRole({ roles: entry.roles }, allowedRoles))
+    .filter((entry) => personMatchesQuery(entry.person, q || query.q, activeOrgId));
+  const sorted = mapped
+    .sort((a, b) => String(formatPersonName(a.person, a.personId)).localeCompare(String(formatPersonName(b.person, b.personId))))
+    .map((entry) => ({
+      ...(entry.person && typeof entry.person === 'object' ? entry.person : {}),
+      id: entry.personId,
+      personId: entry.personId,
+      schoolRoles: entry.roles
+    }));
+  const { data, pagination } = paginateRows(sorted, query);
+  return { rows: data, pagination, allRows: sorted };
+}
+
+async function listSchoolPersons({ reqUser, q = '', query = {}, requireSchoolRole = false, allowedSchoolRoles = [] } = {}) {
+  const payload = await listSchoolPersonRecords({ reqUser, q, query, requireSchoolRole, allowedSchoolRoles });
+  const persons = payload.allRows || payload.rows || [];
+  const mapped = persons.map((person) => {
+    const personId = normalizeId(person.id || person.personId);
+    const roles = Array.isArray(person.schoolRoles) ? person.schoolRoles : extractSchoolRoles(person, getActiveOrgId(reqUser));
+    const firstName = normalizeText(person.firstName || person.name?.first);
+    const lastName = normalizeText(person.lastName || person.name?.last);
+    const preferredName = normalizeText(person.preferredName || person.name?.preferred);
+    return {
+      id: personId,
+      personId,
+      displayName: formatPersonName(person, personId),
+      name: formatPersonName(person, personId),
+      firstName,
+      lastName,
+      preferredName,
+      email: readPersonEmail(person),
+      roles,
+      schoolRoles: roles,
+      status: readStatus(person) || 'active'
+    };
+  });
   const sorted = mapped.sort((a, b) => String(a.displayName || a.id).localeCompare(String(b.displayName || b.id)));
   const { data, pagination } = paginateRows(sorted, query);
   return { rows: data, pagination, allRows: sorted };
@@ -245,6 +283,7 @@ async function listTaggableUsers({ reqUser, q = '', query = {} } = {}) {
 }
 
 module.exports = {
+  listSchoolPersonRecords,
   listSchoolPersons,
   listSchoolUsers,
   listTaggableUsers

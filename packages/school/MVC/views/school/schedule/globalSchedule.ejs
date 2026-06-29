@@ -260,9 +260,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn_addPerson').addEventListener('click', () => {
-        GenericPicker.open(GenericPickerPresets.teacher({
+        GenericPicker.open(GenericPickerPresets.person({
             title: 'Add Teacher to Comparison',
             icon: 'bi-person-plus',
+            apiEndpoint: '/school/identity/api/persons?allowedSchoolRoles=teacher',
             placeholder: 'Search teachers...',
             context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
             onSelect: (item) => {

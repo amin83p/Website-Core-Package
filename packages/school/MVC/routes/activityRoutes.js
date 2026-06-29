@@ -13,7 +13,7 @@ router.use(requireAuth);
 
 router.get('/api/eligible-persons',
   requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.eligiblePersons);
 
 router.get('/categories',

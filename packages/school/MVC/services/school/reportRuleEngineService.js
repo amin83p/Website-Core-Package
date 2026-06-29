@@ -132,7 +132,9 @@ function ensureExpressionText(expression, { allowEmpty = false, maxLength = MAX_
 }
 
 function tokenize(expression) {
-  const src = ensureExpressionText(expression);
+  // Do not enforce a parser-side max length here: save-time validation
+  // decides caps per rule type, and legacy templates may exceed 240 chars.
+  const src = ensureExpressionText(expression, { maxLength: 0 });
   const tokens = [];
   let i = 0;
 
@@ -150,6 +152,13 @@ function tokenize(expression) {
     if (['&&', '||', '==', '!=', '<=', '>='].includes(two)) {
       push('op', two);
       i += 2;
+      continue;
+    }
+
+    // Accept single "=" as equality for template-author convenience.
+    if (ch === '=') {
+      push('op', '==');
+      i += 1;
       continue;
     }
 

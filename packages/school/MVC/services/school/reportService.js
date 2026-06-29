@@ -1,4 +1,5 @@
 const schoolDataService = require('./schoolDataService');
+const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -7,7 +8,6 @@ const reportRuleEngineService = require('./reportRuleEngineService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const { getPrefillValue, normalizePrefillKey } = require('./reportPrefillKeyUtils');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 /**
  * PREFILL_CATALOG - Curated list of template variable keys available for report prefill.
@@ -729,7 +729,11 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     schoolDataService.getDataById('classes', assignment.classId, reqUser),
     schoolDataService.getClassSessions(assignment.classId, reqUser),
     schoolDataService.fetchData('students', {}, reqUser),
-    dataServiceGlobal.fetchData('persons', {}, reqUser, PERSON_QUERY_OPTIONS),
+    schoolIdentityLookupService.listSchoolPersonRecords({
+      reqUser,
+      requireSchoolRole: false,
+      query: { limit: 1000 }
+    }).then((payload) => payload.allRows || payload.rows || []),
     dataServiceGlobal.fetchData('organizations', {}, reqUser),
     classIdForQuery
       ? schoolDataService.fetchData('examAssignments', { classId__eq: classIdForQuery }, reqUser)

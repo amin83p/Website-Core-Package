@@ -45,7 +45,7 @@ router.get('/my-timesheets',
 
 router.get('/api/eligible-persons',
   requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.listEligibleTimesheetPersons);
 
 router.get('/editor/:periodId',

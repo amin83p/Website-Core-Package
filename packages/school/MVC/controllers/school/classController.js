@@ -37,6 +37,7 @@ const finalGradesWorkflowService = require('../../services/school/finalGradesWor
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const schoolFileService = require('../../services/school/schoolFileService');
+const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const schoolRepositories = require('../../repositories/school');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { isRollingClassWorkflowEnabledForClass } = require('../../services/school/phase2FeatureFlagService');
@@ -50,7 +51,6 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function isSafeChildPath(basePath, targetPath) {
     const normalizedBase = path.resolve(basePath);
@@ -312,7 +312,14 @@ async function resolveActorDisplayName(reqUser) {
     const pid = reqUser?.personId;
     if (!pid) return String(reqUser?.username || reqUser?.email || 'User').trim().slice(0, 160) || 'User';
     try {
-        const person = await dataService.getDataById('persons', pid, reqUser, PERSON_QUERY_OPTIONS);
+        const payload = await schoolIdentityLookupService.listSchoolPersonRecords({
+            reqUser,
+            q: String(pid || '').trim(),
+            query: { q: String(pid || '').trim(), limit: 200 },
+            requireSchoolRole: false
+        });
+        const persons = payload?.allRows || payload?.rows || [];
+        const person = persons.find((row) => idsEqual(row?.id, pid)) || null;
         if (person?.name) {
             const label = `${person.name.first || ''} ${person.name.last || ''}`.trim();
             if (label) return label.slice(0, 160);
@@ -2795,7 +2802,11 @@ async function manageSession1(req, res) {
 
         // 2. Resolve Student Names for Attendance
         const [persons, students] = await Promise.all([
-            dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
+            schoolIdentityLookupService.listSchoolPersonRecords({
+                reqUser: req.user,
+                requireSchoolRole: false,
+                query: { limit: 2000 }
+            }).then((payload) => payload.allRows || payload.rows || []),
             schoolDataService.fetchData('students', {}, req.user)
         ]);
         
@@ -2990,7 +3001,11 @@ async function manageSession(req, res) {
 
         // 2. Resolve Student Names for Attendance
         const [persons, students] = await Promise.all([
-            dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
+            schoolIdentityLookupService.listSchoolPersonRecords({
+                reqUser: req.user,
+                requireSchoolRole: false,
+                query: { limit: 2000 }
+            }).then((payload) => payload.allRows || payload.rows || []),
             schoolDataService.fetchData('students', {}, req.user)
         ]);
         

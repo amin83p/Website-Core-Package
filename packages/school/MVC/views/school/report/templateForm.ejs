@@ -121,6 +121,8 @@
           <input type="text" class="form-control form-control-sm" id="prefillKeySearch" placeholder="Search keys (id, address, phone, attendance...)" style="max-width: 360px;">
           <button type="button" class="btn btn-outline-secondary btn-sm" id="btnExpandPrefill">Expand All</button>
           <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCollapsePrefill">Collapse All</button>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btnExportPrefillJson"><i class="bi bi-filetype-json me-1"></i>Export JSON</button>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btnExportPrefillCsv"><i class="bi bi-filetype-csv me-1"></i>Export CSV</button>
         </div>
         <div class="accordion" id="prefillCatalogAccordion">
           <div class="accordion-item">
@@ -581,6 +583,9 @@
     const prefillSearchInput = document.getElementById('prefillKeySearch');
     const btnExpandPrefill = document.getElementById('btnExpandPrefill');
     const btnCollapsePrefill = document.getElementById('btnCollapsePrefill');
+    const btnExportPrefillJson = document.getElementById('btnExportPrefillJson');
+    const btnExportPrefillCsv = document.getElementById('btnExportPrefillCsv');
+    const prefillCatalog = <%- JSON.stringify(prefillCatalogData).replace(/</g, '\\u003c') %>;
     const isEditMode = <%- JSON.stringify(isEdit) %>;
     const VALUE_MODES = Object.freeze({ MANUAL: 'manual', CALCULATED: 'calculated' });
     const CALC_ON_ERROR = Object.freeze({ KEEP_LAST: 'keep_last', EMPTY: 'empty' });
@@ -1782,6 +1787,78 @@ num(value) <= 95</code></pre>
       });
     }
 
+    function buildPrefillExportRows() {
+      const payload = collect();
+      const fields = Array.isArray(payload?.schema?.fields) ? payload.schema.fields : [];
+      const placeholderMap = payload?.placeholderMap && typeof payload.placeholderMap === 'object'
+        ? payload.placeholderMap
+        : {};
+      return fields
+        .filter((field) => !isVisualOnlyType(field?.type))
+        .map((field) => {
+          const fieldId = String(field?.id || '').trim();
+          const label = String(field?.label || fieldId || '').trim();
+          const prefillKey = String(field?.prefillKey || '').trim();
+          const rawToken = String(placeholderMap[fieldId] || '').trim();
+          const token = rawToken || (fieldId ? `{{${fieldId}}}` : '');
+          const key = token
+            .replace(/^\{\{\s*/, '')
+            .replace(/\s*\}\}$/, '')
+            .trim() || fieldId;
+          return {
+            key,
+            label,
+            fieldId,
+            prefillKey,
+            docxToken: token
+          };
+        })
+        .filter((row) => row.key && row.label)
+        .sort((a, b) => String(a.key || '').localeCompare(String(b.key || '')));
+    }
+
+    function downloadTextFile(filename, text, mimeType) {
+      const blob = new Blob([String(text || '')], { type: mimeType || 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+
+    function buildCsvValue(value) {
+      const text = String(value || '');
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+
+    async function exportPrefillRows(format) {
+      const rows = buildPrefillExportRows();
+      if (!rows.length) {
+        await showReportModal({ title: 'No Keys Found', icon: 'warning', message: 'No template keys are available to export yet. Add fields first.' });
+        return;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (format === 'csv') {
+        const header = ['key', 'label', 'docxToken', 'fieldId', 'prefillKey'];
+        const csvLines = [header.join(',')];
+        rows.forEach((row) => {
+          csvLines.push([
+            buildCsvValue(row.key),
+            buildCsvValue(row.label),
+            buildCsvValue(row.docxToken),
+            buildCsvValue(row.fieldId),
+            buildCsvValue(row.prefillKey)
+          ].join(','));
+        });
+        downloadTextFile(`report-template-keys-${stamp}.csv`, csvLines.join('\n'), 'text/csv;charset=utf-8');
+        return;
+      }
+      downloadTextFile(`report-template-keys-${stamp}.json`, JSON.stringify(rows, null, 2), 'application/json;charset=utf-8');
+    }
+
     prefillSearchInput?.addEventListener('input', applyPrefillFilter);
     btnExpandPrefill?.addEventListener('click', () => {
       document.querySelectorAll('#prefillCatalogAccordion .accordion-collapse').forEach((panel) => {
@@ -1793,6 +1870,8 @@ num(value) <= 95</code></pre>
         setAccordionPanelShown(panel, false);
       });
     });
+    btnExportPrefillJson?.addEventListener('click', () => exportPrefillRows('json'));
+    btnExportPrefillCsv?.addEventListener('click', () => exportPrefillRows('csv'));
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = collect();

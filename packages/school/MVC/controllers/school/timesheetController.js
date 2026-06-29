@@ -434,7 +434,7 @@ exports.listEligibleTimesheetPersons = async (req, res) => {
             return roles.includes('school_teacher') || roles.includes('school_staff') || personHasTeacherOrStaffRoleInOrg(p, activeOrgId);
         });
         const { data, pagination } = paginate(eligible, query);
-        return res.json({ status: 'success', results: data, pagination });
+        return res.json({ status: 'success', data, results: data, items: data, pagination });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
     }

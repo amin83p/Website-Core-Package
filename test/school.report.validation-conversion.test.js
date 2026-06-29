@@ -160,6 +160,37 @@ test('conversion supports ifelse and caseof branching', () => {
   assert.equal(bundle.placeholders['{{rating_label}}'], 'G');
 });
 
+test('conversion tolerates single equals in comparisons', () => {
+  const template = {
+    schema: {
+      fields: [
+        {
+          id: 'score_band',
+          label: 'Score Band',
+          type: 'number',
+          conversionRule: {
+            enabled: true,
+            expression: 'caseof(true, num(value) = 0, "-", num(value) < 40, "U", num(value) < 64, "NI", num(value) < 85, "Sat", "S")',
+            onError: 'use_raw'
+          }
+        }
+      ]
+    },
+    placeholderMap: {
+      score_band: '{{score_band}}'
+    }
+  };
+  const zero = reportService.buildPlaceholderPayloadDetailed(template, { answers: { score_band: 0 }, prefillSnapshot: {} }, null);
+  const low = reportService.buildPlaceholderPayloadDetailed(template, { answers: { score_band: 39.5 }, prefillSnapshot: {} }, null);
+  const sat = reportService.buildPlaceholderPayloadDetailed(template, { answers: { score_band: 84.99 }, prefillSnapshot: {} }, null);
+  const high = reportService.buildPlaceholderPayloadDetailed(template, { answers: { score_band: 92.25 }, prefillSnapshot: {} }, null);
+
+  assert.equal(zero.placeholders['{{score_band}}'], '-');
+  assert.equal(low.placeholders['{{score_band}}'], 'U');
+  assert.equal(sat.placeholders['{{score_band}}'], 'Sat');
+  assert.equal(high.placeholders['{{score_band}}'], 'S');
+});
+
 test('calculated fields recompute in dependency order', () => {
   const template = {
     schema: {
@@ -290,4 +321,57 @@ test('mergeTemplateData returns recomputed calculated values', () => {
   const instance = { answers: { x: 10, y: 8, sum: 0 }, prefillSnapshot: {} };
   const merged = reportService.mergeTemplateData(template, instance, null);
   assert.equal(merged.sum, 18);
+});
+
+test('calculated expressions longer than 240 chars still evaluate', () => {
+  const longExpression = [
+    'num(answers.a1)', 'num(answers.a2)', 'num(answers.a3)', 'num(answers.a4)',
+    'num(answers.a5)', 'num(answers.a6)', 'num(answers.a7)', 'num(answers.a8)',
+    'num(answers.a9)', 'num(answers.a10)', 'num(answers.a11)', 'num(answers.a12)',
+    'num(answers.a13)', 'num(answers.a14)', 'num(answers.a15)', 'num(answers.a16)'
+  ].join(' + ');
+  assert.ok(longExpression.length > 240);
+
+  const template = {
+    schema: {
+      fields: [
+        { id: 'a1', label: 'A1', type: 'number' },
+        { id: 'a2', label: 'A2', type: 'number' },
+        { id: 'a3', label: 'A3', type: 'number' },
+        { id: 'a4', label: 'A4', type: 'number' },
+        { id: 'a5', label: 'A5', type: 'number' },
+        { id: 'a6', label: 'A6', type: 'number' },
+        { id: 'a7', label: 'A7', type: 'number' },
+        { id: 'a8', label: 'A8', type: 'number' },
+        { id: 'a9', label: 'A9', type: 'number' },
+        { id: 'a10', label: 'A10', type: 'number' },
+        { id: 'a11', label: 'A11', type: 'number' },
+        { id: 'a12', label: 'A12', type: 'number' },
+        { id: 'a13', label: 'A13', type: 'number' },
+        { id: 'a14', label: 'A14', type: 'number' },
+        { id: 'a15', label: 'A15', type: 'number' },
+        { id: 'a16', label: 'A16', type: 'number' },
+        {
+          id: 'avg',
+          label: 'Average',
+          type: 'number',
+          valueMode: 'calculated',
+          calculationRule: { enabled: true, expression: `(${longExpression}) / 16`, onError: 'keep_last' },
+          calculationDependencies: ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16']
+        }
+      ]
+    }
+  };
+  const mergedAnswers = {
+    a1: 80, a2: 82, a3: 84, a4: 86,
+    a5: 88, a6: 90, a7: 92, a8: 94,
+    a9: 96, a10: 98, a11: 100, a12: 90,
+    a13: 80, a14: 70, a15: 60, a16: 50
+  };
+  const recomputed = reportRuleEngineService.recomputeCalculatedAnswers({
+    template,
+    mergedAnswers,
+    prefill: {}
+  });
+  assert.equal(recomputed.answers.avg, 83.75);
 });

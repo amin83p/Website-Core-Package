@@ -66,7 +66,7 @@
               <input type="text" class="form-control bg-white" id="sessionSummaryInput" placeholder="No sessions selected" readonly>
               <button type="button" class="btn btn-outline-primary" id="btnOpenSessionPicker"><i class="bi bi-calendar3"></i></button>
             </div>
-            <div class="form-text">Pick multiple sessions, with select-all/deselect-all.</div>
+            <div class="form-text">Pick multiple sessions using searchable picker.</div>
             <div id="selectedSessionsContainer" class="d-flex flex-wrap gap-1 mt-2"></div>
           </div>
 
@@ -212,52 +212,6 @@
   </form>
 </div>
 
-<div class="modal fade" id="sessionPickerModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content border-0 shadow-sm">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold"><i class="bi bi-calendar3 me-2"></i>Select Sessions</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="d-flex gap-2 mb-3">
-          <input type="text" class="form-control" id="sessionPickerSearch" placeholder="Search by date, time, or session id...">
-          <button type="button" class="btn btn-outline-secondary" id="btnSessionSelectAll">Select All</button>
-          <button type="button" class="btn btn-outline-secondary" id="btnSessionDeselectAll">Deselect All</button>
-        </div>
-        <div id="sessionPickerList" class="list-group small"></div>
-      </div>
-      <div class="modal-footer bg-white">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="btnApplySessionPicker">Apply</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="studentPickerModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content border-0 shadow-sm">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold"><i class="bi bi-people me-2"></i>Select Students</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="d-flex gap-2 mb-3">
-          <input type="text" class="form-control" id="studentPickerSearch" placeholder="Search by student name or id...">
-          <button type="button" class="btn btn-outline-secondary" id="btnStudentSelectAll">Select All</button>
-          <button type="button" class="btn btn-outline-secondary" id="btnStudentDeselectAll">Deselect All</button>
-        </div>
-        <div id="studentPickerList" class="list-group small"></div>
-      </div>
-      <div class="modal-footer bg-white">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="btnApplyStudentPicker">Apply</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <%- include('partials/modal_GenericPicker') %>
 
 <script>
@@ -293,15 +247,6 @@
     let selectedSessionIds = Array.isArray(<%- JSON.stringify(initialSessionIds) %>) ? <%- JSON.stringify(initialSessionIds) %> : [];
     let selectedDateTargets = Array.isArray(<%- JSON.stringify(initialDateTargets) %>) ? <%- JSON.stringify(initialDateTargets) %> : [];
     let selectedTargetStudentIds = Array.isArray(<%- JSON.stringify(Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : []) %>) ? <%- JSON.stringify(Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : []) %> : [];
-    let pendingSessionIds = new Set(selectedSessionIds);
-    let pendingStudentIds = new Set(selectedTargetStudentIds);
-
-    const sessionPickerModalEl = document.getElementById('sessionPickerModal');
-    const sessionPickerSearch = document.getElementById('sessionPickerSearch');
-    const sessionPickerList = document.getElementById('sessionPickerList');
-    const studentPickerModalEl = document.getElementById('studentPickerModal');
-    const studentPickerSearch = document.getElementById('studentPickerSearch');
-    const studentPickerList = document.getElementById('studentPickerList');
 
     function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
       if (typeof hideLoading === 'function') {
@@ -499,63 +444,6 @@
       updateHiddenFields();
     }
 
-    function renderSessionPickerList() {
-      const keyword = String(sessionPickerSearch.value || '').trim().toLowerCase();
-      const rows = (allSessions || []).filter((session) => {
-        if (!keyword) return true;
-        const hay = [
-          session.sessionId,
-          session.date,
-          session.startTime,
-          session.endTime,
-          session.delivery?.deliveredBy
-        ].map((v) => String(v || '').toLowerCase()).join(' ');
-        return hay.includes(keyword);
-      });
-
-      if (!rows.length) {
-        sessionPickerList.innerHTML = '<div class="text-muted small p-3 text-center">No sessions found.</div>';
-        return;
-      }
-
-      sessionPickerList.innerHTML = rows.map((session) => {
-        const sid = String(session.sessionId || '').trim();
-        const checked = pendingSessionIds.has(sid) ? 'checked' : '';
-        return `
-          <label class="list-group-item d-flex align-items-start gap-2">
-            <input class="form-check-input mt-1" type="checkbox" data-session-id="${sid}" ${checked}>
-            <span class="small">${getSessionDisplay(session)}</span>
-          </label>
-        `;
-      }).join('');
-    }
-
-    function renderStudentPickerList() {
-      const keyword = String(studentPickerSearch.value || '').trim().toLowerCase();
-      const rows = (allStudents || []).filter((student) => {
-        if (!keyword) return true;
-        const hay = [student.id, student.name].map((v) => String(v || '').toLowerCase()).join(' ');
-        return hay.includes(keyword);
-      });
-
-      if (!rows.length) {
-        studentPickerList.innerHTML = '<div class="text-muted small p-3 text-center">No students found.</div>';
-        return;
-      }
-
-      studentPickerList.innerHTML = rows.map((student) => {
-        const sid = String(student.id || '').trim();
-        const checked = pendingStudentIds.has(sid) ? 'checked' : '';
-        const label = `${String(student.name || sid)} (${sid})`;
-        return `
-          <label class="list-group-item d-flex align-items-start gap-2">
-            <input class="form-check-input mt-1" type="checkbox" data-student-id="${sid}" ${checked}>
-            <span class="small">${label}</span>
-          </label>
-        `;
-      }).join('');
-    }
-
     function reloadForClass(classId) {
       const cleanClassId = String(classId || '').trim();
       const base = window.location.pathname.includes('/edit/')
@@ -643,57 +531,51 @@
     });
 
     document.getElementById('btnOpenSessionPicker')?.addEventListener('click', function () {
-      if (!window.bootstrap || !sessionPickerModalEl) return;
-      const sessionPickerModal = bootstrap.Modal.getOrCreateInstance(sessionPickerModalEl);
       if (!String(classIdInput.value || '').trim()) {
         showReportModal({ title: 'Class Required', icon: 'warning', message: 'Select a class first to load sessions.', buttonClass: 'btn-secondary' });
         return;
       }
-      pendingSessionIds = new Set(selectedSessionIds);
-      sessionPickerSearch.value = '';
-      renderSessionPickerList();
-      sessionPickerModal.show();
-    });
-
-    sessionPickerSearch?.addEventListener('input', renderSessionPickerList);
-
-    sessionPickerList?.addEventListener('change', function (event) {
-      const target = event.target;
-      if (!target || !target.matches('input[data-session-id]')) return;
-      const sid = String(target.getAttribute('data-session-id') || '').trim();
-      if (!sid) return;
-      if (target.checked) pendingSessionIds.add(sid);
-      else pendingSessionIds.delete(sid);
-    });
-
-    document.getElementById('btnSessionSelectAll')?.addEventListener('click', function () {
-      (allSessions || []).forEach((session) => {
-        const sid = String(session.sessionId || '').trim();
-        if (sid) pendingSessionIds.add(sid);
-      });
-      renderSessionPickerList();
-    });
-
-    document.getElementById('btnSessionDeselectAll')?.addEventListener('click', function () {
-      pendingSessionIds = new Set();
-      renderSessionPickerList();
-    });
-
-    document.getElementById('btnApplySessionPicker')?.addEventListener('click', function () {
-      selectedSessionIds = (allSessions || [])
-        .map((session) => String(session.sessionId || '').trim())
-        .filter((sid) => pendingSessionIds.has(sid));
-      if (window.bootstrap && sessionPickerModalEl) {
-        bootstrap.Modal.getOrCreateInstance(sessionPickerModalEl).hide();
-      }
-      renderSelectedSessions();
-      applyTargetModeState();
+      if (!window.GenericPicker || !window.GenericPickerPresets) return;
+      const localSessionItems = (allSessions || []).map((session) => {
+        const sessionId = String(session?.sessionId || session?.id || '').trim();
+        const teacherId = String(session?.delivery?.deliveredBy || '').trim();
+        return {
+          id: sessionId,
+          sessionId,
+          date: String(session?.date || ''),
+          startTime: String(session?.startTime || ''),
+          endTime: String(session?.endTime || ''),
+          className: String(classTitleInput?.value || ''),
+          teacherId,
+          teacherName: teacherId,
+          title: getSessionDisplay(session)
+        };
+      }).filter((row) => Boolean(row.id));
+      const selectedSessionMap = new Map(localSessionItems.map((row) => [row.id, row]));
+      GenericPicker.open(GenericPickerPresets.session({
+        title: 'Select Sessions',
+        placeholder: 'Search sessions by date, time, class, or id...',
+        sourceMode: 'local',
+        localItems: localSessionItems,
+        searchFields: 'id,sessionId,date,startTime,endTime,className,teacherId,teacherName,title',
+        limit: 5000,
+        multiselect: true,
+        selectedItems: selectedSessionIds.map((id) => selectedSessionMap.get(String(id || '').trim())).filter(Boolean),
+        onSelect: function (items) {
+          const rows = Array.isArray(items) ? items : [items];
+          selectedSessionIds = rows
+            .map((session) => String(session?.sessionId || session?.id || '').trim())
+            .filter(Boolean);
+          renderSelectedSessions();
+          applyTargetModeState();
+        }
+      }));
     });
 
     reportScopeInput?.addEventListener('change', applyScopeState);
 
     document.getElementById('btnOpenStudentPicker')?.addEventListener('click', function () {
-      if (!window.bootstrap || !studentPickerModalEl) return;
+      if (!window.GenericPicker || !window.GenericPickerPresets) return;
       if (!String(classIdInput.value || '').trim()) {
         showReportModal({ title: 'Class Required', icon: 'warning', message: 'Select a class first.' });
         return;
@@ -702,45 +584,40 @@
         showReportModal({ title: 'No Students', icon: 'info', message: 'No students are available for this class.' });
         return;
       }
-      pendingStudentIds = new Set(selectedTargetStudentIds);
-      studentPickerSearch.value = '';
-      renderStudentPickerList();
-      bootstrap.Modal.getOrCreateInstance(studentPickerModalEl).show();
-    });
-
-    studentPickerSearch?.addEventListener('input', renderStudentPickerList);
-
-    studentPickerList?.addEventListener('change', function (event) {
-      const target = event.target;
-      if (!target || !target.matches('input[data-student-id]')) return;
-      const sid = String(target.getAttribute('data-student-id') || '').trim();
-      if (!sid) return;
-      if (target.checked) pendingStudentIds.add(sid);
-      else pendingStudentIds.delete(sid);
-    });
-
-    document.getElementById('btnStudentSelectAll')?.addEventListener('click', function () {
-      (allStudents || []).forEach((student) => {
-        const sid = String(student.id || '').trim();
-        if (sid) pendingStudentIds.add(sid);
-      });
-      renderStudentPickerList();
-    });
-
-    document.getElementById('btnStudentDeselectAll')?.addEventListener('click', function () {
-      pendingStudentIds = new Set();
-      renderStudentPickerList();
-    });
-
-    document.getElementById('btnApplyStudentPicker')?.addEventListener('click', function () {
-      selectedTargetStudentIds = (allStudents || [])
-        .map((student) => String(student.id || '').trim())
-        .filter((sid) => pendingStudentIds.has(sid));
-      if (window.bootstrap && studentPickerModalEl) {
-        bootstrap.Modal.getOrCreateInstance(studentPickerModalEl).hide();
-      }
-      renderSelectedStudents();
-      updateHiddenFields();
+      const localStudentItems = (allStudents || []).map((student) => {
+        const id = String(student?.id || '').trim();
+        const name = String(student?.name || '').trim();
+        return {
+          id,
+          name,
+          title: name ? `${name} (${id})` : id
+        };
+      }).filter((row) => Boolean(row.id));
+      const allowedStudentIds = new Set(localStudentItems.map((row) => row.id));
+      const selectedRowMap = new Map(localStudentItems.map((row) => [row.id, row]));
+      GenericPicker.open(GenericPickerPresets.person({
+        title: 'Select Students',
+        icon: 'bi-people',
+        placeholder: 'Search class students by name or id...',
+        sourceMode: 'local',
+        localItems: localStudentItems,
+        searchFields: 'id,name,title',
+        limit: 5000,
+        multiselect: true,
+        selectedItems: selectedTargetStudentIds.map((id) => selectedRowMap.get(String(id || '').trim())).filter(Boolean),
+        itemFilter: function (item) {
+          const id = String(item?.id || '').trim();
+          return Boolean(id && allowedStudentIds.has(id));
+        },
+        onSelect: function (items) {
+          const rows = Array.isArray(items) ? items : [items];
+          selectedTargetStudentIds = rows
+            .map((student) => String(student?.id || '').trim())
+            .filter((id) => allowedStudentIds.has(id));
+          renderSelectedStudents();
+          updateHiddenFields();
+        }
+      }));
     });
 
     document.getElementById('btnAddDateTarget')?.addEventListener('click', function () {

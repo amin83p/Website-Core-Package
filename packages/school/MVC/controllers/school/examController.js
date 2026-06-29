@@ -7,10 +7,10 @@ const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
-const dataService = requireCoreModule('MVC/services/dataService');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const schoolDataService = require('../../services/school/schoolDataService');
+const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const examValidationService = require('../../services/school/examValidationService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const examTemplateModel = require('../../models/school/examTemplateModel');
@@ -22,7 +22,6 @@ const {
   assertCreateOrgContextOrThrow: assertCreateOrgContextOrThrowShared
 } = requireCoreModule('MVC/utils/orgContextUtils');
 
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 const WINDOW_POLICY_OPTIONS = examAllocationModel.WINDOW_POLICY_OPTIONS || ['strict_fixed_window', 'suggested_window'];
 const QUESTION_PRESENTATION_MODE_OPTIONS = examAllocationModel.QUESTION_PRESENTATION_MODE_OPTIONS || ['sequential_one_by_one', 'all_questions_on_one_page'];
 
@@ -83,6 +82,17 @@ function resolveTemplateRootId(template = {}) {
 
 function resolveTemplateParentId(template = {}) {
   return String(template?.parentTemplateId || '').trim();
+}
+
+async function listSchoolPersonRecords(reqUser, { q = '', query = {}, requireSchoolRole = false, allowedSchoolRoles = [] } = {}) {
+  const payload = await schoolIdentityLookupService.listSchoolPersonRecords({
+    reqUser,
+    q,
+    query,
+    requireSchoolRole,
+    allowedSchoolRoles
+  });
+  return payload?.allRows || payload?.rows || [];
 }
 
 function resolveTemplateRevisionDepth(template = {}) {
@@ -519,7 +529,11 @@ async function resolvePersonDisplay(personId, reqUser) {
   const normalizedPersonId = normalizeId(personId);
   if (!normalizedPersonId) return '';
   try {
-    const person = await dataService.getDataById('persons', normalizedPersonId, reqUser, PERSON_QUERY_OPTIONS);
+    const persons = await listSchoolPersonRecords(reqUser, {
+      q: normalizedPersonId,
+      query: { q: normalizedPersonId, limit: 200 }
+    });
+    const person = (persons || []).find((row) => idsEqual(row?.id, normalizedPersonId)) || null;
     if (!person) return normalizedPersonId;
     const first = String(person?.name?.first || '').trim();
     const last = String(person?.name?.last || '').trim();
@@ -1787,7 +1801,7 @@ async function viewAllocation(req, res) {
       schoolDataService.getDataById('classes', allocation.classId, req.user),
       schoolDataService.fetchData('examAssignments', { allocationId__eq: allocation.id }, req.user),
       schoolDataService.fetchData('students', {}, req.user),
-      dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS)
+      listSchoolPersonRecords(req.user, { query: { limit: 5000 } })
     ]);
     const counts = buildAssignmentCounts(assignments || []);
     const personById = new Map((Array.isArray(persons) ? persons : [])
@@ -2087,7 +2101,7 @@ async function viewTeacherAssignment(req, res) {
       schoolDataService.fetchData('examAssignments', { allocationId__eq: allocation.id }, req.user),
       schoolDataService.fetchData('teachers', {}, req.user),
       schoolDataService.fetchData('students', {}, req.user),
-      dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
+      listSchoolPersonRecords(req.user, { query: { limit: 5000 } }),
       schoolDataService.fetchData('examAttempts', {}, req.user)
     ]);
 
@@ -2170,7 +2184,7 @@ async function viewTeacherAttemptReview(req, res) {
       schoolDataService.getDataById('classes', assignment.classId, req.user),
       schoolDataService.fetchData('teachers', {}, req.user),
       schoolDataService.fetchData('students', {}, req.user),
-      dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
+      listSchoolPersonRecords(req.user, { query: { limit: 5000 } }),
       schoolDataService.fetchData('examAttempts', { assignmentId__eq: assignment.id }, req.user),
       schoolDataService.getExamRevisionBundle(assignment.revisionId, req.user)
     ]);
@@ -2634,7 +2648,7 @@ async function listAllocationClassStudents(req, res) {
     const q = String(req.query.q || '').trim().toLowerCase();
     const [students, persons, assignments] = await Promise.all([
       schoolDataService.fetchData('students', {}, req.user),
-      dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
+      listSchoolPersonRecords(req.user, { query: { limit: 5000 } }),
       schoolDataService.fetchData('examAssignments', { allocationId__eq: allocation.id }, req.user)
     ]);
 
@@ -2715,7 +2729,7 @@ async function listTakeAssignments(req, res) {
       schoolDataService.fetchData('classes', {}, req.user),
       schoolDataService.fetchData('examAttempts', {}, req.user),
       schoolDataService.fetchData('students', {}, req.user),
-      dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
+      listSchoolPersonRecords(req.user, { query: { limit: 5000 } }),
       schoolDataService.fetchData('teachers', {}, req.user)
     ]);
 
@@ -2948,7 +2962,7 @@ async function listEligibleTakeStudentPersons(req, res) {
     const q = String(req.query?.q || '').trim().toLowerCase();
     const [students, persons] = await Promise.all([
       schoolDataService.fetchData('students', {}, req.user),
-      dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS)
+      listSchoolPersonRecords(req.user, { query: { limit: 5000 } })
     ]);
     const studentCountByPersonId = new Map();
     (Array.isArray(students) ? students : []).forEach((row) => {
@@ -3098,7 +3112,7 @@ async function viewTakeAssignment(req, res) {
       schoolDataService.getDataById('examRevisions', assignment.revisionId, req.user),
       schoolDataService.getDataById('classes', assignment.classId, req.user),
       schoolDataService.fetchData('students', {}, req.user),
-      dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
+      listSchoolPersonRecords(req.user, { query: { limit: 5000 } }),
       schoolDataService.fetchData('examAttempts', { assignmentId__eq: assignment.id }, req.user),
       schoolDataService.getExamRevisionBundle(assignment.revisionId, req.user)
     ]);

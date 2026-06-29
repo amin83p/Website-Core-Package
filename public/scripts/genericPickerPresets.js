@@ -295,6 +295,40 @@
     return next;
   }
 
+  function stripQueryAndHash(endpoint) {
+    return String(endpoint || '').trim().split('?')[0].split('#')[0];
+  }
+
+  function isSchoolPage() {
+    try {
+      const pathname = String(global?.location?.pathname || '').trim().toLowerCase();
+      return pathname.startsWith('/school');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function applySchoolIdentityGuardrails(name, config = {}, overrides = {}) {
+    const next = { ...(config || {}) };
+    if (!isSchoolPage()) return next;
+
+    const hasExplicitEndpointOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'apiEndpoint');
+    const normalizedName = String(name || '').trim().toLowerCase();
+    const normalizedEndpoint = stripQueryAndHash(next.apiEndpoint).toLowerCase();
+
+    // In school pages, do not allow person preset fallback to global /persons.
+    if (normalizedName === 'person' && !hasExplicitEndpointOverride) {
+      next.apiEndpoint = '/school/identity/api/persons';
+      return next;
+    }
+
+    if (normalizedEndpoint === '/persons') {
+      next.apiEndpoint = '/school/identity/api/persons';
+    }
+
+    return next;
+  }
+
   function applyPickerDefaults(name, config) {
     const next = { ...(config || {}) };
     const endpoint = String(next.apiEndpoint || '').trim().toLowerCase();
@@ -315,7 +349,8 @@
   }
 
   function byName(name, overrides) {
-    const merged = applyPickerDefaults(name, merge(presetMap[name] || {}, overrides));
+    const mergedWithGuardrails = applySchoolIdentityGuardrails(name, merge(presetMap[name] || {}, overrides), overrides);
+    const merged = applyPickerDefaults(name, mergedWithGuardrails);
     if (!merged.context) {
       merged.context = buildDefaultContext(name);
     }
@@ -323,7 +358,7 @@
   }
 
   function inferName(config) {
-    const endpoint = String(config?.apiEndpoint || '').trim();
+    const endpoint = stripQueryAndHash(config?.apiEndpoint);
     if (endpoint && endpointAliases[endpoint]) return endpointAliases[endpoint];
     return null;
   }

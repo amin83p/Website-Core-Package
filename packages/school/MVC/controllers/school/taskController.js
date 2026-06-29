@@ -202,7 +202,9 @@ async function listEligiblePersons(req, res) {
     }));
     return res.json({
       status: 'success',
+      data,
       results: data,
+      items: data,
       pagination: payload.pagination || {}
     });
   } catch (error) {

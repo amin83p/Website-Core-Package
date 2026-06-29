@@ -311,6 +311,94 @@ window.GenericPicker = (function() {
         return Number.isFinite(raw) && raw > 0 ? raw : null;
     }
 
+    function isLocalSourceMode() {
+        if (String(currentConfig?.sourceMode || '').trim().toLowerCase() === 'local') return true;
+        return Array.isArray(currentConfig?.localItems);
+    }
+
+    function getNestedValue(obj, path) {
+      if (!obj || typeof obj !== 'object') return '';
+      const parts = String(path || '').trim().split('.').filter(Boolean);
+      if (!parts.length) return '';
+      let cursor = obj;
+      for (let i = 0; i < parts.length; i += 1) {
+        const key = parts[i];
+        if (cursor === null || cursor === undefined) return '';
+        if (typeof cursor !== 'object' && typeof cursor !== 'function') return '';
+        cursor = Object.prototype.hasOwnProperty.call(cursor, key) ? cursor[key] : undefined;
+      }
+      if (cursor === undefined || cursor === null) return '';
+      return String(cursor);
+    }
+
+    function buildLocalSearchText(item) {
+      const explicitFields = String(currentConfig?.searchFields || '')
+        .split(',')
+        .map((field) => field.trim())
+        .filter(Boolean);
+      const fields = explicitFields.length
+        ? explicitFields
+        : ['id', 'name', 'title', 'description', 'email'];
+      const chunks = fields.map((field) => {
+        if (!field.includes('.')) {
+          const direct = item?.[field];
+          if (direct !== undefined && direct !== null && direct !== '') return String(direct);
+        }
+        return getNestedValue(item, field);
+      });
+      return chunks.filter(Boolean).join(' ').toLowerCase();
+    }
+
+    function getLocalItemsPage(queryTerm, forceShowAll, requestedPage) {
+      const source = Array.isArray(currentConfig?.localItems) ? currentConfig.localItems : [];
+      const itemsWithIds = source
+        .map((item, index) => {
+          if (!item || typeof item !== 'object') return null;
+          const id = String(item.id || item.sessionId || item.personId || item.value || item.key || `local_${index + 1}`).trim();
+          if (!id) return null;
+          return { ...item, id };
+        })
+        .filter(Boolean);
+
+      let filtered = itemsWithIds;
+      if (!forceShowAll && queryTerm) {
+        const needle = String(queryTerm || '').trim().toLowerCase();
+        filtered = itemsWithIds.filter((item) => buildLocalSearchText(item).includes(needle));
+      }
+      if (typeof currentConfig?.itemFilter === 'function') {
+        filtered = filtered.filter((item, index) => {
+          try {
+            return currentConfig.itemFilter(item, {
+              term: queryTerm,
+              forceShowAll,
+              page: requestedPage,
+              append: false,
+              index
+            }) !== false;
+          } catch (_) {
+            return true;
+          }
+        });
+      }
+
+      const totalItems = filtered.length;
+      const limit = getConfiguredLimit() || Math.max(totalItems, 1);
+      const totalPages = totalItems > 0 ? Math.max(1, Math.ceil(totalItems / limit)) : 1;
+      const page = Math.min(Math.max(Number(requestedPage || 1), 1), totalPages);
+      const start = (page - 1) * limit;
+      const pageItems = filtered.slice(start, start + limit);
+
+      return {
+        items: pageItems,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems,
+          limit
+        }
+      };
+    }
+
     function buildRequestUrl(queryTerm, page) {
         const params = new URLSearchParams();
         params.set('q', queryTerm);
@@ -398,6 +486,38 @@ window.GenericPicker = (function() {
             setFooterSummary('Searching...', 'bi-hourglass-split');
         } else {
             setLoadMoreBusy(true);
+        }
+
+        if (isLocalSourceMode()) {
+            try {
+                const localPage = getLocalItemsPage(queryTerm, forceShowAll, requestedPage);
+                const items = Array.isArray(localPage?.items) ? localPage.items : [];
+                const prevIds = new Set(Array.from(pickerState.loadedItemsMap.keys()));
+                const uniqueNewItemsCount = items.reduce((count, item) => {
+                  const id = String(item?.id || '');
+                  if (!id) return count + 1;
+                  return prevIds.has(id) ? count : count + 1;
+                }, 0);
+                renderList(items, { append });
+                updatePickerMeta(items.length, localPage.pagination || null, append, requestedPage, uniqueNewItemsCount);
+            } catch (err) {
+                console.error(err);
+                const message = String(err?.message || 'Error filtering local data.');
+                const safeMessage = message
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#39;');
+                if (!append) {
+                    listEl.innerHTML = `<div class="text-center text-danger py-5"><i class="bi bi-exclamation-circle fs-1 opacity-25 mb-2 d-block"></i><div class="fw-bold mb-1">Error filtering local data.</div><div class="small text-muted">${safeMessage}</div></div>`;
+                }
+                setFooterSummary('Error filtering local data', 'bi-exclamation-triangle');
+                if (loadMoreBtn) loadMoreBtn.classList.add('d-none');
+            } finally {
+                if (append) setLoadMoreBusy(false);
+            }
+            return;
         }
         
         try {
@@ -599,6 +719,11 @@ window.GenericPicker = (function() {
               ? window.GenericPickerPresets.normalizeConfig(config || {})
               : (config || {});
             resetPickerState();
+            if (currentConfig.multiselect === true && Array.isArray(currentConfig.selectedItems)) {
+                currentConfig.selectedItems.forEach((item) => {
+                    upsertSelectedItem(item);
+                });
+            }
             
             if (!bsModal) {
                 bsModal = new bootstrap.Modal(modalEl);
@@ -621,8 +746,8 @@ window.GenericPicker = (function() {
             if (loadMoreBtn) loadMoreBtn.classList.add('d-none');
             if (addSelectedBtn) {
                 addSelectedBtn.classList.toggle('d-none', currentConfig.multiselect !== true);
-                if (selectedCountEl) selectedCountEl.textContent = '(0)';
-                addSelectedBtn.disabled = true;
+                if (selectedCountEl) selectedCountEl.textContent = `(${pickerState.selectedItemsMap.size})`;
+                addSelectedBtn.disabled = pickerState.selectedItemsMap.size === 0;
             }
 
             // Context Setup
