@@ -3119,6 +3119,54 @@
       "adoptExisting": true
     },
     {
+      "id": "SYM_SYSTEM_124",
+      "name": "SCHOOL_REPORTS",
+      "type": "class",
+      "value": "bi bi-file-earmark-richtext",
+      "tags": [
+        "SCHOOL_REPORTS",
+        "445571"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_126",
+      "name": "SCHOOL_REPORTS_ASSIGNMENT",
+      "type": "class",
+      "value": "bi bi-list-check",
+      "tags": [
+        "SCHOOL_REPORTS_ASSIGNMENT",
+        "446102"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_127",
+      "name": "SCHOOL_REPORTS_INSTANCES",
+      "type": "class",
+      "value": "bi bi-file-earmark-text-fill",
+      "tags": [
+        "SCHOOL_REPORTS_INSTANCES",
+        "446103"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_125",
+      "name": "SCHOOL_REPORTS_TEMPLATE",
+      "type": "class",
+      "value": "bi bi-journal-richtext",
+      "tags": [
+        "SCHOOL_REPORTS_TEMPLATE",
+        "446101"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
       "id": "SYM_SYSTEM_042",
       "name": "SCHOOL_SAMPLE_DATA",
       "type": "class",

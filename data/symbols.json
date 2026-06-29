@@ -1847,6 +1847,74 @@
     "value": "bi bi-mortarboard-fill"
   },
   {
+    "id": "SYM_SYSTEM_124",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-06-29T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-06-29T00:00:00.000Z"
+    },
+    "name": "SCHOOL_REPORTS",
+    "orgId": "SYSTEM",
+    "tags": [
+      "SCHOOL_REPORTS",
+      "445571"
+    ],
+    "type": "class",
+    "value": "bi bi-file-earmark-richtext"
+  },
+  {
+    "id": "SYM_SYSTEM_125",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-06-29T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-06-29T00:00:00.000Z"
+    },
+    "name": "SCHOOL_REPORTS_TEMPLATE",
+    "orgId": "SYSTEM",
+    "tags": [
+      "SCHOOL_REPORTS_TEMPLATE",
+      "446101"
+    ],
+    "type": "class",
+    "value": "bi bi-journal-richtext"
+  },
+  {
+    "id": "SYM_SYSTEM_126",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-06-29T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-06-29T00:00:00.000Z"
+    },
+    "name": "SCHOOL_REPORTS_ASSIGNMENT",
+    "orgId": "SYSTEM",
+    "tags": [
+      "SCHOOL_REPORTS_ASSIGNMENT",
+      "446102"
+    ],
+    "type": "class",
+    "value": "bi bi-list-check"
+  },
+  {
+    "id": "SYM_SYSTEM_127",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-06-29T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-06-29T00:00:00.000Z"
+    },
+    "name": "SCHOOL_REPORTS_INSTANCES",
+    "orgId": "SYSTEM",
+    "tags": [
+      "SCHOOL_REPORTS_INSTANCES",
+      "446103"
+    ],
+    "type": "class",
+    "value": "bi bi-file-earmark-text-fill"
+  },
+  {
     "id": "SYM_SYSTEM_055",
     "audit": {
       "createUser": "ROOT_001",
