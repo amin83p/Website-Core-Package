@@ -5,6 +5,7 @@ const path = require('path');
 
 const {
   buildOrganizationDisplayMap,
+  canonicalizeMembershipOrganizationName,
   canonicalizeMembershipOrganizationNames
 } = require('../MVC/utils/organizationDisplay');
 
@@ -40,6 +41,15 @@ async function readJsonArray(filePath) {
   return parsed;
 }
 
+function filterOrganizationMap(organizationMap = new Map(), orgId = '') {
+  const target = String(orgId || '').trim();
+  if (!target) return organizationMap;
+  const filtered = new Map();
+  const row = organizationMap.get(target);
+  if (row) filtered.set(target, row);
+  return filtered;
+}
+
 function migrateMembershipDocument(doc = {}, organizationMap = new Map()) {
   if (!doc || typeof doc !== 'object') return { value: doc, changed: false, changedCount: 0 };
   if (!Array.isArray(doc.organizations)) return { value: doc, changed: false, changedCount: 0 };
@@ -57,10 +67,55 @@ function migrateMembershipDocument(doc = {}, organizationMap = new Map()) {
   };
 }
 
-function migrateMembershipRows(rows = [], organizationRows = []) {
-  const organizationMap = organizationRows instanceof Map
+function migrateUserOrganizationSnapshots(user = {}, organizationMap = new Map()) {
+  if (!user || typeof user !== 'object') return { value: user, changed: false, changedCount: 0 };
+
+  let next = user;
+  let changed = false;
+  let changedCount = 0;
+
+  const applyArrayResult = (field, result) => {
+    if (!result.changed) return;
+    if (next === user) next = { ...user };
+    next[field] = result.value;
+    changed = true;
+    changedCount += Number(result.changedCount || 0);
+  };
+
+  applyArrayResult('organizations', canonicalizeMembershipOrganizationNames(user.organizations, organizationMap));
+  applyArrayResult('allowedOrgs', canonicalizeMembershipOrganizationNames(user.allowedOrgs, organizationMap));
+
+  if (user.activeOrganization && typeof user.activeOrganization === 'object') {
+    const activeResult = canonicalizeMembershipOrganizationName(user.activeOrganization, organizationMap);
+    if (activeResult.changed) {
+      if (next === user) next = { ...user };
+      next.activeOrganization = activeResult.value;
+      changed = true;
+      changedCount += 1;
+    }
+  }
+
+  const directOrgId = String(user.orgId || user.organizationId || user.activeOrgId || user.primaryOrgId || '').trim();
+  const canonicalName = String(organizationMap.get(directOrgId)?.name || '').trim();
+  if (canonicalName) {
+    ['orgName', 'organizationName'].forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(user, field) && String(user[field] || '') !== canonicalName) {
+        if (next === user) next = { ...user };
+        next[field] = canonicalName;
+        changed = true;
+        changedCount += 1;
+      }
+    });
+  }
+
+  return { value: next, changed, changedCount };
+}
+
+function migrateMembershipRows(rows = [], organizationRows = [], options = {}) {
+  const baseMap = organizationRows instanceof Map
     ? organizationRows
     : buildOrganizationDisplayMap(organizationRows);
+  const organizationMap = filterOrganizationMap(baseMap, options.orgId);
   let changedCount = 0;
   let membershipChangedCount = 0;
 
@@ -81,11 +136,38 @@ function migrateMembershipRows(rows = [], organizationRows = []) {
   };
 }
 
+function migrateUserRows(rows = [], organizationRows = [], options = {}) {
+  const baseMap = organizationRows instanceof Map
+    ? organizationRows
+    : buildOrganizationDisplayMap(organizationRows);
+  const organizationMap = filterOrganizationMap(baseMap, options.orgId);
+  let changedCount = 0;
+  let membershipChangedCount = 0;
+
+  const value = (Array.isArray(rows) ? rows : []).map((row) => {
+    const result = migrateUserOrganizationSnapshots(row, organizationMap);
+    if (result.changed) {
+      changedCount += 1;
+      membershipChangedCount += Number(result.changedCount || 0);
+    }
+    return result.value;
+  });
+
+  return {
+    value,
+    changed: changedCount > 0,
+    changedCount,
+    membershipChangedCount
+  };
+}
+
 async function migrateJsonFile(fileName, organizationRows, options = {}) {
   const apply = options.apply === true;
   const filePath = path.join(ROOT_DIR, 'data', fileName);
   const rows = await readJsonArray(filePath);
-  const result = migrateMembershipRows(rows, organizationRows);
+  const result = fileName === 'users.json'
+    ? migrateUserRows(rows, organizationRows, options)
+    : migrateMembershipRows(rows, organizationRows, options);
 
   if (apply && result.changed) {
     await fs.writeFile(filePath, `${JSON.stringify(result.value, null, 2)}\n`);
@@ -138,6 +220,52 @@ async function migrateMongoMembershipCollection(db, collectionName, organization
   };
 }
 
+async function migrateMongoUsers(db, organizationMap, options = {}) {
+  const apply = options.apply === true;
+  const collection = db.collection('users');
+  const rows = await collection.find({}, {
+    projection: {
+      organizations: 1,
+      allowedOrgs: 1,
+      activeOrganization: 1,
+      orgName: 1,
+      organizationName: 1,
+      orgId: 1,
+      organizationId: 1,
+      activeOrgId: 1,
+      primaryOrgId: 1,
+      id: 1
+    }
+  }).toArray();
+  let changedCount = 0;
+  let membershipChangedCount = 0;
+
+  for (const row of rows) {
+    const result = migrateUserOrganizationSnapshots(row, organizationMap);
+    if (!result.changed) continue;
+    changedCount += 1;
+    membershipChangedCount += Number(result.changedCount || 0);
+    if (apply) {
+      const patch = {};
+      ['organizations', 'allowedOrgs', 'activeOrganization', 'orgName', 'organizationName'].forEach((field) => {
+        if (Object.prototype.hasOwnProperty.call(result.value, field)) patch[field] = result.value[field];
+      });
+      // eslint-disable-next-line no-await-in-loop
+      await collection.updateOne(
+        { _id: row._id },
+        { $set: patch }
+      );
+    }
+  }
+
+  return {
+    target: 'users',
+    changed: changedCount > 0,
+    changedCount,
+    membershipChangedCount
+  };
+}
+
 async function migrateMongo(options = {}) {
   loadLocalEnvFile();
   const { connectMongo, disconnectMongo } = require('../MVC/infrastructure/mongo/mongoConnection');
@@ -147,10 +275,10 @@ async function migrateMongo(options = {}) {
 
   try {
     const organizationRows = await db.collection('organizations').find({}).toArray();
-    const organizationMap = buildOrganizationDisplayMap(organizationRows);
+    const organizationMap = filterOrganizationMap(buildOrganizationDisplayMap(organizationRows), options.orgId);
     return [
       await migrateMongoMembershipCollection(db, 'persons', organizationMap, options),
-      await migrateMongoMembershipCollection(db, 'users', organizationMap, options)
+      await migrateMongoUsers(db, organizationMap, options)
     ];
   } finally {
     await disconnectMongo();
@@ -171,17 +299,19 @@ function parseCliArgs(argv = process.argv.slice(2)) {
   const args = new Set(argv);
   const wantsJson = args.has('--json');
   const wantsMongo = args.has('--mongo');
+  const orgIdIndex = argv.findIndex((item) => item === '--org-id');
   return {
     apply: args.has('--apply'),
     includeJson: wantsJson || !wantsMongo,
-    includeMongo: wantsMongo || !wantsJson
+    includeMongo: wantsMongo || !wantsJson,
+    orgId: orgIdIndex >= 0 ? String(argv[orgIdIndex + 1] || '').trim() : ''
   };
 }
 
 async function runCli() {
   const options = parseCliArgs();
   const modeLabel = options.apply ? 'APPLY' : 'DRY-RUN';
-  console.log(`[canonical-org-membership-name-migration] mode=${modeLabel}`);
+  console.log(`[canonical-org-membership-name-migration] mode=${modeLabel}${options.orgId ? ` orgId=${options.orgId}` : ''}`);
 
   if (options.includeJson) {
     const reports = await migrateJsonFiles({ apply: options.apply });
@@ -204,6 +334,8 @@ if (require.main === module) {
 module.exports = {
   migrateMembershipDocument,
   migrateMembershipRows,
+  migrateUserOrganizationSnapshots,
+  migrateUserRows,
   migrateJsonFiles,
   migrateMongo
 };

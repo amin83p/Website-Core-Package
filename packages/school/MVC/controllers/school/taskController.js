@@ -20,6 +20,13 @@ function getActiveOrgIdOrThrow(reqUser) {
   return activeOrgId;
 }
 
+function parseAllowedSchoolRoles(query = {}) {
+  return String(query.allowedRoles || query.schoolRoles || query.roleFilter || '')
+    .split(/[\s,;|]+/)
+    .map((role) => String(role || '').trim())
+    .filter(Boolean);
+}
+
 function resolvePersonMembershipOrgIds(person = null) {
   const list = Array.isArray(person?.organizations) ? person.organizations : [];
   return list.map((entry) => String(entry?.orgId || '').trim()).filter(Boolean);
@@ -182,7 +189,8 @@ async function listEligiblePersons(req, res) {
       reqUser: req.user,
       q: query.q || '',
       query,
-      requireSchoolRole: true
+      requireSchoolRole: true,
+      allowedSchoolRoles: parseAllowedSchoolRoles(req.query || {})
     });
     const data = (payload.rows || []).map((row) => ({
       ...row,

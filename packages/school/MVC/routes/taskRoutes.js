@@ -13,15 +13,15 @@ const SECTION = SECTIONS.SCHOOL_TASKS;
 
 router.get('/',
   requireAuth,
-  requireAccess(SECTION, OPERATIONS.READ_ALL),
-  trackActionState(SECTION, OPERATIONS.READ_ALL),
+  requireAccess(SECTION, OPERATIONS.READ),
+  trackActionState(SECTION, OPERATIONS.READ),
   taskController.showList
 );
 
 router.get('/list',
   requireAuth,
-  requireAccess(SECTION, OPERATIONS.READ_ALL),
-  trackActionState(SECTION, OPERATIONS.READ_ALL),
+  requireAccess(SECTION, OPERATIONS.READ),
+  trackActionState(SECTION, OPERATIONS.READ),
   taskController.showList
 );
 

@@ -21,6 +21,23 @@
     const token = String(value || '').trim();
     return token ? token.replace(/_/g, ' ').toUpperCase() : 'NONE';
   }
+  function addDaysIso(value, days) {
+    const token = String(value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return '';
+    const date = new Date(token + 'T00:00:00Z');
+    if (Number.isNaN(date.getTime())) return '';
+    date.setUTCDate(date.getUTCDate() + Number(days || 0));
+    return date.toISOString().slice(0, 10);
+  }
+  const leaveScheduleStartDate = addDaysIso(row.startDate, -3);
+  const leaveScheduleEndDate = addDaysIso(row.endDate || row.startDate, 3);
+  const leaveScheduleParams = new URLSearchParams();
+  if (row.requesterPersonId) leaveScheduleParams.set('personId', row.requesterPersonId);
+  if (row.requesterName) leaveScheduleParams.set('personName', row.requesterName);
+  if (leaveScheduleStartDate) leaveScheduleParams.set('startDate', leaveScheduleStartDate);
+  if (leaveScheduleEndDate) leaveScheduleParams.set('endDate', leaveScheduleEndDate);
+  if (row.requesterRole) leaveScheduleParams.set('role', row.requesterRole);
+  const leaveScheduleUrl = `/school/schedules${leaveScheduleParams.toString() ? '?' + leaveScheduleParams.toString() : ''}`;
 %>
 
 <style>
@@ -136,12 +153,47 @@
     </div>
   </div>
 
+  <div class="d-flex justify-content-end mb-3">
+    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#approvalSnapshotPanel" aria-expanded="<%= status === 'approved' ? 'true' : 'false' %>" aria-controls="approvalSnapshotPanel">
+      <i class="bi bi-shield-check me-1"></i> Approval Snapshot
+    </button>
+  </div>
+
+  <div id="approvalSnapshotPanel" class="collapse <%= status === 'approved' ? 'show' : '' %> mb-3">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+        <h2 class="h5 mb-0">Approval Snapshot</h2>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#approvalSnapshotPanel" aria-expanded="<%= status === 'approved' ? 'true' : 'false' %>" aria-controls="approvalSnapshotPanel">
+          <i class="bi bi-chevron-up me-1"></i> Hide
+        </button>
+      </div>
+      <div class="card-body">
+        <% if (row.lastApprovedSnapshot && row.lastApprovedSnapshot.active !== false) { %>
+          <div class="small">
+            <div><span class="text-muted">Active approved window:</span></div>
+            <div class="fw-bold"><%= row.lastApprovedSnapshot.startDate %><%= row.lastApprovedSnapshot.endDate && row.lastApprovedSnapshot.endDate !== row.lastApprovedSnapshot.startDate ? ' to ' + row.lastApprovedSnapshot.endDate : '' %></div>
+            <div class="text-muted"><%= row.lastApprovedSnapshot.allDay === false ? ((row.lastApprovedSnapshot.startTime || '--:--') + ' - ' + (row.lastApprovedSnapshot.endTime || '--:--')) : 'All day' %></div>
+          </div>
+        <% } else if (status === 'approved') { %>
+          <div class="small text-muted">This approved request is the active schedule-blocking source.</div>
+        <% } else { %>
+          <div class="small text-muted">No active approved snapshot.</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
   <div class="row g-3">
-    <div class="col-lg-8">
+    <div class="col-12">
       <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
           <h2 class="h5 mb-0">Request Details</h2>
-          <span class="badge <%= status === 'approved' ? 'bg-success' : (status === 'submitted' || status === 'pending_reapproval' ? 'bg-warning text-dark' : 'bg-secondary') %>"><%= status.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN' %></span>
+          <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
+            <% if (row.requesterPersonId && leaveScheduleStartDate && leaveScheduleEndDate) { %>
+              <a href="<%= leaveScheduleUrl %>" class="btn btn-outline-info btn-sm" target="_blank" rel="noopener"><i class="bi bi-calendar-week me-1"></i> View Schedule +/- 3 Days</a>
+            <% } %>
+            <span class="badge <%= status === 'approved' ? 'bg-success' : (status === 'submitted' || status === 'pending_reapproval' ? 'bg-warning text-dark' : 'bg-secondary') %>"><%= status.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN' %></span>
+          </div>
         </div>
         <div class="card-body">
           <dl class="row mb-0">
@@ -179,6 +231,7 @@
         <button class="btn btn-outline-danger leave-request-action" data-action="cancel" data-id="<%= row.id %>"><i class="bi bi-slash-circle me-1"></i> Cancel</button>
       <% } %>
       <% if (canApprove) { %>
+        <button type="button" class="btn btn-outline-primary" id="createLeaveTaskFooterBtn" data-id="<%= row.id %>"><i class="bi bi-list-task me-1"></i> Create School Task</button>
         <button class="btn btn-outline-danger leave-request-action" data-action="delete" data-id="<%= row.id %>"><i class="bi bi-trash3 me-1"></i> Delete</button>
       <% } %>
         </div>
@@ -240,32 +293,79 @@
         </div>
       </div>
     </div>
-
-    <div class="col-lg-4">
-      <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-white">
-          <h2 class="h5 mb-0">Approval Snapshot</h2>
-        </div>
-        <div class="card-body">
-          <% if (row.lastApprovedSnapshot && row.lastApprovedSnapshot.active !== false) { %>
-            <div class="small">
-              <div><span class="text-muted">Active approved window:</span></div>
-              <div class="fw-bold"><%= row.lastApprovedSnapshot.startDate %><%= row.lastApprovedSnapshot.endDate && row.lastApprovedSnapshot.endDate !== row.lastApprovedSnapshot.startDate ? ' to ' + row.lastApprovedSnapshot.endDate : '' %></div>
-              <div class="text-muted"><%= row.lastApprovedSnapshot.allDay === false ? ((row.lastApprovedSnapshot.startTime || '--:--') + ' - ' + (row.lastApprovedSnapshot.endTime || '--:--')) : 'All day' %></div>
-            </div>
-          <% } else if (status === 'approved') { %>
-            <div class="small text-muted">This approved request is the active schedule-blocking source.</div>
-          <% } else { %>
-            <div class="small text-muted">No active approved snapshot.</div>
-          <% } %>
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 
+<% if (canApprove) { %>
+  <div class="modal fade" id="leaveTaskCreateModal" tabindex="-1" aria-labelledby="leaveTaskCreateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="leaveTaskCreateModalLabel"><i class="bi bi-list-task me-2"></i>Create School Task</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="leaveTaskCreateForm">
+          <div class="modal-body">
+            <input type="hidden" id="leaveTaskAssignedPersonId" name="assignedPersonId">
+            <input type="hidden" id="leaveTaskAssignedPersonName" name="assignedPersonName">
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label" for="leaveTaskAssigneeLabel">Assignee <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <input class="form-control bg-white" id="leaveTaskAssigneeLabel" placeholder="Select a person" readonly required>
+                  <button type="button" class="btn btn-outline-primary" id="leaveTaskPickPersonBtn"><i class="bi bi-person-search me-1"></i>Select</button>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="leaveTaskDueDate">Due Date</label>
+                <input class="form-control" type="date" id="leaveTaskDueDate" name="dueDate">
+              </div>
+              <div class="col-md-8">
+                <label class="form-label" for="leaveTaskTitle">Task Title <span class="text-danger">*</span></label>
+                <input class="form-control" id="leaveTaskTitle" name="title" maxlength="220" value="Review leave request for <%= row.requesterName || row.requesterPersonId || 'requester' %>" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="leaveTaskSeverity">Severity</label>
+                <select class="form-select" id="leaveTaskSeverity" name="severity">
+                  <option value="info">Info</option>
+                  <option value="warning" selected>Warning</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="error">Error</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="leaveTaskDescription">Task Details <span class="text-danger">*</span></label>
+                <textarea class="form-control" id="leaveTaskDescription" name="description" rows="4" maxlength="2000" required>Review leave request <%= row.id %> for <%= row.requesterName || row.requesterPersonId || 'requester' %>.</textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="leaveTaskNote">Internal Note</label>
+                <textarea class="form-control" id="leaveTaskNote" name="note" rows="2" maxlength="1000"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Create School Task</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <%- include('partials/modal_GenericPicker', { user }) %>
+<% } %>
+
 <script>
   (function () {
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
     async function showLeaveRequestMessage({ title, message, icon = 'info', buttons, size = 'md' } = {}) {
       if (typeof window.showMessageModal === 'function') {
         return window.showMessageModal({
@@ -278,6 +378,114 @@
       }
       console.warn(`${title || 'Leave Request'}: ${message || ''}`);
       return buttons?.[0]?.text || 'OK';
+    }
+
+    function displayNameForPickerItem(item) {
+      const firstName = String(item?.firstName || item?.name?.first || '').trim();
+      const lastName = String(item?.lastName || item?.name?.last || '').trim();
+      const preferredName = String(item?.preferredName || item?.name?.preferred || '').trim();
+      const directName = String(item?.label || item?.displayName || item?.fullName || item?.name || '').trim();
+      const name = preferredName || [firstName, lastName].filter(Boolean).join(' ').trim() || directName;
+      const id = String(item?.personId || item?.id || '').trim();
+      return id ? `${name || id} (${id})` : (name || 'Selected person');
+    }
+
+    function openLeaveTaskModal() {
+      const modalEl = document.getElementById('leaveTaskCreateModal');
+      if (!modalEl || !window.bootstrap) return;
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    async function pickLeaveTaskPerson() {
+      if (!window.GenericPicker || !window.GenericPickerPresets) {
+        await showLeaveRequestMessage({
+          title: 'Person Picker',
+          icon: 'warning',
+          message: 'The person picker is not available on this page. Please refresh and try again.'
+        });
+        return;
+      }
+      const context = (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined;
+      const config = GenericPickerPresets.person({
+        title: 'Select Task Assignee',
+        apiEndpoint: '/school/tasks/api/eligible-persons?allowedRoles=teacher,staff',
+        searchFields: 'id,firstName,lastName,name.first,name.last,name.preferred,preferredName,email,personId',
+        context
+      });
+      config.multiselect = false;
+      config.onSelect = (selected) => {
+        const item = Array.isArray(selected) ? selected[0] : selected;
+        if (!item) return;
+        const personId = String(item?.personId || item?.id || '').trim();
+        const label = displayNameForPickerItem(item);
+        const personIdEl = document.getElementById('leaveTaskAssignedPersonId');
+        const personNameEl = document.getElementById('leaveTaskAssignedPersonName');
+        const labelEl = document.getElementById('leaveTaskAssigneeLabel');
+        if (personIdEl) personIdEl.value = personId;
+        if (personNameEl) personNameEl.value = label;
+        if (labelEl) labelEl.value = label;
+      };
+      GenericPicker.open(config);
+    }
+
+    async function createLeaveTask(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const leaveId = document.getElementById('createLeaveTaskBtn')?.dataset.id
+        || document.getElementById('createLeaveTaskFooterBtn')?.dataset.id
+        || '';
+      const data = new FormData(form);
+      const payload = {
+        assignedPersonId: String(data.get('assignedPersonId') || '').trim(),
+        assignedPersonName: String(data.get('assignedPersonName') || '').trim(),
+        title: String(data.get('title') || '').trim(),
+        description: String(data.get('description') || '').trim(),
+        dueDate: String(data.get('dueDate') || '').trim(),
+        severity: String(data.get('severity') || 'warning').trim(),
+        note: String(data.get('note') || '').trim()
+      };
+      if (!payload.assignedPersonId || !payload.title || !payload.description) {
+        await showLeaveRequestMessage({
+          title: 'Create School Task',
+          icon: 'warning',
+          message: 'Please select an assignee and enter a task title and details.'
+        });
+        return;
+      }
+      if (typeof window.showLoading === 'function') window.showLoading('Creating School Task...');
+      try {
+        const response = await fetch(`/school/leave-requests/api/${encodeURIComponent(leaveId)}/create-task`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Ajax-Request': 'true'
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.status === 'error') throw new Error(result.message || 'The School Task could not be created.');
+        const taskId = result.task && result.task.id ? result.task.id : '';
+        const taskUrl = taskId ? `/school/tasks/detail/${encodeURIComponent(taskId)}` : '/school/tasks';
+        const modalEl = document.getElementById('leaveTaskCreateModal');
+        if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        await showLeaveRequestMessage({
+          title: 'School Task Created',
+          icon: 'success',
+          message: 'School Task created successfully.<br><a class="fw-bold" href="' + escapeHtml(taskUrl) + '" target="_blank" rel="noopener">Open School Task</a>'
+        });
+      } catch (error) {
+        await showLeaveRequestMessage({
+          title: 'Create School Task',
+          icon: 'error',
+          message: escapeHtml(error.message || 'The School Task could not be created.'),
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+      } finally {
+        if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+      }
     }
 
     async function requestReviewNote(action) {
@@ -369,5 +577,9 @@
         await postAction(action, id, note);
       });
     });
+    document.getElementById('createLeaveTaskBtn')?.addEventListener('click', openLeaveTaskModal);
+    document.getElementById('createLeaveTaskFooterBtn')?.addEventListener('click', openLeaveTaskModal);
+    document.getElementById('leaveTaskPickPersonBtn')?.addEventListener('click', pickLeaveTaskPerson);
+    document.getElementById('leaveTaskCreateForm')?.addEventListener('submit', createLeaveTask);
   })();
 </script>

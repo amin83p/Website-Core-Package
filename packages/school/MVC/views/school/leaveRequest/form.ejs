@@ -2,7 +2,7 @@
 <% const isEdit = mode === 'edit' && row && row.id; %>
 <% const isApproved = isEdit && String(row.status || '').toLowerCase() === 'approved'; %>
 <% const asid = actionStateId || ''; %>
-<% const roleOptions = Array.isArray(requesterRoleOptions) && requesterRoleOptions.length ? requesterRoleOptions : (requesterRoles || []); %>
+<% const roleOptions = (Array.isArray(requesterRoleOptions) && requesterRoleOptions.length ? requesterRoleOptions : (requesterRoles || [])).filter((role) => ['teacher', 'staff'].includes(String(role || '').toLowerCase())); %>
 <% const self = selfRequester || {}; %>
 <% const selectedRequesterRole = row.requesterRole || self.requesterRole || roleOptions[0] || 'staff'; %>
 <% const selfRequesterName = row.requesterName || self.requesterName || ''; %>
@@ -268,11 +268,6 @@
         ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
         : undefined;
       const presetFactory = {
-        student: () => GenericPickerPresets.student({
-          title: 'Select Student',
-          searchFields: 'id,firstName,lastName,name.first,name.last,studentNumber,studentCode,personId',
-          context
-        }),
         teacher: () => GenericPickerPresets.teacher({
           title: 'Select Teacher',
           searchFields: 'id,firstName,lastName,name.first,name.last,teacherCode,email,personId',
@@ -281,12 +276,6 @@
         staff: () => GenericPickerPresets.staff({
           title: 'Select Staff',
           searchFields: 'id,firstName,lastName,name.first,name.last,staffCode,email,personId',
-          context
-        }),
-        admin: () => GenericPickerPresets.person({
-          title: 'Select Person',
-          apiEndpoint: '/school/identity/api/persons',
-          searchFields: 'id,firstName,lastName,name.first,name.last,email,personId',
           context
         })
       };

@@ -5,6 +5,10 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const { createTransactionContext, addDeleteCompensation } = requireCoreModule('MVC/services/transactionContextService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
+const {
+  assertNoDuplicatePersonAccount,
+  enrichPersonPickerRowsWithAccountState
+} = require('../../services/school/schoolPeopleDuplicateGuardService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
@@ -614,8 +618,13 @@ exports.listEligiblePersons = async (req, res) => {
         return orgIds.length === 0 || orgIds.some((orgId) => idsEqual(orgId, activeOrgId));
       })
       .map(mapPersonPickerRow);
+    const enriched = await enrichPersonPickerRowsWithAccountState(mapped, {
+      entityType: 'staff',
+      orgId: activeOrgId,
+      requestingUser: req.user
+    });
 
-    const { data, pagination } = paginate(mapped, query);
+    const { data, pagination } = paginate(enriched, query);
     return res.json({
       status: 'success',
       results: data,
@@ -878,6 +887,14 @@ exports.saveStaff = async (req, res) => {
     if (!payload.personId) throw new Error('A valid Person must be selected.');
     if (!id && req.body.staffId) payload.id = String(req.body.staffId).trim();
 
+    await assertNoDuplicatePersonAccount({
+      entityType: 'staff',
+      orgId: payload.orgId,
+      personId: payload.personId,
+      excludeId: id,
+      requestingUser: req.user
+    });
+
     const roleUpdateResult = await ensurePersonHasOrgRole(payload.personId, payload.orgId, 'school_staff', req.user, { transactionContext: txContext });
     if (roleUpdateResult?.changed && roleUpdateResult?.personId) {
       txContext.addCompensation(async () => {
@@ -970,8 +987,16 @@ exports.saveStaff = async (req, res) => {
     if (txContext) {
       await txContext.rollback({ flow: 'staff_save', reason: error.message || 'Staff save failed' });
     }
-    if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
-    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+    const statusCode = Number(error?.statusCode || 400);
+    const responsePayload = {
+      status: 'error',
+      code: error?.code || '',
+      error,
+      message: error.message,
+      details: error?.details || null
+    };
+    if (isAjax(req)) return res.status(statusCode).json(responsePayload);
+    res.status(statusCode).render('error', { title: 'Error', error, message: error.message, user: req.user, statusCode });
   }
 };
 

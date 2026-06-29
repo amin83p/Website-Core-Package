@@ -88,4 +88,12 @@ router.post('/api/:id/delete',
   leaveRequestController.deleteRequest
 );
 
+router.post('/api/:id/create-task',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.READ),
+  requireAccess(SECTIONS.SCHOOL_TASKS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TASKS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  leaveRequestController.createTask
+);
+
 module.exports = router;

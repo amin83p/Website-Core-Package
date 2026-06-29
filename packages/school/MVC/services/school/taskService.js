@@ -158,6 +158,28 @@ function isTaskAssignedToActor(task, user) {
   return idsEqual(task?.assignedPersonId || '', getActorPersonId(user));
 }
 
+function isTaskAssignmentAssignedToPerson(task = {}, personId = '') {
+  const targetPersonId = toPublicId(personId || '');
+  if (!targetPersonId) return false;
+  return idsEqual(task?.assignedPersonId || '', targetPersonId);
+}
+
+function isTaskRowAssignedToPerson(row = {}, personId = '') {
+  const targetPersonId = toPublicId(personId || '');
+  if (!targetPersonId) return false;
+  if (idsEqual(row?.assignedPersonId || '', targetPersonId)) return true;
+  return (Array.isArray(row?.tasks) ? row.tasks : [])
+    .some((task) => isTaskAssignmentAssignedToPerson(task, targetPersonId));
+}
+
+function isTaskRowVisibleToActor(row = {}, user = null) {
+  if (isAdminViewer(user)) return true;
+  const actorPersonId = getActorPersonId(user);
+  if (actorPersonId && isTaskRowAssignedToPerson(row, actorPersonId)) return true;
+  const assignedRole = cleanString(row?.assignedRole, 120).toLowerCase();
+  return Boolean(assignedRole && getActorOrgRoleTokens(user).has(assignedRole));
+}
+
 function assertTaskOwnership(user, task, action = 'update this task') {
   if (isAdminViewer(user)) return;
   if (!task || !isAssignedToActor(task, user)) {
@@ -540,6 +562,7 @@ async function deleteTask(reqUser, id) {
 
 async function listVisibleTasks(reqUser, filters = {}) {
   const query = {};
+  const adminViewer = isAdminViewer(reqUser);
   const status = cleanString(filters.status, 40).toLowerCase();
   if (status) query.status = status;
   const severity = cleanString(filters.severity, 40).toLowerCase();
@@ -549,16 +572,17 @@ async function listVisibleTasks(reqUser, filters = {}) {
   const assignedRole = cleanString(filters.assignedRole, 120);
   if (assignedRole) query.assignedRole = assignedRole;
   const assignedPersonId = toPublicId(filters.assignedPersonId || '');
-  if (assignedPersonId) query.assignedPersonId = assignedPersonId;
   const assignment = cleanString(filters.assignment, 40).toLowerCase();
   const currentPersonId = personDisplayNameService.getUserPersonId(reqUser);
   if (assignment === 'mine' && !currentPersonId) return [];
-  if (assignment === 'mine' && currentPersonId) query.assignedPersonId = currentPersonId;
 
   const rows = await schoolRepositories.tasks.list(normalizeQueryScope(reqUser, query));
   const statusWeight = { open: 0, in_progress: 1, resolved: 2, dismissed: 3 };
   const sorted = (Array.isArray(rows) ? rows : [])
     .filter((row) => {
+      if (!adminViewer && !isTaskRowVisibleToActor(row, reqUser)) return false;
+      if (adminViewer && assignedPersonId && !isTaskRowAssignedToPerson(row, assignedPersonId)) return false;
+      if (assignment === 'mine' && currentPersonId && !isTaskRowAssignedToPerson(row, currentPersonId)) return false;
       if (assignment !== 'unassigned') return true;
       return !toPublicId(row?.assignedPersonId || '');
     })

@@ -6,6 +6,7 @@
     || String(taskStateFilters?.severity || '').trim()
     || String(taskStateFilters?.sourceType || '').trim()
     || String(taskStateFilters?.assignment || '').trim()
+    || String(taskStateFilters?.assignedPersonId || '').trim()
   );
   const headerButtons = [
     '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
@@ -45,7 +46,19 @@
   <div class="collapse<%= hasTaskFiltersApplied ? ' show' : '' %>" id="taskFilterCollapse">
     <form class="card-body p-3" method="get" action="/school/tasks">
       <div class="row g-2 align-items-end">
-        <div class="col-md-3">
+        <% if (canManageAll) { %>
+          <div class="col-lg-4 col-md-6">
+            <label class="form-label" for="taskAssignedPersonNameFilter">Person</label>
+            <div class="input-group">
+              <input type="hidden" id="taskAssignedPersonIdFilter" name="assignedPersonId" value="<%= taskStateFilters?.assignedPersonId || '' %>">
+              <input type="hidden" id="taskAssignedPersonNameHidden" name="assignedPersonName" value="<%= taskStateFilters?.assignedPersonName || '' %>">
+              <input type="text" class="form-control bg-white" id="taskAssignedPersonNameFilter" value="<%= taskStateFilters?.assignedPersonName || taskStateFilters?.assignedPersonId || '' %>" placeholder="All people" readonly>
+              <button type="button" class="btn btn-outline-secondary" id="taskClearPersonFilter" title="Clear person"><i class="bi bi-x"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="taskOpenPersonFilterPicker" title="Select person"><i class="bi bi-person-search"></i></button>
+            </div>
+          </div>
+        <% } %>
+        <div class="<%= canManageAll ? 'col-lg-2 col-md-6' : 'col-md-3' %>">
           <label class="form-label" for="taskAssignmentFilter">Assignment</label>
           <select class="form-select" id="taskAssignmentFilter" name="assignment">
             <option value="" <%= !taskStateFilters?.assignment ? 'selected' : '' %>>All assignments</option>
@@ -53,7 +66,7 @@
             <option value="unassigned" <%= taskStateFilters?.assignment === 'unassigned' ? 'selected' : '' %>>Unassigned</option>
           </select>
         </div>
-        <div class="col-md-3">
+        <div class="<%= canManageAll ? 'col-lg-2 col-md-4' : 'col-md-3' %>">
           <label class="form-label" for="taskStatusFilter">Status</label>
           <select class="form-select" id="taskStatusFilter" name="status">
             <option value="" <%= !taskStateFilters?.status ? 'selected' : '' %>>All statuses</option>
@@ -62,7 +75,7 @@
             <% }) %>
           </select>
         </div>
-        <div class="col-md-2">
+        <div class="<%= canManageAll ? 'col-lg-1 col-md-4' : 'col-md-2' %>">
           <label class="form-label" for="taskSeverityFilter">Severity</label>
           <select class="form-select" id="taskSeverityFilter" name="severity">
             <option value="" <%= !taskStateFilters?.severity ? 'selected' : '' %>>All</option>
@@ -71,7 +84,7 @@
             <% }) %>
           </select>
         </div>
-        <div class="col-md-2">
+        <div class="<%= canManageAll ? 'col-lg-2 col-md-4' : 'col-md-2' %>">
           <label class="form-label" for="taskSourceFilter">Source</label>
           <select class="form-select" id="taskSourceFilter" name="sourceType">
             <option value="" <%= !taskStateFilters?.sourceType ? 'selected' : '' %>>All</option>
@@ -80,7 +93,7 @@
             <% }) %>
           </select>
         </div>
-        <div class="col-md-2 d-flex gap-2">
+        <div class="<%= canManageAll ? 'col-lg-1 col-md-12' : 'col-md-2' %> d-flex gap-2">
           <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-funnel me-1"></i> Filter</button>
           <a href="/school/tasks" class="btn btn-outline-secondary"><i class="bi bi-x-circle"></i></a>
         </div>
@@ -191,6 +204,7 @@
 </div>
 
 <span id="urlRef" data-id="school/tasks" hidden></span>
+<%- include('partials/modal_GenericPicker', { user }) %>
 <%- include('partials/tablePages-end') %>
 
 <script>
@@ -217,6 +231,50 @@
       }
       console.warn(`${title || 'School Tasks'}: ${message || ''}`);
       return buttons?.[0]?.text || 'OK';
+    }
+
+    function displayNameForPickerItem(item) {
+      const firstName = String(item?.firstName || item?.name?.first || '').trim();
+      const lastName = String(item?.lastName || item?.name?.last || '').trim();
+      const preferredName = String(item?.preferredName || item?.name?.preferred || '').trim();
+      const directName = String(item?.label || item?.displayName || item?.fullName || item?.name || '').trim();
+      const name = preferredName || [firstName, lastName].filter(Boolean).join(' ').trim() || directName;
+      const id = String(item?.personId || item?.id || '').trim();
+      return id ? `${name || id} (${id})` : (name || 'Selected person');
+    }
+
+    async function openPersonFilterPicker() {
+      if (!window.GenericPicker || !window.GenericPickerPresets) {
+        await showTaskMessage({
+          title: 'Person Picker',
+          icon: 'warning',
+          message: 'The person picker is not available on this page. Please refresh and try again.'
+        });
+        return;
+      }
+      const context = (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined;
+      const config = GenericPickerPresets.person({
+        title: 'Select Person',
+        apiEndpoint: '/school/tasks/api/eligible-persons',
+        searchFields: 'id,firstName,lastName,name.first,name.last,name.preferred,preferredName,email,personId',
+        context
+      });
+      config.multiselect = false;
+      config.onSelect = (selected) => {
+        const item = Array.isArray(selected) ? selected[0] : selected;
+        if (!item) return;
+        const personId = String(item?.personId || item?.id || '').trim();
+        const label = displayNameForPickerItem(item);
+        const idEl = document.getElementById('taskAssignedPersonIdFilter');
+        const labelEl = document.getElementById('taskAssignedPersonNameFilter');
+        const hiddenNameEl = document.getElementById('taskAssignedPersonNameHidden');
+        if (idEl) idEl.value = personId;
+        if (labelEl) labelEl.value = label;
+        if (hiddenNameEl) hiddenNameEl.value = label;
+      };
+      GenericPicker.open(config);
     }
 
     async function requestNote(status) {
@@ -340,6 +398,16 @@
         if (!id) return;
         await postDelete(id);
       });
+    });
+
+    document.getElementById('taskOpenPersonFilterPicker')?.addEventListener('click', openPersonFilterPicker);
+    document.getElementById('taskClearPersonFilter')?.addEventListener('click', () => {
+      const idEl = document.getElementById('taskAssignedPersonIdFilter');
+      const labelEl = document.getElementById('taskAssignedPersonNameFilter');
+      const hiddenNameEl = document.getElementById('taskAssignedPersonNameHidden');
+      if (idEl) idEl.value = '';
+      if (labelEl) labelEl.value = '';
+      if (hiddenNameEl) hiddenNameEl.value = '';
     });
 
     initCollapseToggleIcon({

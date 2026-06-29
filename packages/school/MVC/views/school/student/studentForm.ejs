@@ -1076,6 +1076,17 @@
           apiEndpoint: '/school/students/api/eligible-persons',
           placeholder: 'Search by name or email...',
           onSelect: (item) => {
+            if (item?.alreadyHasSchoolAccount) {
+              const linked = item.linkedSchoolAccount || {};
+              const targetUrl = linked.archived ? linked.recoveryUrl : linked.editUrl;
+              showMsg({
+                title: 'Student Already Exists',
+                icon: 'warning',
+                message: `This person already has a Student account in the active organization.${targetUrl ? `<br><br><a href="${targetUrl}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">Open existing Student record</a>` : ''}`,
+                buttons: [{ text: 'Close', class: 'btn-secondary' }]
+              });
+              return;
+            }
             document.getElementById('inp_personId').value = item.id;
             document.getElementById('inp_personName').value = `${item.name?.first || ''} ${item.name?.last || ''}`.trim() || item.id;
             selectedPersonOrganizations = Array.isArray(item.organizations) ? item.organizations : [];

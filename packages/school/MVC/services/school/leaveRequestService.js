@@ -2,6 +2,7 @@ const schoolRepositories = require('../../repositories/school');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const taskService = require('./taskService');
 const personDisplayNameService = require('./personDisplayNameService');
+const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
@@ -9,6 +10,7 @@ const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 
 const ACTIVE_REVIEW_STATUSES = new Set(['submitted', 'pending_reapproval']);
 const FINAL_STATUSES = new Set(['rejected', 'cancelled']);
+const LEAVE_REQUEST_PERSON_ROLES = Object.freeze(['teacher', 'staff']);
 
 function cleanString(value, max = 5000) {
   if (value === undefined || value === null) return '';
@@ -179,8 +181,9 @@ function extractSchoolRequesterRoles(user) {
 }
 
 function getRequesterRoleOptions(user) {
-  if (isAdminViewer(user)) return [...leaveRequestModel.REQUESTER_ROLES];
-  const roles = extractSchoolRequesterRoles(user).filter((role) => role !== 'admin');
+  if (isAdminViewer(user)) return [...LEAVE_REQUEST_PERSON_ROLES];
+  const roles = extractSchoolRequesterRoles(user)
+    .filter((role) => LEAVE_REQUEST_PERSON_ROLES.includes(role));
   return roles.length ? roles : ['staff'];
 }
 
@@ -197,12 +200,37 @@ async function getSelfRequesterContext(user) {
   };
 }
 
+async function assertLeavePersonHasRole(reqUser, personId, requesterRole, label = 'Leave request person') {
+  const role = cleanString(requesterRole, 40).toLowerCase();
+  if (!LEAVE_REQUEST_PERSON_ROLES.includes(role)) {
+    const error = new Error('Leave requests can only be assigned to School teachers or staff.');
+    error.code = 'LEAVE_REQUEST_PERSON_ROLE_NOT_ALLOWED';
+    error.statusCode = 400;
+    throw error;
+  }
+  const eligiblePeople = await schoolIdentityLookupService.listSchoolPersons({
+    reqUser,
+    q: '',
+    query: { limit: 100 },
+    requireSchoolRole: true,
+    allowedSchoolRoles: [role]
+  });
+  const found = (eligiblePeople.allRows || eligiblePeople.rows || [])
+    .some((row) => idsEqual(row?.personId || row?.id, personId));
+  if (!found) {
+    const error = new Error(`${label} must be a School ${role} in the active organization.`);
+    error.code = 'LEAVE_REQUEST_PERSON_NOT_TEACHER_OR_STAFF';
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
 function inferRequesterRole(user, preferredRole = '', options = {}) {
   const requested = cleanString(preferredRole, 40).toLowerCase();
   const allowedRoles = Array.isArray(options.allowedRoles) && options.allowedRoles.length
     ? options.allowedRoles
     : getRequesterRoleOptions(user);
-  if (leaveRequestModel.REQUESTER_ROLES.includes(requested) && (isAdminViewer(user) || allowedRoles.includes(requested))) {
+  if (LEAVE_REQUEST_PERSON_ROLES.includes(requested) && (isAdminViewer(user) || allowedRoles.includes(requested))) {
     return requested;
   }
   if (allowedRoles.length) return allowedRoles[0];
@@ -374,6 +402,8 @@ async function buildCreatePayload(reqUser, input = {}) {
   const requesterName = await personDisplayNameService.resolvePersonDisplayName(requesterPersonId, {
     fallback: admin ? cleanString(input.requesterName || requesterPersonId, 160) : requesterPersonId
   });
+  const requesterRole = inferRequesterRole(reqUser, input.requesterRole, { allowedRoles: requesterRoleOptions });
+  await assertLeavePersonHasRole(reqUser, requesterPersonId, requesterRole, 'Leave requester');
 
   return {
     ...input,
@@ -381,7 +411,7 @@ async function buildCreatePayload(reqUser, input = {}) {
     requesterPersonId,
     requesterRecordId: admin ? cleanString(input.requesterRecordId, 100) : '',
     requesterName,
-    requesterRole: inferRequesterRole(reqUser, input.requesterRole, { allowedRoles: requesterRoleOptions }),
+    requesterRole,
     status: 'submitted',
     requestDate: cleanDate(input.requestDate) || new Date().toISOString().slice(0, 10),
     audit: {
@@ -403,9 +433,6 @@ async function buildCreatePayload(reqUser, input = {}) {
 async function createRequest(reqUser, input = {}) {
   const payload = await buildCreatePayload(reqUser, input);
   const created = await schoolRepositories.leaveRequests.create(payload, normalizeQueryScope(reqUser));
-  await syncLeaveRequestTask('upsert', created, reqUser, {
-    note: 'Leave request submitted.'
-  });
   return created;
 }
 
@@ -427,6 +454,10 @@ async function updateRequest(reqUser, id, input = {}, options = {}) {
   const nextRequesterName = await personDisplayNameService.resolvePersonDisplayName(nextRequesterPersonId, {
     fallback: cleanString(input.requesterName || existing.requesterName || nextRequesterPersonId, 160)
   });
+  const nextRequesterRole = isAdminViewer(reqUser)
+    ? inferRequesterRole(reqUser, input.requesterRole || existing.requesterRole)
+    : inferRequesterRole(reqUser, input.requesterRole || existing.requesterRole, { allowedRoles: getRequesterRoleOptions(reqUser) });
+  await assertLeavePersonHasRole(reqUser, nextRequesterPersonId, nextRequesterRole, 'Leave requester');
   const next = {
     ...existing,
     ...input,
@@ -435,9 +466,7 @@ async function updateRequest(reqUser, id, input = {}, options = {}) {
     requesterRecordId: isAdminViewer(reqUser)
       ? toPublicId(input.requesterRecordId || existing.requesterRecordId)
       : existing.requesterRecordId,
-    requesterRole: isAdminViewer(reqUser)
-      ? inferRequesterRole(reqUser, input.requesterRole || existing.requesterRole)
-      : inferRequesterRole(reqUser, input.requesterRole || existing.requesterRole, { allowedRoles: getRequesterRoleOptions(reqUser) }),
+    requesterRole: nextRequesterRole,
     requesterName: nextRequesterName,
     audit: {
       ...(existing.audit || {}),
@@ -472,16 +501,6 @@ async function updateRequest(reqUser, id, input = {}, options = {}) {
   ];
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
-  if (String(updated?.status || '').toLowerCase() === 'pending_reapproval') {
-    await syncLeaveRequestTask('upsert', updated, reqUser, {
-      severity: 'warning',
-      note: 'Approved leave request was modified and needs reapproval.'
-    });
-  } else if (String(updated?.status || '').toLowerCase() === 'submitted') {
-    await syncLeaveRequestTask('upsert', updated, reqUser, {
-      note: 'Leave request was modified.'
-    });
-  }
   return updated;
 }
 
@@ -527,10 +546,6 @@ async function approveRequest(reqUser, id, note = '') {
   ];
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
-  await syncLeaveRequestTask('resolve', updated, reqUser, {
-    action: 'leave_request_approved',
-    note: cleanString(note || 'Leave request approved.', 1000)
-  });
   return updated;
 }
 
@@ -573,10 +588,6 @@ async function rejectRequest(reqUser, id, note = '') {
   };
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
-  await syncLeaveRequestTask('resolve', updated, reqUser, {
-    action: 'leave_request_rejected',
-    note: cleanString(note || 'Leave request rejected.', 1000)
-  });
   return updated;
 }
 
@@ -621,10 +632,6 @@ async function cancelRequest(reqUser, id, note = '') {
   };
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
-  await syncLeaveRequestTask('resolve', updated, reqUser, {
-    action: 'leave_request_cancelled',
-    note: cleanString(note || 'Leave request cancelled.', 1000)
-  });
   return updated;
 }
 
@@ -667,6 +674,83 @@ async function syncLeaveRequestTask(action, row, reqUser, options = {}) {
   } catch (error) {
     console.warn(`School task sync skipped for leave request ${row?.id || ''}: ${error.message}`);
   }
+}
+
+async function createTaskForRequest(reqUser, id, input = {}) {
+  const existing = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser));
+  if (!existing) throw new Error('Leave request was not found.');
+  assertCanView(existing, reqUser);
+
+  const assignedPersonId = toPublicId(input.assignedPersonId || '');
+  if (!assignedPersonId) {
+    const error = new Error('Select a person before creating the School Task.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const eligibleAssignees = await schoolIdentityLookupService.listSchoolPersons({
+    reqUser,
+    q: '',
+    query: { limit: 100 },
+    requireSchoolRole: true,
+    allowedSchoolRoles: ['teacher', 'staff']
+  });
+  const isEligibleAssignee = (eligibleAssignees.allRows || eligibleAssignees.rows || [])
+    .some((row) => idsEqual(row?.personId || row?.id, assignedPersonId));
+  if (!isEligibleAssignee) {
+    const error = new Error('Leave request tasks can only be assigned to School teachers or staff in the active organization.');
+    error.statusCode = 400;
+    error.code = 'LEAVE_TASK_ASSIGNEE_NOT_TEACHER_OR_STAFF';
+    throw error;
+  }
+
+  const taskTitle = cleanString(input.title || '', 220);
+  if (!taskTitle) {
+    const error = new Error('Task title is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const taskDescription = cleanString(input.description || input.details || '', 2000);
+  if (!taskDescription) {
+    const error = new Error('Task details are required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const requesterPersonId = toPublicId(existing.requesterPersonId || '');
+  const requesterName = await personDisplayNameService.resolvePersonDisplayName(requesterPersonId, {
+    fallback: cleanString(existing.requesterName || requesterPersonId || 'Requester', 160)
+  }) || 'Requester';
+  const assignedPersonName = await personDisplayNameService.resolvePersonDisplayName(assignedPersonId, {
+    fallback: cleanString(input.assignedPersonName || assignedPersonId, 160)
+  });
+
+  return taskService.upsertSourceTask({
+    orgId: existing.orgId,
+    sourceType: 'leave_request',
+    sourceId: existing.id,
+    sourceUrl: `/school/leave-requests/detail/${encodeURIComponent(existing.id)}`,
+    title: taskTitle,
+    message: taskDescription,
+    severity: cleanString(input.severity || 'warning', 40).toLowerCase() || 'warning',
+    assignedPersonId,
+    assignedPersonName,
+    assignedRole: cleanString(input.assignedRole || '', 120),
+    dueDate: cleanDate(input.dueDate),
+    taskTitle,
+    taskDescription,
+    note: cleanString(input.note || '', 1000),
+    metadata: {
+      leaveRequestStatus: existing.status,
+      requesterPersonId: existing.requesterPersonId,
+      requesterName,
+      requesterRole: existing.requesterRole,
+      startDate: existing.startDate,
+      endDate: existing.endDate || existing.startDate,
+      reason: existing.reason
+    }
+  }, reqUser);
 }
 
 function getActiveApprovedSnapshot(row) {
@@ -849,6 +933,7 @@ module.exports = {
   rejectRequest,
   cancelRequest,
   deleteRequest,
+  createTaskForRequest,
   getActiveApprovedSnapshot,
   findApprovedLeaveConflicts,
   getApprovedLeaveEventsForPerson,

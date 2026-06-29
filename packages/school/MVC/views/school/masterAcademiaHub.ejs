@@ -830,7 +830,7 @@
       <div class="hub-section-segment hub-task-segment">
         <span class="hub-task-count is-muted" id="schoolMasterHubTaskCount">-</span>
         <button type="button" class="hub-section-main-link" data-hub-workspace-section="tasks">
-          <span><i class="bi bi-bell-fill me-1"></i> Task</span>
+          <span><i class="bi bi-list-task me-1"></i> School Tasks</span>
         </button>
         <button type="button" class="hub-task-gear" id="schoolMasterHubTaskSettings" aria-label="Task refresh settings">
           <i class="bi bi-gear-fill"></i>
@@ -1144,14 +1144,17 @@
       holidays: ''
     },
     holidaysYear: String(new Date().getFullYear())
+    ,
+    taskPersonId: '',
+    taskPersonName: ''
   };
 
   const workspaceSections = {
     tasks: {
-      label: 'Tasks',
+      label: 'School Tasks',
       endpoint: '/school/master-hub/api/workspace/tasks',
       sourceUrl: '/school/tasks',
-      icon: 'bi bi-bell-fill'
+      icon: 'bi bi-list-task'
     },
     classes: {
       label: 'Classes',
@@ -1280,10 +1283,86 @@
     }
   }
 
+  function hubTaskPersonLabelFromItem(item) {
+    const firstName = String(item && (item.firstName || item.name?.first) || '').trim();
+    const lastName = String(item && (item.lastName || item.name?.last) || '').trim();
+    const preferredName = String(item && (item.preferredName || item.name?.preferred) || '').trim();
+    const directName = String(item && (item.label || item.displayName || item.fullName || item.name) || '').trim();
+    const name = preferredName || [firstName, lastName].filter(Boolean).join(' ').trim() || directName;
+    const personId = String(item && (item.personId || item.id) || '').trim();
+    return personId ? (name || personId) + ' (' + personId + ')' : (name || 'Selected person');
+  }
+
+  function openHubTaskPersonPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Person Picker', icon: 'warning', message: 'Person picker is not available yet.' });
+      return;
+    }
+    const context = window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function'
+      ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+      : undefined;
+    const config = GenericPickerPresets.person({
+      title: 'Select Person',
+      apiEndpoint: '/school/tasks/api/eligible-persons',
+      searchFields: 'id,firstName,lastName,name.first,name.last,name.preferred,preferredName,email,personId',
+      context
+    });
+    config.multiselect = false;
+    config.onSelect = function (selected) {
+      const item = Array.isArray(selected) ? selected[0] : selected;
+      if (!item) return;
+      workspaceState.taskPersonId = String(item.personId || item.id || '').trim();
+      workspaceState.taskPersonName = hubTaskPersonLabelFromItem(item);
+      loadWorkspaceSection('tasks');
+    };
+    GenericPicker.open(config);
+  }
+
+  function taskAdminFilterHtml(payload) {
+    if (!payload || payload.canManageAll !== true) return '';
+    const selectedLabel = workspaceState.taskPersonName || payload.selectedPersonName || payload.selectedPersonId || '';
+    return [
+      '<div class="hub-workspace-toolbar border-top-0">',
+      '<div class="row g-2 align-items-end">',
+      '<div class="col-lg-8">',
+      '<label class="form-label small fw-semibold" for="hubTaskPersonName">Person Filter</label>',
+      '<div class="input-group">',
+      '<input type="hidden" id="hubTaskPersonId" value="' + escapeHtml(workspaceState.taskPersonId || payload.selectedPersonId || '') + '">',
+      '<input type="text" class="form-control form-control-sm bg-white" id="hubTaskPersonName" value="' + escapeHtml(selectedLabel) + '" placeholder="All people" readonly>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="hubTaskClearPerson"><i class="bi bi-x-circle me-1"></i> Clear</button>',
+      '<button type="button" class="btn btn-outline-primary btn-sm" id="hubTaskOpenPersonPicker"><i class="bi bi-person-search me-1"></i> Select Person</button>',
+      '</div>',
+      '<div class="form-text">Admins can select a person to review School Tasks currently assigned to that person.</div>',
+      '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function bindTaskWorkspaceControls(payload) {
+    bindWorkspaceSearchControls('tasks');
+    if (!payload || payload.canManageAll !== true) return;
+    const openBtn = document.getElementById('hubTaskOpenPersonPicker');
+    const clearBtn = document.getElementById('hubTaskClearPerson');
+    if (openBtn) openBtn.addEventListener('click', openHubTaskPersonPicker);
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function () {
+        workspaceState.taskPersonId = '';
+        workspaceState.taskPersonName = '';
+        loadWorkspaceSection('tasks');
+      });
+    }
+  }
+
   function renderTaskWorkspace(payload) {
     const section = payload && payload.section ? payload.section : workspaceSections.tasks;
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
     const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const taskScopeText = payload && payload.canManageAll === true
+      ? ((workspaceState.taskPersonName || payload.selectedPersonName || payload.selectedPersonId)
+        ? 'task(s) assigned to the selected person'
+        : 'task(s) found')
+      : 'task(s) assigned to you';
     const body = rows.length
       ? rows.map(function (row) {
         const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
@@ -1320,15 +1399,15 @@
           '</tr>'
         ].join('');
       }).join('')
-      : '<tr><td colspan="8" class="text-center text-muted py-5">No tasks assigned to you.</td></tr>';
+      : '<tr><td colspan="8" class="text-center text-muted py-5">No School Tasks found for this view.</td></tr>';
 
     els.workspace.innerHTML = [
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
       '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
-      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-bell-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Tasks') + '</h2>',
-      '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' task(s) related to you. Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-list-task') + ' me-2"></i>' + escapeHtml(section.label || 'School Tasks') + '</h2>',
+      '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' ' + escapeHtml(taskScopeText) + '. Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
       '</div>',
       '<div class="d-flex gap-2">',
       '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="tasks"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>',
@@ -1336,6 +1415,7 @@
       '</div>',
       '</div>',
       workspaceToolbarHtml('tasks', { label: 'tasks' }),
+      taskAdminFilterHtml(payload),
       '<div class="table-responsive">',
       '<table class="table align-middle hub-workspace-table">',
       '<thead class="table-light">',
@@ -1370,7 +1450,7 @@
         }
       });
     }
-    bindWorkspaceSearchControls('tasks');
+    bindTaskWorkspaceControls(payload);
   }
 
   function classStatusBadgeClass(status) {
@@ -5218,6 +5298,10 @@
     const requestQuery = new URLSearchParams();
     const serverSearch = String(workspaceState.serverSearch[key] || '').trim();
     if (serverSearch) requestQuery.set('q', serverSearch);
+    if (key === 'tasks' && workspaceState.taskPersonId) {
+      requestQuery.set('assignedPersonId', workspaceState.taskPersonId);
+      if (workspaceState.taskPersonName) requestQuery.set('assignedPersonName', workspaceState.taskPersonName);
+    }
     if (key === 'sessions') appendSessionWorkspaceQuery(requestQuery);
     if (key === 'session-issues') appendSessionIssueWorkspaceQuery(requestQuery);
     if (key === 'timesheet-periods') appendTimesheetPeriodWorkspaceQuery(requestQuery);

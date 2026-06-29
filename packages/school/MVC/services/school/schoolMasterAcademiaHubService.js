@@ -712,10 +712,8 @@ function isTaskRelatedToActiveUser(row, user) {
 
 async function getActiveUserTasks(req, filters = {}) {
   const query = { ...(filters || {}) };
-  delete query.assignment;
   const visibleTasks = await taskService.listVisibleTasks(req.user, query);
-  return (Array.isArray(visibleTasks) ? visibleTasks : [])
-    .filter((row) => isTaskRelatedToActiveUser(row, req.user));
+  return Array.isArray(visibleTasks) ? visibleTasks : [];
 }
 
 async function getTaskSummary(req) {
@@ -729,7 +727,7 @@ async function getTaskSummary(req) {
 }
 
 async function getWorkspaceSection(sectionKey, queryInput, req) {
-  const key = lower(sectionKey);
+  const key = lower(sectionKey) === 'notifications' ? 'tasks' : lower(sectionKey);
   const query = await buildDataServiceQuery(queryInput || {});
 
   if (key === 'classes') {
@@ -1045,17 +1043,21 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
 
   const taskRows = await getActiveUserTasks(req, queryInput || {});
   const rows = taskRows.filter((row) => rowMatchesWorkspaceSearch(row, query.q || ''));
+  const canManageAll = taskService.isAdminViewer(req.user);
 
   return {
     section: {
       key: 'tasks',
-      label: 'Tasks',
-      icon: 'bi bi-bell-fill',
+      label: 'School Tasks',
+      icon: 'bi bi-list-task',
       sourceUrl: '/school/tasks'
     },
     rows: normalizeTaskRows(rows),
     total: rows.length,
     unresolvedCount: rows.filter(hasIncompleteTaskWork).length,
+    canManageAll,
+    selectedPersonId: canManageAll ? normalizeText(queryInput?.assignedPersonId || '') : '',
+    selectedPersonName: canManageAll ? normalizeText(queryInput?.assignedPersonName || '') : '',
     searchQuery: normalizeText(query.q || ''),
     refreshedAt: new Date().toISOString()
   };

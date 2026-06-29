@@ -14,10 +14,12 @@ function firstNonBlank(values = []) {
 
 function resolveCanonicalOrganizationName(org = {}, fallbackName = '') {
   return firstNonBlank([
+    org?.name,
     org?.identity?.displayName,
     org?.identity?.legalName,
-    org?.name,
     org?.orgName,
+    org?.organizationName,
+    org?.displayName,
     fallbackName
   ]);
 }
@@ -45,16 +47,20 @@ function buildOrganizationDisplayMap(organizations = []) {
   return map;
 }
 
+function resolveMembershipOrgId(membership = {}) {
+  return normalizeOrgId(membership?.orgId ?? membership?.organizationId ?? membership?.id);
+}
+
 function resolveMembershipOrganizationName(membership = {}, organizationMap = new Map()) {
-  const orgId = normalizeOrgId(membership?.orgId ?? membership?.id);
+  const orgId = resolveMembershipOrgId(membership);
   if (!orgId) return String(membership?.name || membership?.orgName || '').trim();
   const canonical = organizationMap.get(orgId);
   if (canonical?.name) return canonical.name;
-  return String(membership?.name || membership?.orgName || '').trim();
+  return String(membership?.name || membership?.orgName || membership?.organizationName || '').trim();
 }
 
 function resolveMembershipOrganizationLabel(membership = {}, organizationMap = new Map()) {
-  const orgId = normalizeOrgId(membership?.orgId ?? membership?.id);
+  const orgId = resolveMembershipOrgId(membership);
   if (!orgId) return String(membership?.name || membership?.orgName || '').trim();
   const canonical = organizationMap.get(orgId);
   if (canonical?.label) return canonical.label;
@@ -66,23 +72,35 @@ function canonicalizeMembershipOrganizationName(membership = {}, organizationMap
     return { value: membership, changed: false };
   }
 
-  const orgId = normalizeOrgId(membership?.orgId ?? membership?.id);
+  const orgId = resolveMembershipOrgId(membership);
   if (!orgId) return { value: membership, changed: false };
 
   const canonical = organizationMap.get(orgId);
   const canonicalName = String(canonical?.name || '').trim();
   if (!canonicalName) return { value: membership, changed: false };
 
-  const rawCurrentName = String(membership?.name || '');
-  if (rawCurrentName === canonicalName) return { value: membership, changed: false };
+  const canonicalLabel = canonical?.label || formatOrganizationLabel(orgId, canonicalName);
+  const next = { ...membership };
+  let changed = false;
 
-  return {
-    value: {
-      ...membership,
-      name: canonicalName
-    },
-    changed: true
-  };
+  ['name', 'orgName', 'organizationName'].forEach((field) => {
+    if (String(next[field] || '') !== canonicalName) {
+      next[field] = canonicalName;
+      changed = true;
+    }
+  });
+
+  if (Object.prototype.hasOwnProperty.call(next, 'displayName') && String(next.displayName || '') !== canonicalName) {
+    next.displayName = canonicalName;
+    changed = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(next, 'label') && String(next.label || '') !== canonicalLabel) {
+    next.label = canonicalLabel;
+    changed = true;
+  }
+
+  return { value: changed ? next : membership, changed };
 }
 
 function canonicalizeMembershipOrganizationNames(memberships = [], organizationMap = new Map()) {
@@ -109,6 +127,7 @@ module.exports = {
   resolveCanonicalOrganizationName,
   formatOrganizationLabel,
   buildOrganizationDisplayMap,
+  resolveMembershipOrgId,
   resolveMembershipOrganizationName,
   resolveMembershipOrganizationLabel,
   canonicalizeMembershipOrganizationName,

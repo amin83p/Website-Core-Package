@@ -882,6 +882,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const prefillId = canSelectAnyPerson ? urlParams.get('personId') : document.getElementById('sch_personId').value;
     const prefillName = canSelectAnyPerson ? urlParams.get('personName') : document.getElementById('sch_personName').value;
     const prefillDate = urlParams.get('date');
+    const prefillStartDate = urlParams.get('startDate');
+    const prefillEndDate = urlParams.get('endDate');
+    const prefillRole = urlParams.get('role');
 
     if (prefillId) {
         document.getElementById('sch_personId').value = prefillId;
@@ -890,7 +893,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const titleEl = document.getElementById('scheduleTitle');
         if (titleEl) titleEl.innerText = `Schedule: ${prefillName || prefillId}`;
 
-        if (prefillDate) {
+        if (prefillRole && document.getElementById('sch_role')) {
+            document.getElementById('sch_role').value = prefillRole;
+        }
+
+        if (prefillStartDate && prefillEndDate) {
+            document.getElementById('sch_startDate').value = prefillStartDate;
+            document.getElementById('sch_endDate').value = prefillEndDate;
+        } else if (prefillDate) {
             const targetDate = new Date(prefillDate + 'T00:00:00');
             const day = targetDate.getDay() || 7; 
             const start = new Date(targetDate);

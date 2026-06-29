@@ -86,6 +86,24 @@ function extractSchoolRoles(person = {}, activeOrgId = '') {
   return [...roles].sort();
 }
 
+function normalizeAllowedSchoolRoles(value = []) {
+  const raw = Array.isArray(value)
+    ? value
+    : String(value || '').split(/[\s,;|]+/);
+  return new Set(raw
+    .map((role) => normalizeText(role).toLowerCase())
+    .filter(Boolean)
+    .map((role) => (role.startsWith('school_') ? role : `school_${role}`)));
+}
+
+function hasAllowedSchoolRole(row = {}, allowedRoles = new Set()) {
+  if (!allowedRoles || allowedRoles.size === 0) return true;
+  const roles = Array.isArray(row.roles) ? row.roles : (Array.isArray(row.schoolRoles) ? row.schoolRoles : []);
+  return roles
+    .map((role) => normalizeText(role).toLowerCase())
+    .some((role) => allowedRoles.has(role.startsWith('school_') ? role : `school_${role}`));
+}
+
 function formatPersonName(person = {}, fallback = '') {
   const preferred = normalizeText(person.preferredName || person.name?.preferred);
   if (preferred) return preferred;
@@ -145,9 +163,10 @@ async function fetchCoreRows(entityType, query = {}, options = {}) {
   return dataService.fetchData(entityType, query, SYSTEM_CONTEXT, options);
 }
 
-async function listSchoolPersons({ reqUser, q = '', query = {}, requireSchoolRole = false } = {}) {
+async function listSchoolPersons({ reqUser, q = '', query = {}, requireSchoolRole = false, allowedSchoolRoles = [] } = {}) {
   const activeOrgId = getActiveOrgId(reqUser);
   if (!activeOrgId) return { rows: [], pagination: paginateRows([], query).pagination };
+  const allowedRoles = normalizeAllowedSchoolRoles(allowedSchoolRoles);
   const persons = await fetchCoreRows('persons', {}, PERSON_QUERY_OPTIONS);
   const mapped = (Array.isArray(persons) ? persons : [])
     .filter((person) => personBelongsToOrg(person, activeOrgId))
@@ -174,6 +193,7 @@ async function listSchoolPersons({ reqUser, q = '', query = {}, requireSchoolRol
     })
     .filter((row) => row.id)
     .filter((row) => !requireSchoolRole || row.roles.length > 0)
+    .filter((row) => hasAllowedSchoolRole(row, allowedRoles))
     .filter((row) => rowMatchesQuery(row, q || query.q));
   const sorted = mapped.sort((a, b) => String(a.displayName || a.id).localeCompare(String(b.displayName || b.id)));
   const { data, pagination } = paginateRows(sorted, query);

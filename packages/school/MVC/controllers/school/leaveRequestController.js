@@ -49,6 +49,19 @@ function buildFormPayload(body = {}) {
   return payload;
 }
 
+function buildCreateTaskPayload(body = {}) {
+  return {
+    assignedPersonId: body.assignedPersonId,
+    assignedPersonName: body.assignedPersonName,
+    assignedRole: body.assignedRole,
+    title: body.title,
+    description: body.description || body.details,
+    dueDate: body.dueDate,
+    severity: body.severity,
+    note: body.note
+  };
+}
+
 async function baseViewModel(req, res, extra = {}) {
   const requesterRoleOptions = leaveRequestService.getRequesterRoleOptions(req.user);
   return {
@@ -184,6 +197,19 @@ async function deleteRequest(req, res) {
   }
 }
 
+async function createTask(req, res) {
+  try {
+    const task = await leaveRequestService.createTaskForRequest(req.user, req.params.id, buildCreateTaskPayload(req.body || {}));
+    return res.json({
+      status: 'success',
+      message: 'School Task created for this leave request.',
+      task
+    });
+  } catch (error) {
+    return sendError(req, res, error, 400);
+  }
+}
+
 module.exports = {
   showList,
   showNewForm,
@@ -194,5 +220,6 @@ module.exports = {
   approveRequest,
   rejectRequest,
   cancelRequest,
-  deleteRequest
+  deleteRequest,
+  createTask
 };

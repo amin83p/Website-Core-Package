@@ -26,6 +26,10 @@ const path = require('path');
 const crypto = require('crypto');
 const { createTransactionContext, addDeleteCompensation } = requireCoreModule('MVC/services/transactionContextService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
+const {
+    assertNoDuplicatePersonAccount,
+    enrichPersonPickerRowsWithAccountState
+} = require('../../services/school/schoolPeopleDuplicateGuardService');
 const { ACADEMIC_STATUSES } = require('../../models/school/studentModel');
 const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
@@ -689,8 +693,13 @@ exports.listEligiblePersons = async (req, res) => {
         return orgIds.length === 0 || orgIds.some((orgId) => idsEqual(orgId, activeOrgId));
       })
       .map(mapPersonPickerRow);
+    const enriched = await enrichPersonPickerRowsWithAccountState(mapped, {
+      entityType: 'students',
+      orgId: activeOrgId,
+      requestingUser: req.user
+    });
 
-    const { data, pagination } = paginate(mapped, query);
+    const { data, pagination } = paginate(enriched, query);
     return res.json({
       status: 'success',
       results: data,
@@ -1081,6 +1090,14 @@ exports.saveStudent = async (req, res) => {
             throw new Error('Please select funding mode: enable Self-funded, or choose a Funder Account.');
         }
 
+        await assertNoDuplicatePersonAccount({
+            entityType: 'students',
+            orgId: payload.orgId,
+            personId: payload.personId,
+            excludeId: id,
+            requestingUser: req.user
+        });
+
         const roleUpdateResult = await ensurePersonHasOrgRole(payload.personId, payload.orgId, 'school_student', req.user, { transactionContext: txContext });
         if (roleUpdateResult?.changed && roleUpdateResult?.personId) {
             txContext.addCompensation(async () => {
@@ -1174,8 +1191,16 @@ exports.saveStudent = async (req, res) => {
         if (txContext) {
             await txContext.rollback({ flow: 'student_save', reason: error.message || 'Student save failed' });
         }
-        if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
-        res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+        const statusCode = Number(error?.statusCode || 400);
+        const responsePayload = {
+            status: 'error',
+            code: error?.code || '',
+            error,
+            message: error.message,
+            details: error?.details || null
+        };
+        if (isAjax(req)) return res.status(statusCode).json(responsePayload);
+        res.status(statusCode).render('error', { title: 'Error', error, message: error.message, user: req.user, statusCode });
     }
 };
 

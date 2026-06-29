@@ -1,6 +1,7 @@
 // MVC/controllers/organizationController.js
 //const organizationModel = require('../models/organizationModel');
 const dataService = require('../services/dataService'); 
+const organizationNameSnapshotService = require('../services/organizationNameSnapshotService');
 const { buildDataServiceQuery, isAjax } = require('../utils/generalTools');
 const { idsEqual } = require('../utils/idAdapter');
 
@@ -63,6 +64,7 @@ function buildOrganizationFromBody(body, reqUserId) {
   }
 
   return {
+    name: (body.displayName || body.legalName || '').trim(),
     active: parseBool(body.active),
 
     identity: {
@@ -295,10 +297,38 @@ async function editOrganization(req, res) {
     delete updates.audit.createDateTime;
     const updatedObj = await dataService.updateData('organizations', req.params.id, updates, req.user);
 
+    let syncSummary = null;
+    let syncWarning = '';
+    try {
+      const syncOrganization = updatedObj || { ...existing, ...updates, id: req.params.id };
+      syncSummary = await organizationNameSnapshotService.syncOrganizationNameSnapshots({
+        orgId: req.params.id,
+        organization: syncOrganization,
+        requestingUser: req.user
+      });
+      organizationNameSnapshotService.refreshRequestUserOrganizationSnapshots(req, syncOrganization, {
+        orgId: req.params.id
+      });
+    } catch (syncError) {
+      syncWarning = ` Organization name snapshot sync did not complete: ${syncError.message}`;
+      console.warn('[organization][name_snapshot_sync][warn]', syncError.message);
+    }
+
     //await organizationModel.updateOrganization(req.params.id, updates);
 
     if (req.headers['x-ajax-request']) {
-      return res.json({ status: 'success', message: 'Organization updated successfully.' });
+      const syncMessage = syncSummary
+        ? ` Snapshot sync: ${organizationNameSnapshotService.formatSyncSummary(syncSummary)}.`
+        : syncWarning;
+      return res.json({
+        status: 'success',
+        message: `Organization updated successfully.${syncMessage}`,
+        data: {
+          organization: updatedObj,
+          organizationNameSnapshotSync: syncSummary,
+          organizationNameSnapshotWarning: syncWarning || ''
+        }
+      });
     }
     res.redirect('/organizations');
   } catch (error) {
