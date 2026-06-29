@@ -378,6 +378,37 @@ function normalizeScheduleLabel(schedule) {
   return [datePart, dayPart, timePart].filter(Boolean).join(' | ') || 'Not scheduled';
 }
 
+function normalizeInstructorStatus(value = '') {
+  return lower(value || 'active') || 'active';
+}
+
+function resolveDefaultTeacherName(row) {
+  const instructors = Array.isArray(row?.instructors) ? row.instructors : [];
+  const active = instructors.filter((instructor) => !['archived', 'inactive', 'deleted', 'removed'].includes(normalizeInstructorStatus(instructor?.status)));
+  const candidates = active.length ? active : instructors;
+  const selected = candidates.find((instructor) => {
+    const role = lower(instructor?.role || instructor?.type || '');
+    return instructor?.default === true
+      || instructor?.isDefault === true
+      || instructor?.primary === true
+      || instructor?.isPrimary === true
+      || role.includes('primary')
+      || role.includes('default');
+  }) || candidates[0] || null;
+  return normalizeText(
+    selected?.name
+    || selected?.displayName
+    || selected?.teacherName
+    || selected?.personName
+    || selected?.personId
+    || row?.defaultTeacherName
+    || row?.teacherName
+    || row?.primaryTeacherName
+    || row?.defaultTeacherId
+    || row?.primaryTeacherId
+  ) || 'Unassigned';
+}
+
 function normalizeClassRows(rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => {
     const lifecycleMode = lower(row?.registrationMode || 'term_based') === 'rolling' ? 'rolling' : 'term_based';
@@ -396,6 +427,7 @@ function normalizeClassRows(rows) {
       cycleEndDate: normalizeText(row?.cycleEndDate),
       isClosedForNewEnrollment: Boolean(row?.isClosedForNewEnrollment),
       scheduleLabel: normalizeScheduleLabel(row?.schedule),
+      defaultTeacherName: resolveDefaultTeacherName(row),
       subjectLabels: subjects.map((subject) => normalizeText(subject?.code || subject?.subjectId)).filter(Boolean),
       totalHours: Number(row?.curriculum?.totalHours || 0),
       actions: buildClassActionLinks(row)

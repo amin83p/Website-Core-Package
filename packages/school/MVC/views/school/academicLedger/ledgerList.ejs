@@ -1,4 +1,25 @@
-<div class="sections-page">
+<%
+  const ledgerFiltersState = (filters && typeof filters === 'object') ? filters : {};
+  const hasLedgerFiltersApplied = Boolean(
+    String(ledgerFiltersState?.effectiveFrom || '').trim()
+    || String(ledgerFiltersState?.effectiveTo || '').trim()
+    || String(ledgerFiltersState?.postedFrom || '').trim()
+    || String(ledgerFiltersState?.postedTo || '').trim()
+    || String(ledgerFiltersState?.search || '').trim()
+    || (ledgerFiltersState?.programIds || []).length
+    || (ledgerFiltersState?.studentIds || []).length
+    || (ledgerFiltersState?.termIds || []).length
+    || (ledgerFiltersState?.classIds || []).length
+    || (ledgerFiltersState?.entryTypes || []).length
+    || (ledgerFiltersState?.statuses || []).length
+  );
+%>
+<style>
+  .academic-ledger-page {
+    max-width: min(1640px, calc(100vw - 32px));
+  }
+</style>
+<div class="sections-page academic-ledger-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
     <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-journal-medical me-2"></i><%= title %></h1>
     <div class="d-flex gap-2">
@@ -7,14 +28,31 @@
   </div>
 
   <div class="card border-0 shadow-sm mb-4">
-    <div class="card-body p-4">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+      <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filters</div>
+      <button
+        id="academicLedgerFilterToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#academicLedgerFilterCollapse"
+        aria-expanded="<%= hasLedgerFiltersApplied ? 'true' : 'false' %>"
+        aria-controls="academicLedgerFilterCollapse"
+        aria-label="<%= hasLedgerFiltersApplied ? 'Close filters' : 'Open filters' %>">
+        Filters
+        <i id="academicLedgerFilterToggleIcon" class="bi <%= hasLedgerFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+      </button>
+    </div>
+    <div class="collapse<%= hasLedgerFiltersApplied ? ' show' : '' %>" id="academicLedgerFilterCollapse">
+      <div class="card-body p-4">
       <form method="GET" action="/school/academic-ledger" id="academicLedgerFilterForm">
+        <input type="hidden" name="run" value="1">
         <% if (typeof filterError !== 'undefined' && filterError) { %>
           <div class="alert alert-warning border-0 shadow-sm"><%= filterError %></div>
         <% } %>
         <% if (typeof resultsLoaded !== 'undefined' && !resultsLoaded && !filterError) { %>
           <div class="alert alert-info border-0 shadow-sm mb-3">
-            Set one or more filters below, then click <strong>Apply Filters</strong> to load ledger rows. Data is not loaded automatically when you open this page.
+            Choose filters or leave them blank, then click <strong>Apply Filters</strong> to load ledger rows. Data is not loaded automatically when you open this page.
           </div>
         <% } %>
         <div class="row">
@@ -98,10 +136,11 @@
         </div>
 
         <div class="d-flex gap-2 flex-wrap">
-          <button type="submit" name="run" value="1" class="btn btn-filled btn-primary btn-md"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
+          <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
           <a href="/school/academic-ledger" class="btn btn-outline-secondary btn-md">Reset</a>
         </div>
       </form>
+      </div>
     </div>
   </div>
 
@@ -261,7 +300,7 @@
           </thead>
           <tbody>
             <% if (!(rows || []).length) { %>
-              <tr><td colspan="11" class="text-center text-muted py-3"><%= (typeof resultsLoaded !== 'undefined' && !resultsLoaded) ? 'No data loaded yet. Choose filters and click Apply Filters.' : 'No academic ledger rows matched your filters.' %></td></tr>
+              <tr><td colspan="11" class="text-center text-muted py-3"><%= (typeof resultsLoaded !== 'undefined' && !resultsLoaded) ? 'No data loaded yet. Click Apply Filters to load ledger rows.' : 'No academic ledger rows matched your filters.' %></td></tr>
             <% } %>
             <% (rows || []).forEach((row) => { %>
               <tr>
@@ -450,6 +489,39 @@
 
   form?.addEventListener('submit', function () {
     renderAllLists();
+  });
+
+  function initCollapseToggleIcon(options = {}) {
+    const collapseEl = document.getElementById(String(options.collapseId || ''));
+    const buttonEl = document.getElementById(String(options.buttonId || ''));
+    const iconEl = document.getElementById(String(options.iconId || ''));
+    if (!collapseEl || !buttonEl || !iconEl) return;
+
+    const openIcon = String(options.openIcon || 'bi-chevron-down');
+    const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+    const openLabel = String(options.openLabel || 'Open filters');
+    const closeLabel = String(options.closeLabel || 'Close filters');
+
+    const setState = (expanded) => {
+      iconEl.classList.remove(openIcon, closeIcon);
+      iconEl.classList.add(expanded ? closeIcon : openIcon);
+      buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+    };
+
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+    collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+  }
+
+  initCollapseToggleIcon({
+    collapseId: 'academicLedgerFilterCollapse',
+    buttonId: 'academicLedgerFilterToggleBtn',
+    iconId: 'academicLedgerFilterToggleIcon',
+    openIcon: 'bi-chevron-down',
+    closeIcon: 'bi-chevron-up',
+    openLabel: 'Open filters',
+    closeLabel: 'Close filters'
   });
 
   renderAllLists();

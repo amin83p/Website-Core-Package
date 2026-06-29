@@ -7,6 +7,7 @@
   const studentOptionsJson = JSON.stringify(Array.isArray(studentOptions) ? studentOptions : []);
   const enrollmentProgramChoicesJson = JSON.stringify(Array.isArray(enrollmentProgramChoices) ? enrollmentProgramChoices : []);
   const canCreateProgramRegistrationsJson = JSON.stringify(Boolean(typeof canCreateProgramRegistrations !== 'undefined' && canCreateProgramRegistrations));
+  const canCreatePriorSubjectCreditsJson = JSON.stringify(Boolean(typeof canCreatePriorSubjectCredits !== 'undefined' && canCreatePriorSubjectCredits));
 %>
 
 <style>
@@ -257,6 +258,60 @@
         <button type="button" class="btn btn-primary btn-sm" id="btn_shortcutSaveDraft"><i class="bi bi-save me-1"></i>Save Draft</button>
         <button type="button" class="btn btn-success btn-sm" id="btn_shortcutApprove" disabled><i class="bi bi-check2-circle me-1"></i>Approve &amp; Finalize</button>
         <button type="button" class="btn btn-outline-success btn-sm" id="btn_shortcutRetry"><i class="bi bi-arrow-clockwise me-1"></i>Retry Enrollment</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="priorCreditRepairModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-mortarboard me-1"></i>Add Prior Subject Credits For Enrollment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning border small">
+          These suggested credits are based on the current Rolling Enrollment eligibility result. Select only the credits you want to record, save them, then eligibility will be checked again.
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Student</label>
+            <input type="text" id="priorRepair_studentLabel" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Program</label>
+            <input type="text" id="priorRepair_programLabel" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Source</label>
+            <select id="priorRepair_source" class="form-select">
+              <option value="manual_waiver" selected>Manual Waiver</option>
+              <option value="transfer">Transfer</option>
+              <option value="placement">Placement</option>
+              <option value="equivalent">Equivalent</option>
+            </select>
+          </div>
+          <div class="col-md-7">
+            <label class="form-label">Evidence Note</label>
+            <input type="text" id="priorRepair_evidenceNote" class="form-control" placeholder="Optional note for audit/history">
+          </div>
+        </div>
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="fw-semibold small">Suggested prerequisite credits</div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_priorRepairSelectAll">Select All</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_priorRepairClearAll">Clear</button>
+          </div>
+        </div>
+        <div id="priorRepair_subjectList" class="border rounded bg-light p-2 small text-muted">
+          Run eligibility first to see suggested subjects.
+        </div>
+      </div>
+      <div class="modal-footer flex-wrap gap-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-success btn-sm" id="btn_priorRepairSave"><i class="bi bi-check2-circle me-1"></i>Save Selected Credits</button>
+        <button type="button" class="btn btn-outline-success btn-sm" id="btn_priorRepairRetry"><i class="bi bi-arrow-clockwise me-1"></i>Retry Eligibility</button>
       </div>
     </div>
   </div>
@@ -536,6 +591,7 @@
   const studentOptions = <%- studentOptionsJson %>;
   const enrollmentProgramChoices = <%- enrollmentProgramChoicesJson %>;
   const canCreateProgramRegistrations = <%- canCreateProgramRegistrationsJson %>;
+  const canCreatePriorSubjectCredits = <%- canCreatePriorSubjectCreditsJson %>;
   const studentMap = new Map((Array.isArray(studentOptions) ? studentOptions : []).map((row) => [String(row.id || ''), row]));
   let periodRows = <%- initialRowsJson %>;
   let pendingEnrollmentPayload = null;
@@ -555,6 +611,7 @@
   const editModalEl = qs('editPeriodModal');
   const chargeModalEl = qs('enrollmentChargeModal');
   const programShortcutModalEl = qs('programRegistrationShortcutModal');
+  const priorCreditRepairModalEl = qs('priorCreditRepairModal');
   const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
 
   function createModalController(modalEl) {
@@ -628,6 +685,7 @@
   const editModal = createModalController(editModalEl);
   const chargeModal = createModalController(chargeModalEl);
   const programShortcutModal = createModalController(programShortcutModalEl);
+  const priorCreditRepairModal = createModalController(priorCreditRepairModalEl);
   const addButton = qs('btn_addPeriod');
 
   function setRollingRegistrationPanelHtml(html) {
@@ -691,6 +749,136 @@
         '<span class="small text-muted">' + htmlEscape(choiceText) + '</span>' +
       '</div>'
     );
+  }
+
+  function getPriorRepairPrerequisite() {
+    const prereq = lastRollingEligibility?.prerequisite || {};
+    return {
+      missingSubjects: Array.isArray(prereq.missingSubjects) ? prereq.missingSubjects : [],
+      programId: String(prereq.repairProgramId || lastRollingEligibility?.resolved?.programId || '').trim(),
+      programLabel: String(lastRollingEligibility?.resolved?.label || prereq.repairProgramId || lastRollingEligibility?.resolved?.programId || '').trim()
+    };
+  }
+
+  function renderPriorCreditRepairPanel(message) {
+    const repair = getPriorRepairPrerequisite();
+    const issue = (Array.isArray(lastRollingEligibility?.prerequisite?.issues) && lastRollingEligibility.prerequisite.issues.length)
+      ? lastRollingEligibility.prerequisite.issues.map((item) => htmlEscape(item)).join('<br>')
+      : htmlEscape(message || 'Prerequisites are not satisfied for this class.');
+    if (!repair.missingSubjects.length) {
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + issue + '</div>');
+      return;
+    }
+    if (!canCreatePriorSubjectCredits || lastRollingEligibility?.prerequisite?.canCreatePriorCredits === false) {
+      setRollingRegistrationPanelHtml(
+        '<div class="text-danger small mb-2">' + issue + '</div>' +
+        '<div class="alert alert-warning border py-2 mb-0 small">You need Prior Subject Credits create access to add prerequisite credits from here.</div>'
+      );
+      return;
+    }
+    setRollingRegistrationPanelHtml(
+      '<div class="text-danger small mb-2">' + issue + '</div>' +
+      '<div class="d-flex flex-wrap align-items-center gap-2">' +
+        '<button type="button" class="btn btn-sm btn-warning" id="btn_openPriorCreditRepair">' +
+          '<i class="bi bi-mortarboard me-1"></i>Fix Prerequisites / Add Prior Credits' +
+        '</button>' +
+        '<span class="small text-muted">' + htmlEscape(String(repair.missingSubjects.length)) + ' suggested prerequisite credit' + (repair.missingSubjects.length === 1 ? '' : 's') + '.</span>' +
+      '</div>'
+    );
+  }
+
+  function renderPriorRepairSubjectList(subjects) {
+    const box = qs('priorRepair_subjectList');
+    if (!box) return;
+    const list = Array.isArray(subjects) ? subjects : [];
+    if (!list.length) {
+      box.innerHTML = '<div class="text-muted">No missing prerequisite subjects were found in the latest eligibility result.</div>';
+      return;
+    }
+    box.innerHTML = list.map((subject, index) => {
+      const id = String(subject?.id || '').trim();
+      return ''
+        + '<label class="d-flex align-items-start gap-2 border rounded bg-white p-2 mb-2">'
+        +   '<input type="checkbox" class="form-check-input mt-1 prior-repair-subject" value="' + htmlEscape(id) + '" checked>'
+        +   '<span class="flex-grow-1">'
+        +     '<span class="fw-semibold d-block">' + htmlEscape(subject?.label || id) + '</span>'
+        +     '<span class="small text-muted">' + htmlEscape(subject?.reason || 'Required prerequisite') + '</span>'
+        +   '</span>'
+        + '</label>';
+    }).join('');
+  }
+
+  async function openPriorCreditRepairModal() {
+    const student = getSelectedShortcutStudent();
+    const repair = getPriorRepairPrerequisite();
+    if (!student.id) {
+      await showMsg('Select Student', 'warning', 'Select a student first.');
+      return;
+    }
+    if (!repair.programId) {
+      await showMsg('Program Required', 'warning', 'Resolve the program registration before adding prior subject credits.');
+      return;
+    }
+    if (!repair.missingSubjects.length) {
+      await showMsg('No Suggestions', 'info', 'No missing prerequisite subjects were found in the latest eligibility result.');
+      return;
+    }
+    if (qs('priorRepair_studentLabel')) qs('priorRepair_studentLabel').value = student.label || student.id || '';
+    if (qs('priorRepair_programLabel')) qs('priorRepair_programLabel').value = repair.programLabel || repair.programId || '';
+    if (qs('priorRepair_source')) qs('priorRepair_source').value = 'manual_waiver';
+    if (qs('priorRepair_evidenceNote')) qs('priorRepair_evidenceNote').value = 'Added from Rolling Enrollment prerequisite repair';
+    renderPriorRepairSubjectList(repair.missingSubjects);
+    priorCreditRepairModal?.show();
+  }
+
+  function getSelectedPriorRepairSubjectIds() {
+    return Array.from(document.querySelectorAll('.prior-repair-subject:checked'))
+      .map((input) => String(input.value || '').trim())
+      .filter(Boolean);
+  }
+
+  async function savePriorCreditRepair() {
+    if (shortcutActionInProgress) return;
+    const student = getSelectedShortcutStudent();
+    const repair = getPriorRepairPrerequisite();
+    const subjectIds = getSelectedPriorRepairSubjectIds();
+    if (!student.id || !repair.programId) {
+      await showMsg('Missing Context', 'warning', 'Student and program are required before adding prior credits.');
+      return;
+    }
+    if (!subjectIds.length) {
+      await showMsg('Select Subjects', 'warning', 'Select at least one suggested prerequisite subject.');
+      return;
+    }
+    shortcutActionInProgress = true;
+    try {
+      showBusy('Saving prior subject credits...');
+      const result = await requestJson('/school/classes/api/' + encodeURIComponent(classId) + '/rolling-prior-subject-credits/batch', 'POST', {
+        studentId: student.id,
+        studentIds: [student.id],
+        programId: repair.programId,
+        subjectIds,
+        source: String(qs('priorRepair_source')?.value || 'manual_waiver').trim(),
+        evidenceNote: String(qs('priorRepair_evidenceNote')?.value || '').trim()
+      });
+      if (!result) return;
+      const errorList = Array.isArray(result.errors) ? result.errors : [];
+      const createdCount = Number(result.createdCount || 0);
+      const skippedCount = Number(result.skippedDuplicateCount || 0);
+      const statusIcon = errorList.length ? 'warning' : 'success';
+      const message = [
+        `Created ${createdCount} prior subject credit${createdCount === 1 ? '' : 's'}.`,
+        skippedCount ? `Skipped ${skippedCount} duplicate credit${skippedCount === 1 ? '' : 's'}.` : '',
+        errorList.length ? errorList.map((row) => `${row.subjectId || 'Subject'}: ${row.message || 'Save failed.'}`).join('<br>') : ''
+      ].filter(Boolean).join('<br>');
+      await showMsg('Prior Credits Saved', statusIcon, message || 'Prior subject credits were saved.');
+      await refreshRollingEligibility();
+    } catch (error) {
+      await showMsg('Prior Credits Failed', 'error', error.message || 'Unable to save prior subject credits.');
+    } finally {
+      shortcutActionInProgress = false;
+      hideBusy();
+    }
   }
 
   function renderShortcutPreviewHtml(rows, message) {
@@ -891,6 +1079,10 @@
         const label = htmlEscape(data.resolved.label || '');
         const issues = (data.prerequisite.issues || []).map((t) => htmlEscape(t)).join('<br>');
         const warnings = (data.prerequisite.warnings || []).map((t) => htmlEscape(t)).join('<br>');
+        if (!ok && Array.isArray(data.prerequisite.missingSubjects) && data.prerequisite.missingSubjects.length) {
+          renderPriorCreditRepairPanel(data.message || (data.prerequisite.issues || []).join(' '));
+          return;
+        }
         let inner = '<div class="fw-semibold text-dark">' + label + '</div>';
         if (issues) inner += '<div class="text-danger small mt-1">' + issues + '</div>';
         if (warnings) inner += '<div class="text-warning small mt-1">' + warnings + '</div>';
@@ -2098,6 +2290,13 @@
       return;
     }
 
+    const priorCreditRepairBtn = event.target.closest('#btn_openPriorCreditRepair');
+    if (priorCreditRepairBtn) {
+      event.preventDefault();
+      openPriorCreditRepairModal();
+      return;
+    }
+
     const editBtn = event.target.closest('.btn-row-edit');
     if (editBtn) {
       closeAllActionMenus();
@@ -2152,6 +2351,14 @@
   qs('btn_shortcutSaveDraft')?.addEventListener('click', saveProgramRegistrationShortcutDraft);
   qs('btn_shortcutApprove')?.addEventListener('click', approveProgramRegistrationShortcutDraft);
   qs('btn_shortcutRetry')?.addEventListener('click', refreshRollingEligibility);
+  qs('btn_priorRepairSave')?.addEventListener('click', savePriorCreditRepair);
+  qs('btn_priorRepairRetry')?.addEventListener('click', refreshRollingEligibility);
+  qs('btn_priorRepairSelectAll')?.addEventListener('click', () => {
+    document.querySelectorAll('.prior-repair-subject').forEach((input) => { input.checked = true; });
+  });
+  qs('btn_priorRepairClearAll')?.addEventListener('click', () => {
+    document.querySelectorAll('.prior-repair-subject').forEach((input) => { input.checked = false; });
+  });
   qs('inp_startDate')?.addEventListener('change', () => { refreshRollingEligibility(); });
   qs('btn_confirmClosePeriod')?.addEventListener('click', submitClosePeriod);
   qs('btn_confirmReentry')?.addEventListener('click', submitReentry);

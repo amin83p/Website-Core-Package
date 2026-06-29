@@ -1476,11 +1476,6 @@
             '</a>'
           ].join('');
         }).join('');
-        const subjects = Array.isArray(row.subjectLabels) && row.subjectLabels.length
-          ? row.subjectLabels.map(function (label) {
-            return '<span class="badge text-bg-light border me-1 mb-1">' + escapeHtml(label) + '</span>';
-          }).join('')
-          : '<span class="text-muted small">No subjects</span>';
         const lifecycle = row.lifecycleMode === 'rolling'
           ? 'Rolling' + (row.cycleNo ? ' | Cycle #' + escapeHtml(row.cycleNo) : '')
           : 'Term-Based';
@@ -1489,9 +1484,9 @@
           row.id,
           row.status,
           row.deliveryDepartmentName,
+          row.defaultTeacherName,
           lifecycle,
           row.scheduleLabel,
-          Array.isArray(row.subjectLabels) ? row.subjectLabels.join(' ') : '',
           row.totalHours
         ].join(' ');
         return [
@@ -1503,7 +1498,7 @@
           '<td>' + escapeHtml(row.deliveryDepartmentName || '-') + '</td>',
           '<td>' + escapeHtml(lifecycle) + '<div class="small text-muted">Active periods: ' + escapeHtml(row.activePeriodCount || 0) + '</div></td>',
           '<td>' + escapeHtml(row.scheduleLabel || 'Not scheduled') + '</td>',
-          '<td>' + subjects + '<div class="small text-muted mt-1">' + escapeHtml(row.totalHours || 0) + ' total hrs</div></td>',
+          '<td><div class="fw-semibold">' + escapeHtml(row.defaultTeacherName || 'Unassigned') + '</div><div class="small text-muted mt-1">' + escapeHtml(row.totalHours || 0) + ' total hrs</div></td>',
           '<td><span class="badge ' + classStatusBadgeClass(row.status) + '">' + escapeHtml(String(row.status || 'unknown').toUpperCase()) + '</span></td>',
           '<td class="pe-4"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
           '</tr>'
@@ -1535,7 +1530,7 @@
       '<th>Delivery Dept</th>',
       '<th>Lifecycle</th>',
       '<th>Schedule</th>',
-      '<th>Curriculum</th>',
+      '<th>Default Teacher</th>',
       '<th>Status</th>',
       '<th class="pe-4 text-end">Actions</th>',
       '</tr>',

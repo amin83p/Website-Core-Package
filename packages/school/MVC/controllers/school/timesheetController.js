@@ -924,8 +924,18 @@ exports.viewTimesheet = async (req, res) => {
         });
         const mergedLiveSessions = [...liveSessions, ...reportReflectionSessions];
 
-        const allHolidays = await dataService.fetchData('holidays', {}, req.user);
+        const [allHolidays, allDepartments] = await Promise.all([
+            dataService.fetchData('holidays', {}, req.user),
+            dataService.fetchData('departments', {}, req.user)
+        ]);
         const holidays = allHolidays.filter((h) => h.date >= period.startDate && h.date <= period.endDate);
+        const departments = (Array.isArray(allDepartments) ? allDepartments : [])
+            .filter((row) => idsEqual(row?.orgId, activeOrgId))
+            .filter((row) => {
+                const status = String(row?.status || '').trim().toLowerCase();
+                return !status || status === 'active';
+            })
+            .sort((a, b) => String(a?.name || a?.title || a?.code || a?.id || '').localeCompare(String(b?.name || b?.title || b?.code || b?.id || '')));
 
         const isReadOnly = !teacherContext.isAdmin && (
             timesheet.status === 'submitted' ||
@@ -956,6 +966,7 @@ exports.viewTimesheet = async (req, res) => {
             timesheet,
             liveSessions: mergedLiveSessions,
             holidays,
+            departments,
             maxDailyHours,
             maxSessionHours,
             sessionStatusMeta,

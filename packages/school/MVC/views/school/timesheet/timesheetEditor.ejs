@@ -153,9 +153,16 @@
           <div class="mb-3">
               <label class="form-label fw-bold">Activity Type *</label>
               <select id="man_type" class="form-select" onchange="toggleManualType()">
-                  <option value="class">Registered Class</option>
-                  <option value="other">Other Activity (Prep, Admin, Meeting, etc.)</option>
+                  <option value="">Class-based entry</option>
+                  <% (departments || []).forEach((department) => { %>
+                    <option
+                      value="<%= department.id || '' %>"
+                      data-name="<%= department.name || department.title || department.code || department.id || '' %>">
+                      <%= department.name || department.title || department.code || department.id || 'Department' %>
+                    </option>
+                  <% }) %>
               </select>
+              <div class="form-text">Select a department for department-based compensation, or leave blank to select a class.</div>
           </div>
 
           <div class="mb-3" id="div_man_classPicker">
@@ -167,9 +174,9 @@
               </div>
           </div>
           
-          <div class="mb-3 d-none" id="div_man_desc">
+          <div class="mb-3" id="div_man_desc">
               <label class="form-label fw-bold">Description *</label>
-              <input type="text" id="man_desc" class="form-control" placeholder="e.g. Extra Prep">
+              <input type="text" id="man_desc" class="form-control" placeholder="e.g. Extra prep, admin work, meeting...">
           </div>
 
           <div class="mb-3">
@@ -257,12 +264,21 @@
 <script>
 function toggleManualType() {
     const type = document.getElementById('man_type').value;
-    if (type === 'other') {
-        document.getElementById('div_man_desc').classList.remove('d-none');
-        document.getElementById('div_man_classPicker').classList.add('d-none');
-    } else {
-        document.getElementById('div_man_desc').classList.add('d-none');
-        document.getElementById('div_man_classPicker').classList.remove('d-none');
+    const classPickerWrap = document.getElementById('div_man_classPicker');
+    const classIdInput = document.getElementById('man_classId');
+    const classNameInput = document.getElementById('man_className');
+    const classButton = document.getElementById('btnPickClass');
+    const usingDepartment = Boolean(String(type || '').trim());
+    document.getElementById('div_man_desc').classList.remove('d-none');
+    classPickerWrap.classList.toggle('opacity-50', usingDepartment);
+    if (classNameInput) {
+        classNameInput.disabled = usingDepartment;
+        classNameInput.placeholder = usingDepartment ? 'Disabled for department-based entry' : 'Choose a class...';
+    }
+    if (classButton) classButton.disabled = usingDepartment;
+    if (usingDepartment) {
+        if (classIdInput) classIdInput.value = '';
+        if (classNameInput) classNameInput.value = '';
     }
 }
 
@@ -515,11 +531,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const timeLabel = isPriorAdj
                         ? `<div class="small text-muted">Prior period correction</div><div class="small text-muted">Ref: ${(ses.adjustmentMeta?.sourceSessionDate || ses.date || '').toString()}</div>`
                         : `<div class="small">${ses.startTime ? `<i class="bi bi-clock"></i> ${ses.startTime} - ${ses.endTime}` : 'Manual Time'}</div><div class="small text-muted">ID: ${(ses.sessionId || '').substring(0,8)}...</div>`;
+                    const classMeta = ses.isManual && ses.deliveryDepartmentName
+                        ? `<div class="small text-muted"><i class="bi bi-building me-1"></i>${ses.deliveryDepartmentName}</div>`
+                        : (ses.isManual && !ses.classId && !isPriorAdj ? '' : `<div class="small text-muted">${ses.classId || ''}</div>`);
 
                     tbody.innerHTML += `
                         <tr class="${rowClass}">
                             ${dateCell}
-                            <td><div class="fw-bold text-primary">${ses.className || ''}</div>${ses.isManual && !ses.classId && !isPriorAdj ? '' : `<div class="small text-muted">${ses.classId || ''}</div>`}</td>
+                            <td><div class="fw-bold text-primary">${ses.className || ''}</div>${classMeta}</td>
                             <td>${timeLabel}</td>
                             <td>${statusBadge}</td>
                             <td>${commentInput}</td>
@@ -624,13 +643,18 @@ document.addEventListener('DOMContentLoaded', () => {
             
             existingHoursToIgnore = resolveEntryHours(e);
 
-            if (e.classId) {
-                document.getElementById('man_type').value = 'class';
+            if (e.deliveryDepartmentId && !e.classId) {
+                document.getElementById('man_type').value = e.deliveryDepartmentId;
+                document.getElementById('man_classId').value = '';
+                document.getElementById('man_className').value = '';
+                document.getElementById('man_desc').value = e.className || '';
+            } else if (e.classId) {
+                document.getElementById('man_type').value = '';
                 document.getElementById('man_classId').value = e.classId;
                 document.getElementById('man_className').value = e.className;
-                document.getElementById('man_desc').value = '';
+                document.getElementById('man_desc').value = e.description || '';
             } else {
-                document.getElementById('man_type').value = 'other';
+                document.getElementById('man_type').value = '';
                 document.getElementById('man_classId').value = '';
                 document.getElementById('man_className').value = '';
                 document.getElementById('man_desc').value = e.className;
@@ -640,7 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             document.getElementById('modalTitle').innerHTML = '<i class="bi bi-plus-circle me-2 text-primary"></i>Add Manual Entry';
             document.getElementById('btnSaveManualEntry').innerText = 'Add Entry';
-            document.getElementById('man_type').value = 'class';
+            document.getElementById('man_type').value = '';
             document.getElementById('man_classId').value = '';
             document.getElementById('man_className').value = '';
             document.getElementById('man_desc').value = '';
@@ -689,6 +713,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const d = document.getElementById('man_date').value;
         const editId = document.getElementById('man_editSessionId').value;
         const type = document.getElementById('man_type').value;
+        const typeSelect = document.getElementById('man_type');
+        const selectedDepartmentOption = typeSelect?.selectedOptions?.[0] || null;
+        const departmentId = String(type || '').trim();
+        const departmentName = departmentId ? String(selectedDepartmentOption?.dataset?.name || selectedDepartmentOption?.textContent || departmentId).trim() : '';
         
         const classId = document.getElementById('man_classId').value;
         const className = document.getElementById('man_className').value;
@@ -698,15 +726,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let finalClassName = className;
         let finalClassId = classId;
+        let finalDepartmentId = departmentId;
+        let finalDepartmentName = departmentName;
 
-        if (type === 'other') {
+        if (departmentId) {
             if (!descInput) { 
-                await messageBox({ title: 'Missing Information', icon: 'warning', message: 'Please provide a description for the activity.' });
+                await messageBox({ title: 'Missing Information', icon: 'warning', message: 'Please provide a description for the department-based activity.' });
                 return; 
             }
             finalClassName = descInput;
             finalClassId = null;
         } else {
+            finalDepartmentId = '';
+            finalDepartmentName = '';
             if (!classId) { 
                 await messageBox({ title: 'Missing Information', icon: 'warning', message: 'Please select a Class using the search tool.' });
                 return; 
@@ -743,6 +775,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const e = activeEntries.find(x => x.sessionId === editId);
             e.className = finalClassName;
             e.classId = finalClassId;
+            e.deliveryDepartmentId = finalDepartmentId;
+            e.deliveryDepartmentName = finalDepartmentName;
+            e.description = descInput;
             e.hours = hrs;
             e.durationHours = hrs;
             e.comment = comment;
@@ -752,6 +787,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 date: d,
                 className: finalClassName,
                 classId: finalClassId,
+                deliveryDepartmentId: finalDepartmentId,
+                deliveryDepartmentName: finalDepartmentName,
+                description: descInput,
                 hours: hrs, 
                 durationHours: hrs, 
                 status: 'manual',
@@ -782,6 +820,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 comment: e.comment,
                 isManual: e.isManual
             };
+            if (e.deliveryDepartmentId) row.deliveryDepartmentId = e.deliveryDepartmentId;
+            if (e.deliveryDepartmentName) row.deliveryDepartmentName = e.deliveryDepartmentName;
+            if (e.description) row.description = e.description;
             if (e.isReportReflection === true) row.isReportReflection = true;
             if (e.isPriorPeriodAdjustment === true) {
                 row.isPriorPeriodAdjustment = true;

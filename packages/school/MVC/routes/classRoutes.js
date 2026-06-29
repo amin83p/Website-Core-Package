@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/school/classController');
 const programRegistrationCtrl = require('../controllers/school/programRegistrationController');
+const studentProgramPriorSubjectCtrl = require('../controllers/school/studentProgramPriorSubjectController');
 const { requireCoreModule } = require('../services/school/schoolCoreContracts');
 const accessService = requireCoreModule('MVC/services/security/index');
 const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
@@ -241,6 +242,13 @@ router.post('/api/:classId/rolling-program-registration/approve/:registrationId'
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   ctrl.assertRollingProgramRegistrationShortcutContext,
   programRegistrationCtrl.approveRegistration);
+
+router.post('/api/:classId/rolling-prior-subject-credits/batch',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  ctrl.assertRollingProgramRegistrationShortcutContext,
+  studentProgramPriorSubjectCtrl.createBatch);
 
 router.post('/api/enrollment-periods/preview-create',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),

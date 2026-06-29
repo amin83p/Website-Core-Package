@@ -2783,6 +2783,7 @@ async function showRollingEnrollmentPage(req, res) {
       periodRows,
       enrollmentProgramChoices: buildRollingEnrollmentProgramChoices(classData),
       canCreateProgramRegistrations: await canCreateOrgScopedItem(req.user, { scopeLabel: 'program registrations' }),
+      canCreatePriorSubjectCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
       tableName: ROLLING_ENROLLMENT_TABLE_NAME,
       searchableFields: [...ROLLING_ENROLLMENT_SEARCHABLE_FIELDS],
       includeModal: true,
@@ -3085,6 +3086,54 @@ function parseShortcutIdArray(value) {
   return [];
 }
 
+async function canAccessSchoolOperation(reqUser, sectionId, operationId) {
+  try {
+    if (!reqUser || !sectionId || !operationId) return false;
+    const result = await accessService.evaluateAccess({
+      user: reqUser,
+      sectionId,
+      operationId
+    });
+    return result === true || result?.granted === true || result?.allowed === true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function buildRollingSubjectLabel(subject, fallbackId = '') {
+  const id = toPublicId(fallbackId || subject?.id || subject?.subjectId || '');
+  const code = String(subject?.code || '').trim();
+  const title = String(subject?.title || subject?.name || '').trim();
+  return [code || id, title].filter(Boolean).join(' - ') || id;
+}
+
+function extractRollingMissingPrerequisiteSubjects(preview, subjectCatalogMap) {
+  const issues = Array.isArray(preview?.issues) ? preview.issues : [];
+  const out = [];
+  const seen = new Set();
+  issues.forEach((issue) => {
+    const message = String(issue || '').trim();
+    const match = message.match(/^Missing prerequisite\(s\) for\s+([^:]+):\s+(.+?)\.?$/i);
+    if (!match) return;
+    const ownerLabel = String(match[1] || '').trim();
+    String(match[2] || '')
+      .split(',')
+      .map((token) => toPublicId(token))
+      .filter(Boolean)
+      .forEach((subjectId) => {
+        if (seen.has(subjectId)) return;
+        seen.add(subjectId);
+        const subject = subjectCatalogMap instanceof Map ? subjectCatalogMap.get(subjectId) : null;
+        out.push({
+          id: subjectId,
+          label: buildRollingSubjectLabel(subject, subjectId),
+          reason: ownerLabel ? `Required before ${ownerLabel}` : message
+        });
+      });
+  });
+  return out;
+}
+
 async function assertRollingProgramRegistrationShortcutContext(req, res, next) {
   try {
     const classId = toPublicId(req.params?.classId || req.body?.classId || '');
@@ -3339,7 +3388,7 @@ async function buildRollingEnrollmentPrerequisitePreview(req, classData, student
     activeOrgId: toPublicId(classData?.orgId)
   });
 
-  return registrationIntegrityService.buildTermClassPreview({
+  const preview = registrationIntegrityService.buildTermClassPreview({
     classItem: classData,
     program,
     department,
@@ -3352,6 +3401,12 @@ async function buildRollingEnrollmentPrerequisitePreview(req, classData, student
     existingRosterClassIds,
     classEnrollmentCountsByClassId: enrollmentCountResult.map || new Map()
   });
+
+  return {
+    ...preview,
+    missingSubjects: extractRollingMissingPrerequisiteSubjects(preview, subjectCatalogMap),
+    repairProgramId: pid
+  };
 }
 
 async function assertRollingEnrollmentPrerequisitesOrThrow(req, classData, student, programId, termId, startDate) {
@@ -3391,7 +3446,14 @@ async function previewRollingEnrollmentEligibility(req, res) {
         eligible: false,
         message: String(err?.message || err || ''),
         resolved: null,
-        prerequisite: { status: 'blocked', issues: [String(err?.message || err || '')], warnings: [] }
+        prerequisite: {
+          status: 'blocked',
+          issues: [String(err?.message || err || '')],
+          warnings: [],
+          missingSubjects: [],
+          canCreatePriorCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+          repairProgramId: ''
+        }
       });
     }
 
@@ -3424,7 +3486,10 @@ async function previewRollingEnrollmentEligibility(req, res) {
       prerequisite: {
         status: prereqPreview.status,
         issues: Array.isArray(prereqPreview.issues) ? prereqPreview.issues : [],
-        warnings: Array.isArray(prereqPreview.warnings) ? prereqPreview.warnings : []
+        warnings: Array.isArray(prereqPreview.warnings) ? prereqPreview.warnings : [],
+        missingSubjects: Array.isArray(prereqPreview.missingSubjects) ? prereqPreview.missingSubjects : [],
+        canCreatePriorCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+        repairProgramId: prereqPreview.repairProgramId || merged.programId || ''
       }
     });
   } catch (error) {

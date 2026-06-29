@@ -114,11 +114,8 @@ exports.listLedger = async (req, res) => {
     };
 
     const criteriaOk = hasLedgerFetchCriteria(filters);
-    const shouldFetch = runRequested && criteriaOk;
-    const filterError =
-      runRequested && !criteriaOk
-        ? 'Select at least one filter (dates, search, programs, students, terms, classes, entry types, or statuses), then click Apply Filters again.'
-        : null;
+    const shouldFetch = runRequested || criteriaOk;
+    const filterError = null;
 
     let entries = [];
     let students = [];
