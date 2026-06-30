@@ -22,6 +22,7 @@ const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/teachers(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TEACHERS },
     { pattern: /^\/school\/staff(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_STAFF },
     { pattern: /^\/school\/reports(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_REPORTS },
+    { pattern: /^\/school\/calendar(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_CALENDAR },
     { pattern: /^\/school\/schedules(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SCHEDULES },
     { pattern: /^\/school\/sessions(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SESSIONS },
     { pattern: /^\/school\/attendances(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_ATTENDANCES },
@@ -262,6 +263,16 @@ async function showDashboard(req, res) {
                 buttonClass: 'btn btn-secondary'
             },
             // Operations & Monitoring
+            {
+                priority: 138,
+                title: 'School Calendar',
+                description: 'View school days off, professional development, and personal schedule layers in a month or day-ribbon calendar.',
+                href: '/school/calendar',
+                buttonLabel: 'Open Calendar',
+                icon: 'bi-calendar4-week',
+                subtleClass: 'bg-primary-subtle text-primary',
+                buttonClass: 'btn btn-primary'
+            },
             {
                 priority: 140,
                 title: 'Master Schedule',

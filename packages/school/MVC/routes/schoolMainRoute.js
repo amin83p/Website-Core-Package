@@ -41,6 +41,7 @@ router.use('/session-statuses', require('./sessionStatusRoutes'));
 router.use('/timesheetPeriods', require('./timesheetPeriodRoutes'));
 router.use('/timesheets', require('./timesheetRoutes'));
 router.use('/classes', require('./classRoutes'));
+router.use('/calendar', require('./calendarRoutes'));
 router.use('/schedules', require('./scheduleRoutes'));
 router.use('/attendances', require('./attendanceRoutes'));
 router.use('/grades-matrix', require('./gradesMatrixRoutes'));

@@ -1517,6 +1517,10 @@ module.exports = {
     pickerSchoolSchedulePersons,
     listActiveTeacherSchedulePersons,
     showGlobalSchedulePage,
-    getGlobalSchedule
+    getGlobalSchedule,
+    buildScheduleViewerAccess,
+    buildSchoolSchedulePersonPickerRows,
+    buildEventsForPersonAndRange,
+    filterScheduleEventsForRole
 };
 

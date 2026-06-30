@@ -124,6 +124,9 @@
         },
         {
           "id": "445577"
+        },
+        {
+          "id": "445581"
         }
       ],
       "related": [],
@@ -2909,6 +2912,44 @@
       "subsections": [],
       "related": [],
       "adoptExisting": true
+    },
+    {
+      "id": "445581",
+      "name": "SCHOOL_CALENDAR",
+      "category": "SCHOOL",
+      "description": "View school days off, professional development activities, and personal school schedules in a layered calendar.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/calendar",
+      "operations": [
+        {
+          "id": "OP1001",
+          "accessScope": "SCP_ORG"
+        },
+        {
+          "id": "OP1002",
+          "accessScope": "SCP_ORG"
+        },
+        {
+          "id": "OP1003",
+          "accessScope": "SCP_ORG"
+        },
+        {
+          "id": "OP1004",
+          "accessScope": "SCP_ORG"
+        },
+        {
+          "id": "OP1005",
+          "accessScope": "SCP_ORG"
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
     }
   ],
   "symbols": [
@@ -3392,6 +3433,18 @@
       "tags": [
         "SCHOOL_ACTIVITIES",
         "445580"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_063",
+      "name": "SCHOOL_CALENDAR",
+      "type": "class",
+      "value": "bi bi-calendar4-week",
+      "tags": [
+        "SCHOOL_CALENDAR",
+        "445581"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -4681,7 +4734,26 @@
           ]
         }
       ],
-      "adoptExisting": true
+      "adoptExisting": true,
+      "accessJson": {
+        "sections": [
+          {
+            "id": "445581",
+            "name": "SCHOOL_CALENDAR",
+            "category": "SCHOOL",
+            "operations": [
+              {
+                "id": "OP1002",
+                "accessScope": "SCP_ORG"
+              },
+              {
+                "id": "OP1005",
+                "accessScope": "SCP_ORG"
+              }
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "ACC2001",
@@ -5891,7 +5963,26 @@
           ]
         }
       ],
-      "adoptExisting": true
+      "adoptExisting": true,
+      "accessJson": {
+        "sections": [
+          {
+            "id": "445581",
+            "name": "SCHOOL_CALENDAR",
+            "category": "SCHOOL",
+            "operations": [
+              {
+                "id": "OP1002",
+                "accessScope": "SCP_ORG"
+              },
+              {
+                "id": "OP1005",
+                "accessScope": "SCP_ORG"
+              }
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "ACC2002",
@@ -7101,7 +7192,26 @@
           ]
         }
       ],
-      "adoptExisting": true
+      "adoptExisting": true,
+      "accessJson": {
+        "sections": [
+          {
+            "id": "445581",
+            "name": "SCHOOL_CALENDAR",
+            "category": "SCHOOL",
+            "operations": [
+              {
+                "id": "OP1002",
+                "accessScope": "SCP_ORG"
+              },
+              {
+                "id": "OP1005",
+                "accessScope": "SCP_ORG"
+              }
+            ]
+          }
+        ]
+      }
     }
   ],
   "uploadFolders": [
@@ -7351,14 +7461,18 @@
   "settings": [],
   "menuEntries": [
     {
-      "id": "school-menu-root",
-      "label": "School",
-      "href": "/school",
-      "icon": "bi bi-mortarboard",
+      "id": "school-menu-calendar",
+      "label": "School Calendar",
+      "href": "/school/calendar",
+      "icon": "bi bi-calendar4-week",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",
-      "active": true
+      "active": true,
+      "order": 176,
+      "sectionId": "445581",
+      "symbolId": "SYM_SYSTEM_063",
+      "adoptExisting": true
     },
     {
       "id": "school-menu-students",
@@ -7503,15 +7617,19 @@
   ],
   "dashboardEntries": [
     {
-      "id": "school-dashboard-home",
-      "label": "School",
-      "href": "/dashboard/section-nav/SCHOOL",
-      "icon": "bi bi-mortarboard",
-      "description": "Open School section navigator",
+      "id": "school-dashboard-calendar",
+      "label": "School Calendar",
+      "href": "/school/calendar",
+      "icon": "bi bi-calendar4-week",
+      "description": "Open the layered School Calendar for holidays, professional development, and personal schedules.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",
-      "active": true
+      "active": true,
+      "order": 176,
+      "sectionId": "445581",
+      "symbolId": "SYM_SYSTEM_063",
+      "adoptExisting": true
     },
     {
       "id": "school-dashboard-students",

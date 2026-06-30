@@ -1,0 +1,929 @@
+<%
+  const access = calendarAccess || {};
+  const canSelectAnyPerson = Boolean(access.canSelectAnyPerson);
+  const lockedPersonId = access.lockedPersonId || '';
+  const lockedPersonName = access.lockedPersonName || '';
+  const availableRoles = Array.isArray(access.availableRoles) ? access.availableRoles : [];
+%>
+
+<style>
+  .school-calendar-page {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 1rem;
+  }
+  .school-calendar-shell {
+    min-height: calc(100vh - 130px);
+    background:
+      radial-gradient(circle at 10% 0%, rgba(13, 110, 253, 0.10), transparent 28rem),
+      linear-gradient(135deg, #f8fbff 0%, #eef7f2 100%);
+    border: 1px solid rgba(20, 45, 75, 0.08);
+    border-radius: 1.25rem;
+    box-shadow: 0 18px 50px rgba(15, 35, 65, 0.08);
+    overflow: hidden;
+  }
+  .school-calendar-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: rgba(255, 255, 255, .88);
+    border-bottom: 1px solid rgba(20, 45, 75, 0.08);
+    backdrop-filter: blur(10px);
+  }
+  .school-calendar-title {
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+  }
+  .school-calendar-title h1 {
+    margin: 0;
+    font-size: clamp(1.5rem, 2.5vw, 2.35rem);
+    font-weight: 800;
+    color: #123047;
+    letter-spacing: -0.035em;
+  }
+  .school-calendar-title span {
+    color: #5d6f7f;
+    font-size: .92rem;
+  }
+  .school-calendar-controls,
+  .school-calendar-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+  }
+  .school-calendar-view-switcher .btn {
+    min-width: 4.5rem;
+  }
+  .school-calendar-layer-dropdown .dropdown-menu {
+    min-width: min(360px, calc(100vw - 2rem));
+    padding: .6rem;
+    background: #fff;
+    border: 1px solid rgba(20, 45, 75, 0.09);
+    border-radius: 1rem;
+    box-shadow: 0 18px 50px rgba(15, 35, 65, 0.16);
+  }
+  .school-calendar-layer-option {
+    display: flex;
+    gap: .65rem;
+    align-items: start;
+    padding: .6rem .65rem;
+    border-radius: .75rem;
+    cursor: pointer;
+  }
+  .school-calendar-layer-option:hover {
+    background: #f4f8fc;
+  }
+  .school-calendar-layer-option strong {
+    display: block;
+    color: #123047;
+  }
+  .school-calendar-layer-option span {
+    color: #607489;
+    font-size: .8rem;
+  }
+  .school-calendar-person-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem;
+    align-items: end;
+    padding: 1rem;
+    background: rgba(255, 255, 255, .72);
+    border-bottom: 1px solid rgba(20, 45, 75, 0.08);
+  }
+  .school-calendar-grid {
+    padding: 1rem;
+  }
+  .calendar-weekdays,
+  .calendar-month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .calendar-weekdays {
+    gap: .5rem;
+    margin-bottom: .5rem;
+    color: #607489;
+    font-weight: 700;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .calendar-weekdays div {
+    padding: 0 .45rem;
+  }
+  .calendar-month-grid {
+    gap: .55rem;
+  }
+  .calendar-day-cell {
+    min-height: 145px;
+    background: rgba(255, 255, 255, .92);
+    border: 1px solid rgba(20, 45, 75, 0.08);
+    border-radius: 1rem;
+    padding: .65rem;
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+  }
+  .calendar-day-cell.is-muted {
+    opacity: .52;
+  }
+  .calendar-day-cell.is-today {
+    border-color: rgba(13, 110, 253, .42);
+    box-shadow: inset 0 0 0 2px rgba(13, 110, 253, .12);
+  }
+  .calendar-week-cell.is-today,
+  .calendar-day-focus.is-today {
+    border-color: rgba(13, 110, 253, .42);
+    box-shadow: inset 0 0 0 2px rgba(13, 110, 253, .12);
+  }
+  .calendar-day-number {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 800;
+    color: #123047;
+  }
+  .calendar-event-list {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    overflow: hidden;
+  }
+  .calendar-event-pill {
+    display: block;
+    border: 0;
+    border-left: 4px solid var(--event-accent, #0d6efd);
+    background: var(--event-bg, #eef5ff);
+    color: #123047;
+    border-radius: .55rem;
+    padding: .35rem .45rem;
+    text-align: left;
+    font-size: .78rem;
+    line-height: 1.2;
+  }
+  .calendar-event-pill:hover {
+    filter: brightness(.98);
+  }
+  .calendar-event-time {
+    display: block;
+    color: #607489;
+    font-size: .72rem;
+  }
+  .calendar-ribbon-list {
+    display: flex;
+    flex-direction: column;
+    gap: .65rem;
+  }
+  .calendar-ribbon-day {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: .75rem;
+    align-items: stretch;
+    background: rgba(255, 255, 255, .92);
+    border: 1px solid rgba(20, 45, 75, 0.08);
+    border-radius: 1rem;
+    padding: .75rem;
+  }
+  .calendar-ribbon-date {
+    border-right: 1px solid rgba(20, 45, 75, 0.08);
+    color: #123047;
+    font-weight: 800;
+  }
+  .calendar-ribbon-events {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: .45rem;
+  }
+  .calendar-year-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .75rem;
+  }
+  .calendar-year-month {
+    background: #fff;
+    border: 1px solid rgba(20, 45, 75, 0.08);
+    border-radius: 1rem;
+    box-shadow: 0 8px 24px rgba(15, 35, 65, 0.05);
+    overflow: hidden;
+  }
+  .calendar-year-month-title {
+    display: flex;
+    justify-content: space-between;
+    gap: .5rem;
+    align-items: center;
+    color: #0d6efd;
+    background: #eaf3ff;
+    font-weight: 800;
+    padding: .55rem .7rem;
+  }
+  .calendar-year-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    text-align: center;
+    font-size: .78rem;
+  }
+  .calendar-year-table th {
+    color: #607489;
+    font-weight: 700;
+    padding: .35rem .1rem;
+  }
+  .calendar-year-table td {
+    height: 34px;
+    padding: .12rem;
+    vertical-align: middle;
+  }
+  .calendar-year-day {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #123047;
+    font-weight: 600;
+  }
+  .calendar-year-day.is-weekend {
+    background: #fff3cd;
+    color: #664d03;
+  }
+  .calendar-year-day.is-today {
+    outline: 2px solid rgba(13, 110, 253, .35);
+    outline-offset: 1px;
+  }
+  .calendar-year-day.has-events {
+    background: #eaf3ff;
+    color: #0d6efd;
+    cursor: pointer;
+  }
+  .calendar-year-day-count {
+    position: absolute;
+    top: -6px;
+    right: -7px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: #dc3545;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .62rem;
+    font-weight: 800;
+    padding: 0 .25rem;
+    line-height: 1;
+  }
+  .calendar-week-grid,
+  .calendar-day-grid {
+    display: grid;
+    gap: .75rem;
+  }
+  .calendar-week-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .calendar-week-cell,
+  .calendar-day-focus {
+    background: rgba(255, 255, 255, .92);
+    border: 1px solid rgba(20, 45, 75, 0.08);
+    border-radius: 1rem;
+    padding: .75rem;
+  }
+  .calendar-week-cell {
+    min-height: 280px;
+  }
+  .calendar-day-focus {
+    min-height: 520px;
+  }
+  .calendar-day-focus-header,
+  .calendar-week-cell-header {
+    color: #123047;
+    font-weight: 800;
+    margin-bottom: .6rem;
+  }
+  .tone-danger { --event-accent: #dc3545; --event-bg: #fff0f1; }
+  .tone-success { --event-accent: #198754; --event-bg: #edf8f2; }
+  .tone-info { --event-accent: #0dcaf0; --event-bg: #ecfbff; }
+  .tone-primary { --event-accent: #0d6efd; --event-bg: #eef5ff; }
+  .tone-warning { --event-accent: #ffc107; --event-bg: #fff8df; }
+  .tone-secondary { --event-accent: #6c757d; --event-bg: #f4f5f6; }
+  .school-calendar-empty {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: #607489;
+  }
+  @media (max-width: 900px) {
+    .calendar-weekdays {
+      display: none;
+    }
+    .calendar-month-grid {
+      grid-template-columns: 1fr;
+    }
+    .calendar-day-cell {
+      min-height: 110px;
+    }
+    .calendar-ribbon-day {
+      grid-template-columns: 1fr;
+    }
+    .calendar-year-grid,
+    .calendar-week-grid {
+      grid-template-columns: 1fr;
+    }
+    .calendar-ribbon-date {
+      border-right: 0;
+      border-bottom: 1px solid rgba(20, 45, 75, 0.08);
+      padding-bottom: .5rem;
+    }
+  }
+</style>
+
+<div class="container-fluid school-calendar-page">
+  <div class="school-calendar-shell">
+    <div class="school-calendar-toolbar">
+      <div class="school-calendar-title">
+        <h1>School Calendar</h1>
+        <span>School days off, professional development, and personal schedule layers in one view.</span>
+      </div>
+      <div class="school-calendar-controls">
+        <a href="/school" class="btn btn-outline-secondary">
+          <i class="bi bi-speedometer2 me-1"></i> School Dashboard
+        </a>
+        <div class="btn-group school-calendar-view-switcher" role="group" aria-label="Calendar view">
+          <button type="button" class="btn btn-outline-primary calendar-view-btn" data-view="year">Year</button>
+          <button type="button" class="btn btn-primary calendar-view-btn" data-view="month">Month</button>
+          <button type="button" class="btn btn-outline-primary calendar-view-btn" data-view="week">Week</button>
+          <button type="button" class="btn btn-outline-primary calendar-view-btn" data-view="day">Day</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="school-calendar-toolbar">
+      <div class="school-calendar-nav">
+        <button type="button" class="btn btn-outline-primary" id="calendarPrevBtn"><i class="bi bi-chevron-left"></i></button>
+        <button type="button" class="btn btn-outline-primary" id="calendarTodayBtn">Today</button>
+        <button type="button" class="btn btn-outline-primary" id="calendarNextBtn"><i class="bi bi-chevron-right"></i></button>
+        <strong id="calendarRangeLabel" class="ms-2 text-primary"></strong>
+      </div>
+      <div class="school-calendar-controls">
+        <div class="dropdown school-calendar-layer-dropdown">
+          <button class="btn btn-outline-primary dropdown-toggle" type="button" id="calendarLayerDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+            <i class="bi bi-layers me-1"></i><span id="calendarLayerSummary">Calendar Layers</span>
+          </button>
+          <div class="dropdown-menu dropdown-menu-end" aria-labelledby="calendarLayerDropdownBtn">
+            <label class="school-calendar-layer-option">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="school_days_off" checked>
+              <span><strong>School Days Off</strong>Holidays and closure days</span>
+            </label>
+            <label class="school-calendar-layer-option">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="pd_payable" checked>
+              <span><strong>Payable PD</strong>Paid professional development activities</span>
+            </label>
+            <label class="school-calendar-layer-option">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="pd_unpayable" checked>
+              <span><strong>Unpayable PD</strong>Unpaid professional development activities</span>
+            </label>
+            <label class="school-calendar-layer-option">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="timesheet_deadlines" checked>
+              <span><strong>Timesheet Deadlines</strong>Submission deadlines for available timesheet periods</span>
+            </label>
+            <label class="school-calendar-layer-option">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="schedule_teacher" <%= canSelectAnyPerson || availableRoles.some((role) => role.key === 'teacher') ? 'checked' : '' %>>
+              <span><strong>Teacher Schedule</strong>Teaching and classroom schedule events</span>
+            </label>
+            <label class="school-calendar-layer-option">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="schedule_staff" <%= canSelectAnyPerson || availableRoles.some((role) => role.key === 'staff') ? 'checked' : '' %>>
+              <span><strong>Staff Schedule</strong>Staff schedule events</span>
+            </label>
+            <label class="school-calendar-layer-option">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="schedule_student" <%= canSelectAnyPerson || availableRoles.some((role) => role.key === 'student') ? 'checked' : '' %>>
+              <span><strong>Student Schedule</strong>Student schedule events</span>
+            </label>
+          </div>
+        </div>
+        <button type="button" class="btn btn-success" id="calendarRefreshBtn">
+          <i class="bi bi-arrow-clockwise me-1"></i> Refresh Calendar
+        </button>
+      </div>
+    </div>
+
+    <div class="school-calendar-person-panel">
+      <% if (canSelectAnyPerson) { %>
+        <div style="min-width:min(560px, 100%);">
+          <label for="calendarPersonLabel" class="form-label fw-semibold mb-1">Active Person</label>
+          <input type="hidden" id="calendarPersonId" value="">
+          <div class="input-group">
+            <input type="text" class="form-control" id="calendarPersonLabel" placeholder="No person selected" readonly>
+            <button type="button" class="btn btn-outline-primary" id="calendarPickPersonBtn">
+              <i class="bi bi-person-plus me-1"></i> Pick Person
+            </button>
+          </div>
+          <div class="form-text">Admin view: pick one Teacher, Staff, or Student. Type <code>---</code> in the picker to show all eligible people.</div>
+        </div>
+        <button type="button" class="btn btn-outline-secondary" id="calendarClearPersonBtn">Clear Person</button>
+      <% } else { %>
+        <div>
+          <label class="form-label fw-semibold mb-1">Active Person</label>
+          <div class="form-control-plaintext">
+            <i class="bi bi-person-badge me-1"></i>
+            <%= lockedPersonName || 'Your linked School person' %>
+          </div>
+          <input type="hidden" id="calendarPersonId" value="<%= lockedPersonId %>">
+        </div>
+      <% } %>
+    </div>
+
+    <div class="school-calendar-grid">
+      <div id="calendarCanvas"></div>
+    </div>
+  </div>
+</div>
+
+<% if (canSelectAnyPerson) { %>
+  <%- include('partials/modal_GenericPicker', { user }) %>
+<% } %>
+
+<script>
+(() => {
+  const canSelectAnyPerson = <%- JSON.stringify(canSelectAnyPerson) %>;
+  const lockedPersonId = <%- JSON.stringify(lockedPersonId) %>;
+  const monthNames = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+  const monthOnlyNames = new Intl.DateTimeFormat(undefined, { month: 'long' });
+  const compactDateNames = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+  const fullDateNames = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const initialDate = new Date();
+  let cursor = new Date(initialDate.getFullYear(), initialDate.getMonth(), initialDate.getDate());
+  let viewMode = 'month';
+  let events = [];
+  let selectedPerson = null;
+
+  const canvas = document.getElementById('calendarCanvas');
+  const rangeLabel = document.getElementById('calendarRangeLabel');
+  const personIdInput = document.getElementById('calendarPersonId');
+  const personLabelInput = document.getElementById('calendarPersonLabel');
+  const pickPersonBtn = document.getElementById('calendarPickPersonBtn');
+  const layerSummary = document.getElementById('calendarLayerSummary');
+  const layerLabels = {
+    school_days_off: 'Days Off',
+    pd_payable: 'Payable PD',
+    pd_unpayable: 'Unpayable PD',
+    timesheet_deadlines: 'Timesheet Deadlines',
+    schedule_teacher: 'Teacher',
+    schedule_staff: 'Staff',
+    schedule_student: 'Student'
+  };
+
+  function isoDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function parseDateKey(value) {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function getPersonDisplayName(person) {
+    const firstName = person?.name?.first || person?.firstName || '';
+    const lastName = person?.name?.last || person?.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    return fullName || person?.displayName || person?.name || person?.title || person?.email || person?.personId || person?.id || '';
+  }
+
+  function getPersonRoles(person) {
+    const roles = person?.roles || person?.schoolRoles || person?.availableRoles || [];
+    return Array.isArray(roles)
+      ? roles.map((role) => role?.label || role?.key || role).filter(Boolean)
+      : [];
+  }
+
+  function setSelectedPerson(person) {
+    const personId = String(person?.personId || person?.id || '').trim();
+    const displayName = getPersonDisplayName(person);
+    if (personIdInput) personIdInput.value = personId;
+    if (personLabelInput) personLabelInput.value = personId ? (displayName || personId) : '';
+    selectedPerson = personId ? { ...person, id: personId, personId, displayName: displayName || personId } : null;
+  }
+
+  function renderPersonPickerItem(person) {
+    const displayName = escapeHtml(getPersonDisplayName(person) || 'School Person');
+    const personId = escapeHtml(person?.personId || person?.id || '');
+    const email = escapeHtml(person?.email || '');
+    const roleBadges = getPersonRoles(person)
+      .map((role) => `<span class="badge bg-primary-subtle text-primary border">${escapeHtml(role)}</span>`)
+      .join(' ');
+
+    return `
+      <div class="d-flex justify-content-between align-items-center w-100 gap-3">
+        <div class="d-flex align-items-center gap-3 overflow-hidden">
+          <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm fw-bold flex-shrink-0" style="width:40px;height:40px;">
+            ${displayName.charAt(0).toUpperCase()}
+          </div>
+          <div class="overflow-hidden">
+            <div class="fw-bold text-dark text-truncate">${displayName}</div>
+            <div class="text-muted small text-truncate">${email || 'School-linked person'}</div>
+            <div class="mt-1 d-flex flex-wrap gap-1">${roleBadges || '<span class="badge bg-light text-muted border">Teacher / Staff / Student</span>'}</div>
+          </div>
+        </div>
+        <span class="badge bg-light text-secondary border font-monospace">${personId}</span>
+      </div>
+    `;
+  }
+
+  function openPersonPicker() {
+    if (!canSelectAnyPerson) return;
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      if (typeof window.showMessageModal === 'function') {
+        window.showMessageModal('Person Picker', 'The School person picker is not available on this page.', 'warning');
+      }
+      return;
+    }
+
+    const context = window.GenericPickerContexts?.activeOrganizationScope
+      ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+      : null;
+
+    const config = window.GenericPickerPresets.person({
+      title: 'Select Calendar Person',
+      icon: 'bi-person-badge',
+      apiEndpoint: '/school/calendar/api/person-picker',
+      placeholder: 'Search teacher, student, or staff (type --- to show all)...',
+      searchFields: 'id,personId,displayName,name,email,roles,schoolRoles,availableRoles',
+      context,
+      limit: 20,
+      renderer: renderPersonPickerItem,
+      onSelect: (person) => {
+        setSelectedPerson(person);
+        loadEvents();
+      }
+    });
+
+    window.GenericPicker.open(config);
+  }
+
+  function addDays(date, days) {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
+  }
+
+  function startOfWeek(date) {
+    const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    start.setDate(start.getDate() - start.getDay());
+    return start;
+  }
+
+  function currentRange() {
+    let start;
+    let end;
+
+    if (viewMode === 'year') {
+      start = new Date(cursor.getFullYear(), 0, 1);
+      end = new Date(cursor.getFullYear(), 11, 31);
+    } else if (viewMode === 'week') {
+      start = startOfWeek(cursor);
+      end = addDays(start, 6);
+    } else if (viewMode === 'day') {
+      start = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+      end = new Date(start);
+    } else {
+      start = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+      end = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    }
+
+    return { start, end, startDate: isoDate(start), endDate: isoDate(end) };
+  }
+
+  function currentRangeLabel(range) {
+    if (viewMode === 'year') return String(range.start.getFullYear());
+    if (viewMode === 'week') return `${compactDateNames.format(range.start)} - ${compactDateNames.format(range.end)}, ${range.end.getFullYear()}`;
+    if (viewMode === 'day') return fullDateNames.format(range.start);
+    return monthNames.format(range.start);
+  }
+
+  function selectedLayers() {
+    return Array.from(document.querySelectorAll('.calendar-layer-toggle:checked')).map((input) => input.value);
+  }
+
+  function updateLayerSummary() {
+    if (!layerSummary) return;
+    const layers = selectedLayers();
+    if (!layers.length) {
+      layerSummary.textContent = 'No Layers Selected';
+      return;
+    }
+    if (layers.length <= 2) {
+      layerSummary.textContent = layers.map((key) => layerLabels[key] || key).join(', ');
+      return;
+    }
+    layerSummary.textContent = `${layers.length} Layers Selected`;
+  }
+
+  function groupedEvents() {
+    return events.reduce((map, event) => {
+      if (!map[event.date]) map[event.date] = [];
+      map[event.date].push(event);
+      return map;
+    }, {});
+  }
+
+  function eventHtml(event) {
+    const time = event.startTime ? `${escapeHtml(event.startTime)}${event.endTime ? ' - ' + escapeHtml(event.endTime) : ''}` : 'All day';
+    const label = escapeHtml(event.title || 'Calendar event');
+    const cls = `calendar-event-pill tone-${escapeHtml(event.tone || 'secondary')}`;
+    const details = event.detailsUrl ? ` data-url="${escapeHtml(event.detailsUrl)}"` : '';
+    return `<button type="button" class="${cls}"${details}>
+      <span class="calendar-event-time">${time}</span>
+      ${label}
+    </button>`;
+  }
+
+  function attachEventClicks() {
+    canvas.querySelectorAll('.calendar-event-pill[data-url]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const url = button.getAttribute('data-url');
+        if (url) window.open(url, '_blank', 'noopener');
+      });
+    });
+  }
+
+  function attachYearDayClicks() {
+    canvas.querySelectorAll('.calendar-year-day[data-date]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const nextDate = parseDateKey(button.getAttribute('data-date'));
+        if (!nextDate) return;
+        cursor = nextDate;
+        viewMode = 'day';
+        updateViewButtons();
+        loadEvents();
+      });
+    });
+  }
+
+  function renderMonth() {
+    const { start } = currentRange();
+    const firstGrid = new Date(start);
+    firstGrid.setDate(firstGrid.getDate() - firstGrid.getDay());
+    const today = isoDate(new Date());
+    const eventMap = groupedEvents();
+    let html = `<div class="calendar-weekdays">${weekdayNames.map((day) => `<div>${day}</div>`).join('')}</div><div class="calendar-month-grid">`;
+    for (let i = 0; i < 42; i += 1) {
+      const day = new Date(firstGrid);
+      day.setDate(firstGrid.getDate() + i);
+      const dayIso = isoDate(day);
+      const muted = day.getMonth() !== cursor.getMonth();
+      const dayEvents = eventMap[dayIso] || [];
+      html += `<section class="calendar-day-cell${muted ? ' is-muted' : ''}${dayIso === today ? ' is-today' : ''}">
+        <div class="calendar-day-number">
+          <span>${day.getDate()}</span>
+          ${dayEvents.length ? `<span class="badge rounded-pill text-bg-light">${dayEvents.length}</span>` : ''}
+        </div>
+        <div class="calendar-event-list">${dayEvents.slice(0, 5).map(eventHtml).join('')}${dayEvents.length > 5 ? `<span class="small text-muted">+${dayEvents.length - 5} more</span>` : ''}</div>
+      </section>`;
+    }
+    html += '</div>';
+    canvas.innerHTML = html;
+    attachEventClicks();
+  }
+
+  function renderYear() {
+    const eventMap = groupedEvents();
+    const year = cursor.getFullYear();
+    const today = isoDate(new Date());
+    let html = '<div class="calendar-year-grid">';
+
+    for (let month = 0; month < 12; month += 1) {
+      const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
+      const monthEvents = Object.keys(eventMap)
+        .filter((dateKey) => dateKey.startsWith(monthPrefix))
+        .flatMap((dateKey) => eventMap[dateKey] || [])
+        .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.startTime || '').localeCompare(String(b.startTime || '')));
+
+      html += `<section class="calendar-year-month">
+        <div class="calendar-year-month-title">
+          <span>${monthOnlyNames.format(new Date(year, month, 1))}</span>
+          ${monthEvents.length ? `<span class="badge rounded-pill text-bg-light">${monthEvents.length}</span>` : ''}
+        </div>
+        <div class="p-2">
+          <table class="calendar-year-table">
+            <thead><tr>${weekdayNames.map((day) => `<th>${day.slice(0, 2)}</th>`).join('')}</tr></thead>
+            <tbody>`;
+
+      const firstDayOfMonth = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      let dayNumber = 1;
+
+      for (let week = 0; week < 6; week += 1) {
+        let renderedCell = false;
+        html += '<tr>';
+
+        for (let weekDay = 0; weekDay < 7; weekDay += 1) {
+          if ((week === 0 && weekDay < firstDayOfMonth) || dayNumber > daysInMonth) {
+            html += '<td></td>';
+            continue;
+          }
+
+          renderedCell = true;
+          const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
+          const dayEvents = eventMap[dateKey] || [];
+          const dayTitle = dayEvents
+            .map((event) => `${event.startTime || 'All day'} - ${event.title || 'Calendar event'}`)
+            .join(' | ');
+          const classes = [
+            'calendar-year-day',
+            weekDay === 0 || weekDay === 6 ? 'is-weekend' : '',
+            dateKey === today ? 'is-today' : '',
+            dayEvents.length ? 'has-events' : ''
+          ].filter(Boolean).join(' ');
+          const dataAttrs = dayEvents.length
+            ? ` data-date="${escapeHtml(dateKey)}" title="${escapeHtml(dayTitle)}"`
+            : '';
+
+          html += `<td><button type="button" class="${classes}"${dataAttrs}>
+            ${dayNumber}
+            ${dayEvents.length ? `<span class="calendar-year-day-count">${dayEvents.length}</span>` : ''}
+          </button></td>`;
+          dayNumber += 1;
+        }
+
+        html += '</tr>';
+        if (!renderedCell && dayNumber > daysInMonth) break;
+      }
+
+      html += `</tbody></table></div></section>`;
+    }
+
+    html += '</div>';
+    canvas.innerHTML = html;
+    attachYearDayClicks();
+  }
+
+  function renderWeek() {
+    const { start } = currentRange();
+    const today = isoDate(new Date());
+    const eventMap = groupedEvents();
+    let html = '<div class="calendar-week-grid">';
+
+    for (let i = 0; i < 7; i += 1) {
+      const day = addDays(start, i);
+      const dayIso = isoDate(day);
+      const dayEvents = eventMap[dayIso] || [];
+      html += `<section class="calendar-week-cell${dayIso === today ? ' is-today' : ''}">
+        <div class="calendar-week-cell-header">
+          <div>${weekdayNames[day.getDay()]}</div>
+          <div class="fs-4">${day.getDate()}</div>
+          <div class="text-muted small">${dayIso}</div>
+        </div>
+        <div class="calendar-event-list">${dayEvents.length ? dayEvents.map(eventHtml).join('') : '<span class="text-muted small">No events.</span>'}</div>
+      </section>`;
+    }
+
+    html += '</div>';
+    canvas.innerHTML = html;
+    attachEventClicks();
+  }
+
+  function renderDay() {
+    const { start } = currentRange();
+    const dayIso = isoDate(start);
+    const dayEvents = groupedEvents()[dayIso] || [];
+    const isToday = dayIso === isoDate(new Date());
+    canvas.innerHTML = `<section class="calendar-day-focus${isToday ? ' is-today' : ''}">
+      <div class="calendar-day-focus-header">
+        <div>${fullDateNames.format(start)}</div>
+        <div class="text-muted small">${dayEvents.length ? `${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}` : 'No events'}</div>
+      </div>
+      <div class="calendar-ribbon-events">${dayEvents.length ? dayEvents.map(eventHtml).join('') : '<span class="text-muted">No events for this day.</span>'}</div>
+    </section>`;
+    attachEventClicks();
+  }
+
+  function renderRibbon() {
+    const { start, end } = currentRange();
+    const eventMap = groupedEvents();
+    let html = '<div class="calendar-ribbon-list">';
+    for (let day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
+      const dayIso = isoDate(day);
+      const dayEvents = eventMap[dayIso] || [];
+      html += `<section class="calendar-ribbon-day">
+        <div class="calendar-ribbon-date">
+          <div>${weekdayNames[day.getDay()]}</div>
+          <div class="fs-3">${day.getDate()}</div>
+          <div class="text-muted small">${dayIso}</div>
+        </div>
+        <div class="calendar-ribbon-events">${dayEvents.length ? dayEvents.map(eventHtml).join('') : '<span class="text-muted align-self-center">No events for this day.</span>'}</div>
+      </section>`;
+    }
+    html += '</div>';
+    canvas.innerHTML = html;
+    attachEventClicks();
+  }
+
+  function render() {
+    const range = currentRange();
+    rangeLabel.textContent = currentRangeLabel(range);
+    if (viewMode === 'year') renderYear();
+    else if (viewMode === 'week') renderWeek();
+    else if (viewMode === 'day') renderDay();
+    else renderMonth();
+  }
+
+  async function loadEvents() {
+    const { startDate, endDate } = currentRange();
+    const layers = selectedLayers();
+    const params = new URLSearchParams({ startDate, endDate, layers: layers.join(',') });
+    const personId = canSelectAnyPerson ? (personIdInput?.value || '') : lockedPersonId;
+    if (personId) params.set('personId', personId);
+    if (typeof window.showLoading === 'function') window.showLoading('Loading School Calendar...');
+    try {
+      const response = await fetch(`/school/calendar/api/events?${params.toString()}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status === 'error') throw new Error(payload.message || 'Unable to load calendar events.');
+      events = Array.isArray(payload.events) ? payload.events : [];
+      if (payload.selectedPerson) setSelectedPerson(payload.selectedPerson);
+      render();
+    } catch (error) {
+      events = [];
+      canvas.innerHTML = `<div class="school-calendar-empty text-danger"><i class="bi bi-exclamation-triangle fs-1 d-block mb-2"></i>${escapeHtml(error.message || 'Unable to load calendar events.')}</div>`;
+    } finally {
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+    }
+  }
+
+  function updateViewButtons() {
+    document.querySelectorAll('.calendar-view-btn').forEach((button) => {
+      const isActive = button.dataset.view === viewMode;
+      button.className = `btn ${isActive ? 'btn-primary' : 'btn-outline-primary'} calendar-view-btn`;
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  }
+
+  function moveCursor(direction) {
+    if (viewMode === 'year') {
+      cursor = new Date(cursor.getFullYear() + direction, cursor.getMonth(), cursor.getDate());
+    } else if (viewMode === 'week') {
+      cursor = addDays(cursor, direction * 7);
+    } else if (viewMode === 'day') {
+      cursor = addDays(cursor, direction);
+    } else {
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + direction, Math.min(cursor.getDate(), 28));
+    }
+    loadEvents();
+  }
+
+  document.getElementById('calendarPrevBtn')?.addEventListener('click', () => moveCursor(-1));
+  document.getElementById('calendarNextBtn')?.addEventListener('click', () => moveCursor(1));
+  document.getElementById('calendarTodayBtn')?.addEventListener('click', () => {
+    const now = new Date();
+    cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    loadEvents();
+  });
+  document.getElementById('calendarRefreshBtn')?.addEventListener('click', loadEvents);
+  pickPersonBtn?.addEventListener('click', openPersonPicker);
+  document.querySelectorAll('.calendar-view-btn').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextView = String(button.dataset.view || '').trim();
+      if (!['year', 'month', 'week', 'day'].includes(nextView) || nextView === viewMode) return;
+      viewMode = nextView;
+      updateViewButtons();
+      loadEvents();
+    });
+  });
+  document.querySelectorAll('.calendar-layer-toggle').forEach((input) => {
+    input.addEventListener('change', () => {
+      updateLayerSummary();
+      loadEvents();
+    });
+  });
+  document.getElementById('calendarClearPersonBtn')?.addEventListener('click', () => {
+    setSelectedPerson(null);
+    loadEvents();
+  });
+
+  updateViewButtons();
+  updateLayerSummary();
+  loadEvents();
+})();
+</script>
