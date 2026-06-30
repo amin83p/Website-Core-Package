@@ -8,13 +8,13 @@ const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 const LAYER_KEYS = Object.freeze({
   DAYS_OFF: 'school_days_off',
-  PD_PAYABLE: 'pd_payable',
-  PD_UNPAYABLE: 'pd_unpayable',
   SCHEDULE_TEACHER: 'schedule_teacher',
   SCHEDULE_STAFF: 'schedule_staff',
   SCHEDULE_STUDENT: 'schedule_student',
   TIMESHEET_DEADLINES: 'timesheet_deadlines'
 });
+
+const ACTIVITY_CATEGORY_LAYER_PREFIX = 'activity_category:';
 
 const SCHEDULE_ROLE_BY_LAYER = Object.freeze({
   [LAYER_KEYS.SCHEDULE_TEACHER]: 'teacher',
@@ -60,6 +60,23 @@ function parseLayers(value) {
     .filter(Boolean));
 }
 
+function buildActivityCategoryLayerKey(categoryId) {
+  const safeCategoryId = normalizeId(categoryId);
+  if (!safeCategoryId) return '';
+  return `${ACTIVITY_CATEGORY_LAYER_PREFIX}${safeCategoryId}`;
+}
+
+function parseSelectedActivityCategoryIds(selectedLayers = new Set()) {
+  const categoryIds = new Set();
+  (selectedLayers instanceof Set ? Array.from(selectedLayers) : []).forEach((layer) => {
+    const key = normalizeId(layer);
+    if (!key.startsWith(ACTIVITY_CATEGORY_LAYER_PREFIX)) return;
+    const categoryId = normalizeId(key.slice(ACTIVITY_CATEGORY_LAYER_PREFIX.length));
+    if (categoryId) categoryIds.add(categoryId);
+  });
+  return categoryIds;
+}
+
 function inDateRange(date, startDate, endDate) {
   const normalized = normalizeDate(date);
   if (!normalized) return false;
@@ -78,19 +95,6 @@ function rowBelongsToOrg(row, orgId) {
     row?.metadata?.orgId
   ].map(normalizeId).filter(Boolean);
   return candidates.length === 0 || candidates.some((candidate) => idsEqual(candidate, orgId));
-}
-
-function activityLooksProfessionalDevelopment(activity = {}) {
-  const haystack = [
-    activity.categoryName,
-    activity.category,
-    activity.categoryId,
-    activity.type,
-    activity.title,
-    activity.name,
-    activity.description
-  ].map((value) => String(value || '').toLowerCase()).join(' ');
-  return /\b(pd|professional development|professional-development|professional_development|staff development|training)\b/i.test(haystack);
 }
 
 function compareEvents(a, b) {
@@ -123,10 +127,14 @@ function normalizeHolidayEvent(holiday) {
   };
 }
 
-function normalizeActivityEvent(activity, subtype) {
+function normalizeActivityEvent(activity = {}, { layerKey = '', subtype = '' } = {}) {
   const date = normalizeDate(activity.date || activity.activityDate || activity.startDate);
   if (!date) return null;
   const id = normalizeId(activity.id || activity._id || activity.activityId || date);
+  const categoryId = normalizeId(activity.categoryId || activity.category?.id);
+  const resolvedSubtype = normalizeId(subtype || categoryId || 'activity') || 'activity';
+  const resolvedLayerKey = normalizeId(layerKey) || buildActivityCategoryLayerKey(categoryId) || 'activity_category:unknown';
+  const isPaid = normalizeBoolean(activity.paid || activity.isPaid || activity.payable);
   return {
     id: `activity-${id}`,
     sourceId: id,
@@ -135,16 +143,17 @@ function normalizeActivityEvent(activity, subtype) {
     endTime: normalizeTime(activity.endTime),
     title: activity.title || activity.name || 'School Professional Development',
     type: 'school_activity',
-    layer: 'professional_development',
-    subtype,
-    tone: subtype === 'payable' ? 'success' : 'info',
+    layer: resolvedLayerKey,
+    subtype: resolvedSubtype,
+    tone: isPaid ? 'success' : 'info',
     detailsUrl: `/school/activities/edit/${encodeURIComponent(id)}`,
     meta: {
       source: 'activities',
+      categoryId,
       categoryName: activity.categoryName || '',
       departmentName: activity.departmentName || '',
       durationHours: activity.durationHours || '',
-      paid: subtype === 'payable',
+      paid: isPaid,
       notes: activity.notes || ''
     }
   };
@@ -238,19 +247,23 @@ async function getHolidayEvents({ reqUser, orgId, startDate, endDate } = {}) {
     .filter((event) => inDateRange(event.date, startDate, endDate));
 }
 
-async function getProfessionalDevelopmentEvents({ reqUser, orgId, startDate, endDate, includePayable, includeUnpayable } = {}) {
+async function getActivityEventsByCategoryLayers({ reqUser, orgId, startDate, endDate, selectedCategoryIds = new Set() } = {}) {
+  const categoryIdSet = selectedCategoryIds instanceof Set ? selectedCategoryIds : new Set();
+  if (!categoryIdSet.size) return [];
+
   const activities = await activityService.listActivities({ orgId, reqUser });
   return (Array.isArray(activities) ? activities : [])
     .filter((row) => rowBelongsToOrg(row, orgId))
     .filter((row) => normalizeDate(row.date || row.activityDate || row.startDate))
     .filter((row) => inDateRange(row.date || row.activityDate || row.startDate, startDate, endDate))
     .filter((row) => String(row.status || 'posted').toLowerCase() === 'posted')
-    .filter(activityLooksProfessionalDevelopment)
+    .filter((row) => categoryIdSet.has(normalizeId(row.categoryId)))
     .map((row) => {
-      const isPayable = normalizeBoolean(row.paid || row.isPaid || row.payable);
-      if (isPayable && !includePayable) return null;
-      if (!isPayable && !includeUnpayable) return null;
-      return normalizeActivityEvent(row, isPayable ? 'payable' : 'unpayable');
+      const categoryId = normalizeId(row.categoryId);
+      return normalizeActivityEvent(row, {
+        layerKey: buildActivityCategoryLayerKey(categoryId),
+        subtype: categoryId
+      });
     })
     .filter(Boolean);
 }
@@ -328,20 +341,20 @@ async function getCalendarEvents({
   const safeStartDate = normalizeDate(startDate);
   const safeEndDate = normalizeDate(endDate);
   const selectedLayers = parseLayers(layers);
+  const selectedActivityCategoryIds = parseSelectedActivityCategoryIds(selectedLayers);
   const events = [];
 
   if (selectedLayers.has(LAYER_KEYS.DAYS_OFF)) {
     events.push(...await getHolidayEvents({ reqUser, orgId, startDate: safeStartDate, endDate: safeEndDate }));
   }
 
-  if (selectedLayers.has(LAYER_KEYS.PD_PAYABLE) || selectedLayers.has(LAYER_KEYS.PD_UNPAYABLE)) {
-    events.push(...await getProfessionalDevelopmentEvents({
+  if (selectedActivityCategoryIds.size) {
+    events.push(...await getActivityEventsByCategoryLayers({
       reqUser,
       orgId,
       startDate: safeStartDate,
       endDate: safeEndDate,
-      includePayable: selectedLayers.has(LAYER_KEYS.PD_PAYABLE),
-      includeUnpayable: selectedLayers.has(LAYER_KEYS.PD_UNPAYABLE)
+      selectedCategoryIds: selectedActivityCategoryIds
     }));
   }
 
@@ -373,5 +386,7 @@ async function getCalendarEvents({
 
 module.exports = {
   LAYER_KEYS,
+  ACTIVITY_CATEGORY_LAYER_PREFIX,
+  buildActivityCategoryLayerKey,
   getCalendarEvents
 };

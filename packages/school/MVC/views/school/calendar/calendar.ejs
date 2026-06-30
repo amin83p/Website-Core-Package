@@ -4,6 +4,9 @@
   const lockedPersonId = access.lockedPersonId || '';
   const lockedPersonName = access.lockedPersonName || '';
   const availableRoles = Array.isArray(access.availableRoles) ? access.availableRoles : [];
+  const activityCategoryLayers = Array.isArray(calendarActivityCategories) ? calendarActivityCategories : [];
+  const initialRoleKeys = Array.isArray(calendarActiveRoleKeys) ? calendarActiveRoleKeys : [];
+  const calendarLayerStorageKeySafe = String(calendarLayerStorageKey || 'schoolCalendar:selectedLayers:global');
 %>
 
 <style>
@@ -24,6 +27,8 @@
     overflow: hidden;
   }
   .school-calendar-toolbar {
+    position: relative;
+    z-index: 30;
     display: flex;
     flex-wrap: wrap;
     gap: .75rem;
@@ -61,6 +66,7 @@
     min-width: 4.5rem;
   }
   .school-calendar-layer-dropdown .dropdown-menu {
+    z-index: 1200;
     min-width: min(360px, calc(100vw - 2rem));
     padding: .6rem;
     background: #fff;
@@ -97,6 +103,8 @@
     border-bottom: 1px solid rgba(20, 45, 75, 0.08);
   }
   .school-calendar-grid {
+    position: relative;
+    z-index: 1;
     padding: 1rem;
   }
   .calendar-weekdays,
@@ -128,6 +136,18 @@
     display: flex;
     flex-direction: column;
     gap: .45rem;
+  }
+  .calendar-day-cell.is-clickable,
+  .calendar-week-cell.is-clickable,
+  .calendar-day-focus.is-clickable,
+  .calendar-year-day.is-clickable {
+    cursor: pointer;
+  }
+  .calendar-day-cell.is-clickable:hover,
+  .calendar-week-cell.is-clickable:hover,
+  .calendar-day-focus.is-clickable:hover {
+    box-shadow: 0 12px 24px rgba(15, 35, 65, 0.08);
+    transform: translateY(-1px);
   }
   .calendar-day-cell.is-muted {
     opacity: .52;
@@ -169,10 +189,21 @@
   .calendar-event-pill:hover {
     filter: brightness(.98);
   }
+  .calendar-event-pill:focus-visible {
+    outline: 2px solid rgba(13, 110, 253, .35);
+    outline-offset: 2px;
+  }
   .calendar-event-time {
     display: block;
     color: #607489;
     font-size: .72rem;
+  }
+  .calendar-event-category {
+    display: block;
+    color: #4f6476;
+    font-size: .7rem;
+    margin-top: .15rem;
+    opacity: .9;
   }
   .calendar-ribbon-list {
     display: flex;
@@ -267,6 +298,7 @@
   }
   .calendar-year-day-count {
     position: absolute;
+    z-index: 1;
     top: -6px;
     right: -7px;
     min-width: 16px;
@@ -319,6 +351,13 @@
     padding: 3rem 1rem;
     text-align: center;
     color: #607489;
+  }
+  .calendar-modal-item {
+    border: 1px solid rgba(20, 45, 75, 0.08);
+    border-radius: .75rem;
+  }
+  .calendar-modal-item .small {
+    line-height: 1.2;
   }
   @media (max-width: 900px) {
     .calendar-weekdays {
@@ -379,31 +418,33 @@
           </button>
           <div class="dropdown-menu dropdown-menu-end" aria-labelledby="calendarLayerDropdownBtn">
             <label class="school-calendar-layer-option">
-              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="school_days_off" checked>
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="school_days_off" data-layer-kind="fixed" checked>
               <span><strong>School Days Off</strong>Holidays and closure days</span>
             </label>
             <label class="school-calendar-layer-option">
-              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="pd_payable" checked>
-              <span><strong>Payable PD</strong>Paid professional development activities</span>
-            </label>
-            <label class="school-calendar-layer-option">
-              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="pd_unpayable" checked>
-              <span><strong>Unpayable PD</strong>Unpaid professional development activities</span>
-            </label>
-            <label class="school-calendar-layer-option">
-              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="timesheet_deadlines" checked>
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="timesheet_deadlines" data-layer-kind="fixed" checked>
               <span><strong>Timesheet Deadlines</strong>Submission deadlines for available timesheet periods</span>
             </label>
-            <label class="school-calendar-layer-option">
-              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="schedule_teacher" <%= canSelectAnyPerson || availableRoles.some((role) => role.key === 'teacher') ? 'checked' : '' %>>
+            <% if (activityCategoryLayers.length) { %>
+              <% activityCategoryLayers.forEach((category) => { %>
+                <label class="school-calendar-layer-option">
+                  <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="<%= category.layerKey %>" data-layer-kind="activity-category" checked>
+                  <span><strong><%= category.name %></strong><%= category.defaultPaid ? 'Paid by default category' : 'Activity category layer' %></span>
+                </label>
+              <% }) %>
+            <% } else { %>
+              <div class="px-2 py-1 small text-muted">No active activity categories available.</div>
+            <% } %>
+            <label class="school-calendar-layer-option calendar-role-layer-option d-none" data-role-key="teacher">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="schedule_teacher" data-layer-kind="role">
               <span><strong>Teacher Schedule</strong>Teaching and classroom schedule events</span>
             </label>
-            <label class="school-calendar-layer-option">
-              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="schedule_staff" <%= canSelectAnyPerson || availableRoles.some((role) => role.key === 'staff') ? 'checked' : '' %>>
+            <label class="school-calendar-layer-option calendar-role-layer-option d-none" data-role-key="staff">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="schedule_staff" data-layer-kind="role">
               <span><strong>Staff Schedule</strong>Staff schedule events</span>
             </label>
-            <label class="school-calendar-layer-option">
-              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="schedule_student" <%= canSelectAnyPerson || availableRoles.some((role) => role.key === 'student') ? 'checked' : '' %>>
+            <label class="school-calendar-layer-option calendar-role-layer-option d-none" data-role-key="student">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="schedule_student" data-layer-kind="role">
               <span><strong>Student Schedule</strong>Student schedule events</span>
             </label>
           </div>
@@ -424,10 +465,9 @@
             <button type="button" class="btn btn-outline-primary" id="calendarPickPersonBtn">
               <i class="bi bi-person-plus me-1"></i> Pick Person
             </button>
+            <button type="button" class="btn btn-outline-secondary" id="calendarClearPersonBtn">Clear Person</button>
           </div>
-          <div class="form-text">Admin view: pick one Teacher, Staff, or Student. Type <code>---</code> in the picker to show all eligible people.</div>
         </div>
-        <button type="button" class="btn btn-outline-secondary" id="calendarClearPersonBtn">Clear Person</button>
       <% } else { %>
         <div>
           <label class="form-label fw-semibold mb-1">Active Person</label>
@@ -446,6 +486,41 @@
   </div>
 </div>
 
+<div class="modal fade" id="calendarDayItemsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title fw-bold" id="calendarDayItemsModalTitle">Calendar Day Items</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="calendarDayItemsModalBody"></div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="calendarEventDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold" id="calendarEventDetailModalTitle">Event Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="calendarEventDetailModalBody"></div>
+      <div class="modal-footer bg-light d-flex justify-content-between">
+        <a href="#" class="btn btn-outline-primary d-none" id="calendarEventDetailOpenSourceLink" target="_blank" rel="noopener">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Open Source Page
+        </a>
+        <button type="button" class="btn btn-secondary ms-auto" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <% if (canSelectAnyPerson) { %>
   <%- include('partials/modal_GenericPicker', { user }) %>
 <% } %>
@@ -454,6 +529,10 @@
 (() => {
   const canSelectAnyPerson = <%- JSON.stringify(canSelectAnyPerson) %>;
   const lockedPersonId = <%- JSON.stringify(lockedPersonId) %>;
+  const calendarActivityCategories = <%- JSON.stringify(activityCategoryLayers || []).replace(/</g, '\\u003c') %>;
+  const initialRoleKeys = <%- JSON.stringify(initialRoleKeys || []).replace(/</g, '\\u003c') %>;
+  const layerStorageKey = <%- JSON.stringify(calendarLayerStorageKeySafe) %>;
+  const DEFAULT_BASE_LAYERS = ['school_days_off', 'timesheet_deadlines'];
   const monthNames = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
   const monthOnlyNames = new Intl.DateTimeFormat(undefined, { month: 'long' });
   const compactDateNames = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
@@ -464,22 +543,64 @@
   let viewMode = 'month';
   let events = [];
   let selectedPerson = null;
+  let dayItemsModalInstance = null;
+  let eventDetailModalInstance = null;
 
   const canvas = document.getElementById('calendarCanvas');
   const rangeLabel = document.getElementById('calendarRangeLabel');
   const personIdInput = document.getElementById('calendarPersonId');
   const personLabelInput = document.getElementById('calendarPersonLabel');
   const pickPersonBtn = document.getElementById('calendarPickPersonBtn');
+  const dayItemsModalEl = document.getElementById('calendarDayItemsModal');
+  const eventDetailModalEl = document.getElementById('calendarEventDetailModal');
+  const dayItemsModalTitle = document.getElementById('calendarDayItemsModalTitle');
+  const dayItemsModalBody = document.getElementById('calendarDayItemsModalBody');
+  const eventDetailModalTitle = document.getElementById('calendarEventDetailModalTitle');
+  const eventDetailModalBody = document.getElementById('calendarEventDetailModalBody');
+  const eventDetailOpenSourceLink = document.getElementById('calendarEventDetailOpenSourceLink');
   const layerSummary = document.getElementById('calendarLayerSummary');
+  const roleLayerOptions = Array.from(document.querySelectorAll('.calendar-role-layer-option'));
+  const activityLayerLabels = (Array.isArray(calendarActivityCategories) ? calendarActivityCategories : []).reduce((map, category) => {
+    const key = String(category?.layerKey || '').trim();
+    const label = String(category?.name || category?.code || key).trim();
+    if (key && label) map[key] = label;
+    return map;
+  }, {});
   const layerLabels = {
     school_days_off: 'Days Off',
-    pd_payable: 'Payable PD',
-    pd_unpayable: 'Unpayable PD',
     timesheet_deadlines: 'Timesheet Deadlines',
+    ...activityLayerLabels,
     schedule_teacher: 'Teacher',
     schedule_staff: 'Staff',
     schedule_student: 'Student'
   };
+
+  function getOrCreateModalInstance(modalEl, cachedInstance) {
+    if (!modalEl) return null;
+    if (cachedInstance) return cachedInstance;
+    if (typeof window.bootstrap !== 'undefined' && window.bootstrap?.Modal) {
+      if (typeof bootstrap.Modal.getOrCreateInstance === 'function') {
+        return bootstrap.Modal.getOrCreateInstance(modalEl);
+      }
+      return new bootstrap.Modal(modalEl);
+    }
+    return null;
+  }
+
+  function showModalSafely(modalEl, cachedInstance) {
+    if (!modalEl) return cachedInstance;
+    const instance = getOrCreateModalInstance(modalEl, cachedInstance);
+    if (instance) {
+      instance.show();
+      return instance;
+    }
+    // Fallback for environments where bootstrap JS is unavailable.
+    modalEl.classList.add('show');
+    modalEl.style.display = 'block';
+    modalEl.setAttribute('aria-modal', 'true');
+    modalEl.removeAttribute('aria-hidden');
+    return cachedInstance;
+  }
 
   function isoDate(date) {
     const y = date.getFullYear();
@@ -492,6 +613,12 @@
     const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!match) return null;
     return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+
+  function formatDateFromKey(dateKey) {
+    const date = parseDateKey(dateKey);
+    if (!date) return escapeHtml(dateKey || '');
+    return fullDateNames.format(date);
   }
 
   function escapeHtml(value) {
@@ -517,12 +644,119 @@
       : [];
   }
 
+  function normalizeRoleKey(role) {
+    const raw = String(role || '').trim().toLowerCase();
+    if (!raw) return '';
+    if (raw.includes('teacher')) return 'teacher';
+    if (raw.includes('staff')) return 'staff';
+    if (raw.includes('student')) return 'student';
+    return '';
+  }
+
+  function extractRoleKeysFromPerson(person) {
+    const roleSet = new Set();
+    getPersonRoles(person).forEach((role) => {
+      const normalized = normalizeRoleKey(role);
+      if (normalized) roleSet.add(normalized);
+    });
+    return Array.from(roleSet);
+  }
+
+  function getVisibleLayerInputs() {
+    return Array.from(document.querySelectorAll('.calendar-layer-toggle')).filter((input) => {
+      const option = input.closest('.school-calendar-layer-option');
+      return Boolean(option && !option.classList.contains('d-none') && input.disabled !== true);
+    });
+  }
+
+  function selectedLayers() {
+    return getVisibleLayerInputs()
+      .filter((input) => input.checked)
+      .map((input) => String(input.value || '').trim())
+      .filter(Boolean);
+  }
+
+  function saveSelectedLayers() {
+    try {
+      window.localStorage.setItem(layerStorageKey, JSON.stringify(selectedLayers()));
+    } catch (_error) {
+      // Ignore browser storage restrictions.
+    }
+  }
+
+  function readSavedLayers() {
+    try {
+      const raw = window.localStorage.getItem(layerStorageKey);
+      const parsed = JSON.parse(raw || '[]');
+      return Array.isArray(parsed) ? parsed.map((value) => String(value || '').trim()).filter(Boolean) : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function defaultLayers() {
+    const defaults = new Set(DEFAULT_BASE_LAYERS);
+    getVisibleLayerInputs()
+      .filter((input) => String(input.dataset.layerKind || '') === 'activity-category')
+      .forEach((input) => defaults.add(String(input.value || '').trim()));
+    getVisibleLayerInputs()
+      .filter((input) => String(input.dataset.layerKind || '') === 'role')
+      .forEach((input) => defaults.add(String(input.value || '').trim()));
+    return Array.from(defaults).filter(Boolean);
+  }
+
+  function applyLayerSelection(layerKeys = []) {
+    const allowed = new Set(getVisibleLayerInputs().map((input) => String(input.value || '').trim()).filter(Boolean));
+    const normalizedSelection = (Array.isArray(layerKeys) ? layerKeys : [])
+      .map((key) => String(key || '').trim())
+      .filter((key) => allowed.has(key));
+    const selected = new Set(normalizedSelection);
+    getVisibleLayerInputs().forEach((input) => {
+      input.checked = selected.has(String(input.value || '').trim());
+    });
+    updateLayerSummary();
+  }
+
+  function initializeLayerSelection() {
+    const savedLayers = readSavedLayers();
+    const initialLayers = savedLayers.length ? savedLayers : defaultLayers();
+    applyLayerSelection(initialLayers);
+    saveSelectedLayers();
+  }
+
+  function reconcileLayerSelectionAfterRoleChange() {
+    const currentLayers = selectedLayers();
+    if (currentLayers.length) {
+      applyLayerSelection(currentLayers);
+      saveSelectedLayers();
+      return;
+    }
+    initializeLayerSelection();
+  }
+
+  function updateRoleLayerVisibility(roleKeys = []) {
+    const allowedRoles = new Set((Array.isArray(roleKeys) ? roleKeys : []).map(normalizeRoleKey).filter(Boolean));
+    roleLayerOptions.forEach((option) => {
+      const roleKey = normalizeRoleKey(option?.dataset?.roleKey || '');
+      const shouldShow = allowedRoles.has(roleKey);
+      option.classList.toggle('d-none', !shouldShow);
+      const input = option.querySelector('.calendar-layer-toggle');
+      if (input) {
+        input.disabled = !shouldShow;
+        if (!shouldShow) input.checked = false;
+      }
+    });
+  }
+
   function setSelectedPerson(person) {
     const personId = String(person?.personId || person?.id || '').trim();
     const displayName = getPersonDisplayName(person);
     if (personIdInput) personIdInput.value = personId;
     if (personLabelInput) personLabelInput.value = personId ? (displayName || personId) : '';
     selectedPerson = personId ? { ...person, id: personId, personId, displayName: displayName || personId } : null;
+    const roleKeys = personId ? extractRoleKeysFromPerson(selectedPerson) : [];
+    updateRoleLayerVisibility(roleKeys);
+    reconcileLayerSelectionAfterRoleChange();
   }
 
   function renderPersonPickerItem(person) {
@@ -621,10 +855,6 @@
     return monthNames.format(range.start);
   }
 
-  function selectedLayers() {
-    return Array.from(document.querySelectorAll('.calendar-layer-toggle:checked')).map((input) => input.value);
-  }
-
   function updateLayerSummary() {
     if (!layerSummary) return;
     const layers = selectedLayers();
@@ -647,35 +877,135 @@
     }, {});
   }
 
+  function getEventsForDate(dateKey) {
+    return (events || [])
+      .filter((event) => String(event?.date || '') === String(dateKey || ''))
+      .sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+  }
+
+  function getEventById(eventId) {
+    const targetId = String(eventId || '').trim();
+    if (!targetId) return null;
+    return (events || []).find((event) => String(event?.id || '') === targetId) || null;
+  }
+
   function eventHtml(event) {
     const time = event.startTime ? `${escapeHtml(event.startTime)}${event.endTime ? ' - ' + escapeHtml(event.endTime) : ''}` : 'All day';
     const label = escapeHtml(event.title || 'Calendar event');
+    const categoryName = escapeHtml(event?.meta?.categoryName || '');
     const cls = `calendar-event-pill tone-${escapeHtml(event.tone || 'secondary')}`;
-    const details = event.detailsUrl ? ` data-url="${escapeHtml(event.detailsUrl)}"` : '';
-    return `<button type="button" class="${cls}"${details}>
+    const eventId = escapeHtml(event?.id || '');
+    return `<button type="button" class="${cls} js-calendar-event-item" data-event-id="${eventId}">
       <span class="calendar-event-time">${time}</span>
       ${label}
+      ${categoryName ? `<span class="calendar-event-category">${categoryName}</span>` : ''}
     </button>`;
   }
 
-  function attachEventClicks() {
-    canvas.querySelectorAll('.calendar-event-pill[data-url]').forEach((button) => {
+  function openEventDetailModal(event) {
+    if (!event || !eventDetailModalBody || !eventDetailModalTitle || !eventDetailModalEl) return;
+
+    const dateLabel = formatDateFromKey(event.date || '');
+    const timeLabel = event.startTime
+      ? `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`
+      : 'All day';
+    const categoryName = String(event?.meta?.categoryName || '').trim();
+    const departmentName = String(event?.meta?.departmentName || '').trim();
+    const notes = String(event?.meta?.notes || event?.meta?.description || '').trim();
+    const typeLabel = String(event?.type || '').trim() || 'calendar_event';
+
+    eventDetailModalTitle.textContent = event.title || 'Calendar Event';
+    eventDetailModalBody.innerHTML = `
+      <div class="vstack gap-3">
+        <div><span class="fw-bold text-dark">Date:</span> ${escapeHtml(dateLabel)}</div>
+        <div><span class="fw-bold text-dark">Time:</span> ${escapeHtml(timeLabel)}</div>
+        <div><span class="fw-bold text-dark">Type:</span> ${escapeHtml(typeLabel)}</div>
+        ${categoryName ? `<div><span class="fw-bold text-dark">Category:</span> ${escapeHtml(categoryName)}</div>` : ''}
+        ${departmentName ? `<div><span class="fw-bold text-dark">Department:</span> ${escapeHtml(departmentName)}</div>` : ''}
+        ${notes ? `<div><span class="fw-bold text-dark">Notes:</span><div class="small text-muted mt-1">${escapeHtml(notes)}</div></div>` : ''}
+      </div>
+    `;
+
+    const detailsUrl = String(event.detailsUrl || '').trim();
+    if (detailsUrl && eventDetailOpenSourceLink) {
+      eventDetailOpenSourceLink.href = detailsUrl;
+      eventDetailOpenSourceLink.classList.remove('d-none');
+    } else if (eventDetailOpenSourceLink) {
+      eventDetailOpenSourceLink.href = '#';
+      eventDetailOpenSourceLink.classList.add('d-none');
+    }
+
+    eventDetailModalInstance = showModalSafely(eventDetailModalEl, eventDetailModalInstance);
+  }
+
+  function openDayItemsModal(dateKey) {
+    if (!dayItemsModalBody || !dayItemsModalTitle || !dayItemsModalEl) return;
+    const safeDateKey = String(dateKey || '').trim();
+    const dayEvents = getEventsForDate(safeDateKey);
+    dayItemsModalTitle.textContent = `Items for ${formatDateFromKey(safeDateKey)}`;
+
+    if (!dayEvents.length) {
+      dayItemsModalBody.innerHTML = '<div class="text-muted">No calendar items for this day.</div>';
+      dayItemsModalInstance = showModalSafely(dayItemsModalEl, dayItemsModalInstance);
+      return;
+    }
+
+    dayItemsModalBody.innerHTML = `
+      <div class="vstack gap-2">
+        ${dayEvents.map((event) => {
+          const eventId = escapeHtml(event?.id || '');
+          const timeLabel = event.startTime
+            ? `${escapeHtml(event.startTime)}${event.endTime ? ` - ${escapeHtml(event.endTime)}` : ''}`
+            : 'All day';
+          const categoryName = escapeHtml(event?.meta?.categoryName || '');
+          return `
+            <button type="button" class="btn btn-light text-start calendar-modal-item js-calendar-open-event" data-event-id="${eventId}">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <div class="fw-bold text-dark">${escapeHtml(event.title || 'Calendar Event')}</div>
+                  <div class="small text-muted">${timeLabel}</div>
+                  ${categoryName ? `<div class="small text-primary-emphasis mt-1">${categoryName}</div>` : ''}
+                </div>
+                <span class="badge bg-light text-dark border">${escapeHtml(event?.type || 'event')}</span>
+              </div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    dayItemsModalBody.querySelectorAll('.js-calendar-open-event').forEach((button) => {
       button.addEventListener('click', () => {
-        const url = button.getAttribute('data-url');
-        if (url) window.open(url, '_blank', 'noopener');
+        const eventId = button.getAttribute('data-event-id');
+        const targetEvent = getEventById(eventId);
+        if (!targetEvent) return;
+        openEventDetailModal(targetEvent);
+      });
+    });
+
+    dayItemsModalInstance = showModalSafely(dayItemsModalEl, dayItemsModalInstance);
+  }
+
+  function attachEventClicks() {
+    canvas.querySelectorAll('.js-calendar-event-item[data-event-id]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const eventId = button.getAttribute('data-event-id');
+        const targetEvent = getEventById(eventId);
+        if (!targetEvent) return;
+        openEventDetailModal(targetEvent);
       });
     });
   }
 
-  function attachYearDayClicks() {
-    canvas.querySelectorAll('.calendar-year-day[data-date]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const nextDate = parseDateKey(button.getAttribute('data-date'));
-        if (!nextDate) return;
-        cursor = nextDate;
-        viewMode = 'day';
-        updateViewButtons();
-        loadEvents();
+  function attachDayClicks() {
+    canvas.querySelectorAll('[data-day-date]').forEach((node) => {
+      node.addEventListener('click', (event) => {
+        if (event.target.closest('.js-calendar-event-item')) return;
+        const dateKey = String(node.getAttribute('data-day-date') || '').trim();
+        if (!dateKey) return;
+        openDayItemsModal(dateKey);
       });
     });
   }
@@ -693,7 +1023,7 @@
       const dayIso = isoDate(day);
       const muted = day.getMonth() !== cursor.getMonth();
       const dayEvents = eventMap[dayIso] || [];
-      html += `<section class="calendar-day-cell${muted ? ' is-muted' : ''}${dayIso === today ? ' is-today' : ''}">
+      html += `<section class="calendar-day-cell is-clickable${muted ? ' is-muted' : ''}${dayIso === today ? ' is-today' : ''}" data-day-date="${dayIso}">
         <div class="calendar-day-number">
           <span>${day.getDate()}</span>
           ${dayEvents.length ? `<span class="badge rounded-pill text-bg-light">${dayEvents.length}</span>` : ''}
@@ -704,6 +1034,7 @@
     html += '</div>';
     canvas.innerHTML = html;
     attachEventClicks();
+    attachDayClicks();
   }
 
   function renderYear() {
@@ -755,11 +1086,9 @@
             dateKey === today ? 'is-today' : '',
             dayEvents.length ? 'has-events' : ''
           ].filter(Boolean).join(' ');
-          const dataAttrs = dayEvents.length
-            ? ` data-date="${escapeHtml(dateKey)}" title="${escapeHtml(dayTitle)}"`
-            : '';
+          const dataAttrs = ` data-day-date="${escapeHtml(dateKey)}"${dayEvents.length ? ` title="${escapeHtml(dayTitle)}"` : ''}`;
 
-          html += `<td><button type="button" class="${classes}"${dataAttrs}>
+          html += `<td><button type="button" class="${classes} is-clickable"${dataAttrs}>
             ${dayNumber}
             ${dayEvents.length ? `<span class="calendar-year-day-count">${dayEvents.length}</span>` : ''}
           </button></td>`;
@@ -775,7 +1104,7 @@
 
     html += '</div>';
     canvas.innerHTML = html;
-    attachYearDayClicks();
+    attachDayClicks();
   }
 
   function renderWeek() {
@@ -788,7 +1117,7 @@
       const day = addDays(start, i);
       const dayIso = isoDate(day);
       const dayEvents = eventMap[dayIso] || [];
-      html += `<section class="calendar-week-cell${dayIso === today ? ' is-today' : ''}">
+      html += `<section class="calendar-week-cell is-clickable${dayIso === today ? ' is-today' : ''}" data-day-date="${dayIso}">
         <div class="calendar-week-cell-header">
           <div>${weekdayNames[day.getDay()]}</div>
           <div class="fs-4">${day.getDate()}</div>
@@ -801,6 +1130,7 @@
     html += '</div>';
     canvas.innerHTML = html;
     attachEventClicks();
+    attachDayClicks();
   }
 
   function renderDay() {
@@ -808,7 +1138,7 @@
     const dayIso = isoDate(start);
     const dayEvents = groupedEvents()[dayIso] || [];
     const isToday = dayIso === isoDate(new Date());
-    canvas.innerHTML = `<section class="calendar-day-focus${isToday ? ' is-today' : ''}">
+    canvas.innerHTML = `<section class="calendar-day-focus is-clickable${isToday ? ' is-today' : ''}" data-day-date="${dayIso}">
       <div class="calendar-day-focus-header">
         <div>${fullDateNames.format(start)}</div>
         <div class="text-muted small">${dayEvents.length ? `${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}` : 'No events'}</div>
@@ -816,6 +1146,7 @@
       <div class="calendar-ribbon-events">${dayEvents.length ? dayEvents.map(eventHtml).join('') : '<span class="text-muted">No events for this day.</span>'}</div>
     </section>`;
     attachEventClicks();
+    attachDayClicks();
   }
 
   function renderRibbon() {
@@ -914,6 +1245,7 @@
   document.querySelectorAll('.calendar-layer-toggle').forEach((input) => {
     input.addEventListener('change', () => {
       updateLayerSummary();
+      saveSelectedLayers();
       loadEvents();
     });
   });
@@ -923,7 +1255,8 @@
   });
 
   updateViewButtons();
-  updateLayerSummary();
+  updateRoleLayerVisibility(initialRoleKeys);
+  initializeLayerSelection();
   loadEvents();
 })();
 </script>
