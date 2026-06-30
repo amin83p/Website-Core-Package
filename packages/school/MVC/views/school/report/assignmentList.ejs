@@ -100,7 +100,6 @@
         <tr><td colspan="10" class="text-center py-4 text-muted">No assignments found.</td></tr>
       <% } %>
       <% (data || []).forEach((row) => { %>
-        <% const lifecycleMode = String(row?.classLifecycle?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based'; %>
         <% const lifecycleCycleNo = Number(row?.classLifecycle?.cycleNo || 1) > 0 ? Number(row?.classLifecycle?.cycleNo || 1) : 1; %>
         <tr>
           <td class="ps-4">
@@ -109,18 +108,7 @@
           </td>
           <td>
             <div class="fw-bold"><%= row.classTitle %></div>
-            <% if (lifecycleMode === 'rolling') { %>
-              <div class="d-flex flex-wrap gap-1 mt-1">
-                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Rolling</span>
-                <span class="badge bg-light text-dark border">Cycle #<%= lifecycleCycleNo %></span>
-                <% if (row?.classLifecycle?.isClosedForNewEnrollment) { %>
-                  <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Closed Enrollment</span>
-                <% } %>
-              </div>
-              <div class="x-small text-muted mt-1">Cycle Window: <%= row?.classLifecycle?.cycleStartDate || '?' %> -> <%= row?.classLifecycle?.cycleEndDate || 'Open' %></div>
-            <% } else { %>
-              <div class="mt-1"><span class="badge bg-light text-dark border">Term-Based</span></div>
-            <% } %>
+            <div class="x-small text-muted mt-1">Cycle #<%= lifecycleCycleNo %></div>
           </td>
           <td>
             <div><%= row.targetDate || row.sessionDate || '-' %></div>

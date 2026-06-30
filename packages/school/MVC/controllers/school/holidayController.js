@@ -86,6 +86,7 @@ async function listHolidays(req, res) {
         res.render('school/holiday/holidays', {
             title: 'School Holidays & Off Days',
             data,
+            yearHolidayData: filteredHolidays,
             searchableFields,
             currentYear: targetYear,
             tableName: 'Holidays_Management',

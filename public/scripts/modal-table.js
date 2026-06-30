@@ -21,11 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       headers.forEach(h => {
         h.classList.remove('sort-asc', 'sort-desc');
-        h.querySelector('.sort-icon').innerHTML = '';
+        const sortIcon = h.querySelector('.sort-icon');
+        if (sortIcon) sortIcon.innerHTML = '';
       });
 
       header.classList.add(`sort-${sortOrder}`);
-      header.querySelector('.sort-icon').innerHTML = sortOrder === 'asc' ? '▲' : '▼';
+      const activeSortIcon = header.querySelector('.sort-icon');
+      if (activeSortIcon) activeSortIcon.innerHTML = sortOrder === 'asc' ? '▲' : '▼';
 
       sortTable(column, sortOrder);
     });
@@ -51,16 +53,51 @@ document.addEventListener('DOMContentLoaded', () => {
   function sortTable(column, order) {
     const tbody = table.querySelector('tbody');
     const rows = Array.from(tbody.querySelectorAll('tr'));
+    const idx = getColumnIndex(column);
+    if (idx < 0) return;
 
     rows.sort((a, b) => {
-      const idx = getColumnIndex(column);
-      const aVal = a.children[idx].textContent.trim().toLowerCase();
-      const bVal = b.children[idx].textContent.trim().toLowerCase();
-      return order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      const aVal = resolveComparableSortValue(a.children[idx]);
+      const bVal = resolveComparableSortValue(b.children[idx]);
+      const comparison = compareSortValues(aVal, bVal);
+      return order === 'asc' ? comparison : -comparison;
     });
 
     tbody.innerHTML = '';
     rows.forEach(r => tbody.appendChild(r));
+  }
+
+  function resolveComparableSortValue(cell) {
+    const explicitRaw = cell?.dataset?.sortValue;
+    const cellRaw = String(
+      explicitRaw == null || String(explicitRaw).trim() === ''
+        ? (cell?.textContent || '')
+        : explicitRaw
+    ).replace(/\s+/g, ' ').trim();
+
+    if (!cellRaw) return { type: 'string', value: '' };
+
+    const normalizedNumeric = cellRaw.replace(/,/g, '');
+    if (/^-?\d+(\.\d+)?$/.test(normalizedNumeric)) {
+      return { type: 'number', value: Number(normalizedNumeric) };
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(cellRaw)) {
+      const asTimestamp = Date.parse(cellRaw);
+      if (!Number.isNaN(asTimestamp)) return { type: 'number', value: asTimestamp };
+    }
+
+    return { type: 'string', value: cellRaw.toLowerCase() };
+  }
+
+  function compareSortValues(aValue, bValue) {
+    if (aValue.type === 'number' && bValue.type === 'number') {
+      return aValue.value - bValue.value;
+    }
+    return String(aValue.value).localeCompare(String(bValue.value), undefined, {
+      sensitivity: 'base',
+      numeric: true
+    });
   }
 
   function getColumnIndex(column) {
