@@ -152,6 +152,18 @@
   .calendar-day-cell.is-muted {
     opacity: .52;
   }
+  .calendar-day-cell.is-holiday-day,
+  .calendar-week-cell.is-holiday-day,
+  .calendar-day-focus.is-holiday-day {
+    background: linear-gradient(180deg, #fff4f6 0%, #fff9fa 100%);
+    border-color: rgba(220, 53, 69, .24);
+  }
+  .calendar-day-cell.is-holiday-with-events,
+  .calendar-week-cell.is-holiday-with-events,
+  .calendar-day-focus.is-holiday-with-events {
+    background: linear-gradient(180deg, #ffecef 0%, #fff7f8 100%);
+    border-color: rgba(220, 53, 69, .4);
+  }
   .calendar-day-cell.is-today {
     border-color: rgba(13, 110, 253, .42);
     box-shadow: inset 0 0 0 2px rgba(13, 110, 253, .12);
@@ -296,6 +308,14 @@
     color: #0d6efd;
     cursor: pointer;
   }
+  .calendar-year-day.is-holiday-day {
+    background: #ffe8ed;
+    color: #a21e33;
+  }
+  .calendar-year-day.is-holiday-with-events {
+    background: #ffdce4;
+    color: #8e1730;
+  }
   .calendar-year-day-count {
     position: absolute;
     z-index: 1;
@@ -358,6 +378,76 @@
   }
   .calendar-modal-item .small {
     line-height: 1.2;
+  }
+  .calendar-day-modal-summary {
+    border: 1px solid rgba(13, 110, 253, 0.18);
+    background: linear-gradient(180deg, #f4f9ff 0%, #eef6ff 100%);
+    border-radius: .85rem;
+    padding: .7rem .8rem;
+    margin-bottom: .75rem;
+  }
+  .calendar-day-modal-summary .badge {
+    font-size: .72rem;
+  }
+  .calendar-day-affects-all {
+    border: 1px solid rgba(220, 53, 69, .28);
+    background: #fff2f4;
+    border-radius: .75rem;
+    color: #842029;
+    padding: .6rem .75rem;
+    margin-bottom: .75rem;
+    font-size: .84rem;
+  }
+  .calendar-day-section-title {
+    color: #123047;
+    font-size: .84rem;
+    font-weight: 800;
+    letter-spacing: .02em;
+    margin: .35rem 0 .45rem;
+  }
+  .calendar-day-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+  .calendar-day-timeline-item {
+    border-left-width: 5px;
+    margin-top: var(--gap-space, 0px);
+  }
+  .calendar-day-timeline-item .calendar-duration-chip {
+    font-size: .7rem;
+  }
+  .calendar-day-timeline-item[data-duration-level="long"] {
+    min-height: 78px;
+  }
+  .calendar-day-timeline-item[data-duration-level="medium"] {
+    min-height: 62px;
+  }
+  .calendar-day-timeline-item[data-duration-level="short"] {
+    min-height: 50px;
+  }
+  .calendar-day-deadline-ribbon {
+    border-left-color: #dc3545 !important;
+    background: #fff3f5 !important;
+    border-left-width: 3px;
+    padding-top: .2rem;
+    padding-bottom: .2rem;
+    border-radius: .55rem;
+    min-height: 30px !important;
+  }
+  .calendar-day-holiday-note {
+    display: inline-block;
+    margin-left: .35rem;
+    padding: .05rem .35rem;
+    border-radius: .45rem;
+    background: #f8d7da;
+    color: #842029;
+    font-size: .62rem;
+    line-height: 1.2;
+    vertical-align: middle;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
   }
   @media (max-width: 900px) {
     .calendar-weekdays {
@@ -889,8 +979,137 @@
     return (events || []).find((event) => String(event?.id || '') === targetId) || null;
   }
 
+  function parseTimeToMinutes(value) {
+    const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    const hh = Number(match[1]);
+    const mm = Number(match[2]);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+    return (hh * 60) + mm;
+  }
+
+  function formatGapDuration(totalMinutes) {
+    const mins = Math.max(0, Number(totalMinutes) || 0);
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h && m) return `${h}h ${m}m`;
+    if (h) return `${h}h`;
+    return `${m}m`;
+  }
+
+  function gapSpacingPx(gapMinutes) {
+    const mins = Math.max(0, Number(gapMinutes) || 0);
+    if (!mins) return 0;
+    return Math.min(72, Math.round(mins / 2.5));
+  }
+
+  function isHolidayDayOffEvent(event = {}) {
+    return String(event?.type || '').trim().toLowerCase() === 'holiday'
+      || String(event?.layer || '').trim().toLowerCase() === 'school_days_off';
+  }
+
+  function isDeadlineEvent(event = {}) {
+    return String(event?.type || '').trim().toLowerCase() === 'timesheet_deadline'
+      || String(event?.layer || '').trim().toLowerCase() === 'timesheet_deadlines';
+  }
+
+  function isAllDayEvent(event = {}) {
+    if (isHolidayDayOffEvent(event)) return true;
+    if (event?.meta?.allDay === true) return true;
+    return !String(event?.startTime || '').trim() && !String(event?.endTime || '').trim();
+  }
+
+  function deriveEventDurationMinutes(event = {}) {
+    if (isAllDayEvent(event)) return 24 * 60;
+    if (isDeadlineEvent(event)) return 0;
+    const start = parseTimeToMinutes(event?.startTime);
+    const end = parseTimeToMinutes(event?.endTime);
+    if (Number.isFinite(start) && Number.isFinite(end) && end > start) return end - start;
+    const durationHoursRaw = Number(event?.meta?.durationHours || 0);
+    if (Number.isFinite(durationHoursRaw) && durationHoursRaw > 0) {
+      return Math.max(5, Math.round(durationHoursRaw * 60));
+    }
+    return 30;
+  }
+
+  function durationLevel(durationMinutes) {
+    const mins = Math.max(0, Number(durationMinutes) || 0);
+    if (mins >= 120) return 'long';
+    if (mins >= 45) return 'medium';
+    return 'short';
+  }
+
+  function normalizeEventTimeLabel(event = {}) {
+    if (isAllDayEvent(event)) return 'All day';
+    if (isDeadlineEvent(event)) return 'Deadline spot';
+    if (event.startTime) return `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`;
+    return 'Time not specified';
+  }
+
+  function buildDayState(dayEvents = []) {
+    const rows = Array.isArray(dayEvents) ? dayEvents : [];
+    const hasHoliday = rows.some((event) => isHolidayDayOffEvent(event));
+    const hasNonHoliday = rows.some((event) => !isHolidayDayOffEvent(event));
+    return {
+      hasHoliday,
+      hasNonHoliday,
+      hasHolidayWithEvents: hasHoliday && hasNonHoliday
+    };
+  }
+
+  function buildDayTimeline(dayEvents = []) {
+    const normalized = (Array.isArray(dayEvents) ? dayEvents : []).map((event) => {
+      const startMinutes = parseTimeToMinutes(event?.startTime);
+      const endMinutesRaw = parseTimeToMinutes(event?.endTime);
+      const endMinutes = (Number.isFinite(endMinutesRaw) && Number.isFinite(startMinutes) && endMinutesRaw > startMinutes)
+        ? endMinutesRaw
+        : (Number.isFinite(startMinutes) ? Math.min((24 * 60), startMinutes + 30) : null);
+      return {
+        event,
+        isAllDay: isAllDayEvent(event),
+        isHolidayBlock: isHolidayDayOffEvent(event),
+        isDeadline: isDeadlineEvent(event),
+        startMinutes,
+        endMinutes,
+        durationMinutes: deriveEventDurationMinutes(event)
+      };
+    });
+
+    const allDayEvents = normalized
+      .filter((entry) => entry.isAllDay)
+      .sort((a, b) => String(a.event?.title || '').localeCompare(String(b.event?.title || '')));
+
+    const timedEvents = normalized
+      .filter((entry) => !entry.isAllDay && Number.isFinite(entry.startMinutes))
+      .sort((a, b) => Number(a.startMinutes) - Number(b.startMinutes)
+        || Number(b.durationMinutes || 0) - Number(a.durationMinutes || 0)
+        || String(a.event?.title || '').localeCompare(String(b.event?.title || '')));
+
+    const untimedEvents = normalized
+      .filter((entry) => !entry.isAllDay && !Number.isFinite(entry.startMinutes))
+      .sort((a, b) => String(a.event?.title || '').localeCompare(String(b.event?.title || '')));
+
+    const timelineRows = [];
+    let cursorMinutes = null;
+    timedEvents.forEach((entry) => {
+      const leadingGapMinutes = (Number.isFinite(cursorMinutes) && entry.startMinutes > cursorMinutes)
+        ? (entry.startMinutes - cursorMinutes)
+        : 0;
+      timelineRows.push({ ...entry, leadingGapMinutes });
+      if (!Number.isFinite(cursorMinutes)) cursorMinutes = entry.endMinutes;
+      else cursorMinutes = Math.max(cursorMinutes, entry.endMinutes);
+    });
+
+    return {
+      allDayEvents,
+      timelineRows,
+      untimedEvents,
+      hasHolidayBlock: allDayEvents.some((entry) => entry.isHolidayBlock)
+    };
+  }
+
   function eventHtml(event) {
-    const time = event.startTime ? `${escapeHtml(event.startTime)}${event.endTime ? ' - ' + escapeHtml(event.endTime) : ''}` : 'All day';
+    const time = escapeHtml(normalizeEventTimeLabel(event));
     const label = escapeHtml(event.title || 'Calendar event');
     const categoryName = escapeHtml(event?.meta?.categoryName || '');
     const cls = `calendar-event-pill tone-${escapeHtml(event.tone || 'secondary')}`;
@@ -906,9 +1125,7 @@
     if (!event || !eventDetailModalBody || !eventDetailModalTitle || !eventDetailModalEl) return;
 
     const dateLabel = formatDateFromKey(event.date || '');
-    const timeLabel = event.startTime
-      ? `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`
-      : 'All day';
+    const timeLabel = normalizeEventTimeLabel(event);
     const categoryName = String(event?.meta?.categoryName || '').trim();
     const departmentName = String(event?.meta?.departmentName || '').trim();
     const notes = String(event?.meta?.notes || event?.meta?.description || '').trim();
@@ -942,6 +1159,8 @@
     if (!dayItemsModalBody || !dayItemsModalTitle || !dayItemsModalEl) return;
     const safeDateKey = String(dateKey || '').trim();
     const dayEvents = getEventsForDate(safeDateKey);
+    const timeline = buildDayTimeline(dayEvents);
+    const dayState = buildDayState(dayEvents);
     dayItemsModalTitle.textContent = `Items for ${formatDateFromKey(safeDateKey)}`;
 
     if (!dayEvents.length) {
@@ -950,27 +1169,117 @@
       return;
     }
 
+    const summaryHtml = `
+      <div class="calendar-day-modal-summary d-flex align-items-center justify-content-between gap-2 flex-wrap">
+        <div class="fw-semibold text-dark">${escapeHtml(formatDateFromKey(safeDateKey))}</div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="badge bg-primary-subtle text-primary border">${dayEvents.length} item${dayEvents.length === 1 ? '' : 's'}</span>
+          ${timeline.allDayEvents.length ? `<span class="badge bg-danger-subtle text-danger border">${timeline.allDayEvents.length} all-day</span>` : ''}
+          ${timeline.timelineRows.length ? `<span class="badge bg-info-subtle text-info border">${timeline.timelineRows.length} timed</span>` : ''}
+        </div>
+      </div>
+    `;
+
+    const holidayBlockHtml = dayState.hasHoliday
+      ? `<div class="calendar-day-affects-all"><i class="bi bi-exclamation-octagon me-1"></i>This day is holiday/off-day${dayState.hasHolidayWithEvents ? ', and there are scheduled events as well.' : ', so the whole day is affected.'}</div>`
+      : '';
+
+    const allDaySectionHtml = timeline.allDayEvents.length
+      ? `
+        <div class="calendar-day-section-title">All-Day Items</div>
+        <div class="calendar-day-timeline mb-2">
+          ${timeline.allDayEvents.map((entry) => {
+            const event = entry.event || {};
+            const eventId = escapeHtml(event?.id || '');
+            const categoryName = escapeHtml(event?.meta?.categoryName || '');
+            const kindLabel = entry.isHolidayBlock ? 'Holiday / Day Off' : escapeHtml(event?.type || 'all_day');
+            const durationLabel = entry.durationMinutes >= (24 * 60)
+              ? 'Full day'
+              : formatGapDuration(entry.durationMinutes || 0);
+            return `
+              <button type="button" class="btn btn-light text-start calendar-modal-item calendar-day-timeline-item js-calendar-open-event" style="--gap-space:0px;" data-duration-level="${durationLevel(entry.durationMinutes)}" data-event-id="${eventId}">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div class="fw-bold text-dark">${escapeHtml(event.title || 'Calendar Event')}</div>
+                    <div class="small text-muted">${escapeHtml(normalizeEventTimeLabel(event))}</div>
+                    ${categoryName ? `<div class="small text-primary-emphasis mt-1">${categoryName}</div>` : ''}
+                  </div>
+                  <div class="d-flex flex-column align-items-end gap-1">
+                    <span class="badge ${entry.isHolidayBlock ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-light text-dark border'}">${kindLabel}</span>
+                    <span class="badge bg-secondary-subtle text-secondary border calendar-duration-chip">${escapeHtml(durationLabel)}</span>
+                  </div>
+                </div>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `
+      : '';
+
+    const timedSectionRows = timeline.timelineRows.map((row) => {
+      const event = row.event || {};
+      const eventId = escapeHtml(event?.id || '');
+      const categoryName = escapeHtml(event?.meta?.categoryName || '');
+      const durationLabel = formatGapDuration(row.durationMinutes || deriveEventDurationMinutes(event));
+      const isDeadline = row.isDeadline === true || isDeadlineEvent(event);
+      const leadingGapSpacePx = gapSpacingPx(row.leadingGapMinutes || 0);
+      const typeBadgeClass = isDeadline
+        ? 'text-bg-danger'
+        : 'bg-light text-dark border';
+      const timelineItemClass = `calendar-modal-item calendar-day-timeline-item js-calendar-open-event${isDeadline ? ' calendar-day-deadline-ribbon' : ''}`;
+      return `
+        <button type="button" class="btn btn-light text-start ${timelineItemClass}" style="--gap-space:${leadingGapSpacePx}px;" data-duration-level="${durationLevel(row.durationMinutes)}" data-event-id="${eventId}">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <div class="fw-bold text-dark">${escapeHtml(event.title || 'Calendar Event')}</div>
+              <div class="small text-muted">${escapeHtml(normalizeEventTimeLabel(event))}</div>
+              ${categoryName ? `<div class="small text-primary-emphasis mt-1">${categoryName}</div>` : ''}
+            </div>
+            <div class="d-flex flex-column align-items-end gap-1">
+              <span class="badge ${typeBadgeClass}">${isDeadline ? 'Deadline Spot' : escapeHtml(event?.type || 'event')}</span>
+              ${isDeadline ? '' : `<span class="badge bg-secondary-subtle text-secondary border calendar-duration-chip">${escapeHtml(durationLabel)}</span>`}
+            </div>
+          </div>
+        </button>
+      `;
+    }).join('');
+
+    const timedSectionHtml = (timeline.timelineRows.length || timeline.untimedEvents.length)
+      ? `
+        <div class="calendar-day-section-title">Timeline by Occurrence</div>
+        <div class="calendar-day-timeline">
+          ${timedSectionRows || ''}
+          ${timeline.untimedEvents.map((entry) => {
+            const event = entry.event || {};
+            const eventId = escapeHtml(event?.id || '');
+            const categoryName = escapeHtml(event?.meta?.categoryName || '');
+            const durationLabel = formatGapDuration(entry.durationMinutes || deriveEventDurationMinutes(event));
+            return `
+              <button type="button" class="btn btn-light text-start calendar-modal-item calendar-day-timeline-item js-calendar-open-event" style="--gap-space:0px;" data-duration-level="${durationLevel(entry.durationMinutes)}" data-event-id="${eventId}">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div class="fw-bold text-dark">${escapeHtml(event.title || 'Calendar Event')}</div>
+                    <div class="small text-muted">Time not specified</div>
+                    ${categoryName ? `<div class="small text-primary-emphasis mt-1">${categoryName}</div>` : ''}
+                  </div>
+                  <div class="d-flex flex-column align-items-end gap-1">
+                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Unscheduled Time</span>
+                    <span class="badge bg-secondary-subtle text-secondary border calendar-duration-chip">${escapeHtml(durationLabel)}</span>
+                  </div>
+                </div>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `
+      : '';
+
     dayItemsModalBody.innerHTML = `
       <div class="vstack gap-2">
-        ${dayEvents.map((event) => {
-          const eventId = escapeHtml(event?.id || '');
-          const timeLabel = event.startTime
-            ? `${escapeHtml(event.startTime)}${event.endTime ? ` - ${escapeHtml(event.endTime)}` : ''}`
-            : 'All day';
-          const categoryName = escapeHtml(event?.meta?.categoryName || '');
-          return `
-            <button type="button" class="btn btn-light text-start calendar-modal-item js-calendar-open-event" data-event-id="${eventId}">
-              <div class="d-flex justify-content-between align-items-start gap-2">
-                <div>
-                  <div class="fw-bold text-dark">${escapeHtml(event.title || 'Calendar Event')}</div>
-                  <div class="small text-muted">${timeLabel}</div>
-                  ${categoryName ? `<div class="small text-primary-emphasis mt-1">${categoryName}</div>` : ''}
-                </div>
-                <span class="badge bg-light text-dark border">${escapeHtml(event?.type || 'event')}</span>
-              </div>
-            </button>
-          `;
-        }).join('')}
+        ${summaryHtml}
+        ${holidayBlockHtml}
+        ${allDaySectionHtml}
+        ${timedSectionHtml || '<div class="text-muted small">No timed events for this day.</div>'}
       </div>
     `;
 
@@ -1023,9 +1332,10 @@
       const dayIso = isoDate(day);
       const muted = day.getMonth() !== cursor.getMonth();
       const dayEvents = eventMap[dayIso] || [];
-      html += `<section class="calendar-day-cell is-clickable${muted ? ' is-muted' : ''}${dayIso === today ? ' is-today' : ''}" data-day-date="${dayIso}">
+      const dayState = buildDayState(dayEvents);
+      html += `<section class="calendar-day-cell is-clickable${muted ? ' is-muted' : ''}${dayIso === today ? ' is-today' : ''}${dayState.hasHoliday ? ' is-holiday-day' : ''}${dayState.hasHolidayWithEvents ? ' is-holiday-with-events' : ''}" data-day-date="${dayIso}">
         <div class="calendar-day-number">
-          <span>${day.getDate()}</span>
+          <span>${day.getDate()}${dayState.hasHoliday ? '<span class="calendar-day-holiday-note">Holiday</span>' : ''}</span>
           ${dayEvents.length ? `<span class="badge rounded-pill text-bg-light">${dayEvents.length}</span>` : ''}
         </div>
         <div class="calendar-event-list">${dayEvents.slice(0, 5).map(eventHtml).join('')}${dayEvents.length > 5 ? `<span class="small text-muted">+${dayEvents.length - 5} more</span>` : ''}</div>
@@ -1077,6 +1387,7 @@
           renderedCell = true;
           const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
           const dayEvents = eventMap[dateKey] || [];
+          const dayState = buildDayState(dayEvents);
           const dayTitle = dayEvents
             .map((event) => `${event.startTime || 'All day'} - ${event.title || 'Calendar event'}`)
             .join(' | ');
@@ -1084,7 +1395,9 @@
             'calendar-year-day',
             weekDay === 0 || weekDay === 6 ? 'is-weekend' : '',
             dateKey === today ? 'is-today' : '',
-            dayEvents.length ? 'has-events' : ''
+            dayEvents.length ? 'has-events' : '',
+            dayState.hasHoliday ? 'is-holiday-day' : '',
+            dayState.hasHolidayWithEvents ? 'is-holiday-with-events' : ''
           ].filter(Boolean).join(' ');
           const dataAttrs = ` data-day-date="${escapeHtml(dateKey)}"${dayEvents.length ? ` title="${escapeHtml(dayTitle)}"` : ''}`;
 
@@ -1117,10 +1430,12 @@
       const day = addDays(start, i);
       const dayIso = isoDate(day);
       const dayEvents = eventMap[dayIso] || [];
-      html += `<section class="calendar-week-cell is-clickable${dayIso === today ? ' is-today' : ''}" data-day-date="${dayIso}">
+      const dayState = buildDayState(dayEvents);
+      html += `<section class="calendar-week-cell is-clickable${dayIso === today ? ' is-today' : ''}${dayState.hasHoliday ? ' is-holiday-day' : ''}${dayState.hasHolidayWithEvents ? ' is-holiday-with-events' : ''}" data-day-date="${dayIso}">
         <div class="calendar-week-cell-header">
           <div>${weekdayNames[day.getDay()]}</div>
           <div class="fs-4">${day.getDate()}</div>
+          ${dayState.hasHoliday ? '<div class="calendar-day-holiday-note mt-1">Holiday</div>' : ''}
           <div class="text-muted small">${dayIso}</div>
         </div>
         <div class="calendar-event-list">${dayEvents.length ? dayEvents.map(eventHtml).join('') : '<span class="text-muted small">No events.</span>'}</div>
@@ -1138,9 +1453,11 @@
     const dayIso = isoDate(start);
     const dayEvents = groupedEvents()[dayIso] || [];
     const isToday = dayIso === isoDate(new Date());
-    canvas.innerHTML = `<section class="calendar-day-focus is-clickable${isToday ? ' is-today' : ''}" data-day-date="${dayIso}">
+    const dayState = buildDayState(dayEvents);
+    canvas.innerHTML = `<section class="calendar-day-focus is-clickable${isToday ? ' is-today' : ''}${dayState.hasHoliday ? ' is-holiday-day' : ''}${dayState.hasHolidayWithEvents ? ' is-holiday-with-events' : ''}" data-day-date="${dayIso}">
       <div class="calendar-day-focus-header">
         <div>${fullDateNames.format(start)}</div>
+        ${dayState.hasHoliday ? '<div class="calendar-day-holiday-note mt-1">Holiday</div>' : ''}
         <div class="text-muted small">${dayEvents.length ? `${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}` : 'No events'}</div>
       </div>
       <div class="calendar-ribbon-events">${dayEvents.length ? dayEvents.map(eventHtml).join('') : '<span class="text-muted">No events for this day.</span>'}</div>

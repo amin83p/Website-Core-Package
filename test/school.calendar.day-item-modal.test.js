@@ -30,3 +30,21 @@ test('calendar script supports clickable day and item modal flow', () => {
   assert.match(view, /data-day-date="/);
   assert.match(view, /js-calendar-event-item/);
 });
+
+test('calendar day modal renders timeline gaps and holiday full-day indicators', () => {
+  const view = read('packages/school/MVC/views/school/calendar/calendar.ejs');
+
+  assert.match(view, /function buildDayTimeline\(dayEvents = \[\]\)/);
+  assert.match(view, /function buildDayState\(dayEvents = \[\]\)/);
+  assert.match(view, /function gapSpacingPx\(gapMinutes\)/);
+  assert.match(view, /--gap-space:/);
+  assert.match(view, /calendar-day-deadline-ribbon/);
+  assert.match(view, /calendar-duration-chip/);
+  assert.match(view, /Timeline by Occurrence/);
+  assert.match(view, /This day is holiday\/off-day/);
+  assert.match(view, /is-holiday-with-events/);
+  assert.match(view, /if \(isDeadlineEvent\(event\)\) return 0;/);
+  assert.match(view, /if \(isDeadlineEvent\(event\)\) return 'Deadline spot';/);
+  assert.match(view, /Deadline Spot/);
+  assert.match(view, /function isHolidayDayOffEvent\(event = \{\}\)/);
+});
