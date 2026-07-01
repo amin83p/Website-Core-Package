@@ -2,11 +2,16 @@
   const stateFilters = (filters && typeof filters === 'object') ? filters : {};
   const activeStatus = String(stateFilters.status || '').trim().toLowerCase();
   const activeCategoryId = String(stateFilters.categoryId || '').trim();
+  const rawActiveVisibilityScope = String(stateFilters.visibilityScope || stateFilters.scope || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const activeVisibilityScope = ['individual', 'private', 'personal', 'assigned', 'assigned_only', 'attendee', 'attendees', 'attendees_only'].includes(rawActiveVisibilityScope)
+    ? 'individual'
+    : (rawActiveVisibilityScope ? 'school' : '');
   const totalMatchedRows = Number(pagination?.totalItems ?? pagination?.total ?? (Array.isArray(data) ? data.length : 0));
   const hasActivityFiltersApplied = Boolean(
     String(stateFilters.q || '').trim()
     || activeStatus
     || activeCategoryId
+    || activeVisibilityScope
   );
 %>
 
@@ -44,7 +49,7 @@
   <div class="collapse<%= hasActivityFiltersApplied ? ' show' : '' %>" id="schoolActivityFilterCollapse">
     <form method="GET" action="/school/activities" id="schoolActivityFilterForm" class="card-body p-3">
       <div class="row g-3 align-items-end">
-        <div class="col-md-6 col-xl-3">
+        <div class="col-md-6 col-xl-2">
           <label class="form-label">Category</label>
           <select name="categoryId" class="form-select size-md">
             <option value="">All Categories</option>
@@ -53,7 +58,7 @@
             <% }) %>
           </select>
         </div>
-        <div class="col-md-6 col-xl-3">
+        <div class="col-md-6 col-xl-2">
           <label class="form-label">Status</label>
           <select name="status" class="form-select size-md">
             <option value="">All Statuses</option>
@@ -63,10 +68,18 @@
           </select>
         </div>
         <div class="col-md-6 col-xl-3">
+          <label class="form-label">Calendar Scope</label>
+          <select name="visibilityScope" class="form-select size-md">
+            <option value="">All Scopes</option>
+            <option value="school" <%= activeVisibilityScope === 'school' ? 'selected' : '' %>>School / Public</option>
+            <option value="individual" <%= activeVisibilityScope === 'individual' ? 'selected' : '' %>>Individual / Assigned only</option>
+          </select>
+        </div>
+        <div class="col-md-6 col-xl-3">
           <label class="form-label">Search</label>
           <input type="search" name="q" class="form-control size-md" value="<%= stateFilters.q || '' %>" placeholder="Search activities by title, category, department, location, or status...">
         </div>
-        <div class="col-md-6 col-xl-3 d-flex justify-content-xl-end gap-2 pt-xl-4">
+        <div class="col-md-12 col-xl-2 d-flex justify-content-xl-end gap-2 pt-xl-4">
           <a href="/school/activities" class="btn btn-outline-secondary btn-md">Reset</a>
           <button type="submit" class="btn btn-filled btn-primary btn-md">
             <i class="bi bi-funnel me-1"></i> Apply
@@ -114,12 +127,16 @@
       <% } %>
       <% (data || []).forEach((item) => { %>
         <% const attendees = Array.isArray(item.attendees) ? item.attendees : []; %>
+        <% const entries = Array.isArray(item.entries) ? item.entries : []; %>
+        <% const totalDurationHours = Number(item.totalDurationHours || entries.reduce((sum, entry) => sum + (Number(entry.durationHours) || 0), 0) || item.durationHours || 0); %>
         <% const status = String(item.status || 'draft').toLowerCase(); %>
         <% const statusClass = status === 'posted' ? 'bg-success' : (status === 'cancelled' ? 'bg-secondary' : 'bg-info text-dark'); %>
+        <% const itemVisibilityScope = String(item.visibilityScope || 'school').toLowerCase() === 'individual' ? 'individual' : 'school'; %>
         <tr>
           <td class="ps-4">
             <div class="fw-bold text-dark"><%= item.title || '-' %></div>
-            <div class="x-small text-muted font-monospace"><%= item.id || '-' %></div>
+            <div class="x-small text-muted font-monospace mb-1"><%= item.id || '-' %></div>
+            <span class="badge <%= itemVisibilityScope === 'school' ? 'bg-primary' : 'bg-secondary' %>"><%= itemVisibilityScope === 'school' ? 'School / Public' : 'Individual' %></span>
             <% if (item.location) { %>
               <div class="x-small text-muted mt-1"><i class="bi bi-geo-alt me-1"></i><%= item.location %></div>
             <% } %>
@@ -132,10 +149,11 @@
           </td>
           <td>
             <div class="small fw-bold text-dark"><%= item.date || '-' %></div>
-            <div class="x-small text-muted"><%= item.startTime || '-' %> - <%= item.endTime || '-' %> | <%= Number(item.durationHours || 0).toFixed(2) %> h</div>
+            <div class="x-small text-muted"><%= item.startTime || '-' %> - <%= item.endTime || '-' %> | <%= totalDurationHours.toFixed(2) %> h total</div>
+            <div class="x-small text-muted"><%= entries.length || 1 %> work session<%= (entries.length || 1) === 1 ? '' : 's' %></div>
           </td>
           <td>
-            <div class="small text-dark"><%= attendees.length %> attendee<%= attendees.length === 1 ? '' : 's' %></div>
+            <div class="small text-dark"><%= attendees.length %> assigned person<%= attendees.length === 1 ? '' : 's' %></div>
             <div class="x-small text-muted"><%= item.paid ? 'Payable activity' : 'Unpaid activity' %></div>
           </td>
           <td>

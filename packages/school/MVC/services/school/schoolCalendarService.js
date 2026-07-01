@@ -52,6 +52,10 @@ function normalizeBoolean(value) {
   return false;
 }
 
+function normalizeActivityVisibilityScope(value) {
+  return activityService.normalizeActivityVisibilityScope(value);
+}
+
 function parseLayers(value) {
   if (Array.isArray(value)) return new Set(value.map(normalizeId).filter(Boolean));
   return new Set(String(value || '')
@@ -127,21 +131,26 @@ function normalizeHolidayEvent(holiday) {
   };
 }
 
-function normalizeActivityEvent(activity = {}, { layerKey = '', subtype = '' } = {}) {
-  const date = normalizeDate(activity.date || activity.activityDate || activity.startDate);
+function normalizeActivityEvent(activity = {}, { layerKey = '', subtype = '', entry = null } = {}) {
+  const activityEntry = entry || {};
+  const date = normalizeDate(activityEntry.date || activity.date || activity.activityDate || activity.startDate);
   if (!date) return null;
   const id = normalizeId(activity.id || activity._id || activity.activityId || date);
+  const entryId = normalizeId(activityEntry.entryId);
   const categoryId = normalizeId(activity.categoryId || activity.category?.id);
   const resolvedSubtype = normalizeId(subtype || categoryId || 'activity') || 'activity';
   const resolvedLayerKey = normalizeId(layerKey) || buildActivityCategoryLayerKey(categoryId) || 'activity_category:unknown';
   const isPaid = normalizeBoolean(activity.paid || activity.isPaid || activity.payable);
+  const title = activityEntry.title && activityEntry.title !== activity.title
+    ? `${activity.title || activity.name || 'School Activity'}: ${activityEntry.title}`
+    : (activity.title || activity.name || 'School Professional Development');
   return {
-    id: `activity-${id}`,
-    sourceId: id,
+    id: `activity-${id}${entryId ? `-${entryId}` : ''}`,
+    sourceId: entryId ? `${id}:${entryId}` : id,
     date,
-    startTime: normalizeTime(activity.startTime),
-    endTime: normalizeTime(activity.endTime),
-    title: activity.title || activity.name || 'School Professional Development',
+    startTime: normalizeTime(activityEntry.startTime || activity.startTime),
+    endTime: normalizeTime(activityEntry.endTime || activity.endTime),
+    title,
     type: 'school_activity',
     layer: resolvedLayerKey,
     subtype: resolvedSubtype,
@@ -149,12 +158,14 @@ function normalizeActivityEvent(activity = {}, { layerKey = '', subtype = '' } =
     detailsUrl: `/school/activities/edit/${encodeURIComponent(id)}`,
     meta: {
       source: 'activities',
+      entryId,
       categoryId,
       categoryName: activity.categoryName || '',
       departmentName: activity.departmentName || '',
-      durationHours: activity.durationHours || '',
+      visibilityScope: normalizeActivityVisibilityScope(activity.visibilityScope),
+      durationHours: activityEntry.durationHours || activity.durationHours || '',
       paid: isPaid,
-      notes: activity.notes || ''
+      notes: activityEntry.notes || activity.notes || ''
     }
   };
 }
@@ -177,8 +188,9 @@ function normalizeScheduleEvent(event, role) {
   const type = event.eventType || event.targetType || 'schedule';
   const title = event.title || event.className || event.name || 'Schedule Event';
   const isActivity = type === 'school_activity' || event.targetType === 'activity';
+  const activityScope = isActivity ? normalizeActivityVisibilityScope(event.visibilityScope) : '';
   const tone = isActivity
-    ? (event.paid === true ? 'success' : 'info')
+    ? (activityScope === 'school' ? 'purple' : (event.paid === true ? 'success' : 'info'))
     : (role === 'teacher' ? 'primary' : role === 'staff' ? 'warning' : 'secondary');
   return {
     id: `schedule-${role}-${id}`,
@@ -199,6 +211,8 @@ function normalizeScheduleEvent(event, role) {
       classId: event.classId || '',
       className: event.className || '',
       activityId: event.activityId || '',
+      activityEntryId: event.activityEntryId || '',
+      visibilityScope: activityScope,
       categoryName: event.categoryName || '',
       departmentName: event.departmentName || '',
       paid: event.paid === true,
@@ -254,13 +268,17 @@ async function getActivityEventsByCategoryLayers({ reqUser, orgId, startDate, en
   const activities = await activityService.listActivities({ orgId, reqUser });
   return (Array.isArray(activities) ? activities : [])
     .filter((row) => rowBelongsToOrg(row, orgId))
-    .filter((row) => normalizeDate(row.date || row.activityDate || row.startDate))
-    .filter((row) => inDateRange(row.date || row.activityDate || row.startDate, startDate, endDate))
     .filter((row) => String(row.status || 'posted').toLowerCase() === 'posted')
+    .filter((row) => normalizeActivityVisibilityScope(row.visibilityScope) === 'school')
     .filter((row) => categoryIdSet.has(normalizeId(row.categoryId)))
-    .map((row) => {
+    .flatMap((row) => activityService.getActivityEntries(row).map((entry) => ({ row, entry })))
+    .filter(({ entry }) => String(entry.status || 'posted').toLowerCase() === 'posted')
+    .filter(({ entry }) => normalizeDate(entry.date))
+    .filter(({ entry }) => inDateRange(entry.date, startDate, endDate))
+    .map(({ row, entry }) => {
       const categoryId = normalizeId(row.categoryId);
       return normalizeActivityEvent(row, {
+        entry,
         layerKey: buildActivityCategoryLayerKey(categoryId),
         subtype: categoryId
       });

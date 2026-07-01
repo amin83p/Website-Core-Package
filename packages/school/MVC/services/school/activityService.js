@@ -21,6 +21,10 @@ function normalizeStatus(value, fallback = '') {
   return String(value || fallback || '').trim().toLowerCase();
 }
 
+function normalizeActivityVisibilityScope(value) {
+  return activityModel.normalizeActivityVisibilityScope(value);
+}
+
 function isActiveIdentity(row = {}) {
   const status = normalizeStatus(row.status || row.state || row.lifecycleStatus, 'active');
   return !['archived', 'deleted', 'inactive', 'disabled', 'removed'].includes(status);
@@ -35,10 +39,13 @@ function formatPersonName(person = {}, fallback = '') {
 }
 
 async function enrichActivityAttendeeNames(activity = {}, reqUser) {
-  const attendees = Array.isArray(activity.attendees) ? activity.attendees : [];
-  if (!attendees.length) return activity;
-  const personIds = [...new Set(attendees.map((row) => normalizeId(row.personId)).filter(Boolean))];
-  if (!personIds.length) return activity;
+  const normalized = normalizeActivityRecord(activity);
+  const entries = getActivityEntries(normalized);
+  const attendees = Array.isArray(normalized.attendees) ? normalized.attendees : [];
+  const entryAssignees = entries.flatMap((entry) => Array.isArray(entry.assignees) ? entry.assignees : []);
+  if (!attendees.length && !entryAssignees.length) return normalized;
+  const personIds = [...new Set([...attendees, ...entryAssignees].map((row) => normalizeId(row.personId)).filter(Boolean))];
+  if (!personIds.length) return normalized;
   let persons = [];
   try {
     const payload = await schoolIdentityLookupService.listSchoolPersons({
@@ -53,14 +60,19 @@ async function enrichActivityAttendeeNames(activity = {}, reqUser) {
   const personMap = new Map((Array.isArray(persons) ? persons : [])
     .map((person) => [normalizeId(person.id || person.personId), person])
     .filter(([id]) => personIds.includes(id)));
+  const enrichAssignee = (assignee) => {
+    const personId = normalizeId(assignee.personId);
+    const person = personMap.get(personId);
+    const personName = person ? formatPersonName(person, assignee.personName || personId) : (assignee.personName || personId);
+    return { ...assignee, personName };
+  };
   return {
-    ...activity,
-    attendees: attendees.map((attendee) => {
-      const personId = normalizeId(attendee.personId);
-      const person = personMap.get(personId);
-      const personName = person ? formatPersonName(person, attendee.personName || personId) : (attendee.personName || personId);
-      return { ...attendee, personName };
-    })
+    ...normalized,
+    attendees: attendees.map(enrichAssignee),
+    entries: entries.map((entry) => ({
+      ...entry,
+      assignees: (Array.isArray(entry.assignees) ? entry.assignees : []).map(enrichAssignee)
+    }))
   };
 }
 
@@ -75,13 +87,88 @@ function parseJsonArray(value) {
   }
 }
 
+function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
+  const assignees = parseJsonArray(entry.assignees);
+  const fallbackAssignees = parseJsonArray(entry.attendees);
+  const startTime = normalizeId(entry.startTime || activity.startTime);
+  const endTime = normalizeId(entry.endTime || activity.endTime);
+  const durationHours = Number(entry.durationHours || calculateDurationHours(startTime, endTime) || 0);
+  return {
+    entryId: normalizeId(entry.entryId || entry.id || `ENTRY-${index + 1}`),
+    title: normalizeId(entry.title),
+    date: normalizeId(entry.date || entry.activityDate || entry.startDate || activity.date || activity.activityDate || activity.startDate),
+    startTime,
+    endTime,
+    durationHours,
+    location: normalizeId(entry.location || activity.location),
+    notes: normalizeId(entry.notes),
+    status: normalizeStatus(entry.status, 'posted') || 'posted',
+    assignees: assignees.length
+      ? assignees
+      : (fallbackAssignees.length ? fallbackAssignees : parseJsonArray(activity.attendees))
+  };
+}
+
+function getActivityEntries(activity = {}) {
+  const entries = parseJsonArray(activity.entries);
+  if (entries.length) {
+    return entries.map((entry, index) => normalizeActivityEntry(entry, activity, index));
+  }
+  return [normalizeActivityEntry({
+    entryId: 'ENTRY-1',
+    title: '',
+    date: activity.date || activity.activityDate || activity.startDate,
+    startTime: activity.startTime,
+    endTime: activity.endTime,
+    durationHours: activity.durationHours,
+    location: activity.location,
+    notes: '',
+    status: 'posted',
+    assignees: parseJsonArray(activity.attendees)
+  }, activity, 0)];
+}
+
+function flattenActivityAssignees(entries = []) {
+  const byPersonId = new Map();
+  entries.forEach((entry) => {
+    (Array.isArray(entry.assignees) ? entry.assignees : []).forEach((assignee) => {
+      const personId = normalizeId(assignee.personId);
+      if (!personId) return;
+      const existing = byPersonId.get(personId);
+      if (!existing) {
+        byPersonId.set(personId, { ...assignee });
+        return;
+      }
+      const roles = [...new Set([...(existing.roles || []), ...(assignee.roles || [])].filter(Boolean))];
+      byPersonId.set(personId, {
+        ...existing,
+        personName: existing.personName || assignee.personName || personId,
+        roles: roles.length ? roles : existing.roles,
+        role: existing.role || assignee.role,
+        paid: existing.paid !== false || assignee.paid !== false,
+        paidHours: Number(((Number(existing.paidHours) || 0) + (Number(assignee.paidHours) || 0)).toFixed(2))
+      });
+    });
+  });
+  return [...byPersonId.values()];
+}
+
 function normalizeActivityRecord(activity = {}) {
   const parsedAttendees = parseJsonArray(activity.attendees);
+  const entries = getActivityEntries(activity);
+  const firstEntry = entries[0] || {};
+  const attendees = parsedAttendees.length ? parsedAttendees : flattenActivityAssignees(entries);
+  const visibilityScope = normalizeActivityVisibilityScope(activity.visibilityScope || activity.calendarScope || activity.scope);
   return {
     ...activity,
-    attendees: parsedAttendees.length
-      ? parsedAttendees
-      : (Array.isArray(activity.attendees) ? activity.attendees : [])
+    date: activity.date || firstEntry.date || '',
+    startTime: activity.startTime || firstEntry.startTime || '',
+    endTime: activity.endTime || firstEntry.endTime || '',
+    durationHours: Number(activity.durationHours || firstEntry.durationHours || 0),
+    totalDurationHours: Number(activity.totalDurationHours || entries.reduce((sum, entry) => sum + (Number(entry.durationHours) || 0), 0) || 0),
+    visibilityScope,
+    attendees,
+    entries
   };
 }
 
@@ -119,7 +206,8 @@ function enrichActivity(activity = {}, lookups = {}) {
     ...normalized,
     categoryName: normalized.categoryName || category?.name || normalized.categoryId || '',
     departmentName: normalized.departmentName || department?.name || department?.code || normalized.departmentId || '',
-    durationHours: Number(normalized.durationHours || calculateDurationHours(normalized.startTime, normalized.endTime) || 0)
+    durationHours: Number(normalized.durationHours || calculateDurationHours(normalized.startTime, normalized.endTime) || 0),
+    totalDurationHours: Number(normalized.totalDurationHours || normalized.durationHours || 0)
   };
 }
 
@@ -218,33 +306,39 @@ async function getScheduleEventsForPerson({ orgId, personId, startDate, endDate,
   const targetPersonId = normalizeId(personId);
   return activities.flatMap((activity) => {
     if (normalizeStatus(activity.status) !== 'posted') return [];
-    if (!activity.date || activity.date < startDate || activity.date > endDate) return [];
-    const attendees = Array.isArray(activity.attendees) ? activity.attendees : [];
-    return attendees
-      .filter((attendee) => idsEqual(attendee.personId, targetPersonId))
-      .filter((attendee) => normalizeStatus(attendee.status, 'attended') === 'attended')
-      .map((attendee) => ({
-        id: `ACT-${activity.id}-${targetPersonId}`,
-        activityId: activity.id,
-        targetType: 'activity',
-        personId: targetPersonId,
-        date: activity.date,
-        start: activity.startTime,
-        end: activity.endTime,
-        title: activity.title,
-        className: activity.title,
-        categoryName: activity.categoryName,
-        departmentId: activity.departmentId,
-        departmentName: activity.departmentName,
-        duration: Number(activity.durationHours || attendee.paidHours || 0),
-        paid: activity.paid === true && attendee.paid !== false,
-        status: 'posted',
-        roles: [attendee.role || 'Participant'],
-        roleLabel: activity.paid === true && attendee.paid !== false ? 'Paid Activity' : 'Activity',
-        detailsUrl: `/school/activities/edit/${encodeURIComponent(activity.id)}`,
-        hasOverlap: false,
-        eventType: 'school_activity'
-      }));
+    return getActivityEntries(activity).flatMap((entry) => {
+      if (normalizeStatus(entry.status, 'posted') !== 'posted') return [];
+      if (!entry.date || entry.date < startDate || entry.date > endDate) return [];
+      const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+      const entryTitle = entry.title && entry.title !== activity.title ? `${activity.title}: ${entry.title}` : activity.title;
+      return assignees
+        .filter((attendee) => idsEqual(attendee.personId, targetPersonId))
+        .filter((attendee) => normalizeStatus(attendee.status, 'attended') === 'attended')
+        .map((attendee) => ({
+          id: `ACT-${activity.id}-${entry.entryId}-${targetPersonId}`,
+          activityId: activity.id,
+          activityEntryId: entry.entryId,
+          targetType: 'activity',
+          personId: targetPersonId,
+          date: entry.date,
+          start: entry.startTime,
+          end: entry.endTime,
+          title: entryTitle,
+          className: entryTitle,
+          categoryName: activity.categoryName,
+          departmentId: activity.departmentId,
+          departmentName: activity.departmentName,
+          visibilityScope: activity.visibilityScope,
+          duration: Number(entry.durationHours || attendee.paidHours || 0),
+          paid: activity.paid === true && attendee.paid !== false,
+          status: 'posted',
+          roles: [attendee.role || 'Participant'],
+          roleLabel: activity.paid === true && attendee.paid !== false ? 'Paid Activity' : 'Activity',
+          detailsUrl: `/school/activities/edit/${encodeURIComponent(activity.id)}`,
+          hasOverlap: false,
+          eventType: 'school_activity'
+        }));
+    });
   });
 }
 
@@ -253,38 +347,45 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
   const targetPersonId = normalizeId(personId);
   return activities.flatMap((activity) => {
     if (normalizeStatus(activity.status) !== 'posted' || activity.paid !== true) return [];
-    if (!activity.date || activity.date < periodStartDate || activity.date > periodEndDate) return [];
-    const attendees = Array.isArray(activity.attendees) ? activity.attendees : [];
-    return attendees
-      .filter((attendee) => idsEqual(attendee.personId, targetPersonId))
-      .filter((attendee) => attendee.paid !== false && normalizeStatus(attendee.status, 'attended') === 'attended')
-      .map((attendee) => {
-        const hours = Number(attendee.paidHours || activity.durationHours || 0);
-        return {
-          sessionId: `act-${activity.id}-${targetPersonId}`,
-          activityId: activity.id,
-          date: activity.date,
-          startTime: activity.startTime,
-          endTime: activity.endTime,
-          className: activity.title,
-          classId: null,
-          departmentId: activity.departmentId,
-          departmentName: activity.departmentName,
-          categoryName: activity.categoryName,
-          hours,
-          durationHours: hours,
-          timesheetHours: hours,
-          status: 'activity',
-          comment: activity.notes || '',
-          isManual: false,
-          isSchoolActivity: true,
-          compensationLookup: {
-            personId: targetPersonId,
+    return getActivityEntries(activity).flatMap((entry) => {
+      if (normalizeStatus(entry.status, 'posted') !== 'posted') return [];
+      if (!entry.date || entry.date < periodStartDate || entry.date > periodEndDate) return [];
+      const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+      const entryTitle = entry.title && entry.title !== activity.title ? `${activity.title}: ${entry.title}` : activity.title;
+      return assignees
+        .filter((attendee) => idsEqual(attendee.personId, targetPersonId))
+        .filter((attendee) => attendee.paid !== false && normalizeStatus(attendee.status, 'attended') === 'attended')
+        .map((attendee) => {
+          const hours = Number(attendee.paidHours || entry.durationHours || 0);
+          return {
+            sessionId: `act-${activity.id}-${entry.entryId}-${targetPersonId}`,
+            activityId: activity.id,
+            activityEntryId: entry.entryId,
+            date: entry.date,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+            className: entryTitle,
+            classId: null,
             departmentId: activity.departmentId,
-            activityId: activity.id
-          }
-        };
-      });
+            departmentName: activity.departmentName,
+            categoryName: activity.categoryName,
+            visibilityScope: activity.visibilityScope,
+            hours,
+            durationHours: hours,
+            timesheetHours: hours,
+            status: 'activity',
+            comment: entry.notes || activity.notes || '',
+            isManual: false,
+            isSchoolActivity: true,
+            compensationLookup: {
+              personId: targetPersonId,
+              departmentId: activity.departmentId,
+              activityId: activity.id,
+              activityEntryId: entry.entryId
+            }
+          };
+        });
+    });
   });
 }
 
@@ -295,6 +396,8 @@ module.exports = {
   saveActivity,
   saveActivityCategory,
   getEligiblePersons,
+  getActivityEntries,
+  normalizeActivityVisibilityScope,
   getScheduleEventsForPerson,
   getTimesheetEntriesForPerson,
   calculateDurationHours

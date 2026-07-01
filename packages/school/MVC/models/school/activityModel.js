@@ -7,6 +7,7 @@ const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const dataPath = path.join(resolveCoreRoot(), 'data/school/activities.json');
 const ACTIVITY_STATUSES = new Set(['draft', 'posted', 'cancelled']);
 const ATTENDANCE_STATUSES = new Set(['attended', 'absent', 'excused']);
+const ACTIVITY_VISIBILITY_SCOPES = new Set(['school', 'individual']);
 
 if (!fsSync.existsSync(dataPath)) {
   fsSync.mkdirSync(path.dirname(dataPath), { recursive: true });
@@ -57,6 +58,10 @@ function generateId() {
   return `ACT-${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
+function generateEntryId(index = 0) {
+  return `ENTRY-${index + 1}`;
+}
+
 function calculateDurationHours(startTime, endTime) {
   if (!startTime || !endTime) return 0;
   const [sh, sm] = startTime.split(':').map(Number);
@@ -65,6 +70,15 @@ function calculateDurationHours(startTime, endTime) {
   const end = (eh * 60) + em;
   if (end <= start) return 0;
   return Number(((end - start) / 60).toFixed(2));
+}
+
+function normalizeActivityVisibilityScope(value) {
+  const raw = cleanString(value, { max: 40, allowEmpty: true }).toLowerCase().replace(/[\s-]+/g, '_');
+  if (!raw) return 'school';
+  if (['school', 'public', 'global', 'organization', 'org', 'all', 'school_scope', 'school_public', 'public_school', 'schoolwide', 'school_wide'].includes(raw)) return 'school';
+  if (['individual', 'private', 'personal', 'assigned', 'assigned_only', 'attendee', 'attendees', 'attendees_only'].includes(raw)) return 'individual';
+  if (!ACTIVITY_VISIBILITY_SCOPES.has(raw)) throw new Error('Invalid activity calendar scope.');
+  return raw;
 }
 
 function sanitizeAttendee(input = {}, activityPaid = false, durationHours = 0) {
@@ -98,6 +112,95 @@ function sanitizeAttendee(input = {}, activityPaid = false, durationHours = 0) {
   };
 }
 
+function parseJsonArray(value, fieldName = 'value') {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null || value === '') return [];
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    throw new Error(`${fieldName} must be valid JSON.`);
+  }
+}
+
+function sanitizeActivityEntry(input = {}, context = {}) {
+  const activityPaid = Boolean(context.activityPaid);
+  const index = Number.isInteger(context.index) ? context.index : 0;
+  const date = cleanDate(input.date || input.activityDate || input.startDate);
+  const startTime = cleanTime(input.startTime);
+  const endTime = cleanTime(input.endTime);
+  const derivedDuration = calculateDurationHours(startTime, endTime);
+  const durationHours = cleanHours(input.durationHours || derivedDuration, { allowZero: false });
+  const status = cleanString(input.status || 'posted', { max: 30, allowEmpty: true }).toLowerCase() || 'posted';
+  if (!ACTIVITY_STATUSES.has(status)) throw new Error('Invalid activity session status.');
+  const assigneesSource = Array.isArray(input.assignees)
+    ? input.assignees
+    : parseJsonArray(input.assignees, 'Activity session assignees');
+  const fallbackAttendees = Array.isArray(input.attendees)
+    ? input.attendees
+    : parseJsonArray(input.attendees, 'Activity session attendees');
+  const assignees = (assigneesSource.length ? assigneesSource : fallbackAttendees)
+    .map((row) => sanitizeAttendee(row, activityPaid, durationHours));
+  return {
+    entryId: cleanId(input.entryId || input.id || generateEntryId(index), { allowEmpty: false }),
+    title: cleanString(input.title, { max: 180, allowEmpty: true }),
+    date,
+    startTime,
+    endTime,
+    durationHours,
+    location: cleanString(input.location, { max: 180, allowEmpty: true }),
+    notes: cleanString(input.notes, { max: 1200, allowEmpty: true }),
+    status,
+    assignees
+  };
+}
+
+function buildLegacyActivityEntry(input = {}, context = {}) {
+  const attendeesSource = Array.isArray(input.attendees)
+    ? input.attendees
+    : parseJsonArray(input.attendees, 'Activity attendees');
+  return {
+    entryId: 'ENTRY-1',
+    title: '',
+    date: input.date,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    durationHours: input.durationHours,
+    location: input.location,
+    notes: '',
+    status: 'posted',
+    assignees: attendeesSource,
+    attendees: attendeesSource,
+    activityPaid: context.activityPaid
+  };
+}
+
+function flattenActivityAssignees(entries = []) {
+  const byPersonId = new Map();
+  entries.forEach((entry) => {
+    (Array.isArray(entry.assignees) ? entry.assignees : []).forEach((assignee) => {
+      const personId = cleanString(assignee.personId, { max: 80, allowEmpty: true });
+      if (!personId) return;
+      const existing = byPersonId.get(personId);
+      if (!existing) {
+        byPersonId.set(personId, { ...assignee });
+        return;
+      }
+      const roles = [...new Set([...(existing.roles || []), ...(assignee.roles || [])].filter(Boolean))];
+      byPersonId.set(personId, {
+        ...existing,
+        personName: existing.personName || assignee.personName || personId,
+        roles: roles.length ? roles : existing.roles,
+        role: existing.role || assignee.role,
+        paid: existing.paid !== false || assignee.paid !== false,
+        paidHours: Number(((Number(existing.paidHours) || 0) + (Number(assignee.paidHours) || 0)).toFixed(2))
+      });
+    });
+  });
+  return [...byPersonId.values()];
+}
+
 function sanitizeActivityPayload(input = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Invalid school activity payload.');
@@ -106,24 +209,23 @@ function sanitizeActivityPayload(input = {}) {
   const title = cleanString(input.title, { max: 180, allowEmpty: false });
   const categoryId = cleanId(input.categoryId, { allowEmpty: false });
   const departmentId = cleanId(input.departmentId, { allowEmpty: false });
-  const date = cleanDate(input.date);
-  const startTime = cleanTime(input.startTime);
-  const endTime = cleanTime(input.endTime);
-  const derivedDuration = calculateDurationHours(startTime, endTime);
-  const durationHours = cleanHours(input.durationHours || derivedDuration, { allowZero: false });
   const status = cleanString(input.status || 'draft', { max: 30, allowEmpty: true }).toLowerCase() || 'draft';
+  const visibilityScope = normalizeActivityVisibilityScope(input.visibilityScope || input.calendarScope || input.scope);
   const paid = input.paid === true || input.paid === 'true' || input.paid === 'on';
   if (!orgId) throw new Error('Organization is required.');
   if (!title) throw new Error('Activity title is required.');
   if (!categoryId) throw new Error('Activity category is required.');
   if (!departmentId) throw new Error('Activity department is required.');
   if (!ACTIVITY_STATUSES.has(status)) throw new Error('Invalid activity status.');
-  if (!(durationHours > 0)) throw new Error('Activity duration must be greater than zero.');
-  const attendeesSource = typeof input.attendees === 'string'
-    ? JSON.parse(input.attendees || '[]')
-    : input.attendees;
-  const attendees = (Array.isArray(attendeesSource) ? attendeesSource : [])
-    .map((row) => sanitizeAttendee(row, paid, durationHours));
+  const entriesSource = parseJsonArray(input.entries, 'Activity entries');
+  const rawEntries = entriesSource.length
+    ? entriesSource
+    : [buildLegacyActivityEntry(input, { activityPaid: paid })];
+  if (!rawEntries.length) throw new Error('At least one activity session is required.');
+  const entries = rawEntries.map((entry, index) => sanitizeActivityEntry(entry, { activityPaid: paid, index }));
+  const firstEntry = entries[0];
+  const attendees = flattenActivityAssignees(entries);
+  const totalDurationHours = Number(entries.reduce((sum, entry) => sum + (Number(entry.durationHours) || 0), 0).toFixed(2));
   return {
     orgId,
     title,
@@ -131,15 +233,18 @@ function sanitizeActivityPayload(input = {}) {
     categoryName: cleanString(input.categoryName, { max: 180, allowEmpty: true }),
     departmentId,
     departmentName: cleanString(input.departmentName, { max: 180, allowEmpty: true }),
-    date,
-    startTime,
-    endTime,
-    durationHours,
+    date: firstEntry.date,
+    startTime: firstEntry.startTime,
+    endTime: firstEntry.endTime,
+    durationHours: firstEntry.durationHours,
+    totalDurationHours,
     paid,
     status,
+    visibilityScope,
     location: cleanString(input.location, { max: 180, allowEmpty: true }),
     notes: cleanString(input.notes, { max: 1200, allowEmpty: true }),
-    attendees
+    attendees,
+    entries
   };
 }
 
@@ -208,6 +313,8 @@ module.exports = {
   deleteActivity,
   sanitizeActivityPayload,
   sanitizeAttendee,
+  sanitizeActivityEntry,
+  normalizeActivityVisibilityScope,
   calculateDurationHours
 };
 

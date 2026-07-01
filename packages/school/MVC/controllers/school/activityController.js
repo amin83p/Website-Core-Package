@@ -36,9 +36,12 @@ exports.listActivities = async (req, res) => {
     const allRows = await activityService.listActivities({ orgId, reqUser: req.user, query });
     const status = String(req.query.status || '').trim().toLowerCase();
     const categoryId = String(req.query.categoryId || '').trim();
+    const rawVisibilityScope = String(req.query.visibilityScope || req.query.scope || '').trim();
+    const visibilityScope = rawVisibilityScope ? activityService.normalizeActivityVisibilityScope(rawVisibilityScope) : '';
     const filtered = allRows.filter((row) => {
       if (status && String(row.status || '').toLowerCase() !== status) return false;
       if (categoryId && String(row.categoryId || '') !== categoryId) return false;
+      if (visibilityScope && activityService.normalizeActivityVisibilityScope(row.visibilityScope) !== visibilityScope) return false;
       return true;
     });
     const { data, pagination } = paginate(filtered, query.page, query.limit);
@@ -68,7 +71,7 @@ exports.showCreateForm = async (req, res) => {
     const lookups = await loadFormLookups(req);
     res.render('school/activity/activityForm', {
       title: 'New School Activity',
-      activity: { status: 'draft', paid: false, attendees: [] },
+      activity: { status: 'draft', paid: false, visibilityScope: 'school', attendees: [] },
       isEdit: false,
       ...lookups,
       user: req.user,

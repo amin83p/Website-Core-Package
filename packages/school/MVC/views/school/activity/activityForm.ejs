@@ -1,4 +1,26 @@
-<% const row = activity || {}; const attendees = Array.isArray(row.attendees) ? row.attendees : []; %>
+<%
+  const row = activity || {};
+  const legacyAttendees = Array.isArray(row.attendees) ? row.attendees : [];
+  const rawVisibilityScope = String(row.visibilityScope || 'school').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const visibilityScope = ['individual', 'private', 'personal', 'assigned', 'assigned_only', 'attendee', 'attendees', 'attendees_only'].includes(rawVisibilityScope)
+    ? 'individual'
+    : 'school';
+  const initialEntries = Array.isArray(row.entries) && row.entries.length
+    ? row.entries
+    : [{
+        entryId: 'ENTRY-1',
+        title: '',
+        date: row.date || '',
+        startTime: row.startTime || '',
+        endTime: row.endTime || '',
+        durationHours: row.durationHours || '',
+        location: row.location || '',
+        notes: '',
+        status: 'posted',
+        assignees: legacyAttendees
+      }];
+%>
+
 <div class="sections-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
     <h1 class="page-heading size-md m-0"><i class="bi bi-calendar-event me-2"></i><%= title %></h1>
@@ -8,9 +30,15 @@
   <div class="form-container wide" style="max-width: 1180px;">
     <form id="schoolActivityForm" method="POST" action="<%= isEdit ? '/school/activities/edit/' + row.id : '/school/activities/new' %>">
       <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="entries" id="activityEntriesInput" value="[]">
       <input type="hidden" name="attendees" id="activityAttendeesInput" value="[]">
+      <input type="hidden" name="date" id="activityLegacyDate" value="<%= row.date || '' %>">
+      <input type="hidden" name="startTime" id="activityLegacyStartTime" value="<%= row.startTime || '' %>">
+      <input type="hidden" name="endTime" id="activityLegacyEndTime" value="<%= row.endTime || '' %>">
+      <input type="hidden" name="durationHours" id="activityLegacyDurationHours" value="<%= row.durationHours || '' %>">
 
-      <script type="application/json" id="activityInitialAttendees"><%- JSON.stringify(attendees) %></script>
+      <script type="application/json" id="activityInitialEntries"><%- JSON.stringify(initialEntries) %></script>
+      <script type="application/json" id="activityInitialAttendees"><%- JSON.stringify(legacyAttendees) %></script>
       <script type="application/json" id="activityCategoriesData"><%- JSON.stringify(categories || []) %></script>
 
       <div class="card border-0 shadow-sm mb-4">
@@ -18,7 +46,8 @@
           <div class="row g-3">
             <div class="col-md-8">
               <label class="form-label fw-bold">Title *</label>
-              <input type="text" name="title" class="form-control size-md" value="<%= row.title || '' %>" required>
+              <input type="text" name="title" id="activityTitle" class="form-control size-md" value="<%= row.title || '' %>" required>
+              <div class="form-text small">Use this as the parent work plan, such as content preparation or web development.</div>
             </div>
             <div class="col-md-4">
               <label class="form-label fw-bold">Status *</label>
@@ -27,6 +56,14 @@
                   <option value="<%= status %>" <%= String(row.status || 'draft') === status ? 'selected' : '' %>><%= status[0].toUpperCase() + status.slice(1) %></option>
                 <% }) %>
               </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Calendar Scope *</label>
+              <select name="visibilityScope" class="form-select size-md" required>
+                <option value="school" <%= visibilityScope === 'school' ? 'selected' : '' %>>School / Public</option>
+                <option value="individual" <%= visibilityScope === 'individual' ? 'selected' : '' %>>Individual / Assigned people only</option>
+              </select>
+              <div class="form-text small">Public activities appear on the School Calendar; individual activities only appear in assigned schedules.</div>
             </div>
             <div class="col-md-4">
               <label class="form-label fw-bold">Category *</label>
@@ -47,33 +84,18 @@
               </select>
             </div>
             <div class="col-md-4">
-              <label class="form-label fw-bold">Location</label>
-              <input type="text" name="location" class="form-control size-md" value="<%= row.location || '' %>">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-bold">Date *</label>
-              <input type="date" name="date" class="form-control size-md" value="<%= row.date || '' %>" required>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-bold">Start *</label>
-              <input type="time" name="startTime" id="activityStartTime" class="form-control size-md" value="<%= row.startTime || '' %>" required>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-bold">End *</label>
-              <input type="time" name="endTime" id="activityEndTime" class="form-control size-md" value="<%= row.endTime || '' %>" required>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-bold">Hours *</label>
-              <input type="number" step="0.01" min="0" max="24" name="durationHours" id="activityDurationHours" class="form-control size-md" value="<%= row.durationHours || '' %>" required>
+              <label class="form-label fw-bold">Default Location</label>
+              <input type="text" name="location" id="activityLocation" class="form-control size-md" value="<%= row.location || '' %>">
             </div>
             <div class="col-md-4">
               <div class="form-check form-switch mt-4">
                 <input class="form-check-input" type="checkbox" name="paid" id="activityPaid" <%= row.paid ? 'checked' : '' %>>
                 <label class="form-check-label fw-bold" for="activityPaid">Payable activity</label>
               </div>
+              <div class="form-text small">Assignees can still be marked unpaid per work session.</div>
             </div>
             <div class="col-12">
-              <label class="form-label fw-bold">Notes</label>
+              <label class="form-label fw-bold">Parent Notes</label>
               <textarea name="notes" rows="3" class="form-control size-md"><%= row.notes || '' %></textarea>
             </div>
           </div>
@@ -82,11 +104,31 @@
 
       <div class="card border-0 shadow-sm">
         <div class="card-body p-4">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <h5 class="m-0 fw-bold"><i class="bi bi-people me-2"></i>Attendees</h5>
-            <button type="button" class="btn btn-outline-primary btn-sm" id="pickActivityAttendee"><i class="bi bi-person-plus me-1"></i>Add Attendee</button>
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+              <h5 class="m-0 fw-bold"><i class="bi bi-list-check me-2"></i>Sessions / Work Items</h5>
+              <div class="small text-muted">Each session can have its own date, time, assignees, and payable hours.</div>
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="addActivityEntry"><i class="bi bi-plus-circle me-1"></i>Add Work Session</button>
           </div>
-          <div id="activityAttendeesHost"></div>
+          <div class="table-responsive table-scroll-wrapper border rounded bg-white" data-floating-row-actions="true" style="max-height: 460px; overflow-y: auto;">
+            <table class="table table-hover table-sm mb-0 align-middle" id="activityEntriesTable">
+              <thead class="table-light text-nowrap position-sticky top-0" style="z-index: 1;">
+                <tr>
+                  <th style="width: 150px;">Date</th>
+                  <th style="width: 150px;">Time</th>
+                  <th style="width: 80px;">Hrs</th>
+                  <th>Work Session</th>
+                  <th style="width: 170px;">Assigned</th>
+                  <th style="width: 120px;">Status</th>
+                  <th style="width: 150px;">Location</th>
+                  <th style="width: 64px;" class="text-end pe-3">Action</th>
+                </tr>
+              </thead>
+              <tbody id="activityEntriesTbody"></tbody>
+            </table>
+            <div id="activityNoEntriesMsg" class="text-center py-4 text-muted small d-none">No work sessions added yet.</div>
+          </div>
         </div>
       </div>
 
@@ -98,23 +140,170 @@
   </div>
 </div>
 
+<div class="modal fade" id="activityBatchModal" tabindex="-1" aria-labelledby="activityBatchModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <div>
+          <h5 class="modal-title fw-bold" id="activityBatchModalLabel"><i class="bi bi-magic me-2"></i>Generate Work Sessions</h5>
+          <div class="small text-muted">Create one or more activity work sessions using dates, weekdays, time, and copied assignees.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-light border small mb-3">
+          Enter a session count, an end date, or both. If both are provided, generation starts from the start date, follows selected weekdays, and stops when the first limit is reached.
+        </div>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Number of Sessions</label>
+            <input type="number" min="1" max="500" step="1" id="activityBatchCount" class="form-control form-control-sm" value="1">
+            <div class="form-text small">Leave blank to generate through the end date.</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Start Date *</label>
+            <input type="date" id="activityBatchStartDate" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">End Date</label>
+            <input type="date" id="activityBatchEndDate" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Status</label>
+            <select id="activityBatchStatus" class="form-select form-select-sm">
+              <option value="posted" selected>Posted</option>
+              <option value="draft">Draft</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Start Time *</label>
+            <input type="time" id="activityBatchStartTime" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">End Time *</label>
+            <input type="time" id="activityBatchEndTime" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Location</label>
+            <input type="text" id="activityBatchLocation" class="form-control form-control-sm" placeholder="Optional location">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Title Prefix</label>
+            <input type="text" id="activityBatchTitlePrefix" class="form-control form-control-sm" placeholder="Work Session">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-bold">Days</label>
+            <div class="d-flex flex-wrap gap-2">
+              <input type="checkbox" class="btn-check activity-batch-day" id="activityBatchDayMon" value="1"><label class="btn btn-sm btn-outline-primary" for="activityBatchDayMon">Mon</label>
+              <input type="checkbox" class="btn-check activity-batch-day" id="activityBatchDayTue" value="2"><label class="btn btn-sm btn-outline-primary" for="activityBatchDayTue">Tue</label>
+              <input type="checkbox" class="btn-check activity-batch-day" id="activityBatchDayWed" value="3"><label class="btn btn-sm btn-outline-primary" for="activityBatchDayWed">Wed</label>
+              <input type="checkbox" class="btn-check activity-batch-day" id="activityBatchDayThu" value="4"><label class="btn btn-sm btn-outline-primary" for="activityBatchDayThu">Thu</label>
+              <input type="checkbox" class="btn-check activity-batch-day" id="activityBatchDayFri" value="5"><label class="btn btn-sm btn-outline-primary" for="activityBatchDayFri">Fri</label>
+              <input type="checkbox" class="btn-check activity-batch-day" id="activityBatchDaySat" value="6"><label class="btn btn-sm btn-outline-primary" for="activityBatchDaySat">Sat</label>
+              <input type="checkbox" class="btn-check activity-batch-day" id="activityBatchDaySun" value="0"><label class="btn btn-sm btn-outline-primary" for="activityBatchDaySun">Sun</label>
+            </div>
+            <div class="form-text small">If no day is selected, the weekday of the start date will be used.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Exception Dates</label>
+            <input type="text" id="activityBatchExceptions" class="form-control form-control-sm" placeholder="2026-07-01, 2026-07-08">
+            <div class="form-text small">Comma-separated dates to skip.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Holiday Handling</label>
+            <div class="form-check form-switch border rounded bg-light px-3 py-2">
+              <input class="form-check-input ms-0 me-2" type="checkbox" role="switch" id="activityBatchSkipHolidays">
+              <label class="form-check-label fw-bold" for="activityBatchSkipHolidays">Skip school holidays</label>
+              <div class="small text-muted mt-1" id="activityBatchHolidayHint">Uses the school holiday range endpoint when enabled.</div>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-bold">Notes</label>
+            <textarea id="activityBatchNotes" rows="2" class="form-control form-control-sm" placeholder="Optional notes copied into each generated session..."></textarea>
+          </div>
+          <div class="col-12">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+              <div>
+                <div class="fw-bold small"><i class="bi bi-people me-1"></i>Assignees to Copy</div>
+                <div class="small text-muted">Selected people will be copied into every generated work session.</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-primary btn-sm" id="activityBatchAddAssignees"><i class="bi bi-person-plus me-1"></i>Add People</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="activityBatchClearAssignees"><i class="bi bi-x-lg me-1"></i>Clear</button>
+              </div>
+            </div>
+            <div id="activityBatchAssignees" class="border rounded bg-light p-3 small text-muted">No people selected yet.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-filled btn-secondary btn-md" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-filled btn-primary btn-md" id="generateActivityEntries"><i class="bi bi-magic me-1"></i>Generate Sessions</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="activityEntryModal" tabindex="-1" aria-labelledby="activityEntryModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <div>
+          <h5 class="modal-title fw-bold" id="activityEntryModalLabel"><i class="bi bi-pencil-square me-2"></i>Edit Work Session</h5>
+          <div class="small text-muted">Update date, time, notes, status, assignees, and payable hours.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="activityEntryModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-filled btn-secondary btn-md" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/modal_GenericPicker') %>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('schoolActivityForm');
+  const entriesInput = document.getElementById('activityEntriesInput');
   const attendeesInput = document.getElementById('activityAttendeesInput');
-  const attendeesHost = document.getElementById('activityAttendeesHost');
+  const entriesTbody = document.getElementById('activityEntriesTbody');
+  const noEntriesMsg = document.getElementById('activityNoEntriesMsg');
+  const batchModalEl = document.getElementById('activityBatchModal');
+  const entryModalEl = document.getElementById('activityEntryModal');
+  const entryModalBody = document.getElementById('activityEntryModalBody');
   const paidInput = document.getElementById('activityPaid');
   const categorySelect = document.getElementById('activityCategoryId');
-  const startInput = document.getElementById('activityStartTime');
-  const endInput = document.getElementById('activityEndTime');
-  const durationInput = document.getElementById('activityDurationHours');
-  let attendees = JSON.parse(document.getElementById('activityInitialAttendees').textContent || '[]');
+  const activityTitleInput = document.getElementById('activityTitle');
+  const activityLocationInput = document.getElementById('activityLocation');
+  const legacyDateInput = document.getElementById('activityLegacyDate');
+  const legacyStartInput = document.getElementById('activityLegacyStartTime');
+  const legacyEndInput = document.getElementById('activityLegacyEndTime');
+  const legacyDurationInput = document.getElementById('activityLegacyDurationHours');
+
+  function parseInitialJson(id, fallback) {
+    try {
+      const node = document.getElementById(id);
+      const parsed = JSON.parse(node?.textContent || '[]');
+      return Array.isArray(parsed) ? parsed : fallback;
+    } catch (_error) {
+      return fallback;
+    }
+  }
+
+  const initialAttendees = parseInitialJson('activityInitialAttendees', []);
+  let entries = parseInitialJson('activityInitialEntries', []);
+  let selectedEntryIndex = null;
+  let batchModalInstance = null;
+  let batchAssignees = [];
+  let entryModalInstance = null;
 
   function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, function (ch) {
-      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+    return String(value ?? '').replace(/[&<>"']/g, function (character) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character];
     });
   }
 
@@ -159,14 +348,52 @@ document.addEventListener('DOMContentLoaded', function () {
   function buildPersonDisplayName(item, fallback) {
     const preferred = String(item?.preferredName || item?.name?.preferred || '').trim();
     if (preferred) return preferred;
-    const first = String(item?.firstName || item?.name?.first || '').trim();
-    const last = String(item?.lastName || item?.name?.last || '').trim();
-    const fullName = [first, last].filter(Boolean).join(' ');
+    const firstName = String(item?.firstName || item?.name?.first || '').trim();
+    const lastName = String(item?.lastName || item?.name?.last || '').trim();
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
     if (fullName) return fullName;
     return String(item?.personName || item?.displayName || fallback || '').trim();
   }
 
-  function normalizeAttendee(item) {
+  function normalizeBoolean(value, fallback) {
+    if (value === undefined || value === null || value === '') return Boolean(fallback);
+    return value === true || value === 'true' || value === 'on' || value === 1 || value === '1';
+  }
+
+  function calculateDurationHours(startTime, endTime) {
+    if (!startTime || !endTime) return 0;
+    const startParts = String(startTime).split(':').map(Number);
+    const endParts = String(endTime).split(':').map(Number);
+    if (startParts.length < 2 || endParts.length < 2 || !startParts.every(Number.isFinite) || !endParts.every(Number.isFinite)) return 0;
+    const minutes = ((endParts[0] * 60) + endParts[1]) - ((startParts[0] * 60) + startParts[1]);
+    return minutes > 0 ? Number((minutes / 60).toFixed(2)) : 0;
+  }
+
+  function parseLocalDateToken(token) {
+    const parts = String(token || '').split('-').map(Number);
+    if (parts.length !== 3 || !parts.every(Number.isFinite)) return null;
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+
+  function formatLocalDateToken(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return year + '-' + month + '-' + day;
+  }
+
+  function addLocalDays(date, days) {
+    const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    next.setDate(next.getDate() + days);
+    return next;
+  }
+
+  function generateEntryId() {
+    return 'ENTRY-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
+  }
+
+  function normalizeAttendee(item, entryDuration) {
     const personId = String(item?.personId || item?.id || '').trim();
     if (!personId) return null;
     const roles = normalizeRoleList(item?.roles || item?.availableRoles || item?.role || item?.matchedRole);
@@ -177,81 +404,567 @@ document.addEventListener('DOMContentLoaded', function () {
       roles: roles.length ? roles : [selectedRole],
       role: selectedRole,
       status: item?.status || 'attended',
-      paid: item?.paid === undefined ? paidInput.checked : item.paid !== false,
-      paidHours: item?.paidHours ?? durationInput.value ?? '',
+      paid: item?.paid === undefined ? paidInput.checked : normalizeBoolean(item.paid, paidInput.checked),
+      paidHours: item?.paidHours ?? entryDuration ?? '',
       notes: item?.notes || ''
     };
   }
 
-  function calculateHours() {
-    if (!startInput.value || !endInput.value) return;
-    const start = startInput.value.split(':').map(Number);
-    const end = endInput.value.split(':').map(Number);
-    const mins = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
-    if (mins > 0 && !durationInput.value) durationInput.value = (mins / 60).toFixed(2);
+  function getDefaultEntry(overrides) {
+    const values = overrides || {};
+    return {
+      entryId: values.entryId || generateEntryId(),
+      title: values.title || '',
+      date: values.date || '',
+      startTime: values.startTime || '',
+      endTime: values.endTime || '',
+      durationHours: values.durationHours ?? '',
+      location: values.location ?? activityLocationInput.value ?? '',
+      notes: values.notes || '',
+      status: values.status || 'posted',
+      assignees: Array.isArray(values.assignees) ? values.assignees : []
+    };
   }
 
-  function syncAttendees() {
-    attendeesInput.value = JSON.stringify(attendees);
+  function normalizeEntry(item, index) {
+    const sourceAssignees = Array.isArray(item?.assignees)
+      ? item.assignees
+      : (Array.isArray(item?.attendees) ? item.attendees : []);
+    const durationHours = item?.durationHours ?? '';
+    return {
+      entryId: String(item?.entryId || item?.id || 'ENTRY-' + (index + 1)).trim(),
+      title: String(item?.title || '').trim(),
+      date: String(item?.date || '').trim(),
+      startTime: String(item?.startTime || '').trim(),
+      endTime: String(item?.endTime || '').trim(),
+      durationHours,
+      location: String(item?.location || activityLocationInput.value || '').trim(),
+      notes: String(item?.notes || '').trim(),
+      status: String(item?.status || 'posted').trim().toLowerCase(),
+      assignees: sourceAssignees.map(function (itemRow) {
+        return normalizeAttendee(itemRow, durationHours);
+      }).filter(Boolean)
+    };
   }
 
-  function renderRoleSelect(item, index) {
+  function mergeAssigneesForLegacy() {
+    const byPersonId = new Map();
+    entries.forEach(function (entry) {
+      (Array.isArray(entry.assignees) ? entry.assignees : []).forEach(function (assignee) {
+        const personId = String(assignee.personId || '').trim();
+        if (!personId) return;
+        const existing = byPersonId.get(personId);
+        if (!existing) {
+          byPersonId.set(personId, { ...assignee });
+          return;
+        }
+        const roles = Array.from(new Set([...(existing.roles || []), ...(assignee.roles || [])].filter(Boolean)));
+        existing.roles = roles.length ? roles : existing.roles;
+        existing.role = existing.role || assignee.role;
+        existing.personName = existing.personName || assignee.personName || personId;
+        existing.paid = existing.paid !== false || assignee.paid !== false;
+        existing.paidHours = Number(((Number(existing.paidHours) || 0) + (Number(assignee.paidHours) || 0)).toFixed(2));
+      });
+    });
+    return Array.from(byPersonId.values());
+  }
+
+  function syncEntries() {
+    entries = (Array.isArray(entries) ? entries : []).map(normalizeEntry);
+    if (!entries.length) entries.push(getDefaultEntry());
+    entriesInput.value = JSON.stringify(entries);
+    attendeesInput.value = JSON.stringify(mergeAssigneesForLegacy());
+    const firstEntry = entries[0] || {};
+    legacyDateInput.value = firstEntry.date || '';
+    legacyStartInput.value = firstEntry.startTime || '';
+    legacyEndInput.value = firstEntry.endTime || '';
+    legacyDurationInput.value = firstEntry.durationHours || '';
+  }
+
+  function renderRoleSelect(item, entryIndex, assigneeIndex) {
     const roles = normalizeRoleList(item.roles || item.role);
     const selectedRole = pickDefaultRole(roles, item.role);
-    attendees[index].role = selectedRole;
-    attendees[index].roles = roles.length ? roles : [selectedRole];
-    const options = attendees[index].roles.map(function (role) {
+    entries[entryIndex].assignees[assigneeIndex].role = selectedRole;
+    entries[entryIndex].assignees[assigneeIndex].roles = roles.length ? roles : [selectedRole];
+    const options = entries[entryIndex].assignees[assigneeIndex].roles.map(function (role) {
       return '<option value="' + escapeHtml(role) + '" ' + (role === selectedRole ? 'selected' : '') + '>' + escapeHtml(roleLabel(role)) + '</option>';
     }).join('');
-    return '<select class="form-select form-select-sm js-attendee-role">' + options + '</select>';
+    return '<select class="form-select form-select-sm js-assignee-role">' + options + '</select>';
   }
 
-  function renderAttendees() {
-    if (!attendees.length) {
-      attendeesHost.innerHTML = '<div class="text-muted small border rounded p-3 bg-light">No attendees selected yet.</div>';
-      syncAttendees();
-      return;
+  function renderAssigneeRows(entry, entryIndex) {
+    const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+    if (!assignees.length) {
+      return '<div class="text-muted small border rounded p-3 bg-light">No people assigned to this work session yet.</div>';
     }
-    attendeesHost.innerHTML = attendees.map(function (item, index) {
-      const normalized = normalizeAttendee(item);
-      if (normalized) attendees[index] = normalized;
-      const paid = attendees[index].paid !== false;
-      const status = attendees[index].status || 'attended';
+    return assignees.map(function (assignee, assigneeIndex) {
+      const status = assignee.status || 'attended';
+      const paid = assignee.paid !== false;
       return [
-        '<div class="border rounded p-3 mb-2 bg-white" data-attendee-index="' + index + '">',
+        '<div class="border rounded p-3 mb-2 bg-white" data-assignee-index="' + assigneeIndex + '">',
         '<div class="row g-2 align-items-end">',
-        '<div class="col-md-3"><div class="fw-bold">' + escapeHtml(attendees[index].personName || attendees[index].personId) + '</div><div class="small text-muted">' + escapeHtml(attendees[index].personId || '') + '</div></div>',
-        '<div class="col-md-2"><label class="form-label fw-bold small">Role</label>' + renderRoleSelect(attendees[index], index) + '</div>',
-        '<div class="col-md-2"><label class="form-label fw-bold small">Status</label><select class="form-select form-select-sm js-attendee-status"><option value="attended" ' + (status === 'attended' ? 'selected' : '') + '>Attended</option><option value="absent" ' + (status === 'absent' ? 'selected' : '') + '>Absent</option><option value="excused" ' + (status === 'excused' ? 'selected' : '') + '>Excused</option></select></div>',
-        '<div class="col-md-2"><label class="form-label fw-bold small">Paid Hours</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-attendee-hours" value="' + escapeHtml(attendees[index].paidHours ?? durationInput.value ?? '') + '"></div>',
-        '<div class="col-md-2"><div class="form-check form-switch"><input class="form-check-input js-attendee-paid" type="checkbox" ' + (paid ? 'checked' : '') + '><label class="form-check-label small fw-bold">Payable</label></div></div>',
-        '<div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm js-attendee-remove"><i class="bi bi-trash"></i></button></div>',
+        '<div class="col-md-3"><div class="fw-bold">' + escapeHtml(assignee.personName || assignee.personId) + '</div><div class="small text-muted">' + escapeHtml(assignee.personId || '') + '</div></div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Role</label>' + renderRoleSelect(assignee, entryIndex, assigneeIndex) + '</div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Status</label><select class="form-select form-select-sm js-assignee-status"><option value="attended" ' + (status === 'attended' ? 'selected' : '') + '>Attended</option><option value="absent" ' + (status === 'absent' ? 'selected' : '') + '>Absent</option><option value="excused" ' + (status === 'excused' ? 'selected' : '') + '>Excused</option></select></div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Paid Hours</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-assignee-hours" value="' + escapeHtml(assignee.paidHours ?? entry.durationHours ?? '') + '"></div>',
+        '<div class="col-md-2"><div class="form-check form-switch"><input class="form-check-input js-assignee-paid" type="checkbox" ' + (paid ? 'checked' : '') + '><label class="form-check-label small fw-bold">Payable</label></div></div>',
+        '<div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm js-assignee-remove"><i class="bi bi-trash"></i></button></div>',
         '</div>',
+        '<div class="mt-2"><label class="form-label fw-bold small">Assignee Notes</label><input type="text" class="form-control form-control-sm js-assignee-notes" value="' + escapeHtml(assignee.notes || '') + '" placeholder="Optional notes for this person..."></div>',
         '</div>'
       ].join('');
     }).join('');
-
-    attendeesHost.querySelectorAll('[data-attendee-index]').forEach(function (row) {
-      const index = Number(row.getAttribute('data-attendee-index'));
-      row.querySelector('.js-attendee-role').addEventListener('change', function (event) { attendees[index].role = event.target.value; syncAttendees(); });
-      row.querySelector('.js-attendee-status').addEventListener('change', function (event) { attendees[index].status = event.target.value; syncAttendees(); });
-      row.querySelector('.js-attendee-hours').addEventListener('input', function (event) { attendees[index].paidHours = event.target.value; syncAttendees(); });
-      row.querySelector('.js-attendee-paid').addEventListener('change', function (event) { attendees[index].paid = event.target.checked; syncAttendees(); });
-      row.querySelector('.js-attendee-remove').addEventListener('click', function () { attendees.splice(index, 1); renderAttendees(); });
-    });
-    syncAttendees();
   }
 
-  categorySelect?.addEventListener('change', function () {
-    const selected = categorySelect.options[categorySelect.selectedIndex];
-    if (selected && selected.getAttribute('data-paid') === 'true' && !paidInput.checked) paidInput.checked = true;
-  });
-  startInput?.addEventListener('change', calculateHours);
-  endInput?.addEventListener('change', calculateHours);
+  function isBlankActivityEntry(entry) {
+    if (!entry) return true;
+    const hasCoreDetails = Boolean(entry.date || entry.startTime || entry.endTime || entry.durationHours || entry.title || entry.notes);
+    const hasPeople = Array.isArray(entry.assignees) && entry.assignees.length > 0;
+    return !hasCoreDetails && !hasPeople;
+  }
 
-  document.getElementById('pickActivityAttendee')?.addEventListener('click', async function () {
+  function renderBatchAssignees() {
+    const target = document.getElementById('activityBatchAssignees');
+    if (!target) return;
+    if (!batchAssignees.length) {
+      target.classList.add('text-muted');
+      target.innerHTML = 'No people selected yet.';
+      return;
+    }
+    target.classList.remove('text-muted');
+    target.innerHTML = batchAssignees.map(function (assignee, index) {
+      return [
+        '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white p-2 mb-2" data-batch-assignee-index="' + index + '">',
+        '<div><div class="fw-bold text-dark">' + escapeHtml(assignee.personName || assignee.personId) + '</div><div class="x-small text-muted">' + escapeHtml(roleLabel(assignee.role)) + ' · ' + escapeHtml(assignee.personId || '') + '</div></div>',
+        '<button type="button" class="btn btn-outline-danger btn-sm js-batch-assignee-remove"><i class="bi bi-trash"></i></button>',
+        '</div>'
+      ].join('');
+    }).join('');
+    target.querySelectorAll('[data-batch-assignee-index]').forEach(function (row) {
+      const index = Number(row.getAttribute('data-batch-assignee-index'));
+      row.querySelector('.js-batch-assignee-remove')?.addEventListener('click', function () {
+        batchAssignees.splice(index, 1);
+        renderBatchAssignees();
+      });
+    });
+  }
+
+  function buildEntryRowsHtml() {
+    return entries.map(function (entry, entryIndex) {
+      const status = String(entry.status || 'posted').toLowerCase();
+      const statusClass = status === 'posted' ? 'bg-success' : (status === 'cancelled' ? 'bg-secondary' : 'bg-info text-dark');
+      const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+      const assigneeNames = assignees.slice(0, 2).map(function (assignee) {
+        return assignee.personName || assignee.personId || '';
+      }).filter(Boolean);
+      const extraAssignees = assignees.length > assigneeNames.length ? ' +' + (assignees.length - assigneeNames.length) : '';
+      const rowClass = selectedEntryIndex === entryIndex ? 'table-primary' : '';
+      const rowActionId = 'activity-entry-' + escapeHtml(entry.entryId || entryIndex);
+      return [
+        '<tr class="' + rowClass + '" data-entry-index="' + entryIndex + '">',
+        '<td><div class="fw-bold text-dark">' + escapeHtml(entry.date || '-') + '</div></td>',
+        '<td><div class="small text-dark">' + escapeHtml(entry.startTime || '-') + ' - ' + escapeHtml(entry.endTime || '-') + '</div></td>',
+        '<td><span class="badge bg-light text-dark border">' + escapeHtml(Number(entry.durationHours || 0).toFixed(2)) + '</span></td>',
+        '<td><div class="fw-bold text-dark">' + escapeHtml(entry.title || 'Work Session ' + (entryIndex + 1)) + '</div><div class="x-small text-muted">' + escapeHtml(entry.notes || 'No notes') + '</div></td>',
+        '<td><div class="small text-dark">' + escapeHtml(assigneeNames.join(', ') || 'No people') + escapeHtml(extraAssignees) + '</div><div class="x-small text-muted">' + assignees.length + ' assigned</div></td>',
+        '<td><span class="badge ' + statusClass + ' text-capitalize">' + escapeHtml(status) + '</span></td>',
+        '<td><div class="small text-muted">' + escapeHtml(entry.location || '-') + '</div></td>',
+        '<td class="table-actions text-end pe-3">',
+        '<div class="row-actions-wrap">',
+        '<button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="' + rowActionId + '" title="Work session actions"><i class="bi bi-three-dots-vertical"></i></button>',
+        '<div class="row-actions-menu d-none" data-row-actions-id="' + rowActionId + '">',
+        '<button type="button" class="btn btn-outline-primary btn-sm js-entry-edit" data-index="' + entryIndex + '"><i class="bi bi-pencil-square me-2"></i>Edit details</button>',
+        '<button type="button" class="btn btn-outline-primary btn-sm js-entry-add-person" data-index="' + entryIndex + '"><i class="bi bi-person-plus me-2"></i>Add person</button>',
+        '<button type="button" class="btn btn-outline-secondary btn-sm js-entry-duplicate" data-index="' + entryIndex + '"><i class="bi bi-files me-2"></i>Duplicate</button>',
+        '<button type="button" class="btn btn-outline-danger btn-sm js-entry-remove" data-index="' + entryIndex + '" ' + (entries.length <= 1 ? 'disabled' : '') + '><i class="bi bi-trash me-2"></i>Remove</button>',
+        '</div>',
+        '</div>',
+        '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+  }
+
+  function renderEntries() {
+    syncEntries();
+    if (selectedEntryIndex !== null && (!entries[selectedEntryIndex] || selectedEntryIndex < 0)) selectedEntryIndex = null;
+    if (!entries.length) {
+      entriesTbody.innerHTML = '';
+      noEntriesMsg.classList.remove('d-none');
+      return;
+    }
+    noEntriesMsg.classList.add('d-none');
+    entriesTbody.innerHTML = buildEntryRowsHtml();
+  }
+
+  function getEntryModalInstance() {
+    if (!entryModalEl || !window.bootstrap || !window.bootstrap.Modal) return null;
+    if (!entryModalInstance) entryModalInstance = window.bootstrap.Modal.getOrCreateInstance(entryModalEl);
+    return entryModalInstance;
+  }
+
+  function openEntryModal(entryIndex) {
+    if (!Number.isInteger(entryIndex) || !entries[entryIndex]) return;
+    selectedEntryIndex = entryIndex;
+    renderEntryRowsOnly();
+    renderEntryModal();
+    const modal = getEntryModalInstance();
+    if (modal) modal.show();
+  }
+
+  function renderEntryModal() {
+    if (selectedEntryIndex === null || !entries[selectedEntryIndex] || !entryModalBody) return;
+    const entry = entries[selectedEntryIndex];
+    const label = document.getElementById('activityEntryModalLabel');
+    if (label) label.innerHTML = '<i class="bi bi-pencil-square me-2"></i>Edit Work Session ' + (selectedEntryIndex + 1);
+    entryModalBody.innerHTML = [
+      '<div class="row g-3">',
+      '<div class="col-md-6"><label class="form-label fw-bold">Session Title</label><input type="text" class="form-control form-control-sm js-entry-field" data-field="title" value="' + escapeHtml(entry.title || '') + '" placeholder="Optional task title..."></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Status</label><select class="form-select form-select-sm js-entry-field" data-field="status"><option value="posted" ' + (entry.status === 'posted' ? 'selected' : '') + '>Posted</option><option value="draft" ' + (entry.status === 'draft' ? 'selected' : '') + '>Draft</option><option value="cancelled" ' + (entry.status === 'cancelled' ? 'selected' : '') + '>Cancelled</option></select></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Location</label><input type="text" class="form-control form-control-sm js-entry-field" data-field="location" value="' + escapeHtml(entry.location || '') + '"></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Date *</label><input type="date" class="form-control form-control-sm js-entry-field" data-field="date" value="' + escapeHtml(entry.date || '') + '"></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Start *</label><input type="time" class="form-control form-control-sm js-entry-field" data-field="startTime" value="' + escapeHtml(entry.startTime || '') + '"></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">End *</label><input type="time" class="form-control form-control-sm js-entry-field" data-field="endTime" value="' + escapeHtml(entry.endTime || '') + '"></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Hours *</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-entry-field" data-field="durationHours" value="' + escapeHtml(entry.durationHours || '') + '"></div>',
+      '<div class="col-12"><label class="form-label fw-bold">Session Notes</label><textarea rows="2" class="form-control form-control-sm js-entry-field" data-field="notes" placeholder="Optional notes for this session...">' + escapeHtml(entry.notes || '') + '</textarea></div>',
+      '</div>',
+      '<div class="mt-3">',
+      '<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2"><div class="fw-bold small"><i class="bi bi-people me-1"></i>Assigned People</div><button type="button" class="btn btn-outline-primary btn-sm" id="addPersonToSelectedEntry"><i class="bi bi-person-plus me-1"></i>Add Person</button></div>',
+      '<div class="js-entry-assignees">' + renderAssigneeRows(entry, selectedEntryIndex) + '</div>',
+      '</div>'
+    ].join('');
+    bindEntryModal();
+  }
+
+  function bindEntryModal() {
+    const entryIndex = selectedEntryIndex;
+    if (entryIndex === null || !entries[entryIndex]) return;
+    entryModalBody.querySelector('#addPersonToSelectedEntry')?.addEventListener('click', function () {
+      openPersonPicker(entryIndex);
+    });
+    entryModalBody.querySelectorAll('.js-entry-field').forEach(function (field) {
+      const updateEntryField = function () {
+        const fieldName = field.getAttribute('data-field');
+        entries[entryIndex][fieldName] = field.value;
+        if (fieldName === 'startTime' || fieldName === 'endTime') {
+          const calculatedHours = calculateDurationHours(entries[entryIndex].startTime, entries[entryIndex].endTime);
+          if (calculatedHours > 0) {
+            entries[entryIndex].durationHours = calculatedHours.toFixed(2);
+            const durationField = entryModalBody.querySelector('[data-field="durationHours"]');
+            if (durationField) durationField.value = entries[entryIndex].durationHours;
+          }
+        }
+        syncEntries();
+        renderEntryRowsOnly();
+      };
+      field.addEventListener('input', updateEntryField);
+      field.addEventListener('change', updateEntryField);
+    });
+    entryModalBody.querySelectorAll('[data-assignee-index]').forEach(function (assigneeRow) {
+      const assigneeIndex = Number(assigneeRow.getAttribute('data-assignee-index'));
+      assigneeRow.querySelector('.js-assignee-role')?.addEventListener('change', function (event) {
+        entries[entryIndex].assignees[assigneeIndex].role = event.target.value;
+        syncEntries();
+        renderEntryRowsOnly();
+      });
+      assigneeRow.querySelector('.js-assignee-status')?.addEventListener('change', function (event) {
+        entries[entryIndex].assignees[assigneeIndex].status = event.target.value;
+        syncEntries();
+      });
+      assigneeRow.querySelector('.js-assignee-hours')?.addEventListener('input', function (event) {
+        entries[entryIndex].assignees[assigneeIndex].paidHours = event.target.value;
+        syncEntries();
+      });
+      assigneeRow.querySelector('.js-assignee-paid')?.addEventListener('change', function (event) {
+        entries[entryIndex].assignees[assigneeIndex].paid = event.target.checked;
+        syncEntries();
+      });
+      assigneeRow.querySelector('.js-assignee-notes')?.addEventListener('input', function (event) {
+        entries[entryIndex].assignees[assigneeIndex].notes = event.target.value;
+        syncEntries();
+      });
+      assigneeRow.querySelector('.js-assignee-remove')?.addEventListener('click', function () {
+        entries[entryIndex].assignees.splice(assigneeIndex, 1);
+        syncEntries();
+        renderEntryRowsOnly();
+        renderEntryModal();
+      });
+    });
+  }
+
+  function renderEntryRowsOnly() {
+    syncEntries();
+    entriesTbody.innerHTML = buildEntryRowsHtml();
+  }
+
+  function getBatchModalInstance() {
+    if (!batchModalEl || !window.bootstrap || !window.bootstrap.Modal) return null;
+    if (!batchModalInstance) batchModalInstance = window.bootstrap.Modal.getOrCreateInstance(batchModalEl);
+    return batchModalInstance;
+  }
+
+  function getBatchFieldValue(id) {
+    return String(document.getElementById(id)?.value || '').trim();
+  }
+
+  function setBatchFieldValue(id, value) {
+    const field = document.getElementById(id);
+    if (field) field.value = value || '';
+  }
+
+  function getSelectedBatchWeekdays(startDateToken) {
+    const selectedDays = Array.from(document.querySelectorAll('.activity-batch-day:checked'))
+      .map(function (checkbox) { return Number(checkbox.value); })
+      .filter(Number.isFinite);
+    if (selectedDays.length) return selectedDays;
+    const startDate = parseLocalDateToken(startDateToken);
+    return startDate ? [startDate.getDay()] : [];
+  }
+
+  function parseExceptionDates(value) {
+    return new Set(String(value || '').split(',').map(function (item) {
+      return item.trim();
+    }).filter(Boolean));
+  }
+
+  async function getHolidayDatesForBatch(startToken, endToken) {
+    const skipHolidays = document.getElementById('activityBatchSkipHolidays')?.checked;
+    const hint = document.getElementById('activityBatchHolidayHint');
+    if (!skipHolidays || !startToken || !endToken) return new Set();
+    try {
+      if (hint) hint.textContent = 'Loading holidays...';
+      const response = await fetch('/school/holidays/api/range?start=' + encodeURIComponent(startToken) + '&end=' + encodeURIComponent(endToken), {
+        headers: { 'X-AJAX-Request': 'true' }
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Holiday endpoint returned a non-JSON response.' };
+      });
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Unable to load school holidays.');
+      }
+      const holidays = Array.isArray(payload.holidays) ? payload.holidays : [];
+      if (hint) hint.textContent = 'Holidays in range: ' + holidays.length;
+      return new Set(holidays.map(function (holiday) {
+        return String(holiday?.date || '').trim();
+      }).filter(Boolean));
+    } catch (error) {
+      if (hint) hint.textContent = 'Holiday lookup failed; generation will continue without holiday skipping.';
+      await safeShowMessage({
+        title: 'Holiday Lookup Failed',
+        icon: 'warning',
+        message: error.message || 'Unable to load holidays. Generation will continue without skipping holidays.',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return new Set();
+    }
+  }
+
+  function buildBatchDateTokens({ startDateToken, endDateToken, sessionCount, weekdays, exceptions, holidays }) {
+    const startDate = parseLocalDateToken(startDateToken);
+    const explicitEndDate = parseLocalDateToken(endDateToken);
+    if (!startDate) return [];
+    const hasCountLimit = Number(sessionCount) > 0;
+    const maxLoopDays = hasCountLimit
+      ? Math.max(Number(sessionCount) * 14, 366)
+      : 3660;
+    const safetyEndDate = explicitEndDate || addLocalDays(startDate, maxLoopDays);
+    const generated = [];
+    let cursor = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    let guard = 0;
+    while (cursor <= safetyEndDate && guard <= maxLoopDays) {
+      const token = formatLocalDateToken(cursor);
+      if (weekdays.includes(cursor.getDay()) && !exceptions.has(token) && !holidays.has(token)) {
+        generated.push(token);
+        if (hasCountLimit && generated.length >= Number(sessionCount)) break;
+      }
+      cursor.setDate(cursor.getDate() + 1);
+      guard += 1;
+    }
+    return generated;
+  }
+
+  function openActivityBatchModal() {
+    const previousEntry = entries[entries.length - 1] || {};
+    setBatchFieldValue('activityBatchCount', '1');
+    setBatchFieldValue('activityBatchStartDate', previousEntry.date || '');
+    setBatchFieldValue('activityBatchEndDate', '');
+    setBatchFieldValue('activityBatchStartTime', previousEntry.startTime || '');
+    setBatchFieldValue('activityBatchEndTime', previousEntry.endTime || '');
+    setBatchFieldValue('activityBatchLocation', previousEntry.location || activityLocationInput.value || '');
+    setBatchFieldValue('activityBatchTitlePrefix', activityTitleInput.value || 'Work Session');
+    setBatchFieldValue('activityBatchStatus', 'posted');
+    setBatchFieldValue('activityBatchNotes', '');
+    setBatchFieldValue('activityBatchExceptions', '');
+    const skipHolidays = document.getElementById('activityBatchSkipHolidays');
+    if (skipHolidays) skipHolidays.checked = false;
+    document.querySelectorAll('.activity-batch-day').forEach(function (checkbox) { checkbox.checked = false; });
+    batchAssignees = [];
+    renderBatchAssignees();
+    const modal = getBatchModalInstance();
+    if (modal) modal.show();
+  }
+
+  function openBatchAssigneePicker() {
     if (!window.GenericPicker || !window.GenericPickerPresets) {
-      await safeShowMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Requester picker is not available on this page.' });
+      safeShowMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Assignee picker is not available on this page.' });
+      return;
+    }
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    const entryDuration = calculateDurationHours(getBatchFieldValue('activityBatchStartTime'), getBatchFieldValue('activityBatchEndTime')) || '';
+    window.GenericPicker.open(window.GenericPickerPresets.person({
+      title: 'Select People for Generated Sessions',
+      apiEndpoint: '/school/activities/api/eligible-persons',
+      placeholder: 'Search students, teachers, or staff...',
+      multiselect: true,
+      context,
+      onSelect: function (items) {
+        const selectedRows = Array.isArray(items) ? items : [items];
+        selectedRows.forEach(function (item) {
+          const attendee = normalizeAttendee(item, entryDuration);
+          if (!attendee) return;
+          const existing = batchAssignees.find(function (row) {
+            return String(row.personId) === String(attendee.personId);
+          });
+          if (existing) {
+            existing.roles = attendee.roles;
+            existing.role = pickDefaultRole(attendee.roles, existing.role || attendee.role);
+            existing.personName = attendee.personName || existing.personName;
+            return;
+          }
+          batchAssignees.push(attendee);
+        });
+        renderBatchAssignees();
+      }
+    }));
+  }
+
+  async function generateActivityBatchEntries() {
+    const countRaw = getBatchFieldValue('activityBatchCount');
+    const sessionCount = countRaw ? Number(countRaw) : 0;
+    const startDateToken = getBatchFieldValue('activityBatchStartDate');
+    const endDateToken = getBatchFieldValue('activityBatchEndDate');
+    const startTime = getBatchFieldValue('activityBatchStartTime');
+    const endTime = getBatchFieldValue('activityBatchEndTime');
+    const durationHours = calculateDurationHours(startTime, endTime);
+    if (countRaw && (!Number.isInteger(sessionCount) || sessionCount < 1)) {
+      await safeShowMessage({ title: 'Check Session Count', icon: 'warning', message: 'Number of sessions must be a whole number greater than zero.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+    if (!sessionCount && !endDateToken) {
+      await safeShowMessage({ title: 'Add a Limit', icon: 'warning', message: 'Enter a number of sessions or an end date before generating.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+    if (!startDateToken || !startTime || !endTime) {
+      await safeShowMessage({ title: 'Complete Batch Details', icon: 'warning', message: 'Start date, start time, and end time are required.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+    if (endDateToken && endDateToken < startDateToken) {
+      await safeShowMessage({ title: 'Check Date Range', icon: 'warning', message: 'End date cannot be before the start date.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+    if (!(durationHours > 0)) {
+      await safeShowMessage({ title: 'Check Time Range', icon: 'warning', message: 'End time must be after start time.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+
+    const weekdays = getSelectedBatchWeekdays(startDateToken);
+    const exceptions = parseExceptionDates(getBatchFieldValue('activityBatchExceptions'));
+    const lookupEndToken = endDateToken || formatLocalDateToken(addLocalDays(parseLocalDateToken(startDateToken), Math.max((sessionCount || 1) * 14, 30)));
+    const holidays = await getHolidayDatesForBatch(startDateToken, lookupEndToken);
+    const dateTokens = buildBatchDateTokens({ startDateToken, endDateToken, sessionCount, weekdays, exceptions, holidays });
+    if (!dateTokens.length) {
+      await safeShowMessage({ title: 'No Sessions Generated', icon: 'warning', message: 'No matching dates were found for the selected weekdays and limits.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+
+    const titlePrefix = getBatchFieldValue('activityBatchTitlePrefix') || activityTitleInput.value || 'Work Session';
+    const location = getBatchFieldValue('activityBatchLocation') || activityLocationInput.value || '';
+    const status = getBatchFieldValue('activityBatchStatus') || 'posted';
+    const notes = getBatchFieldValue('activityBatchNotes');
+    if (entries.length === 1 && isBlankActivityEntry(entries[0])) entries = [];
+    dateTokens.forEach(function (dateToken, index) {
+      const assignees = batchAssignees.map(function (assignee) {
+        return {
+          ...assignee,
+          roles: Array.isArray(assignee.roles) ? [...assignee.roles] : normalizeRoleList(assignee.roles || assignee.role),
+          paidHours: assignee.paidHours || durationHours
+        };
+      });
+      entries.push(getDefaultEntry({
+        title: titlePrefix + ' ' + (index + 1),
+        date: dateToken,
+        startTime,
+        endTime,
+        durationHours: durationHours.toFixed(2),
+        location,
+        notes,
+        status,
+        assignees
+      }));
+    });
+    renderEntries();
+    const modal = getBatchModalInstance();
+    if (modal) modal.hide();
+    if (sessionCount && dateTokens.length < sessionCount) {
+      await safeShowMessage({
+        title: 'Partial Generation',
+        icon: 'warning',
+        message: 'Generated ' + dateTokens.length + ' session(s). The selected end date or skipped dates prevented reaching ' + sessionCount + '.',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+    }
+  }
+
+  document.addEventListener('click', function (event) {
+    const actionButton = event.target.closest('.js-entry-edit, .js-entry-add-person, .js-entry-duplicate, .js-entry-remove');
+    if (!actionButton) return;
+    const actionMenu = actionButton.closest('.row-actions-menu');
+    if (!actionMenu || !String(actionMenu.dataset.rowActionsId || '').startsWith('activity-entry-')) return;
+    const entryIndex = Number(actionButton.getAttribute('data-index'));
+    if (!Number.isInteger(entryIndex) || !entries[entryIndex]) return;
+
+    if (actionButton.classList.contains('js-entry-edit')) {
+      openEntryModal(entryIndex);
+      return;
+    }
+
+    if (actionButton.classList.contains('js-entry-add-person')) {
+      openEntryModal(entryIndex);
+      openPersonPicker(entryIndex);
+      return;
+    }
+
+    if (actionButton.classList.contains('js-entry-duplicate')) {
+      const clonedEntry = JSON.parse(JSON.stringify(entries[entryIndex] || getDefaultEntry()));
+      clonedEntry.entryId = generateEntryId();
+      entries.splice(entryIndex + 1, 0, clonedEntry);
+      renderEntries();
+      openEntryModal(entryIndex + 1);
+      return;
+    }
+
+    if (actionButton.classList.contains('js-entry-remove')) {
+      if (entries.length <= 1) return;
+      entries.splice(entryIndex, 1);
+      selectedEntryIndex = entries.length ? Math.min(entryIndex, entries.length - 1) : null;
+      renderEntries();
+      if (selectedEntryIndex !== null && entryModalEl?.classList.contains('show')) {
+        renderEntryModal();
+      }
+    }
+  });
+
+  entryModalEl?.addEventListener('hidden.bs.modal', function () {
+    selectedEntryIndex = null;
+    renderEntryRowsOnly();
+  });
+
+  function openPersonPicker(entryIndex) {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      safeShowMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Requester picker is not available on this page.' });
       return;
     }
     const contexts = window.GenericPickerContexts || {};
@@ -259,35 +972,81 @@ document.addEventListener('DOMContentLoaded', function () {
       ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
       : null;
     window.GenericPicker.open(window.GenericPickerPresets.person({
-      title: 'Select Attendees',
+      title: 'Select Assigned People',
       apiEndpoint: '/school/activities/api/eligible-persons',
       placeholder: 'Search students, teachers, or staff...',
       multiselect: true,
       context,
       onSelect: function (items) {
-        const rows = Array.isArray(items) ? items : [items];
-        let added = 0;
-        rows.forEach(function (item) {
-          const attendee = normalizeAttendee(item);
+        const selectedRows = Array.isArray(items) ? items : [items];
+        selectedRows.forEach(function (item) {
+          const attendee = normalizeAttendee(item, entries[entryIndex]?.durationHours || '');
           if (!attendee) return;
-          const existing = attendees.find(function (row) { return String(row.personId) === String(attendee.personId); });
+          const existing = entries[entryIndex].assignees.find(function (row) {
+            return String(row.personId) === String(attendee.personId);
+          });
           if (existing) {
             existing.roles = attendee.roles;
             existing.role = pickDefaultRole(attendee.roles, existing.role || attendee.role);
             existing.personName = attendee.personName || existing.personName;
             return;
           }
-          attendees.push(attendee);
-          added += 1;
+          entries[entryIndex].assignees.push(attendee);
         });
-        renderAttendees();
+        renderEntries();
+        if (selectedEntryIndex === entryIndex && entryModalEl?.classList.contains('show')) {
+          renderEntryModal();
+        }
       }
     }));
+  }
+
+  function validateEntriesBeforeSubmit() {
+    syncEntries();
+    if (!entries.length) return 'Please add at least one work session.';
+    for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+      const entry = entries[entryIndex];
+      if (!entry.date) return 'Please enter a date for every work session.';
+      if (!entry.startTime || !entry.endTime) return 'Please enter start and end times for every work session.';
+      if (!(Number(entry.durationHours) > 0)) return 'Please enter hours greater than zero for every work session.';
+    }
+    return '';
+  }
+
+  categorySelect?.addEventListener('change', function () {
+    const selected = categorySelect.options[categorySelect.selectedIndex];
+    if (selected && selected.getAttribute('data-paid') === 'true' && !paidInput.checked) paidInput.checked = true;
   });
+
+  activityLocationInput?.addEventListener('input', function () {
+    entries.forEach(function (entry) {
+      if (!entry.location) entry.location = activityLocationInput.value;
+    });
+    syncEntries();
+  });
+
+  document.getElementById('addActivityEntry')?.addEventListener('click', function () {
+    openActivityBatchModal();
+  });
+  document.getElementById('activityBatchAddAssignees')?.addEventListener('click', openBatchAssigneePicker);
+  document.getElementById('activityBatchClearAssignees')?.addEventListener('click', function () {
+    batchAssignees = [];
+    renderBatchAssignees();
+  });
+  document.getElementById('generateActivityEntries')?.addEventListener('click', generateActivityBatchEntries);
 
   form.addEventListener('submit', async function (event) {
     event.preventDefault();
-    syncAttendees();
+    const validationMessage = validateEntriesBeforeSubmit();
+    if (validationMessage) {
+      await safeShowMessage({
+        title: 'Complete Work Sessions',
+        icon: 'warning',
+        message: validationMessage,
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
 
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn ? submitBtn.innerHTML : '';
@@ -333,9 +1092,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
-  renderAttendees();
+  entries = entries.length
+    ? entries.map(normalizeEntry)
+    : [getDefaultEntry({ assignees: initialAttendees })];
+  renderEntries();
 });
 </script>
-
-
-

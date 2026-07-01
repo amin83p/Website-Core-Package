@@ -102,10 +102,14 @@ test('School activities attendee picker and save path preserve selected attendee
   assert.match(service, /add\('student', row\)/);
   assert.match(service, /schoolDataService\.fetchData\('teachers'/);
   assert.match(service, /schoolDataService\.fetchData\('staff'/);
+  assert.match(service, /normalizeActivityVisibilityScope/);
+  assert.match(service, /visibilityScope: activity\.visibilityScope/);
 
   const model = readText('packages/school/MVC/models/school/activityModel.js');
   assert.match(model, /const rolesSource = Array\.isArray\(input\.roles\)/);
   assert.match(model, /roles: roles\.length \? roles : \[role\]/);
+  assert.match(model, /public.*school/);
+  assert.match(model, /private.*individual/);
 
   const form = readText('packages/school/MVC/views/school/activity/activityForm.ejs');
   assert.match(form, /multiselect: true/);
@@ -115,4 +119,109 @@ test('School activities attendee picker and save path preserve selected attendee
   assert.match(form, /buildPersonDisplayName/);
   assert.doesNotMatch(form, /window\.alert|\balert\(/);
   assert.match(form, /activityAttendeesInput/);
+  assert.match(form, /name="visibilityScope"/);
+  assert.match(form, /School \/ Public/);
+  assert.match(form, /Individual \/ Assigned people only/);
+  assert.match(form, /activityEntriesTable/);
+  assert.match(form, /activityEntriesTbody/);
+  assert.match(form, /data-floating-row-actions="true"/);
+  assert.match(form, /btn-row-actions-toggle/);
+  assert.match(form, /row-actions-menu/);
+  assert.match(form, /bi-three-dots-vertical/);
+  assert.match(form, /js-entry-edit/);
+  assert.match(form, /Edit details/);
+  assert.match(form, /activityEntryModal/);
+  assert.match(form, /activityEntryModalBody/);
+  assert.match(form, /renderEntryModal/);
+  assert.match(form, /activityBatchModal/);
+  assert.match(form, /activityBatchCount/);
+  assert.match(form, /activityBatchStartDate/);
+  assert.match(form, /activityBatchEndDate/);
+  assert.match(form, /activity-batch-day/);
+  assert.match(form, /activityBatchAddAssignees/);
+  assert.match(form, /activityBatchAssignees/);
+  assert.match(form, /activityBatchSkipHolidays/);
+  assert.match(form, /generateActivityEntries/);
+  assert.match(form, /openActivityBatchModal/);
+  assert.match(form, /openBatchAssigneePicker/);
+  assert.match(form, /generateActivityBatchEntries/);
+  assert.match(form, /buildBatchDateTokens/);
+  assert.match(form, /\/school\/holidays\/api\/range/);
+
+  const list = readText('packages/school/MVC/views/school/activity/activityList.ejs');
+  assert.match(list, /visibilityScope/);
+  assert.match(list, /School \/ Public/);
+  assert.match(list, /Individual \/ Assigned only/);
+
+  const controller = readText('packages/school/MVC/controllers/school/activityController.js');
+  assert.match(controller, /normalizeActivityVisibilityScope\(rawVisibilityScope\)/);
+
+  const calendarService = readText('packages/school/MVC/services/school/schoolCalendarService.js');
+  assert.match(calendarService, /normalizeActivityVisibilityScope\(row\.visibilityScope\) === 'school'/);
+  assert.match(calendarService, /activityScope === 'school' \? 'purple'/);
+
+  const calendarView = readText('packages/school/MVC/views/school/calendar/calendar.ejs');
+  assert.match(calendarView, /\.tone-purple/);
+});
+
+test('School activities support multi-session entries with legacy compatibility', () => {
+  const activityModel = require('../packages/school/MVC/models/school/activityModel');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+
+  const legacy = activityModel.sanitizeActivityPayload({
+    orgId: 'ORG1',
+    title: 'Content Preparation',
+    categoryId: 'CAT1',
+    departmentId: 'DEP1',
+    date: '2026-07-01',
+    startTime: '09:00',
+    endTime: '11:00',
+    paid: 'on',
+    status: 'posted',
+    attendees: JSON.stringify([{ personId: 'P1', personName: 'Teacher One', roles: ['teacher'] }])
+  });
+  assert.equal(legacy.entries.length, 1);
+  assert.equal(legacy.entries[0].entryId, 'ENTRY-1');
+  assert.equal(legacy.entries[0].assignees[0].paidHours, 2);
+  assert.equal(legacy.visibilityScope, 'school');
+
+  const multi = activityModel.sanitizeActivityPayload({
+    orgId: 'ORG1',
+    title: 'Website Build',
+    categoryId: 'CAT1',
+    departmentId: 'DEP1',
+    paid: 'on',
+    status: 'posted',
+    visibilityScope: 'private',
+    entries: JSON.stringify([
+      {
+        entryId: 'ENTRY-A',
+        title: 'Wireframe',
+        date: '2026-07-01',
+        startTime: '09:00',
+        endTime: '10:30',
+        assignees: [{ personId: 'P1', personName: 'Staff One', roles: ['staff'] }]
+      },
+      {
+        entryId: 'ENTRY-B',
+        title: 'Build',
+        date: '2026-07-03',
+        startTime: '13:00',
+        endTime: '16:00',
+        assignees: [{ personId: 'P1', personName: 'Staff One', roles: ['staff'], paidHours: 3 }]
+      }
+    ])
+  });
+
+  assert.equal(multi.entries.length, 2);
+  assert.equal(multi.date, '2026-07-01');
+  assert.equal(multi.durationHours, 1.5);
+  assert.equal(multi.totalDurationHours, 4.5);
+  assert.equal(multi.visibilityScope, 'individual');
+  assert.equal(multi.attendees.length, 1);
+  assert.equal(multi.attendees[0].paidHours, 4.5);
+  assert.deepEqual(activityService.getActivityEntries(multi).map((entry) => entry.entryId), ['ENTRY-A', 'ENTRY-B']);
+  assert.equal(activityService.normalizeActivityVisibilityScope('public'), 'school');
+  assert.equal(activityService.normalizeActivityVisibilityScope('assigned-only'), 'individual');
+  assert.throws(() => activityService.normalizeActivityVisibilityScope('classroom'), /Invalid activity calendar scope/);
 });
