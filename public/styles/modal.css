@@ -3,7 +3,6 @@
 .modal-header.text-warning { background-color: #fff8e1; }
 .modal-header.text-danger { background-color: #fdeaea; }
 .modal-header i { font-size: 1.5rem; margin-right: 10px; }
-.modal-footer .btn { color: #fff !important; }
 .modal-footer .btn-warning { color: #212529 !important; background-color: #ffc107 !important; } */
 
 /* ==========================================================================
@@ -39,13 +38,43 @@
   margin: 0;
 }
 
-.modal-footer .btn {
+.modal-footer .btn-primary,
+.modal-footer .btn-secondary,
+.modal-footer .btn-success,
+.modal-footer .btn-danger,
+.modal-footer .btn-info,
+.modal-footer .btn-dark {
   color: var(--color-white) !important;
+}
+
+.modal-footer .btn-primary {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
 }
 
 .modal-footer .btn-secondary {
   background-color: var(--color-secondary) !important;
   border-color: var(--color-secondary) !important;
+}
+
+.modal-footer .btn-success {
+  background-color: var(--color-success) !important;
+  border-color: var(--color-success) !important;
+}
+
+.modal-footer .btn-danger {
+  background-color: var(--color-danger) !important;
+  border-color: var(--color-danger) !important;
+}
+
+.modal-footer .btn-info {
+  background-color: var(--color-info) !important;
+  border-color: var(--color-info) !important;
+}
+
+.modal-footer .btn-dark {
+  background-color: var(--color-dark) !important;
+  border-color: var(--color-dark) !important;
 }
 
 .modal-footer .btn-warning {
@@ -58,4 +87,70 @@
   color: var(--color-text) !important;
   background-color: var(--color-light) !important;
   border-color: var(--color-light) !important;
+}
+
+.modal-footer .btn-outline-primary {
+  color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+}
+
+.modal-footer .btn-outline-primary:hover,
+.modal-footer .btn-outline-primary:focus {
+  color: var(--color-white) !important;
+  background-color: var(--color-primary) !important;
+}
+
+.modal-footer .btn-outline-secondary {
+  color: var(--color-secondary) !important;
+  border-color: var(--color-secondary) !important;
+}
+
+.modal-footer .btn-outline-secondary:hover,
+.modal-footer .btn-outline-secondary:focus {
+  color: var(--color-white) !important;
+  background-color: var(--color-secondary) !important;
+}
+
+.modal-footer .btn-outline-success {
+  color: var(--color-success) !important;
+  border-color: var(--color-success) !important;
+}
+
+.modal-footer .btn-outline-success:hover,
+.modal-footer .btn-outline-success:focus {
+  color: var(--color-white) !important;
+  background-color: var(--color-success) !important;
+}
+
+.modal-footer .btn-outline-danger {
+  color: var(--color-danger) !important;
+  border-color: var(--color-danger) !important;
+}
+
+.modal-footer .btn-outline-danger:hover,
+.modal-footer .btn-outline-danger:focus {
+  color: var(--color-white) !important;
+  background-color: var(--color-danger) !important;
+}
+
+.modal-footer .btn-outline-info {
+  color: var(--color-info) !important;
+  border-color: var(--color-info) !important;
+}
+
+.modal-footer .btn-outline-info:hover,
+.modal-footer .btn-outline-info:focus {
+  color: var(--color-white) !important;
+  background-color: var(--color-info) !important;
+}
+
+.modal-footer .btn-outline-warning {
+  color: var(--color-text) !important;
+  border-color: var(--color-warning) !important;
+}
+
+.modal-footer .btn-outline-warning:hover,
+.modal-footer .btn-outline-warning:focus {
+  color: var(--color-text) !important;
+  background-color: var(--color-warning) !important;
 }

@@ -90,6 +90,47 @@ test('School activities package route, repository, service, views, and seed scri
   assert.ok(fs.existsSync(path.join(ROOT, 'packages/school/scripts/maintenance/insert-school-activities-section.mongosh.js')));
 });
 
+test('School activities are available in Master Hub with filter metadata', () => {
+  const masterHubRoute = readText('packages/school/MVC/routes/schoolMasterAcademiaHubRoutes.js');
+  assert.match(masterHubRoute, /SECTIONS\.SCHOOL_ACTIVITIES/);
+  assert.match(masterHubRoute, /router\.get\('\/api\/workspace\/:sectionKey'/);
+
+  const masterHubService = readText('packages/school/MVC/services/school/schoolMasterAcademiaHubService.js');
+  assert.match(masterHubService, /const activityService = require\('\.\/activityService'\)/);
+  assert.match(masterHubService, /if \(key === 'activities'\)/);
+  assert.match(masterHubService, /sectionId: SECTIONS\.SCHOOL_ACTIVITIES/);
+  assert.match(masterHubService, /activityService\.listActivities/);
+  assert.match(masterHubService, /activityService\.listActivityCategories/);
+  assert.match(masterHubService, /function normalizeActivityRows/);
+  assert.match(masterHubService, /function activityMatchesFilters/);
+  assert.match(masterHubService, /categoryOptions/);
+  assert.match(masterHubService, /departmentOptions/);
+  assert.match(masterHubService, /statusOptions/);
+  assert.match(masterHubService, /scopeOptions/);
+  assert.match(masterHubService, /paidOptions/);
+  assert.match(masterHubService, /assigneePersonId/);
+  assert.match(masterHubService, /dateFrom/);
+  assert.match(masterHubService, /dateTo/);
+
+  const masterHubView = readText('packages/school/MVC/views/school/masterAcademiaHub.ejs');
+  assert.match(masterHubView, /data-hub-workspace-section="activities"/);
+  assert.match(masterHubView, /endpoint: '\/school\/master-hub\/api\/workspace\/activities'/);
+  assert.match(masterHubView, /function renderActivityWorkspace/);
+  assert.match(masterHubView, /function renderActivityRows/);
+  assert.match(masterHubView, /function appendActivityWorkspaceQuery/);
+  assert.match(masterHubView, /hubActivityCategoryId/);
+  assert.match(masterHubView, /hubActivityDepartmentId/);
+  assert.match(masterHubView, /hubActivityStatus/);
+  assert.match(masterHubView, /hubActivityVisibilityScope/);
+  assert.match(masterHubView, /hubActivityPaid/);
+  assert.match(masterHubView, /hubActivityDateFrom/);
+  assert.match(masterHubView, /hubActivityDateTo/);
+  assert.match(masterHubView, /hubActivityOpenAssigneePicker/);
+  assert.match(masterHubView, /\/school\/activities\/api\/eligible-persons/);
+  assert.match(masterHubView, /data-hub-activity-load/);
+  assert.match(masterHubView, /workspaceToolbarHtml\('activities'/);
+});
+
 
 
 test('School activities attendee picker and save path preserve selected attendees and roles', () => {
@@ -159,9 +200,37 @@ test('School activities attendee picker and save path preserve selected attendee
   const calendarService = readText('packages/school/MVC/services/school/schoolCalendarService.js');
   assert.match(calendarService, /normalizeActivityVisibilityScope\(row\.visibilityScope\) === 'school'/);
   assert.match(calendarService, /activityScope === 'school' \? 'purple'/);
+  assert.match(calendarService, /function buildActivityDuplicateKey/);
+  assert.match(calendarService, /function getActivityDuplicateKeyFromEvent/);
+  assert.match(calendarService, /activityId: id/);
+  assert.match(calendarService, /activityEntryId: entryId/);
+  assert.match(calendarService, /duplicateKey: buildActivityDuplicateKey\(id, entryId\)/);
+  assert.match(calendarService, /publicActivityKeys/);
+  assert.match(calendarService, /if \(!isPublicActivityEvent\(event\)\) return true/);
+  assert.match(calendarService, /!publicActivityKeys\.has\(duplicateKey\)/);
 
   const calendarView = readText('packages/school/MVC/views/school/calendar/calendar.ejs');
   assert.match(calendarView, /\.tone-purple/);
+  assert.match(calendarView, /function humanizeCalendarLabel/);
+  assert.match(calendarView, /replace\(\/\[_-\]\+\/g, ' '\)/);
+  assert.match(calendarView, /humanizeCalendarLabel\(event\?\.type, 'calendar_event'\)/);
+  assert.match(calendarView, /humanizeCalendarLabel\(event\?\.type, 'all_day'\)/);
+  assert.match(calendarView, /humanizeCalendarLabel\(event\?\.type, 'event'\)/);
+  assert.doesNotMatch(calendarView, /escapeHtml\(event\?\.type \|\| 'event'\)/);
+  assert.match(calendarView, /school-calendar-loading/);
+  assert.match(calendarView, /Preparing Calendar/);
+  assert.match(calendarView, /function showCalendarBusy/);
+  assert.match(calendarView, /function hideCalendarBusy/);
+  assert.match(calendarView, /window\.showLoading\(\{\s*title: 'Preparing School Calendar'/);
+  assert.match(calendarView, /operation: 'Loading calendar layers and schedule events'/);
+  assert.match(calendarView, /calendarLoadSequence/);
+  assert.match(calendarView, /loadSequence !== calendarLoadSequence/);
+
+  const modalCss = readText('public/styles/modal.css');
+  assert.doesNotMatch(modalCss, /\.modal-footer\s+\.btn\s*\{\s*color:\s*var\(--color-white\)\s*!important;\s*\}/);
+  assert.match(modalCss, /\.modal-footer\s+\.btn-outline-primary\s*\{/);
+  assert.match(modalCss, /\.modal-footer\s+\.btn-outline-warning:hover/);
+  assert.match(modalCss, /\.modal-footer\s+\.btn-primary,\s*\n\.modal-footer\s+\.btn-secondary/);
 });
 
 test('School activities support multi-session entries with legacy compatibility', () => {
@@ -224,4 +293,8 @@ test('School activities support multi-session entries with legacy compatibility'
   assert.equal(activityService.normalizeActivityVisibilityScope('public'), 'school');
   assert.equal(activityService.normalizeActivityVisibilityScope('assigned-only'), 'individual');
   assert.throws(() => activityService.normalizeActivityVisibilityScope('classroom'), /Invalid activity calendar scope/);
+
+  const calendarService = require('../packages/school/MVC/services/school/schoolCalendarService');
+  assert.equal(calendarService.buildActivityDuplicateKey('ACT1', 'ENTRY-A'), 'ACT1:ENTRY-A');
+  assert.equal(calendarService.buildActivityDuplicateKey('ACT1', ''), '');
 });

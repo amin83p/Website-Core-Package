@@ -839,6 +839,9 @@
       <button type="button" class="hub-section-segment" data-hub-workspace-section="classes">
         <span><i class="bi bi-easel-fill me-1"></i> Class</span>
       </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="activities">
+        <span><i class="bi bi-list-check me-1"></i> Activities</span>
+      </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="sessions">
         <span><i class="bi bi-calendar2-week-fill me-1"></i> Sessions</span>
       </button>
@@ -1134,6 +1137,7 @@
     serverSearch: {
       tasks: '',
       classes: '',
+      activities: '',
       sessions: '',
       'session-issues': '',
       'timesheet-periods': '',
@@ -1143,7 +1147,9 @@
     holidaysYear: String(new Date().getFullYear())
     ,
     taskPersonId: '',
-    taskPersonName: ''
+    taskPersonName: '',
+    activityPersonId: '',
+    activityPersonName: ''
   };
 
   const workspaceSections = {
@@ -1158,6 +1164,12 @@
       endpoint: '/school/master-hub/api/workspace/classes',
       sourceUrl: '/school/classes',
       icon: 'bi bi-easel-fill'
+    },
+    activities: {
+      label: 'Activities',
+      endpoint: '/school/master-hub/api/workspace/activities',
+      sourceUrl: '/school/activities',
+      icon: 'bi bi-list-check'
     },
     'timesheet-periods': {
       label: 'Timesheet Periods',
@@ -1553,6 +1565,287 @@
       });
     }
     bindWorkspaceSearchControls('classes');
+  }
+
+  function activityStatusBadgeClass(status) {
+    const value = String(status || '').toLowerCase();
+    if (value === 'posted') return 'text-bg-success';
+    if (value === 'cancelled') return 'text-bg-secondary';
+    return 'text-bg-info';
+  }
+
+  function activityScopeBadgeClass(scope) {
+    return String(scope || '').toLowerCase() === 'individual' ? 'text-bg-secondary' : 'text-bg-primary';
+  }
+
+  function activityPaidBadgeHtml(row) {
+    return row && row.paid === true
+      ? '<span class="badge text-bg-success">Payable</span>'
+      : '<span class="badge text-bg-light border text-dark">Unpaid</span>';
+  }
+
+  function buildActivitySelectOptions(options, selectedValue, valueKey, labelKey) {
+    const selected = String(selectedValue || '');
+    return (Array.isArray(options) ? options : []).map(function (item) {
+      const value = String(item && (item[valueKey] || item.value || '') || '');
+      if (!value && valueKey !== 'value') return '';
+      const label = String(item && (item[labelKey] || item.label || value || 'All') || 'All');
+      const inactive = item && item.active === false ? ' (inactive)' : '';
+      return '<option value="' + escapeHtml(value) + '"' + (value === selected ? ' selected' : '') + '>' + escapeHtml(label + inactive) + '</option>';
+    }).join('');
+  }
+
+  function hubActivityPersonLabelFromItem(item) {
+    const firstName = String(item && (item.firstName || item.name?.first) || '').trim();
+    const lastName = String(item && (item.lastName || item.name?.last) || '').trim();
+    const preferredName = String(item && (item.preferredName || item.name?.preferred) || '').trim();
+    const directName = String(item && (item.label || item.displayName || item.fullName || item.name) || '').trim();
+    const name = preferredName || [firstName, lastName].filter(Boolean).join(' ').trim() || directName;
+    const personId = String(item && (item.personId || item.id) || '').trim();
+    return personId ? (name || personId) + ' (' + personId + ')' : (name || 'Selected person');
+  }
+
+  function openHubActivityPersonPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Assignee Picker', icon: 'warning', message: 'Person picker is not available yet.' });
+      return;
+    }
+    const context = window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function'
+      ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+      : undefined;
+    const config = GenericPickerPresets.person({
+      title: 'Filter by Activity Assignee',
+      apiEndpoint: '/school/activities/api/eligible-persons',
+      searchFields: 'id,personId,firstName,lastName,preferredName,displayName,roles,matchedRole',
+      context
+    });
+    config.multiselect = false;
+    config.onSelect = function (selected) {
+      const item = Array.isArray(selected) ? selected[0] : selected;
+      if (!item) return;
+      workspaceState.activityPersonId = String(item.personId || item.id || '').trim();
+      workspaceState.activityPersonName = hubActivityPersonLabelFromItem(item);
+      loadWorkspaceSection('activities');
+    };
+    GenericPicker.open(config);
+  }
+
+  function appendActivityWorkspaceQuery(requestQuery) {
+    const values = {
+      categoryId: hubInputValue('hubActivityCategoryId'),
+      departmentId: hubInputValue('hubActivityDepartmentId'),
+      status: hubInputValue('hubActivityStatus'),
+      visibilityScope: hubInputValue('hubActivityVisibilityScope'),
+      paid: hubInputValue('hubActivityPaid'),
+      dateFrom: hubInputValue('hubActivityDateFrom'),
+      dateTo: hubInputValue('hubActivityDateTo'),
+      assigneePersonId: workspaceState.activityPersonId || hubInputValue('hubActivityAssigneePersonId'),
+      assigneePersonName: workspaceState.activityPersonName || hubInputValue('hubActivityAssigneePersonName')
+    };
+
+    Object.keys(values).forEach(function (key) {
+      if (values[key]) requestQuery.set(key, values[key]);
+    });
+  }
+
+  function setHubActivityDateRange(range) {
+    const fromEl = document.getElementById('hubActivityDateFrom');
+    const toEl = document.getElementById('hubActivityDateTo');
+    if (!fromEl || !toEl) return;
+    const today = new Date();
+    let start = new Date(today);
+    let end = new Date(today);
+
+    if (range === 'allTime') {
+      fromEl.value = '';
+      toEl.value = '';
+      loadWorkspaceSection('activities');
+      return;
+    }
+
+    if (range === 'thisMonth') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } else if (range === 'upcoming') {
+      fromEl.value = hubDateToIso(today);
+      toEl.value = '';
+      loadWorkspaceSection('activities');
+      return;
+    }
+
+    fromEl.value = hubDateToIso(start);
+    toEl.value = hubDateToIso(end);
+    loadWorkspaceSection('activities');
+  }
+
+  function bindActivityWorkspaceControls() {
+    bindWorkspaceSearchControls('activities');
+    els.workspace.querySelectorAll('[data-hub-activity-load]').forEach(function (button) {
+      button.addEventListener('click', function () { loadWorkspaceSection('activities'); });
+    });
+    root.querySelectorAll('[data-hub-activity-range]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        setHubActivityDateRange(button.getAttribute('data-hub-activity-range') || 'today');
+      });
+    });
+    const openAssignee = document.getElementById('hubActivityOpenAssigneePicker');
+    if (openAssignee) openAssignee.addEventListener('click', openHubActivityPersonPicker);
+    const clearAssignee = document.getElementById('hubActivityClearAssignee');
+    if (clearAssignee) {
+      clearAssignee.addEventListener('click', function () {
+        workspaceState.activityPersonId = '';
+        workspaceState.activityPersonName = '';
+        const idEl = document.getElementById('hubActivityAssigneePersonId');
+        const nameEl = document.getElementById('hubActivityAssigneePersonName');
+        if (idEl) idEl.value = '';
+        if (nameEl) nameEl.value = '';
+        loadWorkspaceSection('activities');
+      });
+    }
+    const resetButton = document.getElementById('hubActivityResetFilters');
+    if (resetButton) {
+      resetButton.addEventListener('click', function () {
+        [
+          'hubActivityCategoryId',
+          'hubActivityDepartmentId',
+          'hubActivityStatus',
+          'hubActivityVisibilityScope',
+          'hubActivityPaid',
+          'hubActivityDateFrom',
+          'hubActivityDateTo',
+          'hubActivityAssigneePersonId',
+          'hubActivityAssigneePersonName'
+        ].forEach(function (id) {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        workspaceState.serverSearch.activities = '';
+        workspaceState.activityPersonId = '';
+        workspaceState.activityPersonName = '';
+        const searchInput = document.getElementById('hubServerSearch_activities');
+        if (searchInput) searchInput.value = '';
+        loadWorkspaceSection('activities');
+      });
+    }
+  }
+
+  function renderActivityRows(rows, notLoaded) {
+    if (!Array.isArray(rows) || !rows.length) {
+      return notLoaded
+        ? '<tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-arrow-clockwise d-block fs-2 mb-2"></i>Set filters if needed, then click <strong>Load Activities</strong>.</td></tr>'
+        : '<tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-search d-block fs-2 mb-2"></i>No activities found matching these filters.</td></tr>';
+    }
+
+    return rows.map(function (row) {
+      const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
+        return '<a class="btn btn-outline-' + escapeHtml(action.tone || 'primary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener"><i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open') + '</a>';
+      }).join('');
+      const assigneeNames = Array.isArray(row.assigneeNames) ? row.assigneeNames : [];
+      const assigneePreview = assigneeNames.slice(0, 3).join(', ');
+      const extraAssignees = Math.max(0, Number(row.assigneeCount || 0) - 3);
+      const searchText = [
+        row.id,
+        row.title,
+        row.categoryName,
+        row.departmentName,
+        row.status,
+        row.visibilityScope,
+        row.location,
+        row.dateLabel,
+        row.startTime,
+        row.endTime,
+        assigneeNames.join(' '),
+        row.notes
+      ].join(' ');
+
+      return [
+        '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
+        '<td class="ps-4">',
+        '<div class="fw-semibold text-primary">' + escapeHtml(row.title || row.id || 'Activity') + '</div>',
+        '<div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div>',
+        (row.location ? '<div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>' + escapeHtml(row.location) + '</div>' : ''),
+        '</td>',
+        '<td><div class="fw-semibold">' + escapeHtml(row.categoryName || row.categoryId || '-') + '</div><div class="small text-muted">' + escapeHtml(row.departmentName || row.departmentId || '-') + '</div></td>',
+        '<td><div class="fw-semibold">' + escapeHtml(row.dateLabel || '-') + '</div><div class="small text-muted">' + escapeHtml(row.startTime || '--:--') + ' - ' + escapeHtml(row.endTime || '--:--') + '</div></td>',
+        '<td><div class="fw-semibold">' + escapeHtml(String(row.sessionCount || 1)) + ' work session' + (Number(row.sessionCount || 1) === 1 ? '' : 's') + '</div><div class="small text-muted">' + escapeHtml(Number(row.totalDurationHours || 0).toFixed(2)) + ' total hour(s)</div></td>',
+        '<td><div class="fw-semibold">' + escapeHtml(String(row.assigneeCount || 0)) + ' assigned</div><div class="small text-muted">' + escapeHtml(assigneePreview || '-') + (extraAssignees ? ' +' + escapeHtml(String(extraAssignees)) + ' more' : '') + '</div></td>',
+        '<td><span class="badge ' + escapeHtml(activityScopeBadgeClass(row.visibilityScope)) + '">' + escapeHtml(row.visibilityScope === 'individual' ? 'Individual' : 'School / Public') + '</span><div class="mt-1">' + activityPaidBadgeHtml(row) + '</div></td>',
+        '<td><span class="badge ' + escapeHtml(activityStatusBadgeClass(row.status)) + '">' + escapeHtml(toHubTitleCase(row.status || 'draft')) + '</span></td>',
+        '<td class="pe-4 text-end"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+  }
+
+  function renderActivityWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : workspaceSections.activities;
+    const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
+    const notLoaded = payload && payload.notLoaded === true;
+    const filters = payload && payload.filters ? payload.filters : {};
+    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    if (filters.assigneePersonId) {
+      workspaceState.activityPersonId = filters.assigneePersonId;
+      workspaceState.activityPersonName = workspaceState.activityPersonName || filters.assigneePersonName || filters.assigneePersonId;
+    }
+    const categoryOptions = '<option value="">All Categories</option>' + buildActivitySelectOptions(payload && payload.categoryOptions, filters.categoryId, 'id', 'name');
+    const departmentOptions = '<option value="">All Departments</option>' + buildActivitySelectOptions(payload && payload.departmentOptions, filters.departmentId, 'id', 'name');
+    const statusOptions = buildActivitySelectOptions(payload && payload.statusOptions, filters.status, 'value', 'label');
+    const scopeOptions = buildActivitySelectOptions(payload && payload.scopeOptions, filters.visibilityScope, 'value', 'label');
+    const paidOptions = buildActivitySelectOptions(payload && payload.paidOptions, filters.paid, 'value', 'label');
+    const totalHours = rows.reduce(function (sum, row) { return sum + (Number(row.totalDurationHours) || 0); }, 0);
+    const postedCount = rows.filter(function (row) { return String(row.status || '').toLowerCase() === 'posted'; }).length;
+    const assigneeLabel = workspaceState.activityPersonName || filters.assigneePersonName || filters.assigneePersonId || '';
+
+    els.workspace.innerHTML = [
+      '<section class="hub-workspace">',
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-list-check') + ' me-2"></i>' + escapeHtml(section.label || 'Activities') + '</h2>',
+      '<p class="text-muted mb-0">' + (notLoaded ? 'Review school activities from the hub when ready.' : escapeHtml(String(rows.length)) + ' activity record(s), ' + escapeHtml(String(postedCount)) + ' posted, ' + escapeHtml(totalHours.toFixed(2)) + ' total hour(s). Last refreshed: ' + escapeHtml(refreshed) + '.') + '</p>',
+      '</div>',
+      '<div class="hub-workspace-actions">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-activity-load><i class="bi bi-arrow-repeat me-1"></i>' + (notLoaded ? 'Load Activities' : 'Refresh') + '</button>',
+      '<a class="btn btn-primary btn-sm" href="/school/activities/new" target="_blank" rel="noopener"><i class="bi bi-plus-circle me-1"></i> New Activity</a>',
+      '<a class="btn btn-outline-secondary btn-sm" href="' + escapeHtml(section.sourceUrl || '/school/activities') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityCategoryId">Category</label><select id="hubActivityCategoryId" class="form-select form-select-sm">' + categoryOptions + '</select></div>',
+      '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityDepartmentId">Department</label><select id="hubActivityDepartmentId" class="form-select form-select-sm">' + departmentOptions + '</select></div>',
+      '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityStatus">Status</label><select id="hubActivityStatus" class="form-select form-select-sm">' + statusOptions + '</select></div>',
+      '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityVisibilityScope">Calendar Scope</label><select id="hubActivityVisibilityScope" class="form-select form-select-sm">' + scopeOptions + '</select></div>',
+      '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityPaid">Pay Type</label><select id="hubActivityPaid" class="form-select form-select-sm">' + paidOptions + '</select></div>',
+      '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityDateFrom">From</label><input type="date" id="hubActivityDateFrom" class="form-control form-control-sm" value="' + escapeHtml(filters.dateFrom || '') + '"></div>',
+      '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityDateTo">To</label><input type="date" id="hubActivityDateTo" class="form-control form-control-sm" value="' + escapeHtml(filters.dateTo || '') + '"></div>',
+      '<div class="col-xl-6 col-md-8"><label class="form-label fw-bold small" for="hubActivityAssigneePersonName">Assignee</label><div class="input-group input-group-sm"><input type="hidden" id="hubActivityAssigneePersonId" value="' + escapeHtml(workspaceState.activityPersonId || filters.assigneePersonId || '') + '"><input type="text" id="hubActivityAssigneePersonName" class="form-control bg-white" value="' + escapeHtml(assigneeLabel) + '" placeholder="All assigned people" readonly><button type="button" class="btn btn-outline-secondary" id="hubActivityClearAssignee"><i class="bi bi-x-circle me-1"></i>Clear</button><button type="button" class="btn btn-outline-primary" id="hubActivityOpenAssigneePicker"><i class="bi bi-person-search me-1"></i>Select</button></div></div>',
+      '<div class="col-xl-4 col-md-12 d-flex gap-2"><button type="button" class="btn btn-primary btn-sm flex-fill fw-bold" data-hub-activity-load><i class="bi bi-funnel-fill me-1"></i> Apply Filters</button><button type="button" id="hubActivityResetFilters" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button></div>',
+      '</div>',
+      '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-activity-range="today">Today</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-activity-range="thisMonth">This Month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-activity-range="upcoming">Upcoming</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-activity-range="allTime">All Time</button>',
+      '</div>',
+      '</div>',
+      workspaceToolbarHtml('activities', { label: 'activities' }),
+      '<div class="table-responsive">',
+      '<table class="table table-hover align-middle hub-workspace-table">',
+      '<thead class="table-light">',
+      '<tr><th class="ps-4">Activity</th><th>Category / Dept</th><th>Date / Time</th><th>Work Sessions</th><th>Assignees</th><th>Scope / Pay</th><th>Status</th><th class="pe-4 text-end">Actions</th></tr>',
+      '</thead>',
+      '<tbody>',
+      renderActivityRows(rows, notLoaded),
+      '</tbody>',
+      '</table>',
+      '</div>',
+      '</div>',
+      '</section>'
+    ].join('');
+
+    bindActivityWorkspaceControls();
   }
 
   function hubTodayIso() {
@@ -5230,6 +5523,14 @@
         icon: 'bi bi-calendar2-week-fill'
       };
     }
+    if (key === 'activities' && !workspaceSections.activities) {
+      workspaceSections.activities = {
+        label: 'Activities',
+        endpoint: '/school/master-hub/api/workspace/activities',
+        sourceUrl: '/school/activities',
+        icon: 'bi bi-list-check'
+      };
+    }
     if (key === 'session-issues' && !workspaceSections['session-issues']) {
       workspaceSections['session-issues'] = {
         label: 'Session Issues',
@@ -5294,6 +5595,7 @@
       requestQuery.set('assignedPersonId', workspaceState.taskPersonId);
       if (workspaceState.taskPersonName) requestQuery.set('assignedPersonName', workspaceState.taskPersonName);
     }
+    if (key === 'activities') appendActivityWorkspaceQuery(requestQuery);
     if (key === 'sessions') appendSessionWorkspaceQuery(requestQuery);
     if (key === 'session-issues') appendSessionIssueWorkspaceQuery(requestQuery);
     if (key === 'timesheet-periods') appendTimesheetPeriodWorkspaceQuery(requestQuery);
@@ -5325,6 +5627,8 @@
         setTaskCount(payload.unresolvedCount || 0, false);
       } else if (key === 'classes') {
         renderClassWorkspace(payload);
+      } else if (key === 'activities') {
+        renderActivityWorkspace(payload);
       } else if (key === 'sessions') {
         renderSessionWorkspace(payload);
       } else if (key === 'session-issues') {
@@ -5392,6 +5696,41 @@
         total: 0,
         filters: {},
         statusMeta: []
+      });
+      return;
+    }
+
+    if (key === 'activities') {
+      renderActivityWorkspace({
+        status: 'success',
+        notLoaded: true,
+        section: {
+          key: 'activities',
+          label: 'Activities',
+          icon: 'bi bi-list-check',
+          sourceUrl: '/school/activities'
+        },
+        rows: [],
+        total: 0,
+        filters: {},
+        categoryOptions: [],
+        departmentOptions: [],
+        statusOptions: [
+          { value: '', label: 'All Statuses' },
+          { value: 'draft', label: 'Draft' },
+          { value: 'posted', label: 'Posted' },
+          { value: 'cancelled', label: 'Cancelled' }
+        ],
+        scopeOptions: [
+          { value: '', label: 'All Scopes' },
+          { value: 'school', label: 'School / Public' },
+          { value: 'individual', label: 'Individual / Assigned only' }
+        ],
+        paidOptions: [
+          { value: '', label: 'All Pay Types' },
+          { value: 'paid', label: 'Payable' },
+          { value: 'unpaid', label: 'Unpaid' }
+        ]
       });
       return;
     }

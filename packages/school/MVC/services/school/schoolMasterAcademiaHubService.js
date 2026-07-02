@@ -2,6 +2,7 @@ const dataService = require('./schoolDataService');
 const schoolRepositories = require('../../repositories/school');
 const taskService = require('./taskService');
 const leaveRequestService = require('./leaveRequestService');
+const activityService = require('./activityService');
 const personDisplayNameService = require('./personDisplayNameService');
 const sessionExplorerService = require('./sessionExplorerService');
 const schoolIndexService = require('./schoolIndexService');
@@ -498,6 +499,127 @@ function buildTimesheetPeriodActionLinks(row) {
   ];
 }
 
+function buildActivityActionLinks(row) {
+  const id = normalizeText(row?.id);
+  if (!id) return [];
+  const encodedId = encodeURIComponent(id);
+  return [
+    { label: 'Edit', href: `/school/activities/edit/${encodedId}`, icon: 'bi bi-pencil-square', tone: 'primary' },
+    { label: 'Open List', href: '/school/activities', icon: 'bi bi-box-arrow-up-right', tone: 'secondary' }
+  ];
+}
+
+function normalizeActivityAssignee(row = {}) {
+  return {
+    personId: normalizeText(row.personId),
+    personName: normalizeText(row.personName || row.displayName || row.name || row.personId || ''),
+    role: normalizeText(row.role || ''),
+    status: lower(row.status || 'attended'),
+    paid: row.paid !== false,
+    paidHours: Number(row.paidHours || 0)
+  };
+}
+
+function normalizeActivityRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const entries = activityService.getActivityEntries(row);
+    const dateValues = entries.map((entry) => normalizeText(entry.date)).filter(Boolean).sort();
+    const firstDate = dateValues[0] || normalizeText(row?.date || '');
+    const lastDate = dateValues[dateValues.length - 1] || firstDate;
+    const entryAssignees = entries.flatMap((entry) => (
+      Array.isArray(entry.assignees) ? entry.assignees : []
+    ).map(normalizeActivityAssignee));
+    const legacyAssignees = (Array.isArray(row?.attendees) ? row.attendees : []).map(normalizeActivityAssignee);
+    const assigneeMap = new Map();
+    [...legacyAssignees, ...entryAssignees].forEach((assignee) => {
+      if (!assignee.personId) return;
+      const existing = assigneeMap.get(assignee.personId);
+      if (!existing) {
+        assigneeMap.set(assignee.personId, assignee);
+        return;
+      }
+      const paidHours = Number(existing.paidHours || 0) + Number(assignee.paidHours || 0);
+      assigneeMap.set(assignee.personId, {
+        ...existing,
+        personName: existing.personName || assignee.personName,
+        role: existing.role || assignee.role,
+        paid: existing.paid || assignee.paid,
+        paidHours: Number(paidHours.toFixed(2))
+      });
+    });
+    const assignees = [...assigneeMap.values()];
+    const totalDurationHours = Number((entries.reduce((sum, entry) => (
+      sum + (Number(entry.durationHours) || activityService.calculateDurationHours(entry.startTime, entry.endTime) || 0)
+    ), 0) || row?.totalDurationHours || row?.durationHours || 0).toFixed(2));
+    const visibilityScope = activityService.normalizeActivityVisibilityScope(row?.visibilityScope || row?.scope || row?.calendarScope);
+
+    return {
+      id: normalizeText(row?.id),
+      title: normalizeText(row?.title || row?.name || row?.id || 'Activity'),
+      categoryId: normalizeText(row?.categoryId),
+      categoryName: normalizeText(row?.categoryName || row?.categoryId || ''),
+      departmentId: normalizeText(row?.departmentId),
+      departmentName: normalizeText(row?.departmentName || row?.departmentId || ''),
+      location: normalizeText(row?.location || ''),
+      status: lower(row?.status || 'draft'),
+      paid: row?.paid === true,
+      visibilityScope,
+      firstDate,
+      lastDate,
+      dateLabel: firstDate && lastDate && firstDate !== lastDate ? `${firstDate} to ${lastDate}` : (firstDate || '-'),
+      startTime: normalizeText(row?.startTime || entries[0]?.startTime || ''),
+      endTime: normalizeText(row?.endTime || entries[0]?.endTime || ''),
+      sessionCount: entries.length || 1,
+      assigneeCount: assignees.length,
+      assignees,
+      assigneeNames: assignees.map((assignee) => assignee.personName || assignee.personId).filter(Boolean),
+      totalDurationHours,
+      notes: normalizeText(row?.notes || ''),
+      editUrl: `/school/activities/edit/${encodeURIComponent(normalizeText(row?.id))}`,
+      actions: buildActivityActionLinks(row)
+    };
+  });
+}
+
+function activityMatchesFilters(row, queryInput = {}, searchTerm = '') {
+  const status = lower(queryInput.status || '');
+  const categoryId = normalizeText(queryInput.categoryId || '');
+  const departmentId = normalizeText(queryInput.departmentId || '');
+  const rawScope = normalizeText(queryInput.visibilityScope || queryInput.scope || '');
+  const visibilityScope = rawScope ? activityService.normalizeActivityVisibilityScope(rawScope) : '';
+  const paid = lower(queryInput.paid || '');
+  const dateFrom = normalizeText(queryInput.dateFrom || queryInput.startDate || '');
+  const dateTo = normalizeText(queryInput.dateTo || queryInput.endDate || '');
+  const assigneePersonId = normalizeText(queryInput.assigneePersonId || queryInput.personId || '');
+
+  if (status && lower(row.status) !== status) return false;
+  if (categoryId && !idsEqual(row.categoryId, categoryId)) return false;
+  if (departmentId && !idsEqual(row.departmentId, departmentId)) return false;
+  if (visibilityScope && row.visibilityScope !== visibilityScope) return false;
+  if (paid === 'paid' && row.paid !== true) return false;
+  if (paid === 'unpaid' && row.paid === true) return false;
+  if ((dateFrom || dateTo) && !row.firstDate) return false;
+  if ((dateFrom || dateTo) && !dateRangeOverlaps(row.firstDate, row.lastDate || row.firstDate, dateFrom, dateTo)) return false;
+  if (assigneePersonId && !row.assignees.some((assignee) => idsEqual(assignee.personId, assigneePersonId))) return false;
+
+  return rowMatchesWorkspaceSearch(row, searchTerm);
+}
+
+function sortActivityRows(rows) {
+  const statusRank = new Map([
+    ['posted', 0],
+    ['draft', 1],
+    ['cancelled', 2]
+  ]);
+  return [...(Array.isArray(rows) ? rows : [])].sort((a, b) => {
+    const dateDelta = String(b.firstDate || '').localeCompare(String(a.firstDate || ''));
+    if (dateDelta) return dateDelta;
+    const statusDelta = (statusRank.get(a.status) ?? 9) - (statusRank.get(b.status) ?? 9);
+    if (statusDelta) return statusDelta;
+    return String(a.title || '').localeCompare(String(b.title || ''));
+  });
+}
+
 function resolveHolidayYear(value) {
   const candidate = normalizeText(value);
   return /^\d{4}$/.test(candidate) ? candidate : String(new Date().getFullYear());
@@ -916,6 +1038,89 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       },
       rows: [],
       total: 0,
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
+  if (key === 'activities') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Activities',
+      sectionId: SECTIONS.SCHOOL_ACTIVITIES
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Activities.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const orgId = getHubActiveOrgId(req.user);
+    const fetchQuery = {
+      ...query,
+      searchFields: query.searchFields || 'id,title,status,categoryName,categoryId,departmentName,departmentId,location,visibilityScope,notes'
+    };
+    ['categoryId', 'departmentId', 'status', 'visibilityScope', 'scope', 'paid', 'dateFrom', 'dateTo', 'startDate', 'endDate', 'assigneePersonId', 'assigneePersonName', 'personId', 'personName', 'page', 'limit'].forEach((keyName) => {
+      delete fetchQuery[keyName];
+    });
+    const [activities, categories, departments] = await Promise.all([
+      activityService.listActivities({ orgId, reqUser: req.user, query: fetchQuery }),
+      activityService.listActivityCategories({ orgId, reqUser: req.user, includeInactive: true }),
+      dataService.fetchData('departments', {}, req.user, { scopeId: access.scopeId })
+    ]);
+    const normalizedRows = sortActivityRows(normalizeActivityRows(activities)
+      .filter((row) => activityMatchesFilters(row, queryInput || {}, query.q || '')));
+    const activeDepartments = (Array.isArray(departments) ? departments : [])
+      .filter((row) => !normalizeText(row?.orgId) || idsEqual(row?.orgId, orgId))
+      .map((row) => ({
+        id: normalizeText(row?.id),
+        name: normalizeText(row?.name || row?.code || row?.id || 'Department')
+      }))
+      .filter((row) => row.id)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return {
+      section: {
+        key: 'activities',
+        label: 'Activities',
+        icon: 'bi bi-list-check',
+        sourceUrl: '/school/activities'
+      },
+      rows: normalizedRows,
+      total: normalizedRows.length,
+      filters: {
+        categoryId: normalizeText(queryInput?.categoryId || ''),
+        departmentId: normalizeText(queryInput?.departmentId || ''),
+        status: lower(queryInput?.status || ''),
+        visibilityScope: normalizeText(queryInput?.visibilityScope || queryInput?.scope || '')
+          ? activityService.normalizeActivityVisibilityScope(queryInput?.visibilityScope || queryInput?.scope)
+          : '',
+        paid: lower(queryInput?.paid || ''),
+        dateFrom: normalizeText(queryInput?.dateFrom || queryInput?.startDate || ''),
+        dateTo: normalizeText(queryInput?.dateTo || queryInput?.endDate || ''),
+        assigneePersonId: normalizeText(queryInput?.assigneePersonId || queryInput?.personId || ''),
+        assigneePersonName: normalizeText(queryInput?.assigneePersonName || queryInput?.personName || '')
+      },
+      categoryOptions: (Array.isArray(categories) ? categories : []).map((row) => ({
+        id: normalizeText(row?.id),
+        name: normalizeText(row?.name || row?.code || row?.id || 'Category'),
+        active: row?.active !== false
+      })).filter((row) => row.id),
+      departmentOptions: activeDepartments,
+      statusOptions: [
+        { value: '', label: 'All Statuses' },
+        { value: 'draft', label: 'Draft' },
+        { value: 'posted', label: 'Posted' },
+        { value: 'cancelled', label: 'Cancelled' }
+      ],
+      scopeOptions: [
+        { value: '', label: 'All Scopes' },
+        { value: 'school', label: 'School / Public' },
+        { value: 'individual', label: 'Individual / Assigned only' }
+      ],
+      paidOptions: [
+        { value: '', label: 'All Pay Types' },
+        { value: 'paid', label: 'Payable' },
+        { value: 'unpaid', label: 'Unpaid' }
+      ],
+      searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()
     };
   }

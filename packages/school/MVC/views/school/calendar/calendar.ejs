@@ -450,6 +450,27 @@
     text-transform: uppercase;
     letter-spacing: .04em;
   }
+  .school-calendar-loading {
+    min-height: 420px;
+    border-radius: 1rem;
+    border: 1px dashed rgba(13, 110, 253, 0.28);
+    background:
+      radial-gradient(circle at 20% 20%, rgba(13, 110, 253, 0.10), transparent 18rem),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.92));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    color: #475569;
+  }
+  .school-calendar-loading-card {
+    max-width: 460px;
+  }
+  .school-calendar-loading-card .spinner-border {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
   @media (max-width: 900px) {
     .calendar-weekdays {
       display: none;
@@ -572,7 +593,15 @@
     </div>
 
     <div class="school-calendar-grid">
-      <div id="calendarCanvas"></div>
+      <div id="calendarCanvas">
+        <div class="school-calendar-loading">
+          <div class="school-calendar-loading-card">
+            <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+            <div class="fw-bold text-dark">Preparing Calendar</div>
+            <div class="small text-muted mt-1">Please wait while calendar layers and schedule events are loaded.</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -636,6 +665,9 @@
   let selectedPerson = null;
   let dayItemsModalInstance = null;
   let eventDetailModalInstance = null;
+  let calendarLoadingToken = null;
+  let calendarLoadingActive = false;
+  let calendarLoadSequence = 0;
 
   const canvas = document.getElementById('calendarCanvas');
   const rangeLabel = document.getElementById('calendarRangeLabel');
@@ -719,6 +751,65 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function calendarLoadingHtml(note = 'Please wait while calendar layers and schedule events are loaded.') {
+    return `
+      <div class="school-calendar-loading">
+        <div class="school-calendar-loading-card">
+          <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+          <div class="fw-bold text-dark">Preparing Calendar</div>
+          <div class="small text-muted mt-1">${escapeHtml(note)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function showCalendarBusy(note = 'Loading calendar events...') {
+    calendarLoadingActive = true;
+    if (canvas) canvas.innerHTML = calendarLoadingHtml(note);
+    if (typeof window.showLoading === 'function') {
+      calendarLoadingToken = window.showLoading({
+        title: 'Preparing School Calendar',
+        note,
+        operation: 'Loading calendar layers and schedule events'
+      });
+    }
+  }
+
+  function hideCalendarBusy() {
+    calendarLoadingActive = false;
+    if (typeof window.hideLoading === 'function') {
+      if (calendarLoadingToken) window.hideLoading(calendarLoadingToken);
+      else window.hideLoading({ force: true });
+    }
+    calendarLoadingToken = null;
+  }
+
+  window.addEventListener('load', () => {
+    if (!calendarLoadingActive || typeof window.showLoading !== 'function') return;
+    calendarLoadingToken = window.showLoading({
+      title: 'Preparing School Calendar',
+      note: 'Finishing calendar setup...',
+      operation: 'Rendering calendar view'
+    });
+  });
+
+  function humanizeCalendarLabel(value, fallback = '') {
+    const raw = String(value == null ? '' : value).trim();
+    const source = raw || String(fallback || '').trim();
+    if (!source) return '';
+    return source
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(' ')
+      .map((word) => {
+        const lower = word.toLowerCase();
+        return lower ? lower.charAt(0).toUpperCase() + lower.slice(1) : '';
+      })
+      .filter(Boolean)
+      .join(' ');
   }
 
   function getPersonDisplayName(person) {
@@ -855,7 +946,7 @@
     const personId = escapeHtml(person?.personId || person?.id || '');
     const email = escapeHtml(person?.email || '');
     const roleBadges = getPersonRoles(person)
-      .map((role) => `<span class="badge bg-primary-subtle text-primary border">${escapeHtml(role)}</span>`)
+      .map((role) => `<span class="badge bg-primary-subtle text-primary border">${escapeHtml(humanizeCalendarLabel(role))}</span>`)
       .join(' ');
 
     return `
@@ -954,7 +1045,7 @@
       return;
     }
     if (layers.length <= 2) {
-      layerSummary.textContent = layers.map((key) => layerLabels[key] || key).join(', ');
+      layerSummary.textContent = layers.map((key) => humanizeCalendarLabel(layerLabels[key] || key)).join(', ');
       return;
     }
     layerSummary.textContent = `${layers.length} Layers Selected`;
@@ -1130,7 +1221,7 @@
     const categoryName = String(event?.meta?.categoryName || '').trim();
     const departmentName = String(event?.meta?.departmentName || '').trim();
     const notes = String(event?.meta?.notes || event?.meta?.description || '').trim();
-    const typeLabel = String(event?.type || '').trim() || 'calendar_event';
+    const typeLabel = humanizeCalendarLabel(event?.type, 'calendar_event');
 
     eventDetailModalTitle.textContent = event.title || 'Calendar Event';
     eventDetailModalBody.innerHTML = `
@@ -1175,7 +1266,7 @@
         <div class="fw-semibold text-dark">${escapeHtml(formatDateFromKey(safeDateKey))}</div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <span class="badge bg-primary-subtle text-primary border">${dayEvents.length} item${dayEvents.length === 1 ? '' : 's'}</span>
-          ${timeline.allDayEvents.length ? `<span class="badge bg-danger-subtle text-danger border">${timeline.allDayEvents.length} all-day</span>` : ''}
+          ${timeline.allDayEvents.length ? `<span class="badge bg-danger-subtle text-danger border">${timeline.allDayEvents.length} All-Day</span>` : ''}
           ${timeline.timelineRows.length ? `<span class="badge bg-info-subtle text-info border">${timeline.timelineRows.length} timed</span>` : ''}
         </div>
       </div>
@@ -1193,7 +1284,7 @@
             const event = entry.event || {};
             const eventId = escapeHtml(event?.id || '');
             const categoryName = escapeHtml(event?.meta?.categoryName || '');
-            const kindLabel = entry.isHolidayBlock ? 'Holiday / Day Off' : escapeHtml(event?.type || 'all_day');
+            const kindLabel = entry.isHolidayBlock ? 'Holiday / Day Off' : escapeHtml(humanizeCalendarLabel(event?.type, 'all_day'));
             const durationLabel = entry.durationMinutes >= (24 * 60)
               ? 'Full day'
               : formatGapDuration(entry.durationMinutes || 0);
@@ -1237,7 +1328,7 @@
               ${categoryName ? `<div class="small text-primary-emphasis mt-1">${categoryName}</div>` : ''}
             </div>
             <div class="d-flex flex-column align-items-end gap-1">
-              <span class="badge ${typeBadgeClass}">${isDeadline ? 'Deadline Spot' : escapeHtml(event?.type || 'event')}</span>
+              <span class="badge ${typeBadgeClass}">${isDeadline ? 'Deadline Spot' : escapeHtml(humanizeCalendarLabel(event?.type, 'event'))}</span>
               ${isDeadline ? '' : `<span class="badge bg-secondary-subtle text-secondary border calendar-duration-chip">${escapeHtml(durationLabel)}</span>`}
             </div>
           </div>
@@ -1498,26 +1589,29 @@
   }
 
   async function loadEvents() {
+    const loadSequence = ++calendarLoadSequence;
     const { startDate, endDate } = currentRange();
     const layers = selectedLayers();
     const params = new URLSearchParams({ startDate, endDate, layers: layers.join(',') });
     const personId = canSelectAnyPerson ? (personIdInput?.value || '') : lockedPersonId;
     if (personId) params.set('personId', personId);
-    if (typeof window.showLoading === 'function') window.showLoading('Loading School Calendar...');
+    showCalendarBusy('Loading calendar events for the selected view...');
     try {
       const response = await fetch(`/school/calendar/api/events?${params.toString()}`, {
         headers: { 'Accept': 'application/json' }
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.status === 'error') throw new Error(payload.message || 'Unable to load calendar events.');
+      if (loadSequence !== calendarLoadSequence) return;
       events = Array.isArray(payload.events) ? payload.events : [];
       if (payload.selectedPerson) setSelectedPerson(payload.selectedPerson);
       render();
     } catch (error) {
+      if (loadSequence !== calendarLoadSequence) return;
       events = [];
       canvas.innerHTML = `<div class="school-calendar-empty text-danger"><i class="bi bi-exclamation-triangle fs-1 d-block mb-2"></i>${escapeHtml(error.message || 'Unable to load calendar events.')}</div>`;
     } finally {
-      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+      if (loadSequence === calendarLoadSequence) hideCalendarBusy();
     }
   }
 

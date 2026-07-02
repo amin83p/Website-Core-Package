@@ -107,6 +107,27 @@ function compareEvents(a, b) {
     || String(a.title || '').localeCompare(String(b.title || ''));
 }
 
+function buildActivityDuplicateKey(activityId, activityEntryId) {
+  const safeActivityId = normalizeId(activityId);
+  const safeEntryId = normalizeId(activityEntryId);
+  if (!safeActivityId || !safeEntryId) return '';
+  return `${safeActivityId}:${safeEntryId}`;
+}
+
+function getActivityDuplicateKeyFromEvent(event = {}) {
+  const activityId = event?.meta?.activityId || event?.activityId || '';
+  const activityEntryId = event?.meta?.activityEntryId || event?.meta?.entryId || event?.activityEntryId || '';
+  return buildActivityDuplicateKey(activityId, activityEntryId);
+}
+
+function isPublicActivityEvent(event = {}) {
+  const type = normalizeId(event?.type || event?.eventType || event?.targetType).toLowerCase();
+  const source = normalizeId(event?.meta?.source).toLowerCase();
+  const activityScope = normalizeActivityVisibilityScope(event?.meta?.visibilityScope || event?.visibilityScope);
+  return activityScope === 'school'
+    && (type === 'school_activity' || type === 'activity' || source === 'activities');
+}
+
 function normalizeHolidayEvent(holiday) {
   const date = normalizeDate(holiday.date || holiday.holidayDate || holiday.startDate);
   if (!date) return null;
@@ -158,6 +179,9 @@ function normalizeActivityEvent(activity = {}, { layerKey = '', subtype = '', en
     detailsUrl: `/school/activities/edit/${encodeURIComponent(id)}`,
     meta: {
       source: 'activities',
+      activityId: id,
+      activityEntryId: entryId,
+      duplicateKey: buildActivityDuplicateKey(id, entryId),
       entryId,
       categoryId,
       categoryName: activity.categoryName || '',
@@ -212,6 +236,7 @@ function normalizeScheduleEvent(event, role) {
       className: event.className || '',
       activityId: event.activityId || '',
       activityEntryId: event.activityEntryId || '',
+      duplicateKey: isActivity ? buildActivityDuplicateKey(event.activityId, event.activityEntryId) : '',
       visibilityScope: activityScope,
       categoryName: event.categoryName || '',
       departmentName: event.departmentName || '',
@@ -361,19 +386,21 @@ async function getCalendarEvents({
   const selectedLayers = parseLayers(layers);
   const selectedActivityCategoryIds = parseSelectedActivityCategoryIds(selectedLayers);
   const events = [];
+  let activityCategoryEvents = [];
 
   if (selectedLayers.has(LAYER_KEYS.DAYS_OFF)) {
     events.push(...await getHolidayEvents({ reqUser, orgId, startDate: safeStartDate, endDate: safeEndDate }));
   }
 
   if (selectedActivityCategoryIds.size) {
-    events.push(...await getActivityEventsByCategoryLayers({
+    activityCategoryEvents = await getActivityEventsByCategoryLayers({
       reqUser,
       orgId,
       startDate: safeStartDate,
       endDate: safeEndDate,
       selectedCategoryIds: selectedActivityCategoryIds
-    }));
+    });
+    events.push(...activityCategoryEvents);
   }
 
   if (selectedLayers.has(LAYER_KEYS.TIMESHEET_DEADLINES)) {
@@ -385,13 +412,23 @@ async function getCalendarEvents({
     }));
   }
 
-  events.push(...await getScheduleEvents({
+  const publicActivityKeys = new Set(activityCategoryEvents
+    .filter(isPublicActivityEvent)
+    .map(getActivityDuplicateKeyFromEvent)
+    .filter(Boolean));
+
+  const scheduleEvents = await getScheduleEvents({
     reqUser,
     orgId,
     personId,
     startDate: safeStartDate,
     endDate: safeEndDate,
     selectedLayers
+  });
+  events.push(...scheduleEvents.filter((event) => {
+    if (!isPublicActivityEvent(event)) return true;
+    const duplicateKey = getActivityDuplicateKeyFromEvent(event);
+    return !duplicateKey || !publicActivityKeys.has(duplicateKey);
   }));
 
   return {
@@ -406,5 +443,6 @@ module.exports = {
   LAYER_KEYS,
   ACTIVITY_CATEGORY_LAYER_PREFIX,
   buildActivityCategoryLayerKey,
+  buildActivityDuplicateKey,
   getCalendarEvents
 };
