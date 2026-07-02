@@ -160,6 +160,7 @@
                   <a href="/school/reports/assignments/edit/<%= encodeURIComponent(row.assignmentId) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Assignment</a>
                 <% } else { %>
                   <a href="/school/reports/instances/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right me-2"></i>Open</a>
+                  <a href="/school/reports/instances/edit-v2/<%= row.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-layout-text-window-reverse me-2"></i>Open V2</a>
                   <% if (row.hasDocxTemplate) { %>
                     <a href="/school/reports/instances/export/<%= row.id %>?format=docx&download=1" class="btn btn-outline-primary btn-sm"><i class="bi bi-filetype-docx me-2"></i>DOCX</a>
                   <% } %>

@@ -945,81 +945,95 @@ async function startInstance(req, res) {
   }
 }
 
+async function buildInstanceEditorRenderContext(req) {
+  const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(req.params.id, req.user);
+
+  const [template, assignment, classData] = await Promise.all([
+    schoolDataService.getDataById('reportTemplates', instance.templateId, req.user),
+    schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user),
+    schoolDataService.getDataById('classes', instance.classId, req.user)
+  ]);
+  if (!template) throw new Error('Template not found for this report instance.');
+
+  let latestInstance = await schoolDataService.getDataById('reportInstances', req.params.id, req.user);
+  if (String(latestInstance?.status || '').toLowerCase() !== 'locked') {
+    const hydrated = hydrateInitialAnswersFromPrefill(template, latestInstance);
+    if (hydrated.changed) {
+      latestInstance = await schoolDataService.updateData('reportInstances', latestInstance.id, {
+        answers: hydrated.answers,
+        audit: {
+          lastUpdateUser: req.user?.id || '',
+          lastUpdateDateTime: new Date().toISOString(),
+          prefillHydratedAt: new Date().toISOString()
+        }
+      }, req.user);
+    }
+  }
+  const mergedData = reportService.mergeTemplateData(template, latestInstance, assignment);
+  const validationSummary = reportRuleEngineService.evaluateTemplateValidations({
+    template,
+    mergedAnswers: mergedData,
+    prefill: latestInstance?.prefillSnapshot || {}
+  });
+
+  const studentPersonId = String(latestInstance.studentId || '').trim();
+  const [classSessions, teacherPerson, studentRowsByPerson, studentPersonDirect] = await Promise.all([
+    schoolDataService.getClassSessions(latestInstance.classId, req.user),
+    latestInstance.teacherId
+      ? dataServiceGlobal.getDataById('persons', latestInstance.teacherId, req.user, PERSON_QUERY_OPTIONS)
+      : Promise.resolve(null),
+    studentPersonId
+      ? schoolDataService.fetchData('students', { personId__eq: studentPersonId, page: 1, limit: 1 }, req.user)
+      : Promise.resolve([]),
+    studentPersonId
+      ? dataServiceGlobal.getDataById('persons', studentPersonId, req.user, PERSON_QUERY_OPTIONS)
+      : Promise.resolve(null)
+  ]);
+  let studentRegistry = Array.isArray(studentRowsByPerson) && studentRowsByPerson.length ? studentRowsByPerson[0] : null;
+  if (!studentRegistry && studentPersonId) {
+    studentRegistry = await schoolDataService.getDataById('students', studentPersonId, req.user);
+  }
+  const studentPerson = studentPersonDirect || (studentRegistry && studentRegistry.personId
+    ? await dataServiceGlobal.getDataById('persons', studentRegistry.personId, req.user, PERSON_QUERY_OPTIONS)
+    : null);
+  const instanceDetails = buildReportInstanceDetailsForView(latestInstance, {
+    assignment,
+    classData,
+    classSessions,
+    teacherPerson,
+    studentRegistry,
+    studentPerson
+  });
+
+  return {
+    title: `Report Editor: ${template.title}`,
+    instance: latestInstance,
+    template,
+    assignment,
+    classData,
+    instanceDetails,
+    mergedData,
+    validationSummary,
+    safeReturnUrl: resolveSafeSameOriginReturnUrl(req, latestInstance?.id),
+    includeModal: true,
+    user: req.user,
+    actionStateId: req.actionStateId
+  };
+}
+
 async function showInstanceEditor(req, res) {
   try {
-    const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(req.params.id, req.user);
+    const renderContext = await buildInstanceEditorRenderContext(req);
+    res.render('school/report/instanceEditor', renderContext);
+  } catch (error) {
+    res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
 
-    const [template, assignment, classData] = await Promise.all([
-      schoolDataService.getDataById('reportTemplates', instance.templateId, req.user),
-      schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user),
-      schoolDataService.getDataById('classes', instance.classId, req.user)
-    ]);
-    if (!template) throw new Error('Template not found for this report instance.');
-
-    let latestInstance = await schoolDataService.getDataById('reportInstances', req.params.id, req.user);
-    if (String(latestInstance?.status || '').toLowerCase() !== 'locked') {
-      const hydrated = hydrateInitialAnswersFromPrefill(template, latestInstance);
-      if (hydrated.changed) {
-        latestInstance = await schoolDataService.updateData('reportInstances', latestInstance.id, {
-          answers: hydrated.answers,
-          audit: {
-            lastUpdateUser: req.user?.id || '',
-            lastUpdateDateTime: new Date().toISOString(),
-            prefillHydratedAt: new Date().toISOString()
-          }
-        }, req.user);
-      }
-    }
-    const mergedData = reportService.mergeTemplateData(template, latestInstance, assignment);
-    const validationSummary = reportRuleEngineService.evaluateTemplateValidations({
-      template,
-      mergedAnswers: mergedData,
-      prefill: latestInstance?.prefillSnapshot || {}
-    });
-
-    const studentPersonId = String(latestInstance.studentId || '').trim();
-    const [classSessions, teacherPerson, studentRowsByPerson, studentPersonDirect] = await Promise.all([
-      schoolDataService.getClassSessions(latestInstance.classId, req.user),
-      latestInstance.teacherId
-        ? dataServiceGlobal.getDataById('persons', latestInstance.teacherId, req.user, PERSON_QUERY_OPTIONS)
-        : Promise.resolve(null),
-      studentPersonId
-        ? schoolDataService.fetchData('students', { personId__eq: studentPersonId, page: 1, limit: 1 }, req.user)
-        : Promise.resolve([]),
-      studentPersonId
-        ? dataServiceGlobal.getDataById('persons', studentPersonId, req.user, PERSON_QUERY_OPTIONS)
-        : Promise.resolve(null)
-    ]);
-    let studentRegistry = Array.isArray(studentRowsByPerson) && studentRowsByPerson.length ? studentRowsByPerson[0] : null;
-    if (!studentRegistry && studentPersonId) {
-      studentRegistry = await schoolDataService.getDataById('students', studentPersonId, req.user);
-    }
-    const studentPerson = studentPersonDirect || (studentRegistry && studentRegistry.personId
-      ? await dataServiceGlobal.getDataById('persons', studentRegistry.personId, req.user, PERSON_QUERY_OPTIONS)
-      : null);
-    const instanceDetails = buildReportInstanceDetailsForView(latestInstance, {
-      assignment,
-      classData,
-      classSessions,
-      teacherPerson,
-      studentRegistry,
-      studentPerson
-    });
-
-    res.render('school/report/instanceEditor', {
-      title: `Report Editor: ${template.title}`,
-      instance: latestInstance,
-      template,
-      assignment,
-      classData,
-      instanceDetails,
-      mergedData,
-      validationSummary,
-      safeReturnUrl: resolveSafeSameOriginReturnUrl(req, latestInstance?.id),
-      includeModal: true,
-      user: req.user,
-      actionStateId: req.actionStateId
-    });
+async function showInstanceEditorV2(req, res) {
+  try {
+    const renderContext = await buildInstanceEditorRenderContext(req);
+    res.render('school/report/instanceEditorV2', renderContext);
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
   }
@@ -1363,6 +1377,7 @@ module.exports = {
   listPersonReports,
   startInstance,
   showInstanceEditor,
+  showInstanceEditorV2,
   saveInstance,
   previewInstancePrefillRefresh,
   applyInstancePrefillRefresh,

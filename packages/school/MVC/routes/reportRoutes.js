@@ -200,6 +200,11 @@ router.get('/instances/edit/:id',
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
   ctrl.showInstanceEditor);
 
+router.get('/instances/edit-v2/:id',
+  requireReportInstanceEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  ctrl.showInstanceEditorV2);
+
 router.post('/instances/edit/:id',
   requireReportInstanceEditorAccess,
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {

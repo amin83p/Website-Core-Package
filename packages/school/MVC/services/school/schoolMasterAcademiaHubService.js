@@ -646,6 +646,7 @@ function buildReportInstanceActionLinks(row) {
   const encodedInstanceId = encodeURIComponent(instanceId);
   const actions = [
     { label: 'Open', href: `/school/reports/instances/edit/${encodedInstanceId}`, icon: 'bi bi-box-arrow-up-right', tone: 'secondary' },
+    { label: 'Open V2', href: `/school/reports/instances/edit-v2/${encodedInstanceId}`, icon: 'bi bi-layout-text-window-reverse', tone: 'primary' },
     { label: 'Payload', href: `/school/reports/instances/export/${encodedInstanceId}?download=1`, icon: 'bi bi-download', tone: 'secondary' }
   ];
   if (row?.hasDocxTemplate) {

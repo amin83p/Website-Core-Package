@@ -21,6 +21,8 @@
   const allocNum = Number(assignment?.allocatedHours);
   const allocDisplay = tsReflect && Number.isFinite(allocNum) && allocNum > 0 ? Number(allocNum.toFixed(2)) : '';
   const dtl = typeof instanceDetails !== 'undefined' && instanceDetails && typeof instanceDetails === 'object' ? instanceDetails : {};
+  const requestedEditorVariant = String(typeof editorVariant === 'undefined' ? '' : editorVariant).trim().toLowerCase();
+  const isV2 = requestedEditorVariant === 'v2';
   const isVisualOnlyField = (field) => {
     const t = String(field?.type || '').trim().toLowerCase();
     return t === 'section' || t === 'subheader' || t === 'row_break';
@@ -71,6 +73,17 @@
   .report-instance-page .report-section-chevron { transition: transform 0.2s ease; display: inline-block; }
   .report-instance-page .report-section-toggle.collapsed .report-section-chevron { transform: rotate(-90deg); }
   .report-instance-page .report-section-title { font-size: 1.1rem; font-weight: 700; color: var(--bs-emphasis-color); }
+  .report-instance-page .help-tooltip-icon {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    margin-left: 0.35rem;
+    color: var(--bs-secondary-color);
+    line-height: 1;
+  }
+  .report-instance-page .help-tooltip-icon:hover,
+  .report-instance-page .help-tooltip-icon:focus-visible { color: var(--bs-primary); }
+  .report-instance-page .instance-detail-grid-v2 .card { border-radius: 0.75rem; }
 </style>
 <div class="sections-page report-instance-page">
   <input type="hidden" id="reportInstanceActionStateId" value="<%= actionStateId || '' %>">
@@ -81,7 +94,7 @@
 
   <div class="row g-2 align-items-start mb-4">
     <div class="col">
-      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;">Report Instance</h1>
+      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;"><%= isV2 ? 'Report Instance (V2)' : 'Report Instance' %></h1>
       <h6 class="fw-semibold text-primary mt-2 mb-0"><%= template?.title || 'Report' %></h6>
       <div class="text-muted small mt-1">Instance ID: <strong class="font-monospace"><%= instance.id %></strong></div>
       <div class="text-muted small mt-1">
@@ -122,14 +135,18 @@
   <div class="card border-0 shadow-sm mb-4">
     <div class="card-body py-2">
       <div class="d-flex flex-wrap align-items-center gap-2">
-        <a href="/school/reports/instances" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Instances</a>
-        <% if (instance?.classId) { %>
-          <a href="/school/classes/edit-wizard/<%= encodeURIComponent(instance.classId) %>" class="btn btn-outline-info btn-sm"><i class="bi bi-diagram-3 me-1"></i>Class Lifecycle</a>
+        <% if (!isV2) { %>
+          <a href="/school/reports/instances" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Instances</a>
+          <% if (instance?.classId) { %>
+            <a href="/school/classes/edit-wizard/<%= encodeURIComponent(instance.classId) %>" class="btn btn-outline-info btn-sm"><i class="bi bi-diagram-3 me-1"></i>Class Lifecycle</a>
+          <% } %>
         <% } %>
         <% if (template?.docxTemplate?.path) { %>
           <a href="/school/reports/instances/export/<%= instance.id %>?format=docx&download=1" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</a>
         <% } %>
-        <a href="/school/reports/instances/export/<%= instance.id %>?download=1" class="btn btn-outline-dark btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
+        <% if (!isV2) { %>
+          <a href="/school/reports/instances/export/<%= instance.id %>?download=1" class="btn btn-outline-dark btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
+        <% } %>
         <% if (!isLocked) { %>
           <button type="button" class="btn btn-outline-primary btn-sm" id="btnReviewPrefillUpdates"><i class="bi bi-arrow-repeat me-1"></i>Preview Prefill Updates</button>
         <% } %>
@@ -145,74 +162,134 @@
     </button>
     <div id="reportInstanceDetailsCollapse" class="collapse show">
       <div class="card-body p-3 border-top">
-        <div class="row g-3">
-          <div class="col-md-3">
-            <div class="small text-muted">Status</div>
-            <span class="badge <%= instStatus === 'locked' ? 'bg-dark' : (instStatus === 'submitted' ? 'bg-success' : 'bg-secondary') %>"><%= instance.status || '-' %></span>
-          </div>
-          <div class="col-md-3">
-            <div class="small text-muted">Teacher</div>
-            <% if (dtl.teacherName) { %>
-              <div class="fw-bold"><%= dtl.teacherName %></div>
-              <div class="font-monospace x-small text-muted">ID <%= instance.teacherId || '—' %></div>
-            <% } else { %>
-              <div class="fw-bold font-monospace x-small"><%= instance.teacherId || '—' %></div>
-            <% } %>
-          </div>
-          <div class="col-md-3">
-            <div class="small text-muted">Template</div>
-            <div class="fw-bold"><%= template.title %> <span class="text-muted fw-normal">(v<%= Number(template.version || 1) %>)</span></div>
-          </div>
-          <div class="col-md-3">
-            <div class="small text-muted">Target</div>
-            <% if (dtl.targetLabel) { %>
-              <div class="fw-bold"><%= dtl.targetLabel %></div>
-              <div class="font-monospace x-small text-muted"><%= instance.targetKey || '—' %></div>
-            <% } else { %>
-              <div class="fw-bold font-monospace x-small"><%= instance.targetKey || '—' %></div>
-            <% } %>
-          </div>
-          <div class="col-md-3">
-            <div class="small text-muted">Class</div>
-            <% if (dtl.className) { %>
-              <div class="fw-bold"><%= dtl.className %></div>
-              <div class="font-monospace x-small text-muted">ID <%= instance.classId || '—' %></div>
-            <% } else { %>
-              <div class="fw-bold font-monospace x-small"><%= instance.classId || '—' %></div>
-            <% } %>
-          </div>
-          <div class="col-md-3">
-            <div class="small text-muted">Session</div>
-            <% if (dtl.sessionSummary) { %>
-              <div class="fw-bold"><%= dtl.sessionSummary %></div>
-              <div class="font-monospace x-small text-muted"><%= instance.sessionId || '—' %></div>
-            <% } else { %>
-              <div class="fw-bold font-monospace x-small"><%= instance.sessionId || '—' %></div>
-            <% } %>
-          </div>
-          <div class="col-md-3">
-            <div class="small text-muted">Assignment</div>
-            <% if (dtl.assignmentSummary) { %>
-              <div class="fw-bold"><%= dtl.assignmentSummary %></div>
-              <div class="font-monospace x-small text-muted">ID <%= instance.assignmentId || '—' %></div>
-            <% } else { %>
-              <div class="fw-bold font-monospace x-small"><%= instance.assignmentId || '—' %></div>
-            <% } %>
-          </div>
-          <div class="col-md-3">
-            <div class="small text-muted">Student</div>
-            <% if (dtl.studentName) { %>
-              <div class="fw-bold"><%= dtl.studentName %></div>
-              <div class="font-monospace x-small text-muted">
-                <% if (dtl.studentLocalId) { %>Local <%= dtl.studentLocalId %> | <% } %>Record ID <%= instance.studentId || '-' %>
+        <% if (isV2) { %>
+          <div class="row g-3 instance-detail-grid-v2">
+            <div class="col-lg-4 col-md-6">
+              <div class="card border h-100">
+                <div class="card-body">
+                  <div class="small text-muted text-uppercase">Status</div>
+                  <div class="mt-1"><span class="badge <%= instStatus === 'locked' ? 'bg-dark' : (instStatus === 'submitted' ? 'bg-success' : 'bg-secondary') %>"><%= instance.status || '-' %></span></div>
+                </div>
               </div>
-            <% } else if (instance.studentId) { %>
-              <div class="fw-bold font-monospace x-small">Record ID <%= instance.studentId %></div>
-            <% } else { %>
-              <div class="fw-bold font-monospace x-small">-</div>
-            <% } %>
+            </div>
+            <div class="col-lg-4 col-md-6">
+              <div class="card border h-100">
+                <div class="card-body">
+                  <div class="small text-muted text-uppercase">Teacher</div>
+                  <div class="fw-semibold mt-1"><%= dtl.teacherName || instance.teacherId || '—' %></div>
+                  <div class="x-small text-muted font-monospace"><%= instance.teacherId || '—' %></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+              <div class="card border h-100">
+                <div class="card-body">
+                  <div class="small text-muted text-uppercase">Class</div>
+                  <div class="fw-semibold mt-1"><%= dtl.className || instance.classId || '—' %></div>
+                  <div class="x-small text-muted font-monospace"><%= instance.classId || '—' %></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+              <div class="card border h-100">
+                <div class="card-body">
+                  <div class="small text-muted text-uppercase">Session Date</div>
+                  <div class="fw-semibold mt-1"><%= instance.sessionDate || '-' %></div>
+                  <div class="x-small text-muted font-monospace"><%= instance.sessionId || '—' %></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+              <div class="card border h-100">
+                <div class="card-body">
+                  <div class="small text-muted text-uppercase">Student</div>
+                  <div class="fw-semibold mt-1"><%= dtl.studentName || (instance.studentId ? `Record ${instance.studentId}` : '-') %></div>
+                  <div class="x-small text-muted font-monospace">
+                    <% if (dtl.studentLocalId) { %>Local <%= dtl.studentLocalId %> | <% } %>Record ID <%= instance.studentId || '-' %>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+              <div class="card border h-100">
+                <div class="card-body">
+                  <div class="small text-muted text-uppercase">Assignment</div>
+                  <div class="fw-semibold mt-1"><%= dtl.assignmentSummary || 'Assignment linked' %></div>
+                  <div class="x-small text-muted font-monospace">ID <%= instance.assignmentId || '—' %></div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        <% } else { %>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <div class="small text-muted">Status</div>
+              <span class="badge <%= instStatus === 'locked' ? 'bg-dark' : (instStatus === 'submitted' ? 'bg-success' : 'bg-secondary') %>"><%= instance.status || '-' %></span>
+            </div>
+            <div class="col-md-3">
+              <div class="small text-muted">Teacher</div>
+              <% if (dtl.teacherName) { %>
+                <div class="fw-bold"><%= dtl.teacherName %></div>
+                <div class="font-monospace x-small text-muted">ID <%= instance.teacherId || '—' %></div>
+              <% } else { %>
+                <div class="fw-bold font-monospace x-small"><%= instance.teacherId || '—' %></div>
+              <% } %>
+            </div>
+            <div class="col-md-3">
+              <div class="small text-muted">Template</div>
+              <div class="fw-bold"><%= template.title %> <span class="text-muted fw-normal">(v<%= Number(template.version || 1) %>)</span></div>
+            </div>
+            <div class="col-md-3">
+              <div class="small text-muted">Target</div>
+              <% if (dtl.targetLabel) { %>
+                <div class="fw-bold"><%= dtl.targetLabel %></div>
+                <div class="font-monospace x-small text-muted"><%= instance.targetKey || '—' %></div>
+              <% } else { %>
+                <div class="fw-bold font-monospace x-small"><%= instance.targetKey || '—' %></div>
+              <% } %>
+            </div>
+            <div class="col-md-3">
+              <div class="small text-muted">Class</div>
+              <% if (dtl.className) { %>
+                <div class="fw-bold"><%= dtl.className %></div>
+                <div class="font-monospace x-small text-muted">ID <%= instance.classId || '—' %></div>
+              <% } else { %>
+                <div class="fw-bold font-monospace x-small"><%= instance.classId || '—' %></div>
+              <% } %>
+            </div>
+            <div class="col-md-3">
+              <div class="small text-muted">Session</div>
+              <% if (dtl.sessionSummary) { %>
+                <div class="fw-bold"><%= dtl.sessionSummary %></div>
+                <div class="font-monospace x-small text-muted"><%= instance.sessionId || '—' %></div>
+              <% } else { %>
+                <div class="fw-bold font-monospace x-small"><%= instance.sessionId || '—' %></div>
+              <% } %>
+            </div>
+            <div class="col-md-3">
+              <div class="small text-muted">Assignment</div>
+              <% if (dtl.assignmentSummary) { %>
+                <div class="fw-bold"><%= dtl.assignmentSummary %></div>
+                <div class="font-monospace x-small text-muted">ID <%= instance.assignmentId || '—' %></div>
+              <% } else { %>
+                <div class="fw-bold font-monospace x-small"><%= instance.assignmentId || '—' %></div>
+              <% } %>
+            </div>
+            <div class="col-md-3">
+              <div class="small text-muted">Student</div>
+              <% if (dtl.studentName) { %>
+                <div class="fw-bold"><%= dtl.studentName %></div>
+                <div class="font-monospace x-small text-muted">
+                  <% if (dtl.studentLocalId) { %>Local <%= dtl.studentLocalId %> | <% } %>Record ID <%= instance.studentId || '-' %>
+                </div>
+              <% } else if (instance.studentId) { %>
+                <div class="fw-bold font-monospace x-small">Record ID <%= instance.studentId %></div>
+              <% } else { %>
+                <div class="fw-bold font-monospace x-small">-</div>
+              <% } %>
+            </div>
+          </div>
+        <% } %>
       </div>
     </div>
   </div>
@@ -268,8 +345,15 @@
                 aria-expanded="true"
                 aria-controls="<%= collapseId %>">
                 <span>
-                  <span class="report-section-title"><%= group.header.label %></span>
-                  <% if (group.header.helpText) { %><span class="small text-muted d-block mt-1"><%= group.header.helpText %></span><% } %>
+                  <span class="report-section-title">
+                    <%= group.header.label %>
+                    <% if (isV2 && group.header.helpText) { %>
+                      <button type="button" class="help-tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= group.header.helpText %>" aria-label="Section help">
+                        <i class="bi bi-info-circle"></i>
+                      </button>
+                    <% } %>
+                  </span>
+                  <% if (!isV2 && group.header.helpText) { %><span class="small text-muted d-block mt-1"><%= group.header.helpText %></span><% } %>
                 </span>
                 <i class="bi bi-chevron-down text-muted report-section-chevron" aria-hidden="true"></i>
               </button>
@@ -284,8 +368,15 @@
                           <div class="col-12">
                             <% if (studentFieldType === 'subheader') { %>
                               <hr class="my-3 text-muted">
-                              <h6 class="fw-semibold mt-1 mb-1 text-muted"><%= field.label %></h6>
-                              <% if (field.helpText) { %><div class="small text-muted mb-1"><%= field.helpText %></div><% } %>
+                              <h6 class="fw-semibold mt-1 mb-1 text-muted">
+                                <%= field.label %>
+                                <% if (isV2 && field.helpText) { %>
+                                  <button type="button" class="help-tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= field.helpText %>" aria-label="Subheader help">
+                                    <i class="bi bi-info-circle"></i>
+                                  </button>
+                                <% } %>
+                              </h6>
+                              <% if (!isV2 && field.helpText) { %><div class="small text-muted mb-1"><%= field.helpText %></div><% } %>
                             <% } %>
                           </div>
                         <% } else { %>
@@ -308,6 +399,11 @@
                             <div class="<%= fieldShellClass %>" style="<%= fieldShellStyleValue %>">
                               <label class="form-label fw-bold">
                                 <%= field.label %>
+                                <% if (isV2 && field.helpText) { %>
+                                  <button type="button" class="help-tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= field.helpText %>" aria-label="Field help">
+                                    <i class="bi bi-info-circle"></i>
+                                  </button>
+                                <% } %>
                                 <% if (field.required) { %><span class="text-danger">*</span><% } %>
                                 <% if (hasSharedFields && field.sharedAcrossStudents === true) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %>
                                 <% if (readOnlyField) { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } %>
@@ -366,7 +462,7 @@
                                 <% }); %>
                               </div>
 
-                              <% if (field.helpText) { %>
+                              <% if (!isV2 && field.helpText) { %>
                                 <div class="small text-muted mt-1"><%= field.helpText %></div>
                               <% } %>
                             </div>
@@ -389,8 +485,15 @@
                       <div class="col-12">
                         <% if (studentFieldType === 'subheader') { %>
                           <hr class="my-3 text-muted">
-                          <h6 class="fw-semibold mt-1 mb-1 text-muted"><%= field.label %></h6>
-                          <% if (field.helpText) { %><div class="small text-muted mb-1"><%= field.helpText %></div><% } %>
+                          <h6 class="fw-semibold mt-1 mb-1 text-muted">
+                            <%= field.label %>
+                            <% if (isV2 && field.helpText) { %>
+                              <button type="button" class="help-tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= field.helpText %>" aria-label="Subheader help">
+                                <i class="bi bi-info-circle"></i>
+                              </button>
+                            <% } %>
+                          </h6>
+                          <% if (!isV2 && field.helpText) { %><div class="small text-muted mb-1"><%= field.helpText %></div><% } %>
                         <% } %>
                       </div>
                     <% } else { %>
@@ -413,6 +516,11 @@
                         <div class="<%= fieldShellClass %>" style="<%= fieldShellStyleValue %>">
                           <label class="form-label fw-bold">
                             <%= field.label %>
+                            <% if (isV2 && field.helpText) { %>
+                              <button type="button" class="help-tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= field.helpText %>" aria-label="Field help">
+                                <i class="bi bi-info-circle"></i>
+                              </button>
+                            <% } %>
                             <% if (field.required) { %><span class="text-danger">*</span><% } %>
                             <% if (hasSharedFields && field.sharedAcrossStudents === true) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %>
                             <% if (readOnlyField) { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } %>
@@ -468,7 +576,7 @@
                               </div>
                             <% }); %>
                           </div>
-                          <% if (field.helpText) { %>
+                          <% if (!isV2 && field.helpText) { %>
                             <div class="small text-muted mt-1"><%= field.helpText %></div>
                           <% } %>
                         </div>
@@ -559,6 +667,16 @@
     let prefillRefreshChanges = [];
     let reportInstanceSubmitting = false;
     let reportInstanceSubmitLoadingToken = null;
+
+    function initializeTooltips() {
+      if (typeof bootstrap === 'undefined' || !bootstrap || !bootstrap.Tooltip) return;
+      document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+        if (!bootstrap.Tooltip.getInstance(el)) {
+          new bootstrap.Tooltip(el);
+        }
+      });
+    }
+    initializeTooltips();
 
     function showReportInstanceMessage({ title = 'Report Instance', icon = 'info', message = '', buttons = null } = {}) {
       if (typeof showMessageModal === 'function') {
