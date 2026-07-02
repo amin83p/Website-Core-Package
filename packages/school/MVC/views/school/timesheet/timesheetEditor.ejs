@@ -132,7 +132,7 @@
                 Incomplete Sessions Detected
                 <span class="badge bg-warning text-dark ms-2" id="incompleteSessionsCount">0</span>
             </div>
-            <div class="small text-muted">Finalize these session statuses before submitting your timesheet.</div>
+            <div class="small text-muted">Open Manage Session in a new tab to update status, then refresh this timesheet.</div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -143,6 +143,7 @@
                             <th>Class</th>
                             <th style="width: 160px;">Time</th>
                             <th style="width: 150px;">Status</th>
+                            <th class="text-center pe-4" style="width: 150px;">Action</th>
                         </tr>
                     </thead>
                     <tbody id="incompleteSessionsBody"></tbody>
@@ -1419,6 +1420,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <th>Class</th>
                             <th>Time</th>
                             <th>Status</th>
+                            <th class="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>${buildIncompleteSessionsTableBodyHtml(rows)}</tbody>
@@ -1479,6 +1481,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<span class="badge border text-dark" style="background-color:${escapeHtml(bg)};border-color:${escapeHtml(border)} !important;">${escapeHtml(label)}</span>`;
     }
 
+    function buildIncompleteSessionManagerHref(row) {
+        const classId = String(row?.classId || '').trim();
+        const sessionId = String(row?.sessionId || '').trim();
+        if (!classId || !sessionId) return '';
+        return `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`;
+    }
+
+    function buildIncompleteSessionActionButton(row) {
+        const href = buildIncompleteSessionManagerHref(row);
+        if (!href) {
+            return '<span class="text-muted small">Unavailable</span>';
+        }
+        return `<a href="${escapeHtml(href)}" class="btn btn-sm btn-outline-primary fw-semibold" target="_blank" rel="noopener noreferrer" title="Open Manage Session in a new tab"><i class="bi bi-box-arrow-up-right me-1"></i>Manage Session</a>`;
+    }
+
     function buildIncompleteSessionsTableBodyHtml(rows) {
         return rows.map((row, index) => {
             const dateStr = row?.date || '';
@@ -1506,6 +1523,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </td>
                     <td><i class="bi bi-clock me-1 text-muted"></i>${escapeHtml(timeLabel)}</td>
                     <td>${buildIncompleteStatusBadge(row)}</td>
+                    <td class="text-center pe-3">${buildIncompleteSessionActionButton(row)}</td>
                 </tr>`;
         }).join('');
     }
