@@ -452,15 +452,32 @@ function parseAssignmentSaveRequest(body) {
   };
 }
 
-async function buildAssignmentListContext({ reqUser, classFilter = '', q = '' }) {
-  const [allAssignments, allTemplates, classes] = await Promise.all([
+async function buildAssignmentListContext({
+  reqUser,
+  classFilter = '',
+  classIds = [],
+  teacherPersonId = '',
+  reportScope = '',
+  q = ''
+}) {
+  const requestedClassIds = [...new Set(
+    [...parseStringArrayField(classIds), ...parseStringArrayField(classFilter)]
+      .map((id) => toPublicId(id))
+      .filter(Boolean)
+  )];
+  const requestedTeacherPersonId = toPublicId(teacherPersonId);
+  const normalizedReportScope = String(reportScope || '').trim().toLowerCase();
+  const requestedReportScope = reportAssignmentModel.ASSIGNMENT_REPORT_SCOPES?.includes(normalizedReportScope)
+    ? normalizedReportScope
+    : '';
+
+  const [allAssignments, allTemplates, classes, personMap] = await Promise.all([
     listAllReportAssignments(reqUser),
     listAllReportTemplates(reqUser),
-    schoolDataService.fetchData('classes', {}, reqUser)
+    schoolDataService.fetchData('classes', {}, reqUser),
+    requestedTeacherPersonId ? buildPersonNameMap(reqUser) : Promise.resolve(new Map())
   ]);
 
-  const scopedAssignments = filterRecordsByOrg(allAssignments, reqUser)
-    .filter((row) => !classFilter || idsEqual(row.classId, classFilter));
   const classMap = new Map(
     (Array.isArray(classes) ? classes : [])
       .map((row) => [toPublicId(row?.id), row])
@@ -471,24 +488,28 @@ async function buildAssignmentListContext({ reqUser, classFilter = '', q = '' })
       .map((row) => [toPublicId(row?.id), row])
       .filter(([id]) => Boolean(id))
   );
-
-  const classIds = [...new Set(
-    scopedAssignments
-      .map((row) => toPublicId(row?.classId))
-      .filter(Boolean)
-  )];
   const classTitleMap = new Map();
   const classLifecycleMap = new Map();
-  classIds.forEach((id) => {
-    const classItem = classMap.get(id) || null;
+  classMap.forEach((classItem, id) => {
     classTitleMap.set(id, classItem?.title || id);
     classLifecycleMap.set(id, buildClassLifecycleSnapshot(classItem || {}));
   });
 
-  if (classFilter && !classTitleMap.has(classFilter)) {
-    const selectedClass = classMap.get(toPublicId(classFilter));
-    classTitleMap.set(classFilter, selectedClass?.title || classFilter);
-  }
+  const scopedAssignments = filterRecordsByOrg(allAssignments, reqUser)
+    .filter((row) => {
+      const rowClassId = toPublicId(row?.classId);
+      if (requestedClassIds.length && !requestedClassIds.some((id) => idsEqual(id, rowClassId))) return false;
+
+      if (requestedTeacherPersonId) {
+        const rowTeacherIds = (Array.isArray(row?.teacherIds) ? row.teacherIds : [])
+          .map((id) => toPublicId(id))
+          .filter(Boolean);
+        if (!rowTeacherIds.some((id) => idsEqual(id, requestedTeacherPersonId))) return false;
+      }
+
+      if (requestedReportScope && inferAssignmentReportScope(row) !== requestedReportScope) return false;
+      return true;
+    });
 
   const rows = scopedAssignments
     .map((row) => {
@@ -498,14 +519,14 @@ async function buildAssignmentListContext({ reqUser, classFilter = '', q = '' })
       const taskTimeRange = String(row.taskStartTime || '').trim() && String(row.taskEndTime || '').trim()
         ? `${row.taskStartTime} - ${row.taskEndTime}`
         : '';
-      const reportScope = inferAssignmentReportScope(row);
-      const classId = String(row.classId || '').trim();
+      const resolvedReportScope = inferAssignmentReportScope(row);
+      const classId = toPublicId(row?.classId) || String(row?.classId || '').trim();
       return {
         ...row,
         targetType,
         targetDate,
         taskTimeRange,
-        reportScope,
+        reportScope: resolvedReportScope,
         targetStudentCount: Array.isArray(row.targetStudentIds) ? row.targetStudentIds.length : 0,
         classTitle: classTitleMap.get(classId) || classId,
         classLifecycle: classLifecycleMap.get(classId) || buildClassLifecycleSnapshot({}),
@@ -514,15 +535,39 @@ async function buildAssignmentListContext({ reqUser, classFilter = '', q = '' })
     })
     .filter((row) => {
       if (!q) return true;
-      return [row.id, row.classTitle, row.templateTitle, row.targetDate, row.targetType, row.reportScope, row.status, row.reportStartDate, row.reportDueDate, row.taskStartTime, row.taskEndTime, row.taskTimeRange]
+      return [
+        row.id,
+        row.classTitle,
+        row.templateTitle,
+        row.targetDate,
+        row.targetType,
+        row.reportScope,
+        row.status,
+        row.reportStartDate,
+        row.reportDueDate,
+        row.taskStartTime,
+        row.taskEndTime,
+        row.taskTimeRange,
+        Array.isArray(row.teacherIds) ? row.teacherIds.join(' ') : ''
+      ]
         .map((v) => String(v || '').toLowerCase())
         .some((v) => v.includes(q));
     })
     .sort((a, b) => String(b.targetDate || '').localeCompare(String(a.targetDate || '')));
 
+  const selectedClasses = requestedClassIds.map((id) => ({
+    id,
+    name: classTitleMap.get(id) || id
+  }));
+
   return {
     rows,
-    selectedClassTitle: classFilter ? (classTitleMap.get(classFilter) || classFilter) : ''
+    selectedClassTitle: selectedClasses.length === 1 ? selectedClasses[0].name : '',
+    selectedClassIds: requestedClassIds,
+    selectedClasses,
+    selectedTeacherPersonId: requestedTeacherPersonId,
+    selectedTeacherName: requestedTeacherPersonId ? (personMap.get(requestedTeacherPersonId) || requestedTeacherPersonId) : '',
+    selectedReportScope: requestedReportScope
   };
 }
 

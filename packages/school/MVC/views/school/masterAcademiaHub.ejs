@@ -1157,7 +1157,10 @@
     taskPersonId: '',
     taskPersonName: '',
     activityPersonId: '',
-    activityPersonName: ''
+    activityPersonName: '',
+    reportAssignmentTeacherPersonId: '',
+    reportAssignmentTeacherName: '',
+    reportAssignmentScope: ''
   };
 
   const workspaceSections = {
@@ -1984,6 +1987,7 @@
   let hubSessionIssueTeacherSelections = [];
   let hubSessionIssueStudentSelections = [];
   let hubSessionIssueClassSelections = [];
+  let hubReportAssignmentClassSelections = [];
   let hubSessionRowsByKey = new Map();
   let hubSessionStatusMeta = [];
   let hubSessionCanUpdateSessions = false;
@@ -4512,6 +4516,177 @@
     return 'Whole class';
   }
 
+  function renderReportAssignmentClassChips() {
+    const container = document.getElementById('hubReportAssignmentClassChips');
+    if (!container) return;
+    if (!hubReportAssignmentClassSelections.length) {
+      container.innerHTML = '<div class="small text-muted">No class filter selected.</div>';
+      return;
+    }
+    container.innerHTML = hubReportAssignmentClassSelections.map(function (item) {
+      return [
+        '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1">',
+        '<span>' + escapeHtml(item.name || item.id) + '</span>',
+        '<button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove class" data-hub-report-assignment-remove-class="' + escapeHtml(item.id) + '"></button>',
+        '</span>'
+      ].join('');
+    }).join('');
+  }
+
+  function syncReportAssignmentFilterInputs() {
+    const classIds = hubReportAssignmentClassSelections.map(function (item) { return item.id; }).filter(Boolean);
+    const classIdEl = document.getElementById('hubReportAssignmentClassId');
+    const classIdsEl = document.getElementById('hubReportAssignmentClassIds');
+    const classNameEl = document.getElementById('hubReportAssignmentClassName');
+    const teacherIdEl = document.getElementById('hubReportAssignmentTeacherPersonId');
+    const teacherNameEl = document.getElementById('hubReportAssignmentTeacherName');
+    const scopeEl = document.getElementById('hubReportAssignmentScope');
+
+    if (classIdEl) classIdEl.value = classIds[0] || '';
+    if (classIdsEl) classIdsEl.value = classIds.join(',');
+    if (classNameEl) classNameEl.value = hubReportAssignmentClassSelections.map(function (item) { return item.name || item.id; }).join(', ');
+
+    if (teacherIdEl) workspaceState.reportAssignmentTeacherPersonId = String(teacherIdEl.value || '').trim();
+    if (teacherNameEl) workspaceState.reportAssignmentTeacherName = String(teacherNameEl.value || '').trim();
+    if (scopeEl) workspaceState.reportAssignmentScope = String(scopeEl.value || '').trim().toLowerCase();
+
+    renderReportAssignmentClassChips();
+  }
+
+  function appendReportAssignmentWorkspaceQuery(requestQuery) {
+    const classIds = hubReportAssignmentClassSelections.map(function (item) { return item.id; }).filter(Boolean);
+    if (classIds.length) {
+      requestQuery.set('classIds', classIds.join(','));
+      requestQuery.set('classId', classIds[0]);
+    }
+    if (workspaceState.reportAssignmentTeacherPersonId) requestQuery.set('teacherPersonId', workspaceState.reportAssignmentTeacherPersonId);
+    if (workspaceState.reportAssignmentScope) requestQuery.set('reportScope', workspaceState.reportAssignmentScope);
+  }
+
+  function openHubReportAssignmentTeacherPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.teacher({
+      title: 'Filter by Assigned Teacher',
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (itemOrItems) {
+        const item = Array.isArray(itemOrItems) ? itemOrItems[0] : itemOrItems;
+        const id = resolveHubTeacherId(item);
+        if (!id) return;
+        const name = formatHubTeacherName(item, id);
+        const teacherIdEl = document.getElementById('hubReportAssignmentTeacherPersonId');
+        const teacherNameEl = document.getElementById('hubReportAssignmentTeacherName');
+        if (teacherIdEl) teacherIdEl.value = id;
+        if (teacherNameEl) teacherNameEl.value = name;
+        syncReportAssignmentFilterInputs();
+        loadWorkspaceSection('report-assignments');
+      }
+    }));
+  }
+
+  function openHubReportAssignmentClassPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Class Picker', icon: 'warning', message: 'Class picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.class({
+      title: 'Filter Report Assignments by Classes',
+      icon: 'bi-book',
+      multiselect: true,
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubClassId(item);
+          const name = formatHubClassName(item, id);
+          if (id && !hubReportAssignmentClassSelections.some(function (row) { return row.id === id; })) {
+            hubReportAssignmentClassSelections.push({ id, name });
+          }
+        });
+        syncReportAssignmentFilterInputs();
+        loadWorkspaceSection('report-assignments');
+      }
+    }));
+  }
+
+  function bindReportAssignmentWorkspaceControls() {
+    const loadButton = els.workspace.querySelector('[data-hub-load-workspace="report-assignments"]');
+    if (loadButton) {
+      loadButton.addEventListener('click', function () {
+        syncReportAssignmentFilterInputs();
+        loadWorkspaceSection('report-assignments');
+      });
+    }
+    const applyBtn = document.getElementById('hubReportAssignmentFilterLoad');
+    if (applyBtn) {
+      applyBtn.addEventListener('click', function () {
+        syncReportAssignmentFilterInputs();
+        loadWorkspaceSection('report-assignments');
+      });
+    }
+    const resetBtn = document.getElementById('hubReportAssignmentReset');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function () {
+        hubReportAssignmentClassSelections = [];
+        workspaceState.reportAssignmentTeacherPersonId = '';
+        workspaceState.reportAssignmentTeacherName = '';
+        workspaceState.reportAssignmentScope = '';
+        const teacherIdEl = document.getElementById('hubReportAssignmentTeacherPersonId');
+        const teacherNameEl = document.getElementById('hubReportAssignmentTeacherName');
+        const scopeEl = document.getElementById('hubReportAssignmentScope');
+        if (teacherIdEl) teacherIdEl.value = '';
+        if (teacherNameEl) teacherNameEl.value = '';
+        if (scopeEl) scopeEl.value = '';
+        syncReportAssignmentFilterInputs();
+        loadWorkspaceSection('report-assignments');
+      });
+    }
+    const openTeacherBtn = document.getElementById('hubReportAssignmentOpenTeacherPicker');
+    if (openTeacherBtn) openTeacherBtn.addEventListener('click', openHubReportAssignmentTeacherPicker);
+    const clearTeacherBtn = document.getElementById('hubReportAssignmentClearTeacher');
+    if (clearTeacherBtn) {
+      clearTeacherBtn.addEventListener('click', function () {
+        const teacherIdEl = document.getElementById('hubReportAssignmentTeacherPersonId');
+        const teacherNameEl = document.getElementById('hubReportAssignmentTeacherName');
+        if (teacherIdEl) teacherIdEl.value = '';
+        if (teacherNameEl) teacherNameEl.value = '';
+        syncReportAssignmentFilterInputs();
+        loadWorkspaceSection('report-assignments');
+      });
+    }
+    const openClassBtn = document.getElementById('hubReportAssignmentOpenClassPicker');
+    if (openClassBtn) openClassBtn.addEventListener('click', openHubReportAssignmentClassPicker);
+    const clearClassBtn = document.getElementById('hubReportAssignmentClearClass');
+    if (clearClassBtn) {
+      clearClassBtn.addEventListener('click', function () {
+        hubReportAssignmentClassSelections = [];
+        syncReportAssignmentFilterInputs();
+        loadWorkspaceSection('report-assignments');
+      });
+    }
+    const classChips = document.getElementById('hubReportAssignmentClassChips');
+    if (classChips) {
+      classChips.addEventListener('click', function (event) {
+        const button = event.target && event.target.closest('[data-hub-report-assignment-remove-class]');
+        if (!button) return;
+        const removeId = button.getAttribute('data-hub-report-assignment-remove-class') || '';
+        hubReportAssignmentClassSelections = hubReportAssignmentClassSelections.filter(function (item) { return item.id !== removeId; });
+        syncReportAssignmentFilterInputs();
+        loadWorkspaceSection('report-assignments');
+      });
+    }
+    const scopeEl = document.getElementById('hubReportAssignmentScope');
+    if (scopeEl) {
+      scopeEl.addEventListener('change', function () {
+        syncReportAssignmentFilterInputs();
+        loadWorkspaceSection('report-assignments');
+      });
+    }
+    bindWorkspaceSearchControls('report-assignments');
+  }
+
   function renderReportAssignmentRows(rows) {
     if (!Array.isArray(rows) || !rows.length) {
       return '<div class="hub-empty"><div><i class="bi bi-clipboard2-x display-6 d-block mb-3"></i><div class="fw-semibold">No report assignments found.</div><div class="text-muted small mt-1">Try clearing filters or open the full page for assignment management.</div></div></div>';
@@ -4532,7 +4707,8 @@
         row.reportScope,
         row.status,
         row.reportStartDate,
-        row.reportDueDate
+        row.reportDueDate,
+        Array.isArray(row.teacherIds) ? row.teacherIds.join(' ') : ''
       ].filter(Boolean).join(' ');
       return [
         '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
@@ -4566,8 +4742,36 @@
     };
     const rows = Array.isArray(payload.rows) ? payload.rows : [];
     const notLoaded = payload.notLoaded === true;
+    const filters = payload.filters || {};
     const refreshed = payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
-    workspaceState.serverSearch['report-assignments'] = workspaceState.serverSearch['report-assignments'] || payload.searchQuery || '';
+    workspaceState.serverSearch['report-assignments'] = typeof payload.searchQuery === 'string'
+      ? payload.searchQuery
+      : String(workspaceState.serverSearch['report-assignments'] || '');
+    const classIds = splitHubIdList(filters.classIds || filters.classId || '');
+    const existingClasses = new Map(hubReportAssignmentClassSelections.map(function (item) {
+      return [String(item.id || '').trim(), item];
+    }));
+    const payloadClasses = new Map((Array.isArray(payload.selectedClasses) ? payload.selectedClasses : []).map(function (item) {
+      return [String(item?.id || '').trim(), { id: String(item?.id || '').trim(), name: String(item?.name || item?.id || '').trim() }];
+    }));
+    hubReportAssignmentClassSelections = classIds.map(function (id) {
+      return existingClasses.get(id) || payloadClasses.get(id) || { id: id, name: id };
+    });
+    const selectedTeacherName = String(payload.selectedTeacherName || workspaceState.reportAssignmentTeacherName || '').trim();
+    const selectedTeacherPersonId = String(payload.selectedTeacherPersonId || filters.teacherPersonId || workspaceState.reportAssignmentTeacherPersonId || '').trim();
+    workspaceState.reportAssignmentTeacherPersonId = selectedTeacherPersonId;
+    workspaceState.reportAssignmentTeacherName = selectedTeacherName || selectedTeacherPersonId;
+    workspaceState.reportAssignmentScope = String(payload.selectedReportScope || filters.reportScope || workspaceState.reportAssignmentScope || '').trim().toLowerCase();
+    const scopeOptions = [
+      { value: '', label: 'All Scopes' },
+      { value: 'class', label: 'Whole Class' },
+      { value: 'each_student', label: 'Each Student' },
+      { value: 'selected_students', label: 'Selected Students' }
+    ];
+    const scopeSelect = scopeOptions.map(function (item) {
+      const selected = String(item.value || '') === workspaceState.reportAssignmentScope;
+      return '<option value="' + escapeHtml(item.value) + '"' + (selected ? ' selected' : '') + '>' + escapeHtml(item.label) + '</option>';
+    }).join('');
     els.workspace.innerHTML = [
       '<section class="hub-workspace">',
       '<div class="hub-workspace-card">',
@@ -4583,6 +4787,38 @@
       '<a class="btn btn-outline-secondary btn-sm" href="' + escapeHtml(section.sourceUrl || '/school/reports/assignments') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
       '</div>',
       '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-lg-4">',
+      '<label class="form-label small fw-semibold">Classes</label>',
+      '<div class="input-group input-group-sm">',
+      '<input type="hidden" id="hubReportAssignmentClassId" value="' + escapeHtml(classIds[0] || '') + '">',
+      '<input type="hidden" id="hubReportAssignmentClassIds" value="' + escapeHtml(classIds.join(',')) + '">',
+      '<input type="text" id="hubReportAssignmentClassName" class="form-control bg-white" placeholder="All Classes..." readonly>',
+      '<button type="button" class="btn btn-outline-secondary" id="hubReportAssignmentClearClass" title="Clear Classes"><i class="bi bi-x"></i></button>',
+      '<button type="button" class="btn btn-outline-primary" id="hubReportAssignmentOpenClassPicker" title="Select Classes"><i class="bi bi-book"></i></button>',
+      '</div>',
+      '<div id="hubReportAssignmentClassChips" class="mt-2"></div>',
+      '</div>',
+      '<div class="col-lg-4">',
+      '<label class="form-label small fw-semibold">Select Person</label>',
+      '<div class="input-group input-group-sm">',
+      '<input type="hidden" id="hubReportAssignmentTeacherPersonId" value="' + escapeHtml(selectedTeacherPersonId) + '">',
+      '<input type="text" id="hubReportAssignmentTeacherName" class="form-control bg-white" value="' + escapeHtml(selectedTeacherName) + '" placeholder="All Teachers..." readonly>',
+      '<button type="button" class="btn btn-outline-secondary" id="hubReportAssignmentClearTeacher" title="Clear Teacher"><i class="bi bi-x"></i></button>',
+      '<button type="button" class="btn btn-outline-primary" id="hubReportAssignmentOpenTeacherPicker" title="Select Teacher"><i class="bi bi-person-badge"></i></button>',
+      '</div>',
+      '</div>',
+      '<div class="col-lg-2">',
+      '<label class="form-label small fw-semibold" for="hubReportAssignmentScope">Report Scope</label>',
+      '<select id="hubReportAssignmentScope" class="form-select form-select-sm">' + scopeSelect + '</select>',
+      '</div>',
+      '<div class="col-lg-2 d-flex gap-2">',
+      '<button type="button" id="hubReportAssignmentFilterLoad" class="btn btn-primary btn-sm flex-fill fw-bold"><i class="bi bi-funnel-fill me-1"></i> Apply</button>',
+      '<button type="button" id="hubReportAssignmentReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise"></i></button>',
+      '</div>',
+      '</div>',
+      '</div>',
       workspaceToolbarHtml('report-assignments', { label: 'report assignments' }),
       '<div class="p-3 border-bottom bg-white">',
       '<div class="small text-muted">' + (notLoaded ? 'Report assignments are not loaded automatically. Click Load Report Assignments when ready.' : 'Showing ' + escapeHtml(String(rows.length)) + ' report assignment(s). Last refreshed: ' + escapeHtml(refreshed) + '.') + '</div>',
@@ -4593,13 +4829,8 @@
       '</div>',
       '</section>'
     ].join('');
-    bindWorkspaceSearchControls('report-assignments');
-    const loadButton = els.workspace.querySelector('[data-hub-load-workspace="report-assignments"]');
-    if (loadButton) {
-      loadButton.addEventListener('click', function () {
-        loadWorkspaceSection('report-assignments');
-      });
-    }
+    syncReportAssignmentFilterInputs();
+    bindReportAssignmentWorkspaceControls();
   }
 
   function reportInstanceStatusBadgeClass(status, isPendingAssignment) {
@@ -5836,6 +6067,7 @@
     if (key === 'sessions') appendSessionWorkspaceQuery(requestQuery);
     if (key === 'session-issues') appendSessionIssueWorkspaceQuery(requestQuery);
     if (key === 'timesheet-periods') appendTimesheetPeriodWorkspaceQuery(requestQuery);
+    if (key === 'report-assignments') appendReportAssignmentWorkspaceQuery(requestQuery);
     if (key === 'holidays') requestQuery.set('year', workspaceState.holidaysYear || String(new Date().getFullYear()));
 
     workspaceState.currentSection = key;
@@ -6054,6 +6286,7 @@
     }
 
     if (key === 'report-assignments') {
+      const classIds = hubReportAssignmentClassSelections.map(function (item) { return item.id; }).filter(Boolean);
       renderReportAssignmentWorkspace({
         status: 'success',
         notLoaded: true,
@@ -6064,7 +6297,16 @@
           sourceUrl: '/school/reports/assignments'
         },
         rows: [],
-        total: 0
+        total: 0,
+        filters: {
+          classIds: classIds.join(','),
+          classId: classIds[0] || '',
+          teacherPersonId: workspaceState.reportAssignmentTeacherPersonId || '',
+          reportScope: workspaceState.reportAssignmentScope || ''
+        },
+        selectedTeacherName: workspaceState.reportAssignmentTeacherName || '',
+        selectedTeacherPersonId: workspaceState.reportAssignmentTeacherPersonId || '',
+        selectedReportScope: workspaceState.reportAssignmentScope || ''
       });
       return;
     }

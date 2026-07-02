@@ -519,14 +519,45 @@ async function deleteTemplate(req, res) {
 
 async function listAssignments(req, res) {
   try {
-    const classFilter = String(req.query.classId || '').trim();
-    const q = String(req.query.q || '').trim().toLowerCase();
+    const parseIdList = (raw) => {
+      if (Array.isArray(raw)) {
+        return [...new Set(raw.map((item) => String(item || '').trim()).filter(Boolean))];
+      }
+      const text = String(raw || '').trim();
+      if (!text) return [];
+      return [...new Set(text.split(',').map((item) => String(item || '').trim()).filter(Boolean))];
+    };
+    const classIds = parseIdList(req.query.classIds);
+    if (!classIds.length) classIds.push(...parseIdList(req.query.classId));
+    const teacherPersonId = String(req.query.teacherPersonId || '').trim();
+    const reportScope = String(req.query.reportScope || '').trim().toLowerCase();
+    const qRaw = String(req.query.q || '').trim();
+    const q = qRaw.toLowerCase();
 
-    const { rows: assignments, selectedClassTitle } = await reportViewService.buildAssignmentListContext({
+    const {
+      rows: assignments,
+      selectedClassTitle,
+      selectedClassIds,
+      selectedClasses,
+      selectedTeacherPersonId,
+      selectedTeacherName,
+      selectedReportScope
+    } = await reportViewService.buildAssignmentListContext({
       reqUser: req.user,
-      classFilter,
+      classFilter: classIds[0] || '',
+      classIds,
+      teacherPersonId,
+      reportScope,
       q
     });
+    const filters = {
+      ...req.query,
+      q: qRaw,
+      classIds: selectedClassIds.join(','),
+      classId: selectedClassIds[0] || '',
+      teacherPersonId: selectedTeacherPersonId || '',
+      reportScope: selectedReportScope || ''
+    };
 
     const { data, pagination } = paginate(assignments, req.query);
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
@@ -538,9 +569,14 @@ async function listAssignments(req, res) {
       newUrl: 'school/reports/assignments',
       newLabel: 'Add Assignment',
       pagination,
-      filters: req.query,
-      selectedClassId: classFilter,
+      filters,
+      selectedClassId: selectedClassIds[0] || '',
+      selectedClassIds,
+      selectedClasses,
       selectedClassTitle,
+      selectedTeacherId: selectedTeacherPersonId,
+      selectedTeacherName,
+      selectedReportScope,
       includeModal: true,
       includeModal_Table: true,
       includeModal_FileImport: true,

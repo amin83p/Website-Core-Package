@@ -1,10 +1,31 @@
 <%
-  const selectedClassIdSafe = String(((typeof selectedClassId !== 'undefined' ? selectedClassId : (filters?.classId || '')) || '')).trim();
-  const selectedClassLabelSafe = String(((typeof selectedClassTitle !== 'undefined' ? selectedClassTitle : selectedClassIdSafe) || '')).trim();
   const assignmentStateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const parseCsvIds = (value) => String(value || '')
+    .split(',')
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  const selectedClassIdsSafe = Array.isArray(selectedClassIds) && selectedClassIds.length
+    ? selectedClassIds.map((id) => String(id || '').trim()).filter(Boolean)
+    : parseCsvIds(assignmentStateFilters?.classIds || assignmentStateFilters?.classId || '');
+  const selectedClassesSafe = Array.isArray(selectedClasses) && selectedClasses.length
+    ? selectedClasses
+      .map((item) => ({
+        id: String(item?.id || '').trim(),
+        name: String(item?.name || item?.id || '').trim()
+      }))
+      .filter((item) => item.id)
+    : selectedClassIdsSafe.map((id) => ({ id, name: id }));
+  const selectedClassIdSafe = selectedClassIdsSafe[0] || '';
+  const selectedClassIdsCsvSafe = selectedClassIdsSafe.join(',');
+  const selectedClassLabelSafe = selectedClassesSafe.map((item) => item.name || item.id).filter(Boolean).join(', ');
+  const selectedTeacherIdSafe = String(((typeof selectedTeacherId !== 'undefined' ? selectedTeacherId : assignmentStateFilters?.teacherPersonId) || '')).trim();
+  const selectedTeacherNameSafe = String(((typeof selectedTeacherName !== 'undefined' ? selectedTeacherName : selectedTeacherIdSafe) || '')).trim();
+  const selectedReportScopeSafe = String(((typeof selectedReportScope !== 'undefined' ? selectedReportScope : assignmentStateFilters?.reportScope) || '')).trim().toLowerCase();
   const hasAssignmentFiltersApplied = Boolean(
-    String(assignmentStateFilters?.classId || '').trim()
+    selectedClassIdsSafe.length
     || String(assignmentStateFilters?.q || '').trim()
+    || selectedTeacherIdSafe
+    || selectedReportScopeSafe
   );
   const totalMatchedRows = Number(pagination?.totalItems ?? (Array.isArray(data) ? data.length : 0));
 %>
@@ -41,10 +62,11 @@
     <form method="GET" action="/school/reports/assignments" id="reportAssignmentFilterForm" class="card-body p-3">
       <input type="hidden" name="q" value="<%= filters?.q || '' %>">
       <div class="row g-3 align-items-end">
-        <div class="col-md-8 col-xl-6">
-          <label class="form-label">Class</label>
+        <div class="col-lg-6">
+          <label class="form-label">Classes</label>
           <div class="input-group">
             <input type="hidden" name="classId" id="classIdFilterInput" value="<%= selectedClassIdSafe %>">
+            <input type="hidden" name="classIds" id="classIdsFilterInput" value="<%= selectedClassIdsCsvSafe %>">
             <input type="text" class="form-control bg-white" id="classTitleFilterInput" value="<%= selectedClassLabelSafe %>" placeholder="All Classes" readonly>
             <button type="button" class="btn btn-outline-primary" id="btnPickClassFilter" title="Pick Class">
               <i class="bi bi-search"></i>
@@ -53,8 +75,31 @@
               <i class="bi bi-x-lg"></i>
             </button>
           </div>
+          <div id="classFilterChips" class="mt-2"></div>
         </div>
-        <div class="col-md-4 col-xl-6 d-flex justify-content-xl-end gap-2 pt-xl-4">
+        <div class="col-lg-3">
+          <label class="form-label">Select Person</label>
+          <div class="input-group">
+            <input type="hidden" name="teacherPersonId" id="teacherPersonIdFilterInput" value="<%= selectedTeacherIdSafe %>">
+            <input type="text" class="form-control bg-white" id="teacherNameFilterInput" value="<%= selectedTeacherNameSafe %>" placeholder="All Teachers" readonly>
+            <button type="button" class="btn btn-outline-primary" id="btnPickTeacherFilter" title="Pick Teacher">
+              <i class="bi bi-person-badge"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="btnClearTeacherFilter" title="Clear Teacher Filter">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-lg-3">
+          <label class="form-label" for="reportScopeFilterInput">Report Scope</label>
+          <select class="form-select" id="reportScopeFilterInput" name="reportScope">
+            <option value="" <%= !selectedReportScopeSafe ? 'selected' : '' %>>All Scopes</option>
+            <option value="class" <%= selectedReportScopeSafe === 'class' ? 'selected' : '' %>>Whole Class</option>
+            <option value="each_student" <%= selectedReportScopeSafe === 'each_student' ? 'selected' : '' %>>Each Student</option>
+            <option value="selected_students" <%= selectedReportScopeSafe === 'selected_students' ? 'selected' : '' %>>Selected Students</option>
+          </select>
+        </div>
+        <div class="col-12 d-flex justify-content-lg-end gap-2 pt-2">
           <button class="btn btn-filled btn-primary btn-md" type="submit"><i class="bi bi-funnel me-1"></i> Apply</button>
           <a href="/school/reports/assignments" class="btn btn-outline-secondary btn-md">Reset</a>
         </div>
@@ -178,40 +223,147 @@
 <script>
   (function () {
     const classIdInput = document.getElementById('classIdFilterInput');
+    const classIdsInput = document.getElementById('classIdsFilterInput');
     const classTitleInput = document.getElementById('classTitleFilterInput');
+    const classChipContainer = document.getElementById('classFilterChips');
     const btnPickClass = document.getElementById('btnPickClassFilter');
     const btnClearClass = document.getElementById('btnClearClassFilter');
+    const teacherIdInput = document.getElementById('teacherPersonIdFilterInput');
+    const teacherNameInput = document.getElementById('teacherNameFilterInput');
+    const btnPickTeacher = document.getElementById('btnPickTeacherFilter');
+    const btnClearTeacher = document.getElementById('btnClearTeacherFilter');
+    let selectedClassItems = <%- JSON.stringify(selectedClassesSafe || []) %>;
 
-    function showPickerUnavailable() {
+    function normalizeItemId(value) {
+      return String(value || '').trim();
+    }
+
+    function escapeHtmlClient(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatClassName(item, fallbackId) {
+      return String(item?.title || item?.name || fallbackId || '').trim();
+    }
+
+    function formatTeacherName(item, fallbackId) {
+      const directName = String(item?.displayName || item?.fullName || item?.personName || item?.label || item?.title || item?.name || '').trim();
+      if (directName && directName !== '[object Object]') return directName;
+      const objectName = item?.name && typeof item.name === 'object'
+        ? [item.name.first, item.name.middle, item.name.last].map((part) => String(part || '').trim()).filter(Boolean).join(' ')
+        : '';
+      if (objectName) return objectName;
+      return String(fallbackId || '').trim();
+    }
+
+    function showPickerUnavailable(message) {
       if (typeof showMessageModal === 'function') {
         showMessageModal({
           title: 'Picker Unavailable',
           icon: 'warning',
-          message: 'Class picker is not available on this page.',
+          message: message || 'Picker is not available on this page.',
           buttons: [{ text: 'OK', class: 'btn-secondary' }]
         });
       }
     }
 
+    function renderClassChips() {
+      if (!classChipContainer) return;
+      if (!selectedClassItems.length) {
+        classChipContainer.innerHTML = '<div class="small text-muted">No class filter selected.</div>';
+        return;
+      }
+      classChipContainer.innerHTML = selectedClassItems.map((item) => [
+        '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1">',
+        '<span>', escapeHtmlClient(String(item?.name || item?.id || '')), '</span>',
+        '<button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove class" data-class-chip-remove="', escapeHtmlClient(String(item?.id || '')), '"></button>',
+        '</span>'
+      ].join('')).join('');
+    }
+
+    function syncClassInputs() {
+      const ids = selectedClassItems
+        .map((item) => normalizeItemId(item?.id))
+        .filter(Boolean);
+      if (classIdInput) classIdInput.value = ids[0] || '';
+      if (classIdsInput) classIdsInput.value = ids.join(',');
+      if (classTitleInput) {
+        classTitleInput.value = selectedClassItems.map((item) => String(item?.name || item?.id || '').trim()).filter(Boolean).join(', ');
+      }
+      renderClassChips();
+    }
+
     btnPickClass?.addEventListener('click', function () {
       if (!window.GenericPicker || !window.GenericPickerPresets) {
-        showPickerUnavailable();
+        showPickerUnavailable('Class picker is not available on this page.');
         return;
       }
       GenericPicker.open(GenericPickerPresets.class({
-        onSelect: function (item) {
-          const id = String(item?.id || '').trim();
-          if (!id) return;
-          classIdInput.value = id;
-          classTitleInput.value = String(item?.title || item?.name || id);
+        title: 'Filter by Classes',
+        multiselect: true,
+        selectedItems: selectedClassItems.map((item) => ({
+          id: normalizeItemId(item?.id),
+          title: String(item?.name || item?.id || '').trim()
+        })),
+        onSelect: function (items) {
+          (Array.isArray(items) ? items : [items]).forEach((item) => {
+            const id = normalizeItemId(item?.id);
+            if (!id || selectedClassItems.some((existing) => normalizeItemId(existing?.id) === id)) return;
+            selectedClassItems.push({
+              id,
+              name: formatClassName(item, id)
+            });
+          });
+          syncClassInputs();
         }
       }));
     });
 
     btnClearClass?.addEventListener('click', function () {
-      classIdInput.value = '';
-      classTitleInput.value = '';
+      selectedClassItems = [];
+      syncClassInputs();
     });
+
+    classChipContainer?.addEventListener('click', function (event) {
+      const button = event.target && event.target.closest('[data-class-chip-remove]');
+      if (!button) return;
+      const removeId = normalizeItemId(button.getAttribute('data-class-chip-remove'));
+      if (!removeId) return;
+      selectedClassItems = selectedClassItems.filter((item) => normalizeItemId(item?.id) !== removeId);
+      syncClassInputs();
+    });
+
+    btnPickTeacher?.addEventListener('click', function () {
+      if (!window.GenericPicker || !window.GenericPickerPresets) {
+        showPickerUnavailable('Teacher picker is not available on this page.');
+        return;
+      }
+      GenericPicker.open(GenericPickerPresets.teacher({
+        title: 'Filter by Assigned Teacher',
+        context: window.GenericPickerContexts
+          ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+          : undefined,
+        onSelect: function (itemOrItems) {
+          const selectedItem = Array.isArray(itemOrItems) ? itemOrItems[0] : itemOrItems;
+          const id = normalizeItemId(selectedItem?.personId || selectedItem?.teacherPersonId || selectedItem?.id || selectedItem?._id);
+          if (!id) return;
+          if (teacherIdInput) teacherIdInput.value = id;
+          if (teacherNameInput) teacherNameInput.value = formatTeacherName(selectedItem, id);
+        }
+      }));
+    });
+
+    btnClearTeacher?.addEventListener('click', function () {
+      if (teacherIdInput) teacherIdInput.value = '';
+      if (teacherNameInput) teacherNameInput.value = '';
+    });
+
+    syncClassInputs();
 
     function initCollapseToggleIcon(options = {}) {
       const collapseEl = document.getElementById(String(options.collapseId || ''));

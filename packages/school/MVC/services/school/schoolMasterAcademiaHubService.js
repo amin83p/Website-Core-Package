@@ -1307,9 +1307,15 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       throw error;
     }
     const searchTerm = lower(query.q || '');
+    const classIds = splitFilterIds(queryInput?.classIds || queryInput?.classId || '');
+    const teacherPersonId = normalizeText(queryInput?.teacherPersonId || '');
+    const reportScope = lower(queryInput?.reportScope || '');
     const assignmentContext = await reportViewService.buildAssignmentListContext({
       reqUser: req.user,
-      classFilter: normalizeText(queryInput?.classId || ''),
+      classFilter: classIds[0] || '',
+      classIds,
+      teacherPersonId,
+      reportScope,
       q: searchTerm
     });
     const rows = normalizeReportAssignmentRows(assignmentContext?.rows || []);
@@ -1322,6 +1328,16 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       },
       rows,
       total: rows.length,
+      filters: {
+        classIds: normalizeText((assignmentContext?.selectedClassIds || classIds).join(',')),
+        classId: normalizeText((assignmentContext?.selectedClassIds || classIds)[0] || ''),
+        teacherPersonId: normalizeText(assignmentContext?.selectedTeacherPersonId || teacherPersonId),
+        reportScope: lower(assignmentContext?.selectedReportScope || reportScope)
+      },
+      selectedClasses: Array.isArray(assignmentContext?.selectedClasses) ? assignmentContext.selectedClasses : [],
+      selectedTeacherName: normalizeText(assignmentContext?.selectedTeacherName || ''),
+      selectedTeacherPersonId: normalizeText(assignmentContext?.selectedTeacherPersonId || teacherPersonId),
+      selectedReportScope: lower(assignmentContext?.selectedReportScope || reportScope),
       selectedClassTitle: normalizeText(assignmentContext?.selectedClassTitle || ''),
       searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()
