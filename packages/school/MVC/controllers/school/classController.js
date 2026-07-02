@@ -3518,11 +3518,13 @@ async function saveSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
         const { status, notes, room, roster, contentItems, contentOrder } = req.body; 
+        const forceRemoveMakeups = parseBoolean(req.body?.forceRemoveMakeups, false);
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
         if (sessionIndex === -1) throw new Error('Session not found');
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, sessions[sessionIndex], req.user);
+        const originalSession = sessions[sessionIndex];
 
         const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
             includeInactive: true
@@ -3542,47 +3544,104 @@ async function saveSession(req, res) {
         }
 
         // Validate and normalize payload before persisting.
-        const normalizedStatus = sessionStatusPolicyService.normalizeStatusCode(status || sessions[sessionIndex].status || '');
+        const normalizedStatus = sessionStatusPolicyService.normalizeStatusCode(status || originalSession.status || '');
         if (!normalizedStatus || !statusMap.has(normalizedStatus)) {
             throw new Error('Invalid session status.');
         }
-        const currentMakeupInactive = isMakeUpRequiredSessionByMap(statusMap, sessions[sessionIndex]);
+        const currentMakeupInactive = isMakeUpRequiredSessionByMap(statusMap, originalSession);
         const nextMakeupInactive = isMakeUpRequiredSessionByMap(statusMap, {
-            ...sessions[sessionIndex],
+            ...originalSession,
             status: normalizedStatus
         });
-        if ((currentMakeupInactive || nextMakeupInactive) && (roster !== undefined || contentItems !== undefined || contentOrder !== undefined)) {
-            throw new Error('This original session is inactive because its status requires a make-up session. Attendance, gradebook, content, cases, and files are not available for this session. Change the status from Master Hub first, or create/open the make-up session.');
+        const removingMakeupRequirement = currentMakeupInactive && !nextMakeupInactive;
+        const linkedMakeupSessions = removingMakeupRequirement
+            ? sessions.filter((row, idx) => idx !== sessionIndex
+                && row?.makeup?.isMakeup === true
+                && idsEqual(row?.makeup?.originalClassId, classId)
+                && idsEqual(row?.makeup?.originalSessionId, sessionId))
+            : [];
+        const linkedMakeupRows = linkedMakeupSessions.map((row) => ({
+            sessionId: toPublicId(row?.sessionId || row?.id),
+            date: normalizeDateOnlyValue(row?.date),
+            startTime: normalizeClockTime(row?.startTime),
+            endTime: normalizeClockTime(row?.endTime),
+            teacherId: cleanPersonId(row?.delivery?.deliveredBy),
+            teacherName: String(row?.delivery?.deliveredByName || '').trim(),
+            room: String(row?.room || '').trim(),
+            status: sessionStatusPolicyService.normalizeSessionStatus(row?.status, row?.notes)
+        }));
+        if (linkedMakeupRows.length && !forceRemoveMakeups) {
+            const warningMessage = 'You already have make-up sessions scheduled for this original session. Changing to a status that does not require make-up is not allowed until all linked make-up sessions are removed.';
+            if (req.headers['x-ajax-request']) {
+                return res.status(409).json({
+                    status: 'warning',
+                    code: 'MAKEUP_SESSIONS_EXIST',
+                    message: warningMessage,
+                    data: {
+                        requiresConfirmation: true,
+                        originalSessionId: toPublicId(sessionId),
+                        makeupSessions: linkedMakeupRows
+                    }
+                });
+            }
+            throw new Error(warningMessage);
         }
+        let removedMakeupCount = 0;
+        if (linkedMakeupRows.length && forceRemoveMakeups) {
+            const removedIds = new Set(linkedMakeupRows.map((row) => toPublicId(row.sessionId)).filter(Boolean));
+            for (let idx = sessions.length - 1; idx >= 0; idx -= 1) {
+                const row = sessions[idx];
+                if (idx === sessionIndex) continue;
+                if (row?.makeup?.isMakeup !== true) continue;
+                if (!idsEqual(row?.makeup?.originalClassId, classId)) continue;
+                if (!idsEqual(row?.makeup?.originalSessionId, sessionId)) continue;
+                sessions.splice(idx, 1);
+                removedMakeupCount += 1;
+            }
+            if (Array.isArray(originalSession.makeupHistory)) {
+                originalSession.makeupHistory = originalSession.makeupHistory.filter((row) => {
+                    const linkedId = toPublicId(row?.makeupSessionId || row?.sessionId || '');
+                    return !linkedId || !removedIds.has(linkedId);
+                });
+            } else {
+                originalSession.makeupHistory = [];
+            }
+            originalSession.audit = {
+                ...(originalSession.audit || {}),
+                lastUpdateUser: toPublicId(req.user?.id || req.user?.username || ''),
+                lastUpdateDateTime: new Date().toISOString()
+            };
+        }
+        const shouldSkipInstructionalPayload = currentMakeupInactive || nextMakeupInactive;
 
-        const normalizedNotes = notes !== undefined ? String(notes || '').trim() : sessions[sessionIndex].notes;
-        const normalizedRoom = room !== undefined ? String(room || '').trim() : sessions[sessionIndex].room;
+        const normalizedNotes = notes !== undefined ? String(notes || '').trim() : originalSession.notes;
+        const normalizedRoom = room !== undefined ? String(room || '').trim() : originalSession.room;
 
-        sessions[sessionIndex].status = normalizedStatus;
-        sessions[sessionIndex].notes = normalizedNotes;
-        sessions[sessionIndex].room = normalizedRoom;
-        if (contentItems !== undefined) {
+        originalSession.status = normalizedStatus;
+        originalSession.notes = normalizedNotes;
+        originalSession.room = normalizedRoom;
+        if (!shouldSkipInstructionalPayload && contentItems !== undefined) {
             const parsed = typeof contentItems === 'string' ? JSON.parse(contentItems || '[]') : contentItems;
-            sessions[sessionIndex].contentItems = normalizeSessionContentItems(parsed);
+            originalSession.contentItems = normalizeSessionContentItems(parsed);
         }
-        if (contentOrder !== undefined) {
+        if (!shouldSkipInstructionalPayload && contentOrder !== undefined) {
             const parsedOrder = typeof contentOrder === 'string' ? JSON.parse(contentOrder || '[]') : contentOrder;
-            sessions[sessionIndex].contentOrder = normalizeSessionContentOrder(parsedOrder);
+            originalSession.contentOrder = normalizeSessionContentOrder(parsedOrder);
         }
 
-        if (roster) {
+        if (!shouldSkipInstructionalPayload && roster !== undefined) {
             const incomingRoster = typeof roster === 'string' ? JSON.parse(roster) : roster;
             if (!Array.isArray(incomingRoster)) {
                 throw new Error('Invalid roster payload.');
             }
-            const existingRoster = sessions[sessionIndex].roster || [];
+            const existingRoster = originalSession.roster || [];
             const allowedAttendance = new Set(['present', 'late', 'excused', 'absent']);
             const orgPolicyLayerSave = await attendanceMatrixPolicyModel.getPolicyForOrg(
                 classData?.orgId || getActiveOrgIdOrThrow(req.user)
             );
             const matrixPolicySave = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSave);
 
-            sessions[sessionIndex].roster = incomingRoster.map((incRec) => {
+            originalSession.roster = incomingRoster.map((incRec) => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 if (!incomingPersonId) return null;
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
@@ -3623,7 +3682,12 @@ async function saveSession(req, res) {
         const indexService = require('../../services/school/schoolIndexService');
         await indexService.rebuildIndexesForClass(classId);
 
-        if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Session data saved successfully.' });
+        if (req.headers['x-ajax-request']) {
+            const message = removedMakeupCount > 0
+                ? `Removed ${removedMakeupCount} linked make-up session(s) and saved session data successfully.`
+                : 'Session data saved successfully.';
+            return res.json({ status: 'success', message });
+        }
         res.redirect(`/school/classes/sessions/${classId}/${sessionId}`);
     } catch (error) {
         if (req.headers['x-ajax-request']) return res.status(400).json({ status: 'error', message: error.message });
