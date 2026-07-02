@@ -860,6 +860,12 @@
       <button type="button" class="hub-section-segment" data-hub-workspace-section="timesheet-management">
         <span><i class="bi bi-table me-1"></i> Timesheet Management</span>
       </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="report-assignments">
+        <span><i class="bi bi-clipboard2-check-fill me-1"></i> Report Assignments</span>
+      </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="report-instances">
+        <span><i class="bi bi-file-earmark-text-fill me-1"></i> Report Instances</span>
+      </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="leave-requests">
         <span><i class="bi bi-calendar-heart me-1"></i> Leave Requests</span>
       </button>
@@ -1142,6 +1148,8 @@
       'session-issues': '',
       'timesheet-periods': '',
       'timesheet-management': '',
+      'report-assignments': '',
+      'report-instances': '',
       holidays: ''
     },
     holidaysYear: String(new Date().getFullYear())
@@ -1182,6 +1190,18 @@
       endpoint: '/school/master-hub/api/workspace/timesheet-management',
       sourceUrl: '/school/timesheets/manage',
       icon: 'bi bi-table'
+    },
+    'report-assignments': {
+      label: 'Report Assignments',
+      endpoint: '/school/master-hub/api/workspace/report-assignments',
+      sourceUrl: '/school/reports/assignments',
+      icon: 'bi bi-clipboard2-check-fill'
+    },
+    'report-instances': {
+      label: 'Report Instances',
+      endpoint: '/school/master-hub/api/workspace/report-instances',
+      sourceUrl: '/school/reports/instances',
+      icon: 'bi bi-file-earmark-text-fill'
     },
     holidays: {
       label: 'Holidays',
@@ -4477,6 +4497,207 @@
     });
   }
 
+  function reportAssignmentStatusBadgeClass(status) {
+    const value = String(status || '').trim().toLowerCase();
+    if (value === 'active') return 'text-bg-success';
+    if (value === 'draft') return 'text-bg-warning';
+    if (value === 'archived' || value === 'inactive') return 'text-bg-secondary';
+    return 'text-bg-primary';
+  }
+
+  function reportScopeLabel(scope, targetStudentCount) {
+    const value = String(scope || '').trim().toLowerCase();
+    if (value === 'each_student') return 'Each student';
+    if (value === 'selected_students') return 'Selected students (' + String(Number(targetStudentCount || 0)) + ')';
+    return 'Whole class';
+  }
+
+  function renderReportAssignmentRows(rows) {
+    if (!Array.isArray(rows) || !rows.length) {
+      return '<div class="hub-empty"><div><i class="bi bi-clipboard2-x display-6 d-block mb-3"></i><div class="fw-semibold">No report assignments found.</div><div class="text-muted small mt-1">Try clearing filters or open the full page for assignment management.</div></div></div>';
+    }
+
+    const body = rows.map(function (row) {
+      const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
+        return '<a class="btn btn-outline-' + escapeHtml(action.tone || 'secondary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener"><i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open') + '</a>';
+      }).join('');
+      const cycleSeed = Number(row?.classLifecycle?.cycleNo || 1);
+      const cycleNo = Number.isFinite(cycleSeed) && cycleSeed > 0 ? cycleSeed : 1;
+      const targetType = String(row.targetType || 'date').toLowerCase() === 'date' ? 'Date target' : 'Session target';
+      const searchText = [
+        row.id,
+        row.classTitle,
+        row.templateTitle,
+        row.targetDate,
+        row.reportScope,
+        row.status,
+        row.reportStartDate,
+        row.reportDueDate
+      ].filter(Boolean).join(' ');
+      return [
+        '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
+        '<td class="ps-3"><div class="fw-bold text-primary font-monospace">' + escapeHtml(row.id || '-') + '</div><div class="small text-muted">' + escapeHtml(targetType) + '</div></td>',
+        '<td><div class="fw-semibold">' + escapeHtml(row.classTitle || '-') + '</div><div class="x-small text-muted">Cycle #' + escapeHtml(String(cycleNo)) + '</div></td>',
+        '<td><div class="fw-semibold">' + escapeHtml(row.templateTitle || '-') + '</div><div class="x-small text-muted">v' + escapeHtml(String(Number(row.templateVersion || 1))) + '</div></td>',
+        '<td><div>' + escapeHtml(row.targetDate || '-') + '</div><div class="x-small text-muted">' + escapeHtml(row.taskTimeRange || 'No task time window') + '</div></td>',
+        '<td><span class="badge text-bg-light border">' + escapeHtml(reportScopeLabel(row.reportScope, row.targetStudentCount)) + '</span></td>',
+        '<td><span class="badge ' + escapeHtml(reportAssignmentStatusBadgeClass(row.status)) + '">' + escapeHtml(toHubTitleCase(row.status || 'active')) + '</span></td>',
+        '<td class="text-end pe-3"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+
+    return [
+      '<div class="hub-table-wrap">',
+      '<table class="table table-hover align-middle hub-workspace-table">',
+      '<thead><tr><th class="ps-3">Assignment</th><th>Class</th><th>Template</th><th>Target</th><th>Scope</th><th>Status</th><th class="text-end pe-3">Actions</th></tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderReportAssignmentWorkspace(payload) {
+    const section = payload.section || {
+      key: 'report-assignments',
+      label: 'Report Assignments',
+      icon: 'bi bi-clipboard2-check-fill',
+      sourceUrl: '/school/reports/assignments'
+    };
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+    const notLoaded = payload.notLoaded === true;
+    const refreshed = payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    workspaceState.serverSearch['report-assignments'] = workspaceState.serverSearch['report-assignments'] || payload.searchQuery || '';
+    els.workspace.innerHTML = [
+      '<section class="hub-workspace">',
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-clipboard2-check-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Report Assignments') + '</h2>',
+      '<p class="text-muted mb-0">Review assignment status, class targeting, and templates in one place. Use actions to open assignment workflows.</p>',
+      '</div>',
+      '<div class="hub-workspace-actions">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-load-workspace="report-assignments"><i class="bi bi-arrow-repeat me-1"></i>' + (notLoaded ? 'Load Report Assignments' : 'Refresh') + '</button>',
+      '<a class="btn btn-primary btn-sm" href="/school/reports/assignments/new" target="_blank" rel="noopener"><i class="bi bi-plus-circle me-1"></i> New Assignment</a>',
+      '<a class="btn btn-outline-secondary btn-sm" href="' + escapeHtml(section.sourceUrl || '/school/reports/assignments') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      workspaceToolbarHtml('report-assignments', { label: 'report assignments' }),
+      '<div class="p-3 border-bottom bg-white">',
+      '<div class="small text-muted">' + (notLoaded ? 'Report assignments are not loaded automatically. Click Load Report Assignments when ready.' : 'Showing ' + escapeHtml(String(rows.length)) + ' report assignment(s). Last refreshed: ' + escapeHtml(refreshed) + '.') + '</div>',
+      '</div>',
+      '<div class="p-3">',
+      notLoaded ? '<div class="hub-empty"><div><i class="bi bi-clipboard2-check display-6 d-block mb-3"></i><div class="fw-semibold">Report assignments are ready to load.</div><div class="text-muted small mt-1">Click the load button above to fetch assignment rows.</div></div></div>' : renderReportAssignmentRows(rows),
+      '</div>',
+      '</div>',
+      '</section>'
+    ].join('');
+    bindWorkspaceSearchControls('report-assignments');
+    const loadButton = els.workspace.querySelector('[data-hub-load-workspace="report-assignments"]');
+    if (loadButton) {
+      loadButton.addEventListener('click', function () {
+        loadWorkspaceSection('report-assignments');
+      });
+    }
+  }
+
+  function reportInstanceStatusBadgeClass(status, isPendingAssignment) {
+    if (isPendingAssignment === true) return 'text-bg-info';
+    const value = String(status || '').trim().toLowerCase();
+    if (value === 'submitted') return 'text-bg-success';
+    if (value === 'locked') return 'text-bg-dark';
+    if (value === 'draft') return 'text-bg-warning';
+    return 'text-bg-secondary';
+  }
+
+  function renderReportInstanceRows(rows) {
+    if (!Array.isArray(rows) || !rows.length) {
+      return '<div class="hub-empty"><div><i class="bi bi-file-earmark-x display-6 d-block mb-3"></i><div class="fw-semibold">No report instances found.</div><div class="text-muted small mt-1">Try clearing filters or open the full page for details.</div></div></div>';
+    }
+
+    const body = rows.map(function (row) {
+      const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
+        return '<a class="btn btn-outline-' + escapeHtml(action.tone || 'secondary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener"><i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open') + '</a>';
+      }).join('');
+      const statusLabel = row.isPendingAssignment ? 'Pending assignment' : toHubTitleCase(row.status || 'draft');
+      const instanceLabel = row.isPendingAssignment ? 'Pending report' : (row.id || '-');
+      const searchText = [
+        row.id,
+        row.assignmentId,
+        row.classTitle,
+        row.templateTitle,
+        row.teacherName,
+        row.studentName,
+        row.status,
+        row.sessionDate
+      ].filter(Boolean).join(' ');
+      return [
+        '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
+        '<td class="ps-3"><div class="fw-bold text-primary">' + escapeHtml(instanceLabel) + '</div><div class="x-small text-muted">Assignment: ' + escapeHtml(row.assignmentId || '-') + '</div><div class="x-small text-muted">' + escapeHtml(row.sessionDate || 'No session date') + '</div></td>',
+        '<td><div class="fw-semibold">' + escapeHtml(row.classTitle || '-') + '</div><div class="x-small text-muted">Template: ' + escapeHtml(row.templateTitle || '-') + '</div></td>',
+        '<td><div>' + escapeHtml(row.teacherName || row.teacherId || '-') + '</div><div class="x-small text-muted font-monospace">' + escapeHtml(row.teacherId || '-') + '</div></td>',
+        '<td><div>' + escapeHtml(row.studentName || (row.studentId ? row.studentId : 'Whole class')) + '</div>' + (row.studentId ? '<div class="x-small text-muted font-monospace">' + escapeHtml(row.studentId) + '</div>' : '') + '</td>',
+        '<td><span class="badge ' + escapeHtml(reportInstanceStatusBadgeClass(row.status, row.isPendingAssignment)) + '">' + escapeHtml(statusLabel) + '</span></td>',
+        '<td class="text-end pe-3"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+
+    return [
+      '<div class="hub-table-wrap">',
+      '<table class="table table-hover align-middle hub-workspace-table">',
+      '<thead><tr><th class="ps-3">Instance</th><th>Class / Template</th><th>Teacher</th><th>Student</th><th>Status</th><th class="text-end pe-3">Actions</th></tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderReportInstanceWorkspace(payload) {
+    const section = payload.section || {
+      key: 'report-instances',
+      label: 'Report Instances',
+      icon: 'bi bi-file-earmark-text-fill',
+      sourceUrl: '/school/reports/instances'
+    };
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+    const notLoaded = payload.notLoaded === true;
+    const refreshed = payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    workspaceState.serverSearch['report-instances'] = workspaceState.serverSearch['report-instances'] || payload.searchQuery || '';
+    els.workspace.innerHTML = [
+      '<section class="hub-workspace">',
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-file-earmark-text-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Report Instances') + '</h2>',
+      '<p class="text-muted mb-0">Review generated and pending report instances. Open item-level actions to continue reporting workflows.</p>',
+      '</div>',
+      '<div class="hub-workspace-actions">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-load-workspace="report-instances"><i class="bi bi-arrow-repeat me-1"></i>' + (notLoaded ? 'Load Report Instances' : 'Refresh') + '</button>',
+      '<a class="btn btn-outline-secondary btn-sm" href="' + escapeHtml(section.sourceUrl || '/school/reports/instances') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      workspaceToolbarHtml('report-instances', { label: 'report instances' }),
+      '<div class="p-3 border-bottom bg-white">',
+      '<div class="small text-muted">' + (notLoaded ? 'Report instances are not loaded automatically. Click Load Report Instances when ready.' : 'Showing ' + escapeHtml(String(rows.length)) + ' report instance(s). Last refreshed: ' + escapeHtml(refreshed) + '.') + '</div>',
+      '</div>',
+      '<div class="p-3">',
+      notLoaded ? '<div class="hub-empty"><div><i class="bi bi-file-earmark-text display-6 d-block mb-3"></i><div class="fw-semibold">Report instances are ready to load.</div><div class="text-muted small mt-1">Click the load button above to fetch report instance rows.</div></div></div>' : renderReportInstanceRows(rows),
+      '</div>',
+      '</div>',
+      '</section>'
+    ].join('');
+    bindWorkspaceSearchControls('report-instances');
+    const loadButton = els.workspace.querySelector('[data-hub-load-workspace="report-instances"]');
+    if (loadButton) {
+      loadButton.addEventListener('click', function () {
+        loadWorkspaceSection('report-instances');
+      });
+    }
+  }
+
   function leaveRequestBadgeClass(status) {
     const value = String(status || '').trim().toLowerCase();
     if (value === 'approved') return 'text-bg-success';
@@ -5575,6 +5796,22 @@
         icon: 'bi bi-calendar-heart'
       };
     }
+    if (key === 'report-assignments' && !workspaceSections['report-assignments']) {
+      workspaceSections['report-assignments'] = {
+        label: 'Report Assignments',
+        endpoint: '/school/master-hub/api/workspace/report-assignments',
+        sourceUrl: '/school/reports/assignments',
+        icon: 'bi bi-clipboard2-check-fill'
+      };
+    }
+    if (key === 'report-instances' && !workspaceSections['report-instances']) {
+      workspaceSections['report-instances'] = {
+        label: 'Report Instances',
+        endpoint: '/school/master-hub/api/workspace/report-instances',
+        sourceUrl: '/school/reports/instances',
+        icon: 'bi bi-file-earmark-text-fill'
+      };
+    }
     if (key === 'holidays' && !workspaceSections.holidays) {
       workspaceSections.holidays = {
         label: 'Holidays',
@@ -5643,6 +5880,10 @@
         renderTimesheetManagementWorkspace(payload);
       } else if (key === 'leave-requests') {
         renderLeaveRequestWorkspace(payload);
+      } else if (key === 'report-assignments') {
+        renderReportAssignmentWorkspace(payload);
+      } else if (key === 'report-instances') {
+        renderReportInstanceWorkspace(payload);
       } else if (key === 'holidays') {
         renderHolidayWorkspace(payload);
       }
@@ -5805,6 +6046,38 @@
           label: 'Leave Requests',
           icon: 'bi bi-calendar-heart',
           sourceUrl: '/school/leave-requests'
+        },
+        rows: [],
+        total: 0
+      });
+      return;
+    }
+
+    if (key === 'report-assignments') {
+      renderReportAssignmentWorkspace({
+        status: 'success',
+        notLoaded: true,
+        section: {
+          key: 'report-assignments',
+          label: 'Report Assignments',
+          icon: 'bi bi-clipboard2-check-fill',
+          sourceUrl: '/school/reports/assignments'
+        },
+        rows: [],
+        total: 0
+      });
+      return;
+    }
+
+    if (key === 'report-instances') {
+      renderReportInstanceWorkspace({
+        status: 'success',
+        notLoaded: true,
+        section: {
+          key: 'report-instances',
+          label: 'Report Instances',
+          icon: 'bi bi-file-earmark-text-fill',
+          sourceUrl: '/school/reports/instances'
         },
         rows: [],
         total: 0

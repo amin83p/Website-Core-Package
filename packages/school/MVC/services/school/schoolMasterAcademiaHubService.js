@@ -3,6 +3,7 @@ const schoolRepositories = require('../../repositories/school');
 const taskService = require('./taskService');
 const leaveRequestService = require('./leaveRequestService');
 const activityService = require('./activityService');
+const reportViewService = require('./reportViewService');
 const personDisplayNameService = require('./personDisplayNameService');
 const sessionExplorerService = require('./sessionExplorerService');
 const schoolIndexService = require('./schoolIndexService');
@@ -579,6 +580,105 @@ function normalizeActivityRows(rows) {
       actions: buildActivityActionLinks(row)
     };
   });
+}
+
+function buildReportAssignmentActionLinks(row) {
+  const id = normalizeText(row?.id);
+  if (!id) return [];
+  const encodedId = encodeURIComponent(id);
+  const actions = [
+    { label: 'Edit', href: `/school/reports/assignments/edit/${encodedId}`, icon: 'bi bi-pencil-square', tone: 'secondary' },
+    { label: 'Instances', href: `/school/reports/instances?assignmentId=${encodedId}`, icon: 'bi bi-file-earmark-text', tone: 'primary' }
+  ];
+  const firstTeacherId = normalizeText(Array.isArray(row?.teacherIds) ? row.teacherIds[0] : '');
+  if (firstTeacherId) {
+    actions.push({
+      label: 'Start',
+      href: `/school/reports/instances/start/${encodedId}?teacherId=${encodeURIComponent(firstTeacherId)}`,
+      icon: 'bi bi-play-circle',
+      tone: 'success'
+    });
+  }
+  return actions;
+}
+
+function normalizeReportAssignmentRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: normalizeText(row?.id),
+    classId: normalizeText(row?.classId),
+    classTitle: normalizeText(row?.classTitle || row?.classId || '-'),
+    classLifecycle: row?.classLifecycle && typeof row.classLifecycle === 'object' ? row.classLifecycle : {},
+    templateId: normalizeText(row?.templateId),
+    templateTitle: normalizeText(row?.templateTitle || row?.templateId || '-'),
+    templateVersion: Number(row?.templateVersion || 1) || 1,
+    targetType: normalizeText(row?.targetType || 'date'),
+    targetDate: normalizeText(row?.targetDate || row?.sessionDate || row?.dueDate || ''),
+    reportScope: normalizeText(row?.reportScope || 'class'),
+    targetStudentCount: Number(row?.targetStudentCount || 0),
+    taskTimeRange: normalizeText(row?.taskTimeRange || ''),
+    reportStartDate: normalizeText(row?.reportStartDate || ''),
+    reportDueDate: normalizeText(row?.reportDueDate || ''),
+    teacherIds: Array.isArray(row?.teacherIds) ? row.teacherIds.map((value) => normalizeText(value)).filter(Boolean) : [],
+    status: lower(row?.status || 'active'),
+    actions: buildReportAssignmentActionLinks(row)
+  }));
+}
+
+function buildReportInstanceActionLinks(row) {
+  const assignmentId = normalizeText(row?.assignmentId);
+  const teacherId = normalizeText(row?.teacherId);
+  const studentId = normalizeText(row?.studentId);
+  const instanceId = normalizeText(row?.id);
+  if (row?.isPendingAssignment === true) {
+    const actions = [];
+    if (assignmentId && teacherId) {
+      let startUrl = `/school/reports/instances/start/${encodeURIComponent(assignmentId)}?teacherId=${encodeURIComponent(teacherId)}`;
+      if (studentId) startUrl += `&studentId=${encodeURIComponent(studentId)}`;
+      actions.push({ label: 'Start', href: startUrl, icon: 'bi bi-play-circle', tone: 'primary' });
+    }
+    if (assignmentId) {
+      actions.push({ label: 'Assignment', href: `/school/reports/assignments/edit/${encodeURIComponent(assignmentId)}`, icon: 'bi bi-pencil-square', tone: 'secondary' });
+    }
+    return actions;
+  }
+
+  if (!instanceId) return [];
+  const encodedInstanceId = encodeURIComponent(instanceId);
+  const actions = [
+    { label: 'Open', href: `/school/reports/instances/edit/${encodedInstanceId}`, icon: 'bi bi-box-arrow-up-right', tone: 'secondary' },
+    { label: 'Payload', href: `/school/reports/instances/export/${encodedInstanceId}?download=1`, icon: 'bi bi-download', tone: 'secondary' }
+  ];
+  if (row?.hasDocxTemplate) {
+    actions.splice(1, 0, {
+      label: 'DOCX',
+      href: `/school/reports/instances/export/${encodedInstanceId}?format=docx&download=1`,
+      icon: 'bi bi-filetype-docx',
+      tone: 'primary'
+    });
+  }
+  return actions;
+}
+
+function normalizeReportInstanceRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: normalizeText(row?.id),
+    isPendingAssignment: row?.isPendingAssignment === true,
+    assignmentId: normalizeText(row?.assignmentId),
+    classId: normalizeText(row?.classId),
+    classTitle: normalizeText(row?.classTitle || row?.classId || '-'),
+    classLifecycle: row?.classLifecycle && typeof row.classLifecycle === 'object' ? row.classLifecycle : {},
+    sessionDate: normalizeText(row?.sessionDate || ''),
+    templateId: normalizeText(row?.templateId),
+    templateTitle: normalizeText(row?.templateTitle || row?.templateId || '-'),
+    templateVersion: Number(row?.templateVersion || 1) || 1,
+    teacherId: normalizeText(row?.teacherId),
+    teacherName: normalizeText(row?.teacherName || row?.teacherId || '-'),
+    studentId: normalizeText(row?.studentId),
+    studentName: normalizeText(row?.studentName || (row?.studentId ? row.studentId : 'Whole class')),
+    status: lower(row?.status || 'draft'),
+    hasDocxTemplate: row?.hasDocxTemplate === true,
+    actions: buildReportInstanceActionLinks(row)
+  }));
 }
 
 function activityMatchesFilters(row, queryInput = {}, searchTerm = '') {
@@ -1192,6 +1292,72 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       rows: [],
       total: 0,
       filters: {},
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
+  if (key === 'report-assignments') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Report Assignments',
+      sectionId: SECTIONS.SCHOOL_REPORTS_ASSIGNMENT
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Report Assignments.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const searchTerm = lower(query.q || '');
+    const assignmentContext = await reportViewService.buildAssignmentListContext({
+      reqUser: req.user,
+      classFilter: normalizeText(queryInput?.classId || ''),
+      q: searchTerm
+    });
+    const rows = normalizeReportAssignmentRows(assignmentContext?.rows || []);
+    return {
+      section: {
+        key: 'report-assignments',
+        label: 'Report Assignments',
+        icon: 'bi bi-clipboard2-check-fill',
+        sourceUrl: '/school/reports/assignments'
+      },
+      rows,
+      total: rows.length,
+      selectedClassTitle: normalizeText(assignmentContext?.selectedClassTitle || ''),
+      searchQuery: normalizeText(query.q || ''),
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
+  if (key === 'report-instances') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Report Instances',
+      sectionId: SECTIONS.SCHOOL_REPORTS_INSTANCES
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Report Instances.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const assignmentFilter = normalizeText(queryInput?.assignmentId || '');
+    const searchTerm = lower(query.q || '');
+    const rows = normalizeReportInstanceRows(await reportViewService.buildInstanceListRows({
+      reqUser: req.user,
+      assignmentFilter,
+      q: searchTerm
+    }));
+    return {
+      section: {
+        key: 'report-instances',
+        label: 'Report Instances',
+        icon: 'bi bi-file-earmark-text-fill',
+        sourceUrl: '/school/reports/instances'
+      },
+      rows,
+      total: rows.length,
+      filters: {
+        assignmentId: assignmentFilter
+      },
+      searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()
     };
   }

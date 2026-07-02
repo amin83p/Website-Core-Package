@@ -9,16 +9,11 @@ function read(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
 }
 
-test('master academia hub exposes holidays as the last section tab', () => {
+test('master academia hub keeps holidays workspace wiring without a section button', () => {
   const viewSource = read('packages/school/MVC/views/school/masterAcademiaHub.ejs');
-  const leaveIndex = viewSource.indexOf('data-hub-workspace-section="leave-requests"');
-  const holidayIndex = viewSource.indexOf('data-hub-workspace-section="holidays"');
+  const holidayButtonIndex = viewSource.indexOf('data-hub-workspace-section="holidays"');
 
-  assert.notEqual(leaveIndex, -1);
-  assert.notEqual(holidayIndex, -1);
-  assert.ok(holidayIndex > leaveIndex, 'Holidays should be rendered after Leave Requests.');
-  assert.match(viewSource, /grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(viewSource, /data-hub-workspace-section="holidays"[\s\S]*Holidays/);
+  assert.equal(holidayButtonIndex, -1, 'Holidays button should remain removed from the section strip.');
   assert.match(viewSource, /function renderHolidayWorkspace\(payload\)/);
   assert.match(viewSource, /function renderHolidayRows\(rows\)/);
   assert.match(viewSource, /id="hubHolidayYear"/);
