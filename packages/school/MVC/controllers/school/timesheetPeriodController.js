@@ -1,5 +1,6 @@
 // MVC/controllers/school/timesheetPeriodController.js
 const dataService = require('../../services/school/schoolDataService');
+const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
@@ -217,6 +218,12 @@ exports.deleteTimesheetPeriod = async (req, res) => {
         const existingPeriod = await dataService.getDataById('timesheetPeriods', req.params.id, req.user);
         if (!existingPeriod) throw new Error('Timesheet Period not found.');
         assertTimesheetPeriodOrgAccess(existingPeriod, activeOrgId, req.user);
+
+        await schoolDependencyService.assertPeriodHasNoTimesheets({
+            periodId: req.params.id,
+            orgId: activeOrgId,
+            reqUser: req.user
+        });
 
         await dataService.deleteData('timesheetPeriods', req.params.id, req.user);
         const payloadOut = { status: 'success', message: 'Period deleted successfully.', redirectTo: '/school/timesheetPeriods' };

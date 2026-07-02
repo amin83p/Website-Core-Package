@@ -170,7 +170,7 @@ async function findPriorSubmittedTimesheet({ teacherId, currentPeriod, activeOrg
         if (!priorTimesheet) continue;
         const tsStatus = String(priorTimesheet?.status || '').trim().toLowerCase();
         const periodStatus = String(priorPeriod?.status || '').trim().toLowerCase();
-        if (tsStatus === 'submitted' || tsStatus === 'processed' || periodStatus === 'processed') {
+        if (tsStatus === 'submitted' || tsStatus === 'approved' || tsStatus === 'processed' || periodStatus === 'processed') {
             return { priorPeriod, priorTimesheet };
         }
     }

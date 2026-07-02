@@ -384,9 +384,24 @@ async function updateActivity(id, payload) {
     if (index < 0) throw new Error('School activity not found.');
     const existing = rows[index];
     const sanitized = sanitizeActivityPayload({ ...payload, orgId: existing.orgId || payload.orgId });
+    const existingEntries = new Map((Array.isArray(existing.entries) ? existing.entries : []).map((entry) => [String(entry.entryId), entry]));
+    const mergedEntries = (Array.isArray(sanitized.entries) ? sanitized.entries : []).map((entry) => {
+      const prior = existingEntries.get(String(entry.entryId));
+      if (!prior || prior.locked !== true) return entry;
+      return {
+        ...entry,
+        locked: prior.locked,
+        lockedAt: prior.lockedAt,
+        lockedBy: prior.lockedBy,
+        lockReason: prior.lockReason,
+        lockedTimesheetId: prior.lockedTimesheetId
+      };
+    });
     rows[index] = {
       ...existing,
       ...sanitized,
+      entries: mergedEntries,
+      locked: existing.locked === true || mergedEntries.some((entry) => entry.locked === true),
       updatedAt: new Date().toISOString()
     };
     rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(a.startTime || '').localeCompare(String(b.startTime || '')));

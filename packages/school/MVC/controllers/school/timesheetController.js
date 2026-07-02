@@ -13,6 +13,7 @@ const { buildReportReflectionLiveSessions } = require('../../services/school/rep
 const activityService = require('../../services/school/activityService');
 const timesheetManualConflictService = require('../../services/school/timesheetManualConflictService');
 const priorPeriodAdjustmentService = require('../../services/school/timesheetPriorPeriodAdjustmentService');
+const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const { sanitizeSnapshotEntry } = require('../../models/school/timesheetModel');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -1064,8 +1065,14 @@ exports.viewTimesheet = async (req, res) => {
             .filter((row) => isActiveActivityRow(row))
             .filter((row) => activityService.isPersonEligibleForActivity(row, teacherContext.targetTeacherId)));
 
+        const useFrozenSnapshot = ['submitted', 'approved', 'processed'].includes(String(timesheet.status || '').toLowerCase())
+            && Array.isArray(timesheet?.submissionSnapshot?.entries)
+            && timesheet.submissionSnapshot.entries.length > 0;
+        const canAdminApprove = teacherContext.isAdmin && String(timesheet.status || '').toLowerCase() === 'submitted';
+        const canAdminReopen = teacherContext.isAdmin && ['approved', 'processed'].includes(String(timesheet.status || '').toLowerCase());
         const isReadOnly = !teacherContext.isAdmin && (
             timesheet.status === 'submitted' ||
+            timesheet.status === 'approved' ||
             timesheet.status === 'processed' ||
             period.status === 'processed'
         );
@@ -1104,7 +1111,10 @@ exports.viewTimesheet = async (req, res) => {
             targetTeacherId: teacherContext.targetTeacherId,
             includeModal: true,
             actionStateId: req.actionStateId,
-            showPriorAdjustmentReview: priorReviewPending
+            showPriorAdjustmentReview: priorReviewPending,
+            useFrozenSnapshot,
+            canAdminApprove,
+            canAdminReopen
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -1144,13 +1154,16 @@ exports.saveTimesheet = async (req, res) => {
 
         const existing = await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user);
 
-        if (existing && existing.status === 'submitted' && !teacherContext.isAdmin) {
+        if (existing && ['submitted', 'approved', 'processed'].includes(String(existing.status || '').toLowerCase()) && !teacherContext.isAdmin) {
             throw new Error('<b>Security Error</b><br>This timesheet has been submitted and is locked.<br>Contact an admin to make changes.');
         }
 
         let nextStatus = (status === 'submitted') ? 'submitted' : 'draft';
         if (existing && existing.status === 'submitted' && teacherContext.isAdmin) {
             nextStatus = 'submitted';
+        }
+        if (existing && String(existing.status || '').toLowerCase() === 'approved' && teacherContext.isAdmin && nextStatus !== 'approved') {
+            throw new Error('Approved timesheets must be reopened before editing. Use Reopen Timesheet.');
         }
 
         const parsedEntries = typeof entries === 'string' ? JSON.parse(entries) : entries;
@@ -1630,6 +1643,103 @@ exports.applyPriorAdjustments = async (req, res) => {
             entries: saved?.entries || mergedEntries,
             actionStateId: req.actionStateId || null
         };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        return res.json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.approveTimesheet = async (req, res) => {
+    let guardKey = '';
+    try {
+        const { periodId } = req.params;
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.UPDATE });
+        if (!teacherContext.isAdmin) {
+            throw new Error('Only administrators can approve timesheets.');
+        }
+        guardKey = idempotencyGuardService.createGuardKey([
+            'timesheet_approve',
+            String(activeOrgId || '').trim(),
+            String(periodId || '').trim(),
+            String(teacherContext?.targetTeacherId || '').trim()
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({ key: guardKey, runningTtlMs: 120000, replayTtlMs: 15000 });
+        if (sendGuardedResponse(req, res, guardResult, 'Timesheet approval is already in progress. Please wait.')) return;
+
+        const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
+        if (!period) throw new Error('Period not found.');
+        assertPeriodOrgAccess(period, activeOrgId, req.user);
+        const existing = await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user);
+        if (!existing) throw new Error('Timesheet not found.');
+        if (String(existing.status || '').toLowerCase() !== 'submitted') {
+            throw new Error('Only submitted timesheets can be approved.');
+        }
+        if (!existing.submissionSnapshot?.submittedAt) {
+            throw new Error('Submission snapshot is missing. Ask the teacher to resubmit the timesheet.');
+        }
+
+        const lockSummary = await schoolDependencyService.lockSourcesForApprovedTimesheet(existing, req.user);
+        const payload = {
+            ...existing,
+            orgId: existing.orgId || period.orgId || activeOrgId,
+            status: 'approved',
+            approvedAt: new Date().toISOString(),
+            approvedBy: String(req.user?.id || req.user?.username || '').trim(),
+            lockedSourceRefs: lockSummary.lockedSourceRefs || []
+        };
+        await dataService.updateData('timesheets', existing.id, payload, req.user);
+        const payloadOut = { status: 'success', message: 'Timesheet approved and linked sessions/activities were locked.', lockSummary };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        return res.json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.reopenTimesheet = async (req, res) => {
+    let guardKey = '';
+    try {
+        const { periodId } = req.params;
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.UPDATE });
+        if (!teacherContext.isAdmin) {
+            throw new Error('Only administrators can reopen approved timesheets.');
+        }
+        guardKey = idempotencyGuardService.createGuardKey([
+            'timesheet_reopen',
+            String(activeOrgId || '').trim(),
+            String(periodId || '').trim(),
+            String(teacherContext?.targetTeacherId || '').trim()
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({ key: guardKey, runningTtlMs: 120000, replayTtlMs: 15000 });
+        if (sendGuardedResponse(req, res, guardResult, 'Timesheet reopen is already in progress. Please wait.')) return;
+
+        const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
+        if (!period) throw new Error('Period not found.');
+        assertPeriodOrgAccess(period, activeOrgId, req.user);
+        const existing = await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user);
+        if (!existing) throw new Error('Timesheet not found.');
+        const status = String(existing.status || '').toLowerCase();
+        if (!['approved', 'processed'].includes(status)) {
+            throw new Error('Only approved or processed timesheets can be reopened.');
+        }
+
+        await schoolDependencyService.unlockSourcesForTimesheet(existing, req.user);
+        const payload = {
+            ...existing,
+            status: 'submitted',
+            reopenedAt: new Date().toISOString(),
+            reopenedBy: String(req.user?.id || req.user?.username || '').trim(),
+            lockedSourceRefs: []
+        };
+        delete payload.approvedAt;
+        delete payload.approvedBy;
+        await dataService.updateData('timesheets', existing.id, payload, req.user);
+        const payloadOut = { status: 'success', message: 'Timesheet reopened to submitted status and source locks were released.' };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);
         return res.json(payloadOut);
     } catch (error) {

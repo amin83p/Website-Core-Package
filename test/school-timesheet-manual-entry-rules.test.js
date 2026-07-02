@@ -18,6 +18,8 @@ test('timesheet editor manual modal uses activity definitions and class time inp
   assert.match(source, /id="man_endTime"/);
   assert.match(source, /Pending Approval/);
   assert.match(source, /INCOMPLETE_SESSIONS/);
+  assert.match(source, /incomplete-sessions-table/);
+  assert.match(source, /incompleteSessionsPanel/);
 });
 
 test('timesheet controller wires activity-based manual options and incomplete warnings', () => {

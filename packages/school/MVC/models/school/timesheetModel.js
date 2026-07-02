@@ -12,7 +12,7 @@ if (!fsSync.existsSync(dataPath)) {
     fsSync.writeFileSync(dataPath, '[]');
 }
 
-const TIMESHEET_STATUSES = new Set(['draft', 'submitted', 'processed']);
+const TIMESHEET_STATUSES = new Set(['draft', 'submitted', 'approved', 'processed']);
 
 function cleanString(v, { max = 500, allowEmpty = true } = {}) {
     if (v === undefined || v === null) return allowEmpty ? '' : null;
@@ -73,10 +73,25 @@ function sanitizeSnapshotEntry(entry) {
         classId: cleanString(entry.classId, { max: 64, allowEmpty: true }) || null,
         hours: cleanHours(entry.hours ?? entry.durationHours ?? 0, { min: 0, max: 24 }),
         status: cleanString(entry.status, { max: 40, allowEmpty: true }).toLowerCase() || 'manual',
-        isManual: Boolean(entry.isManual)
+        isManual: Boolean(entry.isManual),
+        comment: cleanString(entry.comment, { max: 1000, allowEmpty: true })
     };
+    const startTime = cleanTime(entry.startTime, { allowEmpty: true });
+    const endTime = cleanTime(entry.endTime, { allowEmpty: true });
+    if (startTime) row.startTime = startTime;
+    if (endTime) row.endTime = endTime;
+    const timesheetHours = Number(entry.timesheetHours);
+    if (Number.isFinite(timesheetHours)) row.timesheetHours = cleanHours(timesheetHours, { min: 0, max: 24 });
+    const activityId = cleanString(entry.activityId, { max: 80, allowEmpty: true });
+    const activityEntryId = cleanString(entry.activityEntryId, { max: 80, allowEmpty: true });
+    const activityName = cleanString(entry.activityName, { max: 220, allowEmpty: true });
+    if (activityId) row.activityId = activityId;
+    if (activityEntryId) row.activityEntryId = activityEntryId;
+    if (activityName) row.activityName = activityName;
     if (entry.isReportReflection === true || sessionId.startsWith('rptref-')) row.isReportReflection = true;
     if (entry.isSchoolActivity === true || sessionId.startsWith('act-')) row.isSchoolActivity = true;
+    if (entry.isFinalStatus === true) row.isFinalStatus = true;
+    if (entry.isFinalStatus === false) row.isFinalStatus = false;
     return row;
 }
 
@@ -231,6 +246,24 @@ function sanitizeTimesheetPayload(input) {
         if (appliedFrom) result.priorPeriodAdjustmentsAppliedFrom = String(appliedFrom);
     }
 
+    const approvedAt = cleanString(input.approvedAt, { max: 40, allowEmpty: true });
+    if (approvedAt) result.approvedAt = approvedAt;
+    const approvedBy = cleanString(input.approvedBy, { max: 120, allowEmpty: true });
+    if (approvedBy) result.approvedBy = approvedBy;
+    if (Array.isArray(input.lockedSourceRefs)) {
+        result.lockedSourceRefs = input.lockedSourceRefs
+            .filter((ref) => ref && typeof ref === 'object' && !Array.isArray(ref))
+            .map((ref) => ({
+                type: cleanString(ref.type, { max: 40, allowEmpty: false }),
+                classId: cleanString(ref.classId, { max: 64, allowEmpty: true }) || undefined,
+                sessionId: cleanString(ref.sessionId, { max: 80, allowEmpty: true }) || undefined,
+                activityId: cleanString(ref.activityId, { max: 80, allowEmpty: true }) || undefined,
+                activityEntryId: cleanString(ref.activityEntryId, { max: 80, allowEmpty: true }) || undefined,
+                assignmentId: cleanString(ref.assignmentId, { max: 80, allowEmpty: true }) || undefined
+            }))
+            .filter((ref) => ref.type);
+    }
+
     return result;
 }
 
@@ -280,6 +313,11 @@ async function saveTimesheet(data) {
             }
             if (sanitized.priorPeriodAdjustmentsAppliedFrom === undefined && existing.priorPeriodAdjustmentsAppliedFrom) {
                 merged.priorPeriodAdjustmentsAppliedFrom = existing.priorPeriodAdjustmentsAppliedFrom;
+            }
+            if (sanitized.approvedAt === undefined && existing.approvedAt) merged.approvedAt = existing.approvedAt;
+            if (sanitized.approvedBy === undefined && existing.approvedBy) merged.approvedBy = existing.approvedBy;
+            if (sanitized.lockedSourceRefs === undefined && existing.lockedSourceRefs) {
+                merged.lockedSourceRefs = existing.lockedSourceRefs;
             }
             all[existingIndex] = merged;
 

@@ -72,4 +72,15 @@ router.post('/editor/:periodId/save',
   }),
   ctrl.saveTimesheet);
 
+
+router.post('/editor/:periodId/approve',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.approveTimesheet);
+
+router.post('/editor/:periodId/reopen',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.reopenTimesheet);
+
 module.exports = router;

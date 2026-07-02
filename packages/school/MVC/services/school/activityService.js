@@ -1,4 +1,5 @@
 const schoolDataService = require('./schoolDataService');
+const schoolDependencyService = require('./schoolDependencyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const activityModel = require('../../models/school/activityModel');
@@ -323,6 +324,65 @@ async function getActivity(id, reqUser) {
   return enrichActivityAttendeeNames(enrichActivity(activity, lookups), reqUser);
 }
 
+function preserveActivityLockMetadata(existing = {}, nextData = {}) {
+  const existingEntries = new Map(
+    (Array.isArray(existing.entries) ? existing.entries : []).map((entry) => [normalizeId(entry.entryId), entry])
+  );
+  const entries = (Array.isArray(nextData.entries) ? nextData.entries : []).map((entry) => {
+    const prior = existingEntries.get(normalizeId(entry.entryId));
+    if (!prior || !schoolDependencyService.isActivityEntryTimesheetLocked(prior)) return entry;
+    if (String(prior.lockReason || '') !== 'timesheet_approved') return entry;
+    return {
+      ...entry,
+      locked: prior.locked,
+      lockedAt: prior.lockedAt,
+      lockedBy: prior.lockedBy,
+      lockReason: prior.lockReason,
+      lockedTimesheetId: prior.lockedTimesheetId
+    };
+  });
+  const locked = existing.locked === true || entries.some(schoolDependencyService.isActivityEntryTimesheetLocked);
+  return {
+    ...nextData,
+    entries,
+    locked: locked || nextData.locked === true
+  };
+}
+
+function enforceActivityLockRules(existing = {}, nextData = {}) {
+  const existingEntries = new Map(
+    (Array.isArray(existing.entries) ? existing.entries : []).map((entry) => [normalizeId(entry.entryId), entry])
+  );
+  const nextIds = new Set((Array.isArray(nextData.entries) ? nextData.entries : []).map((entry) => normalizeId(entry.entryId)));
+  for (const [entryId, prior] of existingEntries.entries()) {
+    if (nextIds.has(entryId)) continue;
+    if (schoolDependencyService.isActivityEntryTimesheetLocked(prior) && String(prior.lockReason || '') === 'timesheet_approved') {
+      throw new Error(`Work session ${entryId} is locked by an approved timesheet and cannot be removed.`);
+    }
+  }
+  const parentFields = ['title', 'categoryId', 'departmentId', 'paid', 'visibilityScope', 'allowedPersonIds', 'excludedPersonIds', 'status'];
+  if (existing.locked === true && String(existing.lockReason || '') === 'timesheet_approved') {
+    parentFields.forEach((field) => {
+      const before = JSON.stringify(existing[field] ?? null);
+      const after = JSON.stringify(nextData[field] ?? null);
+      if (before !== after) {
+        throw new Error('This activity is locked by an approved timesheet and cannot be structurally modified.');
+      }
+    });
+  }
+  (Array.isArray(nextData.entries) ? nextData.entries : []).forEach((entry) => {
+    const prior = existingEntries.get(normalizeId(entry.entryId));
+    if (!prior || !schoolDependencyService.isActivityEntryTimesheetLocked(prior)) return;
+    if (String(prior.lockReason || '') !== 'timesheet_approved') return;
+    const structuralFields = ['date', 'startTime', 'endTime', 'durationHours', 'status'];
+    const structuralChanged = structuralFields.some((field) => String(prior[field] ?? '') !== String(entry[field] ?? ''));
+    const assigneeChanged = JSON.stringify(prior.assignees || []) !== JSON.stringify(entry.assignees || []);
+    if (structuralChanged || assigneeChanged) {
+      throw new Error(`Work session ${entry.entryId} is locked by an approved timesheet and cannot be modified.`);
+    }
+  });
+}
+
 async function saveActivity(payload = {}, reqUser) {
   const orgId = payload.orgId || getActiveOrgId(reqUser);
   const lookups = await loadActivityLookups(reqUser);
@@ -410,6 +470,12 @@ async function saveActivity(payload = {}, reqUser) {
     totalDurationHours
   };
   if (payload.id) {
+    const existing = await schoolDataService.getDataById('activities', payload.id, reqUser);
+    if (existing) {
+      enforceActivityLockRules(existing, normalizedData);
+      const lockedData = preserveActivityLockMetadata(existing, normalizedData);
+      return schoolDataService.updateData('activities', payload.id, lockedData, reqUser);
+    }
     return schoolDataService.updateData('activities', payload.id, normalizedData, reqUser);
   }
   return schoolDataService.addData('activities', normalizedData, reqUser);

@@ -69,7 +69,7 @@
 <%- include('partials/tablePages-search', {
   placeholder: 'Search periods...',
   fields: [
-      { name: 'tsStatus', label: 'Timesheet Status', type: 'select', options: ['not_started', 'draft', 'submitted', 'processed'] }
+      { name: 'tsStatus', label: 'Timesheet Status', type: 'select', options: ['not_started', 'draft', 'submitted', 'approved', 'processed'] }
   ]
 }) %>
 
@@ -100,6 +100,7 @@
                let badge = 'bg-secondary';
                if (p.tsStatus === 'draft') badge = 'bg-info text-dark';
                if (p.tsStatus === 'submitted') badge = 'bg-primary';
+               if (p.tsStatus === 'approved') badge = 'bg-warning text-dark';
                if (p.tsStatus === 'processed') badge = 'bg-success';
              %>
              <span class="badge <%= badge %> px-2 py-1"><%= p.tsStatus.replace('_', ' ').toUpperCase() %></span>

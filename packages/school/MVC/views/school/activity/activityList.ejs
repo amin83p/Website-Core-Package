@@ -144,6 +144,8 @@
         <% const totalDurationHours = Number(item.totalDurationHours || entries.reduce((sum, entry) => sum + (Number(entry.durationHours) || 0), 0) || item.durationHours || 0); %>
         <% const status = String(item.status || 'draft').toLowerCase(); %>
         <% const statusClass = status === 'posted' ? 'bg-success' : (status === 'cancelled' ? 'bg-secondary' : 'bg-info text-dark'); %>
+        <% const hasTimesheetLock = (item.locked === true || String(item.locked) === 'true') && String(item.lockReason || '') === 'timesheet_approved'
+          || entries.some((entry) => (entry.locked === true || String(entry.locked) === 'true') && String(entry.lockReason || '') === 'timesheet_approved'); %>
         <% const itemVisibilityScope = String(item.visibilityScope || 'school').toLowerCase() === 'individual' ? 'individual' : 'school'; %>
         <tr>
           <td class="ps-4">
@@ -181,6 +183,9 @@
           </td>
           <td>
             <span class="badge <%= statusClass %> text-capitalize"><%= status || '-' %></span>
+            <% if (hasTimesheetLock) { %>
+              <span class="badge bg-warning text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Timesheet Locked</span>
+            <% } %>
           </td>
           <td class="table-actions text-end pe-4">
             <div class="row-actions-wrap">

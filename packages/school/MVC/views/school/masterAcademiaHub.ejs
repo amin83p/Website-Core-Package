@@ -1975,6 +1975,14 @@
     return '';
   }
 
+  function formatHubSessionLockBadge(row) {
+    if (!row || (row.locked !== true && String(row.locked) !== 'true')) return '';
+    if (String(row.lockReason || '') === 'timesheet_approved') {
+      return '<span class="badge bg-warning text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Timesheet Locked</span>';
+    }
+    return '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>';
+  }
+
   function buildSessionRowStyle(status, locked, statusMap) {
     const normalized = normalizeSessionStatusCode(status);
     const meta = statusMap.get(normalized);
@@ -2636,7 +2644,7 @@
     if (cells[5]) cells[5].innerHTML = buildSessionStatusBadgeHtml(updatedRow.status, statusMap)
       + buildSessionCaseBadgeHtml(updatedRow.caseSummary)
       + buildSessionMakeupBadgeHtml(updatedRow)
-      + (updatedRow.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : '');
+      + formatHubSessionLockBadge(updatedRow);
     if (cells[6]) cells[6].innerHTML = escapeHtml(truncateHubText(updatedRow.notes, 42)) + commentsIcon;
     if (cells[7]) cells[7].innerHTML = buildHubSessionActionHtml(rowKey, updatedRow);
     bindHubSessionRowActions(rowEl);
@@ -2760,7 +2768,7 @@
           '<td class="text-muted small"><i class="bi bi-clock me-1"></i>' + escapeHtml(row.startTime || '00:00') + ' - ' + escapeHtml(row.endTime || '00:00') + '</td>',
           '<td><div class="fw-semibold text-primary">' + escapeHtml(row.className || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.classId || '') + '</div></td>',
           '<td>' + escapeHtml(row.teacherName || 'Unassigned') + '</td>',
-          '<td>' + badgeHtml + caseBadgeHtml + makeupBadgeHtml + (row.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : '') + '</td>',
+          '<td>' + badgeHtml + caseBadgeHtml + makeupBadgeHtml + formatHubSessionLockBadge(row) + '</td>',
           '<td class="text-muted small fst-italic">' + escapeHtml(truncateHubText(row.notes, 42)) + commentsIcon + '</td>',
           '<td class="pe-4 text-end">' + buildHubSessionActionHtml(rowKey, row) + '</td>',
           '</tr>'

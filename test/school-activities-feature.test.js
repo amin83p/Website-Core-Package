@@ -189,6 +189,14 @@ test('School activities attendee picker and save path preserve selected attendee
   assert.match(form, /renderEntryModal/);
   assert.match(form, /activityBatchModal/);
   assert.match(form, /activityBatchCount/);
+  assert.doesNotMatch(form, /id="activityBatchCount"[^>]*value="1"/);
+  assert.match(form, /placeholder="e\.g\. 10"/);
+  assert.doesNotMatch(form, /setBatchFieldValue\('activityBatchCount', '1'\)/);
+  assert.match(form, /End Date Too Early/);
+  assert.match(form, /openWorkSessionAssigneePicker/);
+  assert.match(form, /buildWorkSessionAssigneeLocalItems/);
+  assert.match(form, /getActivityLevelEffectiveAllowedSet\(\)/);
+  assert.match(form, /pickerConfig\.sourceMode = 'local'/);
   assert.match(form, /activityBatchStartDate/);
   assert.match(form, /activityBatchEndDate/);
   assert.match(form, /activity-batch-day/);

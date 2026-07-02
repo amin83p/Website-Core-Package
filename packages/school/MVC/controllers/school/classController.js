@@ -28,6 +28,7 @@ const programRegistrationDraftService = require('../../services/school/programRe
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
+const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
@@ -2702,6 +2703,14 @@ async function deleteClass(req, res) {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Class delete is already in progress. Please wait.')) return;
 
+    await schoolDependencyService.assertClassHasNoLockedSessions(classId, req.user, classData.title || 'This class');
+    await schoolDependencyService.assertClassSessionsNotReferencedByApprovedTimesheets({
+      classId,
+      orgId: activeOrgId,
+      label: classData.title || 'This class',
+      reqUser: req.user
+    });
+
     await schoolDataService.deleteData('classes', req.params.id, req.user);
     const folderCleanup = await cleanupClassRelatedFolders(classData);
     await indexService.rebuildIndexesForClass(req.params.id); // Fixed ID reference
@@ -3532,6 +3541,7 @@ async function saveSession(req, res) {
 
         // --- Backend Save Protection ---
         const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
+        schoolDependencyService.assertSessionNotTimesheetLocked(sessions[sessionIndex], 'This session');
         let canOverride = await adminChekersService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_CLASSES,
@@ -3713,6 +3723,7 @@ async function saveSessionGradebooks(req, res) {
         }
 
         const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
+        schoolDependencyService.assertSessionNotTimesheetLocked(sessions[sessionIndex], 'This session');
         let canOverride = await adminChekersService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_CLASSES,

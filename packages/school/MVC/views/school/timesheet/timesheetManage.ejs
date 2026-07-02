@@ -53,6 +53,7 @@
       <option value="not_started">Not Started</option>
       <option value="draft">Draft</option>
       <option value="submitted">Submitted</option>
+      <option value="approved">Approved</option>
       <option value="processed">Processed</option>
     </select>
   </div>
@@ -171,6 +172,7 @@
       not_started: ['#6c757d', 'Not Started', 'secondary'],
       draft: ['#0dcaf0', 'Draft', 'info'],
       submitted: ['#0d6efd', 'Submitted', 'primary'],
+      approved: ['#ffc107', 'Approved', 'warning'],
       processed: ['#198754', 'Processed', 'success']
     };
     const meta = map[normalized] || ['#6c757d', normalized.replace(/_/g, ' '), 'secondary'];

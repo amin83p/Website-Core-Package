@@ -1,5 +1,8 @@
 <% 
-  const isReadOnly = !isAdmin && (timesheet.status === 'submitted' || timesheet.status === 'processed' || period.status === 'processed');
+  const isReadOnly = !isAdmin && (timesheet.status === 'submitted' || timesheet.status === 'approved' || timesheet.status === 'processed' || period.status === 'processed');
+  const adminCanApprove = (typeof canAdminApprove !== 'undefined') ? canAdminApprove : (isAdmin && String(timesheet.status || '').toLowerCase() === 'submitted');
+  const adminCanReopen = (typeof canAdminReopen !== 'undefined') ? canAdminReopen : (isAdmin && ['approved', 'processed'].includes(String(timesheet.status || '').toLowerCase()));
+  const isEditorLocked = isReadOnly || adminCanReopen;
   const isManuallyEdited = timesheet.entries && timesheet.entries.some(e => e.isManual || e.isDeleted);
 %>
 
@@ -60,6 +63,32 @@
         --bs-table-accent-bg: #ffe8a1 !important;
         background-color: #ffe8a1 !important;
     }
+
+  .incomplete-sessions-table thead th {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .incomplete-sessions-table tbody tr.incomplete-row-weekday-even > * {
+    --bs-table-bg: #ffffff;
+    background-color: #ffffff !important;
+  }
+  .incomplete-sessions-table tbody tr.incomplete-row-weekday-odd > * {
+    --bs-table-bg: #f8f9fa;
+    background-color: #f8f9fa !important;
+  }
+  .incomplete-sessions-table tbody tr.incomplete-row-weekend-even > * {
+    --bs-table-bg: #ffe8e8;
+    background-color: #ffe8e8 !important;
+  }
+  .incomplete-sessions-table tbody tr.incomplete-row-weekend-odd > * {
+    --bs-table-bg: #ffdede;
+    background-color: #ffdede !important;
+  }
+  .incomplete-sessions-table tbody tr.incomplete-row-holiday > * {
+    --bs-table-bg: #ff9a9a;
+    background-color: #ff9a9a !important;
+  }
 </style>
 
 <div class="sections-page">
@@ -96,6 +125,32 @@
         </div>
     <% } %>
 
+    <div id="incompleteSessionsPanel" class="card border-warning shadow-sm mb-4 d-none">
+        <div class="card-header bg-warning-subtle border-warning d-flex align-items-center justify-content-between py-3">
+            <div class="fw-bold text-warning-emphasis">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                Incomplete Sessions Detected
+                <span class="badge bg-warning text-dark ms-2" id="incompleteSessionsCount">0</span>
+            </div>
+            <div class="small text-muted">Finalize these session statuses before submitting your timesheet.</div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle mb-0 incomplete-sessions-table">
+                    <thead class="table-warning">
+                        <tr>
+                            <th class="ps-4" style="width: 140px;">Date</th>
+                            <th>Class</th>
+                            <th style="width: 160px;">Time</th>
+                            <th style="width: 150px;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="incompleteSessionsBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -108,7 +163,7 @@
                             <th style="width: 120px;">Status</th>
                             <th>Comment</th>
                             <th class="text-end" style="width: 90px;">Hours</th>
-                            <% if (!isReadOnly) { %><th class="text-center" style="width: 90px;">Act</th><% } %>
+                            <% if (!isEditorLocked) { %><th class="text-center" style="width: 90px;">Act</th><% } %>
                         </tr>
                     </thead>
                     <tbody id="tsBody">
@@ -118,7 +173,7 @@
                             <!-- FIX: keep total in Hours column, not Act column -->
                             <td colspan="5" class="text-end fw-bold text-uppercase">Total Period Hours:</td>
                             <td class="text-end pe-4 fw-bold text-success fs-5" id="lbl_grandTotal">0.00</td>
-                            <% if (!isReadOnly) { %><td></td><% } %>
+                            <% if (!isEditorLocked) { %><td></td><% } %>
                         </tr>
                     </tfoot>
                 </table>
@@ -126,10 +181,18 @@
         </div>
     </div>
 
-    <% if (!isReadOnly) { %>
+    <% if (!isEditorLocked || adminCanApprove || adminCanReopen) { %>
         <div class="d-flex justify-content-end gap-2 border-top pt-3">
-            <button class="btn btn-light border fw-bold px-4" id="btnSaveDraft">Save Draft</button>
-            <button class="btn btn-primary fw-bold px-4" id="btnSubmit">Submit for Payroll</button>
+            <% if (!isEditorLocked) { %>
+                <button class="btn btn-light border fw-bold px-4" id="btnSaveDraft">Save Draft</button>
+                <button class="btn btn-primary fw-bold px-4" id="btnSubmit">Submit for Payroll</button>
+            <% } %>
+            <% if (adminCanApprove) { %>
+                <button class="btn btn-success fw-bold px-4" id="btnApproveTimesheet"><i class="bi bi-check-circle me-1"></i> Approve Timesheet</button>
+            <% } %>
+            <% if (adminCanReopen) { %>
+                <button class="btn btn-warning fw-bold px-4" id="btnReopenTimesheet"><i class="bi bi-unlock me-1"></i> Reopen Timesheet</button>
+            <% } %>
         </div>
     <% } %>
 </div>
@@ -259,10 +322,12 @@
     const LIVE_SESSIONS = <%- JSON.stringify(liveSessions || []) %>;
     const HOLIDAYS = <%- JSON.stringify(holidays || []) %>;
     const TIMESHEET_ENTRIES = <%- JSON.stringify(timesheet.entries || []) %>;
+    const SNAPSHOT_ENTRIES = <%- JSON.stringify((timesheet.submissionSnapshot && timesheet.submissionSnapshot.entries) || []) %>;
+    const USE_FROZEN_SNAPSHOT = <%= (typeof useFrozenSnapshot !== 'undefined' && useFrozenSnapshot) ? 'true' : 'false' %>;
     const MANUAL_ACTIVITIES = <%- JSON.stringify(manualActivities || []) %>;
     const INCOMPLETE_SESSIONS = <%- JSON.stringify(incompleteSessions || []) %>;
     const SESSION_STATUS_META = <%- JSON.stringify(sessionStatusMeta || []) %>;
-    const IS_READONLY = <%= isReadOnly %>;
+    const IS_READONLY = <%= isEditorLocked %>;
     const IS_ADMIN = <%= isAdmin %>;
     const SHOW_PRIOR_ADJUSTMENT_REVIEW = <%= showPriorAdjustmentReview ? 'true' : 'false' %>;
     const PERIOD_ID = "<%= period.id %>";
@@ -525,11 +590,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    LIVE_SESSIONS.forEach(ls => {
-        if (!deletedAutoSessionIds.includes(ls.sessionId)) {
-            activeEntries.push({ ...ls, comment: savedComments[ls.sessionId] || '', isManual: false });
-        }
-    });
+    if (USE_FROZEN_SNAPSHOT) {
+        SNAPSHOT_ENTRIES.forEach(ls => {
+            if (!deletedAutoSessionIds.includes(ls.sessionId)) {
+                activeEntries.push({
+                    ...ls,
+                    hours: ls.hours ?? ls.timesheetHours ?? ls.durationHours ?? 0,
+                    comment: savedComments[ls.sessionId] || ls.comment || '',
+                    isManual: false
+                });
+            }
+        });
+    } else {
+        LIVE_SESSIONS.forEach(ls => {
+            if (!deletedAutoSessionIds.includes(ls.sessionId)) {
+                activeEntries.push({ ...ls, comment: savedComments[ls.sessionId] || '', isManual: false });
+            }
+        });
+    }
 
     function getDatesInRange(startStr, endStr) {
         const dates = [];
@@ -1134,6 +1212,58 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    async function executeAdminTimesheetAction(endpoint, { title, message, confirmText, successTitle }) {
+        const ok = await confirmAction({
+            title,
+            message,
+            confirmText,
+            cancelText: 'Cancel',
+            icon: 'warning',
+            confirmBtnClass: 'btn-primary'
+        });
+        if (!ok) return;
+        try {
+            const res = await fetch(`/school/timesheets/editor/${PERIOD_ID}/${endpoint}${buildMutationQuery()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify({ actionStateId })
+            });
+            const result = await res.json();
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(result, { busyTitle: 'Request In Progress', replayTitle: 'Request Already Processed' })
+                : { stop: false };
+            if (guarded.stop) return;
+            if (result.status === 'success') {
+                await messageBox({ title: successTitle, icon: 'success', message: result.message || 'Done.' });
+                window.location.reload();
+                return;
+            }
+            throw new Error(result.message || 'Request failed.');
+        } catch (error) {
+            await messageBox({ title: 'Error', icon: 'error', message: error.message });
+        }
+    }
+
+    const btnApproveTimesheet = document.getElementById('btnApproveTimesheet');
+    if (btnApproveTimesheet) {
+        btnApproveTimesheet.addEventListener('click', () => executeAdminTimesheetAction('approve', {
+            title: 'Approve Timesheet',
+            message: 'Approve this timesheet and lock all linked class sessions and activities?',
+            confirmText: 'Approve',
+            successTitle: 'Timesheet Approved'
+        }));
+    }
+
+    const btnReopenTimesheet = document.getElementById('btnReopenTimesheet');
+    if (btnReopenTimesheet) {
+        btnReopenTimesheet.addEventListener('click', () => executeAdminTimesheetAction('reopen', {
+            title: 'Reopen Timesheet',
+            message: 'Reopen this timesheet to submitted status and release source locks?',
+            confirmText: 'Reopen',
+            successTitle: 'Timesheet Reopened'
+        }));
+    }
+
     function formatSignedHours(value) {
         const n = Number(value);
         if (!Number.isFinite(n)) return '0.00';
@@ -1279,20 +1409,123 @@ document.addEventListener('DOMContentLoaded', () => {
     async function showIncompleteSessionWarningOnLoad() {
         const rows = Array.isArray(INCOMPLETE_SESSIONS) ? INCOMPLETE_SESSIONS : [];
         if (!rows.length) return;
-        const detailText = rows.slice(0, 8).map((row) => {
-            const classLabel = row?.className || row?.classId || 'Class';
-            const dateLabel = row?.date || '-';
-            const timeLabel = row?.startTime && row?.endTime ? `${row.startTime}-${row.endTime}` : 'Time not set';
-            const statusLabel = row?.statusLabel || row?.status || 'In progress';
-            return `${dateLabel} | ${classLabel} | ${timeLabel} | ${statusLabel}`;
-        }).join('\n');
+        const tableHtml = `
+            <p class="mb-3">You have <strong>${rows.length}</strong> incomplete session(s) in this period. Finalize session statuses before submission.</p>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle mb-0 incomplete-sessions-table">
+                    <thead class="table-warning">
+                        <tr>
+                            <th class="ps-3">Date</th>
+                            <th>Class</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>${buildIncompleteSessionsTableBodyHtml(rows)}</tbody>
+                </table>
+            </div>
+            <p class="small text-muted mb-0 mt-2">These sessions are excluded from auto-pulled timesheet rows until marked final.</p>`;
+        if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+                title: 'Incomplete Sessions Detected',
+                icon: 'warning',
+                size: 'lg',
+                message: tableHtml,
+                buttons: [{ text: 'OK', class: 'btn-warning' }]
+            });
+            return;
+        }
         await messageBox({
             title: 'Incomplete Sessions Detected',
             icon: 'warning',
-            message: `You have ${rows.length} incomplete session(s) in this period. Finalize session statuses before submission.\n\n${detailText}`
+            message: `You have ${rows.length} incomplete session(s) in this period.`
         });
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function normalizeIncompleteStatusCode(value) {
+        return String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    }
+
+    function getIncompleteSessionStatusMeta(statusCode) {
+        const code = normalizeIncompleteStatusCode(statusCode);
+        return (Array.isArray(SESSION_STATUS_META) ? SESSION_STATUS_META : [])
+            .find((row) => normalizeIncompleteStatusCode(row?.code) === code) || null;
+    }
+
+    function resolveIncompleteRowClass(dateStr, index) {
+        if (holidayMap.get(dateStr)) return 'incomplete-row-holiday';
+        const d = dateStr ? new Date(`${dateStr}T00:00:00`) : null;
+        const day = d ? d.getDay() : -1;
+        if (day === 0 || day === 6) {
+            return index % 2 === 0 ? 'incomplete-row-weekend-even' : 'incomplete-row-weekend-odd';
+        }
+        return index % 2 === 0 ? 'incomplete-row-weekday-even' : 'incomplete-row-weekday-odd';
+    }
+
+    function buildIncompleteStatusBadge(row) {
+        const label = row?.statusLabel || row?.status || 'In progress';
+        const meta = getIncompleteSessionStatusMeta(row?.status);
+        const bg = meta?.colorBg || '#fff3cd';
+        const border = meta?.colorBorder || '#ffc107';
+        return `<span class="badge border text-dark" style="background-color:${escapeHtml(bg)};border-color:${escapeHtml(border)} !important;">${escapeHtml(label)}</span>`;
+    }
+
+    function buildIncompleteSessionsTableBodyHtml(rows) {
+        return rows.map((row, index) => {
+            const dateStr = row?.date || '';
+            const dayName = dateStr
+                ? new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short' })
+                : '';
+            const timeLabel = row?.startTime && row?.endTime
+                ? `${row.startTime} - ${row.endTime}`
+                : 'Time not set';
+            const rowClass = resolveIncompleteRowClass(dateStr, index);
+            const hol = holidayMap.get(dateStr);
+            const holidayNote = hol
+                ? `<div class="small text-danger fw-semibold mt-1"><i class="bi bi-calendar-x me-1"></i>${escapeHtml(holidayName(hol))}</div>`
+                : '';
+            return `
+                <tr class="${rowClass}">
+                    <td class="ps-3 fw-semibold">
+                        <div>${escapeHtml(dateStr || '-')}</div>
+                        <div class="small text-muted">${escapeHtml(dayName)}</div>
+                        ${holidayNote}
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark">${escapeHtml(row?.className || row?.classId || 'Class')}</div>
+                        <div class="small text-muted font-monospace">${escapeHtml(row?.sessionId || '')}</div>
+                    </td>
+                    <td><i class="bi bi-clock me-1 text-muted"></i>${escapeHtml(timeLabel)}</td>
+                    <td>${buildIncompleteStatusBadge(row)}</td>
+                </tr>`;
+        }).join('');
+    }
+
+    function renderIncompleteSessionsPanel() {
+        const rows = Array.isArray(INCOMPLETE_SESSIONS) ? INCOMPLETE_SESSIONS : [];
+        const panel = document.getElementById('incompleteSessionsPanel');
+        const tbody = document.getElementById('incompleteSessionsBody');
+        const countEl = document.getElementById('incompleteSessionsCount');
+        if (!panel || !tbody) return;
+        if (!rows.length) {
+            panel.classList.add('d-none');
+            return;
+        }
+        panel.classList.remove('d-none');
+        if (countEl) countEl.textContent = String(rows.length);
+        tbody.innerHTML = buildIncompleteSessionsTableBodyHtml(rows);
+    }
+
+    renderIncompleteSessionsPanel();
     renderTable();
     showIncompleteSessionWarningOnLoad();
     loadPriorAdjustmentsReview();

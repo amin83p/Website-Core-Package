@@ -41,6 +41,15 @@
     <% if (isEdit) { %><span class="badge bg-primary border font-monospace"><%= row.id %></span><% } %>
   </div>
 
+  <% const activityTimesheetLocked = (row.locked === true || String(row.locked) === 'true') && String(row.lockReason || '') === 'timesheet_approved'
+    || (Array.isArray(row.entries) ? row.entries : []).some((entry) => (entry.locked === true || String(entry.locked) === 'true') && String(entry.lockReason || '') === 'timesheet_approved'); %>
+  <% if (activityTimesheetLocked) { %>
+    <div class="alert alert-warning border-warning shadow-sm mb-4">
+      <i class="bi bi-lock-fill me-2"></i>
+      <strong>Timesheet locked.</strong> One or more work sessions on this activity are locked by an approved timesheet. Reopen the timesheet before making structural changes.
+    </div>
+  <% } %>
+
   <div class="form-container wide" style="max-width: 1180px;">
     <form id="schoolActivityForm" method="POST" action="<%= isEdit ? '/school/activities/edit/' + row.id : '/school/activities/new' %>">
       <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
@@ -216,7 +225,7 @@
         <div class="row g-3">
           <div class="col-md-3">
             <label class="form-label fw-bold">Number of Sessions</label>
-            <input type="number" min="1" max="500" step="1" id="activityBatchCount" class="form-control form-control-sm" value="1">
+            <input type="number" max="500" step="1" id="activityBatchCount" class="form-control form-control-sm" placeholder="e.g. 10">
             <div class="form-text small">Leave blank to generate through the end date.</div>
           </div>
           <div class="col-md-3">
@@ -1111,7 +1120,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function openActivityBatchModal() {
     const previousEntry = entries[entries.length - 1] || {};
-    setBatchFieldValue('activityBatchCount', '1');
     setBatchFieldValue('activityBatchStartDate', previousEntry.date || '');
     setBatchFieldValue('activityBatchEndDate', '');
     setBatchFieldValue('activityBatchStartTime', previousEntry.startTime || '');
@@ -1130,22 +1138,75 @@ document.addEventListener('DOMContentLoaded', function () {
     if (modal) modal.show();
   }
 
-  function openBatchAssigneePicker() {
+  function buildWorkSessionAssigneeLocalItems() {
+    const allowedSet = getActivityLevelEffectiveAllowedSet();
+    return Array.from(allowedSet).map(function (personId) {
+      const person = eligiblePersonMap.get(personId) || { personId, id: personId };
+      const displayName = personChipLabel(personId);
+      return {
+        id: personId,
+        personId,
+        displayName,
+        firstName: String(person?.firstName || '').trim(),
+        lastName: String(person?.lastName || '').trim(),
+        preferredName: String(person?.preferredName || '').trim(),
+        roles: normalizeRoleList(person?.roles || person?.matchedRole || person?.role),
+        matchedRole: normalizeRole(person?.matchedRole || person?.role || ''),
+        title: displayName
+      };
+    }).sort(function (a, b) {
+      return String(a.displayName || a.personId).localeCompare(String(b.displayName || b.personId));
+    });
+  }
+
+  async function openWorkSessionAssigneePicker(options) {
+    const title = options?.title || 'Select Assigned People';
+    const onSelect = options?.onSelect;
     if (!window.GenericPicker || !window.GenericPickerPresets) {
-      safeShowMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Assignee picker is not available on this page.' });
+      await safeShowMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Assignee picker is not available on this page.' });
       return;
     }
-    const contexts = window.GenericPickerContexts || {};
-    const context = (typeof contexts.activeOrganizationScope === 'function')
-      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
-      : null;
-    const entryDuration = calculateDurationHours(getBatchFieldValue('activityBatchStartTime'), getBatchFieldValue('activityBatchEndTime')) || '';
-    window.GenericPicker.open(window.GenericPickerPresets.person({
-      title: 'Select People for Generated Sessions',
-      apiEndpoint: '/school/activities/api/eligible-persons',
+    try {
+      await ensureEligiblePersonsLoaded();
+    } catch (error) {
+      await safeShowMessage({ title: 'Load Failed', icon: 'error', message: error.message || 'Unable to load eligible persons.' });
+      return;
+    }
+    const pickerConfig = {
+      title,
       placeholder: 'Search students, teachers, or staff...',
       multiselect: true,
-      context,
+      onSelect
+    };
+    if (getVisibilityScopeValue() === 'individual') {
+      const localItems = buildWorkSessionAssigneeLocalItems();
+      if (!localItems.length) {
+        await safeShowMessage({
+          title: 'No Allowed Persons',
+          icon: 'warning',
+          message: 'Add allowed persons at the activity level before assigning people to work sessions.',
+          buttons: [{ text: 'OK', class: 'btn-warning' }]
+        });
+        return;
+      }
+      pickerConfig.sourceMode = 'local';
+      pickerConfig.localItems = localItems;
+      pickerConfig.searchFields = 'id,personId,displayName,firstName,lastName,preferredName,title';
+      pickerConfig.limit = 5000;
+    } else {
+      const contexts = window.GenericPickerContexts || {};
+      pickerConfig.apiEndpoint = '/school/activities/api/eligible-persons';
+      pickerConfig.context = (typeof contexts.activeOrganizationScope === 'function')
+        ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+        : null;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.person(pickerConfig));
+  }
+
+  function openBatchAssigneePicker() {
+    const entryDuration = calculateDurationHours(getBatchFieldValue('activityBatchStartTime'), getBatchFieldValue('activityBatchEndTime')) || '';
+    openWorkSessionAssigneePicker({
+      title: 'Select People for Generated Sessions',
       onSelect: function (items) {
         const selectedRows = Array.isArray(items) ? items : [items];
         let blockedCount = 0;
@@ -1179,7 +1240,7 @@ document.addEventListener('DOMContentLoaded', function () {
           });
         }
       }
-    }));
+    });
   }
 
   async function generateActivityBatchEntries() {
@@ -1220,6 +1281,15 @@ document.addEventListener('DOMContentLoaded', function () {
       await safeShowMessage({ title: 'No Sessions Generated', icon: 'warning', message: 'No matching dates were found for the selected weekdays and limits.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
       return;
     }
+    if (sessionCount > 1 && dateTokens.length < sessionCount) {
+      await safeShowMessage({
+        title: 'End Date Too Early',
+        icon: 'warning',
+        message: 'Only ' + dateTokens.length + ' matching date(s) were found before the end date on the selected weekdays. Extend the end date, adjust weekdays, or reduce the session count.',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
 
     const titlePrefix = getBatchFieldValue('activityBatchTitlePrefix') || activityTitleInput.value || 'Work Session';
     const location = getBatchFieldValue('activityBatchLocation') || activityLocationInput.value || '';
@@ -1249,14 +1319,6 @@ document.addEventListener('DOMContentLoaded', function () {
     renderEntries();
     const modal = getBatchModalInstance();
     if (modal) modal.hide();
-    if (sessionCount && dateTokens.length < sessionCount) {
-      await safeShowMessage({
-        title: 'Partial Generation',
-        icon: 'warning',
-        message: 'Generated ' + dateTokens.length + ' session(s). The selected end date or skipped dates prevented reaching ' + sessionCount + '.',
-        buttons: [{ text: 'OK', class: 'btn-warning' }]
-      });
-    }
   }
 
   document.addEventListener('click', function (event) {
@@ -1304,20 +1366,8 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   function openPersonPicker(entryIndex) {
-    if (!window.GenericPicker || !window.GenericPickerPresets) {
-      safeShowMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Requester picker is not available on this page.' });
-      return;
-    }
-    const contexts = window.GenericPickerContexts || {};
-    const context = (typeof contexts.activeOrganizationScope === 'function')
-      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
-      : null;
-    window.GenericPicker.open(window.GenericPickerPresets.person({
+    openWorkSessionAssigneePicker({
       title: 'Select Assigned People',
-      apiEndpoint: '/school/activities/api/eligible-persons',
-      placeholder: 'Search students, teachers, or staff...',
-      multiselect: true,
-      context,
       onSelect: function (items) {
         const selectedRows = Array.isArray(items) ? items : [items];
         let blockedCount = 0;
@@ -1357,7 +1407,7 @@ document.addEventListener('DOMContentLoaded', function () {
           });
         }
       }
-    }));
+    });
   }
 
   function openEntryExcludedPersonPicker(entryIndex) {
