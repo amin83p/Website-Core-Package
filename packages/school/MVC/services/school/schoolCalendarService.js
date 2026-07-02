@@ -286,9 +286,10 @@ async function getHolidayEvents({ reqUser, orgId, startDate, endDate } = {}) {
     .filter((event) => inDateRange(event.date, startDate, endDate));
 }
 
-async function getActivityEventsByCategoryLayers({ reqUser, orgId, startDate, endDate, selectedCategoryIds = new Set() } = {}) {
+async function getActivityEventsByCategoryLayers({ reqUser, orgId, startDate, endDate, selectedCategoryIds = new Set(), personId = '' } = {}) {
   const categoryIdSet = selectedCategoryIds instanceof Set ? selectedCategoryIds : new Set();
   if (!categoryIdSet.size) return [];
+  const targetPersonId = normalizeId(personId);
 
   const activities = await activityService.listActivities({ orgId, reqUser });
   return (Array.isArray(activities) ? activities : [])
@@ -299,6 +300,10 @@ async function getActivityEventsByCategoryLayers({ reqUser, orgId, startDate, en
     .flatMap((row) => activityService.getActivityEntries(row).map((entry) => ({ row, entry })))
     .filter(({ entry }) => String(entry.status || 'posted').toLowerCase() === 'posted')
     .filter(({ entry }) => normalizeDate(entry.date))
+    .filter(({ row, entry }) => {
+      if (!targetPersonId) return true;
+      return activityService.isPersonEligibleForEntry(row, entry, targetPersonId);
+    })
     .filter(({ entry }) => inDateRange(entry.date, startDate, endDate))
     .map(({ row, entry }) => {
       const categoryId = normalizeId(row.categoryId);
@@ -398,7 +403,8 @@ async function getCalendarEvents({
       orgId,
       startDate: safeStartDate,
       endDate: safeEndDate,
-      selectedCategoryIds: selectedActivityCategoryIds
+      selectedCategoryIds: selectedActivityCategoryIds,
+      personId
     });
     events.push(...activityCategoryEvents);
   }

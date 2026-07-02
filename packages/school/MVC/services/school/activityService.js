@@ -87,6 +87,82 @@ function parseJsonArray(value) {
   }
 }
 
+function normalizePersonIdList(value) {
+  const source = Array.isArray(value) ? value : parseJsonArray(value);
+  const seen = new Set();
+  return source
+    .map((item) => normalizeId(
+      typeof item === 'string'
+        ? item
+        : (item?.personId || item?.id || item?.value || item?.person?.id || '')
+    ))
+    .filter((personId) => {
+      if (!personId || seen.has(personId)) return false;
+      seen.add(personId);
+      return true;
+    });
+}
+
+function listAssigneePersonIds(entries = []) {
+  return [...new Set((Array.isArray(entries) ? entries : [])
+    .flatMap((entry) => (Array.isArray(entry?.assignees) ? entry.assignees : []))
+    .map((assignee) => normalizeId(assignee?.personId))
+    .filter(Boolean))];
+}
+
+function listLegacyAttendeePersonIds(activity = {}) {
+  return normalizePersonIdList(activity?.attendees || []);
+}
+
+function getEffectiveActivityAllowedIds(activity = {}, orgPersonPool = []) {
+  const visibilityScope = normalizeActivityVisibilityScope(activity.visibilityScope || activity.calendarScope || activity.scope);
+  const normalizedEntries = getActivityEntries(activity);
+  const normalizedActivity = {
+    ...activity,
+    entries: normalizedEntries,
+    allowedPersonIds: normalizePersonIdList(activity.allowedPersonIds || activity.allowedPersons || []),
+    excludedPersonIds: normalizePersonIdList(activity.excludedPersonIds || activity.excludedPersons || [])
+  };
+  if (visibilityScope === 'individual' && !normalizedActivity.allowedPersonIds.length) {
+    normalizedActivity.allowedPersonIds = [...new Set([
+      ...listAssigneePersonIds(normalizedEntries),
+      ...listLegacyAttendeePersonIds(activity)
+    ])];
+  }
+  return activityModel.resolveActivityScopeAllowedSet(normalizedActivity, orgPersonPool);
+}
+
+function getEffectiveEntryAllowedIds(activity = {}, entry = {}, orgPersonPool = []) {
+  const normalizedEntry = {
+    ...(entry || {}),
+    excludedPersonIds: normalizePersonIdList(entry?.excludedPersonIds || entry?.excludedPersons || [])
+  };
+  return activityModel.resolveEntryEligibleSet({
+    ...activity,
+    allowedPersonIds: normalizePersonIdList(activity?.allowedPersonIds || activity?.allowedPersons || []),
+    excludedPersonIds: normalizePersonIdList(activity?.excludedPersonIds || activity?.excludedPersons || []),
+    entries: getActivityEntries(activity)
+  }, normalizedEntry, orgPersonPool);
+}
+
+function isPersonEligibleForActivity(activity = {}, personId, orgPersonPool = []) {
+  const targetPersonId = normalizeId(personId);
+  if (!targetPersonId) return false;
+  const pool = Array.isArray(orgPersonPool) && orgPersonPool.length
+    ? orgPersonPool
+    : [{ id: targetPersonId, personId: targetPersonId }];
+  return new Set(getEffectiveActivityAllowedIds(activity, pool)).has(targetPersonId);
+}
+
+function isPersonEligibleForEntry(activity = {}, entry = {}, personId, orgPersonPool = []) {
+  const targetPersonId = normalizeId(personId);
+  if (!targetPersonId) return false;
+  const pool = Array.isArray(orgPersonPool) && orgPersonPool.length
+    ? orgPersonPool
+    : [{ id: targetPersonId, personId: targetPersonId }];
+  return new Set(getEffectiveEntryAllowedIds(activity, entry, pool)).has(targetPersonId);
+}
+
 function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
   const assignees = parseJsonArray(entry.assignees);
   const fallbackAssignees = parseJsonArray(entry.attendees);
@@ -103,6 +179,7 @@ function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
     location: normalizeId(entry.location || activity.location),
     notes: normalizeId(entry.notes),
     status: normalizeStatus(entry.status, 'posted') || 'posted',
+    excludedPersonIds: normalizePersonIdList(entry.excludedPersonIds || entry.excludedPersons || []),
     assignees: assignees.length
       ? assignees
       : (fallbackAssignees.length ? fallbackAssignees : parseJsonArray(activity.attendees))
@@ -159,6 +236,16 @@ function normalizeActivityRecord(activity = {}) {
   const firstEntry = entries[0] || {};
   const attendees = parsedAttendees.length ? parsedAttendees : flattenActivityAssignees(entries);
   const visibilityScope = normalizeActivityVisibilityScope(activity.visibilityScope || activity.calendarScope || activity.scope);
+  const excludedPersonIds = normalizePersonIdList(activity.excludedPersonIds || activity.excludedPersons || []);
+  let allowedPersonIds = normalizePersonIdList(activity.allowedPersonIds || activity.allowedPersons || []);
+  if (visibilityScope === 'individual' && !allowedPersonIds.length) {
+    allowedPersonIds = [...new Set([
+      ...listAssigneePersonIds(entries),
+      ...listLegacyAttendeePersonIds(activity)
+    ])];
+  }
+  const excludedSet = new Set(excludedPersonIds);
+  allowedPersonIds = allowedPersonIds.filter((personId) => !excludedSet.has(personId));
   return {
     ...activity,
     date: activity.date || firstEntry.date || '',
@@ -167,6 +254,8 @@ function normalizeActivityRecord(activity = {}) {
     durationHours: Number(activity.durationHours || firstEntry.durationHours || 0),
     totalDurationHours: Number(activity.totalDurationHours || entries.reduce((sum, entry) => sum + (Number(entry.durationHours) || 0), 0) || 0),
     visibilityScope,
+    allowedPersonIds,
+    excludedPersonIds,
     attendees,
     entries
   };
@@ -245,10 +334,85 @@ async function saveActivity(payload = {}, reqUser) {
     categoryName: category?.name || payload.categoryName || '',
     departmentName: department?.name || department?.code || payload.departmentName || ''
   });
-  if (payload.id) {
-    return schoolDataService.updateData('activities', payload.id, data, reqUser);
+  const normalized = normalizeActivityRecord(data);
+  const eligiblePersons = await getEligiblePersons({ orgId, reqUser, q: '' });
+  const eligiblePersonIds = [...new Set((Array.isArray(eligiblePersons) ? eligiblePersons : [])
+    .map((row) => normalizeId(row?.personId || row?.id))
+    .filter(Boolean))];
+  const eligibleSet = new Set(eligiblePersonIds);
+  const activityExcludedSet = new Set(normalized.excludedPersonIds || []);
+  const activityAllowedIds = getEffectiveActivityAllowedIds(normalized, eligiblePersonIds);
+  const activityAllowedSet = new Set(activityAllowedIds);
+  const scopeLabel = normalized.visibilityScope === 'individual' ? 'individual' : 'school';
+  const persistedAllowedPersonIds = scopeLabel === 'individual'
+    ? activityAllowedIds
+    : (normalized.allowedPersonIds || []).filter((personId) => !activityExcludedSet.has(personId));
+  if (scopeLabel === 'individual' && !activityAllowedIds.length) {
+    throw new Error('Individual scope activities must include at least one allowed person.');
   }
-  return schoolDataService.addData('activities', data, reqUser);
+  const invalidActivityPersonIds = [...new Set([
+    ...(normalized.allowedPersonIds || []),
+    ...(normalized.excludedPersonIds || [])
+  ])].filter((personId) => !eligibleSet.has(personId));
+  if (invalidActivityPersonIds.length) {
+    throw new Error('Activity person controls include unknown people. Please refresh and reselect.');
+  }
+  const validatedEntries = getActivityEntries(normalized).map((entry) => {
+    const entryExcludedIds = normalizePersonIdList(entry.excludedPersonIds || []);
+    const invalidEntryExcluded = entryExcludedIds.filter((personId) => !eligibleSet.has(personId));
+    if (invalidEntryExcluded.length) {
+      throw new Error('Work session exclusions include unknown people. Please refresh and reselect.');
+    }
+    const nonSubsetExclusions = entryExcludedIds.filter((personId) => !activityAllowedSet.has(personId));
+    if (nonSubsetExclusions.length) {
+      throw new Error('Work session exclusions must be selected from activity-level eligible people.');
+    }
+    const effectiveEntryAllowedSet = new Set(getEffectiveEntryAllowedIds({
+      ...normalized,
+      entries: normalized.entries
+    }, {
+      ...entry,
+      excludedPersonIds: entryExcludedIds
+    }, eligiblePersonIds));
+    const assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).map((assignee) => ({
+      ...assignee,
+      personId: normalizeId(assignee?.personId)
+    })).filter((assignee) => assignee.personId);
+    const invalidAssignees = assignees.filter((assignee) => !eligibleSet.has(assignee.personId));
+    if (invalidAssignees.length) {
+      throw new Error('Assigned people include unknown school identities. Please refresh and reselect.');
+    }
+    const blockedAssignees = assignees.filter((assignee) => !effectiveEntryAllowedSet.has(assignee.personId));
+    if (blockedAssignees.length) {
+      const blockedName = blockedAssignees[0]?.personName || blockedAssignees[0]?.personId || 'Selected person';
+      throw new Error(`Assigned person "${blockedName}" is excluded from this activity scope/session.`);
+    }
+    return {
+      ...entry,
+      excludedPersonIds: entryExcludedIds.filter((personId) => !activityExcludedSet.has(personId)),
+      assignees
+    };
+  });
+  const firstEntry = validatedEntries[0] || {};
+  const totalDurationHours = Number(validatedEntries.reduce((sum, entry) => {
+    return sum + (Number(entry.durationHours) || 0);
+  }, 0).toFixed(2));
+  const normalizedData = {
+    ...normalized,
+    allowedPersonIds: persistedAllowedPersonIds,
+    excludedPersonIds: [...activityExcludedSet],
+    entries: validatedEntries,
+    attendees: flattenActivityAssignees(validatedEntries),
+    date: firstEntry.date || normalized.date || '',
+    startTime: firstEntry.startTime || normalized.startTime || '',
+    endTime: firstEntry.endTime || normalized.endTime || '',
+    durationHours: Number(firstEntry.durationHours || normalized.durationHours || 0),
+    totalDurationHours
+  };
+  if (payload.id) {
+    return schoolDataService.updateData('activities', payload.id, normalizedData, reqUser);
+  }
+  return schoolDataService.addData('activities', normalizedData, reqUser);
 }
 
 async function saveActivityCategory(payload = {}, reqUser) {
@@ -309,6 +473,7 @@ async function getScheduleEventsForPerson({ orgId, personId, startDate, endDate,
     return getActivityEntries(activity).flatMap((entry) => {
       if (normalizeStatus(entry.status, 'posted') !== 'posted') return [];
       if (!entry.date || entry.date < startDate || entry.date > endDate) return [];
+      if (!isPersonEligibleForEntry(activity, entry, targetPersonId)) return [];
       const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
       const entryTitle = entry.title && entry.title !== activity.title ? `${activity.title}: ${entry.title}` : activity.title;
       return assignees
@@ -350,6 +515,7 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
     return getActivityEntries(activity).flatMap((entry) => {
       if (normalizeStatus(entry.status, 'posted') !== 'posted') return [];
       if (!entry.date || entry.date < periodStartDate || entry.date > periodEndDate) return [];
+      if (!isPersonEligibleForEntry(activity, entry, targetPersonId)) return [];
       const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
       const entryTitle = entry.title && entry.title !== activity.title ? `${activity.title}: ${entry.title}` : activity.title;
       return assignees
@@ -398,6 +564,10 @@ module.exports = {
   getEligiblePersons,
   getActivityEntries,
   normalizeActivityVisibilityScope,
+  getEffectiveActivityAllowedIds,
+  getEffectiveEntryAllowedIds,
+  isPersonEligibleForActivity,
+  isPersonEligibleForEntry,
   getScheduleEventsForPerson,
   getTimesheetEntriesForPerson,
   calculateDurationHours

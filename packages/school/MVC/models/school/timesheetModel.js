@@ -40,6 +40,21 @@ function cleanDate(v, { allowEmpty = true } = {}) {
     return d.toISOString().slice(0, 10);
 }
 
+function cleanTime(v, { allowEmpty = true } = {}) {
+    if (v === undefined || v === null || String(v).trim() === '') {
+        return allowEmpty ? '' : null;
+    }
+    const s = String(v).trim();
+    const match = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) throw new Error('Invalid time value. Use HH:mm.');
+    const h = Number(match[1]);
+    const m = Number(match[2]);
+    if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+        throw new Error('Invalid time value. Use HH:mm.');
+    }
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 function cleanHours(v, { min = 0, max = 24 } = {}) {
     const n = Number(v);
     if (!Number.isFinite(n)) return 0;
@@ -131,6 +146,27 @@ function sanitizeEntry(entry) {
         row.isPriorPeriodAdjustment = true;
         row.adjustmentMeta = sanitizeAdjustmentMeta(entry.adjustmentMeta);
     }
+    if (row.isManual && !isPriorPeriodAdjustment) {
+        const requestedHoursRaw = Number(entry.requestedHours ?? entry.durationHours ?? entry.hours ?? 0);
+        const requestedHours = cleanHours(requestedHoursRaw, { min: 0, max: 24 });
+        const approvalToken = String(entry.approvalStatus || '').trim().toLowerCase();
+        const approvalStatus = ['pending_approval', 'approved', 'unpaid'].includes(approvalToken)
+            ? approvalToken
+            : '';
+        const excludeFromTotals = entry.excludeFromTotals === true || approvalStatus === 'pending_approval';
+        row.requestedHours = requestedHours;
+        row.durationHours = requestedHours;
+        row.startTime = cleanTime(entry.startTime, { allowEmpty: true });
+        row.endTime = cleanTime(entry.endTime, { allowEmpty: true });
+        row.activityId = cleanString(entry.activityId, { max: 80, allowEmpty: true });
+        row.activityName = cleanString(entry.activityName, { max: 220, allowEmpty: true });
+        row.activityPaid = entry.activityPaid === true;
+        row.approvalStatus = approvalStatus || (row.activityId ? (row.activityPaid ? 'pending_approval' : 'unpaid') : 'approved');
+        row.excludeFromTotals = excludeFromTotals;
+        if (excludeFromTotals) {
+            row.hours = 0;
+        }
+    }
     if (isReportReflection) row.isReportReflection = true;
     if (isSchoolActivity) {
         row.isSchoolActivity = true;
@@ -171,6 +207,8 @@ function sanitizeTimesheetPayload(input) {
     const entries = input.entries.map(sanitizeEntry);
     const computedTotal = entries.reduce((sum, e) => {
         if (e.isDeleted) return sum;
+        if (e.excludeFromTotals === true) return sum;
+        if (String(e.approvalStatus || '').trim().toLowerCase() === 'pending_approval') return sum;
         return sum + (Number(e.hours) || 0);
     }, 0);
 

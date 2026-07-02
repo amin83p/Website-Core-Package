@@ -524,6 +524,11 @@ function normalizeActivityAssignee(row = {}) {
 function normalizeActivityRows(rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => {
     const entries = activityService.getActivityEntries(row);
+    const allowedPersonIds = splitFilterIds(row?.allowedPersonIds || row?.allowedPersons || '');
+    const excludedPersonIds = splitFilterIds(row?.excludedPersonIds || row?.excludedPersons || '');
+    const entryExcludedCount = entries.reduce((sum, entry) => (
+      sum + splitFilterIds(entry?.excludedPersonIds || entry?.excludedPersons || '').length
+    ), 0);
     const dateValues = entries.map((entry) => normalizeText(entry.date)).filter(Boolean).sort();
     const firstDate = dateValues[0] || normalizeText(row?.date || '');
     const lastDate = dateValues[dateValues.length - 1] || firstDate;
@@ -553,6 +558,7 @@ function normalizeActivityRows(rows) {
       sum + (Number(entry.durationHours) || activityService.calculateDurationHours(entry.startTime, entry.endTime) || 0)
     ), 0) || row?.totalDurationHours || row?.durationHours || 0).toFixed(2));
     const visibilityScope = activityService.normalizeActivityVisibilityScope(row?.visibilityScope || row?.scope || row?.calendarScope);
+    const hasPersonControls = allowedPersonIds.length > 0 || excludedPersonIds.length > 0 || entryExcludedCount > 0;
 
     return {
       id: normalizeText(row?.id),
@@ -565,6 +571,13 @@ function normalizeActivityRows(rows) {
       status: lower(row?.status || 'draft'),
       paid: row?.paid === true,
       visibilityScope,
+      allowedPersonIds,
+      excludedPersonIds,
+      allowedPersonCount: allowedPersonIds.length,
+      excludedPersonCount: excludedPersonIds.length,
+      entryExcludedCount,
+      hasPersonControls,
+      personControlState: hasPersonControls ? 'restricted' : 'open',
       firstDate,
       lastDate,
       dateLabel: firstDate && lastDate && firstDate !== lastDate ? `${firstDate} to ${lastDate}` : (firstDate || '-'),
@@ -692,6 +705,7 @@ function activityMatchesFilters(row, queryInput = {}, searchTerm = '') {
   const dateFrom = normalizeText(queryInput.dateFrom || queryInput.startDate || '');
   const dateTo = normalizeText(queryInput.dateTo || queryInput.endDate || '');
   const assigneePersonId = normalizeText(queryInput.assigneePersonId || queryInput.personId || '');
+  const personControl = lower(queryInput.personControl || '');
 
   if (status && lower(row.status) !== status) return false;
   if (categoryId && !idsEqual(row.categoryId, categoryId)) return false;
@@ -702,6 +716,8 @@ function activityMatchesFilters(row, queryInput = {}, searchTerm = '') {
   if ((dateFrom || dateTo) && !row.firstDate) return false;
   if ((dateFrom || dateTo) && !dateRangeOverlaps(row.firstDate, row.lastDate || row.firstDate, dateFrom, dateTo)) return false;
   if (assigneePersonId && !row.assignees.some((assignee) => idsEqual(assignee.personId, assigneePersonId))) return false;
+  if (personControl === 'restricted' && row.hasPersonControls !== true) return false;
+  if (personControl === 'open' && row.hasPersonControls === true) return false;
 
   return rowMatchesWorkspaceSearch(row, searchTerm);
 }
@@ -1158,7 +1174,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       ...query,
       searchFields: query.searchFields || 'id,title,status,categoryName,categoryId,departmentName,departmentId,location,visibilityScope,notes'
     };
-    ['categoryId', 'departmentId', 'status', 'visibilityScope', 'scope', 'paid', 'dateFrom', 'dateTo', 'startDate', 'endDate', 'assigneePersonId', 'assigneePersonName', 'personId', 'personName', 'page', 'limit'].forEach((keyName) => {
+    ['categoryId', 'departmentId', 'status', 'visibilityScope', 'scope', 'paid', 'dateFrom', 'dateTo', 'startDate', 'endDate', 'assigneePersonId', 'assigneePersonName', 'personId', 'personName', 'personControl', 'page', 'limit'].forEach((keyName) => {
       delete fetchQuery[keyName];
     });
     const [activities, categories, departments] = await Promise.all([
@@ -1197,7 +1213,8 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
         dateFrom: normalizeText(queryInput?.dateFrom || queryInput?.startDate || ''),
         dateTo: normalizeText(queryInput?.dateTo || queryInput?.endDate || ''),
         assigneePersonId: normalizeText(queryInput?.assigneePersonId || queryInput?.personId || ''),
-        assigneePersonName: normalizeText(queryInput?.assigneePersonName || queryInput?.personName || '')
+        assigneePersonName: normalizeText(queryInput?.assigneePersonName || queryInput?.personName || ''),
+        personControl: lower(queryInput?.personControl || '')
       },
       categoryOptions: (Array.isArray(categories) ? categories : []).map((row) => ({
         id: normalizeText(row?.id),
@@ -1220,6 +1237,11 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
         { value: '', label: 'All Pay Types' },
         { value: 'paid', label: 'Payable' },
         { value: 'unpaid', label: 'Unpaid' }
+      ],
+      personControlOptions: [
+        { value: '', label: 'All Person Controls' },
+        { value: 'restricted', label: 'Has Controls' },
+        { value: 'open', label: 'No Controls' }
       ],
       searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()

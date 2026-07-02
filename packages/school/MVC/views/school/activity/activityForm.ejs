@@ -1,10 +1,23 @@
 <%
   const row = activity || {};
   const legacyAttendees = Array.isArray(row.attendees) ? row.attendees : [];
+  const normalizePersonIdListServer = (source) => {
+    if (!Array.isArray(source)) return [];
+    const seen = new Set();
+    return source
+      .map((item) => String(typeof item === 'string' ? item : (item?.personId || item?.id || '')).trim())
+      .filter((personId) => {
+        if (!personId || seen.has(personId)) return false;
+        seen.add(personId);
+        return true;
+      });
+  };
   const rawVisibilityScope = String(row.visibilityScope || 'school').trim().toLowerCase().replace(/[\s-]+/g, '_');
   const visibilityScope = ['individual', 'private', 'personal', 'assigned', 'assigned_only', 'attendee', 'attendees', 'attendees_only'].includes(rawVisibilityScope)
     ? 'individual'
     : 'school';
+  const initialAllowedPersonIds = normalizePersonIdListServer(row.allowedPersonIds || []);
+  const initialExcludedPersonIds = normalizePersonIdListServer(row.excludedPersonIds || []);
   const initialEntries = Array.isArray(row.entries) && row.entries.length
     ? row.entries
     : [{
@@ -17,6 +30,7 @@
         location: row.location || '',
         notes: '',
         status: 'posted',
+        excludedPersonIds: [],
         assignees: legacyAttendees
       }];
 %>
@@ -32,6 +46,8 @@
       <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
       <input type="hidden" name="entries" id="activityEntriesInput" value="[]">
       <input type="hidden" name="attendees" id="activityAttendeesInput" value="[]">
+      <input type="hidden" name="allowedPersonIds" id="activityAllowedPersonIdsInput" value="[]">
+      <input type="hidden" name="excludedPersonIds" id="activityExcludedPersonIdsInput" value="[]">
       <input type="hidden" name="date" id="activityLegacyDate" value="<%= row.date || '' %>">
       <input type="hidden" name="startTime" id="activityLegacyStartTime" value="<%= row.startTime || '' %>">
       <input type="hidden" name="endTime" id="activityLegacyEndTime" value="<%= row.endTime || '' %>">
@@ -39,6 +55,8 @@
 
       <script type="application/json" id="activityInitialEntries"><%- JSON.stringify(initialEntries) %></script>
       <script type="application/json" id="activityInitialAttendees"><%- JSON.stringify(legacyAttendees) %></script>
+      <script type="application/json" id="activityInitialAllowedPersonIds"><%- JSON.stringify(initialAllowedPersonIds) %></script>
+      <script type="application/json" id="activityInitialExcludedPersonIds"><%- JSON.stringify(initialExcludedPersonIds) %></script>
       <script type="application/json" id="activityCategoriesData"><%- JSON.stringify(categories || []) %></script>
 
       <div class="card border-0 shadow-sm mb-4">
@@ -59,7 +77,7 @@
             </div>
             <div class="col-md-4">
               <label class="form-label fw-bold">Calendar Scope *</label>
-              <select name="visibilityScope" class="form-select size-md" required>
+              <select name="visibilityScope" id="activityVisibilityScope" class="form-select size-md" required>
                 <option value="school" <%= visibilityScope === 'school' ? 'selected' : '' %>>School / Public</option>
                 <option value="individual" <%= visibilityScope === 'individual' ? 'selected' : '' %>>Individual / Assigned people only</option>
               </select>
@@ -97,6 +115,47 @@
             <div class="col-12">
               <label class="form-label fw-bold">Parent Notes</label>
               <textarea name="notes" rows="3" class="form-control size-md"><%= row.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+              <h5 class="m-0 fw-bold"><i class="bi bi-person-check me-2"></i>Scope Person Controls</h5>
+              <div class="small text-muted">Configure who can be assigned to this activity by scope, with optional exclusions.</div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-12 d-none" id="activityAllowedPersonsGroup">
+              <div class="border rounded p-3 bg-light">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                  <div>
+                    <div class="fw-bold">Allowed persons (Individual scope)</div>
+                    <div class="small text-muted">Only selected people can be assigned when scope is individual.</div>
+                  </div>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="activityAllowedPersonsSelectBtn"><i class="bi bi-person-plus me-1"></i>Select allowed persons</button>
+                </div>
+                <div id="activityAllowedPersonsChips" class="d-flex flex-wrap gap-2"></div>
+                <div class="small text-muted mt-2" id="activityAllowedPersonsEmptyHint">No allowed persons selected yet.</div>
+              </div>
+            </div>
+
+            <div class="col-12" id="activityExcludedPersonsGroup">
+              <div class="border rounded p-3 bg-light">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                  <div>
+                    <div class="fw-bold">Excluded persons</div>
+                    <div class="small text-muted">Excluded people cannot be assigned, shown in schedule, or extracted to timesheets for this activity.</div>
+                  </div>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="activityExcludedPersonsSelectBtn"><i class="bi bi-person-dash me-1"></i>Select exclusions</button>
+                </div>
+                <div id="activityExcludedPersonsChips" class="d-flex flex-wrap gap-2"></div>
+                <div class="small text-muted mt-2" id="activityExcludedPersonsEmptyHint">No excluded persons configured.</div>
+              </div>
             </div>
           </div>
         </div>
@@ -270,6 +329,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('schoolActivityForm');
   const entriesInput = document.getElementById('activityEntriesInput');
   const attendeesInput = document.getElementById('activityAttendeesInput');
+  const allowedPersonIdsInput = document.getElementById('activityAllowedPersonIdsInput');
+  const excludedPersonIdsInput = document.getElementById('activityExcludedPersonIdsInput');
   const entriesTbody = document.getElementById('activityEntriesTbody');
   const noEntriesMsg = document.getElementById('activityNoEntriesMsg');
   const batchModalEl = document.getElementById('activityBatchModal');
@@ -277,8 +338,15 @@ document.addEventListener('DOMContentLoaded', function () {
   const entryModalBody = document.getElementById('activityEntryModalBody');
   const paidInput = document.getElementById('activityPaid');
   const categorySelect = document.getElementById('activityCategoryId');
+  const visibilityScopeSelect = document.getElementById('activityVisibilityScope');
   const activityTitleInput = document.getElementById('activityTitle');
   const activityLocationInput = document.getElementById('activityLocation');
+  const allowedPersonsGroup = document.getElementById('activityAllowedPersonsGroup');
+  const allowedPersonsChips = document.getElementById('activityAllowedPersonsChips');
+  const allowedPersonsEmptyHint = document.getElementById('activityAllowedPersonsEmptyHint');
+  const excludedPersonsGroup = document.getElementById('activityExcludedPersonsGroup');
+  const excludedPersonsChips = document.getElementById('activityExcludedPersonsChips');
+  const excludedPersonsEmptyHint = document.getElementById('activityExcludedPersonsEmptyHint');
   const legacyDateInput = document.getElementById('activityLegacyDate');
   const legacyStartInput = document.getElementById('activityLegacyStartTime');
   const legacyEndInput = document.getElementById('activityLegacyEndTime');
@@ -295,11 +363,17 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   const initialAttendees = parseInitialJson('activityInitialAttendees', []);
+  const initialAllowedPersonIds = parseInitialJson('activityInitialAllowedPersonIds', []);
+  const initialExcludedPersonIds = parseInitialJson('activityInitialExcludedPersonIds', []);
   let entries = parseInitialJson('activityInitialEntries', []);
+  let activityAllowedPersonIds = Array.isArray(initialAllowedPersonIds) ? initialAllowedPersonIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean) : [];
+  let activityExcludedPersonIds = Array.isArray(initialExcludedPersonIds) ? initialExcludedPersonIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean) : [];
   let selectedEntryIndex = null;
   let batchModalInstance = null;
   let batchAssignees = [];
   let entryModalInstance = null;
+  const eligiblePersonMap = new Map();
+  let eligiblePersonsLoaded = false;
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, function (character) {
@@ -358,6 +432,214 @@ document.addEventListener('DOMContentLoaded', function () {
   function normalizeBoolean(value, fallback) {
     if (value === undefined || value === null || value === '') return Boolean(fallback);
     return value === true || value === 'true' || value === 'on' || value === 1 || value === '1';
+  }
+
+  function normalizePersonIdList(value) {
+    const source = Array.isArray(value) ? value : [];
+    const seen = new Set();
+    return source.map(function (item) {
+      return String(typeof item === 'string' ? item : (item?.personId || item?.id || item?.value || '')).trim();
+    }).filter(function (personId) {
+      if (!personId || seen.has(personId)) return false;
+      seen.add(personId);
+      return true;
+    });
+  }
+
+  function getVisibilityScopeValue() {
+    const token = String(visibilityScopeSelect?.value || 'school').trim().toLowerCase();
+    return token === 'individual' ? 'individual' : 'school';
+  }
+
+  function getActivityScopeAssigneeFallbackSet() {
+    const fallback = [];
+    entries.forEach(function (entry) {
+      (Array.isArray(entry?.assignees) ? entry.assignees : []).forEach(function (assignee) {
+        const personId = String(assignee?.personId || '').trim();
+        if (personId) fallback.push(personId);
+      });
+    });
+    return new Set(fallback);
+  }
+
+  function getActivityLevelEffectiveAllowedSet() {
+    const excludedSet = new Set(normalizePersonIdList(activityExcludedPersonIds));
+    if (getVisibilityScopeValue() === 'individual') {
+      const allowedSource = normalizePersonIdList(activityAllowedPersonIds);
+      const fallbackIds = allowedSource.length ? [] : Array.from(getActivityScopeAssigneeFallbackSet());
+      return new Set([].concat(allowedSource, fallbackIds).filter(function (personId) {
+        return personId && !excludedSet.has(personId);
+      }));
+    }
+    const schoolAllowed = [];
+    if (eligiblePersonMap.size) {
+      eligiblePersonMap.forEach(function (_person, personId) {
+        if (personId && !excludedSet.has(personId)) schoolAllowed.push(personId);
+      });
+    } else {
+      const referencedIds = new Set([
+        ...normalizePersonIdList(activityAllowedPersonIds),
+        ...Array.from(getActivityScopeAssigneeFallbackSet()),
+        ...entries.flatMap(function (entry) { return normalizePersonIdList(entry?.excludedPersonIds || []); })
+      ]);
+      referencedIds.forEach(function (personId) {
+        if (personId && !excludedSet.has(personId)) schoolAllowed.push(personId);
+      });
+    }
+    return new Set(schoolAllowed);
+  }
+
+  function syncActivityScopePersonControlInputs() {
+    activityAllowedPersonIds = normalizePersonIdList(activityAllowedPersonIds).filter(function (personId) {
+      return !activityExcludedPersonIds.includes(personId);
+    });
+    activityExcludedPersonIds = normalizePersonIdList(activityExcludedPersonIds);
+    if (allowedPersonIdsInput) allowedPersonIdsInput.value = JSON.stringify(activityAllowedPersonIds);
+    if (excludedPersonIdsInput) excludedPersonIdsInput.value = JSON.stringify(activityExcludedPersonIds);
+  }
+
+  function ensurePersonRecord(item) {
+    const personId = String(item?.personId || item?.id || '').trim();
+    if (!personId) return null;
+    const normalized = {
+      id: personId,
+      personId,
+      displayName: buildPersonDisplayName(item, personId),
+      firstName: String(item?.firstName || item?.name?.first || '').trim(),
+      lastName: String(item?.lastName || item?.name?.last || '').trim(),
+      preferredName: String(item?.preferredName || item?.name?.preferred || '').trim(),
+      roles: normalizeRoleList(item?.roles || item?.availableRoles || item?.matchedRole || item?.role),
+      matchedRole: normalizeRole(item?.matchedRole || item?.role || '')
+    };
+    eligiblePersonMap.set(personId, normalized);
+    return normalized;
+  }
+
+  async function ensureEligiblePersonsLoaded() {
+    if (eligiblePersonsLoaded) return Array.from(eligiblePersonMap.values());
+    const response = await fetch('/school/activities/api/eligible-persons?q=', {
+      headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' },
+      credentials: 'same-origin'
+    });
+    const payload = await response.json().catch(function () {
+      return { status: 'error', message: 'Unable to read eligible persons.' };
+    });
+    if (!response.ok || payload.status !== 'success') {
+      throw new Error(payload.message || 'Unable to load eligible persons.');
+    }
+    const rows = Array.isArray(payload.data) ? payload.data : [];
+    rows.forEach(function (row) {
+      ensurePersonRecord(row);
+    });
+    eligiblePersonsLoaded = true;
+    return Array.from(eligiblePersonMap.values());
+  }
+
+  function personChipLabel(personId) {
+    const person = eligiblePersonMap.get(String(personId || '').trim());
+    if (!person) return String(personId || '').trim();
+    return person.displayName || person.personId;
+  }
+
+  function renderPersonControlChips(targetNode, emptyNode, rows, type) {
+    if (!targetNode) return;
+    const normalizedRows = normalizePersonIdList(rows);
+    targetNode.innerHTML = normalizedRows.map(function (personId, index) {
+      return [
+        '<span class="badge text-bg-light border d-inline-flex align-items-center gap-2 py-2 px-2" data-chip-type="' + escapeHtml(type) + '" data-chip-index="' + index + '">',
+        '<span>' + escapeHtml(personChipLabel(personId)) + '</span>',
+        '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 js-remove-scope-chip" title="Remove"><i class="bi bi-x"></i></button>',
+        '</span>'
+      ].join('');
+    }).join('');
+    if (emptyNode) {
+      emptyNode.classList.toggle('d-none', normalizedRows.length > 0);
+    }
+    targetNode.querySelectorAll('[data-chip-index]').forEach(function (chipEl) {
+      const chipIndex = Number(chipEl.getAttribute('data-chip-index'));
+      const chipType = String(chipEl.getAttribute('data-chip-type') || '').trim();
+      chipEl.querySelector('.js-remove-scope-chip')?.addEventListener('click', function () {
+        if (chipType === 'allowed') {
+          activityAllowedPersonIds.splice(chipIndex, 1);
+        } else {
+          activityExcludedPersonIds.splice(chipIndex, 1);
+        }
+        syncActivityScopePersonControlInputs();
+        renderScopePersonControls();
+        if (selectedEntryIndex !== null && entryModalEl?.classList.contains('show')) renderEntryModal();
+      });
+    });
+  }
+
+  function renderScopePersonControls() {
+    syncActivityScopePersonControlInputs();
+    const scope = getVisibilityScopeValue();
+    if (allowedPersonsGroup) allowedPersonsGroup.classList.toggle('d-none', scope !== 'individual');
+    if (excludedPersonsGroup) excludedPersonsGroup.classList.remove('d-none');
+    renderPersonControlChips(allowedPersonsChips, allowedPersonsEmptyHint, activityAllowedPersonIds, 'allowed');
+    renderPersonControlChips(excludedPersonsChips, excludedPersonsEmptyHint, activityExcludedPersonIds, 'excluded');
+  }
+
+  async function openScopePersonPicker(type) {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      await safeShowMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Person picker is not available on this page.' });
+      return;
+    }
+    try {
+      await ensureEligiblePersonsLoaded();
+    } catch (error) {
+      await safeShowMessage({ title: 'Load Failed', icon: 'error', message: error.message || 'Unable to load eligible persons.' });
+      return;
+    }
+    const context = window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function'
+      ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.person({
+      title: type === 'allowed' ? 'Select Allowed Persons' : 'Select Excluded Persons',
+      apiEndpoint: '/school/activities/api/eligible-persons',
+      placeholder: 'Search students, teachers, or staff...',
+      multiselect: true,
+      context,
+      onSelect: function (items) {
+        const selectedRows = Array.isArray(items) ? items : [items];
+        selectedRows.forEach(function (item) {
+          const person = ensurePersonRecord(item);
+          if (!person || !person.personId) return;
+          if (type === 'allowed') {
+            if (!activityAllowedPersonIds.includes(person.personId)) activityAllowedPersonIds.push(person.personId);
+            activityExcludedPersonIds = activityExcludedPersonIds.filter(function (personId) { return personId !== person.personId; });
+          } else {
+            if (!activityExcludedPersonIds.includes(person.personId)) activityExcludedPersonIds.push(person.personId);
+            activityAllowedPersonIds = activityAllowedPersonIds.filter(function (personId) { return personId !== person.personId; });
+            entries.forEach(function (entry) {
+              entry.assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).filter(function (assignee) {
+                return String(assignee?.personId || '').trim() !== person.personId;
+              });
+              entry.excludedPersonIds = normalizePersonIdList(entry.excludedPersonIds).filter(function (entryPersonId) {
+                return entryPersonId !== person.personId;
+              });
+            });
+          }
+        });
+        syncEntries();
+        renderScopePersonControls();
+        renderEntries();
+        if (selectedEntryIndex !== null && entryModalEl?.classList.contains('show')) renderEntryModal();
+      }
+    }));
+  }
+
+  function isPersonAllowedByScope(personId, entryIndex) {
+    const token = String(personId || '').trim();
+    if (!token) return false;
+    if (activityExcludedPersonIds.includes(token)) return false;
+    if (getVisibilityScopeValue() === 'individual') {
+      const allowedSet = getActivityLevelEffectiveAllowedSet();
+      if (!allowedSet.has(token)) return false;
+    }
+    const entry = Number.isInteger(entryIndex) ? entries[entryIndex] : null;
+    const entryExcluded = new Set(normalizePersonIdList(entry?.excludedPersonIds || []));
+    return !entryExcluded.has(token);
   }
 
   function calculateDurationHours(startTime, endTime) {
@@ -422,6 +704,7 @@ document.addEventListener('DOMContentLoaded', function () {
       location: values.location ?? activityLocationInput.value ?? '',
       notes: values.notes || '',
       status: values.status || 'posted',
+      excludedPersonIds: normalizePersonIdList(values.excludedPersonIds || values.excludedPersons || []),
       assignees: Array.isArray(values.assignees) ? values.assignees : []
     };
   }
@@ -441,6 +724,7 @@ document.addEventListener('DOMContentLoaded', function () {
       location: String(item?.location || activityLocationInput.value || '').trim(),
       notes: String(item?.notes || '').trim(),
       status: String(item?.status || 'posted').trim().toLowerCase(),
+      excludedPersonIds: normalizePersonIdList(item?.excludedPersonIds || item?.excludedPersons || []),
       assignees: sourceAssignees.map(function (itemRow) {
         return normalizeAttendee(itemRow, durationHours);
       }).filter(Boolean)
@@ -472,8 +756,17 @@ document.addEventListener('DOMContentLoaded', function () {
   function syncEntries() {
     entries = (Array.isArray(entries) ? entries : []).map(normalizeEntry);
     if (!entries.length) entries.push(getDefaultEntry());
+    entries.forEach(function (entry, entryIndex) {
+      const excludedSet = new Set(normalizePersonIdList(entry.excludedPersonIds || []));
+      entry.assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).filter(function (assignee) {
+        const personId = String(assignee?.personId || '').trim();
+        if (!personId || excludedSet.has(personId)) return false;
+        return isPersonAllowedByScope(personId, entryIndex);
+      });
+    });
     entriesInput.value = JSON.stringify(entries);
     attendeesInput.value = JSON.stringify(mergeAssigneesForLegacy());
+    syncActivityScopePersonControlInputs();
     const firstEntry = entries[0] || {};
     legacyDateInput.value = firstEntry.date || '';
     legacyStartInput.value = firstEntry.startTime || '';
@@ -511,6 +804,21 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm js-assignee-remove"><i class="bi bi-trash"></i></button></div>',
         '</div>',
         '<div class="mt-2"><label class="form-label fw-bold small">Assignee Notes</label><input type="text" class="form-control form-control-sm js-assignee-notes" value="' + escapeHtml(assignee.notes || '') + '" placeholder="Optional notes for this person..."></div>',
+        '</div>'
+      ].join('');
+    }).join('');
+  }
+
+  function renderEntryExcludedRows(entry) {
+    const excludedPersonIds = normalizePersonIdList(entry?.excludedPersonIds || []);
+    if (!excludedPersonIds.length) {
+      return '<div class="text-muted small border rounded p-3 bg-light">No session-level exclusions set.</div>';
+    }
+    return excludedPersonIds.map(function (personId, idx) {
+      return [
+        '<div class="d-flex align-items-center justify-content-between gap-2 border rounded p-2 mb-2 bg-white" data-entry-excluded-index="' + idx + '">',
+        '<div><div class="fw-semibold">' + escapeHtml(personChipLabel(personId)) + '</div><div class="small text-muted font-monospace">' + escapeHtml(personId) + '</div></div>',
+        '<button type="button" class="btn btn-outline-danger btn-sm js-entry-excluded-remove"><i class="bi bi-x-lg"></i></button>',
         '</div>'
       ].join('');
     }).join('');
@@ -631,6 +939,10 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="mt-3">',
       '<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2"><div class="fw-bold small"><i class="bi bi-people me-1"></i>Assigned People</div><button type="button" class="btn btn-outline-primary btn-sm" id="addPersonToSelectedEntry"><i class="bi bi-person-plus me-1"></i>Add Person</button></div>',
       '<div class="js-entry-assignees">' + renderAssigneeRows(entry, selectedEntryIndex) + '</div>',
+      '</div>',
+      '<div class="mt-3">',
+      '<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2"><div class="fw-bold small"><i class="bi bi-person-dash me-1"></i>Exclude from This Session</div><button type="button" class="btn btn-outline-secondary btn-sm" id="excludePersonFromSelectedEntry"><i class="bi bi-person-dash me-1"></i>Add Exclusion</button></div>',
+      '<div class="js-entry-excluded">' + renderEntryExcludedRows(entry) + '</div>',
       '</div>'
     ].join('');
     bindEntryModal();
@@ -641,6 +953,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (entryIndex === null || !entries[entryIndex]) return;
     entryModalBody.querySelector('#addPersonToSelectedEntry')?.addEventListener('click', function () {
       openPersonPicker(entryIndex);
+    });
+    entryModalBody.querySelector('#excludePersonFromSelectedEntry')?.addEventListener('click', function () {
+      openEntryExcludedPersonPicker(entryIndex);
     });
     entryModalBody.querySelectorAll('.js-entry-field').forEach(function (field) {
       const updateEntryField = function () {
@@ -685,6 +1000,17 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       assigneeRow.querySelector('.js-assignee-remove')?.addEventListener('click', function () {
         entries[entryIndex].assignees.splice(assigneeIndex, 1);
+        syncEntries();
+        renderEntryRowsOnly();
+        renderEntryModal();
+      });
+    });
+    entryModalBody.querySelectorAll('[data-entry-excluded-index]').forEach(function (rowEl) {
+      const excludedIndex = Number(rowEl.getAttribute('data-entry-excluded-index'));
+      rowEl.querySelector('.js-entry-excluded-remove')?.addEventListener('click', function () {
+        const list = normalizePersonIdList(entries[entryIndex].excludedPersonIds || []);
+        list.splice(excludedIndex, 1);
+        entries[entryIndex].excludedPersonIds = list;
         syncEntries();
         renderEntryRowsOnly();
         renderEntryModal();
@@ -822,7 +1148,14 @@ document.addEventListener('DOMContentLoaded', function () {
       context,
       onSelect: function (items) {
         const selectedRows = Array.isArray(items) ? items : [items];
+        let blockedCount = 0;
         selectedRows.forEach(function (item) {
+          const person = ensurePersonRecord(item);
+          const personId = String(person?.personId || '').trim();
+          if (!personId || !isPersonAllowedByScope(personId)) {
+            blockedCount += 1;
+            return;
+          }
           const attendee = normalizeAttendee(item, entryDuration);
           if (!attendee) return;
           const existing = batchAssignees.find(function (row) {
@@ -837,6 +1170,14 @@ document.addEventListener('DOMContentLoaded', function () {
           batchAssignees.push(attendee);
         });
         renderBatchAssignees();
+        if (blockedCount > 0) {
+          safeShowMessage({
+            title: 'Scope Restriction',
+            icon: 'warning',
+            message: blockedCount + ' selected person(s) were skipped because of activity scope or exclusion rules.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        }
       }
     }));
   }
@@ -979,9 +1320,19 @@ document.addEventListener('DOMContentLoaded', function () {
       context,
       onSelect: function (items) {
         const selectedRows = Array.isArray(items) ? items : [items];
+        let blockedCount = 0;
         selectedRows.forEach(function (item) {
+          const person = ensurePersonRecord(item);
+          const personId = String(person?.personId || '').trim();
+          if (!personId || !isPersonAllowedByScope(personId, entryIndex)) {
+            blockedCount += 1;
+            return;
+          }
           const attendee = normalizeAttendee(item, entries[entryIndex]?.durationHours || '');
           if (!attendee) return;
+          entries[entryIndex].excludedPersonIds = normalizePersonIdList(entries[entryIndex].excludedPersonIds || []).filter(function (entryPersonId) {
+            return entryPersonId !== personId;
+          });
           const existing = entries[entryIndex].assignees.find(function (row) {
             return String(row.personId) === String(attendee.personId);
           });
@@ -997,6 +1348,70 @@ document.addEventListener('DOMContentLoaded', function () {
         if (selectedEntryIndex === entryIndex && entryModalEl?.classList.contains('show')) {
           renderEntryModal();
         }
+        if (blockedCount > 0) {
+          safeShowMessage({
+            title: 'Scope Restriction',
+            icon: 'warning',
+            message: blockedCount + ' selected person(s) were skipped because of activity scope or exclusion rules.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        }
+      }
+    }));
+  }
+
+  function openEntryExcludedPersonPicker(entryIndex) {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      safeShowMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Requester picker is not available on this page.' });
+      return;
+    }
+    ensureEligiblePersonsLoaded().catch(function () {
+      return null;
+    });
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.person({
+      title: 'Exclude People for This Session',
+      apiEndpoint: '/school/activities/api/eligible-persons',
+      placeholder: 'Search students, teachers, or staff...',
+      multiselect: true,
+      context,
+      onSelect: function (items) {
+        const selectedRows = Array.isArray(items) ? items : [items];
+        const scope = getVisibilityScopeValue();
+        const allowedSet = getActivityLevelEffectiveAllowedSet();
+        let skippedCount = 0;
+        selectedRows.forEach(function (item) {
+          const person = ensurePersonRecord(item);
+          const personId = String(person?.personId || '').trim();
+          const blockedByScope = scope === 'individual' && !allowedSet.has(personId);
+          const blockedByActivityExclusion = activityExcludedPersonIds.includes(personId);
+          if (!personId || blockedByScope || blockedByActivityExclusion) {
+            skippedCount += 1;
+            return;
+          }
+          const nextExcluded = normalizePersonIdList(entries[entryIndex].excludedPersonIds || []);
+          if (!nextExcluded.includes(personId)) nextExcluded.push(personId);
+          entries[entryIndex].excludedPersonIds = nextExcluded;
+          entries[entryIndex].assignees = (Array.isArray(entries[entryIndex].assignees) ? entries[entryIndex].assignees : []).filter(function (assignee) {
+            return String(assignee?.personId || '').trim() !== personId;
+          });
+        });
+        syncEntries();
+        renderEntries();
+        if (selectedEntryIndex === entryIndex && entryModalEl?.classList.contains('show')) {
+          renderEntryModal();
+        }
+        if (skippedCount > 0) {
+          safeShowMessage({
+            title: 'Subset Rule',
+            icon: 'warning',
+            message: skippedCount + ' selected person(s) were skipped because they are not in activity-level eligible people.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        }
       }
     }));
   }
@@ -1004,11 +1419,25 @@ document.addEventListener('DOMContentLoaded', function () {
   function validateEntriesBeforeSubmit() {
     syncEntries();
     if (!entries.length) return 'Please add at least one work session.';
+    const scope = getVisibilityScopeValue();
+    const activityAllowedSet = getActivityLevelEffectiveAllowedSet();
+    if (scope === 'individual' && !activityAllowedSet.size) {
+      return 'Individual scope requires at least one allowed person.';
+    }
     for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
       const entry = entries[entryIndex];
       if (!entry.date) return 'Please enter a date for every work session.';
       if (!entry.startTime || !entry.endTime) return 'Please enter start and end times for every work session.';
       if (!(Number(entry.durationHours) > 0)) return 'Please enter hours greater than zero for every work session.';
+      const entryExcluded = normalizePersonIdList(entry.excludedPersonIds || []);
+      const nonSubsetExclusions = entryExcluded.filter(function (personId) { return !activityAllowedSet.has(personId); });
+      if (nonSubsetExclusions.length) return 'Session exclusions must be selected from activity-level eligible people.';
+      const blockedAssignee = (Array.isArray(entry.assignees) ? entry.assignees : []).find(function (assignee) {
+        return !isPersonAllowedByScope(assignee?.personId, entryIndex);
+      });
+      if (blockedAssignee) {
+        return 'Assigned people must match the selected scope and exclusion rules.';
+      }
     }
     return '';
   }
@@ -1018,11 +1447,36 @@ document.addEventListener('DOMContentLoaded', function () {
     if (selected && selected.getAttribute('data-paid') === 'true' && !paidInput.checked) paidInput.checked = true;
   });
 
+  visibilityScopeSelect?.addEventListener('change', function () {
+    if (getVisibilityScopeValue() === 'school') {
+      activityAllowedPersonIds = [];
+    }
+    entries.forEach(function (entry, entryIndex) {
+      entry.assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).filter(function (assignee) {
+        return isPersonAllowedByScope(assignee?.personId, entryIndex);
+      });
+      entry.excludedPersonIds = normalizePersonIdList(entry.excludedPersonIds || []).filter(function (personId) {
+        return getActivityLevelEffectiveAllowedSet().has(personId);
+      });
+    });
+    syncEntries();
+    renderScopePersonControls();
+    renderEntries();
+    if (selectedEntryIndex !== null && entryModalEl?.classList.contains('show')) renderEntryModal();
+  });
+
   activityLocationInput?.addEventListener('input', function () {
     entries.forEach(function (entry) {
       if (!entry.location) entry.location = activityLocationInput.value;
     });
     syncEntries();
+  });
+
+  document.getElementById('activityAllowedPersonsSelectBtn')?.addEventListener('click', function () {
+    openScopePersonPicker('allowed');
+  });
+  document.getElementById('activityExcludedPersonsSelectBtn')?.addEventListener('click', function () {
+    openScopePersonPicker('excluded');
   });
 
   document.getElementById('addActivityEntry')?.addEventListener('click', function () {
@@ -1095,6 +1549,13 @@ document.addEventListener('DOMContentLoaded', function () {
   entries = entries.length
     ? entries.map(normalizeEntry)
     : [getDefaultEntry({ assignees: initialAttendees })];
+  entries.forEach(function (entry) {
+    (Array.isArray(entry?.assignees) ? entry.assignees : []).forEach(function (assignee) {
+      ensurePersonRecord(assignee);
+    });
+  });
+  syncActivityScopePersonControlInputs();
+  renderScopePersonControls();
   renderEntries();
 });
 </script>

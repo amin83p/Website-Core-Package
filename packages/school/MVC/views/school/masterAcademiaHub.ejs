@@ -1660,6 +1660,7 @@
       status: hubInputValue('hubActivityStatus'),
       visibilityScope: hubInputValue('hubActivityVisibilityScope'),
       paid: hubInputValue('hubActivityPaid'),
+      personControl: hubInputValue('hubActivityPersonControl'),
       dateFrom: hubInputValue('hubActivityDateFrom'),
       dateTo: hubInputValue('hubActivityDateTo'),
       assigneePersonId: workspaceState.activityPersonId || hubInputValue('hubActivityAssigneePersonId'),
@@ -1734,6 +1735,7 @@
           'hubActivityStatus',
           'hubActivityVisibilityScope',
           'hubActivityPaid',
+          'hubActivityPersonControl',
           'hubActivityDateFrom',
           'hubActivityDateTo',
           'hubActivityAssigneePersonId',
@@ -1766,6 +1768,15 @@
       const assigneeNames = Array.isArray(row.assigneeNames) ? row.assigneeNames : [];
       const assigneePreview = assigneeNames.slice(0, 3).join(', ');
       const extraAssignees = Math.max(0, Number(row.assigneeCount || 0) - 3);
+      const personControlBadge = row.hasPersonControls
+        ? '<span class="badge text-bg-warning-subtle text-warning-emphasis border border-warning-subtle">Person Controls</span>'
+        : '<span class="badge text-bg-light border text-dark">Open Access</span>';
+      const scopeRuleLabel = row.visibilityScope === 'individual'
+        ? 'Allowed: ' + escapeHtml(String(row.allowedPersonCount || 0))
+        : 'Excluded: ' + escapeHtml(String(row.excludedPersonCount || 0));
+      const entryExclusionLabel = Number(row.entryExcludedCount || 0) > 0
+        ? '<div class="small text-muted">Session exclusions: ' + escapeHtml(String(row.entryExcludedCount || 0)) + '</div>'
+        : '';
       const searchText = [
         row.id,
         row.title,
@@ -1792,7 +1803,7 @@
         '<td><div class="fw-semibold">' + escapeHtml(row.dateLabel || '-') + '</div><div class="small text-muted">' + escapeHtml(row.startTime || '--:--') + ' - ' + escapeHtml(row.endTime || '--:--') + '</div></td>',
         '<td><div class="fw-semibold">' + escapeHtml(String(row.sessionCount || 1)) + ' work session' + (Number(row.sessionCount || 1) === 1 ? '' : 's') + '</div><div class="small text-muted">' + escapeHtml(Number(row.totalDurationHours || 0).toFixed(2)) + ' total hour(s)</div></td>',
         '<td><div class="fw-semibold">' + escapeHtml(String(row.assigneeCount || 0)) + ' assigned</div><div class="small text-muted">' + escapeHtml(assigneePreview || '-') + (extraAssignees ? ' +' + escapeHtml(String(extraAssignees)) + ' more' : '') + '</div></td>',
-        '<td><span class="badge ' + escapeHtml(activityScopeBadgeClass(row.visibilityScope)) + '">' + escapeHtml(row.visibilityScope === 'individual' ? 'Individual' : 'School / Public') + '</span><div class="mt-1">' + activityPaidBadgeHtml(row) + '</div></td>',
+        '<td><span class="badge ' + escapeHtml(activityScopeBadgeClass(row.visibilityScope)) + '">' + escapeHtml(row.visibilityScope === 'individual' ? 'Individual' : 'School / Public') + '</span><div class="mt-1">' + activityPaidBadgeHtml(row) + '</div><div class="mt-1">' + personControlBadge + '</div><div class="small text-muted mt-1">' + scopeRuleLabel + '</div>' + entryExclusionLabel + '</td>',
         '<td><span class="badge ' + escapeHtml(activityStatusBadgeClass(row.status)) + '">' + escapeHtml(toHubTitleCase(row.status || 'draft')) + '</span></td>',
         '<td class="pe-4 text-end"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
         '</tr>'
@@ -1815,6 +1826,7 @@
     const statusOptions = buildActivitySelectOptions(payload && payload.statusOptions, filters.status, 'value', 'label');
     const scopeOptions = buildActivitySelectOptions(payload && payload.scopeOptions, filters.visibilityScope, 'value', 'label');
     const paidOptions = buildActivitySelectOptions(payload && payload.paidOptions, filters.paid, 'value', 'label');
+    const personControlOptions = buildActivitySelectOptions(payload && payload.personControlOptions, filters.personControl, 'value', 'label');
     const totalHours = rows.reduce(function (sum, row) { return sum + (Number(row.totalDurationHours) || 0); }, 0);
     const postedCount = rows.filter(function (row) { return String(row.status || '').toLowerCase() === 'posted'; }).length;
     const assigneeLabel = workspaceState.activityPersonName || filters.assigneePersonName || filters.assigneePersonId || '';
@@ -1841,6 +1853,7 @@
       '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityStatus">Status</label><select id="hubActivityStatus" class="form-select form-select-sm">' + statusOptions + '</select></div>',
       '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityVisibilityScope">Calendar Scope</label><select id="hubActivityVisibilityScope" class="form-select form-select-sm">' + scopeOptions + '</select></div>',
       '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityPaid">Pay Type</label><select id="hubActivityPaid" class="form-select form-select-sm">' + paidOptions + '</select></div>',
+      '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityPersonControl">Person Controls</label><select id="hubActivityPersonControl" class="form-select form-select-sm">' + personControlOptions + '</select></div>',
       '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityDateFrom">From</label><input type="date" id="hubActivityDateFrom" class="form-control form-control-sm" value="' + escapeHtml(filters.dateFrom || '') + '"></div>',
       '<div class="col-xl-2 col-md-4"><label class="form-label fw-bold small" for="hubActivityDateTo">To</label><input type="date" id="hubActivityDateTo" class="form-control form-control-sm" value="' + escapeHtml(filters.dateTo || '') + '"></div>',
       '<div class="col-xl-6 col-md-8"><label class="form-label fw-bold small" for="hubActivityAssigneePersonName">Assignee</label><div class="input-group input-group-sm"><input type="hidden" id="hubActivityAssigneePersonId" value="' + escapeHtml(workspaceState.activityPersonId || filters.assigneePersonId || '') + '"><input type="text" id="hubActivityAssigneePersonName" class="form-control bg-white" value="' + escapeHtml(assigneeLabel) + '" placeholder="All assigned people" readonly><button type="button" class="btn btn-outline-secondary" id="hubActivityClearAssignee"><i class="bi bi-x-circle me-1"></i>Clear</button><button type="button" class="btn btn-outline-primary" id="hubActivityOpenAssigneePicker"><i class="bi bi-person-search me-1"></i>Select</button></div></div>',
@@ -6203,6 +6216,11 @@
           { value: '', label: 'All Pay Types' },
           { value: 'paid', label: 'Payable' },
           { value: 'unpaid', label: 'Unpaid' }
+        ],
+        personControlOptions: [
+          { value: '', label: 'All Person Controls' },
+          { value: 'restricted', label: 'Has Controls' },
+          { value: 'open', label: 'No Controls' }
         ]
       });
       return;

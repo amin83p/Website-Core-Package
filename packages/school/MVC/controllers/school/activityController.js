@@ -17,6 +17,15 @@ function assertOrgAccess(row, orgId) {
   }
 }
 
+function hasPersonControlRules(row = {}) {
+  const allowedCount = Array.isArray(row.allowedPersonIds) ? row.allowedPersonIds.length : 0;
+  const excludedCount = Array.isArray(row.excludedPersonIds) ? row.excludedPersonIds.length : 0;
+  const entryExclusionCount = (Array.isArray(row.entries) ? row.entries : []).reduce((sum, entry) => {
+    return sum + (Array.isArray(entry?.excludedPersonIds) ? entry.excludedPersonIds.length : 0);
+  }, 0);
+  return allowedCount > 0 || excludedCount > 0 || entryExclusionCount > 0;
+}
+
 async function loadFormLookups(req) {
   const orgId = getActiveOrgIdOrThrow(req.user);
   const [categories, departments] = await Promise.all([
@@ -36,12 +45,15 @@ exports.listActivities = async (req, res) => {
     const allRows = await activityService.listActivities({ orgId, reqUser: req.user, query });
     const status = String(req.query.status || '').trim().toLowerCase();
     const categoryId = String(req.query.categoryId || '').trim();
+    const personControl = String(req.query.personControl || '').trim().toLowerCase();
     const rawVisibilityScope = String(req.query.visibilityScope || req.query.scope || '').trim();
     const visibilityScope = rawVisibilityScope ? activityService.normalizeActivityVisibilityScope(rawVisibilityScope) : '';
     const filtered = allRows.filter((row) => {
       if (status && String(row.status || '').toLowerCase() !== status) return false;
       if (categoryId && String(row.categoryId || '') !== categoryId) return false;
       if (visibilityScope && activityService.normalizeActivityVisibilityScope(row.visibilityScope) !== visibilityScope) return false;
+      if (personControl === 'restricted' && !hasPersonControlRules(row)) return false;
+      if (personControl === 'open' && hasPersonControlRules(row)) return false;
       return true;
     });
     const { data, pagination } = paginate(filtered, query.page, query.limit);
@@ -71,7 +83,7 @@ exports.showCreateForm = async (req, res) => {
     const lookups = await loadFormLookups(req);
     res.render('school/activity/activityForm', {
       title: 'New School Activity',
-      activity: { status: 'draft', paid: false, visibilityScope: 'school', attendees: [] },
+      activity: { status: 'draft', paid: false, visibilityScope: 'school', attendees: [], allowedPersonIds: [], excludedPersonIds: [] },
       isEdit: false,
       ...lookups,
       user: req.user,

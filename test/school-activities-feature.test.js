@@ -139,6 +139,10 @@ test('School activities attendee picker and save path preserve selected attendee
   assert.match(service, /normalizeActivityRecord/);
   assert.match(service, /enrichActivityAttendeeNames/);
   assert.match(service, /parseJsonArray\(activity\.attendees\)/);
+  assert.match(service, /isPersonEligibleForActivity/);
+  assert.match(service, /isPersonEligibleForEntry/);
+  assert.match(service, /allowedPersonIds/);
+  assert.match(service, /excludedPersonIds/);
   assert.match(service, /schoolDataService\.fetchData\('students'/);
   assert.match(service, /add\('student', row\)/);
   assert.match(service, /schoolDataService\.fetchData\('teachers'/);
@@ -160,6 +164,15 @@ test('School activities attendee picker and save path preserve selected attendee
   assert.match(form, /buildPersonDisplayName/);
   assert.doesNotMatch(form, /window\.alert|\balert\(/);
   assert.match(form, /activityAttendeesInput/);
+  assert.match(form, /activityAllowedPersonIdsInput/);
+  assert.match(form, /activityExcludedPersonIdsInput/);
+  assert.match(form, /activityAllowedPersonsSelectBtn/);
+  assert.match(form, /activityExcludedPersonsSelectBtn/);
+  assert.match(form, /excludePersonFromSelectedEntry/);
+  assert.match(form, /openEntryExcludedPersonPicker/);
+  assert.match(form, /renderScopePersonControls/);
+  assert.match(form, /name="allowedPersonIds"/);
+  assert.match(form, /name="excludedPersonIds"/);
   assert.match(form, /name="visibilityScope"/);
   assert.match(form, /School \/ Public/);
   assert.match(form, /Individual \/ Assigned people only/);
@@ -191,11 +204,18 @@ test('School activities attendee picker and save path preserve selected attendee
 
   const list = readText('packages/school/MVC/views/school/activity/activityList.ejs');
   assert.match(list, /visibilityScope/);
+  assert.match(list, /personControl/);
+  assert.match(list, /Session exclusions/);
   assert.match(list, /School \/ Public/);
   assert.match(list, /Individual \/ Assigned only/);
 
   const controller = readText('packages/school/MVC/controllers/school/activityController.js');
   assert.match(controller, /normalizeActivityVisibilityScope\(rawVisibilityScope\)/);
+  assert.match(controller, /personControl/);
+  assert.match(controller, /hasPersonControlRules/);
+
+  const timesheetController = readText('packages/school/MVC/controllers/school/timesheetController.js');
+  assert.match(timesheetController, /isPersonEligibleForActivity/);
 
   const calendarService = readText('packages/school/MVC/services/school/schoolCalendarService.js');
   assert.match(calendarService, /normalizeActivityVisibilityScope\(row\.visibilityScope\) === 'school'/);
@@ -297,4 +317,57 @@ test('School activities support multi-session entries with legacy compatibility'
   const calendarService = require('../packages/school/MVC/services/school/schoolCalendarService');
   assert.equal(calendarService.buildActivityDuplicateKey('ACT1', 'ENTRY-A'), 'ACT1:ENTRY-A');
   assert.equal(calendarService.buildActivityDuplicateKey('ACT1', ''), '');
+});
+
+test('School activities sanitize and resolve scope-based person controls', () => {
+  const activityModel = require('../packages/school/MVC/models/school/activityModel');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+
+  const sanitized = activityModel.sanitizeActivityPayload({
+    orgId: 'ORG1',
+    title: 'Scope Controls',
+    categoryId: 'CAT1',
+    departmentId: 'DEP1',
+    visibilityScope: 'individual',
+    allowedPersonIds: JSON.stringify(['P1', 'P2', 'P2']),
+    excludedPersonIds: JSON.stringify(['P2', 'P3']),
+    status: 'posted',
+    entries: JSON.stringify([{
+      entryId: 'ENTRY-1',
+      date: '2026-08-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      excludedPersonIds: ['P1', 'P3'],
+      assignees: [{ personId: 'P1', personName: 'User 1', roles: ['teacher'] }]
+    }])
+  });
+
+  assert.deepEqual(sanitized.allowedPersonIds, ['P1']);
+  assert.deepEqual(sanitized.excludedPersonIds, ['P2', 'P3']);
+  assert.deepEqual(sanitized.entries[0].excludedPersonIds, ['P1']);
+
+  const allowedByScope = activityModel.resolveActivityScopeAllowedSet(sanitized, ['P1', 'P2', 'P3', 'P4']);
+  assert.deepEqual(allowedByScope, ['P1']);
+  const entryAllowed = activityModel.resolveEntryEligibleSet(sanitized, sanitized.entries[0], ['P1', 'P2', 'P3', 'P4']);
+  assert.deepEqual(entryAllowed, []);
+
+  const schoolScope = activityModel.sanitizeActivityPayload({
+    orgId: 'ORG1',
+    title: 'School Scope',
+    categoryId: 'CAT1',
+    departmentId: 'DEP1',
+    visibilityScope: 'school',
+    excludedPersonIds: JSON.stringify(['P9']),
+    status: 'posted',
+    entries: JSON.stringify([{
+      entryId: 'ENTRY-S',
+      date: '2026-08-02',
+      startTime: '09:00',
+      endTime: '11:00',
+      assignees: [{ personId: 'P8', personName: 'User 8', roles: ['staff'] }]
+    }])
+  });
+  assert.equal(activityService.isPersonEligibleForActivity(schoolScope, 'P8'), true);
+  assert.equal(activityService.isPersonEligibleForActivity(schoolScope, 'P9'), false);
+  assert.equal(activityService.isPersonEligibleForEntry(schoolScope, schoolScope.entries[0], 'P8'), true);
 });

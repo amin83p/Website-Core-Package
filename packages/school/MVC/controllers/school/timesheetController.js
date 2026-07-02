@@ -11,6 +11,7 @@ const sessionStatusPolicyService = require('../../services/school/sessionStatusP
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const { buildReportReflectionLiveSessions } = require('../../services/school/reportTimesheetReflectionService');
 const activityService = require('../../services/school/activityService');
+const timesheetManualConflictService = require('../../services/school/timesheetManualConflictService');
 const priorPeriodAdjustmentService = require('../../services/school/timesheetPriorPeriodAdjustmentService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const { sanitizeSnapshotEntry } = require('../../models/school/timesheetModel');
@@ -113,6 +114,93 @@ function getTimesheetRolesForPersonInOrg(person, orgId) {
     return [...rolesOut];
 }
 
+function normalizeScheduleRole(value) {
+    const token = String(value || '').trim().toLowerCase();
+    if (!token) return '';
+    if (token.includes('teacher')) return 'teacher';
+    if (token.includes('staff')) return 'staff';
+    if (token.includes('student')) return 'student';
+    return '';
+}
+
+function getScheduleRolesForPersonInOrg(person, orgId) {
+    const targetOrgId = String(orgId || '').trim();
+    if (!targetOrgId || !person) return [];
+
+    const rolesOut = new Set();
+    const directRoles = Array.isArray(person.schoolRoles || person.roles) ? (person.schoolRoles || person.roles) : [];
+    directRoles.forEach((role) => {
+        const normalized = normalizeScheduleRole(role);
+        if (normalized) rolesOut.add(normalized);
+    });
+
+    const memberships = Array.isArray(person.organizations) ? person.organizations : [];
+    memberships.forEach((org) => {
+        if (!idsEqual(org?.orgId, targetOrgId)) return;
+        const memberStatus = String(org?.memberStatus || 'active').trim().toLowerCase();
+        if (memberStatus && memberStatus !== 'active') return;
+        const roles = normalizeOrgRoles(org);
+        roles.forEach((role) => {
+            const normalized = normalizeScheduleRole(role);
+            if (normalized) rolesOut.add(normalized);
+        });
+    });
+    return [...rolesOut];
+}
+
+async function resolveScheduleRolesForPerson({ activeOrgId, personId, reqUser }) {
+    const rolesOut = new Set();
+    const person = await getPersonById(personId, reqUser);
+    getScheduleRolesForPersonInOrg(person, activeOrgId).forEach((role) => rolesOut.add(role));
+
+    const [teachers, staff, students] = await Promise.all([
+        dataService.fetchData('teachers', { orgId__eq: activeOrgId, personId__eq: personId }, reqUser),
+        dataService.fetchData('staff', { orgId__eq: activeOrgId, personId__eq: personId }, reqUser),
+        dataService.fetchData('students', { orgId__eq: activeOrgId, personId__eq: personId }, reqUser)
+    ]);
+
+    const hasActive = (rows = []) => (Array.isArray(rows) ? rows : []).some((row) => !isInactiveSchoolRecord(row));
+    if (hasActive(teachers)) rolesOut.add('teacher');
+    if (hasActive(staff)) rolesOut.add('staff');
+    if (hasActive(students)) rolesOut.add('student');
+
+    return [...rolesOut];
+}
+
+function normalizeDateOnly(value) {
+    const raw = String(value || '').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
+}
+
+function normalizeClockTime(value) {
+    return timesheetManualConflictService.normalizeClockTime(value);
+}
+
+function calculateHoursFromTimes(startTime, endTime) {
+    const start = normalizeClockTime(startTime);
+    const end = normalizeClockTime(endTime);
+    if (!start || !end) return 0;
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    const startMinutes = (startH * 60) + startM;
+    const endMinutes = (endH * 60) + endM;
+    if (endMinutes <= startMinutes) return 0;
+    return Number(((endMinutes - startMinutes) / 60).toFixed(2));
+}
+
+function normalizeManualApprovalStatus(value) {
+    const token = String(value || '').trim().toLowerCase();
+    if (token === 'pending_approval') return 'pending_approval';
+    if (token === 'approved') return 'approved';
+    if (token === 'unpaid') return 'unpaid';
+    return '';
+}
+
+function isActiveActivityRow(row) {
+    const status = String(row?.status || '').trim().toLowerCase();
+    return !['archived', 'deleted', 'inactive', 'removed'].includes(status);
+}
+
 function isInactiveSchoolRecord(row) {
     const status = String(row?.status || '').trim().toLowerCase();
     return ['archived', 'deleted', 'inactive', 'terminated'].includes(status);
@@ -134,6 +222,8 @@ function resolveDepartmentName(departmentId, explicitName, departmentMap) {
 
 function resolveTimesheetEntryHours(entry) {
     if (!entry || entry.isDeleted) return 0;
+    const approvalStatus = String(entry?.approvalStatus || '').trim().toLowerCase();
+    if (entry?.excludeFromTotals === true || approvalStatus === 'pending_approval') return 0;
     if (entry.isManual || entry.isPriorPeriodAdjustment) {
         return Number(parseFloat(entry.durationHours) || parseFloat(entry.hours) || 0);
     }
@@ -250,6 +340,35 @@ function shapeTimesheetPeriodPickerRow(period) {
         periodWindowLabel,
         deadlineLabel,
         submissionDeadlineTime: String(period?.submissionDeadlineTime || '23:59')
+    };
+}
+
+function shapeManualActivityRows(activityRows = []) {
+    return (Array.isArray(activityRows) ? activityRows : [])
+        .filter((row) => row && row.id)
+        .map((row) => ({
+            id: String(row.id),
+            name: String(row.title || row.name || row.id),
+            paid: row.paid === true,
+            status: String(row.status || ''),
+            categoryId: String(row.categoryId || ''),
+            categoryName: String(row.categoryName || ''),
+            departmentId: String(row.departmentId || ''),
+            departmentName: String(row.departmentName || '')
+        }))
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+function buildIncompleteSessionWarningRow(classRow, sessionRow, statusLabel = '') {
+    return {
+        sessionId: String(sessionRow?.sessionId || ''),
+        classId: String(classRow?.id || ''),
+        className: String(classRow?.title || classRow?.name || classRow?.id || ''),
+        date: String(sessionRow?.date || ''),
+        startTime: String(sessionRow?.startTime || ''),
+        endTime: String(sessionRow?.endTime || ''),
+        status: String(sessionRow?.status || ''),
+        statusLabel: String(statusLabel || '')
     };
 }
 
@@ -873,9 +992,11 @@ exports.viewTimesheet = async (req, res) => {
         }
 
         const classes = await dataService.fetchData('classes', {}, req.user);
+        const scopedClasses = (Array.isArray(classes) ? classes : []).filter((row) => idsEqual(row?.orgId, activeOrgId));
         const liveSessions = [];
+        const incompleteSessions = [];
 
-        for (const c of classes) {
+        for (const c of scopedClasses) {
             const sessions = await dataService.getClassSessions(c.id, req.user);
             const myClassSessions = sessions.filter((s) =>
                 idsEqual(s.delivery?.deliveredBy, teacherContext.targetTeacherId) &&
@@ -890,7 +1011,16 @@ exports.viewTimesheet = async (req, res) => {
                     status: s.status,
                     notes: s.notes
                 });
-                if (!isFinalStatus) return;
+                const statusLabel = (() => {
+                    const normalizedCode = normalizeStatusCode(s.status);
+                    const meta = (Array.isArray(sessionStatusMeta) ? sessionStatusMeta : []).find((row) => normalizeStatusCode(row?.code) === normalizedCode);
+                    if (meta?.label) return String(meta.label);
+                    return normalizedStatus || normalizedCode;
+                })();
+                if (!isFinalStatus) {
+                    incompleteSessions.push(buildIncompleteSessionWarningRow(c, s, statusLabel));
+                    return;
+                }
                 const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                     status: s.status,
                     notes: s.notes,
@@ -924,18 +1054,15 @@ exports.viewTimesheet = async (req, res) => {
         });
         const mergedLiveSessions = [...liveSessions, ...reportReflectionSessions];
 
-        const [allHolidays, allDepartments] = await Promise.all([
+        const [allHolidays, allActivities] = await Promise.all([
             dataService.fetchData('holidays', {}, req.user),
-            dataService.fetchData('departments', {}, req.user)
+            activityService.listActivities({ orgId: activeOrgId, reqUser: req.user })
         ]);
         const holidays = allHolidays.filter((h) => h.date >= period.startDate && h.date <= period.endDate);
-        const departments = (Array.isArray(allDepartments) ? allDepartments : [])
+        const manualActivities = shapeManualActivityRows((Array.isArray(allActivities) ? allActivities : [])
             .filter((row) => idsEqual(row?.orgId, activeOrgId))
-            .filter((row) => {
-                const status = String(row?.status || '').trim().toLowerCase();
-                return !status || status === 'active';
-            })
-            .sort((a, b) => String(a?.name || a?.title || a?.code || a?.id || '').localeCompare(String(b?.name || b?.title || b?.code || b?.id || '')));
+            .filter((row) => isActiveActivityRow(row))
+            .filter((row) => activityService.isPersonEligibleForActivity(row, teacherContext.targetTeacherId)));
 
         const isReadOnly = !teacherContext.isAdmin && (
             timesheet.status === 'submitted' ||
@@ -965,8 +1092,9 @@ exports.viewTimesheet = async (req, res) => {
             period,
             timesheet,
             liveSessions: mergedLiveSessions,
+            incompleteSessions,
             holidays,
-            departments,
+            manualActivities,
             maxDailyHours,
             maxSessionHours,
             sessionStatusMeta,
@@ -989,6 +1117,7 @@ exports.saveTimesheet = async (req, res) => {
         const { periodId } = req.params;
         const { status, entries, totalHours } = req.body;
         const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const maxSessionHours = 8.0;
 
         const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.UPDATE });
         guardKey = idempotencyGuardService.createGuardKey([
@@ -1030,9 +1159,10 @@ exports.saveTimesheet = async (req, res) => {
         const sessionStatusMeta = await sessionStatusPolicyService.getClientStatusMeta(period.orgId || activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(sessionStatusMeta);
         const classes = await dataService.fetchData('classes', {}, req.user);
+        const scopedClasses = (Array.isArray(classes) ? classes : []).filter((row) => idsEqual(row?.orgId, activeOrgId));
         const liveSessionById = new Map();
 
-        for (const classRow of classes || []) {
+        for (const classRow of scopedClasses || []) {
             const sessions = await dataService.getClassSessions(classRow.id, req.user);
             (sessions || []).forEach((sessionRow) => {
                 if (!idsEqual(sessionRow?.delivery?.deliveredBy, teacherContext.targetTeacherId)) return;
@@ -1054,13 +1184,106 @@ exports.saveTimesheet = async (req, res) => {
             });
         }
 
+        const hasManualRows = entryRows.some((entry) => entry && entry.isDeleted !== true && entry.isManual === true);
+        let activityById = new Map();
+        if (hasManualRows) {
+            const allActivities = await activityService.listActivities({ orgId: activeOrgId, reqUser: req.user });
+            activityById = new Map((Array.isArray(allActivities) ? allActivities : [])
+                .filter((row) => isActiveActivityRow(row))
+                .map((row) => [String(row?.id || '').trim(), row])
+                .filter(([id]) => Boolean(id)));
+        }
+
         const normalizedEntries = entryRows.map((entry) => {
             if (!entry || typeof entry !== 'object') return entry;
             if (entry.isDeleted === true) {
                 return { sessionId: String(entry.sessionId || ''), isDeleted: true };
             }
             if (entry.isManual === true) {
-                return entry;
+                const sessionId = String(entry.sessionId || '').trim();
+                if (!sessionId) throw new Error('Manual entry session id is required.');
+                const classId = String(entry.classId || '').trim();
+                const activityId = String(entry.activityId || '').trim();
+                const activityRow = activityId ? activityById.get(activityId) : null;
+                if (activityId && !activityRow) {
+                    throw new Error('Selected activity is not active or no longer available. Please reselect the activity.');
+                }
+                if (activityRow && !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {
+                    throw new Error('You are not eligible for the selected activity. Please choose another activity.');
+                }
+
+                const dateValue = normalizeDateOnly(entry.date);
+                if (!dateValue || dateValue < period.startDate || dateValue > period.endDate) {
+                    throw new Error('Manual entry date must be within the selected timesheet period.');
+                }
+
+                let startTime = normalizeClockTime(entry.startTime || '');
+                let endTime = normalizeClockTime(entry.endTime || '');
+                let requestedHours = Number(parseFloat(entry.requestedHours ?? entry.durationHours ?? entry.hours) || 0);
+                if (classId) {
+                    if (!startTime || !endTime) {
+                        throw new Error('Class-based manual entries require start and end time.');
+                    }
+                    const calculatedHours = calculateHoursFromTimes(startTime, endTime);
+                    if (!Number.isFinite(calculatedHours) || calculatedHours <= 0) {
+                        throw new Error('Class-based manual entries require a valid time range where end time is after start time.');
+                    }
+                    requestedHours = calculatedHours;
+                } else {
+                    startTime = '';
+                    endTime = '';
+                }
+                if (!Number.isFinite(requestedHours) || requestedHours <= 0) {
+                    throw new Error('Manual entry hours must be greater than 0.');
+                }
+                if (requestedHours > maxSessionHours) {
+                    throw new Error(`A single manual entry cannot exceed ${maxSessionHours} hours.`);
+                }
+
+                const activityName = String(activityRow?.title || activityRow?.name || entry.activityName || '').trim();
+                const activityPaid = activityRow ? activityRow.paid === true : entry.activityPaid === true;
+                const manualApproval = normalizeManualApprovalStatus(entry.approvalStatus);
+                const approvalStatus = activityId
+                    ? (activityPaid ? (manualApproval || 'pending_approval') : 'unpaid')
+                    : (manualApproval || 'approved');
+                const excludeFromTotals = entry.excludeFromTotals === true || approvalStatus === 'pending_approval';
+                const payableHours = excludeFromTotals ? 0 : requestedHours;
+
+                const classNameRaw = String(entry.className || '').trim();
+                const description = String(entry.description || '').trim();
+                const resolvedClassName = classNameRaw || description || activityName || 'Manual Activity';
+
+                const normalizedManual = {
+                    ...entry,
+                    sessionId,
+                    date: dateValue,
+                    classId: classId || null,
+                    className: resolvedClassName,
+                    hours: Number(payableHours.toFixed(2)),
+                    timesheetHours: Number(payableHours.toFixed(2)),
+                    durationHours: Number(requestedHours.toFixed(2)),
+                    requestedHours: Number(requestedHours.toFixed(2)),
+                    startTime: startTime || '',
+                    endTime: endTime || '',
+                    status: approvalStatus === 'pending_approval'
+                        ? 'pending_approval'
+                        : (String(entry.status || 'manual').trim().toLowerCase() || 'manual'),
+                    comment: String(entry.comment || '').trim(),
+                    isManual: true,
+                    activityId: activityId || '',
+                    activityName,
+                    activityPaid: activityId ? activityPaid : (entry.activityPaid === true),
+                    approvalStatus,
+                    excludeFromTotals,
+                    deliveryDepartmentId: String(entry.deliveryDepartmentId || activityRow?.departmentId || '').trim(),
+                    deliveryDepartmentName: String(entry.deliveryDepartmentName || activityRow?.departmentName || '').trim(),
+                    categoryName: String(entry.categoryName || activityRow?.categoryName || '').trim(),
+                    description
+                };
+                if (!activityId) {
+                    normalizedManual.activityPaid = false;
+                }
+                return normalizedManual;
             }
 
             const sessionId = String(entry.sessionId || '').trim();
@@ -1111,7 +1334,46 @@ exports.saveTimesheet = async (req, res) => {
             };
         });
 
+        const scheduleRoles = await resolveScheduleRolesForPerson({
+            activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            reqUser: req.user
+        });
+        const manualClassEntries = normalizedEntries.filter((entry) => (
+            entry &&
+            entry.isDeleted !== true &&
+            entry.isManual === true &&
+            entry.classId &&
+            entry.startTime &&
+            entry.endTime
+        ));
+        if (manualClassEntries.length && scheduleRoles.length) {
+            const conflicts = await timesheetManualConflictService.detectRoleAwareManualEntryConflicts({
+                activeOrgId,
+                personId: teacherContext.targetTeacherId,
+                activeRoles: scheduleRoles,
+                startDate: period.startDate,
+                endDate: period.endDate,
+                candidateEntries: manualClassEntries,
+                reqUser: req.user
+            });
+            if (Array.isArray(conflicts) && conflicts.length) {
+                const warning = new Error('Selected class date/time conflicts with your role-based schedule. Adjust the row and try again.');
+                warning.status = 'warning';
+                warning.code = 'MANUAL_ENTRY_SCHEDULE_CONFLICT';
+                warning.conflicts = conflicts.slice(0, 20);
+                throw warning;
+            }
+        }
+
         if (nextStatus === 'submitted') {
+            const hasPendingApprovalManualRows = normalizedEntries.some((entry) => {
+                if (!entry || entry.isDeleted === true || entry.isManual !== true) return false;
+                return String(entry.approvalStatus || '').trim().toLowerCase() === 'pending_approval';
+            });
+            if (hasPendingApprovalManualRows) {
+                throw new Error('Some paid manual activities are pending authority approval. Approve or remove them before submission.');
+            }
             const hasNonFinalAutoSession = normalizedEntries.some((entry) => {
                 if (!entry || entry.isDeleted || entry.isManual) return false;
                 if (entry.isPriorPeriodAdjustment === true) return false;
@@ -1157,6 +1419,16 @@ exports.saveTimesheet = async (req, res) => {
         res.json(payloadOut);
     } catch (error) {
         if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        if (error?.status === 'warning') {
+            return res.status(409).json({
+                status: 'warning',
+                code: String(error?.code || 'TIMESHEET_WARNING'),
+                message: error.message,
+                data: {
+                    conflicts: Array.isArray(error?.conflicts) ? error.conflicts : []
+                }
+            });
+        }
         res.status(400).json({ status: 'error', message: error.message });
     }
 };

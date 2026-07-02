@@ -154,15 +154,18 @@
               <label class="form-label fw-bold">Activity Type *</label>
               <select id="man_type" class="form-select" onchange="toggleManualType()">
                   <option value="">Class-based entry</option>
-                  <% (departments || []).forEach((department) => { %>
+                  <% (manualActivities || []).forEach((activity) => { %>
                     <option
-                      value="<%= department.id || '' %>"
-                      data-name="<%= department.name || department.title || department.code || department.id || '' %>">
-                      <%= department.name || department.title || department.code || department.id || 'Department' %>
+                      value="<%= activity.id || '' %>"
+                      data-name="<%= activity.name || activity.id || '' %>"
+                      data-paid="<%= activity.paid ? 'true' : 'false' %>"
+                      data-category="<%= activity.categoryName || '' %>"
+                      data-department="<%= activity.departmentName || '' %>">
+                      <%= activity.name || activity.id || 'Activity' %>
                     </option>
                   <% }) %>
               </select>
-              <div class="form-text">Select a department for department-based compensation, or leave blank to select a class.</div>
+              <div class="form-text">Select an activity definition, or leave blank for class-based entry.</div>
           </div>
 
           <div class="mb-3" id="div_man_classPicker">
@@ -177,6 +180,20 @@
           <div class="mb-3" id="div_man_desc">
               <label class="form-label fw-bold">Description *</label>
               <input type="text" id="man_desc" class="form-control" placeholder="e.g. Extra prep, admin work, meeting...">
+          </div>
+
+          <div class="row g-2 mb-3" id="div_man_timeRange">
+              <div class="col-6">
+                  <label class="form-label fw-bold">Start Time *</label>
+                  <input type="time" id="man_startTime" class="form-control">
+              </div>
+              <div class="col-6">
+                  <label class="form-label fw-bold">End Time *</label>
+                  <input type="time" id="man_endTime" class="form-control">
+              </div>
+              <div class="col-12">
+                  <div class="form-text">For class-based rows, total hours are calculated from start/end time.</div>
+              </div>
           </div>
 
           <div class="mb-3">
@@ -242,6 +259,8 @@
     const LIVE_SESSIONS = <%- JSON.stringify(liveSessions || []) %>;
     const HOLIDAYS = <%- JSON.stringify(holidays || []) %>;
     const TIMESHEET_ENTRIES = <%- JSON.stringify(timesheet.entries || []) %>;
+    const MANUAL_ACTIVITIES = <%- JSON.stringify(manualActivities || []) %>;
+    const INCOMPLETE_SESSIONS = <%- JSON.stringify(incompleteSessions || []) %>;
     const SESSION_STATUS_META = <%- JSON.stringify(sessionStatusMeta || []) %>;
     const IS_READONLY = <%= isReadOnly %>;
     const IS_ADMIN = <%= isAdmin %>;
@@ -268,17 +287,31 @@ function toggleManualType() {
     const classIdInput = document.getElementById('man_classId');
     const classNameInput = document.getElementById('man_className');
     const classButton = document.getElementById('btnPickClass');
-    const usingDepartment = Boolean(String(type || '').trim());
+    const startInput = document.getElementById('man_startTime');
+    const endInput = document.getElementById('man_endTime');
+    const hoursInput = document.getElementById('man_hours');
+    const usingActivity = Boolean(String(type || '').trim());
     document.getElementById('div_man_desc').classList.remove('d-none');
-    classPickerWrap.classList.toggle('opacity-50', usingDepartment);
+    classPickerWrap.classList.toggle('opacity-50', usingActivity);
+    document.getElementById('div_man_timeRange').classList.toggle('d-none', usingActivity);
     if (classNameInput) {
-        classNameInput.disabled = usingDepartment;
-        classNameInput.placeholder = usingDepartment ? 'Disabled for department-based entry' : 'Choose a class...';
+        classNameInput.disabled = usingActivity;
+        classNameInput.placeholder = usingActivity ? 'Disabled for activity-based entry' : 'Choose a class...';
     }
-    if (classButton) classButton.disabled = usingDepartment;
-    if (usingDepartment) {
+    if (classButton) classButton.disabled = usingActivity;
+    if (startInput) startInput.disabled = usingActivity;
+    if (endInput) endInput.disabled = usingActivity;
+    if (hoursInput) {
+        hoursInput.readOnly = !usingActivity;
+        hoursInput.placeholder = usingActivity ? 'e.g. 1.5' : 'Calculated from start/end time';
+    }
+    if (usingActivity) {
+        if (startInput) startInput.value = '';
+        if (endInput) endInput.value = '';
         if (classIdInput) classIdInput.value = '';
         if (classNameInput) classNameInput.value = '';
+    } else if (typeof window.updateManualComputedHoursFromTimes === 'function') {
+        window.updateManualComputedHoursFromTimes();
     }
 }
 
@@ -312,6 +345,50 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         alert(message);
+    }
+
+    const manualActivityMap = new Map((Array.isArray(MANUAL_ACTIVITIES) ? MANUAL_ACTIVITIES : [])
+        .map((row) => [String(row?.id || '').trim(), row])
+        .filter(([id]) => Boolean(id)));
+
+    function normalizeClock(value) {
+        const raw = String(value || '').trim();
+        const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return '';
+        const h = Number(match[1]);
+        const m = Number(match[2]);
+        if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) return '';
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    function calculateHoursFromRange(startTime, endTime) {
+        const start = normalizeClock(startTime);
+        const end = normalizeClock(endTime);
+        if (!start || !end) return 0;
+        const [startH, startM] = start.split(':').map(Number);
+        const [endH, endM] = end.split(':').map(Number);
+        const startMinutes = (startH * 60) + startM;
+        const endMinutes = (endH * 60) + endM;
+        if (endMinutes <= startMinutes) return 0;
+        return Number(((endMinutes - startMinutes) / 60).toFixed(2));
+    }
+
+    function hasTimeOverlap(startA, endA, startB, endB) {
+        const aStart = normalizeClock(startA);
+        const aEnd = normalizeClock(endA);
+        const bStart = normalizeClock(startB);
+        const bEnd = normalizeClock(endB);
+        if (!aStart || !aEnd || !bStart || !bEnd) return false;
+        const [ash, asm] = aStart.split(':').map(Number);
+        const [aeh, aem] = aEnd.split(':').map(Number);
+        const [bsh, bsm] = bStart.split(':').map(Number);
+        const [beh, bem] = bEnd.split(':').map(Number);
+        const aStartMin = (ash * 60) + asm;
+        const aEndMin = (aeh * 60) + aem;
+        const bStartMin = (bsh * 60) + bsm;
+        const bEndMin = (beh * 60) + bem;
+        if (aEndMin <= aStartMin || bEndMin <= bStartMin) return false;
+        return aStartMin < bEndMin && aEndMin > bStartMin;
     }
 
     // Normalize holidays into Map(dateStr -> holidayObj)
@@ -355,11 +432,22 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const resolveEntryHours = (entry) => {
         if (!entry || entry.isDeleted) return 0;
+        const approvalStatus = String(entry.approvalStatus || '').trim().toLowerCase();
+        const excluded = entry.excludeFromTotals === true || approvalStatus === 'pending_approval';
+        if (excluded) return 0;
         if (entry.isManual) return Number(parseFloat(entry.durationHours) || parseFloat(entry.hours) || 0);
         const formulaHours = Number(entry.timesheetHours);
         if (Number.isFinite(formulaHours)) return Number(formulaHours.toFixed(2));
         return Number(parseFloat(entry.durationHours) || parseFloat(entry.hours) || 0);
     };
+    const resolveRequestedHours = (entry) => {
+        if (!entry || entry.isDeleted) return 0;
+        if (entry.isManual) {
+            return Number(parseFloat(entry.requestedHours ?? entry.durationHours ?? entry.hours) || 0);
+        }
+        return resolveEntryHours(entry);
+    };
+    const isPendingApprovalEntry = (entry) => String(entry?.approvalStatus || '').trim().toLowerCase() === 'pending_approval';
     const isFinalAutoStatus = (entry) => {
         if (!entry || entry.isManual) return true;
         if (entry.isPriorPeriodAdjustment === true) return true;
@@ -373,6 +461,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-arrow-left-right me-1"></i> Prior Period Adjustment</span>`;
         }
         if (entry?.isManual) {
+            if (isPendingApprovalEntry(entry)) {
+                return `<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-hourglass-split me-1"></i> Pending Approval</span>`;
+            }
+            if (entry?.activityId && entry?.activityPaid === false) {
+                return `<span class="badge bg-secondary border"><i class="bi bi-slash-circle me-1"></i> Unpaid Activity</span>`;
+            }
             return `<span class="badge bg-info text-dark border border-info"><i class="bi bi-person-fill me-1"></i> Manual</span>`;
         }
         if (entry?.isReportReflection === true) {
@@ -401,14 +495,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 onSelect: (item) => {
                     document.getElementById('man_classId').value = item.id;
                     document.getElementById('man_className').value = item.title || item.name || item.id;
+                    if (typeof window.updateManualComputedHoursFromTimes === 'function') window.updateManualComputedHoursFromTimes();
                 }
             }));
         });
     }
+    const manualStartInput = document.getElementById('man_startTime');
+    const manualEndInput = document.getElementById('man_endTime');
+    if (manualStartInput) manualStartInput.addEventListener('change', () => window.updateManualComputedHoursFromTimes());
+    if (manualEndInput) manualEndInput.addEventListener('change', () => window.updateManualComputedHoursFromTimes());
 
     const tbody = document.getElementById('tsBody');
     let grandTotalHours = 0;
-    let hasUncompletedSessions = false;
+    let hasUncompletedSessions = Array.isArray(INCOMPLETE_SESSIONS) && INCOMPLETE_SESSIONS.length > 0;
+    let hasPendingApprovals = false;
     
     let activeEntries = []; 
     let deletedAutoSessionIds = [];
@@ -454,7 +554,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTable() {
         tbody.innerHTML = '';
         grandTotalHours = 0;
-        hasUncompletedSessions = false;
+        hasUncompletedSessions = Array.isArray(INCOMPLETE_SESSIONS) && INCOMPLETE_SESSIONS.length > 0;
+        hasPendingApprovals = false;
         let weeklyTotal = 0;
 
         dates.forEach((dObj, index) => {
@@ -499,6 +600,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!ses.isManual && !ses.isPriorPeriodAdjustment && !isFinalAutoStatus(ses)) {
                         hasUncompletedSessions = true;
                     }
+                    if (isPendingApprovalEntry(ses)) {
+                        hasPendingApprovals = true;
+                    }
 
                     const isPriorAdj = ses.isPriorPeriodAdjustment === true;
                     const rowClass = isPriorAdj ? `${bgClass} row-hover row-prior-adjustment` : `${bgClass} row-hover`;
@@ -527,13 +631,18 @@ document.addEventListener('DOMContentLoaded', () => {
                            </td>` 
                         : '';
 
-                    const hoursDisplay = isPriorAdj && hrs < 0 ? hrs.toFixed(2) : hrs.toFixed(2);
+                    const requestedHours = resolveRequestedHours(ses);
+                    const hoursDisplay = isPendingApprovalEntry(ses)
+                        ? `<span class="text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><br><small class="text-warning fw-semibold">0.00 payable (pending)</small>`
+                        : (isPriorAdj && hrs < 0 ? hrs.toFixed(2) : hrs.toFixed(2));
                     const timeLabel = isPriorAdj
                         ? `<div class="small text-muted">Prior period correction</div><div class="small text-muted">Ref: ${(ses.adjustmentMeta?.sourceSessionDate || ses.date || '').toString()}</div>`
                         : `<div class="small">${ses.startTime ? `<i class="bi bi-clock"></i> ${ses.startTime} - ${ses.endTime}` : 'Manual Time'}</div><div class="small text-muted">ID: ${(ses.sessionId || '').substring(0,8)}...</div>`;
-                    const classMeta = ses.isManual && ses.deliveryDepartmentName
-                        ? `<div class="small text-muted"><i class="bi bi-building me-1"></i>${ses.deliveryDepartmentName}</div>`
-                        : (ses.isManual && !ses.classId && !isPriorAdj ? '' : `<div class="small text-muted">${ses.classId || ''}</div>`);
+                    const classMeta = ses.isManual && ses.activityName
+                        ? `<div class="small text-muted"><i class="bi bi-list-check me-1"></i>${ses.activityName}${ses.activityPaid ? ' (paid)' : ' (unpaid)'}</div>`
+                        : (ses.isManual && ses.deliveryDepartmentName
+                            ? `<div class="small text-muted"><i class="bi bi-building me-1"></i>${ses.deliveryDepartmentName}</div>`
+                            : (ses.isManual && !ses.classId && !isPriorAdj ? '' : `<div class="small text-muted">${ses.classId || ''}</div>`));
 
                     tbody.innerHTML += `
                         <tr class="${rowClass}">
@@ -603,9 +712,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const btnSubmit = document.getElementById('btnSubmit');
         if (btnSubmit) {
-            if (hasUncompletedSessions) {
+            if (hasUncompletedSessions || hasPendingApprovals) {
                 btnSubmit.disabled = true;
-                btnSubmit.innerHTML = '<i class="bi bi-lock-fill me-1"></i> Finalize Session Statuses to Submit';
+                btnSubmit.innerHTML = hasPendingApprovals
+                    ? '<i class="bi bi-hourglass-split me-1"></i> Pending Approvals Block Submission'
+                    : '<i class="bi bi-lock-fill me-1"></i> Finalize Session Statuses to Submit';
                 btnSubmit.classList.replace('btn-primary', 'btn-secondary');
             } else {
                 btnSubmit.disabled = false;
@@ -620,6 +731,18 @@ document.addEventListener('DOMContentLoaded', () => {
     window.updateComment = function(sesId, val) {
         const e = activeEntries.find(x => x.sessionId === sesId);
         if (e) e.comment = val;
+    };
+
+    window.updateManualComputedHoursFromTimes = function() {
+        const type = String(document.getElementById('man_type')?.value || '').trim();
+        if (type) return;
+        const startTime = document.getElementById('man_startTime')?.value || '';
+        const endTime = document.getElementById('man_endTime')?.value || '';
+        const hours = calculateHoursFromRange(startTime, endTime);
+        const hoursInput = document.getElementById('man_hours');
+        if (hoursInput) {
+            hoursInput.value = hours > 0 ? hours.toFixed(2) : '';
+        }
     };
 
     window.openManualModal = function(dateStr, editId = null) {
@@ -641,25 +764,29 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btnSaveManualEntry').innerText = 'Update Entry';
             const e = activeEntries.find(x => x.sessionId === editId);
             
-            existingHoursToIgnore = resolveEntryHours(e);
+            existingHoursToIgnore = resolveRequestedHours(e);
 
-            if (e.deliveryDepartmentId && !e.classId) {
-                document.getElementById('man_type').value = e.deliveryDepartmentId;
+            if (e.activityId && !e.classId) {
+                document.getElementById('man_type').value = e.activityId;
                 document.getElementById('man_classId').value = '';
                 document.getElementById('man_className').value = '';
-                document.getElementById('man_desc').value = e.className || '';
+                document.getElementById('man_desc').value = e.description || e.className || '';
             } else if (e.classId) {
                 document.getElementById('man_type').value = '';
                 document.getElementById('man_classId').value = e.classId;
                 document.getElementById('man_className').value = e.className;
                 document.getElementById('man_desc').value = e.description || '';
+                document.getElementById('man_startTime').value = normalizeClock(e.startTime || '');
+                document.getElementById('man_endTime').value = normalizeClock(e.endTime || '');
             } else {
                 document.getElementById('man_type').value = '';
                 document.getElementById('man_classId').value = '';
                 document.getElementById('man_className').value = '';
                 document.getElementById('man_desc').value = e.className;
+                document.getElementById('man_startTime').value = '';
+                document.getElementById('man_endTime').value = '';
             }
-            document.getElementById('man_hours').value = existingHoursToIgnore;
+            document.getElementById('man_hours').value = existingHoursToIgnore ? existingHoursToIgnore.toFixed(2) : '';
             document.getElementById('man_comment').value = e.comment || '';
         } else {
             document.getElementById('modalTitle').innerHTML = '<i class="bi bi-plus-circle me-2 text-primary"></i>Add Manual Entry';
@@ -668,13 +795,15 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('man_classId').value = '';
             document.getElementById('man_className').value = '';
             document.getElementById('man_desc').value = '';
+            document.getElementById('man_startTime').value = '';
+            document.getElementById('man_endTime').value = '';
             document.getElementById('man_hours').value = '';
             document.getElementById('man_comment').value = '';
         }
         
         toggleManualType();
         
-        const dailyTotalSoFar = activeEntries.filter(e => e.date === dateStr).reduce((sum, e) => sum + resolveEntryHours(e), 0);
+        const dailyTotalSoFar = activeEntries.filter(e => e.date === dateStr).reduce((sum, e) => sum + resolveRequestedHours(e), 0);
         const actualExisting = dailyTotalSoFar - existingHoursToIgnore;
         
         document.getElementById('man_hours_warning').innerText = `Note: ${actualExisting.toFixed(2)} hours already logged for this day. (Max: ${MAX_DAILY_HOURS} hrs/day)`;
@@ -714,34 +843,87 @@ document.addEventListener('DOMContentLoaded', () => {
         const editId = document.getElementById('man_editSessionId').value;
         const type = document.getElementById('man_type').value;
         const typeSelect = document.getElementById('man_type');
-        const selectedDepartmentOption = typeSelect?.selectedOptions?.[0] || null;
-        const departmentId = String(type || '').trim();
-        const departmentName = departmentId ? String(selectedDepartmentOption?.dataset?.name || selectedDepartmentOption?.textContent || departmentId).trim() : '';
+        const selectedActivityOption = typeSelect?.selectedOptions?.[0] || null;
+        const activityId = String(type || '').trim();
+        const activityName = activityId ? String(selectedActivityOption?.dataset?.name || selectedActivityOption?.textContent || activityId).trim() : '';
+        const activityPaid = activityId ? String(selectedActivityOption?.dataset?.paid || '').trim().toLowerCase() === 'true' : false;
+        const activityMeta = manualActivityMap.get(activityId) || null;
         
         const classId = document.getElementById('man_classId').value;
         const className = document.getElementById('man_className').value;
         const descInput = document.getElementById('man_desc').value.trim();
-        const hrs = parseFloat(document.getElementById('man_hours').value);
+        const startTimeRaw = document.getElementById('man_startTime').value;
+        const endTimeRaw = document.getElementById('man_endTime').value;
+        let hrs = parseFloat(document.getElementById('man_hours').value);
         const comment = document.getElementById('man_comment').value.trim();
 
         let finalClassName = className;
         let finalClassId = classId;
-        let finalDepartmentId = departmentId;
-        let finalDepartmentName = departmentName;
+        let finalActivityId = activityId;
+        let finalActivityName = activityName;
+        let finalActivityPaid = activityPaid;
+        let finalApprovalStatus = 'approved';
+        let finalExcludeFromTotals = false;
+        let finalStartTime = '';
+        let finalEndTime = '';
+        const finalDepartmentId = String(activityMeta?.departmentId || '').trim();
+        const finalDepartmentName = String(activityMeta?.departmentName || '').trim();
+        const finalCategoryName = String(activityMeta?.categoryName || '').trim();
 
-        if (departmentId) {
-            if (!descInput) { 
-                await messageBox({ title: 'Missing Information', icon: 'warning', message: 'Please provide a description for the department-based activity.' });
-                return; 
+        if (activityId) {
+            if (!descInput) {
+                await messageBox({ title: 'Missing Information', icon: 'warning', message: 'Please provide a short description for the selected activity.' });
+                return;
             }
-            finalClassName = descInput;
+            finalClassName = descInput || finalActivityName;
             finalClassId = null;
+            if (finalActivityPaid) {
+                const proceed = await confirmAction({
+                    title: 'Paid Activity Requires Approval',
+                    message: 'This paid activity row will be saved as pending approval and excluded from payable totals until authorities approve it. Continue?',
+                    confirmText: 'Save as Pending Approval',
+                    cancelText: 'Cancel',
+                    icon: 'warning',
+                    confirmBtnClass: 'btn-warning'
+                });
+                if (!proceed) return;
+                finalApprovalStatus = 'pending_approval';
+                finalExcludeFromTotals = true;
+            } else {
+                await messageBox({
+                    title: 'Unpaid Activity',
+                    icon: 'warning',
+                    message: 'The selected activity is unpaid. It will be recorded as unpaid and will not generate payable hours.'
+                });
+                finalApprovalStatus = 'unpaid';
+            }
         } else {
-            finalDepartmentId = '';
-            finalDepartmentName = '';
-            if (!classId) { 
-                await messageBox({ title: 'Missing Information', icon: 'warning', message: 'Please select a Class using the search tool.' });
-                return; 
+            finalActivityId = '';
+            finalActivityName = '';
+            finalActivityPaid = false;
+            finalApprovalStatus = 'approved';
+            if (classId) {
+                finalStartTime = normalizeClock(startTimeRaw);
+                finalEndTime = normalizeClock(endTimeRaw);
+                if (!finalStartTime || !finalEndTime) {
+                    await messageBox({ title: 'Missing Time', icon: 'warning', message: 'Class-based manual rows require both start time and end time.' });
+                    return;
+                }
+                hrs = calculateHoursFromRange(finalStartTime, finalEndTime);
+                if (!hrs || hrs <= 0) {
+                    await messageBox({ title: 'Invalid Time Range', icon: 'warning', message: 'End time must be later than start time for class-based manual rows.' });
+                    return;
+                }
+                document.getElementById('man_hours').value = hrs.toFixed(2);
+            } else {
+                if (!descInput) {
+                    await messageBox({ title: 'Missing Information', icon: 'warning', message: 'Please select a class or provide a description for manual work.' });
+                    return;
+                }
+                finalClassName = descInput;
+                finalClassId = null;
+                finalStartTime = '';
+                finalEndTime = '';
             }
         }
 
@@ -755,11 +937,30 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (!activityId && finalClassId) {
+            const overlaps = activeEntries.filter((entry) => {
+                if (!entry || entry.sessionId === editId) return false;
+                if (entry.date !== d) return false;
+                const entryStart = normalizeClock(entry.startTime || '');
+                const entryEnd = normalizeClock(entry.endTime || '');
+                if (!entryStart || !entryEnd) return false;
+                return hasTimeOverlap(finalStartTime, finalEndTime, entryStart, entryEnd);
+            });
+            if (overlaps.length) {
+                await messageBox({
+                    title: 'Schedule Conflict Detected',
+                    icon: 'error',
+                    message: 'This class time overlaps another session/activity in the current timesheet draft. Adjust start/end time and try again.'
+                });
+                return;
+            }
+        }
+
         // Daily Limit Enforcement Check
-        let existingHours = activeEntries.filter(e => e.date === d).reduce((sum, e) => sum + resolveEntryHours(e), 0);
+        let existingHours = activeEntries.filter(e => e.date === d).reduce((sum, e) => sum + resolveRequestedHours(e), 0);
         if (editId) {
             const oldEntry = activeEntries.find(e => e.sessionId === editId);
-            if (oldEntry) existingHours -= resolveEntryHours(oldEntry);
+            if (oldEntry) existingHours -= resolveRequestedHours(oldEntry);
         }
 
         if (existingHours + hrs > MAX_DAILY_HOURS) {
@@ -775,11 +976,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const e = activeEntries.find(x => x.sessionId === editId);
             e.className = finalClassName;
             e.classId = finalClassId;
+            e.activityId = finalActivityId;
+            e.activityName = finalActivityName;
+            e.activityPaid = finalActivityPaid;
+            e.approvalStatus = finalApprovalStatus;
+            e.excludeFromTotals = finalExcludeFromTotals;
+            e.startTime = finalStartTime;
+            e.endTime = finalEndTime;
             e.deliveryDepartmentId = finalDepartmentId;
             e.deliveryDepartmentName = finalDepartmentName;
+            e.categoryName = finalCategoryName;
             e.description = descInput;
-            e.hours = hrs;
+            e.requestedHours = hrs;
             e.durationHours = hrs;
+            e.hours = finalExcludeFromTotals ? 0 : hrs;
+            e.timesheetHours = finalExcludeFromTotals ? 0 : hrs;
+            e.status = finalApprovalStatus === 'pending_approval' ? 'pending_approval' : 'manual';
             e.comment = comment;
         } else {
             activeEntries.push({
@@ -787,12 +999,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 date: d,
                 className: finalClassName,
                 classId: finalClassId,
+                activityId: finalActivityId,
+                activityName: finalActivityName,
+                activityPaid: finalActivityPaid,
+                approvalStatus: finalApprovalStatus,
+                excludeFromTotals: finalExcludeFromTotals,
+                startTime: finalStartTime,
+                endTime: finalEndTime,
                 deliveryDepartmentId: finalDepartmentId,
                 deliveryDepartmentName: finalDepartmentName,
+                categoryName: finalCategoryName,
                 description: descInput,
-                hours: hrs, 
+                requestedHours: hrs,
+                hours: finalExcludeFromTotals ? 0 : hrs, 
                 durationHours: hrs, 
-                status: 'manual',
+                timesheetHours: finalExcludeFromTotals ? 0 : hrs,
+                status: finalApprovalStatus === 'pending_approval' ? 'pending_approval' : 'manual',
                 comment: comment,
                 isManual: true
             });
@@ -816,12 +1038,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 className: e.className,
                 classId: e.classId || null,
                 hours: resolveEntryHours(e),
+                requestedHours: resolveRequestedHours(e),
+                durationHours: resolveRequestedHours(e),
                 status: e.status,
                 comment: e.comment,
                 isManual: e.isManual
             };
+            if (e.startTime) row.startTime = e.startTime;
+            if (e.endTime) row.endTime = e.endTime;
+            if (e.activityId) row.activityId = e.activityId;
+            if (e.activityName) row.activityName = e.activityName;
+            if (e.activityPaid !== undefined) row.activityPaid = e.activityPaid === true;
+            if (e.approvalStatus) row.approvalStatus = e.approvalStatus;
+            if (e.excludeFromTotals === true) row.excludeFromTotals = true;
             if (e.deliveryDepartmentId) row.deliveryDepartmentId = e.deliveryDepartmentId;
             if (e.deliveryDepartmentName) row.deliveryDepartmentName = e.deliveryDepartmentName;
+            if (e.categoryName) row.categoryName = e.categoryName;
             if (e.description) row.description = e.description;
             if (e.isReportReflection === true) row.isReportReflection = true;
             if (e.isPriorPeriodAdjustment === true) {
@@ -852,6 +1084,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.disabled = false;
                 return;
             }
+            if (result.status === 'warning' && result.code === 'MANUAL_ENTRY_SCHEDULE_CONFLICT') {
+                const rows = Array.isArray(result?.data?.conflicts) ? result.data.conflicts : [];
+                const detailText = rows.length
+                    ? rows.slice(0, 6).map((row) => {
+                        const eventLabel = row?.conflictLabel || 'Scheduled event';
+                        const day = row?.date || row?.conflictDate || '-';
+                        const time = `${row?.conflictStartTime || '--:--'} - ${row?.conflictEndTime || '--:--'}`;
+                        return `${day}: ${eventLabel} (${time})`;
+                    }).join('\n')
+                    : '';
+                await messageBox({
+                    title: 'Schedule Conflict',
+                    icon: 'warning',
+                    message: `${result.message || 'Manual class entry conflicts with your schedule.'}${detailText ? `\n\n${detailText}` : ''}`
+                });
+                btn.innerHTML = origHtml;
+                btn.disabled = false;
+                return;
+            }
             
             if (result.status !== 'success') throw new Error(result.message);
 
@@ -868,7 +1119,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (document.getElementById('btnSubmit')) {
         document.getElementById('btnSubmit').addEventListener('click', async () => {
-            if (hasUncompletedSessions) return; 
+            if (hasUncompletedSessions || hasPendingApprovals) return; 
             
             const ok = await confirmAction({
                 title: 'Submit Timesheet',
@@ -1025,7 +1276,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function showIncompleteSessionWarningOnLoad() {
+        const rows = Array.isArray(INCOMPLETE_SESSIONS) ? INCOMPLETE_SESSIONS : [];
+        if (!rows.length) return;
+        const detailText = rows.slice(0, 8).map((row) => {
+            const classLabel = row?.className || row?.classId || 'Class';
+            const dateLabel = row?.date || '-';
+            const timeLabel = row?.startTime && row?.endTime ? `${row.startTime}-${row.endTime}` : 'Time not set';
+            const statusLabel = row?.statusLabel || row?.status || 'In progress';
+            return `${dateLabel} | ${classLabel} | ${timeLabel} | ${statusLabel}`;
+        }).join('\n');
+        await messageBox({
+            title: 'Incomplete Sessions Detected',
+            icon: 'warning',
+            message: `You have ${rows.length} incomplete session(s) in this period. Finalize session statuses before submission.\n\n${detailText}`
+        });
+    }
+
     renderTable();
+    showIncompleteSessionWarningOnLoad();
     loadPriorAdjustmentsReview();
 });
 </script>

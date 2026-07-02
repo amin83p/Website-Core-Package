@@ -6,12 +6,14 @@
   const activeVisibilityScope = ['individual', 'private', 'personal', 'assigned', 'assigned_only', 'attendee', 'attendees', 'attendees_only'].includes(rawActiveVisibilityScope)
     ? 'individual'
     : (rawActiveVisibilityScope ? 'school' : '');
+  const activePersonControl = String(stateFilters.personControl || '').trim().toLowerCase();
   const totalMatchedRows = Number(pagination?.totalItems ?? pagination?.total ?? (Array.isArray(data) ? data.length : 0));
   const hasActivityFiltersApplied = Boolean(
     String(stateFilters.q || '').trim()
     || activeStatus
     || activeCategoryId
     || activeVisibilityScope
+    || activePersonControl
   );
 %>
 
@@ -67,7 +69,7 @@
             <% }) %>
           </select>
         </div>
-        <div class="col-md-6 col-xl-3">
+        <div class="col-md-6 col-xl-2">
           <label class="form-label">Calendar Scope</label>
           <select name="visibilityScope" class="form-select size-md">
             <option value="">All Scopes</option>
@@ -75,7 +77,15 @@
             <option value="individual" <%= activeVisibilityScope === 'individual' ? 'selected' : '' %>>Individual / Assigned only</option>
           </select>
         </div>
-        <div class="col-md-6 col-xl-3">
+        <div class="col-md-6 col-xl-2">
+          <label class="form-label">Person Controls</label>
+          <select name="personControl" class="form-select size-md">
+            <option value="">All</option>
+            <option value="restricted" <%= activePersonControl === 'restricted' ? 'selected' : '' %>>Has Controls</option>
+            <option value="open" <%= activePersonControl === 'open' ? 'selected' : '' %>>No Controls</option>
+          </select>
+        </div>
+        <div class="col-md-6 col-xl-4">
           <label class="form-label">Search</label>
           <input type="search" name="q" class="form-control size-md" value="<%= stateFilters.q || '' %>" placeholder="Search activities by title, category, department, location, or status...">
         </div>
@@ -128,6 +138,9 @@
       <% (data || []).forEach((item) => { %>
         <% const attendees = Array.isArray(item.attendees) ? item.attendees : []; %>
         <% const entries = Array.isArray(item.entries) ? item.entries : []; %>
+        <% const allowedPersonIds = Array.isArray(item.allowedPersonIds) ? item.allowedPersonIds : []; %>
+        <% const excludedPersonIds = Array.isArray(item.excludedPersonIds) ? item.excludedPersonIds : []; %>
+        <% const entryExcludedCount = entries.reduce((sum, entry) => sum + (Array.isArray(entry?.excludedPersonIds) ? entry.excludedPersonIds.length : 0), 0); %>
         <% const totalDurationHours = Number(item.totalDurationHours || entries.reduce((sum, entry) => sum + (Number(entry.durationHours) || 0), 0) || item.durationHours || 0); %>
         <% const status = String(item.status || 'draft').toLowerCase(); %>
         <% const statusClass = status === 'posted' ? 'bg-success' : (status === 'cancelled' ? 'bg-secondary' : 'bg-info text-dark'); %>
@@ -155,6 +168,16 @@
           <td>
             <div class="small text-dark"><%= attendees.length %> assigned person<%= attendees.length === 1 ? '' : 's' %></div>
             <div class="x-small text-muted"><%= item.paid ? 'Payable activity' : 'Unpaid activity' %></div>
+            <div class="x-small text-muted">
+              <% if (itemVisibilityScope === 'individual') { %>
+                Allowed: <%= allowedPersonIds.length %>
+              <% } else { %>
+                Excluded: <%= excludedPersonIds.length %>
+              <% } %>
+              <% if (entryExcludedCount > 0) { %>
+                | Session exclusions: <%= entryExcludedCount %>
+              <% } %>
+            </div>
           </td>
           <td>
             <span class="badge <%= statusClass %> text-capitalize"><%= status || '-' %></span>
