@@ -77,6 +77,10 @@ test('instance list and master hub report instance actions include Open V2 links
 
   assert.match(instanceListSource, /\/school\/reports\/instances\/edit-v2\/<%= row\.id %>/);
   assert.match(instanceListSource, />Open V2</);
+  assert.match(instanceListSource, /name="assignmentRowId"/);
+  assert.match(instanceListSource, /name="sessionId"/);
+  assert.match(instanceListSource, /name="sessionDate"/);
+  assert.match(instanceListSource, /name="autoOpenSingle"/);
 
   assert.match(masterHubServiceSource, /label:\s*'Open V2'/);
   assert.match(masterHubServiceSource, /\/school\/reports\/instances\/edit-v2\/\$\{encodedInstanceId\}/);

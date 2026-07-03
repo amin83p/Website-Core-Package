@@ -13,8 +13,19 @@
 
 <%
   const instanceStateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const selectedAssignmentRowId = String(instanceStateFilters?.assignmentRowId || instanceStateFilters?.rowId || '').trim();
+  const selectedSessionId = String(instanceStateFilters?.sessionId || '').trim();
+  const selectedSessionDate = String(instanceStateFilters?.sessionDate || '').trim();
+  const selectedAutoOpenSingle = String(instanceStateFilters?.autoOpenSingle || '').trim();
+  const selectedTeacherId = String(instanceStateFilters?.teacherId || '').trim();
+  const selectedStudentId = String(instanceStateFilters?.studentId || '').trim();
   const hasInstanceFiltersApplied = Boolean(
     String(instanceStateFilters?.assignmentId || '').trim()
+    || selectedAssignmentRowId
+    || selectedSessionId
+    || selectedSessionDate
+    || selectedTeacherId
+    || selectedStudentId
     || String(instanceStateFilters?.q || '').trim()
   );
   const totalMatchedRows = Number(pagination?.totalItems ?? (Array.isArray(data) ? data.length : 0));
@@ -38,9 +49,36 @@
   <div class="collapse<%= hasInstanceFiltersApplied ? ' show' : '' %>" id="reportInstanceFilterCollapse">
     <form method="GET" action="/school/reports/instances" id="reportInstanceFilterForm" class="card-body p-3">
       <input type="hidden" name="q" value="<%= filters?.q || '' %>">
+      <input type="hidden" name="assignmentRowId" value="<%= selectedAssignmentRowId %>">
+      <input type="hidden" name="sessionId" value="<%= selectedSessionId %>">
+      <input type="hidden" name="sessionDate" value="<%= selectedSessionDate %>">
+      <input type="hidden" name="teacherId" value="<%= selectedTeacherId %>">
+      <input type="hidden" name="studentId" value="<%= selectedStudentId %>">
+      <% if (selectedAutoOpenSingle) { %>
+        <input type="hidden" name="autoOpenSingle" value="<%= selectedAutoOpenSingle %>">
+      <% } %>
       <% if (filters?.assignmentId) { %>
         <div class="alert alert-light border py-2 px-3 mb-2">
           Filtered by Assignment: <span class="font-monospace"><%= filters.assignmentId %></span>
+        </div>
+      <% } %>
+      <% if (selectedAssignmentRowId || selectedSessionId || selectedSessionDate || selectedTeacherId || selectedStudentId) { %>
+        <div class="alert alert-light border py-2 px-3 mb-2 d-flex flex-wrap gap-2 align-items-center">
+          <% if (selectedAssignmentRowId) { %>
+            <span class="badge bg-light text-dark border">Target row: <span class="font-monospace"><%= selectedAssignmentRowId %></span></span>
+          <% } %>
+          <% if (selectedSessionId) { %>
+            <span class="badge bg-light text-dark border">Session: <span class="font-monospace"><%= selectedSessionId %></span></span>
+          <% } %>
+          <% if (selectedSessionDate) { %>
+            <span class="badge bg-light text-dark border">Session date: <span class="font-monospace"><%= selectedSessionDate %></span></span>
+          <% } %>
+          <% if (selectedTeacherId) { %>
+            <span class="badge bg-light text-dark border">Teacher: <span class="font-monospace"><%= selectedTeacherId %></span></span>
+          <% } %>
+          <% if (selectedStudentId) { %>
+            <span class="badge bg-light text-dark border">Student: <span class="font-monospace"><%= selectedStudentId %></span></span>
+          <% } %>
         </div>
       <% } %>
       <div class="row g-3 align-items-end">

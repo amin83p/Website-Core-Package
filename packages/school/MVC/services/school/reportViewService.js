@@ -796,7 +796,48 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
   };
 }
 
-async function buildInstanceListRows({ reqUser, assignmentFilter = '', q = '' }) {
+function buildInstanceScheduleFilters(input = {}) {
+  return {
+    assignmentId: toPublicId(input.assignmentFilter || input.assignmentId || ''),
+    assignmentRowId: toPublicId(input.assignmentRowFilter || input.assignmentRowId || input.rowId || ''),
+    sessionId: toPublicId(input.sessionFilter || input.sessionId || ''),
+    sessionDate: parseDateOnlyValue(input.sessionDateFilter || input.sessionDate || ''),
+    teacherId: toPublicId(input.teacherFilter || input.teacherId || ''),
+    studentId: toPublicId(input.studentFilter || input.studentId || '')
+  };
+}
+
+function rowMatchesInstanceFilters(row = {}, filters = {}) {
+  if (filters.assignmentId && !idsEqual(row.assignmentId, filters.assignmentId)) return false;
+  if (filters.assignmentRowId) {
+    if (row.assignmentRowId && !idsEqual(row.assignmentRowId, filters.assignmentRowId)) return false;
+    if (!row.assignmentRowId && !filters.sessionId && !filters.sessionDate) return false;
+  }
+  if (filters.sessionId && !idsEqual(row.sessionId || '', filters.sessionId)) return false;
+  if (filters.sessionDate && parseDateOnlyValue(row.sessionDate || '') !== filters.sessionDate) return false;
+  if (filters.teacherId && !idsEqual(row.teacherId || '', filters.teacherId)) return false;
+  if (filters.studentId && !idsEqual(row.studentId || '', filters.studentId)) return false;
+  return true;
+}
+
+async function buildInstanceListRows({
+  reqUser,
+  assignmentFilter = '',
+  assignmentRowFilter = '',
+  sessionFilter = '',
+  sessionDateFilter = '',
+  teacherFilter = '',
+  studentFilter = '',
+  q = ''
+}) {
+  const instanceFilters = buildInstanceScheduleFilters({
+    assignmentFilter,
+    assignmentRowFilter,
+    sessionFilter,
+    sessionDateFilter,
+    teacherFilter,
+    studentFilter
+  });
   const [allInstances, allAssignments, allTemplates, classes, students, personMap] = await Promise.all([
     listAllReportInstances(reqUser),
     listAllReportAssignments(reqUser),
@@ -850,7 +891,7 @@ async function buildInstanceListRows({ reqUser, assignmentFilter = '', q = '' })
   const pendingRows = [];
   const scopedAssignments = filterRecordsByOrg(allAssignments, reqUser)
     .filter(isActiveReportAssignment)
-    .filter((row) => !assignmentFilter || idsEqual(row.id, assignmentFilter));
+    .filter((row) => !instanceFilters.assignmentId || idsEqual(row.id, instanceFilters.assignmentId));
 
   for (const assignment of scopedAssignments) {
     const assignmentId = toPublicId(assignment?.id);
@@ -913,7 +954,7 @@ async function buildInstanceListRows({ reqUser, assignmentFilter = '', q = '' })
   }
 
   return [...activeInstanceRows, ...pendingRows]
-    .filter((row) => !assignmentFilter || idsEqual(row.assignmentId, assignmentFilter))
+    .filter((row) => rowMatchesInstanceFilters(row, instanceFilters))
     .filter((row) => {
       if (!q) return true;
       return [

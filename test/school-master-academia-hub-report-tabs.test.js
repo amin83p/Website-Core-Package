@@ -76,3 +76,25 @@ test('master academia hub service and routes expose report workspace branches wi
   assert.match(serviceSource, /params\.set\('rowId', normalizeText\(row\.assignmentRowId\)\)/);
   assert.match(serviceSource, /sourceUrl:\s*'\/school\/reports\/instances'/);
 });
+
+test('schedule report task links filter report instances by schedule target and auto-open singles', () => {
+  const scheduleControllerSource = read('packages/school/MVC/controllers/school/scheduleController.js');
+  const masterHubViewSource = read('packages/school/MVC/views/school/masterAcademiaHub.ejs');
+  const masterHubServiceSource = read('packages/school/MVC/services/school/schoolMasterAcademiaHubService.js');
+
+  assert.match(scheduleControllerSource, /function buildReportDetailUrl\(\{ assignment, personId, role \}\)/);
+  assert.match(scheduleControllerSource, /params\.set\('assignmentId', assignmentId\)/);
+  assert.match(scheduleControllerSource, /params\.set\('assignmentRowId', normalizeId\(assignment\.assignmentRowId\)\)/);
+  assert.match(scheduleControllerSource, /params\.set\('sessionId', normalizeId\(assignment\.sessionId\)\)/);
+  assert.match(scheduleControllerSource, /const assignmentDate = normalizeId\(assignment\?\.sessionDate \|\| assignment\?\.dueDate \|\| ''\)/);
+  assert.match(scheduleControllerSource, /params\.set\('sessionDate', assignmentDate\)/);
+  assert.match(scheduleControllerSource, /params\.set\('autoOpenSingle', '1'\)/);
+  assert.match(scheduleControllerSource, /return `\/school\/reports\/instances\?\$\{params\.toString\(\)\}`/);
+  assert.doesNotMatch(scheduleControllerSource, /return `\/school\/reports\/instances\/start\/\$\{encodeURIComponent\(assignmentId\)\}/);
+
+  assert.match(masterHubViewSource, /function getHubScheduleEventDetailsUrl\(event\)/);
+  assert.match(masterHubViewSource, /String\(event\?\.detailsUrl \|\| ''\)\.trim\(\)/);
+  assert.match(masterHubServiceSource, /assignmentRowFilter/);
+  assert.match(masterHubServiceSource, /sessionDateFilter/);
+  assert.match(masterHubServiceSource, /filters:\s*\{[\s\S]*assignmentRowId[\s\S]*sessionId[\s\S]*sessionDate/);
+});

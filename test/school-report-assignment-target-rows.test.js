@@ -8,6 +8,7 @@ const schoolRepositories = require('../packages/school/MVC/repositories/school')
 const reportAssignmentModel = require('../packages/school/MVC/models/school/reportAssignmentModel');
 const reportIntegrityService = require('../packages/school/MVC/services/school/reportIntegrityService');
 const reportViewService = require('../packages/school/MVC/services/school/reportViewService');
+const reportController = require('../packages/school/MVC/controllers/school/reportController');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const reqUser = { id: 'USER-1', personId: 'PERSON-1', activeOrgId: '900000' };
@@ -218,6 +219,141 @@ test('pending instance rows are created per target row teacher without parent cr
   });
 });
 
+test('instance list filters can narrow by assignment row and legacy session target', async () => {
+  await withPatched(schoolDataService, {
+    fetchData: async (entityType) => {
+      if (entityType === 'reportInstances') {
+        return [{
+          id: 'INST-ROW-A',
+          orgId: '900000',
+          assignmentId: 'ASN-1',
+          assignmentRowId: 'row_a',
+          classId: 'CLASS-1',
+          sessionId: 'S1',
+          sessionDate: '2026-06-10',
+          templateId: 'TPL-1',
+          teacherId: 'TEACHER-1',
+          targetKey: 'class',
+          status: 'draft',
+          audit: { createDateTime: '2026-06-11T00:00:00.000Z' }
+        }];
+      }
+      if (entityType === 'reportAssignments') {
+        return [{
+          id: 'ASN-1',
+          orgId: '900000',
+          classId: 'CLASS-1',
+          templateId: 'TPL-1',
+          teacherIds: ['TEACHER-1', 'TEACHER-2'],
+          reportScope: 'class',
+          status: 'active',
+          targetRows: [
+            buildTargetRow({ rowId: 'row_a', sessionId: 'S1' }),
+            buildTargetRow({ rowId: 'row_b', sessionId: 'S2', sessionDate: '2026-06-20', teacherId: 'TEACHER-2' })
+          ],
+          audit: { createDateTime: '2026-06-01T00:00:00.000Z' }
+        }];
+      }
+      if (entityType === 'reportTemplates') return [{ id: 'TPL-1', orgId: '900000', title: 'Template 1' }];
+      if (entityType === 'classes') return [{ id: 'CLASS-1', orgId: '900000', title: 'Class 1' }];
+      if (entityType === 'students') return [];
+      return [];
+    }
+  }, async () => {
+    const assignmentRows = await reportViewService.buildInstanceListRows({ reqUser, assignmentFilter: 'ASN-1' });
+    assert.equal(assignmentRows.length, 2);
+
+    const rowA = await reportViewService.buildInstanceListRows({ reqUser, assignmentFilter: 'ASN-1', assignmentRowFilter: 'row_a' });
+    assert.deepEqual(rowA.map((row) => row.id), ['INST-ROW-A']);
+
+    const rowB = await reportViewService.buildInstanceListRows({ reqUser, assignmentFilter: 'ASN-1', assignmentRowFilter: 'row_b' });
+    assert.equal(rowB.length, 1);
+    assert.equal(rowB[0].isPendingAssignment, true);
+    assert.equal(rowB[0].assignmentRowId, 'row_b');
+
+    const legacySession = await reportViewService.buildInstanceListRows({ reqUser, assignmentFilter: 'ASN-1', sessionFilter: 'S2' });
+    assert.deepEqual(legacySession.map((row) => row.assignmentRowId), ['row_b']);
+
+    const legacyDate = await reportViewService.buildInstanceListRows({ reqUser, assignmentFilter: 'ASN-1', sessionDateFilter: '2026-06-20' });
+    assert.deepEqual(legacyDate.map((row) => row.assignmentRowId), ['row_b']);
+  });
+});
+
+test('report instance list auto-opens single filtered rows through V2', async () => {
+  await withPatched(reportViewService, {
+    buildInstanceListRows: async () => [{
+      id: 'INST-1',
+      isPendingAssignment: false,
+      assignmentId: 'ASN-1'
+    }]
+  }, async () => {
+    const res = {
+      redirectedTo: '',
+      redirect(url) { this.redirectedTo = url; return this; },
+      json() { throw new Error('Expected redirect, not json.'); },
+      render() { throw new Error('Expected redirect, not render.'); },
+      status() { return this; }
+    };
+    await reportController.listInstances({
+      query: { assignmentId: 'ASN-1', assignmentRowId: 'row_a', autoOpenSingle: '1' },
+      user: reqUser,
+      headers: {}
+    }, res);
+    assert.equal(res.redirectedTo, '/school/reports/instances/edit-v2/INST-1');
+  });
+
+  await withPatched(reportViewService, {
+    buildInstanceListRows: async () => [{
+      id: 'pending-ASN-1-row-a-TEACHER-1-class',
+      isPendingAssignment: true,
+      assignmentId: 'ASN-1',
+      assignmentRowId: 'row_a',
+      teacherId: 'TEACHER-1',
+      studentId: ''
+    }]
+  }, async () => {
+    const res = {
+      redirectedTo: '',
+      redirect(url) { this.redirectedTo = url; return this; },
+      json() { throw new Error('Expected redirect, not json.'); },
+      render() { throw new Error('Expected redirect, not render.'); },
+      status() { return this; }
+    };
+    await reportController.listInstances({
+      query: { assignmentId: 'ASN-1', assignmentRowId: 'row_a', autoOpenSingle: '1' },
+      user: reqUser,
+      headers: {}
+    }, res);
+    assert.match(res.redirectedTo, /^\/school\/reports\/instances\/start\/ASN-1\?/);
+    assert.match(res.redirectedTo, /rowId=row_a/);
+    assert.match(res.redirectedTo, /teacherId=TEACHER-1/);
+    assert.match(res.redirectedTo, /editor=v2/);
+  });
+
+  await withPatched(reportViewService, {
+    buildInstanceListRows: async () => [
+      { id: 'INST-1', isPendingAssignment: false, assignmentId: 'ASN-1' },
+      { id: 'INST-2', isPendingAssignment: false, assignmentId: 'ASN-1' }
+    ]
+  }, async () => {
+    const res = {
+      renderedView: '',
+      redirectedTo: '',
+      redirect(url) { this.redirectedTo = url; return this; },
+      render(view) { this.renderedView = view; return this; },
+      json() { return this; },
+      status() { return this; }
+    };
+    await reportController.listInstances({
+      query: { assignmentId: 'ASN-1', autoOpenSingle: '1' },
+      user: reqUser,
+      headers: {}
+    }, res);
+    assert.equal(res.redirectedTo, '');
+    assert.equal(res.renderedView, 'school/report/instanceList');
+  });
+});
+
 test('assignment form uses row modal and removes top-level session/date/teacher controls', () => {
   const viewSource = read('packages/school/MVC/views/school/report/assignmentForm.ejs');
 
@@ -260,5 +396,7 @@ test('instance uniqueness and start links include assignmentRowId', () => {
   assert.match(instanceModelSource, /assignmentRowId:\s*cleanId/);
   assert.match(instanceModelSource, /idsEqual\(row\.assignmentRowId \|\| '', candidate\.assignmentRowId \|\| ''\)/);
   assert.match(controllerSource, /assignmentRowId:\s*req\.query\.rowId \|\| req\.query\.assignmentRowId/);
+  assert.match(controllerSource, /const preferV2Editor = String\(req\.query\.editor/);
+  assert.match(controllerSource, /const editorPath = preferV2Editor \? 'edit-v2' : 'edit'/);
   assert.match(instanceListSource, /row\.assignmentRowId[\s\S]*rowId=/);
 });

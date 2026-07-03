@@ -690,19 +690,19 @@ function buildReportDetailUrl({ assignment, personId, role }) {
     const assignmentId = normalizeId(assignment?.id);
     if (!assignmentId) return '';
 
-    if (role === 'Student') {
-        const params = new URLSearchParams();
-        if (assignment?.assignmentRowId) params.set('rowId', normalizeId(assignment.assignmentRowId));
-        params.set('studentId', normalizeId(personId));
-        const fallbackTeacher = normalizeId((assignment?.teacherIds || [])[0]);
-        if (fallbackTeacher) params.set('teacherId', fallbackTeacher);
-        return `/school/reports/instances/start/${encodeURIComponent(assignmentId)}?${params.toString()}`;
-    }
-
     const params = new URLSearchParams();
-    if (assignment?.assignmentRowId) params.set('rowId', normalizeId(assignment.assignmentRowId));
-    params.set('teacherId', normalizeId(personId));
-    return `/school/reports/instances/start/${encodeURIComponent(assignmentId)}?${params.toString()}`;
+    params.set('assignmentId', assignmentId);
+    if (assignment?.assignmentRowId) params.set('assignmentRowId', normalizeId(assignment.assignmentRowId));
+    if (assignment?.sessionId) params.set('sessionId', normalizeId(assignment.sessionId));
+    const assignmentDate = normalizeId(assignment?.sessionDate || assignment?.dueDate || '');
+    if (assignmentDate) params.set('sessionDate', assignmentDate);
+    if (role === 'Student') {
+        params.set('studentId', normalizeId(personId));
+    } else {
+        params.set('teacherId', normalizeId(personId));
+    }
+    params.set('autoOpenSingle', '1');
+    return `/school/reports/instances?${params.toString()}`;
 }
 
 async function appendReportEventsForPerson({
@@ -819,7 +819,8 @@ async function appendReportEventsForPerson({
         const classLifecycle = buildClassLifecycleSnapshot(classRow);
         const role = isTeacherAssigned ? (isLikelyStaffOnly ? 'Staff' : 'Teacher') : 'Student';
         const roleLabel = role;
-        const eventId = `RPT-${normalizeId(assignment?.id)}-${role.toLowerCase()}-${normalizedPersonId}`;
+        const eventTargetKey = normalizeId(assignment?.assignmentRowId) || normalizeId(assignment?.sessionId) || normalizeId(assignment?.dueDate) || date;
+        const eventId = `RPT-${normalizeId(assignment?.id)}-${eventTargetKey}-${role.toLowerCase()}-${normalizedPersonId}`;
 
         events.push({
             id: eventId,

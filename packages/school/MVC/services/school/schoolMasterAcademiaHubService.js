@@ -686,9 +686,11 @@ function normalizeReportInstanceRows(rows) {
     id: normalizeText(row?.id),
     isPendingAssignment: row?.isPendingAssignment === true,
     assignmentId: normalizeText(row?.assignmentId),
+    assignmentRowId: normalizeText(row?.assignmentRowId),
     classId: normalizeText(row?.classId),
     classTitle: normalizeText(row?.classTitle || row?.classId || '-'),
     classLifecycle: row?.classLifecycle && typeof row.classLifecycle === 'object' ? row.classLifecycle : {},
+    sessionId: normalizeText(row?.sessionId || ''),
     sessionDate: normalizeText(row?.sessionDate || ''),
     templateId: normalizeText(row?.templateId),
     templateTitle: normalizeText(row?.templateTitle || row?.templateId || '-'),
@@ -1386,10 +1388,20 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       throw error;
     }
     const assignmentFilter = normalizeText(queryInput?.assignmentId || '');
+    const assignmentRowFilter = normalizeText(queryInput?.assignmentRowId || queryInput?.rowId || '');
+    const sessionFilter = normalizeText(queryInput?.sessionId || '');
+    const sessionDateFilter = normalizeText(queryInput?.sessionDate || '');
+    const teacherFilter = normalizeText(queryInput?.teacherId || '');
+    const studentFilter = normalizeText(queryInput?.studentId || '');
     const searchTerm = lower(query.q || '');
     const rows = normalizeReportInstanceRows(await reportViewService.buildInstanceListRows({
       reqUser: req.user,
       assignmentFilter,
+      assignmentRowFilter,
+      sessionFilter,
+      sessionDateFilter,
+      teacherFilter,
+      studentFilter,
       q: searchTerm
     }));
     return {
@@ -1402,7 +1414,12 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       rows,
       total: rows.length,
       filters: {
-        assignmentId: assignmentFilter
+        assignmentId: assignmentFilter,
+        assignmentRowId: assignmentRowFilter,
+        sessionId: sessionFilter,
+        sessionDate: sessionDateFilter,
+        teacherId: teacherFilter,
+        studentId: studentFilter
       },
       searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()

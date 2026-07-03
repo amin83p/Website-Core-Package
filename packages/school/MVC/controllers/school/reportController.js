@@ -763,12 +763,36 @@ async function deleteAssignment(req, res) {
 async function listInstances(req, res) {
   try {
     const assignmentFilter = String(req.query.assignmentId || '').trim();
+    const assignmentRowFilter = String(req.query.assignmentRowId || req.query.rowId || '').trim();
+    const sessionFilter = String(req.query.sessionId || '').trim();
+    const sessionDateFilter = String(req.query.sessionDate || '').trim();
+    const teacherFilter = String(req.query.teacherId || '').trim();
+    const studentFilter = String(req.query.studentId || '').trim();
+    const autoOpenSingle = ['1', 'true', 'yes'].includes(String(req.query.autoOpenSingle || '').trim().toLowerCase());
     const q = String(req.query.q || '').trim().toLowerCase();
     const instances = await reportViewService.buildInstanceListRows({
       reqUser: req.user,
       assignmentFilter,
+      assignmentRowFilter,
+      sessionFilter,
+      sessionDateFilter,
+      teacherFilter,
+      studentFilter,
       q
     });
+
+    if (!isAjax(req) && autoOpenSingle && instances.length === 1) {
+      const row = instances[0];
+      if (row.isPendingAssignment) {
+        const params = new URLSearchParams();
+        if (row.teacherId) params.set('teacherId', row.teacherId);
+        if (row.assignmentRowId) params.set('rowId', row.assignmentRowId);
+        if (row.studentId) params.set('studentId', row.studentId);
+        params.set('editor', 'v2');
+        return res.redirect(`/school/reports/instances/start/${encodeURIComponent(row.assignmentId)}?${params.toString()}`);
+      }
+      return res.redirect(`/school/reports/instances/edit-v2/${encodeURIComponent(row.id)}`);
+    }
 
     const { data, pagination } = paginate(instances, req.query);
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
@@ -836,6 +860,7 @@ async function listPersonReports(req, res) {
 
 async function startInstance(req, res) {
   try {
+    const preferV2Editor = String(req.query.editor || '').trim().toLowerCase() === 'v2';
     const {
       assignment,
       assignmentRow,
@@ -897,10 +922,14 @@ async function startInstance(req, res) {
     }
 
     if (createdOrResolved.length === 1) {
-      return res.redirect(`/school/reports/instances/edit/${createdOrResolved[0].id}`);
+      const editorPath = preferV2Editor ? 'edit-v2' : 'edit';
+      return res.redirect(`/school/reports/instances/${editorPath}/${createdOrResolved[0].id}`);
     }
 
-    return res.redirect(`/school/reports/instances?assignmentId=${encodeURIComponent(assignment.id)}`);
+    const params = new URLSearchParams();
+    params.set('assignmentId', assignment.id);
+    if (assignment.assignmentRowId) params.set('assignmentRowId', assignment.assignmentRowId);
+    return res.redirect(`/school/reports/instances?${params.toString()}`);
   } catch (error) {
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
