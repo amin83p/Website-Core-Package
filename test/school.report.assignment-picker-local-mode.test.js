@@ -35,3 +35,14 @@ test('report assignment row session and student pickers use local data mode', ()
   assert.doesNotMatch(assignmentView, /apiEndpoint:\s*['"`]\/persons['"`]/);
   assert.doesNotMatch(assignmentView, /apiEndpoint:\s*['"`]\/school\/sessions\/api\/data/);
 });
+
+test('report assignment Add Row appends instead of replacing first row', () => {
+  const assignmentView = read('packages/school/MVC/views/school/report/assignmentForm.ejs');
+
+  assert.match(assignmentView, /function getModalTargetRowIndex\(\)/);
+  assert.match(assignmentView, /if \(!\/\^\\d\+\$\/\.test\(rawIndex\)\) return null;/);
+  assert.match(assignmentView, /const index = getModalTargetRowIndex\(\);/);
+  assert.match(assignmentView, /if \(index !== null && targetRows\[index\]\) targetRows\[index\] = row;/);
+  assert.match(assignmentView, /else targetRows\.push\(row\);/);
+  assert.doesNotMatch(assignmentView, /Number\(modalFields\.index\.value\)/);
+});

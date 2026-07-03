@@ -227,16 +227,29 @@ test('assignment form uses row modal and removes top-level session/date/teacher 
   assert.match(viewSource, /id="btnPickRowTeacher"/);
   assert.match(viewSource, /rowModalTeacherWarning/);
   assert.match(viewSource, /bi-three-dots-vertical/);
-  assert.match(viewSource, /data-row-actions-toggle/);
+  assert.match(viewSource, /data-floating-row-actions="true"/);
+  assert.match(viewSource, /btn-row-actions-toggle/);
+  assert.match(viewSource, /row-actions-menu/);
   assert.match(viewSource, /function showTargetRowModal/);
   assert.match(viewSource, /multiselect:\s*false/);
   assert.match(viewSource, /targetRowsJson/);
   assert.match(viewSource, /const teacherId = String\(row\.teacherId/);
+  assert.match(viewSource, /title:\s*'Save Failed'[\s\S]*icon:\s*'error'/);
+  assert.match(viewSource, /buttonClass:\s*'btn-danger'/);
   assert.doesNotMatch(viewSource, /btn-group btn-group-sm/);
+  assert.doesNotMatch(viewSource, /data-bs-toggle="dropdown"/);
   assert.doesNotMatch(viewSource, /id="btnOpenSessionPicker"/);
   assert.doesNotMatch(viewSource, /id="dateTargetSection"/);
   assert.doesNotMatch(viewSource, /Assigned Teachers/);
   assert.doesNotMatch(viewSource, /class="form-select form-select-sm js-target-session"/);
+});
+
+test('assignment save routes recover from stale form action-state tokens', () => {
+  const routeSource = read('packages/school/MVC/routes/reportRoutes.js');
+
+  assert.match(routeSource, /const reportAssignmentMutationActionState = \{[\s\S]*requireToken:\s*true[\s\S]*allowOperationTokenFallback:\s*true[\s\S]*allowInactiveTokenFallback:\s*true[\s\S]*\}/);
+  assert.match(routeSource, /router\.post\('\/assignments\/new'[\s\S]*trackActionState\(REPORT_ASSIGNMENT_SECTION,\s*OPERATIONS\.CREATE,\s*reportAssignmentMutationActionState\)/);
+  assert.match(routeSource, /router\.post\('\/assignments\/edit\/:id'[\s\S]*trackActionState\(REPORT_ASSIGNMENT_SECTION,\s*OPERATIONS\.UPDATE,\s*reportAssignmentMutationActionState\)/);
 });
 
 test('instance uniqueness and start links include assignmentRowId', () => {

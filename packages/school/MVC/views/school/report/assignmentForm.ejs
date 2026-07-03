@@ -111,7 +111,7 @@
             Report row dates must stay between <strong><%= classFirstSessionDate %></strong> and <strong><%= classLastSessionDate %></strong>.
           </div>
         <% } %>
-        <div class="table-responsive">
+        <div class="table-responsive table-scroll-wrapper" data-floating-row-actions="true">
           <table class="table table-sm align-middle mb-0" id="targetRowsTable">
             <thead>
               <tr>
@@ -492,17 +492,20 @@
             <td>${escapeHtml(taskLabel)}</td>
             <td>${escapeHtml(timesheetLabel)}</td>
             <td><span class="badge ${row.status === 'active' ? 'bg-success' : 'bg-secondary'}">${escapeHtml(row.status || '-')}</span></td>
-            <td class="text-end">
-              <div class="dropdown">
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" data-row-actions-toggle aria-expanded="false" aria-label="Target row actions">
+            <td class="table-actions pe-4">
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="${escapeHtml(`target-row-${row.rowId || index}`)}"
+                  title="Target Row Actions">
                   <i class="bi bi-three-dots-vertical"></i>
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><button type="button" class="dropdown-item js-edit-target-row"><i class="bi bi-pencil-square me-2"></i>Edit</button></li>
-                  <li><button type="button" class="dropdown-item js-duplicate-target-row"><i class="bi bi-files me-2"></i>Duplicate</button></li>
-                  <li><hr class="dropdown-divider"></li>
-                  <li><button type="button" class="dropdown-item text-danger js-remove-target-row"><i class="bi bi-trash me-2"></i>Remove</button></li>
-                </ul>
+                <div class="row-actions-menu d-none" data-row-actions-id="${escapeHtml(`target-row-${row.rowId || index}`)}" data-target-row-index="${index}">
+                  <button type="button" class="btn btn-outline-secondary btn-sm js-edit-target-row" data-target-row-index="${index}"><i class="bi bi-pencil-square me-2"></i>Edit</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm js-duplicate-target-row" data-target-row-index="${index}"><i class="bi bi-files me-2"></i>Duplicate</button>
+                  <button type="button" class="btn btn-outline-danger btn-sm js-remove-target-row" data-target-row-index="${index}"><i class="bi bi-trash me-2"></i>Remove</button>
+                </div>
               </div>
             </td>
           </tr>`;
@@ -569,6 +572,13 @@
       });
     }
 
+    function getModalTargetRowIndex() {
+      const rawIndex = String(modalFields.index.value || '').trim();
+      if (!/^\d+$/.test(rawIndex)) return null;
+      const index = Number(rawIndex);
+      return Number.isInteger(index) ? index : null;
+    }
+
     function validateRow(row, label = 'Target row') {
       if (!row.teacherId) return `${label}: select one teacher.`;
       if (row.targetType === 'session') {
@@ -613,23 +623,23 @@
       }, '');
     });
 
-    targetRowsBody?.addEventListener('click', (event) => {
+    function getTargetRowActionIndex(event) {
+      const actionEl = event.target?.closest?.('.js-edit-target-row, .js-duplicate-target-row, .js-remove-target-row');
+      const menuEl = event.target?.closest?.('.row-actions-menu');
       const rowEl = event.target?.closest?.('tr[data-target-row-index]');
-      if (!rowEl) return;
-      const index = Number(rowEl.getAttribute('data-target-row-index'));
+      const rawIndex = actionEl?.getAttribute('data-target-row-index')
+        || menuEl?.getAttribute('data-target-row-index')
+        || rowEl?.getAttribute('data-target-row-index')
+        || '';
+      const index = Number(rawIndex);
+      return Number.isInteger(index) ? index : null;
+    }
+
+    document.addEventListener('click', (event) => {
+      if (!event.target?.closest?.('.js-edit-target-row, .js-duplicate-target-row, .js-remove-target-row')) return;
+      const index = getTargetRowActionIndex(event);
       if (!Number.isInteger(index)) return;
-      const fallbackToggle = event.target.closest('[data-row-actions-toggle]');
-      if (fallbackToggle && !window.bootstrap?.Dropdown) {
-        event.preventDefault();
-        const menu = fallbackToggle.closest('.dropdown')?.querySelector('.dropdown-menu');
-        const isOpen = menu?.classList.contains('show');
-        document.querySelectorAll('#targetRowsBody .dropdown-menu.show').forEach((openMenu) => openMenu.classList.remove('show'));
-        document.querySelectorAll('#targetRowsBody [data-row-actions-toggle][aria-expanded="true"]').forEach((openToggle) => openToggle.setAttribute('aria-expanded', 'false'));
-        if (menu && !isOpen) {
-          menu.classList.add('show');
-          fallbackToggle.setAttribute('aria-expanded', 'true');
-        }
-      } else if (event.target.closest('.js-edit-target-row')) {
+      if (event.target.closest('.js-edit-target-row')) {
         event.preventDefault();
         populateRowModal(targetRows[index], String(index));
       } else if (event.target.closest('.js-duplicate-target-row')) {
@@ -642,12 +652,6 @@
         targetRows.splice(index, 1);
         renderTargetRows();
       }
-    });
-
-    document.addEventListener('click', (event) => {
-      if (event.target.closest('#targetRowsBody .dropdown')) return;
-      document.querySelectorAll('#targetRowsBody .dropdown-menu.show').forEach((openMenu) => openMenu.classList.remove('show'));
-      document.querySelectorAll('#targetRowsBody [data-row-actions-toggle][aria-expanded="true"]').forEach((openToggle) => openToggle.setAttribute('aria-expanded', 'false'));
     });
 
     modalEl?.addEventListener('click', (event) => {
@@ -720,8 +724,8 @@
         await showReportModal({ title: 'Row Incomplete', icon: 'warning', message: issue });
         return;
       }
-      const index = Number(modalFields.index.value);
-      if (Number.isInteger(index) && index >= 0 && targetRows[index]) targetRows[index] = row;
+      const index = getModalTargetRowIndex();
+      if (index !== null && targetRows[index]) targetRows[index] = row;
       else targetRows.push(row);
       renderTargetRows();
       hideTargetRowModal();
@@ -931,7 +935,7 @@
 
         if (!response.ok || String(payload?.status || '').toLowerCase() !== 'success') {
           const message = String(payload?.message || '').trim() || 'Unable to save assignment.';
-          await showReportModal({ title: 'Save Failed', icon: 'warning', message });
+          await showReportModal({ title: 'Save Failed', icon: 'error', message, buttonClass: 'btn-danger' });
           return;
         }
 
@@ -946,8 +950,9 @@
       } catch (error) {
         await showReportModal({
           title: 'Save Failed',
-          icon: 'warning',
-          message: String(error?.message || 'Unexpected error while saving assignment.')
+          icon: 'error',
+          message: String(error?.message || 'Unexpected error while saving assignment.'),
+          buttonClass: 'btn-danger'
         });
       } finally {
         isSavingAssignment = false;

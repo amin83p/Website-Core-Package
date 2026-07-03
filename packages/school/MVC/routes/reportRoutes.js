@@ -15,6 +15,11 @@ const REPORT_NAV_SECTION = SECTIONS.SCHOOL_REPORTS;
 const REPORT_TEMPLATE_SECTION = SECTIONS.SCHOOL_REPORTS_TEMPLATE;
 const REPORT_ASSIGNMENT_SECTION = SECTIONS.SCHOOL_REPORTS_ASSIGNMENT;
 const REPORT_INSTANCE_SECTION = SECTIONS.SCHOOL_REPORTS_INSTANCES;
+const reportAssignmentMutationActionState = {
+  requireToken: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+};
 
 router.use(requireAuth);
 
@@ -156,7 +161,7 @@ router.get('/assignments/new',
 
 router.post('/assignments/new',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
-  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentMutationActionState),
   ctrl.saveAssignment);
 
 router.get('/assignments/edit/:id',
@@ -166,7 +171,7 @@ router.get('/assignments/edit/:id',
 
 router.post('/assignments/edit/:id',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
-  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, reportAssignmentMutationActionState),
   ctrl.saveAssignment);
 
 router.get('/assignments/delete/:id',
