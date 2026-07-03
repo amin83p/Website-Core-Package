@@ -52,11 +52,268 @@
         font-weight: 600;
     }
 
-    /* Info card: compact cluster + location top-right; three equal “slots” on second row */
+    .session-manager-quick-nav {
+        margin-bottom: 1rem;
+    }
+    .session-manager-class-nav {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: stretch;
+        min-width: min(100%, 280px);
+    }
+    .session-manager-class-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.7rem;
+        width: 100%;
+        padding: 0.62rem 0.95rem;
+        border: 1px solid #a5b4fc;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #ffffff 0%, #eef2ff 55%, #e0e7ff 100%);
+        color: #312e81;
+        font-weight: 700;
+        text-align: left;
+        box-shadow: 0 6px 18px rgba(79, 70, 229, 0.14);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    }
+    .session-manager-class-nav-toggle:hover:not(:disabled) {
+        border-color: #818cf8;
+        box-shadow: 0 8px 22px rgba(79, 70, 229, 0.2);
+        transform: translateY(-1px);
+        color: #1e1b4b;
+    }
+    .session-manager-class-nav-toggle[aria-expanded="true"] {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        border-bottom-color: #c7d2fe;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
+    }
+    .session-manager-class-nav-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 9px;
+        background: rgba(99, 102, 241, 0.14);
+        color: #4338ca;
+        flex-shrink: 0;
+    }
+    .session-manager-class-nav-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+        min-width: 0;
+        flex: 1;
+    }
+    .session-manager-class-nav-title {
+        font-size: 0.92rem;
+        line-height: 1.2;
+    }
+    .session-manager-class-nav-sub {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #6366f1;
+        letter-spacing: 0.02em;
+    }
+    .session-class-nav-chevron {
+        transition: transform 0.2s ease;
+        font-size: 0.9em;
+        color: #6366f1;
+        flex-shrink: 0;
+    }
+    .session-manager-class-nav-toggle[aria-expanded="true"] .session-class-nav-chevron {
+        transform: rotate(180deg);
+    }
+    .session-manager-class-nav-links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        padding: 0.55rem;
+        border: 1px solid #a5b4fc;
+        border-top: 1px solid #c7d2fe;
+        border-radius: 0 0 12px 12px;
+        background: #fff;
+        box-shadow: 0 10px 24px rgba(79, 70, 229, 0.1);
+    }
+    .session-manager-class-nav-link {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.55rem 0.7rem;
+        border-radius: 9px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #1e293b;
+        border: 1px solid transparent;
+        transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+    }
+    .session-manager-class-nav-link:hover {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+        color: #1d4ed8;
+    }
+    .session-manager-class-nav-link i {
+        font-size: 1rem;
+        opacity: 0.9;
+    }
+    .session-manager-class-nav-link--outcomes {
+        color: #166534;
+    }
+    .session-manager-class-nav-link--outcomes:hover {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        color: #15803d;
+    }
+
+    /* Info card: distinct tiles for session metadata */
     .session-manager-info-card {
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid #e2e8f0 !important;
+        border: 1px solid #dbe3ef !important;
         border-radius: 14px;
+        overflow: hidden;
+    }
+    .session-manager-info-card .card-body {
+        padding: 1rem 1.1rem 1.1rem;
+    }
+    .session-info-grid,
+    .session-info-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.65rem;
+    }
+    .session-info-meta-grid {
+        margin-top: 0.85rem;
+        padding-top: 0.85rem;
+        border-top: 1px solid #e8edf4;
+    }
+    .session-info-tile {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.7rem 0.85rem;
+        min-width: 0;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .session-info-tile--accent {
+        background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+        border-color: #c7d7f5;
+    }
+    .session-info-tile--location {
+        grid-column: 1 / -1;
+    }
+    @media (min-width: 992px) {
+        .session-info-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+    .session-info-tile-value-with-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-width: 0;
+    }
+    .session-class-info-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.35rem;
+        height: 1.35rem;
+        padding: 0;
+        border: none;
+        border-radius: 999px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        flex-shrink: 0;
+        line-height: 1;
+        cursor: help;
+    }
+    .session-class-info-badge:hover,
+    .session-class-info-badge:focus-visible {
+        background: #bfdbfe;
+        color: #1e3a8a;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+    }
+    .session-class-info-badge.is-danger {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+    .session-class-info-badge.is-danger:hover,
+    .session-class-info-badge.is-danger:focus-visible {
+        background: #fecaca;
+        color: #991b1b;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+    }
+    .session-class-info-badge i {
+        font-size: 0.82rem;
+    }
+    .session-info-tile--status-required {
+        border-color: #fbbf24;
+        background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%);
+        box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.12);
+    }
+    .session-status-required-badge {
+        font-size: 0.62rem;
+        letter-spacing: 0.04em;
+        vertical-align: middle;
+    }
+    .session-status-required-hint {
+        font-size: 0.72rem;
+        color: #b45309;
+        font-weight: 600;
+        margin-top: 0.2rem;
+        line-height: 1.25;
+    }
+    .session-info-tile .session-status-button {
+        margin-top: 0.15rem;
+    }
+    .session-status-button--action-required:not(:disabled) {
+        border-width: 2px !important;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22), inset 0 1px 2px rgba(15, 23, 42, 0.05);
+        animation: session-status-attention 2.4s ease-in-out infinite;
+    }
+    @keyframes session-status-attention {
+        0%, 100% { box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18), inset 0 1px 2px rgba(15, 23, 42, 0.05); }
+        50% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.28), inset 0 1px 2px rgba(15, 23, 42, 0.05); }
+    }
+    .session-info-tile-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: #64748b;
+        font-weight: 700;
+        margin-bottom: 0.35rem;
+        line-height: 1.2;
+    }
+    .session-info-tile-value {
+        font-size: 1.02rem;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+    .session-info-tile-value-sm {
+        font-size: 0.92rem;
+        font-weight: 600;
+    }
+    .session-info-tile-muted {
+        color: #94a3b8;
+        font-weight: 600;
+    }
+    .session-info-tile #sessionRoom {
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #0f172a;
+        background: #fff;
+        margin-top: 0.1rem;
+    }
+    .session-info-tile #sessionRoom:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 0.15rem rgba(59, 130, 246, 0.15);
     }
     .session-manager-info-card .info-label {
         font-size: 0.7rem;
@@ -71,25 +328,6 @@
         font-weight: 600;
         color: #0f172a;
         line-height: 1.25;
-    }
-    .session-info-cluster {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-start;
-        gap: 0.35rem 1.25rem;
-    }
-    .session-info-cluster .info-block {
-        min-width: 0;
-    }
-    .session-manager-location-block {
-        min-width: 200px;
-        max-width: 340px;
-    }
-    .session-manager-location-block #sessionRoom {
-        border-radius: 8px;
-        border: 1px solid #cbd5e1;
-        font-weight: 500;
-        font-size: 0.9rem;
     }
     .session-status-button {
         width: 100%;
@@ -339,6 +577,11 @@
             ? '/school/classes/' + encodeURIComponent(classData.id) + '/enrollment-outcomes'
             : '/school/classes/' + encodeURIComponent(classData.id) + '/final-grades';
         const finalGradesNavLabel = smIsRolling ? 'Enrollment outcomes' : 'Final Grades';
+        const smCycleTooltipText = smIsRolling
+            ? (smSessionOutsideCycle
+                ? 'This session date is outside the rolling cycle window. Update the class cycle dates or rebuild the session ledger before saving session changes.'
+                : `Rolling sessions are limited to the cycle window: ${smCycleWindowLabel}.`)
+            : '';
     %>
 
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
@@ -346,8 +589,31 @@
         <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md session-manager-nav-away" id="linkSessionDashboard" data-confirm-title="Go to dashboard?" data-confirm-message="Leave this page and go to the school dashboard? Unsaved changes will be lost unless you save first."><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
     </div>
 
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <a href="<%= finalGradesNavHref %>" class="btn btn-outline-success btn-md session-manager-nav-away" id="linkFinalGradesNav" data-confirm-title="Leave session manager?" data-confirm-message="Open <%= finalGradesNavLabel %>? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-award me-1"></i><%= finalGradesNavLabel %></a>
+    <div class="session-manager-quick-nav">
+        <div class="session-manager-class-nav">
+            <button
+                type="button"
+                class="session-manager-class-nav-toggle"
+                id="btnToggleSessionClassNav"
+                data-bs-toggle="collapse"
+                data-bs-target="#sessionManagerClassNavCollapse"
+                aria-expanded="false"
+                aria-controls="sessionManagerClassNavCollapse">
+                <span class="session-manager-class-nav-icon" aria-hidden="true"><i class="bi bi-box-arrow-up-right"></i></span>
+                <span class="session-manager-class-nav-copy">
+                    <span class="session-manager-class-nav-title">Class navigation</span>
+                    <span class="session-manager-class-nav-sub">Outcomes &amp; matrices</span>
+                </span>
+                <i class="bi bi-chevron-down session-class-nav-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="collapse" id="sessionManagerClassNavCollapse">
+                <div class="session-manager-class-nav-links">
+                    <a href="<%= finalGradesNavHref %>" class="session-manager-class-nav-link session-manager-class-nav-link--outcomes session-manager-nav-away" id="linkFinalGradesNav" data-confirm-title="Leave session manager?" data-confirm-message="Open <%= finalGradesNavLabel %>? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-award"></i><%= finalGradesNavLabel %></a>
+                    <a href="<%= attendanceMatrixHref %>" class="session-manager-class-nav-link session-manager-nav-away" id="linkAttendanceMatrix" data-matrix-href="<%= attendanceMatrixHref %>" data-confirm-title="Open attendance matrix?" data-confirm-message="Open the attendance matrix? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-grid-3x3"></i>Attendance matrix</a>
+                    <a href="<%= gradesMatrixHref %>" class="session-manager-class-nav-link session-manager-nav-away" id="linkGradesMatrix" data-matrix-href="<%= gradesMatrixHref %>" data-confirm-title="Open grades matrix?" data-confirm-message="Open the grades matrix? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-table"></i>Grades matrix</a>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="session-manager-toolbar-row">
@@ -363,8 +629,6 @@
                 <button type="button" class="btn btn-outline-secondary bg-light btn-md" disabled><i class="bi bi-chevron-right"></i></button>
             <% } %>
         </div>
-        <a href="<%= attendanceMatrixHref %>" class="btn btn-outline-primary btn-md  fw-semibold session-manager-nav-away shadow-md" id="linkAttendanceMatrix" data-matrix-href="<%= attendanceMatrixHref %>" data-confirm-title="Open attendance matrix?" data-confirm-message="Open the attendance matrix? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-grid-3x3 me-1"></i>Attendance matrix</a>
-        <a href="<%= gradesMatrixHref %>" class="btn btn-outline-primary btn-md fw-semibold session-manager-nav-away shadow-md" id="linkGradesMatrix" data-matrix-href="<%= gradesMatrixHref %>" data-confirm-title="Open grades matrix?" data-confirm-message="Open the grades matrix? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-table me-1"></i>Grades matrix</a>
         <% if (canCreateMakeupSession) { %>
             <button type="button" class="btn btn-outline-warning btn-md fw-semibold shadow-md" id="btnCreateMakeupSession"><i class="bi bi-calendar-plus me-1"></i>Create make-up session</button>
         <% } %>
@@ -375,50 +639,54 @@
     </div>
 
     <div class="card session-manager-info-card shadow-sm mb-3">
-        <div class="card-body p-3">
-            <div class="row g-2 g-md-3 align-items-start mb-3">
-                <div class="col">
-                    <div class="session-info-cluster">
-                        <div class="info-block">
-                            <div class="info-label">Class</div>
-                            <div class="info-value text-truncate" style="max-width: 28rem;" title="<%= classData.title %>"><%= classData.title %></div>
-                        </div>
-                        <div class="info-block">
-                            <div class="info-label">Date</div>
-                            <div class="info-value"><%= session.date %></div>
-                        </div>
-                        <div class="info-block">
-                            <div class="info-label">Time</div>
-                            <div class="info-value text-nowrap"><%= session.startTime %> – <%= session.endTime %></div>
-                        </div>
-                        <% if (smIsRolling) { %>
-                        <div class="info-block">
-                            <div class="info-label">Cycle window</div>
-                            <div class="info-value text-nowrap"><%= smCycleWindowLabel %></div>
-                        </div>
+        <div class="card-body">
+            <div class="session-info-grid">
+                <div class="session-info-tile session-info-tile--accent">
+                    <div class="session-info-tile-label">Class</div>
+                    <div class="session-info-tile-value session-info-tile-value-with-badge">
+                        <span class="text-truncate" title="<%= classData.title %>"><%= classData.title %></span>
+                        <% if (smIsRolling && smCycleTooltipText) { %>
+                            <button
+                                type="button"
+                                class="session-class-info-badge<%= smSessionOutsideCycle ? ' is-danger' : '' %>"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="<%= smCycleTooltipText %>"
+                                aria-label="Rolling cycle window information">
+                                <i class="bi <%= smSessionOutsideCycle ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill' %>" aria-hidden="true"></i>
+                            </button>
                         <% } %>
                     </div>
                 </div>
-                <div class="col-12 col-md-auto ms-md-auto session-manager-location-block text-md-end">
-                    <label class="info-label d-block text-md-end" for="sessionRoom">Location</label>
-                    <input type="text" id="sessionRoom" class="form-control form-control-sm text-md-end" value="<%= session.room || '' %>" placeholder="Room, lab, field…" <%- disabledAttr %> autocomplete="off">
+                <div class="session-info-tile">
+                    <div class="session-info-tile-label">Date</div>
+                    <div class="session-info-tile-value"><%= session.date %></div>
+                </div>
+                <div class="session-info-tile">
+                    <div class="session-info-tile-label">Time</div>
+                    <div class="session-info-tile-value text-nowrap"><%= session.startTime %> – <%= session.endTime %></div>
+                </div>
+                <% if (smIsRolling) { %>
+                <div class="session-info-tile session-info-tile--cycle">
+                    <div class="session-info-tile-label">Cycle window</div>
+                    <div class="session-info-tile-value text-nowrap"><%= smCycleWindowLabel %></div>
+                </div>
+                <% } %>
+                <div class="session-info-tile session-info-tile--location">
+                    <label class="session-info-tile-label mb-0" for="sessionRoom">Location</label>
+                    <input type="text" id="sessionRoom" class="form-control form-control-sm" value="<%= session.room || '' %>" placeholder="Room, lab, field…" <%- disabledAttr %> autocomplete="off">
                 </div>
             </div>
-            <% if (smIsRolling) { %>
-              <div class="alert <%= smSessionOutsideCycle ? 'alert-danger' : 'alert-info' %> border small py-2 mb-3">
-                <% if (smSessionOutsideCycle) { %>
-                  This session date is outside the rolling cycle window. Update the class cycle dates or rebuild the session ledger before saving session changes.
-                <% } else { %>
-                  Rolling sessions are limited to the cycle window: <strong><%= smCycleWindowLabel %></strong>.
-                <% } %>
-              </div>
-            <% } %>
-            <div class="row g-2 align-items-end">
-                <div class="col-md-4">
-                    <label class="info-label d-block" for="sessionStatusSelect">Session status</label>
-                    <button type="button" id="sessionStatusButton" class="btn session-status-button" <%= disabledAttr ? 'disabled' : '' %>>
+            <div class="session-info-meta-grid">
+                <div class="session-info-tile session-info-tile--status-required">
+                    <div class="session-info-tile-label">
+                        Session status
+                        <span class="badge bg-warning text-dark session-status-required-badge ms-1">Required</span>
+                    </div>
+                    <div class="session-status-required-hint">Click to set the workflow state for this session.</div>
+                    <button type="button" id="sessionStatusButton" class="btn session-status-button session-status-button--action-required" <%= disabledAttr ? 'disabled' : '' %>>
                         <span id="sessionStatusButtonLabel">Session status</span>
-                        <i class="bi bi-grid-3x3-gap-fill"></i>
+                        <i class="bi bi-chevron-down"></i>
                     </button>
                     <select id="sessionStatusSelect" class="d-none" aria-hidden="true" tabindex="-1" <%= disabledAttr ? 'disabled' : '' %>>
                         <% availableStatusRows.forEach((statusRow) => { %>
@@ -437,9 +705,9 @@
                         <% }) %>
                     </select>
                 </div>
-                <div class="col-md-4">
-                    <label class="info-label d-block text-muted">Make-up</label>
-                    <div class="session-manager-field-placeholder justify-content-start px-2 text-start" title="Make-up session links">
+                <div class="session-info-tile">
+                    <div class="session-info-tile-label">Make-up</div>
+                    <div class="session-info-tile-value session-info-tile-value-sm">
                         <% if (isMakeupSession) { %>
                             <span><i class="bi bi-arrow-return-left me-1 text-warning"></i>For <%= session.makeup.originalSessionId || 'original session' %></span>
                         <% } else if (existingMakeupHistory.length) { %>
@@ -447,13 +715,13 @@
                         <% } else if (canCreateMakeupSession) { %>
                             <span><i class="bi bi-calendar-plus me-1 text-warning"></i>Available</span>
                         <% } else { %>
-                            <span>—</span>
+                            <span class="session-info-tile-muted">Not required</span>
                         <% } %>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <label class="info-label d-block text-muted">Reserved</label>
-                    <div class="session-manager-field-placeholder" title="Reserved for future session fields">—</div>
+                <div class="session-info-tile">
+                    <div class="session-info-tile-label">Reserved</div>
+                    <div class="session-info-tile-value session-info-tile-value-sm session-info-tile-muted">—</div>
                 </div>
             </div>
         </div>
@@ -1787,6 +2055,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (statusSelect) {
         statusSelect.addEventListener('change', () => styleSessionStatusSelect());
         styleSessionStatusSelect();
+    }
+    if (typeof bootstrap !== 'undefined' && bootstrap?.Tooltip) {
+        document.querySelectorAll('.session-manager-page [data-bs-toggle="tooltip"]').forEach((el) => {
+            if (!bootstrap.Tooltip.getInstance(el)) new bootstrap.Tooltip(el);
+        });
     }
     if (statusButton) {
         statusButton.addEventListener('click', () => {
