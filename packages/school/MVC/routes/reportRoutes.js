@@ -20,6 +20,10 @@ const reportAssignmentMutationActionState = {
   allowOperationTokenFallback: true,
   allowInactiveTokenFallback: true
 };
+const reportAssignmentBulkActionState = {
+  requireToken: false,
+  keepActive: true
+};
 
 router.use(requireAuth);
 
@@ -164,6 +168,16 @@ router.post('/assignments/new',
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentMutationActionState),
   ctrl.saveAssignment);
 
+router.post('/assignments/generate-target-rows',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
+  ctrl.generateAssignmentTargetRows);
+
+router.post('/assignments/preview-target-rows',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
+  ctrl.previewAssignmentTargetRows);
+
 router.get('/assignments/edit/:id',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
@@ -173,6 +187,16 @@ router.post('/assignments/edit/:id',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, reportAssignmentMutationActionState),
   ctrl.saveAssignment);
+
+router.post('/assignments/edit/:id/preview-target-rows',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, reportAssignmentBulkActionState),
+  ctrl.previewAssignmentTargetRows);
+
+router.post('/assignments/edit/:id/generate-target-rows',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, reportAssignmentBulkActionState),
+  ctrl.generateAssignmentTargetRows);
 
 router.get('/assignments/delete/:id',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.DELETE),

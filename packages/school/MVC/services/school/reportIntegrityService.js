@@ -628,6 +628,70 @@ const reportIntegrityService = {
     };
   },
 
+  async previewAssignmentTargetRows({
+    classId,
+    targetRows = [],
+    reqUser,
+    excludeAssignmentId = ''
+  }) {
+    const cleanClassId = String(classId || '').trim();
+    if (!cleanClassId) throw new Error('Class is required.');
+
+    const [classData, sessions] = await Promise.all([
+      schoolDataService.getDataById('classes', cleanClassId, reqUser),
+      schoolDataService.getClassSessions(cleanClassId, reqUser)
+    ]);
+    if (!classData) throw new Error('Class not found or inaccessible.');
+
+    const rows = Array.isArray(targetRows) ? targetRows : [];
+    const results = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
+      const errors = [];
+      const conflicts = [];
+
+      try {
+        validateAssignmentTargetRowsAgainstSessions({
+          targetRows: [row],
+          sessions,
+          requireTeacher: true
+        });
+      } catch (error) {
+        errors.push(String(error?.message || error || 'Validation failed.'));
+      }
+
+      if (!errors.length && !Boolean(row?.conflictPermitted)) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await assertNoAssignmentScheduleConflicts({
+            reqUser,
+            classData,
+            sessions,
+            selectedSessionIds: [row?.sessionId].filter(Boolean),
+            selectedDateTargets: [row?.dueDate || row?.sessionDate].filter(Boolean),
+            teacherIds: [row?.teacherId].filter(Boolean),
+            requestedTaskStartTime: row?.taskStartTime,
+            requestedTaskEndTime: row?.taskEndTime,
+            conflictPermitted: Boolean(row?.conflictPermitted),
+            excludeAssignmentId
+          });
+        } catch (error) {
+          conflicts.push(String(error?.message || error || 'Schedule conflict detected.'));
+        }
+      }
+
+      results.push({
+        index,
+        valid: !errors.length && !conflicts.length,
+        errors,
+        conflicts
+      });
+    }
+
+    return { rows: results };
+  },
+
   async resolveStartInstanceContext({
     assignmentId,
     assignmentRowId = '',

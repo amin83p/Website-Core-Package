@@ -518,7 +518,7 @@
                     <i class="bi bi-folder2-open fs-5"></i><span class="session-manager-nav-label">Content</span>
                 </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="assignments" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
-                    <i class="bi bi-clipboard-check fs-5"></i><span class="session-manager-nav-label">Assignments</span>
+                    <i class="bi bi-clipboard-check fs-5"></i><span class="session-manager-nav-label">Reports</span>
                 </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="student-cases" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-folder-check fs-5"></i><span class="session-manager-nav-label">Student Cases</span>
@@ -773,42 +773,30 @@
             </div>
             <div class="session-panel" id="session-panel-assignments" role="tabpanel">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white border-bottom py-3">
-                        <h5 class="m-0 fw-bold text-primary"><i class="bi bi-clipboard-check me-2"></i>Report assignments</h5>
-                        <div class="small text-muted mt-1">Active report tasks tied to this session or its date. Use <strong>Open</strong> to fill out the report. To change assignment settings (teachers, dates, scope), use <strong>Reports → Assignments</strong>.</div>
+                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+                        <div>
+                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-clipboard-check me-2"></i>Report instances</h5>
+                            <div class="small text-muted mt-1">Concrete report instances for this session (one row per student or class target). Use <strong>Open V2</strong> or <strong>Start</strong> to fill out reports. To change assignment settings (teachers, dates, scope), use <strong>Reports → Assignments</strong>.</div>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
                     </div>
                     <div class="card-body p-0">
-                        <% const rptRows = Array.isArray(sessionReportAssignmentRows) ? sessionReportAssignmentRows : []; %>
-                        <% if (!rptRows.length) { %>
-                            <div class="p-4 text-center text-muted small">No report assignments for this session, or none visible for your account.</div>
-                        <% } else { %>
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th class="ps-4">Report</th>
-                                            <th>Scope</th>
-                                            <th>Target</th>
-                                            <th>Task window</th>
-                                            <th class="pe-4 text-end">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <% rptRows.forEach((row) => { %>
-                                            <tr>
-                                                <td class="ps-4 fw-semibold"><%= row.title %></td>
-                                                <td><span class="badge bg-light text-dark border"><%= row.scopeLabel %></span></td>
-                                                <td><span class="badge bg-secondary-subtle text-secondary-emphasis border"><%= row.targetTypeLabel %></span></td>
-                                                <td class="small font-monospace text-muted"><%= row.timeLabel %></td>
-                                                <td class="pe-4 text-end">
-                                                    <a href="<%= row.href %>" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-up-right me-1"></i><%= row.actionLabel %></a>
-                                                </td>
-                                            </tr>
-                                        <% }); %>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <% } %>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Report</th>
+                                        <th>Student / target</th>
+                                        <th>Teacher</th>
+                                        <th>Status</th>
+                                        <th class="pe-4 text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sessionReportInstancesBody">
+                                    <tr><td colspan="5" class="text-center py-4 text-muted">No report instances for this session, or none visible for your account.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1265,6 +1253,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.__attendanceMatrixPolicy = <%- JSON.stringify(typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved ? attendanceMatrixPolicyResolved : { disqualifyLateMinutes: 30, disqualifyEarlyLeaveMinutes: 30, disqualifyCombinedMissedMinutes: null, scheduledMinutes: 180 }) %>;
     let studentCasesState = <%- jsonForScript(Array.isArray(sessionStudentCases) ? sessionStudentCases : []) %>;
+    let sessionReportInstancesState = <%- jsonForScript(Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : []) %>;
     const requestedStudentCaseId = new URLSearchParams(window.location.search || '').get('caseId') || '';
     let requestedStudentCaseHandled = false;
     let studentCaseModalInstance = null;
@@ -1359,6 +1348,53 @@ document.addEventListener('DOMContentLoaded', () => {
                     </td>
                 </tr>`;
         }).join('');
+    }
+
+    function renderSessionReportInstances() {
+        const body = document.getElementById('sessionReportInstancesBody');
+        if (!body) return;
+        const rows = Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : [];
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No report instances for this session, or none visible for your account.</td></tr>';
+            return;
+        }
+        body.innerHTML = rows.map((row) => {
+            const statusLabel = String(row.statusLabel || row.status || 'draft');
+            const badgeClass = String(row.statusBadgeClass || 'bg-warning text-dark');
+            const actionLabel = String(row.actionLabel || (row.isPending ? 'Start' : 'Open V2'));
+            const href = String(row.href || '#');
+            const studentSub = row.studentId
+                ? `<div class="small text-muted font-monospace">${scEscapeHtml(row.studentId)}</div>`
+                : '';
+            return `
+                <tr data-report-instance-id="${scEscapeHtml(row.id)}">
+                    <td class="ps-4 fw-semibold">${scEscapeHtml(row.templateTitle)}</td>
+                    <td>${scEscapeHtml(row.studentName)}${studentSub}</td>
+                    <td>${scEscapeHtml(row.teacherName)}</td>
+                    <td><span class="badge ${badgeClass} text-capitalize">${scEscapeHtml(statusLabel)}</span></td>
+                    <td class="pe-4 text-end">
+                        <a href="${scEscapeHtml(href)}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</a>
+                    </td>
+                </tr>`;
+        }).join('');
+    }
+
+    async function refreshSessionReportInstances() {
+        const btn = document.getElementById('btnRefreshSessionReportInstances');
+        if (btn) btn.disabled = true;
+        if (typeof window.showLoading === 'function') window.showLoading('Refreshing report instances...');
+        try {
+            const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/report-instances`, {
+                headers: { 'x-ajax-request': 'true', 'Accept': 'application/json' }
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to load report instances.');
+            sessionReportInstancesState = result.rows || [];
+            renderSessionReportInstances();
+        } finally {
+            if (btn) btn.disabled = false;
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+        }
     }
 
     function getStudentCaseById(id) {
@@ -1494,6 +1530,10 @@ document.addEventListener('DOMContentLoaded', () => {
         saveStudentCase({ resolve: true }).catch((error) => showStudentCaseMessage('Resolve Failed', error.message, 'error'));
     });
     renderStudentCases();
+    renderSessionReportInstances();
+    document.getElementById('btnRefreshSessionReportInstances')?.addEventListener('click', () => {
+        refreshSessionReportInstances().catch((error) => showStudentCaseMessage('Refresh Failed', error.message, 'error'));
+    });
 
 
     function parseNonNegAttendanceMins(v) {
@@ -1591,6 +1631,9 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-session-panel');
             if (id) setActivePanel(id);
+            if (id === 'assignments') {
+                refreshSessionReportInstances().catch(() => {});
+            }
         });
     });
 

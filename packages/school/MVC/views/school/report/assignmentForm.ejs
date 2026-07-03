@@ -103,7 +103,10 @@
           <h5 class="m-0 fw-bold">Report Target Rows</h5>
           <div class="small text-muted">Each row creates report instances for one target and one teacher.</div>
         </div>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddTargetRow"><i class="bi bi-plus-lg me-1"></i>Add Row</button>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddMultipleTargetRows" <%= (selectedClassId && Array.isArray(sessions) && sessions.length) ? '' : 'disabled' %>><i class="bi bi-table me-1"></i>Add Multiple Rows</button>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddTargetRow"><i class="bi bi-plus-lg me-1"></i>Add Row</button>
+        </div>
       </div>
       <div class="card-body p-3">
         <% if (classFirstSessionDate && classLastSessionDate) { %>
@@ -247,6 +250,140 @@
   </div>
 </div>
 
+<div class="modal fade" id="bulkTargetRowsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Multiple Report Target Rows</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <% if (!selectedClassId || !Array.isArray(sessions) || !sessions.length) { %>
+          <div class="alert alert-warning mb-0">Select a class with scheduled sessions before using bulk row generation.</div>
+        <% } else { %>
+          <div class="row g-3">
+            <div class="col-12">
+              <h6 class="fw-bold mb-2">Schedule</h6>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Preset</label>
+              <select class="form-select" id="bulkPreset">
+                <option value="end_of_month">End of Each Month</option>
+                <option value="end_of_week">End of Each Week</option>
+                <option value="end_of_each_day">End of Each Day (per session)</option>
+                <option value="semi_monthly">Semi-Monthly (15th + month end)</option>
+                <option value="custom">Custom Intervals</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Start Date</label>
+              <input type="date" class="form-control" id="bulkStartDate" min="<%= classFirstSessionDate %>" max="<%= classLastSessionDate %>" value="<%= classFirstSessionDate %>">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">End Date</label>
+              <input type="date" class="form-control" id="bulkEndDate" min="<%= classFirstSessionDate %>" max="<%= classLastSessionDate %>" value="<%= classLastSessionDate %>">
+            </div>
+            <div class="col-md-4 d-none" id="bulkCustomStepSection">
+              <label class="form-label fw-bold">Every N Days</label>
+              <input type="number" class="form-control" id="bulkCustomStepDays" min="1" max="365" step="1" value="7">
+            </div>
+            <div class="col-md-8">
+              <div class="form-text mt-2" id="bulkCountEstimate">~0 rows will be generated.</div>
+              <div class="form-text text-warning d-none" id="bulkLargeBatchWarning">Large batch (50+ rows). Review the preview carefully before adding.</div>
+            </div>
+
+            <div class="col-12 mt-2">
+              <h6 class="fw-bold mb-2">Defaults (applied to every row)</h6>
+            </div>
+            <input type="hidden" id="bulkTeacherId" value="<%= firstTeacherId || '' %>">
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Teacher</label>
+              <div class="input-group">
+                <input type="text" class="form-control bg-white" id="bulkTeacherSummary" placeholder="Default teacher" readonly>
+                <button type="button" class="btn btn-outline-primary" id="btnPickBulkTeacher"><i class="bi bi-person-lines-fill me-1"></i>Pick</button>
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Task Start</label>
+              <input type="time" class="form-control" id="bulkTaskStartTime" value="09:00">
+              <div class="form-text">Used for every generated row (overrides session times).</div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Task End</label>
+              <input type="time" class="form-control" id="bulkTaskEndTime" value="10:00">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Status</label>
+              <select class="form-select" id="bulkStatus">
+                <% (assignmentStatuses || ['active', 'inactive', 'archived']).forEach((st) => { %>
+                  <option value="<%= st %>" <%= st === 'active' ? 'selected' : '' %>><%= st %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Allocated Hours</label>
+              <input type="number" class="form-control" id="bulkAllocatedHours" min="0.25" max="24" step="0.25" placeholder="e.g. 1.5">
+            </div>
+            <div class="col-md-3">
+              <div class="form-check mt-4">
+                <input class="form-check-input" type="checkbox" id="bulkLinkSessions" checked>
+                <label class="form-check-label" for="bulkLinkSessions">Link sessions</label>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check mt-4">
+                <input class="form-check-input" type="checkbox" id="bulkTimesheetReflection">
+                <label class="form-check-label" for="bulkTimesheetReflection">Reflect on timesheet</label>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check mt-4">
+                <input class="form-check-input" type="checkbox" id="bulkConflictPermitted">
+                <label class="form-check-label" for="bulkConflictPermitted">Intentional overlap permitted</label>
+              </div>
+            </div>
+
+            <div class="col-12 d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnBulkPreviewRows"><i class="bi bi-eye me-1"></i>Preview Rows</button>
+            </div>
+
+            <div class="col-12 d-none" id="bulkPreviewSection">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <h6 class="fw-bold m-0">Preview</h6>
+                <div class="small text-muted" id="bulkPreviewSelectionHint">Select rows to add. Invalid rows cannot be selected.</div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0" id="bulkPreviewTable">
+                  <thead>
+                    <tr>
+                      <th style="width:2.5rem;">
+                        <input class="form-check-input mt-0" type="checkbox" id="bulkPreviewSelectAll" title="Select all valid rows" aria-label="Select all valid rows">
+                      </th>
+                      <th>Target</th>
+                      <th>Report Period</th>
+                      <th>Teacher</th>
+                      <th>Task Time</th>
+                      <th>Timesheet</th>
+                      <th>Link Note</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bulkPreviewBody"></tbody>
+                </table>
+              </div>
+              <div class="small text-muted mt-2" id="bulkPreviewSummary"></div>
+            </div>
+          </div>
+        <% } %>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnBulkAddRows" disabled>Add Selected Rows to Assignment</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/modal_GenericPicker') %>
 
 <script>
@@ -297,6 +434,8 @@
     const classFirstSessionDate = <%- JSON.stringify(classFirstSessionDate) %>;
     const classLastSessionDate = <%- JSON.stringify(classLastSessionDate) %>;
     const firstTeacherId = <%- JSON.stringify(firstTeacherId) %>;
+    const isEditAssignment = <%= isEdit ? 'true' : 'false' %>;
+    const assignmentId = <%- JSON.stringify(assignment?.id || '') %>;
     let selectedTargetStudentIds = Array.isArray(<%- JSON.stringify(Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : []) %>) ? <%- JSON.stringify(Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : []) %> : [];
     let targetRows = Array.isArray(<%- JSON.stringify(initialTargetRows) %>) ? <%- JSON.stringify(initialTargetRows) %> : [];
 
@@ -614,6 +753,504 @@
         };
       }).filter((row) => Boolean(row.id));
     }
+
+    const bulkModalEl = document.getElementById('bulkTargetRowsModal');
+    const bulkFields = {
+      preset: document.getElementById('bulkPreset'),
+      startDate: document.getElementById('bulkStartDate'),
+      endDate: document.getElementById('bulkEndDate'),
+      customStepSection: document.getElementById('bulkCustomStepSection'),
+      customStepDays: document.getElementById('bulkCustomStepDays'),
+      countEstimate: document.getElementById('bulkCountEstimate'),
+      largeBatchWarning: document.getElementById('bulkLargeBatchWarning'),
+      teacherId: document.getElementById('bulkTeacherId'),
+      teacherSummary: document.getElementById('bulkTeacherSummary'),
+      taskStartTime: document.getElementById('bulkTaskStartTime'),
+      taskEndTime: document.getElementById('bulkTaskEndTime'),
+      status: document.getElementById('bulkStatus'),
+      allocatedHours: document.getElementById('bulkAllocatedHours'),
+      linkSessions: document.getElementById('bulkLinkSessions'),
+      timesheetReflection: document.getElementById('bulkTimesheetReflection'),
+      conflictPermitted: document.getElementById('bulkConflictPermitted'),
+      previewSection: document.getElementById('bulkPreviewSection'),
+      previewBody: document.getElementById('bulkPreviewBody'),
+      previewSummary: document.getElementById('bulkPreviewSummary'),
+      previewSelectAll: document.getElementById('bulkPreviewSelectAll'),
+      previewSelectionHint: document.getElementById('bulkPreviewSelectionHint'),
+      addRowsButton: document.getElementById('btnBulkAddRows'),
+      previewButton: document.getElementById('btnBulkPreviewRows')
+    };
+    let bulkPreviewState = { accepted: [], skipped: [], previewResults: [], previewRows: [] };
+    let bulkEstimateTimer = null;
+
+    function getBulkApiUrl(suffix) {
+      const cleanSuffix = String(suffix || '').replace(/^\//, '');
+      if (isEditAssignment && assignmentId) {
+        return `/school/reports/assignments/edit/${encodeURIComponent(assignmentId)}/${cleanSuffix}`;
+      }
+      return `/school/reports/assignments/${cleanSuffix}`;
+    }
+
+    function getBulkTargetRowModalInstance() {
+      if (!bulkModalEl || !window.bootstrap?.Modal) return null;
+      if (typeof window.bootstrap.Modal.getOrCreateInstance === 'function') {
+        return window.bootstrap.Modal.getOrCreateInstance(bulkModalEl);
+      }
+      return new window.bootstrap.Modal(bulkModalEl);
+    }
+
+    function showBulkTargetRowsModal() {
+      const modalInstance = getBulkTargetRowModalInstance();
+      if (modalInstance) {
+        modalInstance.show();
+        return;
+      }
+      if (!bulkModalEl) return;
+      bulkModalEl.classList.add('show');
+      bulkModalEl.style.display = 'block';
+      bulkModalEl.removeAttribute('aria-hidden');
+      bulkModalEl.setAttribute('aria-modal', 'true');
+      document.body.classList.add('modal-open');
+    }
+
+    function hideBulkTargetRowsModal() {
+      const modalInstance = getBulkTargetRowModalInstance();
+      if (modalInstance) {
+        modalInstance.hide();
+        return;
+      }
+      if (!bulkModalEl) return;
+      bulkModalEl.classList.remove('show');
+      bulkModalEl.style.display = 'none';
+      bulkModalEl.setAttribute('aria-hidden', 'true');
+      bulkModalEl.removeAttribute('aria-modal');
+      document.body.classList.remove('modal-open');
+    }
+
+    function resetBulkPreview() {
+      bulkPreviewState = { accepted: [], skipped: [], previewResults: [], previewRows: [] };
+      bulkFields.previewSection?.classList.add('d-none');
+      if (bulkFields.previewBody) bulkFields.previewBody.innerHTML = '';
+      if (bulkFields.previewSummary) bulkFields.previewSummary.textContent = '';
+      if (bulkFields.previewSelectAll) {
+        bulkFields.previewSelectAll.checked = false;
+        bulkFields.previewSelectAll.indeterminate = false;
+        bulkFields.previewSelectAll.disabled = true;
+      }
+      updateBulkAddRowsButton();
+    }
+
+    function buildBulkPreviewRows(acceptedRows = [], skippedRows = [], previewResults = []) {
+      const previewMap = new Map((Array.isArray(previewResults) ? previewResults : []).map((row) => [row.index, row]));
+      const previewRows = [];
+
+      (Array.isArray(acceptedRows) ? acceptedRows : []).forEach((row, index) => {
+        const normalized = normalizeTargetRow(row);
+        const clientIssue = validateRow(normalized, `Row ${index + 1}`);
+        const serverPreview = previewMap.get(index) || { valid: true, errors: [], conflicts: [] };
+        const issues = [];
+        if (clientIssue) issues.push(clientIssue);
+        (serverPreview.errors || []).forEach((msg) => issues.push(msg));
+        (serverPreview.conflicts || []).forEach((msg) => issues.push(msg));
+        const isValid = !issues.length;
+        previewRows.push({
+          kind: 'candidate',
+          sourceIndex: index,
+          row,
+          normalized,
+          valid: isValid,
+          issues,
+          selected: isValid
+        });
+      });
+
+      (Array.isArray(skippedRows) ? skippedRows : []).forEach((entry) => {
+        previewRows.push({
+          kind: 'skipped',
+          row: entry?.row || {},
+          reason: String(entry?.reason || 'Skipped'),
+          valid: false,
+          selected: false
+        });
+      });
+
+      return previewRows;
+    }
+
+    function getBulkSelectablePreviewRows() {
+      return (Array.isArray(bulkPreviewState.previewRows) ? bulkPreviewState.previewRows : [])
+        .filter((entry) => entry.kind === 'candidate' && entry.valid);
+    }
+
+    function getBulkSelectedPreviewRows() {
+      return getBulkSelectablePreviewRows().filter((entry) => entry.selected);
+    }
+
+    function syncBulkPreviewSelectAllControl() {
+      const selectAll = bulkFields.previewSelectAll;
+      if (!selectAll) return;
+      const selectable = getBulkSelectablePreviewRows();
+      const selected = getBulkSelectedPreviewRows();
+      selectAll.disabled = selectable.length === 0;
+      if (!selectable.length) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+        return;
+      }
+      selectAll.checked = selected.length === selectable.length;
+      selectAll.indeterminate = selected.length > 0 && selected.length < selectable.length;
+    }
+
+    function updateBulkAddRowsButton() {
+      const selectedCount = getBulkSelectedPreviewRows().length;
+      const selectableCount = getBulkSelectablePreviewRows().length;
+      const skippedCount = (bulkPreviewState.previewRows || []).filter((entry) => entry.kind === 'skipped').length;
+      const invalidCount = (bulkPreviewState.previewRows || []).filter((entry) => entry.kind === 'candidate' && !entry.valid).length;
+
+      if (bulkFields.previewSummary) {
+        const parts = [`${selectedCount} of ${selectableCount} valid row${selectableCount === 1 ? '' : 's'} selected to add.`];
+        if (skippedCount) parts.push(`${skippedCount} duplicate${skippedCount === 1 ? '' : 's'} skipped.`);
+        if (invalidCount) parts.push(`${invalidCount} invalid row${invalidCount === 1 ? '' : 's'} ignored.`);
+        bulkFields.previewSummary.textContent = parts.join(' ');
+      }
+
+      if (bulkFields.addRowsButton) {
+        bulkFields.addRowsButton.disabled = selectedCount === 0;
+        bulkFields.addRowsButton.textContent = selectedCount
+          ? `Add ${selectedCount} Selected Row${selectedCount === 1 ? '' : 's'} to Assignment`
+          : 'Add Selected Rows to Assignment';
+      }
+
+      syncBulkPreviewSelectAllControl();
+    }
+
+    function renderBulkPreviewTable() {
+      const previewRows = Array.isArray(bulkPreviewState.previewRows) ? bulkPreviewState.previewRows : [];
+      if (!bulkFields.previewBody) return;
+
+      bulkFields.previewBody.innerHTML = previewRows.map((entry, displayIndex) => {
+        const normalized = entry.normalized || normalizeTargetRow(entry.row || {});
+        const targetLabel = normalized.targetType === 'date'
+          ? `No session | ${normalized.dueDate || '-'}`
+          : `Session | ${getSessionDisplay(getSessionById(normalized.sessionId)) || normalized.sessionId || '-'}`;
+        const periodLabel = `${normalized.reportStartDate || '-'} to ${normalized.reportDueDate || '-'}`;
+        const teacherLabel = normalized.teacherName || normalized.teacherId || '-';
+        const taskLabel = normalized.taskStartTime && normalized.taskEndTime
+          ? `${normalized.taskStartTime} - ${normalized.taskEndTime}`
+          : '-';
+        const timesheetLabel = normalized.timesheetReflection ? `${normalized.allocatedHours || '-'} hr` : 'No';
+        const linkNote = entry.kind === 'skipped'
+          ? String(entry.reason || 'Skipped')
+          : String(entry.row?.linkNote || '-');
+        const statusLabel = entry.kind === 'skipped'
+          ? 'Skipped duplicate'
+          : (entry.valid ? (normalized.status || 'active') : (entry.issues || []).join(' '));
+        const rowClass = entry.kind === 'skipped'
+          ? 'table-warning'
+          : (entry.valid ? '' : 'table-danger');
+        const canSelect = entry.kind === 'candidate' && entry.valid;
+        const checked = canSelect && entry.selected;
+        const checkboxTitle = canSelect
+          ? 'Include this row when adding to the assignment'
+          : (entry.kind === 'skipped' ? 'Duplicate row cannot be added' : 'Invalid row cannot be added');
+
+        return `
+          <tr class="${escapeHtml(rowClass)}" data-bulk-preview-index="${displayIndex}">
+            <td>
+              <input
+                class="form-check-input mt-0 js-bulk-preview-row-select"
+                type="checkbox"
+                data-bulk-preview-index="${displayIndex}"
+                ${checked ? 'checked' : ''}
+                ${canSelect ? '' : 'disabled'}
+                title="${escapeHtml(checkboxTitle)}"
+                aria-label="Select row ${displayIndex + 1}"
+              >
+            </td>
+            <td>${escapeHtml(targetLabel)}</td>
+            <td>${escapeHtml(periodLabel)}</td>
+            <td>${escapeHtml(teacherLabel)}</td>
+            <td>${escapeHtml(taskLabel)}</td>
+            <td>${escapeHtml(timesheetLabel)}</td>
+            <td>${escapeHtml(linkNote)}</td>
+            <td>${escapeHtml(statusLabel)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      updateBulkAddRowsButton();
+    }
+
+    function setBulkPreviewRowSelected(displayIndex, selected) {
+      const entry = bulkPreviewState.previewRows?.[displayIndex];
+      if (!entry || entry.kind !== 'candidate' || !entry.valid) return;
+      entry.selected = Boolean(selected);
+      updateBulkAddRowsButton();
+    }
+
+    function setAllBulkPreviewRowsSelected(selected) {
+      getBulkSelectablePreviewRows().forEach((entry) => {
+        entry.selected = Boolean(selected);
+      });
+      renderBulkPreviewTable();
+    }
+
+    function bulkRowDedupeKey(row = {}) {
+      const targetType = String(row?.targetType || '').trim().toLowerCase();
+      const teacherId = String(row?.teacherId || '').trim();
+      if (targetType === 'session') return `session:${String(row?.sessionId || '').trim()}`;
+      return `date:${String(row?.dueDate || row?.sessionDate || '').trim()}:${teacherId}`;
+    }
+
+    function dedupeBulkRows(existingRows = [], candidateRows = []) {
+      const seen = new Set((Array.isArray(existingRows) ? existingRows : []).map(bulkRowDedupeKey));
+      const accepted = [];
+      const skipped = [];
+      (Array.isArray(candidateRows) ? candidateRows : []).forEach((row) => {
+        const key = bulkRowDedupeKey(row);
+        if (!key || key === 'date::' || key === 'session:') {
+          skipped.push({ row, reason: 'Invalid row identity.' });
+          return;
+        }
+        if (seen.has(key)) {
+          skipped.push({ row, reason: 'Duplicate target already exists in this assignment.' });
+          return;
+        }
+        seen.add(key);
+        accepted.push(row);
+      });
+      return { accepted, skipped };
+    }
+
+    function getBulkDefaults() {
+      const teacherId = String(bulkFields.teacherId?.value || getFirstClassTeacherId() || '').trim();
+      return {
+        teacherId,
+        teacherName: getTeacherName(teacherId, teacherId),
+        taskStartTime: String(bulkFields.taskStartTime?.value || '').trim(),
+        taskEndTime: String(bulkFields.taskEndTime?.value || '').trim(),
+        timesheetReflection: bulkFields.timesheetReflection?.checked === true,
+        allocatedHours: bulkFields.allocatedHours?.value,
+        conflictPermitted: bulkFields.conflictPermitted?.checked === true,
+        status: String(bulkFields.status?.value || 'active').trim(),
+        notes: ''
+      };
+    }
+
+    function getBulkSchedulePayload() {
+      return {
+        classId: String(classIdInput.value || '').trim(),
+        preset: String(bulkFields.preset?.value || 'end_of_month').trim(),
+        startDate: String(bulkFields.startDate?.value || '').trim(),
+        endDate: String(bulkFields.endDate?.value || '').trim(),
+        customStepDays: Number(bulkFields.customStepDays?.value || 7),
+        linkSessions: bulkFields.linkSessions?.checked !== false,
+        defaults: getBulkDefaults()
+      };
+    }
+
+    function updateBulkPresetUi() {
+      const isCustom = String(bulkFields.preset?.value || '') === 'custom';
+      bulkFields.customStepSection?.classList.toggle('d-none', !isCustom);
+    }
+
+    async function fetchBulkGeneratedRows() {
+      const payload = getBulkSchedulePayload();
+      const response = await fetch(getBulkApiUrl('generate-target-rows'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.status === 'error') {
+        throw new Error(data?.message || 'Unable to generate bulk rows.');
+      }
+      return data;
+    }
+
+    function scheduleBulkCountEstimate() {
+      if (!bulkFields.countEstimate) return;
+      clearTimeout(bulkEstimateTimer);
+      bulkEstimateTimer = setTimeout(async () => {
+        try {
+          const data = await fetchBulkGeneratedRows();
+          const count = Array.isArray(data?.rows) ? data.rows.length : Number(data?.anchorCount || 0);
+          bulkFields.countEstimate.textContent = `~${count} row${count === 1 ? '' : 's'} will be generated.`;
+          bulkFields.largeBatchWarning?.classList.toggle('d-none', count < 50);
+        } catch (error) {
+          bulkFields.countEstimate.textContent = error.message || 'Unable to estimate row count.';
+          bulkFields.largeBatchWarning?.classList.add('d-none');
+        }
+      }, 250);
+    }
+
+    async function runBulkPreview() {
+      if (!String(classIdInput.value || '').trim()) {
+        await showReportModal({ title: 'Class Required', icon: 'warning', message: 'Select a class first.' });
+        return;
+      }
+      const defaults = getBulkDefaults();
+      if (!defaults.teacherId) {
+        await showReportModal({ title: 'Teacher Required', icon: 'warning', message: 'Select a default teacher for bulk rows.' });
+        return;
+      }
+      if (defaults.timesheetReflection) {
+        const allocated = Number(defaults.allocatedHours);
+        if (!Number.isFinite(allocated) || allocated <= 0) {
+          await showReportModal({ title: 'Allocated Hours Required', icon: 'warning', message: 'Enter allocated hours when timesheet reflection is enabled.' });
+          return;
+        }
+      }
+
+      let loadingToken = null;
+      if (bulkFields.previewButton) bulkFields.previewButton.disabled = true;
+      try {
+        loadingToken = typeof showLoading === 'function'
+          ? showLoading({
+            title: 'Generating Preview',
+            note: 'Building schedule rows and checking conflicts...',
+            operation: 'Report assignment bulk rows'
+          })
+          : null;
+
+        const generated = await fetchBulkGeneratedRows();
+        const candidates = (Array.isArray(generated?.rows) ? generated.rows : []).map((row) => normalizeTargetRow(row));
+        const { accepted, skipped } = dedupeBulkRows(targetRows, candidates);
+        let previewResults = [];
+        if (accepted.length) {
+          const previewResponse = await fetch(getBulkApiUrl('preview-target-rows'), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-AJAX-Request': 'true'
+            },
+            body: JSON.stringify({
+              classId: String(classIdInput.value || '').trim(),
+              targetRows: accepted
+            })
+          });
+          const previewPayload = await previewResponse.json().catch(() => ({}));
+          if (!previewResponse.ok || previewPayload?.status === 'error') {
+            throw new Error(previewPayload?.message || 'Unable to preview bulk rows.');
+          }
+          previewResults = Array.isArray(previewPayload?.rows) ? previewPayload.rows : [];
+        }
+
+        const previewRows = buildBulkPreviewRows(accepted, skipped, previewResults);
+        bulkPreviewState = { accepted, skipped, previewResults, previewRows };
+        bulkFields.previewSection?.classList.remove('d-none');
+        renderBulkPreviewTable();
+      } catch (error) {
+        await showReportModal({ title: 'Preview Failed', icon: 'warning', message: error.message || 'Unable to preview bulk rows.' });
+      } finally {
+        if (loadingToken && typeof hideLoading === 'function') hideLoading(loadingToken);
+        if (bulkFields.previewButton) bulkFields.previewButton.disabled = false;
+      }
+    }
+
+    function initBulkTeacherSummary() {
+      const teacherId = String(bulkFields.teacherId?.value || getFirstClassTeacherId() || '').trim();
+      if (bulkFields.teacherId) bulkFields.teacherId.value = teacherId;
+      if (bulkFields.teacherSummary) {
+        bulkFields.teacherSummary.value = teacherId ? getTeacherName(teacherId, teacherId) : '';
+      }
+    }
+
+    document.getElementById('btnAddMultipleTargetRows')?.addEventListener('click', () => {
+      if (!String(classIdInput.value || '').trim() || !(allSessions || []).length) {
+        showReportModal({ title: 'Class Required', icon: 'warning', message: 'Select a class with sessions first.' });
+        return;
+      }
+      resetBulkPreview();
+      updateBulkPresetUi();
+      initBulkTeacherSummary();
+      scheduleBulkCountEstimate();
+      showBulkTargetRowsModal();
+    });
+
+    bulkFields.preset?.addEventListener('change', () => {
+      resetBulkPreview();
+      updateBulkPresetUi();
+      scheduleBulkCountEstimate();
+    });
+    [bulkFields.startDate, bulkFields.endDate, bulkFields.customStepDays, bulkFields.linkSessions,
+      bulkFields.taskStartTime, bulkFields.taskEndTime, bulkFields.timesheetReflection,
+      bulkFields.conflictPermitted, bulkFields.status, bulkFields.allocatedHours].forEach((field) => {
+      field?.addEventListener('change', () => {
+        resetBulkPreview();
+        scheduleBulkCountEstimate();
+      });
+    });
+    bulkFields.teacherId?.addEventListener('change', () => {
+      resetBulkPreview();
+      scheduleBulkCountEstimate();
+    });
+
+    document.getElementById('btnPickBulkTeacher')?.addEventListener('click', () => {
+      if (!window.GenericPicker || !window.GenericPickerPresets) return;
+      GenericPicker.open(GenericPickerPresets.teacher({
+        title: 'Select Default Teacher',
+        placeholder: 'Search teachers...',
+        multiselect: false,
+        onSelect: function (item) {
+          const id = String(item?.personId || item?.id || '').trim();
+          if (!id) return;
+          if (bulkFields.teacherId) bulkFields.teacherId.value = id;
+          if (bulkFields.teacherSummary) {
+            bulkFields.teacherSummary.value = String(item?.name || item?.title || getTeacherName(id, id));
+          }
+          resetBulkPreview();
+          scheduleBulkCountEstimate();
+        }
+      }));
+    });
+
+    document.getElementById('btnBulkPreviewRows')?.addEventListener('click', runBulkPreview);
+
+    bulkFields.previewSelectAll?.addEventListener('change', (event) => {
+      setAllBulkPreviewRowsSelected(Boolean(event.target?.checked));
+    });
+
+    bulkFields.previewBody?.addEventListener('change', (event) => {
+      const checkbox = event.target?.closest?.('.js-bulk-preview-row-select');
+      if (!checkbox) return;
+      const displayIndex = Number(checkbox.getAttribute('data-bulk-preview-index'));
+      if (!Number.isInteger(displayIndex)) return;
+      setBulkPreviewRowSelected(displayIndex, checkbox.checked);
+      syncBulkPreviewSelectAllControl();
+    });
+
+    document.getElementById('btnBulkAddRows')?.addEventListener('click', async () => {
+      const rowsToAdd = getBulkSelectedPreviewRows().map((entry) => entry.row);
+      if (!rowsToAdd.length) {
+        await showReportModal({ title: 'No Rows Selected', icon: 'info', message: 'Select at least one valid preview row to add.' });
+        return;
+      }
+      rowsToAdd.forEach((row) => {
+        const clean = { ...row };
+        delete clean.linkNote;
+        targetRows.push(normalizeTargetRow(clean));
+      });
+      renderTargetRows();
+      hideBulkTargetRowsModal();
+      resetBulkPreview();
+    });
+
+    bulkModalEl?.addEventListener('click', (event) => {
+      if (event.target.closest('[data-bs-dismiss="modal"]') && !window.bootstrap?.Modal) {
+        hideBulkTargetRowsModal();
+      }
+    });
+
+    initBulkTeacherSummary();
+    updateBulkPresetUi();
 
     document.getElementById('btnAddTargetRow')?.addEventListener('click', () => {
       populateRowModal({

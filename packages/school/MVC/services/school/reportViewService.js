@@ -1253,6 +1253,7 @@ module.exports = {
   buildHomeSummary,
   buildTemplateSavePayload,
   parseAssignmentSaveRequest,
+  parseTargetRowsField,
   buildAssignmentListContext,
   buildAssignmentFormContext,
   buildInstanceListRows,

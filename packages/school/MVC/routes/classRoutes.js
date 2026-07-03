@@ -345,6 +345,9 @@ router.get('/:id/sessions/:sessionId',
 router.get('/:id/sessions/:sessionId/cases',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
   classCtrl.listSessionStudentCases);
+router.get('/:id/sessions/:sessionId/report-instances',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
+  classCtrl.listSessionReportInstances);
 router.post('/:id/sessions/:sessionId/files/upload',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   upload('school-class-workspace', true).single('file'),

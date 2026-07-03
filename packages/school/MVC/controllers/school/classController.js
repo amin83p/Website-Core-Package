@@ -50,6 +50,7 @@ const {
 } = requireCoreModule('MVC/utils/orgContextUtils');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
+const sessionReportInstanceService = require('../../services/school/sessionReportInstanceService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 
@@ -3075,15 +3076,13 @@ async function manageSession(req, res) {
         session.roster = enrichedRoster;
 
         // 3. Fetch Curriculum Content + Session Content/Exam Stream
-        const [allSubjects, examAllocations, examTemplates, examQuestions, examAssignments, studentsForExamStart, reportAssignments, reportTemplates] = await Promise.all([
+        const [allSubjects, examAllocations, examTemplates, examQuestions, examAssignments, studentsForExamStart] = await Promise.all([
             schoolDataService.fetchData('subjects', {}, req.user),
             schoolDataService.fetchData('examAllocations', { classId__eq: classId }, req.user),
             schoolDataService.fetchData('examTemplates', {}, req.user),
             schoolDataService.fetchData('examQuestions', {}, req.user),
             schoolDataService.fetchData('examAssignments', { classId__eq: classId }, req.user),
-            schoolDataService.fetchData('students', {}, req.user),
-            schoolDataService.fetchData('reportAssignments', { classId__eq: classId }, req.user),
-            schoolDataService.fetchData('reportTemplates', {}, req.user)
+            schoolDataService.fetchData('students', {}, req.user)
         ]);
         const currentUserPersonId = String(req.user?.personId || '').trim();
         const ownedStudentIdsForExamStart = new Set((Array.isArray(studentsForExamStart) ? studentsForExamStart : [])
@@ -3211,97 +3210,21 @@ async function manageSession(req, res) {
             sessionContentOrder
         );
 
-        const reportTemplateById = new Map(
-            (Array.isArray(reportTemplates) ? reportTemplates : [])
-                .map((row) => [String(row?.id || '').trim(), row])
-                .filter(([id]) => Boolean(id))
-        );
-        const rosterPersonIdsForReports = new Set(
-            (Array.isArray(session.roster) ? session.roster : [])
-                .map((r) => cleanPersonId(r?.personId))
-                .filter(Boolean)
-        );
-        const ownedStudentPersonIdsForReports = new Set(
-            (Array.isArray(studentsForExamStart) ? studentsForExamStart : [])
-                .filter((row) => ownedStudentIdsForExamStart.has(String(row?.id || '').trim()))
-                .map((row) => String(row?.personId || '').trim())
-                .filter(Boolean)
-        );
         const isReportAdminViewer = isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL);
-        const sessionReportAssignmentRows = [];
-        for (const assignment of (Array.isArray(reportAssignments) ? reportAssignments : [])) {
-            if (!idsEqual(assignment?.orgId, classData?.orgId)) continue;
-            if (!reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, {
-                classId,
-                sessionId,
-                sessionDate: session?.date
-            })) continue;
-            const matchingTargetRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment)
-                .filter((targetRow) => reportAssignmentSessionUtils.reportAssignmentMatchesSession({
-                    ...assignment,
-                    targetRows: [targetRow]
-                }, { classId, sessionId, sessionDate: session?.date }));
-            const matchingAssignment = reportAssignmentSessionUtils.applyTargetRow(assignment, matchingTargetRows[0] || null);
-
-            const templateRow = reportTemplateById.get(String(assignment.templateId || '').trim()) || null;
-            const templateTitle = String(templateRow?.title || assignment.templateId || 'Report').trim();
-            const scope = reportAssignmentSessionUtils.inferAssignmentReportScope(matchingAssignment);
-            const targetType = reportAssignmentSessionUtils.inferAssignmentTargetType(matchingAssignment);
-            const timeLabel = reportAssignmentSessionUtils.formatReportAssignmentTimeWindow(matchingAssignment);
-
-            let href = '';
-            const actionLabel = 'Open';
-            const teacherIds = Array.isArray(matchingAssignment.teacherIds) ? matchingAssignment.teacherIds : [];
-            const isAssignedTeacher = teacherIds.some((tid) => idsEqual(tid, currentUserPersonId));
-            const rowIdForLink = String(matchingAssignment?.assignmentRowId || '').trim();
-
-            if (isReportAdminViewer) {
-                const params = new URLSearchParams();
-                if (rowIdForLink) params.set('rowId', rowIdForLink);
-                if (isAssignedTeacher) {
-                    params.set('teacherId', String(currentUserPersonId || '').trim());
-                } else {
-                    const fallbackTeacher = String((matchingAssignment.teacherIds || [])[0] || '').trim();
-                    if (fallbackTeacher) params.set('teacherId', fallbackTeacher);
-                }
-                href = `/school/reports/instances/start/${encodeURIComponent(String(assignment.id || '').trim())}?${params.toString()}`;
-            } else if (isAssignedTeacher) {
-                const params = new URLSearchParams();
-                if (rowIdForLink) params.set('rowId', rowIdForLink);
-                params.set('teacherId', String(currentUserPersonId || '').trim());
-                href = `/school/reports/instances/start/${encodeURIComponent(String(assignment.id || '').trim())}?${params.toString()}`;
-            } else {
-                let studentHit = false;
-                if (scope === 'selected_students') {
-                    const targets = Array.isArray(matchingAssignment.targetStudentIds) ? matchingAssignment.targetStudentIds : [];
-                    studentHit = [...ownedStudentIdsForExamStart].some((sid) => targets.some((t) => idsEqual(t, sid)));
-                } else if (scope === 'each_student') {
-                    studentHit = [...ownedStudentPersonIdsForReports].some((pid) => rosterPersonIdsForReports.has(pid));
-                }
-                if (studentHit) {
-                    const params = new URLSearchParams();
-                    if (rowIdForLink) params.set('rowId', rowIdForLink);
-                    params.set('studentId', String(currentUserPersonId || '').trim());
-                    const fallbackTeacher = String((matchingAssignment.teacherIds || [])[0] || '').trim();
-                    if (fallbackTeacher) params.set('teacherId', fallbackTeacher);
-                    href = `/school/reports/instances/start/${encodeURIComponent(String(assignment.id || '').trim())}?${params.toString()}`;
-                }
-            }
-
-            if (!href) continue;
-
-            sessionReportAssignmentRows.push({
-                id: String(assignment.id || '').trim(),
-                title: templateTitle,
-                scopeLabel: reportAssignmentSessionUtils.scopeDisplayLabel(scope),
-                targetTypeLabel: targetType === 'date' ? 'Date' : 'Session',
-                timeLabel,
-                href,
-                actionLabel
-            });
-        }
-        sessionReportAssignmentRows.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''))
-            || String(a.id || '').localeCompare(String(b.id || '')));
+        const sessionReportViewerContext = await sessionReportInstanceService.buildSessionReportViewerContext({
+            classId,
+            sessionRoster: session.roster,
+            reqUser: req.user,
+            isReportAdminViewer
+        });
+        const sessionReportInstanceRows = await sessionReportInstanceService.buildSessionReportInstanceRows({
+            classId,
+            sessionId,
+            sessionDate: session?.date,
+            reqUser: req.user,
+            viewerContext: sessionReportViewerContext,
+            sessionRoster: session.roster
+        });
 
         const orgPolicyLayerMs = await attendanceMatrixPolicyModel.getPolicyForOrg(
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
@@ -3322,7 +3245,7 @@ async function manageSession(req, res) {
             sessionContentOrder,
             sessionExamContentItems,
             combinedSessionContent,
-            sessionReportAssignmentRows,
+            sessionReportInstanceRows,
             sessionStatusMeta: getActiveSessionStatusMeta(sessionStatusMeta),
             defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
             prevSessionId,    
@@ -3337,6 +3260,39 @@ async function manageSession(req, res) {
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    }
+}
+
+async function listSessionReportInstances(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        await getClassByIdWithOrgCheck(classId, req.user);
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const session = sessions.find((row) => row.sessionId === sessionId);
+        if (!session) throw new Error('Session not found.');
+
+        const isReportAdminViewer = isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL);
+        const viewerContext = await sessionReportInstanceService.buildSessionReportViewerContext({
+            classId,
+            sessionRoster: session.roster || [],
+            reqUser: req.user,
+            isReportAdminViewer
+        });
+        const rows = await sessionReportInstanceService.buildSessionReportInstanceRows({
+            classId,
+            sessionId,
+            sessionDate: session?.date,
+            reqUser: req.user,
+            viewerContext,
+            sessionRoster: session.roster || []
+        });
+        return res.json({
+            status: 'success',
+            rows,
+            refreshedAt: new Date().toISOString()
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
     }
 }
 
@@ -3893,7 +3849,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus,
+  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus,
   showFinalGradesPage,
   postOfficialFinalGradesWorkflow
 };

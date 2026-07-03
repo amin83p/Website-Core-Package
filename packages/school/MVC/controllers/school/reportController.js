@@ -12,6 +12,7 @@ const reportService = require('../../services/school/reportService');
 const reportDocxRenderService = require('../../services/school/reportDocxRenderService');
 const reportIntegrityService = require('../../services/school/reportIntegrityService');
 const reportViewService = require('../../services/school/reportViewService');
+const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const { getPrefillValue } = require('../../services/school/reportPrefillKeyUtils');
@@ -621,6 +622,57 @@ async function showAssignmentForm(req, res) {
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+async function generateAssignmentTargetRows(req, res) {
+  try {
+    const classId = String(req.body?.classId || '').trim();
+    if (!classId) throw new Error('Class is required.');
+
+    const sessions = await schoolDataService.getClassSessions(classId, req.user);
+    const rows = reportAssignmentBulkRowService.generateBulkTargetRows({
+      preset: req.body?.preset,
+      startDate: req.body?.startDate,
+      endDate: req.body?.endDate,
+      sessions,
+      customStepDays: req.body?.customStepDays,
+      linkSessions: req.body?.linkSessions !== false,
+      defaults: req.body?.defaults || {}
+    });
+
+    const anchorCount = reportAssignmentBulkRowService.buildScheduleAnchors({
+      preset: req.body?.preset,
+      startDate: req.body?.startDate,
+      endDate: req.body?.endDate,
+      sessions,
+      customStepDays: req.body?.customStepDays
+    }).length;
+
+    return res.json({
+      status: 'success',
+      anchorCount,
+      rows
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function previewAssignmentTargetRows(req, res) {
+  try {
+    const classId = String(req.body?.classId || '').trim();
+    const targetRows = reportViewService.parseTargetRowsField(req.body?.targetRowsJson || req.body?.targetRows);
+    const excludeAssignmentId = String(req.params?.id || req.body?.assignmentId || '').trim();
+    const payload = await reportIntegrityService.previewAssignmentTargetRows({
+      classId,
+      targetRows,
+      reqUser: req.user,
+      excludeAssignmentId
+    });
+    return res.json({ status: 'success', ...payload });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 }
 
@@ -1388,6 +1440,8 @@ module.exports = {
   deleteTemplate,
   listAssignments,
   showAssignmentForm,
+  generateAssignmentTargetRows,
+  previewAssignmentTargetRows,
   saveAssignment,
   deleteAssignment,
   listInstances,
