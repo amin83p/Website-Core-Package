@@ -178,6 +178,181 @@ test('report instance list shows pending rows for active assignments without ins
   });
 });
 
+test('report review navigator filters same template, student target, class, and participant access', async () => {
+  const currentInstance = {
+    id: 'INST-CURRENT',
+    orgId: '900000',
+    assignmentId: 'ASN-CURRENT',
+    classId: 'CLASS-1',
+    templateId: 'TPL-1',
+    teacherId: 'TEACHER-1',
+    studentId: 'STUDENT-1',
+    targetKey: 'student:STUDENT-1',
+    sessionDate: '2026-07-10',
+    status: 'draft',
+    audit: { createDateTime: '2026-07-10T00:00:00.000Z' }
+  };
+
+  const instances = [
+    currentInstance,
+    {
+      id: 'INST-OLDER',
+      orgId: '900000',
+      assignmentId: 'ASN-OLDER',
+      classId: 'CLASS-1',
+      templateId: 'TPL-1',
+      teacherId: 'TEACHER-1',
+      studentId: 'STUDENT-1',
+      targetKey: 'student:STUDENT-1',
+      sessionDate: '2026-06-01',
+      status: 'submitted',
+      audit: { createDateTime: '2026-06-01T00:00:00.000Z' }
+    },
+    {
+      id: 'INST-OTHER-TEACHER',
+      orgId: '900000',
+      assignmentId: 'ASN-OTHER-TEACHER',
+      classId: 'CLASS-1',
+      templateId: 'TPL-1',
+      teacherId: 'TEACHER-2',
+      studentId: 'STUDENT-1',
+      targetKey: 'student:STUDENT-1',
+      sessionDate: '2026-07-05',
+      status: 'locked',
+      audit: { createDateTime: '2026-07-05T00:00:00.000Z' }
+    },
+    {
+      id: 'INST-DIFFERENT-STUDENT',
+      orgId: '900000',
+      assignmentId: 'ASN-DIFFERENT-STUDENT',
+      classId: 'CLASS-1',
+      templateId: 'TPL-1',
+      teacherId: 'TEACHER-1',
+      studentId: 'STUDENT-2',
+      targetKey: 'student:STUDENT-2',
+      sessionDate: '2026-07-04',
+      status: 'submitted',
+      audit: { createDateTime: '2026-07-04T00:00:00.000Z' }
+    },
+    {
+      id: 'INST-DIFFERENT-CLASS',
+      orgId: '900000',
+      assignmentId: 'ASN-DIFFERENT-CLASS',
+      classId: 'CLASS-2',
+      templateId: 'TPL-1',
+      teacherId: 'TEACHER-1',
+      studentId: 'STUDENT-1',
+      targetKey: 'student:STUDENT-1',
+      sessionDate: '2026-07-03',
+      status: 'submitted',
+      audit: { createDateTime: '2026-07-03T00:00:00.000Z' }
+    },
+    {
+      id: 'INST-DIFFERENT-TEMPLATE',
+      orgId: '900000',
+      assignmentId: 'ASN-DIFFERENT-TEMPLATE',
+      classId: 'CLASS-1',
+      templateId: 'TPL-2',
+      teacherId: 'TEACHER-1',
+      studentId: 'STUDENT-1',
+      targetKey: 'student:STUDENT-1',
+      sessionDate: '2026-07-02',
+      status: 'submitted',
+      audit: { createDateTime: '2026-07-02T00:00:00.000Z' }
+    },
+    {
+      id: 'INST-DIFFERENT-ORG',
+      orgId: '900001',
+      assignmentId: 'ASN-DIFFERENT-ORG',
+      classId: 'CLASS-1',
+      templateId: 'TPL-1',
+      teacherId: 'TEACHER-1',
+      studentId: 'STUDENT-1',
+      targetKey: 'student:STUDENT-1',
+      sessionDate: '2026-07-01',
+      status: 'submitted',
+      audit: { createDateTime: '2026-07-01T00:00:00.000Z' }
+    },
+    {
+      id: 'INST-ARCHIVED',
+      orgId: '900000',
+      assignmentId: 'ASN-ARCHIVED',
+      classId: 'CLASS-1',
+      templateId: 'TPL-1',
+      teacherId: 'TEACHER-1',
+      studentId: 'STUDENT-1',
+      targetKey: 'student:STUDENT-1',
+      sessionDate: '2026-06-20',
+      status: 'archived',
+      audit: { createDateTime: '2026-06-20T00:00:00.000Z' }
+    },
+    {
+      id: 'INST-ORPHAN',
+      orgId: '900000',
+      assignmentId: 'ASN-MISSING',
+      classId: 'CLASS-1',
+      templateId: 'TPL-1',
+      teacherId: 'TEACHER-1',
+      studentId: 'STUDENT-1',
+      targetKey: 'student:STUDENT-1',
+      sessionDate: '2026-06-15',
+      status: 'submitted',
+      audit: { createDateTime: '2026-06-15T00:00:00.000Z' }
+    },
+    {
+      id: 'INST-MISMATCHED-ASSIGNMENT',
+      orgId: '900000',
+      assignmentId: 'ASN-MISMATCHED',
+      classId: 'CLASS-1',
+      templateId: 'TPL-1',
+      teacherId: 'TEACHER-1',
+      studentId: 'STUDENT-1',
+      targetKey: 'student:STUDENT-1',
+      sessionDate: '2026-06-10',
+      status: 'submitted',
+      audit: { createDateTime: '2026-06-10T00:00:00.000Z' }
+    }
+  ];
+
+  const assignments = [
+    { id: 'ASN-CURRENT', orgId: '900000', classId: 'CLASS-1', templateId: 'TPL-1' },
+    { id: 'ASN-OLDER', orgId: '900000', classId: 'CLASS-1', templateId: 'TPL-1' },
+    { id: 'ASN-OTHER-TEACHER', orgId: '900000', classId: 'CLASS-1', templateId: 'TPL-1' },
+    { id: 'ASN-DIFFERENT-STUDENT', orgId: '900000', classId: 'CLASS-1', templateId: 'TPL-1' },
+    { id: 'ASN-DIFFERENT-CLASS', orgId: '900000', classId: 'CLASS-2', templateId: 'TPL-1' },
+    { id: 'ASN-DIFFERENT-TEMPLATE', orgId: '900000', classId: 'CLASS-1', templateId: 'TPL-2' },
+    { id: 'ASN-DIFFERENT-ORG', orgId: '900001', classId: 'CLASS-1', templateId: 'TPL-1' },
+    { id: 'ASN-ARCHIVED', orgId: '900000', classId: 'CLASS-1', templateId: 'TPL-1' },
+    { id: 'ASN-MISMATCHED', orgId: '900000', classId: 'CLASS-OTHER', templateId: 'TPL-1' }
+  ];
+
+  await withPatched(schoolDataService, {
+    fetchData: async (entityType) => {
+      if (entityType === 'reportInstances') return instances;
+      if (entityType === 'reportAssignments') return assignments;
+      return [];
+    }
+  }, async () => {
+    const fullNavigator = await reportViewService.buildReportReviewNavigator({
+      currentInstance,
+      reqUser
+    });
+    assert.deepEqual(fullNavigator.rows.map((row) => row.id), ['INST-CURRENT', 'INST-OTHER-TEACHER', 'INST-OLDER']);
+    assert.equal(fullNavigator.currentIndex, 0);
+    assert.equal(fullNavigator.olderCount, 2);
+    assert.equal(fullNavigator.olderHref, '/school/reports/instances/edit-v2/INST-OTHER-TEACHER');
+    assert.equal(fullNavigator.newerHref, '');
+    assert.deepEqual(Object.keys(fullNavigator.rows[0]).sort(), ['href', 'id', 'isCurrent', 'sessionDate', 'status', 'teacherId'].sort());
+
+    const participantNavigator = await reportViewService.buildReportReviewNavigator({
+      currentInstance,
+      reqUser: { ...reqUser, personId: 'TEACHER-1' },
+      participantOnly: true
+    });
+    assert.deepEqual(participantNavigator.rows.map((row) => row.id), ['INST-CURRENT', 'INST-OLDER']);
+  });
+});
+
 test('report controller uses person ids for fallback teacher and student lookup', () => {
   const source = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/controllers/school/reportController.js'), 'utf8');
   assert.match(source, /fallbackTeacherId:\s*req\.user\?\.personId\s*\|\|\s*''/);

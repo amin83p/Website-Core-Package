@@ -11,6 +11,7 @@ const sessionStudentCaseService = require('../../services/school/sessionStudentC
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const activityService = require('../../services/school/activityService');
+const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
     day: 'Daily',
@@ -691,6 +692,7 @@ function buildReportDetailUrl({ assignment, personId, role }) {
 
     if (role === 'Student') {
         const params = new URLSearchParams();
+        if (assignment?.assignmentRowId) params.set('rowId', normalizeId(assignment.assignmentRowId));
         params.set('studentId', normalizeId(personId));
         const fallbackTeacher = normalizeId((assignment?.teacherIds || [])[0]);
         if (fallbackTeacher) params.set('teacherId', fallbackTeacher);
@@ -698,6 +700,7 @@ function buildReportDetailUrl({ assignment, personId, role }) {
     }
 
     const params = new URLSearchParams();
+    if (assignment?.assignmentRowId) params.set('rowId', normalizeId(assignment.assignmentRowId));
     params.set('teacherId', normalizeId(personId));
     return `/school/reports/instances/start/${encodeURIComponent(assignmentId)}?${params.toString()}`;
 }
@@ -721,7 +724,15 @@ async function appendReportEventsForPerson({
     if (!normalizedPersonId) return;
     const isLikelyStaffOnly = personOrgRoles.includes('school_staff') && !personOrgRoles.includes('school_teacher');
 
+    const expandedAssignments = [];
     for (const assignment of (Array.isArray(assignments) ? assignments : [])) {
+        const targetRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment);
+        (targetRows.length ? targetRows : [{}]).forEach((targetRow) => {
+            expandedAssignments.push(reportAssignmentSessionUtils.applyTargetRow(assignment, targetRow));
+        });
+    }
+
+    for (const assignment of expandedAssignments) {
         const status = String(assignment?.status || '').trim().toLowerCase();
         if (status !== 'active') continue;
 

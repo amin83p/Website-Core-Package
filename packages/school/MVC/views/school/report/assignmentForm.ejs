@@ -1,19 +1,16 @@
 <%
   const isEdit = !!assignment;
-  const selectedTeacherIds = Array.isArray(assignment?.teacherIds) ? assignment.teacherIds : [];
-  const initialSessionIds = Array.isArray(selectedSessionIds) ? selectedSessionIds.map((v) => String(v || '').trim()).filter(Boolean) : [];
-  const initialDateTargets = Array.isArray(selectedDateTargets) ? selectedDateTargets.map((v) => String(v || '').trim()).filter(Boolean) : [];
-  const initialTaskStartTime = String(((typeof selectedTaskStartTime !== 'undefined' ? selectedTaskStartTime : assignment?.taskStartTime) || '')).trim();
-  const initialTaskEndTime = String(((typeof selectedTaskEndTime !== 'undefined' ? selectedTaskEndTime : assignment?.taskEndTime) || '')).trim();
-  const initialConflictPermitted = (selectedSessionIds && selectedSessionIds.length)
-    ? true
-    : Boolean((typeof selectedConflictPermitted !== 'undefined' ? selectedConflictPermitted : assignment?.conflictPermitted));
-  const initialReportStartDate = String(((typeof selectedReportStartDate !== 'undefined' ? selectedReportStartDate : assignment?.reportStartDate) || '')).trim();
-  const initialReportDueDate = String(((typeof selectedReportDueDate !== 'undefined' ? selectedReportDueDate : assignment?.reportDueDate) || '')).trim();
-  const initialTimesheetReflection = assignment?.timesheetReflection === true;
-  const initialAllocatedHours = (assignment && assignment.allocatedHours != null && Number.isFinite(Number(assignment.allocatedHours)))
-    ? Number(assignment.allocatedHours)
-    : '';
+  const rawTargetRows = Array.isArray(selectedTargetRows) && selectedTargetRows.length
+    ? selectedTargetRows
+    : (Array.isArray(assignment?.targetRows) ? assignment.targetRows : []);
+  const firstTeacherId = Array.isArray(assignment?.teacherIds) && assignment.teacherIds.length ? assignment.teacherIds[0] : '';
+  const initialTargetRows = rawTargetRows.length ? rawTargetRows : [];
+  const sessionDatesForBounds = (Array.isArray(sessions) ? sessions : [])
+    .map((row) => String(row?.date || '').trim())
+    .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+    .sort();
+  const classFirstSessionDate = sessionDatesForBounds[0] || '';
+  const classLastSessionDate = sessionDatesForBounds[sessionDatesForBounds.length - 1] || '';
   const classLabel = selectedClassTitle || selectedClassId || '';
   const templateLabel = selectedTemplateTitle || selectedTemplateId || '';
 %>
@@ -21,7 +18,7 @@
   <div class="row g-2 align-items-start mb-4">
     <div class="col">
       <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;"><i class="bi bi-journal-plus me-2"></i><%= title %></h1>
-      <div class="text-muted small mt-1">Assign report templates by selecting sessions or due dates. Conflict validation applies to non-session targets; session-linked reports may overlap class time.</div>
+      <div class="text-muted small mt-1">Define shared report context once, then add target rows for session-linked or no-session reports.</div>
     </div>
     <div class="col-auto d-flex flex-column align-items-end gap-1">
       <% if (isEdit && assignment?.id) { %>
@@ -33,9 +30,18 @@
 
   <form method="POST" id="assignmentForm" action="<%= isEdit ? ('/school/reports/assignments/edit/' + assignment.id) : '/school/reports/assignments/new' %>">
     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
-    <input type="hidden" name="sessionIdsJson" id="sessionIdsJson" value='<%- JSON.stringify(initialSessionIds) %>'>
-    <input type="hidden" name="dateTargetsJson" id="dateTargetsJson" value='<%- JSON.stringify(initialDateTargets) %>'>
+    <input type="hidden" name="sessionIdsJson" id="sessionIdsJson" value="[]">
+    <input type="hidden" name="dateTargetsJson" id="dateTargetsJson" value="[]">
+    <input type="hidden" name="targetRowsJson" id="targetRowsJson" value='<%- JSON.stringify(initialTargetRows) %>'>
     <input type="hidden" name="targetStudentIdsJson" id="targetStudentIdsJson" value='<%- JSON.stringify(Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : []) %>'>
+    <input type="hidden" name="reportStartDate" id="legacyReportStartDateInput" value="">
+    <input type="hidden" name="reportDueDate" id="legacyReportDueDateInput" value="">
+    <input type="hidden" name="taskStartTime" id="legacyTaskStartTimeInput" value="">
+    <input type="hidden" name="taskEndTime" id="legacyTaskEndTimeInput" value="">
+    <input type="hidden" name="conflictPermitted" id="legacyConflictPermittedInput" value="false">
+    <input type="hidden" name="timesheetReflection" id="legacyTimesheetReflectionInput" value="false">
+    <input type="hidden" name="allocatedHours" id="legacyAllocatedHoursInput" value="0">
+    <input type="hidden" name="status" id="legacyStatusInput" value="active">
 
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-body p-3">
@@ -47,7 +53,7 @@
               <input type="text" class="form-control bg-white" id="classTitleInput" value="<%= classLabel %>" placeholder="Pick class..." readonly>
               <button type="button" class="btn btn-outline-primary" id="btnPickClass"><i class="bi bi-search"></i></button>
             </div>
-            <div class="form-text">Selecting class reloads sessions and teacher options.</div>
+            <div class="form-text">Selecting class reloads available sessions and students.</div>
           </div>
 
           <div class="col-md-4">
@@ -58,16 +64,6 @@
               <button type="button" class="btn btn-outline-primary" id="btnPickTemplate"><i class="bi bi-search"></i></button>
             </div>
             <div class="form-text">Template is selected from report templates picker.</div>
-          </div>
-
-          <div class="col-md-4">
-            <label class="form-label fw-bold">Sessions</label>
-            <div class="input-group">
-              <input type="text" class="form-control bg-white" id="sessionSummaryInput" placeholder="No sessions selected" readonly>
-              <button type="button" class="btn btn-outline-primary" id="btnOpenSessionPicker"><i class="bi bi-calendar3"></i></button>
-            </div>
-            <div class="form-text">Pick multiple sessions using searchable picker.</div>
-            <div id="selectedSessionsContainer" class="d-flex flex-wrap gap-1 mt-2"></div>
           </div>
 
           <div class="col-md-4">
@@ -84,7 +80,7 @@
           </div>
 
           <div class="col-md-8" id="specificStudentsSection">
-            <label class="form-label fw-bold">Specific Students (when scope is Specific Students)</label>
+            <label class="form-label fw-bold">Specific Students</label>
             <div class="input-group">
               <input type="text" class="form-control bg-white" id="targetStudentSummaryInput" placeholder="No students selected" readonly>
               <button type="button" class="btn btn-outline-primary" id="btnOpenStudentPicker"><i class="bi bi-people"></i></button>
@@ -93,115 +89,45 @@
             <div id="scopeStudentHint" class="small text-muted mt-1">For "each student" scope, all active class students are used automatically.</div>
           </div>
 
-          <div class="col-md-6">
-            <label class="form-label fw-bold">Due Dates (when sessions are not selected)</label>
-            <div id="dateTargetSection">
-              <div class="d-flex gap-2">
-                <input type="date" class="form-control" id="dateTargetInput">
-                <button type="button" class="btn btn-outline-primary" id="btnAddDateTarget"><i class="bi bi-plus-lg"></i> Add</button>
-                <button type="button" class="btn btn-outline-secondary" id="btnClearDateTargets">Clear</button>
-              </div>
-              <div id="selectedDatesContainer" class="d-flex flex-wrap gap-1 mt-2"></div>
-            </div>
-            <div id="sessionSelectedHint" class="alert alert-light border mt-2 mb-0 py-2 px-2 d-none">
-              Session mode is active. Due date targets are ignored, and overlap with the selected class session is allowed.
-            </div>
-            <div class="form-text">If no session/date target is selected, Report Due Date will be used as the assignment schedule target.</div>
-          </div>
-
-          <div class="col-md-3">
-            <label class="form-label fw-bold">Task Start Time</label>
-            <input type="time" class="form-control" id="taskStartTimeInput" name="taskStartTime" value="<%= initialTaskStartTime %>" required>
-            <div class="form-text">Used in schedule and conflict detection.</div>
-          </div>
-
-          <div class="col-md-3">
-            <label class="form-label fw-bold">Task End Time</label>
-            <input type="time" class="form-control" id="taskEndTimeInput" name="taskEndTime" value="<%= initialTaskEndTime %>" required>
-            <div class="form-text">Must be later than task start time.</div>
-          </div>
-
-          <div class="col-md-3">
-            <label class="form-label fw-bold d-block">Conflict Policy</label>
-            <div class="form-check mt-2">
-              <input class="form-check-input" type="checkbox" id="conflictPermittedInput" name="conflictPermitted" value="true" <%= initialConflictPermitted ? 'checked' : '' %>>
-              <label class="form-check-label" for="conflictPermittedInput">
-                Intentional overlap permitted
-              </label>
-            </div>
-            <div class="form-text" id="conflictPermittedHint">Enable only when overlap is intentionally allowed.</div>
-          </div>
-
-          <div class="col-md-3">
-            <label class="form-label fw-bold">Report Start Date</label>
-            <input type="date" class="form-control" id="reportStartDateInput" name="reportStartDate" value="<%= initialReportStartDate %>">
-            <div class="form-text">Used for date-span based metrics (attendance, totals, etc.).</div>
-          </div>
-
-          <div class="col-md-3">
-            <label class="form-label fw-bold">Report Due Date</label>
-            <input type="date" class="form-control" id="reportDueDateInput" name="reportDueDate" value="<%= initialReportDueDate %>">
-            <div class="form-text">End of reporting period for calculated values.</div>
-          </div>
-
-          <div class="col-md-3">
-            <label class="form-label fw-bold">Status</label>
-            <select class="form-select" name="status">
-              <% (assignmentStatuses || []).forEach((st) => { %>
-                <option value="<%= st %>" <%= String(assignment?.status || 'active') === String(st) ? 'selected' : '' %>><%= st %></option>
-              <% }); %>
-            </select>
-          </div>
-
-          <div class="col-md-3">
-            <label class="form-label fw-bold">Notes</label>
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Assignment Notes</label>
             <input type="text" class="form-control" name="notes" maxlength="1500" value="<%= assignment?.notes || '' %>" placeholder="Optional assignment notes">
-          </div>
-
-          <div class="col-12"><hr class="my-1 text-muted"></div>
-          <div class="col-md-6">
-            <label class="form-label fw-bold d-block">Timesheet reflection</label>
-            <div class="form-check mt-2">
-              <input class="form-check-input" type="checkbox" id="timesheetReflectionInput" name="timesheetReflection" value="true" <%= initialTimesheetReflection ? 'checked' : '' %>>
-              <label class="form-check-label" for="timesheetReflectionInput">
-                Count allocated hours in Master Schedule totals and on instructor timesheets (for the period that contains this task date).
-              </label>
-            </div>
-            <div class="form-text">When enabled, scheduled task times still position the item on the calendar; hours for totals and payroll use <strong>Allocated hours</strong> below.</div>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label fw-bold" for="allocatedHoursInput">Allocated hours</label>
-            <input type="number" class="form-control" id="allocatedHoursInput" name="allocatedHours" min="0.25" max="24" step="0.25"
-              value="<%= initialAllocatedHours === '' ? '' : initialAllocatedHours %>"
-              placeholder="e.g. 1.5">
-            <div class="form-text">Required when Timesheet reflection is checked (max 24).</div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white d-flex align-items-center justify-content-between gap-2">
-        <h5 class="m-0 fw-bold">Assigned Teachers</h5>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenTeacherSchedulePreview">
-          <i class="bi bi-calendar-week me-1"></i> View Teacher Schedule (Assignment Day)
-        </button>
+      <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <h5 class="m-0 fw-bold">Report Target Rows</h5>
+          <div class="small text-muted">Each row creates report instances for one target and one teacher.</div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddTargetRow"><i class="bi bi-plus-lg me-1"></i>Add Row</button>
       </div>
       <div class="card-body p-3">
-        <% if (!teacherOptions || !teacherOptions.length) { %>
-          <div class="text-muted small">No teachers were resolved from class instructors/sessions. Select a class first.</div>
+        <% if (classFirstSessionDate && classLastSessionDate) { %>
+          <div class="alert alert-light border py-2 px-3 small mb-3">
+            Report row dates must stay between <strong><%= classFirstSessionDate %></strong> and <strong><%= classLastSessionDate %></strong>.
+          </div>
         <% } %>
-        <div class="row g-2">
-          <% (teacherOptions || []).forEach((teacher) => { %>
-            <div class="col-md-4">
-              <label class="form-check border rounded p-2 h-100">
-                <input class="form-check-input me-2" type="checkbox" name="teacherIds" value="<%= teacher.id %>" <%= selectedTeacherIds.includes(teacher.id) ? 'checked' : '' %>>
-                <span class="fw-semibold"><%= teacher.name %></span>
-                <span class="small text-muted d-block font-monospace"><%= teacher.id %></span>
-              </label>
-            </div>
-          <% }); %>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0" id="targetRowsTable">
+            <thead>
+              <tr>
+                <th>Target</th>
+                <th>Report Period</th>
+                <th>Teacher</th>
+                <th>Task Time</th>
+                <th>Timesheet</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="targetRowsBody"></tbody>
+          </table>
         </div>
+        <div id="targetRowsEmpty" class="text-muted small py-3 d-none">No target rows yet. Click Add Row to define the first report target.</div>
       </div>
     </div>
 
@@ -212,6 +138,115 @@
   </form>
 </div>
 
+<div class="modal fade" id="targetRowModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="targetRowModalTitle">Report Target Row</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="rowModalIndex" value="">
+        <input type="hidden" id="rowModalRowId" value="">
+        <input type="hidden" id="rowModalSessionId" value="">
+        <input type="hidden" id="rowModalSessionDate" value="">
+        <input type="hidden" id="rowModalTeacherId" value="">
+
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Target Mode</label>
+            <select class="form-select" id="rowModalTargetType">
+              <option value="session">Session</option>
+              <option value="date">No session</option>
+            </select>
+          </div>
+
+          <div class="col-md-9" id="rowModalSessionSection">
+            <label class="form-label fw-bold">Session</label>
+            <div class="input-group">
+              <input type="text" class="form-control bg-white" id="rowModalSessionSummary" placeholder="No session selected" readonly>
+              <button type="button" class="btn btn-outline-primary" id="btnPickRowSession"><i class="bi bi-calendar3 me-1"></i>Pick</button>
+            </div>
+          </div>
+
+          <div class="col-md-4 d-none" id="rowModalDateSection">
+            <label class="form-label fw-bold">Target Date</label>
+            <input type="date" class="form-control" id="rowModalDueDate" min="<%= classFirstSessionDate %>" max="<%= classLastSessionDate %>">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Report Start Date</label>
+            <input type="date" class="form-control" id="rowModalReportStartDate" min="<%= classFirstSessionDate %>" max="<%= classLastSessionDate %>">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Report Due Date</label>
+            <input type="date" class="form-control" id="rowModalReportDueDate" min="<%= classFirstSessionDate %>" max="<%= classLastSessionDate %>">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Teacher</label>
+            <div class="input-group">
+              <input type="text" class="form-control bg-white" id="rowModalTeacherSummary" placeholder="No teacher selected" readonly>
+              <button type="button" class="btn btn-outline-primary" id="btnPickRowTeacher"><i class="bi bi-person-lines-fill me-1"></i>Pick</button>
+            </div>
+            <div class="form-text text-warning d-none" id="rowModalTeacherWarning">This teacher has no delivered session in the selected class. You can still save this row.</div>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label fw-bold">Task Start</label>
+            <input type="time" class="form-control" id="rowModalTaskStartTime">
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label fw-bold">Task End</label>
+            <input type="time" class="form-control" id="rowModalTaskEndTime">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Status</label>
+            <select class="form-select" id="rowModalStatus">
+              <% (assignmentStatuses || ['active', 'inactive', 'archived']).forEach((st) => { %>
+                <option value="<%= st %>"><%= st %></option>
+              <% }); %>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label fw-bold d-block">Conflict</label>
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="rowModalConflictPermitted">
+              <label class="form-check-label" for="rowModalConflictPermitted">Intentional overlap permitted</label>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label fw-bold d-block">Timesheet</label>
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="rowModalTimesheetReflection">
+              <label class="form-check-label" for="rowModalTimesheetReflection">Reflect on timesheet</label>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Allocated Hours</label>
+            <input type="number" class="form-control" id="rowModalAllocatedHours" min="0.25" max="24" step="0.25" placeholder="e.g. 1.5">
+          </div>
+
+          <div class="col-12">
+            <label class="form-label fw-bold">Row Notes</label>
+            <textarea class="form-control" id="rowModalNotes" rows="2" maxlength="1500"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnSaveTargetRow">Save Row</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/modal_GenericPicker') %>
 
 <script>
@@ -220,38 +255,53 @@
     const classTitleInput = document.getElementById('classTitleInput');
     const templateIdInput = document.getElementById('templateIdInput');
     const templateTitleInput = document.getElementById('templateTitleInput');
+    const targetRowsInput = document.getElementById('targetRowsJson');
     const sessionIdsInput = document.getElementById('sessionIdsJson');
     const dateTargetsInput = document.getElementById('dateTargetsJson');
-    const sessionSummaryInput = document.getElementById('sessionSummaryInput');
-    const selectedSessionsContainer = document.getElementById('selectedSessionsContainer');
-    const selectedDatesContainer = document.getElementById('selectedDatesContainer');
     const targetStudentIdsInput = document.getElementById('targetStudentIdsJson');
     const reportScopeInput = document.getElementById('reportScopeInput');
     const targetStudentSummaryInput = document.getElementById('targetStudentSummaryInput');
     const selectedStudentsContainer = document.getElementById('selectedStudentsContainer');
     const specificStudentsSection = document.getElementById('specificStudentsSection');
     const scopeStudentHint = document.getElementById('scopeStudentHint');
-    const reportStartDateInput = document.getElementById('reportStartDateInput');
-    const reportDueDateInput = document.getElementById('reportDueDateInput');
-    const taskStartTimeInput = document.getElementById('taskStartTimeInput');
-    const taskEndTimeInput = document.getElementById('taskEndTimeInput');
-    const conflictPermittedInput = document.getElementById('conflictPermittedInput');
-    const conflictPermittedHint = document.getElementById('conflictPermittedHint');
-    const btnOpenTeacherSchedulePreview = document.getElementById('btnOpenTeacherSchedulePreview');
-    const dateTargetSection = document.getElementById('dateTargetSection');
-    const sessionSelectedHint = document.getElementById('sessionSelectedHint');
+    const targetRowsBody = document.getElementById('targetRowsBody');
+    const targetRowsEmpty = document.getElementById('targetRowsEmpty');
     const formEl = document.getElementById('assignmentForm');
+
+    const modalEl = document.getElementById('targetRowModal');
+    const modalFields = {
+      index: document.getElementById('rowModalIndex'),
+      rowId: document.getElementById('rowModalRowId'),
+      targetType: document.getElementById('rowModalTargetType'),
+      sessionId: document.getElementById('rowModalSessionId'),
+      sessionDate: document.getElementById('rowModalSessionDate'),
+      sessionSummary: document.getElementById('rowModalSessionSummary'),
+      dueDate: document.getElementById('rowModalDueDate'),
+      reportStartDate: document.getElementById('rowModalReportStartDate'),
+      reportDueDate: document.getElementById('rowModalReportDueDate'),
+      teacherId: document.getElementById('rowModalTeacherId'),
+      teacherSummary: document.getElementById('rowModalTeacherSummary'),
+      teacherWarning: document.getElementById('rowModalTeacherWarning'),
+      taskStartTime: document.getElementById('rowModalTaskStartTime'),
+      taskEndTime: document.getElementById('rowModalTaskEndTime'),
+      conflictPermitted: document.getElementById('rowModalConflictPermitted'),
+      timesheetReflection: document.getElementById('rowModalTimesheetReflection'),
+      allocatedHours: document.getElementById('rowModalAllocatedHours'),
+      status: document.getElementById('rowModalStatus'),
+      notes: document.getElementById('rowModalNotes')
+    };
 
     const allSessions = <%- JSON.stringify(sessions || []) %>;
     const allStudents = <%- JSON.stringify(studentOptions || []) %>;
-    let selectedSessionIds = Array.isArray(<%- JSON.stringify(initialSessionIds) %>) ? <%- JSON.stringify(initialSessionIds) %> : [];
-    let selectedDateTargets = Array.isArray(<%- JSON.stringify(initialDateTargets) %>) ? <%- JSON.stringify(initialDateTargets) %> : [];
+    const teacherOptions = <%- JSON.stringify(teacherOptions || []) %>;
+    const classFirstSessionDate = <%- JSON.stringify(classFirstSessionDate) %>;
+    const classLastSessionDate = <%- JSON.stringify(classLastSessionDate) %>;
+    const firstTeacherId = <%- JSON.stringify(firstTeacherId) %>;
     let selectedTargetStudentIds = Array.isArray(<%- JSON.stringify(Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : []) %>) ? <%- JSON.stringify(Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : []) %> : [];
+    let targetRows = Array.isArray(<%- JSON.stringify(initialTargetRows) %>) ? <%- JSON.stringify(initialTargetRows) %> : [];
 
     function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
-      if (typeof hideLoading === 'function') {
-        hideLoading();
-      }
+      if (typeof hideLoading === 'function') hideLoading();
       if (typeof showMessageModal === 'function') {
         return showMessageModal({
           title,
@@ -264,6 +314,42 @@
       return Promise.resolve('OK');
     }
 
+    function getTargetRowModalInstance() {
+      if (!modalEl || !window.bootstrap?.Modal) return null;
+      if (typeof window.bootstrap.Modal.getOrCreateInstance === 'function') {
+        return window.bootstrap.Modal.getOrCreateInstance(modalEl);
+      }
+      return new window.bootstrap.Modal(modalEl);
+    }
+
+    function showTargetRowModal() {
+      const modalInstance = getTargetRowModalInstance();
+      if (modalInstance) {
+        modalInstance.show();
+        return;
+      }
+      if (!modalEl) return;
+      modalEl.classList.add('show');
+      modalEl.style.display = 'block';
+      modalEl.removeAttribute('aria-hidden');
+      modalEl.setAttribute('aria-modal', 'true');
+      document.body.classList.add('modal-open');
+    }
+
+    function hideTargetRowModal() {
+      const modalInstance = getTargetRowModalInstance();
+      if (modalInstance) {
+        modalInstance.hide();
+        return;
+      }
+      if (!modalEl) return;
+      modalEl.classList.remove('show');
+      modalEl.style.display = 'none';
+      modalEl.setAttribute('aria-hidden', 'true');
+      modalEl.removeAttribute('aria-modal');
+      document.body.classList.remove('modal-open');
+    }
+
     function setSubmitLock(isLocked, activeButton, loadingLabel) {
       const submitButtons = Array.from(formEl?.querySelectorAll('button[type="submit"]') || []);
       submitButtons.forEach((button) => {
@@ -271,16 +357,12 @@
         if (!button.dataset.originalHtml) button.dataset.originalHtml = button.innerHTML;
         button.disabled = isLocked;
       });
-
       if (activeButton) {
         if (!activeButton.dataset.originalHtml) activeButton.dataset.originalHtml = activeButton.innerHTML;
-        if (isLocked) {
-          activeButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + String(loadingLabel || 'Saving...');
-        } else if (activeButton.dataset.originalHtml) {
-          activeButton.innerHTML = activeButton.dataset.originalHtml;
-        }
+        activeButton.innerHTML = isLocked
+          ? '<span class="spinner-border spinner-border-sm me-1"></span>' + String(loadingLabel || 'Saving...')
+          : activeButton.dataset.originalHtml;
       }
-
       if (typeof showLoading === 'function') {
         if (isLocked) showLoading();
         else if (typeof hideLoading === 'function') hideLoading();
@@ -295,120 +377,355 @@
       return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim()) ? String(value).trim() : '';
     }
 
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
+    function getSessionById(id) {
+      return (allSessions || []).find((s) => String(s.sessionId || s.id || '') === String(id || '')) || null;
+    }
+
     function getSessionDisplay(session) {
       if (!session) return '';
       const date = String(session.date || '');
       const start = String(session.startTime || '--:--');
       const end = String(session.endTime || '--:--');
-      const sid = String(session.sessionId || '');
+      const sid = String(session.sessionId || session.id || '');
       return `${date} | ${start}-${end} (${sid})`;
     }
 
-    function getSessionById(id) {
-      return (allSessions || []).find((s) => String(s.sessionId || '') === String(id || '')) || null;
+    function getTeacherName(id, fallback = '') {
+      const teacher = (teacherOptions || []).find((row) => String(row?.id || '') === String(id || ''));
+      return String(teacher?.name || fallback || id || '').trim();
     }
 
-    function getDerivedPeriodFromTargets() {
-      const dates = [];
-      if (selectedSessionIds.length) {
-        selectedSessionIds.forEach((sid) => {
-          const session = getSessionById(sid);
-          const date = toDateOnly(session?.date || '');
-          if (date) dates.push(date);
-        });
-      } else {
-        selectedDateTargets.forEach((date) => {
-          const clean = toDateOnly(date);
-          if (clean) dates.push(clean);
-        });
-      }
-      if (!dates.length) return { start: '', due: '' };
-      dates.sort();
-      return { start: dates[0], due: dates[dates.length - 1] };
+    function teacherHasDeliveredSession(teacherId) {
+      const id = String(teacherId || '').trim();
+      if (!id) return false;
+      return (allSessions || []).some((session) => String(session?.delivery?.deliveredBy || '').trim() === id);
     }
 
-    function syncReportPeriodDefaults() {
-      const derived = getDerivedPeriodFromTargets();
-      if (!derived.start || !derived.due) return;
-      const currentStart = toDateOnly(reportStartDateInput?.value || '');
-      const currentDue = toDateOnly(reportDueDateInput?.value || '');
-      if (!currentStart && reportStartDateInput) reportStartDateInput.value = derived.start;
-      if (!currentDue && reportDueDateInput) reportDueDateInput.value = derived.due;
+    function getFirstClassTeacherId() {
+      return String((teacherOptions || [])[0]?.id || firstTeacherId || '').trim();
     }
 
-    function syncTaskTimeDefaultsFromSessions() {
-      if (!selectedSessionIds.length) return;
-      const currentStart = String(taskStartTimeInput?.value || '').trim();
-      const currentEnd = String(taskEndTimeInput?.value || '').trim();
-      if (currentStart && currentEnd) return;
-      const firstSession = getSessionById(selectedSessionIds[0]);
-      const sessionStart = String(firstSession?.startTime || '').trim();
-      const sessionEnd = String(firstSession?.endTime || '').trim();
-      if (!sessionStart || !sessionEnd) return;
-      if (!currentStart && taskStartTimeInput) taskStartTimeInput.value = sessionStart;
-      if (!currentEnd && taskEndTimeInput) taskEndTimeInput.value = sessionEnd;
+    function getSessionTeacherId(session) {
+      return String(session?.delivery?.deliveredBy || '').trim() || getFirstClassTeacherId();
+    }
+
+    function generateTargetRowId() {
+      return `row_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function normalizeTargetRow(row = {}) {
+      const targetType = String(row.targetType || (row.sessionId ? 'session' : 'date')).trim().toLowerCase() === 'date' ? 'date' : 'session';
+      const session = targetType === 'session' ? getSessionById(row.sessionId) : null;
+      const sessionDate = targetType === 'session' ? toDateOnly(row.sessionDate || session?.date || '') : '';
+      const dueDate = targetType === 'date' ? toDateOnly(row.dueDate || row.sessionDate || '') : '';
+      const teacherId = String(row.teacherId || (session ? getSessionTeacherId(session) : getFirstClassTeacherId()) || '').trim();
+      return {
+        rowId: String(row.rowId || '') || generateTargetRowId(),
+        targetType,
+        sessionId: targetType === 'session' ? String(row.sessionId || session?.sessionId || session?.id || '').trim() : '',
+        sessionDate,
+        dueDate,
+        reportStartDate: toDateOnly(row.reportStartDate || sessionDate || dueDate),
+        reportDueDate: toDateOnly(row.reportDueDate || sessionDate || dueDate),
+        taskStartTime: String(row.taskStartTime || session?.startTime || '').trim(),
+        taskEndTime: String(row.taskEndTime || session?.endTime || '').trim(),
+        conflictPermitted: row.conflictPermitted !== undefined ? Boolean(row.conflictPermitted) : targetType === 'session',
+        timesheetReflection: row.timesheetReflection === true,
+        allocatedHours: row.allocatedHours !== undefined && row.allocatedHours !== null ? row.allocatedHours : '',
+        teacherId,
+        teacherName: String(row.teacherName || getTeacherName(teacherId)).trim(),
+        status: String(row.status || 'active').trim().toLowerCase(),
+        notes: String(row.notes || '').trim()
+      };
     }
 
     function updateHiddenFields() {
-      sessionIdsInput.value = JSON.stringify(uniq(selectedSessionIds));
-      dateTargetsInput.value = JSON.stringify(uniq(selectedDateTargets.map(toDateOnly).filter(Boolean)));
+      targetRows = targetRows.map(normalizeTargetRow);
+      const activeRow = targetRows.find((row) => String(row.status || '').toLowerCase() === 'active') || targetRows[0] || {};
+      const selectedSessionIds = uniq(targetRows.map((row) => row.sessionId));
+      const selectedDateTargets = uniq(targetRows.map((row) => row.dueDate || row.sessionDate).filter(Boolean));
+      sessionIdsInput.value = JSON.stringify(selectedSessionIds);
+      dateTargetsInput.value = JSON.stringify(selectedDateTargets);
       targetStudentIdsInput.value = JSON.stringify(uniq(selectedTargetStudentIds));
+      targetRowsInput.value = JSON.stringify(targetRows);
+      document.getElementById('legacyReportStartDateInput').value = activeRow.reportStartDate || '';
+      document.getElementById('legacyReportDueDateInput').value = activeRow.reportDueDate || '';
+      document.getElementById('legacyTaskStartTimeInput').value = activeRow.taskStartTime || '';
+      document.getElementById('legacyTaskEndTimeInput').value = activeRow.taskEndTime || '';
+      document.getElementById('legacyConflictPermittedInput').value = activeRow.conflictPermitted ? 'true' : 'false';
+      document.getElementById('legacyTimesheetReflectionInput').value = activeRow.timesheetReflection ? 'true' : 'false';
+      document.getElementById('legacyAllocatedHoursInput').value = activeRow.allocatedHours || 0;
+      document.getElementById('legacyStatusInput').value = activeRow.status || 'active';
     }
 
-    function renderSelectedSessions() {
-      const ids = uniq(selectedSessionIds);
-      selectedSessionIds = ids;
-      if (!ids.length) {
-        sessionSummaryInput.value = 'No sessions selected';
-        selectedSessionsContainer.innerHTML = '';
+    function renderTargetRows() {
+      targetRows = targetRows.map(normalizeTargetRow);
+      updateHiddenFields();
+      targetRowsEmpty?.classList.toggle('d-none', targetRows.length > 0);
+      if (!targetRowsBody) return;
+      if (!targetRows.length) {
+        targetRowsBody.innerHTML = '';
         return;
       }
-
-      sessionSummaryInput.value = `${ids.length} session${ids.length === 1 ? '' : 's'} selected`;
-      selectedSessionsContainer.innerHTML = ids.map((id) => {
-        const session = getSessionById(id);
-        const label = session ? getSessionDisplay(session) : id;
-        return `<span class="badge bg-light text-dark border">${label}</span>`;
+      targetRowsBody.innerHTML = targetRows.map((row, index) => {
+        const targetLabel = row.targetType === 'date'
+          ? `No session | ${row.dueDate || '-'}`
+          : `Session | ${getSessionDisplay(getSessionById(row.sessionId)) || row.sessionId || '-'}`;
+        const periodLabel = `${row.reportStartDate || '-'} to ${row.reportDueDate || '-'}`;
+        const taskLabel = row.taskStartTime && row.taskEndTime ? `${row.taskStartTime} - ${row.taskEndTime}` : '-';
+        const timesheetLabel = row.timesheetReflection ? `${row.allocatedHours || '-'} hr` : 'No';
+        return `
+          <tr data-target-row-index="${index}">
+            <td>${escapeHtml(targetLabel)}</td>
+            <td>${escapeHtml(periodLabel)}</td>
+            <td>${escapeHtml(row.teacherName || row.teacherId || '-')}</td>
+            <td>${escapeHtml(taskLabel)}</td>
+            <td>${escapeHtml(timesheetLabel)}</td>
+            <td><span class="badge ${row.status === 'active' ? 'bg-success' : 'bg-secondary'}">${escapeHtml(row.status || '-')}</span></td>
+            <td class="text-end">
+              <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" data-row-actions-toggle aria-expanded="false" aria-label="Target row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><button type="button" class="dropdown-item js-edit-target-row"><i class="bi bi-pencil-square me-2"></i>Edit</button></li>
+                  <li><button type="button" class="dropdown-item js-duplicate-target-row"><i class="bi bi-files me-2"></i>Duplicate</button></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><button type="button" class="dropdown-item text-danger js-remove-target-row"><i class="bi bi-trash me-2"></i>Remove</button></li>
+                </ul>
+              </div>
+            </td>
+          </tr>`;
       }).join('');
     }
 
-    function renderDateTargets() {
-      selectedDateTargets = uniq(selectedDateTargets.map(toDateOnly).filter(Boolean)).sort();
-      if (!selectedDateTargets.length) {
-        selectedDatesContainer.innerHTML = '<span class="text-muted small">No dates selected.</span>';
+    function setModalTargetMode() {
+      const targetType = String(modalFields.targetType.value || 'session');
+      document.getElementById('rowModalSessionSection')?.classList.toggle('d-none', targetType !== 'session');
+      document.getElementById('rowModalDateSection')?.classList.toggle('d-none', targetType !== 'date');
+      updateTeacherWarning();
+    }
+
+    function updateTeacherWarning() {
+      const teacherId = String(modalFields.teacherId.value || '').trim();
+      const show = Boolean(teacherId && !teacherHasDeliveredSession(teacherId));
+      modalFields.teacherWarning?.classList.toggle('d-none', !show);
+    }
+
+    function populateRowModal(row = {}, index = '') {
+      const normalized = normalizeTargetRow(row);
+      modalFields.index.value = index;
+      modalFields.rowId.value = normalized.rowId;
+      modalFields.targetType.value = normalized.targetType;
+      modalFields.sessionId.value = normalized.sessionId;
+      modalFields.sessionDate.value = normalized.sessionDate;
+      modalFields.sessionSummary.value = normalized.sessionId ? (getSessionDisplay(getSessionById(normalized.sessionId)) || normalized.sessionId) : '';
+      modalFields.dueDate.value = normalized.dueDate;
+      modalFields.reportStartDate.value = normalized.reportStartDate;
+      modalFields.reportDueDate.value = normalized.reportDueDate;
+      modalFields.teacherId.value = normalized.teacherId;
+      modalFields.teacherSummary.value = normalized.teacherId ? (normalized.teacherName || getTeacherName(normalized.teacherId)) : '';
+      modalFields.taskStartTime.value = normalized.taskStartTime;
+      modalFields.taskEndTime.value = normalized.taskEndTime;
+      modalFields.conflictPermitted.checked = normalized.conflictPermitted === true;
+      modalFields.timesheetReflection.checked = normalized.timesheetReflection === true;
+      modalFields.allocatedHours.value = normalized.allocatedHours || '';
+      modalFields.status.value = normalized.status || 'active';
+      modalFields.notes.value = normalized.notes || '';
+      setModalTargetMode();
+      showTargetRowModal();
+    }
+
+    function rowFromModal() {
+      const targetType = String(modalFields.targetType.value || 'session') === 'date' ? 'date' : 'session';
+      const session = targetType === 'session' ? getSessionById(modalFields.sessionId.value) : null;
+      return normalizeTargetRow({
+        rowId: modalFields.rowId.value,
+        targetType,
+        sessionId: targetType === 'session' ? modalFields.sessionId.value : '',
+        sessionDate: targetType === 'session' ? (modalFields.sessionDate.value || session?.date || '') : '',
+        dueDate: targetType === 'date' ? modalFields.dueDate.value : '',
+        reportStartDate: modalFields.reportStartDate.value,
+        reportDueDate: modalFields.reportDueDate.value,
+        teacherId: modalFields.teacherId.value,
+        teacherName: modalFields.teacherSummary.value,
+        taskStartTime: modalFields.taskStartTime.value,
+        taskEndTime: modalFields.taskEndTime.value,
+        conflictPermitted: modalFields.conflictPermitted.checked,
+        timesheetReflection: modalFields.timesheetReflection.checked,
+        allocatedHours: modalFields.allocatedHours.value,
+        status: modalFields.status.value,
+        notes: modalFields.notes.value
+      });
+    }
+
+    function validateRow(row, label = 'Target row') {
+      if (!row.teacherId) return `${label}: select one teacher.`;
+      if (row.targetType === 'session') {
+        if (!row.sessionId) return `${label}: select a session.`;
+      } else if (!row.dueDate) return `${label}: set a target date.`;
+      if (!row.reportStartDate || !row.reportDueDate) return `${label}: set both report start and due date.`;
+      if (row.reportStartDate > row.reportDueDate) return `${label}: report start date cannot be after due date.`;
+      if (classFirstSessionDate && row.reportStartDate < classFirstSessionDate) return `${label}: start date cannot be before ${classFirstSessionDate}.`;
+      if (classLastSessionDate && row.reportDueDate > classLastSessionDate) return `${label}: due date cannot be after ${classLastSessionDate}.`;
+      if (!row.taskStartTime || !row.taskEndTime) return `${label}: set both task start and end time.`;
+      if (row.taskStartTime >= row.taskEndTime) return `${label}: task end time must be later than task start time.`;
+      if (row.timesheetReflection) {
+        const allocated = Number(row.allocatedHours);
+        if (!Number.isFinite(allocated) || allocated <= 0) return `${label}: enter allocated hours greater than zero.`;
+      }
+      return '';
+    }
+
+    function localSessionItems() {
+      return (allSessions || []).map((session) => {
+        const sessionId = String(session?.sessionId || session?.id || '').trim();
+        const teacherId = String(session?.delivery?.deliveredBy || '').trim();
+        return {
+          id: sessionId,
+          sessionId,
+          date: String(session?.date || ''),
+          startTime: String(session?.startTime || ''),
+          endTime: String(session?.endTime || ''),
+          className: String(classTitleInput?.value || ''),
+          teacherId,
+          teacherName: getTeacherName(teacherId, teacherId),
+          title: getSessionDisplay(session)
+        };
+      }).filter((row) => Boolean(row.id));
+    }
+
+    document.getElementById('btnAddTargetRow')?.addEventListener('click', () => {
+      populateRowModal({
+        targetType: 'session',
+        teacherId: getFirstClassTeacherId(),
+        status: 'active'
+      }, '');
+    });
+
+    targetRowsBody?.addEventListener('click', (event) => {
+      const rowEl = event.target?.closest?.('tr[data-target-row-index]');
+      if (!rowEl) return;
+      const index = Number(rowEl.getAttribute('data-target-row-index'));
+      if (!Number.isInteger(index)) return;
+      const fallbackToggle = event.target.closest('[data-row-actions-toggle]');
+      if (fallbackToggle && !window.bootstrap?.Dropdown) {
+        event.preventDefault();
+        const menu = fallbackToggle.closest('.dropdown')?.querySelector('.dropdown-menu');
+        const isOpen = menu?.classList.contains('show');
+        document.querySelectorAll('#targetRowsBody .dropdown-menu.show').forEach((openMenu) => openMenu.classList.remove('show'));
+        document.querySelectorAll('#targetRowsBody [data-row-actions-toggle][aria-expanded="true"]').forEach((openToggle) => openToggle.setAttribute('aria-expanded', 'false'));
+        if (menu && !isOpen) {
+          menu.classList.add('show');
+          fallbackToggle.setAttribute('aria-expanded', 'true');
+        }
+      } else if (event.target.closest('.js-edit-target-row')) {
+        event.preventDefault();
+        populateRowModal(targetRows[index], String(index));
+      } else if (event.target.closest('.js-duplicate-target-row')) {
+        event.preventDefault();
+        const copy = normalizeTargetRow({ ...targetRows[index], rowId: generateTargetRowId() });
+        targetRows.splice(index + 1, 0, copy);
+        renderTargetRows();
+      } else if (event.target.closest('.js-remove-target-row')) {
+        event.preventDefault();
+        targetRows.splice(index, 1);
+        renderTargetRows();
+      }
+    });
+
+    document.addEventListener('click', (event) => {
+      if (event.target.closest('#targetRowsBody .dropdown')) return;
+      document.querySelectorAll('#targetRowsBody .dropdown-menu.show').forEach((openMenu) => openMenu.classList.remove('show'));
+      document.querySelectorAll('#targetRowsBody [data-row-actions-toggle][aria-expanded="true"]').forEach((openToggle) => openToggle.setAttribute('aria-expanded', 'false'));
+    });
+
+    modalEl?.addEventListener('click', (event) => {
+      if (event.target.closest('[data-bs-dismiss="modal"]') && !window.bootstrap?.Modal) {
+        hideTargetRowModal();
+      }
+    });
+
+    modalFields.targetType?.addEventListener('change', setModalTargetMode);
+    modalFields.teacherId?.addEventListener('change', updateTeacherWarning);
+
+    document.getElementById('btnPickRowSession')?.addEventListener('click', () => {
+      if (!String(classIdInput.value || '').trim()) {
+        showReportModal({ title: 'Class Required', icon: 'warning', message: 'Select a class first to load sessions.' });
         return;
       }
+      if (!window.GenericPicker || !window.GenericPickerPresets) return;
+      const rows = localSessionItems();
+      const selected = rows.find((row) => row.id === String(modalFields.sessionId.value || '').trim());
+      GenericPicker.open(GenericPickerPresets.session({
+        title: 'Select Session',
+        placeholder: 'Search sessions by date, time, class, or id...',
+        sourceMode: 'local',
+        localItems: rows,
+        searchFields: 'id,sessionId,date,startTime,endTime,className,teacherId,teacherName,title',
+        limit: 5000,
+        multiselect: false,
+        selectedItems: selected ? [selected] : [],
+        onSelect: function (item) {
+          const selectedSessionId = String(item?.sessionId || item?.id || '').trim();
+          const session = getSessionById(selectedSessionId);
+          if (!session) return;
+          modalFields.sessionId.value = selectedSessionId;
+          modalFields.sessionDate.value = toDateOnly(session.date || '');
+          modalFields.sessionSummary.value = getSessionDisplay(session);
+          if (!modalFields.reportStartDate.value) modalFields.reportStartDate.value = toDateOnly(session.date || '');
+          if (!modalFields.reportDueDate.value) modalFields.reportDueDate.value = toDateOnly(session.date || '');
+          if (!modalFields.taskStartTime.value) modalFields.taskStartTime.value = String(session.startTime || '');
+          if (!modalFields.taskEndTime.value) modalFields.taskEndTime.value = String(session.endTime || '');
+          const sessionTeacherId = getSessionTeacherId(session);
+          if (sessionTeacherId) {
+            modalFields.teacherId.value = sessionTeacherId;
+            modalFields.teacherSummary.value = getTeacherName(sessionTeacherId, sessionTeacherId);
+          }
+          updateTeacherWarning();
+        }
+      }));
+    });
 
-      selectedDatesContainer.innerHTML = selectedDateTargets.map((date) => (
-        `<span class="badge bg-light text-dark border">
-          ${date}
-          <button type="button" class="btn btn-link btn-sm p-0 ms-1 text-danger text-decoration-none" data-remove-date="${date}">&times;</button>
-        </span>`
-      )).join('');
-    }
+    document.getElementById('btnPickRowTeacher')?.addEventListener('click', () => {
+      if (!window.GenericPicker || !window.GenericPickerPresets) return;
+      GenericPicker.open(GenericPickerPresets.teacher({
+        title: 'Select Teacher',
+        placeholder: 'Search teachers...',
+        multiselect: false,
+        onSelect: function (item) {
+          const id = String(item?.personId || item?.id || '').trim();
+          if (!id) return;
+          modalFields.teacherId.value = id;
+          modalFields.teacherSummary.value = String(item?.name || item?.title || getTeacherName(id, id));
+          updateTeacherWarning();
+        }
+      }));
+    });
 
-    function applyTargetModeState() {
-      const hasSessions = selectedSessionIds.length > 0;
-      dateTargetSection.classList.toggle('opacity-50', hasSessions);
-      const dateControls = dateTargetSection.querySelectorAll('input,button');
-      dateControls.forEach((el) => { el.disabled = hasSessions; });
-      sessionSelectedHint.classList.toggle('d-none', !hasSessions);
-      if (conflictPermittedInput) {
-        if (hasSessions) conflictPermittedInput.checked = true;
+    document.getElementById('btnSaveTargetRow')?.addEventListener('click', async () => {
+      const row = rowFromModal();
+      const issue = validateRow(row, 'Target row');
+      if (issue) {
+        await showReportModal({ title: 'Row Incomplete', icon: 'warning', message: issue });
+        return;
       }
-      if (conflictPermittedHint) {
-        conflictPermittedHint.textContent = hasSessions
-          ? 'Session-linked reports are marked as intentional overlap automatically.'
-          : 'Enable only when overlap is intentionally allowed.';
-      }
-      updateHiddenFields();
-      syncReportPeriodDefaults();
-      syncTaskTimeDefaultsFromSessions();
-    }
-
-    function getStudentById(id) {
-      return (allStudents || []).find((s) => String(s.id || '') === String(id || '')) || null;
-    }
+      const index = Number(modalFields.index.value);
+      if (Number.isInteger(index) && index >= 0 && targetRows[index]) targetRows[index] = row;
+      else targetRows.push(row);
+      renderTargetRows();
+      hideTargetRowModal();
+    });
 
     function renderSelectedStudents() {
       const ids = uniq(selectedTargetStudentIds);
@@ -420,9 +737,9 @@
       }
       targetStudentSummaryInput.value = `${ids.length} student${ids.length === 1 ? '' : 's'} selected`;
       selectedStudentsContainer.innerHTML = ids.map((id) => {
-        const student = getStudentById(id);
+        const student = (allStudents || []).find((s) => String(s.id || '') === String(id || '')) || null;
         const label = student ? `${student.name || id} (${id})` : id;
-        return `<span class="badge bg-light text-dark border">${label}</span>`;
+        return `<span class="badge bg-light text-dark border">${escapeHtml(label)}</span>`;
       }).join('');
     }
 
@@ -452,23 +769,6 @@
       const next = cleanClassId ? `${base}?classId=${encodeURIComponent(cleanClassId)}` : base;
       window.isFormSubmitting = true;
       window.location.assign(next);
-    }
-
-    function resolvePreviewTargetDate() {
-      const sessionDates = selectedSessionIds
-        .map((sid) => getSessionById(sid))
-        .map((session) => toDateOnly(session?.date || ''))
-        .filter(Boolean)
-        .sort();
-      if (sessionDates.length) return sessionDates[0];
-
-      const dateTargets = selectedDateTargets
-        .map((date) => toDateOnly(date))
-        .filter(Boolean)
-        .sort();
-      if (dateTargets.length) return dateTargets[0];
-
-      return toDateOnly(reportDueDateInput?.value || '');
     }
 
     document.getElementById('btnPickClass')?.addEventListener('click', function () {
@@ -501,77 +801,6 @@
       }));
     });
 
-    btnOpenTeacherSchedulePreview?.addEventListener('click', function () {
-      const selectedTeacherInput = formEl?.querySelector('input[name="teacherIds"]:checked');
-      if (!selectedTeacherInput) {
-        showReportModal({ title: 'Teacher Required', icon: 'warning', message: 'Select at least one teacher first.' });
-        return;
-      }
-
-      const teacherId = String(selectedTeacherInput.value || '').trim();
-      if (!teacherId) {
-        showReportModal({ title: 'Teacher Required', icon: 'warning', message: 'Selected teacher id is invalid.' });
-        return;
-      }
-
-      const labelEl = selectedTeacherInput.closest('label')?.querySelector('.fw-semibold');
-      const teacherName = String(labelEl?.textContent || teacherId).trim() || teacherId;
-      const targetDate = resolvePreviewTargetDate();
-      if (!targetDate) {
-        showReportModal({
-          title: 'Target Date Required',
-          icon: 'warning',
-          message: 'Select a session, add a due date target, or set Report Due Date first.'
-        });
-        return;
-      }
-
-      const url = `/school/schedules?personId=${encodeURIComponent(teacherId)}&personName=${encodeURIComponent(teacherName)}&date=${encodeURIComponent(targetDate)}`;
-      window.open(url, '_blank', 'noopener');
-    });
-
-    document.getElementById('btnOpenSessionPicker')?.addEventListener('click', function () {
-      if (!String(classIdInput.value || '').trim()) {
-        showReportModal({ title: 'Class Required', icon: 'warning', message: 'Select a class first to load sessions.', buttonClass: 'btn-secondary' });
-        return;
-      }
-      if (!window.GenericPicker || !window.GenericPickerPresets) return;
-      const localSessionItems = (allSessions || []).map((session) => {
-        const sessionId = String(session?.sessionId || session?.id || '').trim();
-        const teacherId = String(session?.delivery?.deliveredBy || '').trim();
-        return {
-          id: sessionId,
-          sessionId,
-          date: String(session?.date || ''),
-          startTime: String(session?.startTime || ''),
-          endTime: String(session?.endTime || ''),
-          className: String(classTitleInput?.value || ''),
-          teacherId,
-          teacherName: teacherId,
-          title: getSessionDisplay(session)
-        };
-      }).filter((row) => Boolean(row.id));
-      const selectedSessionMap = new Map(localSessionItems.map((row) => [row.id, row]));
-      GenericPicker.open(GenericPickerPresets.session({
-        title: 'Select Sessions',
-        placeholder: 'Search sessions by date, time, class, or id...',
-        sourceMode: 'local',
-        localItems: localSessionItems,
-        searchFields: 'id,sessionId,date,startTime,endTime,className,teacherId,teacherName,title',
-        limit: 5000,
-        multiselect: true,
-        selectedItems: selectedSessionIds.map((id) => selectedSessionMap.get(String(id || '').trim())).filter(Boolean),
-        onSelect: function (items) {
-          const rows = Array.isArray(items) ? items : [items];
-          selectedSessionIds = rows
-            .map((session) => String(session?.sessionId || session?.id || '').trim())
-            .filter(Boolean);
-          renderSelectedSessions();
-          applyTargetModeState();
-        }
-      }));
-    });
-
     reportScopeInput?.addEventListener('change', applyScopeState);
 
     document.getElementById('btnOpenStudentPicker')?.addEventListener('click', function () {
@@ -587,11 +816,7 @@
       const localStudentItems = (allStudents || []).map((student) => {
         const id = String(student?.id || '').trim();
         const name = String(student?.name || '').trim();
-        return {
-          id,
-          name,
-          title: name ? `${name} (${id})` : id
-        };
+        return { id, name, title: name ? `${name} (${id})` : id };
       }).filter((row) => Boolean(row.id));
       const allowedStudentIds = new Set(localStudentItems.map((row) => row.id));
       const selectedRowMap = new Map(localStudentItems.map((row) => [row.id, row]));
@@ -620,33 +845,7 @@
       }));
     });
 
-    document.getElementById('btnAddDateTarget')?.addEventListener('click', function () {
-      const dateInput = document.getElementById('dateTargetInput');
-      const date = toDateOnly(dateInput?.value || '');
-      if (!date) return;
-      if (!selectedDateTargets.includes(date)) selectedDateTargets.push(date);
-      if (dateInput) dateInput.value = '';
-      renderDateTargets();
-      applyTargetModeState();
-    });
-
-    document.getElementById('btnClearDateTargets')?.addEventListener('click', function () {
-      selectedDateTargets = [];
-      renderDateTargets();
-      applyTargetModeState();
-    });
-
-    selectedDatesContainer?.addEventListener('click', function (event) {
-      const target = event.target;
-      if (!target || !target.matches('button[data-remove-date]')) return;
-      const date = String(target.getAttribute('data-remove-date') || '').trim();
-      selectedDateTargets = selectedDateTargets.filter((d) => d !== date);
-      renderDateTargets();
-      applyTargetModeState();
-    });
-
     let isSavingAssignment = false;
-
     formEl?.addEventListener('submit', async function (event) {
       event.preventDefault();
       if (isSavingAssignment) return;
@@ -661,38 +860,21 @@
         await showReportModal({ title: 'Template Required', icon: 'warning', message: 'Select a template.' });
         return;
       }
-      const reportDueDateForTargetFallback = toDateOnly(reportDueDateInput?.value || '');
-      if (!selectedSessionIds.length && !selectedDateTargets.length && !reportDueDateForTargetFallback) {
-        await showReportModal({ title: 'Target Required', icon: 'warning', message: 'Select at least one session, add a due date target, or set Report Due Date.' });
+      targetRows = targetRows.map(normalizeTargetRow);
+      if (!targetRows.length) {
+        await showReportModal({ title: 'Target Rows Required', icon: 'warning', message: 'Add at least one report target row.' });
         return;
       }
       if (String(reportScopeInput?.value || 'class').trim().toLowerCase() === 'selected_students' && !selectedTargetStudentIds.length) {
         await showReportModal({ title: 'Student Required', icon: 'warning', message: 'Select at least one student for the specific students scope.' });
         return;
       }
-      if (selectedSessionIds.length && conflictPermittedInput) {
-        conflictPermittedInput.checked = true;
-      }
-      syncReportPeriodDefaults();
-      const reportStartDate = toDateOnly(reportStartDateInput?.value || '');
-      const reportDueDate = toDateOnly(reportDueDateInput?.value || '');
-      const taskStartTime = String(taskStartTimeInput?.value || '').trim();
-      const taskEndTime = String(taskEndTimeInput?.value || '').trim();
-      if (!taskStartTime || !taskEndTime) {
-        await showReportModal({ title: 'Task Time Required', icon: 'warning', message: 'Set both task start and task end time.' });
-        return;
-      }
-      if (taskStartTime >= taskEndTime) {
-        await showReportModal({ title: 'Invalid Task Time', icon: 'warning', message: 'Task end time must be later than task start time.' });
-        return;
-      }
-      if ((reportStartDate && !reportDueDate) || (!reportStartDate && reportDueDate)) {
-        await showReportModal({ title: 'Invalid Report Period', icon: 'warning', message: 'Provide both report start date and report due date, or leave both empty.' });
-        return;
-      }
-      if (reportStartDate && reportDueDate && reportStartDate > reportDueDate) {
-        await showReportModal({ title: 'Invalid Report Period', icon: 'warning', message: 'Report start date cannot be after report due date.' });
-        return;
+      for (let i = 0; i < targetRows.length; i += 1) {
+        const issue = validateRow(targetRows[i], `Target row ${i + 1}`);
+        if (issue) {
+          await showReportModal({ title: 'Row Incomplete', icon: 'warning', message: issue });
+          return;
+        }
       }
       updateHiddenFields();
 
@@ -749,19 +931,14 @@
 
         if (!response.ok || String(payload?.status || '').toLowerCase() !== 'success') {
           const message = String(payload?.message || '').trim() || 'Unable to save assignment.';
-          await showReportModal({
-            title: 'Save Failed',
-            icon: 'warning',
-            message
-          });
+          await showReportModal({ title: 'Save Failed', icon: 'warning', message });
           return;
         }
 
-        const successMessage = String(payload?.message || '').trim() || 'Assignment saved successfully.';
         await showReportModal({
           title: 'Saved',
           icon: 'success',
-          message: successMessage,
+          message: String(payload?.message || '').trim() || 'Assignment saved successfully.',
           buttonClass: 'btn-success'
         });
         window.isFormSubmitting = true;
@@ -778,34 +955,8 @@
       }
     });
 
-    renderSelectedSessions();
-    renderDateTargets();
     renderSelectedStudents();
-    applyTargetModeState();
+    renderTargetRows();
     applyScopeState();
-
-    const timesheetReflectionInput = document.getElementById('timesheetReflectionInput');
-    const allocatedHoursInput = document.getElementById('allocatedHoursInput');
-    function syncTimesheetReflectionUi() {
-      if (!timesheetReflectionInput || !allocatedHoursInput) return;
-      const on = timesheetReflectionInput.checked;
-      allocatedHoursInput.toggleAttribute('required', on);
-      if (!on) allocatedHoursInput.setCustomValidity('');
-    }
-    if (timesheetReflectionInput) {
-      timesheetReflectionInput.addEventListener('change', syncTimesheetReflectionUi);
-    }
-    if (allocatedHoursInput) {
-      allocatedHoursInput.addEventListener('input', () => {
-        if (!timesheetReflectionInput?.checked) return;
-        const v = parseFloat(allocatedHoursInput.value);
-        if (!Number.isFinite(v) || v <= 0) {
-          allocatedHoursInput.setCustomValidity('Enter allocated hours greater than zero when Timesheet reflection is enabled.');
-        } else {
-          allocatedHoursInput.setCustomValidity('');
-        }
-      });
-    }
-    syncTimesheetReflectionUi();
   })();
 </script>

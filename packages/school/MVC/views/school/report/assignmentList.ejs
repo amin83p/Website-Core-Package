@@ -150,6 +150,9 @@
           <td class="ps-4">
             <div class="fw-bold text-dark font-monospace"><%= row.id %></div>
             <div class="x-small text-muted"><%= row.targetType === 'date' ? 'Date Target' : 'Session Target' %></div>
+            <% if (Number(row.targetRowCount || 0) > 1) { %>
+              <div class="x-small mt-1"><span class="badge bg-info-subtle text-info-emphasis border"><%= row.targetRowCount %> target rows</span></div>
+            <% } %>
           </td>
           <td>
             <div class="fw-bold"><%= row.classTitle %></div>
@@ -204,7 +207,8 @@
                   <a href="/school/classes/edit-wizard/<%= encodeURIComponent(row.classId) %>" class="btn btn-outline-info btn-sm"><i class="bi bi-diagram-3 me-2"></i>Lifecycle</a>
                 <% } %>
                 <a href="/school/reports/assignments/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
-                <a href="/school/reports/instances/start/<%= row.id %>?teacherId=<%= encodeURIComponent((row.teacherIds || [])[0] || '') %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-play-circle me-2"></i>Start</a>
+                <% const firstTargetRow = Array.isArray(row.targetRows) && row.targetRows.length ? row.targetRows[0] : null; %>
+                <a href="/school/reports/instances/start/<%= row.id %>?teacherId=<%= encodeURIComponent((row.teacherIds || [])[0] || '') %><%= firstTargetRow?.rowId ? ('&rowId=' + encodeURIComponent(firstTargetRow.rowId)) : '' %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-play-circle me-2"></i>Start</a>
                 <a href="/school/reports/assignments/delete/<%= row.id %>" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-2"></i>Delete</a>
               </div>
             </div>

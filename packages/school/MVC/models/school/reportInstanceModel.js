@@ -118,6 +118,7 @@ function sanitizeInstance(input, { isUpdate = false, existing = null } = {}) {
   const out = {
     orgId,
     assignmentId,
+    assignmentRowId: cleanId(input.assignmentRowId, { max: 80, allowEmpty: true }) || '',
     classId,
     sessionId,
     sessionDate,
@@ -161,10 +162,11 @@ async function getInstanceById(id) {
   return all.find((row) => idsEqual(row.id, id)) || null;
 }
 
-async function findByAssignmentTeacherTarget(assignmentId, teacherId, targetKey = 'class') {
+async function findByAssignmentTeacherTarget(assignmentId, teacherId, targetKey = 'class', assignmentRowId = '') {
   const all = await getAllInstances();
   return all.find((row) =>
     idsEqual(row.assignmentId, assignmentId) &&
+    idsEqual(row.assignmentRowId || '', assignmentRowId || '') &&
     idsEqual(row.teacherId, teacherId) &&
     String(row.targetKey || 'class') === String(targetKey || 'class')
   ) || null;
@@ -175,6 +177,7 @@ function assertUnique(list, candidate, { excludeId = null } = {}) {
     if (excludeId && idsEqual(row.id, excludeId)) return false;
     return (
       idsEqual(row.assignmentId, candidate.assignmentId) &&
+      idsEqual(row.assignmentRowId || '', candidate.assignmentRowId || '') &&
       idsEqual(row.teacherId, candidate.teacherId) &&
       String(row.targetKey || 'class') === String(candidate.targetKey || 'class')
     );

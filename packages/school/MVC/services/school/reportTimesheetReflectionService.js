@@ -5,6 +5,7 @@
 const schoolDataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 
 function normalizeId(value) {
   return String(value || '').trim();
@@ -32,9 +33,10 @@ function padTime(value) {
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
-function sessionIdForReportAssignment(assignmentId) {
+function sessionIdForReportAssignment(assignmentId, assignmentRowId = '') {
   const id = normalizeId(assignmentId);
-  return id ? `rptref-${id}` : '';
+  const rowId = normalizeId(assignmentRowId);
+  return id ? `rptref-${id}${rowId ? `-${rowId}` : ''}` : '';
 }
 
 /**
@@ -70,7 +72,15 @@ async function buildReportReflectionLiveSessions({
   const classSessionsById = new Map();
   const out = [];
 
+  const expandedAssignments = [];
   for (const assignment of Array.isArray(assignments) ? assignments : []) {
+    const targetRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment);
+    (targetRows.length ? targetRows : [{}]).forEach((targetRow) => {
+      expandedAssignments.push(reportAssignmentSessionUtils.applyTargetRow(assignment, targetRow));
+    });
+  }
+
+  for (const assignment of expandedAssignments) {
     if (String(assignment?.status || '').trim().toLowerCase() !== 'active') continue;
     if (assignment?.timesheetReflection !== true) continue;
     if (activeOrgId && !idsEqual(assignment?.orgId, activeOrgId)) continue;
@@ -109,7 +119,7 @@ async function buildReportReflectionLiveSessions({
     const templateTitle = templateMap.get(normalizeId(assignment?.templateId)) || assignment.templateId || 'Report';
     const startTime = padTime(assignment?.taskStartTime);
     const endTime = padTime(assignment?.taskEndTime);
-    const sid = sessionIdForReportAssignment(assignment.id);
+    const sid = sessionIdForReportAssignment(assignment.id, assignment.assignmentRowId);
     if (!sid) continue;
 
     out.push({

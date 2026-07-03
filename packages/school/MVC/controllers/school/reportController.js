@@ -648,22 +648,16 @@ async function saveAssignment(req, res) {
       conflictPermitted,
       selectedTargetStudentIds,
       reportScope,
-      teacherIds,
       status,
       notes,
-      timesheetReflection,
-      allocatedHours
+      targetRows
     } = requestPayload;
-    if (timesheetReflection && (!Number.isFinite(allocatedHours) || allocatedHours <= 0)) {
-      throw new Error('Enter allocated hours greater than zero when Timesheet reflection is enabled.');
-    }
     const hasSessionTargets = selectedSessionIds.length > 0;
     const effectiveConflictPermitted = hasSessionTargets ? true : Boolean(conflictPermitted);
 
     const {
-      sessions,
       template,
-      effectiveDateTargets,
+      effectiveTargetRows,
       persistedTargetStudentIds
     } = await reportIntegrityService.validateAssignmentCrossEntityContext({
       classId,
@@ -673,23 +667,23 @@ async function saveAssignment(req, res) {
       hasSessionTargets,
       selectedDateTargets,
       selectedSessionIds,
-      teacherIds,
+      teacherIds: targetRows.length
+        ? targetRows.map((row) => row.teacherId).filter(Boolean)
+        : requestPayload.teacherIds,
       requestedTaskStartTime,
       requestedTaskEndTime,
       conflictPermitted: effectiveConflictPermitted,
       requestedReportStartDate,
       requestedReportDueDate,
       selectedTargetStudentIds,
+      targetRows,
       excludeAssignmentId: isEdit ? id : ''
     });
 
-    const resolvedPeriod = reportViewService.resolveReportPeriod({
-      requestedStartDate: requestedReportStartDate,
-      requestedDueDate: requestedReportDueDate,
-      selectedSessionIds,
-      selectedDateTargets: effectiveDateTargets,
-      sessions
-    });
+    const firstActiveRow = effectiveTargetRows.find((row) => String(row?.status || '').toLowerCase() === 'active') || effectiveTargetRows[0];
+    const rowTeacherIds = [...new Set(effectiveTargetRows
+      .map((row) => String(row?.teacherId || '').trim())
+      .filter(Boolean))];
 
     const basePayload = {
       orgId: existing?.orgId || activeOrgId,
@@ -698,16 +692,21 @@ async function saveAssignment(req, res) {
       targetStudentIds: persistedTargetStudentIds,
       templateId: template.id,
       templateVersion: Number(template.version || 1),
-      teacherIds,
-      conflictPermitted: effectiveConflictPermitted,
-      taskStartTime: requestedTaskStartTime,
-      taskEndTime: requestedTaskEndTime,
-      reportStartDate: resolvedPeriod.reportStartDate,
-      reportDueDate: resolvedPeriod.reportDueDate,
+      teacherIds: rowTeacherIds,
+      targetRows: effectiveTargetRows,
+      targetType: firstActiveRow.targetType,
+      sessionId: firstActiveRow.sessionId,
+      sessionDate: firstActiveRow.sessionDate,
+      dueDate: firstActiveRow.dueDate,
+      conflictPermitted: firstActiveRow.conflictPermitted,
+      taskStartTime: firstActiveRow.taskStartTime,
+      taskEndTime: firstActiveRow.taskEndTime,
+      reportStartDate: firstActiveRow.reportStartDate,
+      reportDueDate: firstActiveRow.reportDueDate,
       status,
       notes,
-      timesheetReflection,
-      allocatedHours: timesheetReflection ? Number(allocatedHours) : 0,
+      timesheetReflection: firstActiveRow.timesheetReflection,
+      allocatedHours: firstActiveRow.timesheetReflection ? Number(firstActiveRow.allocatedHours) : 0,
       audit: {
         createUser: existing?.audit?.createUser || req.user?.id || '',
         createDateTime: existing?.audit?.createDateTime || new Date().toISOString(),
@@ -717,66 +716,14 @@ async function saveAssignment(req, res) {
     };
 
     if (isEdit) {
-      if (hasSessionTargets) {
-        if (selectedSessionIds.length !== 1) {
-          throw new Error('Edit mode supports exactly one target session. Use New Assignment for bulk creation.');
-        }
-        const session = sessions.find((row) => idsEqual(row.sessionId || '', selectedSessionIds[0] || ''));
-        if (!session) throw new Error('Selected class session was not found.');
-        await schoolDataService.updateData('reportAssignments', id, {
-          ...basePayload,
-          targetType: 'session',
-          sessionId: String(session.sessionId || ''),
-          sessionDate: String(session.date || ''),
-          dueDate: ''
-        }, req.user);
-      } else {
-        if (effectiveDateTargets.length !== 1) {
-          throw new Error('Edit mode supports exactly one due date target. Use New Assignment for bulk creation.');
-        }
-        const dueDate = String(effectiveDateTargets[0] || '').trim();
-        await schoolDataService.updateData('reportAssignments', id, {
-          ...basePayload,
-          targetType: 'date',
-          sessionId: '',
-          sessionDate: dueDate,
-          dueDate
-        }, req.user);
-      }
+      await schoolDataService.updateData('reportAssignments', id, basePayload, req.user);
     } else {
-      const payloads = [];
-      if (hasSessionTargets) {
-        selectedSessionIds.forEach((sessionId) => {
-          const session = sessions.find((row) => idsEqual(row.sessionId || '', sessionId || ''));
-          if (!session) throw new Error(`Selected class session was not found: ${sessionId}`);
-          payloads.push({
-            ...basePayload,
-            targetType: 'session',
-            sessionId: String(session.sessionId || ''),
-            sessionDate: String(session.date || ''),
-            dueDate: ''
-          });
-        });
-      } else {
-        effectiveDateTargets.forEach((dueDate) => {
-          payloads.push({
-            ...basePayload,
-            targetType: 'date',
-            sessionId: '',
-            sessionDate: dueDate,
-            dueDate
-          });
-        });
-      }
-
-      for (const payload of payloads) {
-        await schoolDataService.addData('reportAssignments', payload, req.user);
-      }
+      await schoolDataService.addData('reportAssignments', basePayload, req.user);
 
       if (isAjax(req)) {
         return res.json({
           status: 'success',
-          message: `${payloads.length} assignment${payloads.length === 1 ? '' : 's'} saved successfully.`
+          message: `Assignment saved with ${effectiveTargetRows.length} target row${effectiveTargetRows.length === 1 ? '' : 's'}.`
         });
       }
       return res.redirect('/school/reports/assignments');
@@ -891,10 +838,12 @@ async function startInstance(req, res) {
   try {
     const {
       assignment,
+      assignmentRow,
       teacherId,
       targetStudentIds
     } = await reportIntegrityService.resolveStartInstanceContext({
       assignmentId: req.params.assignmentId,
+      assignmentRowId: req.query.rowId || req.query.assignmentRowId || '',
       reqUser: req.user,
       requestedTeacherId: req.query.teacherId,
       fallbackTeacherId: req.user?.personId || '',
@@ -906,6 +855,7 @@ async function startInstance(req, res) {
       const targetKey = studentId ? `student:${studentId}` : 'class';
       const existingInstances = await schoolDataService.fetchData('reportInstances', {
         assignmentId__eq: assignment.id,
+        assignmentRowId__eq: assignment.assignmentRowId || '',
         teacherId__eq: teacherId,
         targetKey__eq: targetKey,
         page: 1,
@@ -922,6 +872,7 @@ async function startInstance(req, res) {
         instance = await schoolDataService.addData('reportInstances', {
           orgId: assignment.orgId,
           assignmentId: assignment.id,
+          assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
           classId: assignment.classId,
           sessionId: assignment.sessionId,
           sessionDate: assignment.sessionDate,
@@ -965,6 +916,10 @@ async function buildInstanceEditorRenderContext(req) {
     schoolDataService.getDataById('classes', instance.classId, req.user)
   ]);
   if (!template) throw new Error('Template not found for this report instance.');
+  const effectiveAssignment = reportViewService.applyAssignmentRow(
+    assignment,
+    reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+  );
 
   let latestInstance = await schoolDataService.getDataById('reportInstances', req.params.id, req.user);
   if (String(latestInstance?.status || '').toLowerCase() !== 'locked') {
@@ -980,7 +935,7 @@ async function buildInstanceEditorRenderContext(req) {
       }, req.user);
     }
   }
-  const mergedData = reportService.mergeTemplateData(template, latestInstance, assignment);
+  const mergedData = reportService.mergeTemplateData(template, latestInstance, effectiveAssignment);
   const validationSummary = reportRuleEngineService.evaluateTemplateValidations({
     template,
     mergedAnswers: mergedData,
@@ -1008,23 +963,29 @@ async function buildInstanceEditorRenderContext(req) {
     ? await dataServiceGlobal.getDataById('persons', studentRegistry.personId, req.user, PERSON_QUERY_OPTIONS)
     : null);
   const instanceDetails = buildReportInstanceDetailsForView(latestInstance, {
-    assignment,
+    assignment: effectiveAssignment,
     classData,
     classSessions,
     teacherPerson,
     studentRegistry,
     studentPerson
   });
+  const reportReviewNavigator = await reportViewService.buildReportReviewNavigator({
+    currentInstance: latestInstance,
+    reqUser: req.user,
+    participantOnly: req.reportInstanceParticipantAccess === true
+  });
 
   return {
     title: `Report Editor: ${template.title}`,
     instance: latestInstance,
     template,
-    assignment,
+    assignment: effectiveAssignment,
     classData,
     instanceDetails,
     mergedData,
     validationSummary,
+    reportReviewNavigator,
     safeReturnUrl: resolveSafeSameOriginReturnUrl(req, latestInstance?.id),
     includeModal: true,
     user: req.user,
@@ -1075,8 +1036,12 @@ async function saveInstance(req, res) {
       schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user)
     ]);
     if (!template) throw new Error('Template not found.');
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+    );
 
-    const mergedBeforeSave = reportService.mergeTemplateData(template, instance, assignment);
+    const mergedBeforeSave = reportService.mergeTemplateData(template, instance, effectiveAssignment);
     const parsedAnswers = reportViewService.buildInstanceAnswers(template, req.body, mergedBeforeSave);
     const recomputedBeforeSave = reportService.recomputeCalculatedAnswers({
       template,
@@ -1084,7 +1049,7 @@ async function saveInstance(req, res) {
       prefill: instance?.prefillSnapshot || {}
     });
     const fullAnswers = recomputedBeforeSave.answers;
-    const { studentAnswers, sharedAnswers } = reportService.partitionInstanceSave(template, assignment, fullAnswers);
+    const { studentAnswers, sharedAnswers } = reportService.partitionInstanceSave(template, effectiveAssignment, fullAnswers);
     const nextStatus = reportViewService.resolveInstanceNextStatus(instance, req.body.submitAction);
 
     const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
@@ -1095,7 +1060,7 @@ async function saveInstance(req, res) {
         return !visualOnly && f?.sharedAcrossStudents === true;
       })
       .map((f) => f.id);
-    const eachStudent = String(assignment?.reportScope || '').trim().toLowerCase() === 'each_student';
+    const eachStudent = String(effectiveAssignment?.reportScope || '').trim().toLowerCase() === 'each_student';
     const nextShared = {};
     if (eachStudent && sharedFieldIds.length > 0) {
       sharedFieldIds.forEach((fid) => {
@@ -1107,11 +1072,11 @@ async function saveInstance(req, res) {
       ? {
           ...(assignment || {}),
           sharedAnswers: {
-            ...((assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object') ? assignment.sharedAnswers : {}),
+          ...((effectiveAssignment?.sharedAnswers && typeof effectiveAssignment.sharedAnswers === 'object') ? effectiveAssignment.sharedAnswers : {}),
             ...sharedAnswers
           }
         }
-      : assignment;
+      : effectiveAssignment;
     const mergedForValidation = reportService.mergeTemplateData(
       template,
       {
@@ -1136,8 +1101,8 @@ async function saveInstance(req, res) {
       throw new Error(message);
     }
 
-    if (eachStudent && sharedFieldIds.length > 0 && assignment?.id) {
-      await schoolDataService.updateData('reportAssignments', assignment.id, {
+    if (eachStudent && sharedFieldIds.length > 0 && effectiveAssignment?.id) {
+      await schoolDataService.updateData('reportAssignments', effectiveAssignment.id, {
         sharedAnswers: nextShared
       }, req.user);
     }
@@ -1186,7 +1151,11 @@ async function previewInstancePrefillRefresh(req, res) {
       });
     }
 
-    const preview = await buildPrefillRefreshPreview({ instance, template, assignment, reqUser: req.user });
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+    );
+    const preview = await buildPrefillRefreshPreview({ instance, template, assignment: effectiveAssignment, reqUser: req.user });
     return res.json({
       status: 'success',
       message: preview.changes.length
@@ -1208,6 +1177,10 @@ async function applyInstancePrefillRefresh(req, res) {
       schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user)
     ]);
     if (!template) throw new Error('Template not found.');
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+    );
 
     const rawSelected = Array.isArray(req.body?.selectedKeys)
       ? req.body.selectedKeys
@@ -1221,7 +1194,7 @@ async function applyInstancePrefillRefresh(req, res) {
       throw new Error('Select at least one prefill key to replace.');
     }
 
-    const preview = await buildPrefillRefreshPreview({ instance, template, assignment, reqUser: req.user });
+    const preview = await buildPrefillRefreshPreview({ instance, template, assignment: effectiveAssignment, reqUser: req.user });
     const selectedChanges = preview.changes.filter((change) => selectedKeys.has(change.prefillKey));
     if (!selectedChanges.length) {
       throw new Error('The selected prefill keys no longer have changes to apply.');
@@ -1248,7 +1221,7 @@ async function applyInstancePrefillRefresh(req, res) {
         prefillSnapshot: nextPrefill,
         answers: nextAnswers
       },
-      assignment
+      effectiveAssignment
     );
     const recomputedAfterPrefillRefresh = reportService.recomputeCalculatedAnswers({
       template,
@@ -1331,9 +1304,13 @@ async function exportInstance(req, res) {
     ]);
     if (!template) throw new Error('Template not found.');
 
-    const placeholderBundle = reportService.buildPlaceholderPayloadDetailed(template, instance, assignment);
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+    );
+    const placeholderBundle = reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
     const placeholders = placeholderBundle.placeholders;
-    const mergedAnswers = reportService.mergeTemplateData(template, instance, assignment);
+    const mergedAnswers = reportService.mergeTemplateData(template, instance, effectiveAssignment);
     const payload = {
       instanceId: instance.id,
       templateId: template.id,
@@ -1343,7 +1320,7 @@ async function exportInstance(req, res) {
       answers: instance.answers || {},
       mergedAnswers,
       conversionDiagnostics: placeholderBundle.conversionDiagnostics || [],
-      assignmentSharedAnswers: assignment?.sharedAnswers || {},
+      assignmentSharedAnswers: effectiveAssignment?.sharedAnswers || {},
       prefillSnapshot: instance.prefillSnapshot || {}
     };
 

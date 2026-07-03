@@ -77,7 +77,7 @@ function extractRelativeUploadPath(uploadUrl = '') {
   if (!token) return '';
   const withoutHost = token.replace(/^https?:\/\/[^/]+/i, '');
   const normalized = withoutHost.replace(/\\/g, '/');
-  const match = normalized.match(/^\/?uploads\/(.+)$/i);
+  const match = normalized.match(/^\/?(?:app\/)?uploads\/(.+)$/i);
   if (!match || !match[1]) return '';
   return String(match[1]).replace(/^\/+/, '');
 }
@@ -94,7 +94,7 @@ function fromUploadsUrlToDiskPath(uploadUrl = '', rootPath = '') {
 
 function fromDiskPathToUploadsUrl(absolutePath = '', rootPath = '') {
   const token = cleanString(absolutePath).replace(/\\/g, '/');
-  if (/^https?:\/\/[^/]+\/uploads\//i.test(token) || /^\/uploads\//i.test(token)) {
+  if (/^https?:\/\/[^/]+\/(?:app\/)?uploads\//i.test(token) || /^\/(?:app\/)?uploads\//i.test(token)) {
     const relative = extractRelativeUploadPath(token);
     return relative ? `${UPLOADS_URL_PREFIX}/${relative}` : '';
   }

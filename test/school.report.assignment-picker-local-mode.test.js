@@ -18,17 +18,19 @@ test('generic picker supports local source mode', () => {
   assert.match(pickerView, /Error filtering local data\./);
 });
 
-test('report assignment session and student pickers use local data mode', () => {
+test('report assignment row session and student pickers use local data mode', () => {
   const assignmentView = read('packages/school/MVC/views/school/report/assignmentForm.ejs');
 
-  assert.match(assignmentView, /const localSessionItems = \(allSessions \|\| \[\]\)\.map/);
+  assert.match(assignmentView, /function localSessionItems\(\)/);
   assert.match(assignmentView, /sourceMode:\s*'local'/);
-  assert.match(assignmentView, /localItems:\s*localSessionItems/);
+  assert.match(assignmentView, /localItems:\s*rows/);
   assert.match(assignmentView, /searchFields:\s*'id,sessionId,date,startTime,endTime,className,teacherId,teacherName,title'/);
+  assert.match(assignmentView, /multiselect:\s*false/);
 
   assert.match(assignmentView, /const localStudentItems = \(allStudents \|\| \[\]\)\.map/);
   assert.match(assignmentView, /localItems:\s*localStudentItems/);
   assert.match(assignmentView, /searchFields:\s*'id,name,title'/);
+  assert.match(assignmentView, /GenericPickerPresets\.teacher/);
 
   assert.doesNotMatch(assignmentView, /apiEndpoint:\s*['"`]\/persons['"`]/);
   assert.doesNotMatch(assignmentView, /apiEndpoint:\s*['"`]\/school\/sessions\/api\/data/);

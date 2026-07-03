@@ -156,7 +156,7 @@
                   <a href="/school/classes/edit-wizard/<%= encodeURIComponent(row.classId) %>" class="btn btn-outline-info btn-sm"><i class="bi bi-diagram-3 me-2"></i>Lifecycle</a>
                 <% } %>
                 <% if (row.isPendingAssignment) { %>
-                  <a href="/school/reports/instances/start/<%= encodeURIComponent(row.assignmentId) %>?teacherId=<%= encodeURIComponent(row.teacherId || '') %><%= row.studentId ? ('&studentId=' + encodeURIComponent(row.studentId)) : '' %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-play-circle me-2"></i>Start</a>
+                  <a href="/school/reports/instances/start/<%= encodeURIComponent(row.assignmentId) %>?teacherId=<%= encodeURIComponent(row.teacherId || '') %><%= row.assignmentRowId ? ('&rowId=' + encodeURIComponent(row.assignmentRowId)) : '' %><%= row.studentId ? ('&studentId=' + encodeURIComponent(row.studentId)) : '' %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-play-circle me-2"></i>Start</a>
                   <a href="/school/reports/assignments/edit/<%= encodeURIComponent(row.assignmentId) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Assignment</a>
                 <% } else { %>
                   <a href="/school/reports/instances/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right me-2"></i>Open</a>

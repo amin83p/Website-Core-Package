@@ -80,6 +80,12 @@ function parseUploadReference(ref = '') {
   };
 }
 
+function isUploadReference(ref = '') {
+  const token = clean(ref).replace(/\\/g, '/');
+  if (!token) return false;
+  return /^\/(?:app\/)?uploads\//i.test(token) || /^https?:\/\/[^/]+\/(?:app\/)?uploads\//i.test(token);
+}
+
 function resolveAvailableFilePath(directory, desiredName) {
   const fileName = cleanFileName(desiredName);
   const ext = path.extname(fileName);
@@ -199,7 +205,7 @@ async function saveJson({ scopeKey = 'GLOBAL', relativeDir = '', fileName = 'dat
 async function readBuffer(ref = '') {
   const token = clean(ref);
   if (!token) throw new Error('File reference is required.');
-  if (/^\/uploads\//i.test(token) || /^https?:\/\/[^/]+\/uploads\//i.test(token)) {
+  if (isUploadReference(token)) {
     if (isRailwayProxyMode()) {
       const parsed = parseUploadReference(token);
       if (!parsed) throw new Error('Invalid upload URL.');
@@ -270,7 +276,7 @@ async function listDirectory({ scopeKey = 'GLOBAL', relativeDir = '' } = {}) {
 async function deleteByUploadUrl(uploadUrl = '') {
   const token = clean(uploadUrl);
   if (!token) return false;
-  if (isRailwayProxyMode() && /^\/uploads\//i.test(token)) {
+  if (isRailwayProxyMode() && isUploadReference(token)) {
     await gatewayDeleteByUploadUrl(token);
     return true;
   }
@@ -370,8 +376,8 @@ async function copyRelativePath({ sourceScopeKey = '', sourceRelativePath = '', 
 async function sendDownload(res, ref = '', downloadName = '') {
   const token = clean(ref);
   if (!token) throw new Error('File reference is required.');
-  if (!isRailwayProxyMode() && (/^\/uploads\//i.test(token) || path.isAbsolute(token))) {
-    const diskPath = /^\/uploads\//i.test(token) ? uploadPathUtils.fromUploadsUrlToDiskPath(token) : token;
+  if (!isRailwayProxyMode() && (isUploadReference(token) || path.isAbsolute(token))) {
+    const diskPath = isUploadReference(token) ? uploadPathUtils.fromUploadsUrlToDiskPath(token) : token;
     if (!diskPath) throw new Error('Unable to resolve file path.');
     if (!uploadPathUtils.isInsideUploadRoot(diskPath)) {
       throw new Error('File is outside the upload storage root.');
@@ -392,6 +398,7 @@ module.exports = {
   cleanFileName,
   scopeFolder,
   parseUploadReference,
+  isUploadReference,
   uploadsUrlForParts,
   localDirectory,
   ensureDirectory,

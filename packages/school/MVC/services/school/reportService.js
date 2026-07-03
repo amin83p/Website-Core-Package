@@ -687,6 +687,32 @@ function getPreferredOrgName(org) {
   return String(org?.identity?.displayName || org?.name || org?.identity?.legalName || org?.id || '').trim();
 }
 
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const clean = String(value || '').trim();
+    if (clean) return clean;
+  }
+  return '';
+}
+
+function getPersonNameParts(person) {
+  if (!person || typeof person !== 'object') {
+    return { first: '', middle: '', last: '', preferred: '', full: '' };
+  }
+  const directName = typeof person.name === 'string' ? person.name : '';
+  const first = firstNonEmpty(person?.name?.first, person?.firstName, person?.first_name);
+  const middle = firstNonEmpty(person?.name?.middle, person?.middleName, person?.middle_name);
+  const last = firstNonEmpty(person?.name?.last, person?.lastName, person?.last_name);
+  const preferred = firstNonEmpty(person?.name?.preferred, person?.preferredName, person?.preferred_name);
+  const full = [first, last].filter(Boolean).join(' ').trim() || preferred || String(directName || '').trim();
+  return { first, middle, last, preferred, full };
+}
+
+function getPersonDisplayName(person, fallback = '') {
+  const parts = getPersonNameParts(person);
+  return firstNonEmpty(parts.preferred, parts.full, fallback);
+}
+
 function getPrimaryEmailFromPerson(person) {
   if (!person || typeof person !== 'object') return '';
   if (person?.contact?.email) return String(person.contact.email).trim();
@@ -747,9 +773,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
   persons.forEach((person) => {
     const id = toPublicId(person?.id);
     if (!id) return;
-    const fullName = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim();
-    const preferred = String(person?.name?.preferred || '').trim();
-    personMap.set(id, preferred || fullName || id);
+    personMap.set(id, getPersonDisplayName(person, id));
   });
   const resolvedTeacherId = toPublicId(teacherId || session?.delivery?.deliveredBy || assignment?.teacherIds?.[0]);
   const resolvedTeacherName = personMap.get(resolvedTeacherId) || resolvedTeacherId || '';
@@ -805,7 +829,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
   const studentOrg = organizations.find((row) => idsEqual(row?.id, studentOrgId)) || null;
   const studentOrgMembership = findOrgMembership(studentPerson, studentOrgId);
   const studentAddress = getAddressFromPerson(studentPerson);
-  const studentFullName = `${studentPerson?.name?.first || ''} ${studentPerson?.name?.last || ''}`.trim();
+  const studentNameParts = getPersonNameParts(studentPerson);
 
   const snapshot = {
     teacher_id: resolvedTeacherId,
@@ -827,11 +851,11 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_local_id: String(studentRecord?.localId || ''),
     student_org_id: studentOrgId,
     student_org_name: getPreferredOrgName(studentOrg),
-    student_first_name: String(studentPerson?.name?.first || ''),
-    student_middle_name: String(studentPerson?.name?.middle || ''),
-    student_last_name: String(studentPerson?.name?.last || ''),
-    student_full_name: studentFullName,
-    student_preferred_name: String(studentPerson?.name?.preferred || ''),
+    student_first_name: studentNameParts.first,
+    student_middle_name: studentNameParts.middle,
+    student_last_name: studentNameParts.last,
+    student_full_name: studentNameParts.full,
+    student_preferred_name: studentNameParts.preferred,
     student_active: studentPerson ? studentPerson?.active === true : '',
     student_gender: String(studentPerson?.demographics?.gender || ''),
     student_date_of_birth: String(studentPerson?.demographics?.dateOfBirth || ''),
@@ -995,6 +1019,11 @@ function buildPlaceholderPayloadDetailed(template, instance, assignment = null) 
 
   const out = {};
   const conversionDiagnostics = [];
+  Object.keys(prefill).forEach((key) => {
+    const cleanKey = normalizePrefillKey(key);
+    if (!cleanKey) return;
+    out[`{{${cleanKey}}}`] = toPrintableValue(prefill[key]);
+  });
   Object.keys(placeholderMap).forEach((fieldId) => {
     const token = String(placeholderMap[fieldId] || '').trim();
     if (!token) return;

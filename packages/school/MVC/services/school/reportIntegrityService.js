@@ -1,5 +1,6 @@
 const schoolDataService = require('./schoolDataService');
 const schoolRepositories = require('../../repositories/school');
+const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const {
@@ -135,12 +136,21 @@ function inferAssignmentTargetType(row) {
 }
 
 function resolveAssignmentDate(row) {
+  const targetRow = reportAssignmentModel.findEffectiveTargetRow(row, row?.assignmentRowId || row?.rowId || '');
+  if (targetRow) return String(targetRow.reportDueDate || targetRow.dueDate || targetRow.sessionDate || '').trim();
   const targetType = inferAssignmentTargetType(row);
   if (targetType === 'session') return String(row?.sessionDate || row?.dueDate || '').trim();
   return String(row?.dueDate || row?.sessionDate || '').trim();
 }
 
 function resolveAssignmentTimeWindow(row, classSessionsMap = new Map()) {
+  const targetRow = reportAssignmentModel.findEffectiveTargetRow(row, row?.assignmentRowId || row?.rowId || '');
+  if (targetRow) {
+    return {
+      start: normalizeTimeValue(targetRow.taskStartTime),
+      end: normalizeTimeValue(targetRow.taskEndTime)
+    };
+  }
   const fromRecordStart = normalizeTimeValue(row?.taskStartTime);
   const fromRecordEnd = normalizeTimeValue(row?.taskEndTime);
   if (fromRecordStart && fromRecordEnd) return { start: fromRecordStart, end: fromRecordEnd };
@@ -160,6 +170,130 @@ function resolveAssignmentTimeWindow(row, classSessionsMap = new Map()) {
 function isActiveAssignmentStatus(status) {
   const normalized = String(status || '').trim().toLowerCase();
   return normalized === 'active';
+}
+
+function getClassSessionDateBounds(sessions = []) {
+  const dates = (Array.isArray(sessions) ? sessions : [])
+    .map((row) => normalizeDateOnly(row?.date))
+    .filter(Boolean)
+    .sort();
+  return {
+    firstSessionDate: dates[0] || '',
+    lastSessionDate: dates[dates.length - 1] || ''
+  };
+}
+
+function validateAssignmentTargetRowsAgainstSessions({ targetRows = [], sessions = [], requireTeacher = true } = {}) {
+  const sessionMap = new Map(
+    (Array.isArray(sessions) ? sessions : [])
+      .map((row) => [String(row?.sessionId || '').trim(), row])
+      .filter(([id]) => Boolean(id))
+  );
+  const { firstSessionDate, lastSessionDate } = getClassSessionDateBounds(sessions);
+  const rows = Array.isArray(targetRows) ? targetRows : [];
+  if (!rows.length) throw new Error('Add at least one report assignment target row.');
+
+  rows.forEach((row, index) => {
+    const label = `Target row ${index + 1}`;
+    const targetType = String(row?.targetType || '').trim().toLowerCase();
+    const sessionId = String(row?.sessionId || '').trim();
+    const teacherId = String(row?.teacherId || '').trim();
+    if (requireTeacher && !teacherId) throw new Error(`${label}: select one teacher.`);
+    if (targetType !== 'date') {
+      if (!sessionId) throw new Error(`${label}: select exactly one class session.`);
+      const session = sessionMap.get(sessionId);
+      if (!session) throw new Error(`${label}: selected session was not found in this class.`);
+      const sessionDate = normalizeDateOnly(session?.date);
+      if (!sessionDate) throw new Error(`${label}: selected session is missing a valid date.`);
+      if (String(row?.sessionDate || '').trim() && normalizeDateOnly(row?.sessionDate) !== sessionDate) {
+        throw new Error(`${label}: session date does not match the selected class session.`);
+      }
+    }
+    const reportStartDate = normalizeDateOnly(row?.reportStartDate);
+    const reportDueDate = normalizeDateOnly(row?.reportDueDate);
+    if (!reportStartDate || !reportDueDate) throw new Error(`${label}: report start date and due date are required.`);
+    if (reportStartDate > reportDueDate) throw new Error(`${label}: report start date cannot be after due date.`);
+    if (firstSessionDate && reportStartDate < firstSessionDate) {
+      throw new Error(`${label}: report start date cannot be before the first class session (${firstSessionDate}).`);
+    }
+    if (lastSessionDate && reportDueDate > lastSessionDate) {
+      throw new Error(`${label}: report due date cannot be beyond the last class session (${lastSessionDate}).`);
+    }
+    const start = normalizeTimeValue(row?.taskStartTime);
+    const end = normalizeTimeValue(row?.taskEndTime);
+    if (targetType !== 'date' || start || end) {
+      if (!start || !end) throw new Error(`${label}: task start/end time are required.`);
+      if (start >= end) throw new Error(`${label}: task end time must be later than task start time.`);
+    }
+    if (row?.timesheetReflection === true) {
+      const allocated = Number(row?.allocatedHours);
+      if (!Number.isFinite(allocated) || allocated <= 0) {
+        throw new Error(`${label}: allocated hours must be greater than zero when Timesheet reflection is enabled.`);
+      }
+    }
+  });
+}
+
+function buildFallbackAssignmentTargetRows({
+  sessions = [],
+  hasSessionTargets,
+  selectedSessionIds = [],
+  selectedDateTargets = [],
+  requestedReportStartDate = '',
+  requestedReportDueDate = '',
+  requestedTaskStartTime = '',
+  requestedTaskEndTime = '',
+  conflictPermitted = false,
+  teacherIds = []
+} = {}) {
+  const sessionMap = new Map(
+    (Array.isArray(sessions) ? sessions : [])
+      .map((row) => [String(row?.sessionId || '').trim(), row])
+      .filter(([id]) => Boolean(id))
+  );
+  if (hasSessionTargets) {
+    return [...new Set((Array.isArray(selectedSessionIds) ? selectedSessionIds : [])
+      .map((id) => String(id || '').trim())
+      .filter(Boolean))]
+      .map((sessionId) => {
+        const sessionDate = normalizeDateOnly(sessionMap.get(sessionId)?.date);
+        return {
+          targetType: 'session',
+          sessionId,
+          sessionDate,
+          dueDate: '',
+          reportStartDate: normalizeDateOnly(requestedReportStartDate) || sessionDate,
+          reportDueDate: normalizeDateOnly(requestedReportDueDate) || sessionDate,
+          taskStartTime: normalizeTimeValue(requestedTaskStartTime),
+          taskEndTime: normalizeTimeValue(requestedTaskEndTime),
+          conflictPermitted: true,
+          timesheetReflection: false,
+          allocatedHours: 0,
+          teacherId: String((Array.isArray(teacherIds) ? teacherIds[0] : '') || '').trim(),
+          status: 'active'
+        };
+      });
+  }
+
+  const dates = [...new Set((Array.isArray(selectedDateTargets) ? selectedDateTargets : [])
+    .map((date) => normalizeDateOnly(date))
+    .filter(Boolean))];
+  if (!dates.length && requestedReportDueDate) dates.push(normalizeDateOnly(requestedReportDueDate));
+  return dates.filter(Boolean).map((date) => ({
+    targetType: 'date',
+    sessionId: '',
+    sessionDate: date,
+    dueDate: date,
+    reportStartDate: normalizeDateOnly(requestedReportStartDate) || date,
+    reportDueDate: normalizeDateOnly(requestedReportDueDate) || date,
+    taskStartTime: normalizeTimeValue(requestedTaskStartTime),
+    taskEndTime: normalizeTimeValue(requestedTaskEndTime),
+    conflictPermitted: Boolean(conflictPermitted),
+    timesheetReflection: false,
+    allocatedHours: 0,
+    teacherId: String((Array.isArray(teacherIds) ? teacherIds[0] : '') || '').trim(),
+    status: 'active'
+  }));
 }
 
 function buildClassInstructorSet(classRow) {
@@ -373,6 +507,7 @@ const reportIntegrityService = {
     requestedReportStartDate = '',
     requestedReportDueDate = '',
     selectedTargetStudentIds = [],
+    targetRows = [],
     excludeAssignmentId = ''
   }) {
     const [classData, sessions, template] = await Promise.all([
@@ -387,13 +522,35 @@ const reportIntegrityService = {
       throw new Error('Invalid report scope.');
     }
 
-    const effectiveDateTargets = Array.isArray(selectedDateTargets)
-      ? selectedDateTargets.map((d) => String(d || '').trim()).filter(Boolean)
-      : [];
-    if (!hasSessionTargets && !effectiveDateTargets.length && requestedReportDueDate) {
+    const effectiveTargetRows = Array.isArray(targetRows) && targetRows.length
+      ? targetRows
+      : buildFallbackAssignmentTargetRows({
+        sessions,
+        hasSessionTargets,
+        selectedSessionIds,
+        selectedDateTargets,
+        requestedReportStartDate,
+        requestedReportDueDate,
+        requestedTaskStartTime,
+        requestedTaskEndTime,
+        conflictPermitted,
+        teacherIds
+      });
+
+    const targetRowsProvided = Array.isArray(targetRows) && targetRows.length > 0;
+    validateAssignmentTargetRowsAgainstSessions({ targetRows: effectiveTargetRows, sessions, requireTeacher: targetRowsProvided });
+
+    const effectiveDateTargets = targetRowsProvided
+      ? [...new Set(effectiveTargetRows
+        .map((row) => String(row?.dueDate || row?.sessionDate || '').trim())
+        .filter(Boolean))]
+      : (Array.isArray(selectedDateTargets)
+        ? selectedDateTargets.map((d) => String(d || '').trim()).filter(Boolean)
+        : []);
+    if (!targetRowsProvided && !hasSessionTargets && !effectiveDateTargets.length && requestedReportDueDate) {
       effectiveDateTargets.push(String(requestedReportDueDate).trim());
     }
-    if (!hasSessionTargets && !effectiveDateTargets.length) {
+    if (!targetRowsProvided && !hasSessionTargets && !effectiveDateTargets.length) {
       throw new Error('Select at least one session, or provide due date (target date or report due date).');
     }
 
@@ -401,13 +558,9 @@ const reportIntegrityService = {
       throw new Error('Provide both report start date and report due date, or leave both empty.');
     }
 
-    const targetDates = getTargetDatesForValidation({
-      hasSessionTargets,
-      selectedSessionIds,
-      sessions,
-      selectedDateTargets: effectiveDateTargets,
-      requestedReportDueDate
-    });
+    const targetDates = [...new Set(effectiveTargetRows
+      .map((row) => String(row?.reportDueDate || row?.dueDate || row?.sessionDate || '').trim())
+      .filter(Boolean))];
 
     const studentIdsByTargetDate = new Map();
     for (const targetDate of targetDates) {
@@ -443,17 +596,19 @@ const reportIntegrityService = {
       }
     }
 
-    if (!hasSessionTargets && !Boolean(conflictPermitted)) {
+    for (const targetRow of effectiveTargetRows) {
+      if (Boolean(targetRow?.conflictPermitted)) continue;
+      // eslint-disable-next-line no-await-in-loop
       await assertNoAssignmentScheduleConflicts({
         reqUser,
         classData,
         sessions,
-        selectedSessionIds,
-        selectedDateTargets: effectiveDateTargets,
-        teacherIds,
-        requestedTaskStartTime,
-        requestedTaskEndTime,
-        conflictPermitted,
+        selectedSessionIds: [targetRow.sessionId].filter(Boolean),
+        selectedDateTargets: [targetRow.dueDate || targetRow.sessionDate].filter(Boolean),
+        teacherIds: [targetRow.teacherId].filter(Boolean),
+        requestedTaskStartTime: targetRow.taskStartTime,
+        requestedTaskEndTime: targetRow.taskEndTime,
+        conflictPermitted: Boolean(targetRow.conflictPermitted),
         excludeAssignmentId
       });
     }
@@ -468,23 +623,29 @@ const reportIntegrityService = {
       template,
       classStudentIds,
       effectiveDateTargets,
+      effectiveTargetRows,
       persistedTargetStudentIds: reportScope === 'selected_students' ? selectedTargetStudentIds : []
     };
   },
 
   async resolveStartInstanceContext({
     assignmentId,
+    assignmentRowId = '',
     reqUser,
     requestedTeacherId = '',
     fallbackTeacherId = '',
     requestedStudentId = ''
   }) {
-    const assignment = await this.assertAssignmentAccessible(assignmentId, reqUser);
+    const baseAssignment = await this.assertAssignmentAccessible(assignmentId, reqUser);
+    const targetRow = reportAssignmentModel.findEffectiveTargetRow(baseAssignment, assignmentRowId);
+    if (!targetRow) throw new Error('Report assignment target row not found.');
+    const assignment = reportAssignmentModel.applyTargetRowToAssignment(baseAssignment, targetRow);
     const template = await assertTemplateAccessible(assignment.templateId, reqUser, {
       notFoundMessage: 'Template not found for this assignment.'
     });
 
-    const teacherId = String(requestedTeacherId || assignment.teacherIds?.[0] || fallbackTeacherId || '').trim();
+    const rowTeacherId = String(assignment?.teacherId || targetRow?.teacherId || '').trim();
+    const teacherId = String(rowTeacherId || requestedTeacherId || assignment.teacherIds?.[0] || fallbackTeacherId || '').trim();
     if (!teacherId) throw new Error('Unable to resolve teacher id for report instance.');
     if (!Array.isArray(assignment.teacherIds) || (!assignment.teacherIds.includes(teacherId) && !canBypassOrgScope(reqUser))) {
       throw new Error('Teacher is not listed in this assignment.');
@@ -538,6 +699,7 @@ const reportIntegrityService = {
 
     return {
       assignment,
+      assignmentRow: targetRow,
       template,
       classData,
       sessions,

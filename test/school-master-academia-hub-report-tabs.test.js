@@ -68,9 +68,11 @@ test('master academia hub service and routes expose report workspace branches wi
   assert.match(serviceSource, /classIds/);
   assert.match(serviceSource, /filters:\s*\{/);
   assert.match(serviceSource, /sourceUrl:\s*'\/school\/reports\/assignments'/);
+  assert.match(serviceSource, /getEffectiveAssignmentRows\(row\)/);
   assert.match(serviceSource, /key === 'report-instances'/);
   assert.match(serviceSource, /sectionId:\s*SECTIONS\.SCHOOL_REPORTS_INSTANCES/);
   assert.match(serviceSource, /buildInstanceListRows/);
   assert.match(serviceSource, /normalizeReportInstanceRows/);
+  assert.match(serviceSource, /params\.set\('rowId', normalizeText\(row\.assignmentRowId\)\)/);
   assert.match(serviceSource, /sourceUrl:\s*'\/school\/reports\/instances'/);
 });

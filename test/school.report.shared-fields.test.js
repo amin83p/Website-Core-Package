@@ -7,12 +7,16 @@ const fs = require('fs');
 const path = require('path');
 
 const reportService = require('../packages/school/MVC/services/school/reportService');
+const reportDocxRenderService = require('../packages/school/MVC/services/school/reportDocxRenderService');
 const { normalizePrefillKey } = require('../packages/school/MVC/services/school/reportPrefillKeyUtils');
 const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+const schoolIdentityLookupService = require('../packages/school/MVC/services/school/schoolIdentityLookupService');
 const sessionStatusPolicyService = require('../packages/school/MVC/services/school/sessionStatusPolicyService');
 const attendanceMatrixPolicyModel = require('../packages/school/MVC/models/school/attendanceMatrixPolicyModel');
 const { requireCoreModule } = require('../packages/school/MVC/services/school/schoolCoreContracts');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
+const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -85,6 +89,89 @@ test('mergeTemplateData resolves brace-wrapped prefill keys and preserves zero v
   const merged = reportService.mergeTemplateData(template, instance, null);
   assert.equal(merged.Attendance, 0);
   assert.equal(merged.RawAttendance, 0);
+});
+
+test('DOCX placeholder payload exposes all prefill catalog keys directly', () => {
+  const catalogKeys = Object.values(reportService.getPrefillCatalog())
+    .flat()
+    .map((item) => item.key);
+  const prefillSnapshot = {};
+  catalogKeys.forEach((key) => {
+    prefillSnapshot[key] = `value:${key}`;
+  });
+
+  const payload = reportService.buildPlaceholderPayloadDetailed(
+    { schema: { fields: [] }, placeholderMap: {} },
+    { answers: {}, prefillSnapshot },
+    null
+  );
+
+  catalogKeys.forEach((key) => {
+    assert.equal(payload.placeholders[`{{${key}}}`], `value:${key}`);
+  });
+});
+
+test('mapped DOCX placeholders override direct prefill catalog placeholders', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'student_first_name_field', type: 'text' }
+      ]
+    },
+    placeholderMap: {
+      student_first_name_field: '{{student_first_name}}'
+    }
+  };
+  const payload = reportService.buildPlaceholderPayloadDetailed(
+    template,
+    {
+      answers: { student_first_name_field: 'Mapped Name' },
+      prefillSnapshot: { student_first_name: 'Prefill Name' }
+    },
+    null
+  );
+
+  assert.equal(payload.placeholders['{{student_first_name}}'], 'Mapped Name');
+});
+
+test('DOCX render data normalizes braced and bare keys and blanks missing values', () => {
+  const renderData = reportDocxRenderService.buildRenderData({
+    '{{student_first_name}}': 'Ada',
+    student_last_name: null,
+    '{{student_middle_name}}': undefined
+  });
+  const renderServiceSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/services/school/reportDocxRenderService.js'),
+    'utf8'
+  );
+
+  assert.equal(renderData.student_first_name, 'Ada');
+  assert.equal(renderData.student_last_name, '');
+  assert.equal(renderData.student_middle_name, '');
+  assert.match(renderServiceSource, /nullGetter:\s*\(\)\s*=>\s*''/);
+});
+
+test('DOCX template resolver treats /app/uploads paths as upload storage references', () => {
+  const storedPath = '/app/uploads/ORG_900000/reports/Semi-Monthly-Report_1783055912591.docx';
+  const railwayVolumeRoot = '/app/uploads';
+  const expectedVolumeDiskPath = path
+    .resolve(railwayVolumeRoot, 'ORG_900000/reports/Semi-Monthly-Report_1783055912591.docx')
+    .replace(/\\/g, '/');
+
+  assert.equal(uploadPathUtils.extractRelativeUploadPath(storedPath), 'ORG_900000/reports/Semi-Monthly-Report_1783055912591.docx');
+  assert.equal(
+    uploadPathUtils.fromUploadsUrlToDiskPath(storedPath, railwayVolumeRoot).replace(/\\/g, '/'),
+    expectedVolumeDiskPath
+  );
+  assert.equal(
+    uploadPathUtils.fromDiskPathToUploadsUrl(storedPath, railwayVolumeRoot),
+    '/uploads/ORG_900000/reports/Semi-Monthly-Report_1783055912591.docx'
+  );
+  assert.equal(fileAssetStorage.isUploadReference(storedPath), true);
+  assert.equal(
+    reportDocxRenderService.resolveTemplateFilePath({ path: storedPath }),
+    '/uploads/ORG_900000/reports/Semi-Monthly-Report_1783055912591.docx'
+  );
 });
 
 test('report prefill key normalization removes template braces', () => {
@@ -413,6 +500,79 @@ test('report template prefill catalog keys are all produced with correct represe
           assert.equal(snapshot.student_exam_period_avg_percent, 90);
           assert.equal(snapshot.student_exam_period_total_score, 18);
           assert.equal(snapshot.student_exam_period_total_max_score, 20);
+        });
+      });
+    });
+  });
+});
+
+test('buildPrefillSnapshot resolves student name prefill from top-level person name fields', async () => {
+  const assignment = {
+    id: 'ASN-TOP-NAME',
+    orgId: '900000',
+    classId: 'CLASS-TOP-NAME',
+    sessionId: 'SES-TOP-NAME',
+    sessionDate: '2026-06-18',
+    reportStartDate: '2026-06-18',
+    reportDueDate: '2026-06-18',
+    teacherIds: ['TEACHER-TOP']
+  };
+  const sessions = [
+    {
+      sessionId: 'SES-TOP-NAME',
+      date: '2026-06-18',
+      status: 'completed',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: [{ personId: 'STUDENT-TOP', attendance: 'present' }]
+    }
+  ];
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-TOP-NAME') {
+        return { id: 'CLASS-TOP-NAME', orgId: '900000', title: 'Top Name Class' };
+      }
+      return null;
+    },
+    getClassSessions: async () => sessions,
+    fetchData: async (entityType) => {
+      if (entityType === 'students') return [{ id: 'STU-TOP', orgId: '900000', personId: 'STUDENT-TOP' }];
+      if (entityType === 'examAssignments') return [];
+      return [];
+    }
+  }, async () => {
+    await withPatched(schoolIdentityLookupService, {
+      listSchoolPersonRecords: async () => ({
+        allRows: [
+          { id: 'TEACHER-TOP', firstName: 'Teacher', lastName: 'Top' },
+          { id: 'STUDENT-TOP', firstName: 'Ada', middleName: 'M', lastName: 'Lovelace', preferredName: 'Addie' }
+        ]
+      })
+    }, async () => {
+      await withPatched(dataServiceGlobal, {
+        fetchData: async (entityType) => (entityType === 'organizations' ? [{ id: '900000', name: 'Org' }] : [])
+      }, async () => {
+        await withPatched(sessionStatusPolicyService, {
+          getStatusMap: async () => new Map()
+        }, async () => {
+          await withPatched(attendanceMatrixPolicyModel, {
+            getPolicyForOrg: async () => ({})
+          }, async () => {
+            const snapshot = await reportService.buildPrefillSnapshot({
+              assignment,
+              teacherId: 'TEACHER-TOP',
+              studentId: 'STUDENT-TOP',
+              reqUser: { id: 'USER-1', activeOrgId: '900000' }
+            });
+
+            assert.equal(snapshot.student_first_name, 'Ada');
+            assert.equal(snapshot.student_middle_name, 'M');
+            assert.equal(snapshot.student_last_name, 'Lovelace');
+            assert.equal(snapshot.student_full_name, 'Ada Lovelace');
+            assert.equal(snapshot.student_preferred_name, 'Addie');
+            assert.equal(snapshot.teacher_name, 'Teacher Top');
+          });
         });
       });
     });

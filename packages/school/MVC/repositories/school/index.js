@@ -1056,13 +1056,14 @@ schoolRepositories.schoolAccounts.purgeById = async (id, options = {}) => {
   }, 'school.schoolAccounts.purgeById');
 };
 
-schoolRepositories.reportInstances.findByAssignmentTeacherTarget = async (assignmentId, teacherId, targetKey = 'class') => {
+schoolRepositories.reportInstances.findByAssignmentTeacherTarget = async (assignmentId, teacherId, targetKey = 'class', assignmentRowId = '') => {
   return runByRepositoryBackend({}, {
-    json: async () => reportInstanceModel.findByAssignmentTeacherTarget(assignmentId, teacherId, targetKey),
+    json: async () => reportInstanceModel.findByAssignmentTeacherTarget(assignmentId, teacherId, targetKey, assignmentRowId),
     mongo: async () => {
       const rows = await schoolRepositories.reportInstances.list({
         query: {
           assignmentId__eq: assignmentId,
+          assignmentRowId__eq: assignmentRowId,
           teacherId__eq: teacherId,
           targetKey__eq: targetKey,
           page: 1,
@@ -1075,8 +1076,8 @@ schoolRepositories.reportInstances.findByAssignmentTeacherTarget = async (assign
   }, 'school.reportInstances.findByAssignmentTeacherTarget');
 };
 
-schoolRepositories.reportInstances.existsByAssignmentTeacherTarget = async (assignmentId, teacherId, targetKey = 'class') => {
-  const found = await schoolRepositories.reportInstances.findByAssignmentTeacherTarget(assignmentId, teacherId, targetKey);
+schoolRepositories.reportInstances.existsByAssignmentTeacherTarget = async (assignmentId, teacherId, targetKey = 'class', assignmentRowId = '') => {
+  const found = await schoolRepositories.reportInstances.findByAssignmentTeacherTarget(assignmentId, teacherId, targetKey, assignmentRowId);
   return Boolean(found);
 };
 

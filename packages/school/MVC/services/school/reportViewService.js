@@ -85,6 +85,54 @@ function parseBooleanFlag(rawValue, fallback = false) {
   return Boolean(fallback);
 }
 
+function parseTargetRowsField(rawValue) {
+  const parsed = parseJsonSafe(rawValue, []);
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((row) => row && typeof row === 'object' && !Array.isArray(row))
+    .map((row) => ({
+      rowId: String(row.rowId || '').trim(),
+      targetType: String(row.targetType || 'session').trim().toLowerCase() || 'session',
+      sessionId: String(row.sessionId || '').trim(),
+      sessionDate: parseDateOnlyValue(row.sessionDate),
+      dueDate: parseDateOnlyValue(row.dueDate),
+      reportStartDate: parseDateOnlyValue(row.reportStartDate),
+      reportDueDate: parseDateOnlyValue(row.reportDueDate),
+      taskStartTime: parseTimeValue(row.taskStartTime),
+      taskEndTime: parseTimeValue(row.taskEndTime),
+      conflictPermitted: parseBooleanFlag(row.conflictPermitted, false),
+      timesheetReflection: parseBooleanFlag(row.timesheetReflection, false),
+      allocatedHours: (() => {
+        const n = parseFloat(row.allocatedHours);
+        return Number.isFinite(n) ? n : 0;
+      })(),
+      teacherId: String(row.teacherId || '').trim(),
+      status: String(row.status || 'active').trim().toLowerCase() || 'active',
+      notes: String(row.notes || '').trim()
+    }));
+}
+
+function getEffectiveAssignmentRows(assignment = {}) {
+  if (reportAssignmentModel && typeof reportAssignmentModel.getEffectiveTargetRows === 'function') {
+    return reportAssignmentModel.getEffectiveTargetRows(assignment);
+  }
+  return [];
+}
+
+function applyAssignmentRow(assignment = {}, row = null) {
+  if (reportAssignmentModel && typeof reportAssignmentModel.applyTargetRowToAssignment === 'function') {
+    return reportAssignmentModel.applyTargetRowToAssignment(assignment, row);
+  }
+  return assignment;
+}
+
+function findAssignmentRow(assignment = {}, rowId = '') {
+  if (reportAssignmentModel && typeof reportAssignmentModel.findEffectiveTargetRow === 'function') {
+    return reportAssignmentModel.findEffectiveTargetRow(assignment, rowId);
+  }
+  return null;
+}
+
 function resolveReportPeriod({ requestedStartDate = '', requestedDueDate = '', selectedSessionIds = [], selectedDateTargets = [], sessions = [] }) {
   const start = parseDateOnlyValue(requestedStartDate);
   const due = parseDateOnlyValue(requestedDueDate);
@@ -360,12 +408,68 @@ function isActiveReportAssignment(row) {
 function buildInstanceIdentityKey(assignmentId = '', teacherId = '', targetKey = 'class') {
   return [
     toPublicId(assignmentId),
+    '',
     toPublicId(teacherId),
     String(targetKey || 'class').trim() || 'class'
   ].join('|');
 }
 
+function buildInstanceIdentityKeyForRow(assignmentId = '', assignmentRowId = '', teacherId = '', targetKey = 'class') {
+  return [
+    toPublicId(assignmentId),
+    toPublicId(assignmentRowId),
+    toPublicId(teacherId),
+    String(targetKey || 'class').trim() || 'class'
+  ].join('|');
+}
+
+function normalizeInstanceTargetKey(row = {}) {
+  const targetKey = String(row?.targetKey || '').trim();
+  if (targetKey) return targetKey;
+  const studentId = toPublicId(row?.studentId);
+  return studentId ? `student:${studentId}` : 'class';
+}
+
+function isSameReportReviewTarget(left = {}, right = {}) {
+  const leftStudentId = toPublicId(left?.studentId);
+  const rightStudentId = toPublicId(right?.studentId);
+  const leftTargetKey = normalizeInstanceTargetKey(left);
+  const rightTargetKey = normalizeInstanceTargetKey(right);
+
+  if (!leftStudentId && !rightStudentId) {
+    return leftTargetKey === 'class' && rightTargetKey === 'class';
+  }
+
+  return Boolean(leftStudentId && rightStudentId)
+    && idsEqual(leftStudentId, rightStudentId)
+    && leftTargetKey === rightTargetKey;
+}
+
+function isReportInstanceAssignmentConsistent(instance = {}, assignment = {}) {
+  if (!assignment) return false;
+  return idsEqual(instance?.orgId, assignment?.orgId)
+    && idsEqual(instance?.classId, assignment?.classId)
+    && idsEqual(instance?.templateId, assignment?.templateId);
+}
+
+function resolveReviewNavigatorSortDate(instance = {}, assignment = {}) {
+  return String(
+    instance?.sessionDate
+    || assignment?.reportDueDate
+    || assignment?.dueDate
+    || assignment?.sessionDate
+    || ''
+  ).trim();
+}
+
+function canParticipantReviewInstance(row = {}, viewerPersonId = '') {
+  if (!viewerPersonId) return false;
+  return idsEqual(row?.teacherId, viewerPersonId) || idsEqual(row?.studentId, viewerPersonId);
+}
+
 function resolveAssignmentTargetDate(assignment = {}) {
+  const row = findAssignmentRow(assignment, assignment.assignmentRowId || assignment.rowId || '');
+  if (row) return String(row.reportDueDate || row.dueDate || row.sessionDate || '').trim();
   return String(
     assignment?.reportDueDate ||
     assignment?.dueDate ||
@@ -425,6 +529,7 @@ function buildTemplateSavePayload({
 }
 
 function parseAssignmentSaveRequest(body) {
+  const targetRows = parseTargetRowsField(body.targetRowsJson || body.targetRows);
   return {
     classId: String(body.classId || '').trim(),
     templateId: String(body.templateId || '').trim(),
@@ -448,7 +553,8 @@ function parseAssignmentSaveRequest(body) {
     allocatedHours: (() => {
       const n = parseFloat(body.allocatedHours);
       return Number.isFinite(n) ? n : 0;
-    })()
+    })(),
+    targetRows
   };
 }
 
@@ -514,15 +620,20 @@ async function buildAssignmentListContext({
   const rows = scopedAssignments
     .map((row) => {
       const template = templateMap.get(toPublicId(row?.templateId)) || null;
-      const targetType = inferAssignmentTargetType(row);
-      const targetDate = String(row.sessionDate || row.dueDate || '').trim();
-      const taskTimeRange = String(row.taskStartTime || '').trim() && String(row.taskEndTime || '').trim()
-        ? `${row.taskStartTime} - ${row.taskEndTime}`
+      const targetRows = getEffectiveAssignmentRows(row);
+      const activeTargetRows = targetRows.filter((targetRow) => String(targetRow?.status || '').trim().toLowerCase() === 'active');
+      const firstRow = activeTargetRows[0] || targetRows[0] || {};
+      const targetType = firstRow.targetType || inferAssignmentTargetType(row);
+      const targetDate = String(firstRow.sessionDate || firstRow.dueDate || row.sessionDate || row.dueDate || '').trim();
+      const taskTimeRange = String(firstRow.taskStartTime || '').trim() && String(firstRow.taskEndTime || '').trim()
+        ? `${firstRow.taskStartTime} - ${firstRow.taskEndTime}`
         : '';
       const resolvedReportScope = inferAssignmentReportScope(row);
       const classId = toPublicId(row?.classId) || String(row?.classId || '').trim();
       return {
         ...row,
+        targetRows,
+        targetRowCount: targetRows.length,
         targetType,
         targetDate,
         taskTimeRange,
@@ -548,6 +659,16 @@ async function buildAssignmentListContext({
         row.taskStartTime,
         row.taskEndTime,
         row.taskTimeRange,
+        Array.isArray(row.targetRows) ? row.targetRows.map((targetRow) => [
+          targetRow.sessionId,
+          targetRow.sessionDate,
+          targetRow.reportStartDate,
+          targetRow.reportDueDate,
+          targetRow.taskStartTime,
+          targetRow.taskEndTime,
+          targetRow.teacherId,
+          targetRow.status
+        ].join(' ')).join(' ') : '',
         Array.isArray(row.teacherIds) ? row.teacherIds.join(' ') : ''
       ]
         .map((v) => String(v || '').toLowerCase())
@@ -596,6 +717,7 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
 
   const selectedSessionIds = [];
   const selectedDateTargets = [];
+  const selectedTargetRows = [];
   const selectedReportScope = inferAssignmentReportScope(assignment);
   const selectedTargetStudentIds = [];
   const selectedTaskStartTime = String(assignment?.taskStartTime || '').trim();
@@ -607,13 +729,14 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
   const selectedReportDueDate = String(assignment?.reportDueDate || '').trim();
   const canReuseAssignmentTargets = assignment && idsEqual(assignment?.classId, selectedClassId);
   if (canReuseAssignmentTargets) {
-    if (inferAssignmentTargetType(assignment) === 'session') {
-      const sid = String(assignment?.sessionId || '').trim();
+    const effectiveRows = getEffectiveAssignmentRows(assignment);
+    effectiveRows.forEach((targetRow) => {
+      selectedTargetRows.push(targetRow);
+      const sid = String(targetRow?.sessionId || '').trim();
       if (sid) selectedSessionIds.push(sid);
-    } else {
-      const dateTarget = String(assignment?.dueDate || assignment?.sessionDate || '').trim();
+      const dateTarget = String(targetRow?.dueDate || targetRow?.sessionDate || '').trim();
       if (dateTarget) selectedDateTargets.push(dateTarget);
-    }
+    });
     if (Array.isArray(assignment?.targetStudentIds)) {
       assignment.targetStudentIds
         .map((id) => toPublicId(id))
@@ -665,6 +788,7 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
     selectedConflictPermitted,
     selectedReportStartDate,
     selectedReportDueDate,
+    selectedTargetRows,
     selectedReportScope,
     selectedTargetStudentIds,
     teacherOptions: Array.from(teacherOptionsMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
@@ -720,7 +844,7 @@ async function buildInstanceListRows({ reqUser, assignmentFilter = '', q = '' })
     });
 
   const existingInstanceKeys = new Set(
-    activeInstanceRows.map((row) => buildInstanceIdentityKey(row.assignmentId, row.teacherId, row.targetKey || 'class'))
+    activeInstanceRows.map((row) => buildInstanceIdentityKeyForRow(row.assignmentId, row.assignmentRowId || '', row.teacherId, row.targetKey || 'class'))
   );
 
   const pendingRows = [];
@@ -736,46 +860,56 @@ async function buildInstanceListRows({ reqUser, assignmentFilter = '', q = '' })
     const teacherIds = [...new Set((Array.isArray(assignment?.teacherIds) ? assignment.teacherIds : [])
       .map((id) => toPublicId(id))
       .filter(Boolean))];
-    if (!teacherIds.length) continue;
-    // eslint-disable-next-line no-await-in-loop
-    const targetStudentIds = await resolvePendingAssignmentStudentTargets({
-      assignment,
-      classItem,
-      reqUser,
-      students
-    });
-    const targets = targetStudentIds.length ? targetStudentIds : [''];
+    const targetRows = getEffectiveAssignmentRows(assignment)
+      .filter((targetRow) => String(targetRow?.status || '').trim().toLowerCase() === 'active');
+    const rowsForTargets = targetRows.length ? targetRows : getEffectiveAssignmentRows(assignment);
 
-    teacherIds.forEach((teacherId) => {
-      targets.forEach((studentId) => {
-        const targetKey = studentId ? `student:${studentId}` : 'class';
-        const identityKey = buildInstanceIdentityKey(assignmentId, teacherId, targetKey);
-        if (existingInstanceKeys.has(identityKey)) return;
-        pendingRows.push({
-          id: `pending-${assignmentId}-${teacherId}-${targetKey}`.replace(/[^A-Za-z0-9_-]/g, '-'),
-          isPendingAssignment: true,
-          orgId: assignment.orgId,
-          assignmentId,
-          classId: assignment.classId,
-          sessionId: assignment.sessionId,
-          sessionDate: String(assignment.sessionDate || assignment.reportDueDate || assignment.dueDate || '').trim(),
-          templateId: assignment.templateId,
-          templateVersion: assignment.templateVersion || template?.version || 1,
-          teacherId,
-          teacherName: personMap.get(teacherId) || teacherId || '-',
-          studentId,
-          studentName: studentId ? (personMap.get(studentId) || studentId) : 'Whole class',
-          targetKey,
-          status: 'pending',
-          classTitle: classItem?.title || assignment.classId,
-          classLifecycle: buildClassLifecycleSnapshot(classItem || {}),
-          templateTitle: template?.title || assignment.templateId,
-          hasDocxTemplate: Boolean(template?.docxTemplate?.path),
-          assignmentStatus: assignment.status || '',
-          audit: assignment.audit || {}
+    for (const targetRow of rowsForTargets) {
+      const rowTeacherId = toPublicId(targetRow?.teacherId) || teacherIds[0] || '';
+      if (!rowTeacherId) continue;
+      const rowAssignment = applyAssignmentRow(assignment, targetRow);
+      // eslint-disable-next-line no-await-in-loop
+      const targetStudentIds = await resolvePendingAssignmentStudentTargets({
+        assignment: rowAssignment,
+        classItem,
+        reqUser,
+        students
+      });
+      const targets = targetStudentIds.length ? targetStudentIds : [''];
+
+      [rowTeacherId].forEach((teacherId) => {
+        targets.forEach((studentId) => {
+          const targetKey = studentId ? `student:${studentId}` : 'class';
+          const assignmentRowId = String(targetRow?.rowId || '').trim();
+          const identityKey = buildInstanceIdentityKeyForRow(assignmentId, assignmentRowId, teacherId, targetKey);
+          if (existingInstanceKeys.has(identityKey)) return;
+          pendingRows.push({
+            id: `pending-${assignmentId}-${assignmentRowId || 'legacy'}-${teacherId}-${targetKey}`.replace(/[^A-Za-z0-9_-]/g, '-'),
+            isPendingAssignment: true,
+            orgId: assignment.orgId,
+            assignmentId,
+            assignmentRowId,
+            classId: assignment.classId,
+            sessionId: targetRow.sessionId,
+            sessionDate: String(targetRow.sessionDate || targetRow.reportDueDate || targetRow.dueDate || '').trim(),
+            templateId: assignment.templateId,
+            templateVersion: assignment.templateVersion || template?.version || 1,
+            teacherId,
+            teacherName: personMap.get(teacherId) || teacherId || '-',
+            studentId,
+            studentName: studentId ? (personMap.get(studentId) || studentId) : 'Whole class',
+            targetKey,
+            status: 'pending',
+            classTitle: classItem?.title || assignment.classId,
+            classLifecycle: buildClassLifecycleSnapshot(classItem || {}),
+            templateTitle: template?.title || assignment.templateId,
+            hasDocxTemplate: Boolean(template?.docxTemplate?.path),
+            assignmentStatus: assignment.status || '',
+            audit: assignment.audit || {}
+          });
         });
       });
-    });
+    }
   }
 
   return [...activeInstanceRows, ...pendingRows]
@@ -803,6 +937,75 @@ async function buildInstanceListRows({ reqUser, assignmentFilter = '', q = '' })
       if (a.isPendingAssignment !== b.isPendingAssignment) return a.isPendingAssignment ? -1 : 1;
       return String(b.audit?.createDateTime || '').localeCompare(String(a.audit?.createDateTime || ''));
     });
+}
+
+async function buildReportReviewNavigator({ currentInstance, reqUser, participantOnly = false } = {}) {
+  const currentId = toPublicId(currentInstance?.id);
+  if (!currentId) {
+    return { rows: [], currentIndex: -1, olderCount: 0, olderHref: '', newerHref: '' };
+  }
+
+  const [allInstances, allAssignments] = await Promise.all([
+    listAllReportInstances(reqUser),
+    listAllReportAssignments(reqUser)
+  ]);
+  const assignmentMap = new Map(
+    (Array.isArray(allAssignments) ? allAssignments : [])
+      .map((row) => [toPublicId(row?.id), row])
+      .filter(([id]) => Boolean(id))
+  );
+  const viewerPersonId = toPublicId(reqUser?.personId || reqUser?.id || '');
+
+  const rows = filterRecordsByOrg(allInstances, reqUser)
+    .filter(isActiveReportInstance)
+    .filter((row) => idsEqual(row?.orgId, currentInstance?.orgId))
+    .filter((row) => idsEqual(row?.classId, currentInstance?.classId))
+    .filter((row) => idsEqual(row?.templateId, currentInstance?.templateId))
+    .filter((row) => isSameReportReviewTarget(row, currentInstance))
+    .filter((row) => {
+      const assignment = assignmentMap.get(toPublicId(row?.assignmentId)) || null;
+      return isReportInstanceAssignmentConsistent(row, assignment);
+    })
+    .filter((row) => !participantOnly || canParticipantReviewInstance(row, viewerPersonId))
+    .map((row) => {
+      const assignment = assignmentMap.get(toPublicId(row?.assignmentId)) || null;
+      const sortDate = resolveReviewNavigatorSortDate(row, assignment);
+      const id = toPublicId(row?.id);
+      return {
+        id,
+        href: `/school/reports/instances/edit-v2/${encodeURIComponent(id)}`,
+        sessionDate: sortDate,
+        status: String(row?.status || '').trim(),
+        teacherId: toPublicId(row?.teacherId) || String(row?.teacherId || '').trim(),
+        isCurrent: idsEqual(id, currentId),
+        _sortDate: sortDate,
+        _createdAt: String(row?.audit?.createDateTime || '').trim()
+      };
+    })
+    .filter((row) => row.id)
+    .sort((a, b) => {
+      const dateCompare = String(b._sortDate || '').localeCompare(String(a._sortDate || ''));
+      if (dateCompare) return dateCompare;
+      const createdCompare = String(b._createdAt || '').localeCompare(String(a._createdAt || ''));
+      if (createdCompare) return createdCompare;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    })
+    .map((row) => {
+      const { _sortDate, _createdAt, ...safeRow } = row;
+      return safeRow;
+    });
+
+  const currentIndex = rows.findIndex((row) => row.isCurrent);
+  const olderRow = currentIndex >= 0 ? rows[currentIndex + 1] : null;
+  const newerRow = currentIndex > 0 ? rows[currentIndex - 1] : null;
+
+  return {
+    rows,
+    currentIndex,
+    olderCount: currentIndex >= 0 ? Math.max(0, rows.length - currentIndex - 1) : 0,
+    olderHref: olderRow?.href || '',
+    newerHref: newerRow?.href || ''
+  };
 }
 
 async function buildPersonReportListContext({ reqUser, requestedScope = '', requestedPersonId = '', q = '' }) {
@@ -999,6 +1202,9 @@ module.exports = {
   resolveReportPeriod,
   inferAssignmentTargetType,
   inferAssignmentReportScope,
+  getEffectiveAssignmentRows,
+  findAssignmentRow,
+  applyAssignmentRow,
   getClassStudentIds,
   buildClassStudentOptions,
   isRecordAccessibleByOrg,
@@ -1009,6 +1215,7 @@ module.exports = {
   buildAssignmentListContext,
   buildAssignmentFormContext,
   buildInstanceListRows,
+  buildReportReviewNavigator,
   buildPersonReportListContext,
   buildInstanceAnswers,
   resolveInstanceNextStatus

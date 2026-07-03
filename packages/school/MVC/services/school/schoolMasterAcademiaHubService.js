@@ -605,9 +605,14 @@ function buildReportAssignmentActionLinks(row) {
   ];
   const firstTeacherId = normalizeText(Array.isArray(row?.teacherIds) ? row.teacherIds[0] : '');
   if (firstTeacherId) {
+    const firstTargetRow = reportViewService.getEffectiveAssignmentRows(row)[0] || null;
+    const rowId = normalizeText(firstTargetRow?.rowId || row?.assignmentRowId || '');
+    const params = new URLSearchParams();
+    params.set('teacherId', firstTeacherId);
+    if (rowId) params.set('rowId', rowId);
     actions.push({
       label: 'Start',
-      href: `/school/reports/instances/start/${encodedId}?teacherId=${encodeURIComponent(firstTeacherId)}`,
+      href: `/school/reports/instances/start/${encodedId}?${params.toString()}`,
       icon: 'bi bi-play-circle',
       tone: 'success'
     });
@@ -645,8 +650,11 @@ function buildReportInstanceActionLinks(row) {
   if (row?.isPendingAssignment === true) {
     const actions = [];
     if (assignmentId && teacherId) {
-      let startUrl = `/school/reports/instances/start/${encodeURIComponent(assignmentId)}?teacherId=${encodeURIComponent(teacherId)}`;
-      if (studentId) startUrl += `&studentId=${encodeURIComponent(studentId)}`;
+      const params = new URLSearchParams();
+      params.set('teacherId', teacherId);
+      if (row?.assignmentRowId) params.set('rowId', normalizeText(row.assignmentRowId));
+      if (studentId) params.set('studentId', studentId);
+      const startUrl = `/school/reports/instances/start/${encodeURIComponent(assignmentId)}?${params.toString()}`;
       actions.push({ label: 'Start', href: startUrl, icon: 'bi bi-play-circle', tone: 'primary' });
     }
     if (assignmentId) {

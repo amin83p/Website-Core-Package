@@ -59,6 +59,18 @@ test('shared editor template uses tooltip help markers for V2 instead of inline 
   assert.match(viewSource, /initializeTooltips\(\);/);
 });
 
+test('shared editor template has V2 previous report navigator button, modal, and guarded links', () => {
+  const viewSource = read('packages/school/MVC/views/school/report/instanceEditor.ejs');
+
+  assert.match(viewSource, /<% \} else \{ %>[\s\S]*id="btnReviewPreviousReports"[\s\S]*Review Previous Reports/);
+  assert.match(viewSource, /id="reportReviewNavigatorModal"/);
+  assert.match(viewSource, /href="<%= row\.href %>"/);
+  assert.match(viewSource, /class="btn btn-outline-primary btn-sm js-report-review-nav-link"[\s\S]*Open V2/);
+  assert.match(viewSource, /function bindReportReviewNavigatorLinks\(\)/);
+  assert.match(viewSource, /confirmLeave\([\s\S]*Open another report\?/);
+  assert.match(viewSource, /bindReportReviewNavigatorLinks\(\);/);
+});
+
 test('instance list and master hub report instance actions include Open V2 links', () => {
   const instanceListSource = read('packages/school/MVC/views/school/report/instanceList.ejs');
   const masterHubServiceSource = read('packages/school/MVC/services/school/schoolMasterAcademiaHubService.js');

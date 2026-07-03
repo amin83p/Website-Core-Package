@@ -23,6 +23,11 @@
   const dtl = typeof instanceDetails !== 'undefined' && instanceDetails && typeof instanceDetails === 'object' ? instanceDetails : {};
   const requestedEditorVariant = String(typeof editorVariant === 'undefined' ? '' : editorVariant).trim().toLowerCase();
   const isV2 = requestedEditorVariant === 'v2';
+  const reviewNav = (typeof reportReviewNavigator !== 'undefined' && reportReviewNavigator && typeof reportReviewNavigator === 'object')
+    ? reportReviewNavigator
+    : { rows: [], currentIndex: -1, olderCount: 0, olderHref: '', newerHref: '' };
+  const reviewRows = Array.isArray(reviewNav.rows) ? reviewNav.rows : [];
+  const reviewOlderCount = Number.isFinite(Number(reviewNav.olderCount)) ? Number(reviewNav.olderCount) : 0;
   const isVisualOnlyField = (field) => {
     const t = String(field?.type || '').trim().toLowerCase();
     return t === 'section' || t === 'subheader' || t === 'row_break';
@@ -140,6 +145,11 @@
           <% if (instance?.classId) { %>
             <a href="/school/classes/edit-wizard/<%= encodeURIComponent(instance.classId) %>" class="btn btn-outline-info btn-sm"><i class="bi bi-diagram-3 me-1"></i>Class Lifecycle</a>
           <% } %>
+        <% } else { %>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnReviewPreviousReports" data-bs-toggle="modal" data-bs-target="#reportReviewNavigatorModal">
+            <i class="bi bi-clock-history me-1"></i>Review Previous Reports
+            <span class="badge bg-secondary ms-1"><%= reviewOlderCount %></span>
+          </button>
         <% } %>
         <% if (template?.docxTemplate?.path) { %>
           <a href="/school/reports/instances/export/<%= instance.id %>?format=docx&download=1" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</a>
@@ -607,6 +617,78 @@
   </form>
 </div>
 
+<% if (isV2) { %>
+<div class="modal fade" id="reportReviewNavigatorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <div>
+          <h5 class="modal-title mb-0"><i class="bi bi-clock-history me-2"></i>Review Previous Reports</h5>
+          <div class="small text-muted mt-1">Same template, student target, and class.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <% if (reviewNav.olderHref) { %>
+            <a class="btn btn-outline-primary btn-sm js-report-review-nav-link" href="<%= reviewNav.olderHref %>"><i class="bi bi-arrow-left me-1"></i>Older report</a>
+          <% } else { %>
+            <button type="button" class="btn btn-outline-secondary btn-sm" disabled><i class="bi bi-arrow-left me-1"></i>Older report</button>
+          <% } %>
+          <% if (reviewNav.newerHref) { %>
+            <a class="btn btn-outline-primary btn-sm js-report-review-nav-link" href="<%= reviewNav.newerHref %>">Newer report<i class="bi bi-arrow-right ms-1"></i></a>
+          <% } else { %>
+            <button type="button" class="btn btn-outline-secondary btn-sm" disabled>Newer report<i class="bi bi-arrow-right ms-1"></i></button>
+          <% } %>
+          <span class="small text-muted ms-auto"><%= Math.max(0, reviewRows.length - 1) %> matching report(s) besides this one.</span>
+        </div>
+        <% if (reviewRows.length <= 1) { %>
+          <div class="alert alert-light border mb-0">No previous matching reports were found for this student, class, and template.</div>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Teacher</th>
+                  <th class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% reviewRows.forEach((row) => { %>
+                  <tr class="<%= row.isCurrent ? 'table-primary' : '' %>">
+                    <td>
+                      <div class="fw-semibold"><%= row.sessionDate || '-' %></div>
+                      <div class="x-small text-muted font-monospace"><%= row.id || '-' %></div>
+                    </td>
+                    <td>
+                      <span class="badge <%= String(row.status || '').toLowerCase() === 'locked' ? 'bg-dark' : (String(row.status || '').toLowerCase() === 'submitted' ? 'bg-success' : 'bg-warning text-dark') %>"><%= row.status || '-' %></span>
+                      <% if (row.isCurrent) { %><span class="badge bg-primary ms-1">Current</span><% } %>
+                    </td>
+                    <td class="font-monospace small"><%= row.teacherId || '-' %></td>
+                    <td class="text-end">
+                      <% if (row.isCurrent) { %>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>Current</button>
+                      <% } else { %>
+                        <a class="btn btn-outline-primary btn-sm js-report-review-nav-link" href="<%= row.href %>"><i class="bi bi-layout-text-window-reverse me-1"></i>Open V2</a>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
 <div class="modal fade" id="prefillRefreshReviewModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
@@ -661,6 +743,7 @@
     const fieldConfigEl = document.getElementById('reportInstanceFieldsConfig');
     const mergedDataEl = document.getElementById('reportInstanceMergedData');
     const prefillDataEl = document.getElementById('reportInstancePrefillData');
+    const reportReviewNavLinks = Array.from(document.querySelectorAll('.js-report-review-nav-link'));
     const instanceId = <%- JSON.stringify(String(instance?.id || '')) %>;
     const summaryFocusStorageKey = 'report_instance_validation_focus';
     let prefillRefreshModal = null;
@@ -898,6 +981,24 @@
       } catch (e) {
         return '';
       }
+    }
+
+    function bindReportReviewNavigatorLinks() {
+      reportReviewNavLinks.forEach((link) => {
+        if (!link || link.dataset.reportReviewNavBound === '1') return;
+        link.dataset.reportReviewNavBound = '1';
+        link.addEventListener('click', async (event) => {
+          const href = String(link.getAttribute('href') || '').trim();
+          if (!href) return;
+          event.preventDefault();
+          const ok = await confirmLeave(
+            'Open another report?',
+            'Open this report? Unsaved changes on the current form will be lost unless you save first.',
+            'Open Report'
+          );
+          if (ok) window.location.href = href;
+        });
+      });
     }
 
     function parseJsonScript(el, fallback) {
@@ -1706,6 +1807,7 @@
       });
     }
 
+    bindReportReviewNavigatorLinks();
     bindPrefillRefreshControls();
   })();
 </script>

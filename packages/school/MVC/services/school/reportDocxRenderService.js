@@ -2,6 +2,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
 
 function normalizeTokenKey(rawToken) {
   const clean = String(rawToken || '').trim();
@@ -29,7 +30,10 @@ function resolveTemplateFilePath(docxTemplate = {}) {
   const fromRecord = String(docxTemplate.path || '').trim();
   if (!fromRecord) return '';
 
-  if (/^\/uploads\//i.test(fromRecord) || /^https?:\/\/[^/]+\/uploads\//i.test(fromRecord)) return fromRecord;
+  if (fileAssetStorage.isUploadReference?.(fromRecord)) {
+    const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(fromRecord);
+    return relativeUploadPath ? `/uploads/${relativeUploadPath}` : fromRecord;
+  }
   if (path.isAbsolute(fromRecord)) return fromRecord;
   return path.resolve(process.cwd(), fromRecord);
 }
@@ -110,7 +114,7 @@ async function renderReportInstanceDocx({ template, instance, placeholders }) {
   const { PizZip, Docxtemplater } = getDocxDependencies();
   let binary;
   try {
-    if (/^\/uploads\//i.test(filePath) || /^https?:\/\/[^/]+\/uploads\//i.test(filePath)) {
+    if (fileAssetStorage.isUploadReference?.(filePath)) {
       binary = (await fileAssetStorage.readBuffer(filePath)).buffer;
     } else {
       binary = await fs.readFile(filePath);
@@ -130,7 +134,8 @@ async function renderReportInstanceDocx({ template, instance, placeholders }) {
     doc = new Docxtemplater(zip, {
       delimiters: { start: '{{', end: '}}' },
       paragraphLoop: true,
-      linebreaks: true
+      linebreaks: true,
+      nullGetter: () => ''
     });
     doc.render(renderData);
   } catch (error) {
@@ -157,5 +162,6 @@ async function renderReportInstanceDocx({ template, instance, placeholders }) {
 module.exports = {
   normalizeTokenKey,
   buildRenderData,
+  resolveTemplateFilePath,
   renderReportInstanceDocx
 };

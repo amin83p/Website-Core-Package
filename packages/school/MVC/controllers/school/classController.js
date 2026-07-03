@@ -3236,43 +3236,53 @@ async function manageSession(req, res) {
                 sessionId,
                 sessionDate: session?.date
             })) continue;
+            const matchingTargetRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment)
+                .filter((targetRow) => reportAssignmentSessionUtils.reportAssignmentMatchesSession({
+                    ...assignment,
+                    targetRows: [targetRow]
+                }, { classId, sessionId, sessionDate: session?.date }));
+            const matchingAssignment = reportAssignmentSessionUtils.applyTargetRow(assignment, matchingTargetRows[0] || null);
 
             const templateRow = reportTemplateById.get(String(assignment.templateId || '').trim()) || null;
             const templateTitle = String(templateRow?.title || assignment.templateId || 'Report').trim();
-            const scope = reportAssignmentSessionUtils.inferAssignmentReportScope(assignment);
-            const targetType = reportAssignmentSessionUtils.inferAssignmentTargetType(assignment);
-            const timeLabel = reportAssignmentSessionUtils.formatReportAssignmentTimeWindow(assignment);
+            const scope = reportAssignmentSessionUtils.inferAssignmentReportScope(matchingAssignment);
+            const targetType = reportAssignmentSessionUtils.inferAssignmentTargetType(matchingAssignment);
+            const timeLabel = reportAssignmentSessionUtils.formatReportAssignmentTimeWindow(matchingAssignment);
 
             let href = '';
             const actionLabel = 'Open';
-            const teacherIds = Array.isArray(assignment.teacherIds) ? assignment.teacherIds : [];
+            const teacherIds = Array.isArray(matchingAssignment.teacherIds) ? matchingAssignment.teacherIds : [];
             const isAssignedTeacher = teacherIds.some((tid) => idsEqual(tid, currentUserPersonId));
+            const rowIdForLink = String(matchingAssignment?.assignmentRowId || '').trim();
 
             if (isReportAdminViewer) {
                 const params = new URLSearchParams();
+                if (rowIdForLink) params.set('rowId', rowIdForLink);
                 if (isAssignedTeacher) {
                     params.set('teacherId', String(currentUserPersonId || '').trim());
                 } else {
-                    const fallbackTeacher = String((assignment.teacherIds || [])[0] || '').trim();
+                    const fallbackTeacher = String((matchingAssignment.teacherIds || [])[0] || '').trim();
                     if (fallbackTeacher) params.set('teacherId', fallbackTeacher);
                 }
                 href = `/school/reports/instances/start/${encodeURIComponent(String(assignment.id || '').trim())}?${params.toString()}`;
             } else if (isAssignedTeacher) {
                 const params = new URLSearchParams();
+                if (rowIdForLink) params.set('rowId', rowIdForLink);
                 params.set('teacherId', String(currentUserPersonId || '').trim());
                 href = `/school/reports/instances/start/${encodeURIComponent(String(assignment.id || '').trim())}?${params.toString()}`;
             } else {
                 let studentHit = false;
                 if (scope === 'selected_students') {
-                    const targets = Array.isArray(assignment.targetStudentIds) ? assignment.targetStudentIds : [];
+                    const targets = Array.isArray(matchingAssignment.targetStudentIds) ? matchingAssignment.targetStudentIds : [];
                     studentHit = [...ownedStudentIdsForExamStart].some((sid) => targets.some((t) => idsEqual(t, sid)));
                 } else if (scope === 'each_student') {
                     studentHit = [...ownedStudentPersonIdsForReports].some((pid) => rosterPersonIdsForReports.has(pid));
                 }
                 if (studentHit) {
                     const params = new URLSearchParams();
+                    if (rowIdForLink) params.set('rowId', rowIdForLink);
                     params.set('studentId', String(currentUserPersonId || '').trim());
-                    const fallbackTeacher = String((assignment.teacherIds || [])[0] || '').trim();
+                    const fallbackTeacher = String((matchingAssignment.teacherIds || [])[0] || '').trim();
                     if (fallbackTeacher) params.set('teacherId', fallbackTeacher);
                     href = `/school/reports/instances/start/${encodeURIComponent(String(assignment.id || '').trim())}?${params.toString()}`;
                 }

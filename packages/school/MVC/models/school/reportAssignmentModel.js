@@ -82,6 +82,14 @@ function cleanAllocatedHours(v) {
   return Number(n.toFixed(2));
 }
 
+function generateTargetRowId(existingIds = new Set()) {
+  for (let i = 0; i < 50; i += 1) {
+    const candidate = `row_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    if (!existingIds.has(candidate)) return candidate;
+  }
+  return `row_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function sanitizeTeacherIds(v) {
   const rows = Array.isArray(v) ? v : [];
   const seen = new Set();
@@ -142,20 +150,192 @@ function cleanSharedAnswersObject(v) {
   return out;
 }
 
+function sanitizeAssignmentTargetRows(v, input = {}, existing = null) {
+  const rows = Array.isArray(v) ? v : [];
+  const existingRows = Array.isArray(existing?.targetRows) ? existing.targetRows : [];
+  const existingRowIds = new Set(existingRows.map((row) => cleanString(row?.rowId, { max: 80, allowEmpty: true })).filter(Boolean));
+  const seenRowIds = new Set();
+
+  const fallbackRows = rows.length ? rows : [{
+    rowId: input.assignmentRowId || input.rowId || '',
+    targetType: input.targetType,
+    sessionId: input.sessionId,
+    sessionDate: input.sessionDate,
+    dueDate: input.dueDate,
+    reportStartDate: input.reportStartDate,
+    reportDueDate: input.reportDueDate,
+    taskStartTime: input.taskStartTime,
+    taskEndTime: input.taskEndTime,
+    conflictPermitted: input.conflictPermitted,
+    timesheetReflection: input.timesheetReflection,
+    allocatedHours: input.allocatedHours,
+    teacherId: input.teacherId || (Array.isArray(input.teacherIds) ? input.teacherIds[0] : ''),
+    status: input.status,
+    notes: input.notes
+  }];
+
+  return fallbackRows.map((row) => {
+    const targetTypeRaw = cleanString(row?.targetType, { max: 20, allowEmpty: true }).toLowerCase();
+    const targetType = ASSIGNMENT_TARGET_TYPES.has(targetTypeRaw)
+      ? targetTypeRaw
+      : (String(row?.sessionId || '').trim() ? 'session' : 'date');
+    const cleanExistingId = cleanString(row?.rowId, { max: 80, allowEmpty: true });
+    let rowId = cleanExistingId && /^[A-Za-z0-9:_-]+$/.test(cleanExistingId) ? cleanExistingId : '';
+    if (!rowId || seenRowIds.has(rowId)) rowId = generateTargetRowId(new Set([...existingRowIds, ...seenRowIds]));
+    seenRowIds.add(rowId);
+
+    const sessionId = cleanId(row?.sessionId, { max: 80, allowEmpty: targetType === 'date' }) || '';
+    const teacherId = cleanId(row?.teacherId || (Array.isArray(input.teacherIds) ? input.teacherIds[0] : ''), { max: 80, allowEmpty: false });
+    const sessionDate = cleanDateOnly(row?.sessionDate || row?.dueDate, { allowEmpty: false });
+    const dueDate = targetType === 'date'
+      ? cleanDateOnly(row?.dueDate || row?.sessionDate, { allowEmpty: false })
+      : '';
+    const taskStartTime = cleanTimeOnly(row?.taskStartTime, { allowEmpty: false });
+    const taskEndTime = cleanTimeOnly(row?.taskEndTime, { allowEmpty: false });
+    if (!taskStartTime || !taskEndTime) {
+      throw new Error('Task start/end time are required for every report assignment row.');
+    }
+    if (taskStartTime >= taskEndTime) {
+      throw new Error('Task end time must be later than task start time for every report assignment row.');
+    }
+
+    const reportStartDate = cleanDateOnly(row?.reportStartDate, { allowEmpty: false });
+    const reportDueDate = cleanDateOnly(row?.reportDueDate, { allowEmpty: false });
+    if (reportStartDate > reportDueDate) {
+      throw new Error('Report start date cannot be after report due date.');
+    }
+
+    const rowStatus = cleanString(row?.status, { max: 20, allowEmpty: true }).toLowerCase() || 'active';
+    if (!ASSIGNMENT_STATUSES.has(rowStatus)) throw new Error('Invalid assignment row status.');
+    const timesheetReflection = cleanBoolean(row?.timesheetReflection, false);
+
+    return {
+      rowId,
+      targetType,
+      sessionId,
+      sessionDate,
+      dueDate,
+      reportStartDate,
+      reportDueDate,
+      taskStartTime,
+      taskEndTime,
+      conflictPermitted: cleanBoolean(row?.conflictPermitted, targetType === 'session'),
+      timesheetReflection,
+      allocatedHours: timesheetReflection ? cleanAllocatedHours(row?.allocatedHours) : 0,
+      teacherId,
+      status: rowStatus,
+      notes: cleanString(row?.notes, { max: 1500, allowEmpty: true })
+    };
+  });
+}
+
+function getEffectiveTargetRows(assignment = {}) {
+  const rows = Array.isArray(assignment?.targetRows) ? assignment.targetRows : [];
+  if (rows.length) return rows.map((row) => ({
+    rowId: cleanString(row?.rowId, { max: 80, allowEmpty: true }) || '',
+    targetType: ASSIGNMENT_TARGET_TYPES.has(String(row?.targetType || '').trim().toLowerCase())
+      ? String(row?.targetType || '').trim().toLowerCase()
+      : (String(row?.sessionId || '').trim() ? 'session' : 'date'),
+    sessionId: cleanString(row?.sessionId, { max: 80, allowEmpty: true }),
+    sessionDate: cleanString(row?.sessionDate, { max: 10, allowEmpty: true }),
+    dueDate: cleanString(row?.dueDate, { max: 10, allowEmpty: true }),
+    reportStartDate: cleanString(row?.reportStartDate, { max: 10, allowEmpty: true }),
+    reportDueDate: cleanString(row?.reportDueDate, { max: 10, allowEmpty: true }),
+    taskStartTime: cleanString(row?.taskStartTime, { max: 5, allowEmpty: true }),
+    taskEndTime: cleanString(row?.taskEndTime, { max: 5, allowEmpty: true }),
+    conflictPermitted: cleanBoolean(row?.conflictPermitted, String(row?.targetType || '').trim().toLowerCase() === 'session'),
+    timesheetReflection: cleanBoolean(row?.timesheetReflection, false),
+    allocatedHours: Number(row?.allocatedHours || 0),
+    teacherId: cleanString(row?.teacherId, { max: 80, allowEmpty: true }),
+    status: cleanString(row?.status, { max: 20, allowEmpty: true }).toLowerCase() || String(assignment?.status || 'active').toLowerCase(),
+    notes: cleanString(row?.notes, { max: 1500, allowEmpty: true })
+  }));
+
+  const targetTypeRaw = cleanString(assignment?.targetType, { max: 20, allowEmpty: true }).toLowerCase();
+  const targetType = ASSIGNMENT_TARGET_TYPES.has(targetTypeRaw)
+    ? targetTypeRaw
+    : (String(assignment?.sessionId || '').trim() ? 'session' : 'date');
+  return [{
+    rowId: cleanString(assignment?.assignmentRowId || assignment?.rowId, { max: 80, allowEmpty: true }) || '',
+    targetType,
+    sessionId: cleanString(assignment?.sessionId, { max: 80, allowEmpty: true }),
+    sessionDate: cleanString(assignment?.sessionDate || assignment?.dueDate, { max: 10, allowEmpty: true }),
+    dueDate: targetType === 'date'
+      ? cleanString(assignment?.dueDate || assignment?.sessionDate, { max: 10, allowEmpty: true })
+      : '',
+    reportStartDate: cleanString(assignment?.reportStartDate, { max: 10, allowEmpty: true }),
+    reportDueDate: cleanString(assignment?.reportDueDate, { max: 10, allowEmpty: true }),
+    taskStartTime: cleanString(assignment?.taskStartTime, { max: 5, allowEmpty: true }),
+    taskEndTime: cleanString(assignment?.taskEndTime, { max: 5, allowEmpty: true }),
+    conflictPermitted: cleanBoolean(assignment?.conflictPermitted, targetType === 'session'),
+    timesheetReflection: cleanBoolean(assignment?.timesheetReflection, false),
+    allocatedHours: Number(assignment?.allocatedHours || 0),
+    teacherId: cleanString(assignment?.teacherId || (Array.isArray(assignment?.teacherIds) ? assignment.teacherIds[0] : ''), { max: 80, allowEmpty: true }),
+    status: cleanString(assignment?.status, { max: 20, allowEmpty: true }).toLowerCase() || 'active',
+    notes: cleanString(assignment?.notes, { max: 1500, allowEmpty: true })
+  }];
+}
+
+function findEffectiveTargetRow(assignment = {}, rowId = '') {
+  const rows = getEffectiveTargetRows(assignment);
+  const requested = cleanString(rowId, { max: 80, allowEmpty: true });
+  if (requested) {
+    const found = rows.find((row) => String(row?.rowId || '') === requested);
+    if (found) return found;
+  }
+  return rows.find((row) => String(row?.status || '').toLowerCase() === 'active') || rows[0] || null;
+}
+
+function applyTargetRowToAssignment(assignment = {}, row = null) {
+  const effectiveRow = row || findEffectiveTargetRow(assignment);
+  if (!effectiveRow) return assignment;
+  return {
+    ...assignment,
+    assignmentRowId: effectiveRow.rowId || '',
+    rowId: effectiveRow.rowId || '',
+    targetType: effectiveRow.targetType,
+    sessionId: effectiveRow.sessionId,
+    sessionDate: effectiveRow.sessionDate,
+    dueDate: effectiveRow.dueDate,
+    reportStartDate: effectiveRow.reportStartDate,
+    reportDueDate: effectiveRow.reportDueDate,
+    taskStartTime: effectiveRow.taskStartTime,
+    taskEndTime: effectiveRow.taskEndTime,
+    conflictPermitted: effectiveRow.conflictPermitted,
+    timesheetReflection: effectiveRow.timesheetReflection,
+    allocatedHours: effectiveRow.allocatedHours,
+    teacherId: effectiveRow.teacherId || '',
+    teacherIds: effectiveRow.teacherId ? [effectiveRow.teacherId] : (Array.isArray(assignment?.teacherIds) ? assignment.teacherIds : []),
+    rowStatus: effectiveRow.status,
+    rowNotes: effectiveRow.notes
+  };
+}
+
 function sanitizeAssignment(input, { isUpdate = false, existing = null } = {}) {
   if (!isPlainObject(input)) throw new Error('Invalid report assignment payload.');
 
   const orgId = cleanId(input.orgId, { max: 64, allowEmpty: false });
   const classId = cleanId(input.classId, { max: 80, allowEmpty: false });
   const templateId = cleanId(input.templateId, { max: 80, allowEmpty: false });
-  const targetTypeInput = cleanString(input.targetType, { max: 20, allowEmpty: true }).toLowerCase();
-  const targetType = ASSIGNMENT_TARGET_TYPES.has(targetTypeInput)
-    ? targetTypeInput
-    : (String(input.sessionId || '').trim() ? 'session' : 'date');
-  const sessionId = cleanId(input.sessionId, { max: 80, allowEmpty: targetType === 'date' });
-  const sessionDate = cleanDateOnly(input.sessionDate, { allowEmpty: false });
+  const targetRows = sanitizeAssignmentTargetRows(input.targetRows, input, existing);
+  if (!targetRows.length) throw new Error('Add at least one report assignment target row.');
+  const firstActiveRow = targetRows.find((row) => row.status === 'active') || targetRows[0];
+  const targetType = firstActiveRow.targetType;
+  const sessionId = firstActiveRow.sessionId;
+  const sessionDate = firstActiveRow.sessionDate;
   const templateVersion = cleanInteger(input.templateVersion, { min: 1, max: 1000, allowEmpty: false });
-  const teacherIds = sanitizeTeacherIds(input.teacherIds);
+  const teacherIds = sanitizeTeacherIds(
+    [...new Set([
+      ...targetRows
+        .filter((row) => row.status === 'active')
+        .map((row) => row.teacherId)
+        .filter(Boolean),
+      ...targetRows
+        .map((row) => row.teacherId)
+        .filter(Boolean),
+      ...(Array.isArray(input.teacherIds) ? input.teacherIds : [])
+    ])]
+  );
   if (!teacherIds.length) throw new Error('Select at least one teacher for assignment.');
   const reportScope = cleanString(input.reportScope, { max: 40, allowEmpty: true }).toLowerCase() || 'class';
   if (!ASSIGNMENT_REPORT_SCOPES.has(reportScope)) throw new Error('Invalid assignment report scope.');
@@ -167,33 +347,14 @@ function sanitizeAssignment(input, { isUpdate = false, existing = null } = {}) {
   const status = cleanString(input.status, { max: 20, allowEmpty: true }).toLowerCase() || 'active';
   if (!ASSIGNMENT_STATUSES.has(status)) throw new Error('Invalid assignment status.');
 
-  if (!ASSIGNMENT_TARGET_TYPES.has(targetType)) throw new Error('Invalid assignment target type.');
-
-  const dueDate = cleanDateOnly(input.dueDate, { allowEmpty: true });
-  if (targetType === 'date' && !dueDate) throw new Error('Due date is required when session is not selected.');
-  const taskStartTime = cleanTimeOnly(input.taskStartTime, { allowEmpty: false });
-  const taskEndTime = cleanTimeOnly(input.taskEndTime, { allowEmpty: false });
-  if (!taskStartTime || !taskEndTime) {
-    throw new Error('Task start/end time are required for schedule conflict checks.');
-  }
-  if (taskStartTime >= taskEndTime) {
-    throw new Error('Task end time must be later than task start time.');
-  }
-  const reportStartDate = cleanDateOnly(input.reportStartDate, { allowEmpty: true });
-  const reportDueDate = cleanDateOnly(input.reportDueDate, { allowEmpty: true });
-  if ((reportStartDate && !reportDueDate) || (!reportStartDate && reportDueDate)) {
-    throw new Error('Provide both report start date and report due date, or leave both empty.');
-  }
-  if (reportStartDate && reportDueDate && reportStartDate > reportDueDate) {
-    throw new Error('Report start date cannot be after report due date.');
-  }
-
-  const conflictPermitted = (targetType === 'session')
-    ? true
-    : cleanBoolean(input.conflictPermitted, false);
-
-  const timesheetReflection = cleanBoolean(input.timesheetReflection, false);
-  const allocatedHours = timesheetReflection ? cleanAllocatedHours(input.allocatedHours) : 0;
+  const dueDate = firstActiveRow.dueDate;
+  const taskStartTime = firstActiveRow.taskStartTime;
+  const taskEndTime = firstActiveRow.taskEndTime;
+  const reportStartDate = firstActiveRow.reportStartDate;
+  const reportDueDate = firstActiveRow.reportDueDate;
+  const conflictPermitted = firstActiveRow.conflictPermitted;
+  const timesheetReflection = firstActiveRow.timesheetReflection;
+  const allocatedHours = firstActiveRow.allocatedHours;
 
   const out = {
     orgId,
@@ -213,6 +374,7 @@ function sanitizeAssignment(input, { isUpdate = false, existing = null } = {}) {
     reportStartDate,
     reportDueDate,
     status,
+    targetRows,
     timesheetReflection,
     allocatedHours,
     sharedAnswers: cleanSharedAnswersObject(
@@ -363,6 +525,9 @@ async function clearByOrg(orgId, options = {}) {
 module.exports = {
   ASSIGNMENT_STATUSES: Object.freeze([...ASSIGNMENT_STATUSES]),
   ASSIGNMENT_REPORT_SCOPES: Object.freeze([...ASSIGNMENT_REPORT_SCOPES]),
+  getEffectiveTargetRows,
+  findEffectiveTargetRow,
+  applyTargetRowToAssignment,
   getAllAssignments,
   getAssignmentById,
   addAssignment,
