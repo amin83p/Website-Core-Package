@@ -817,8 +817,11 @@ exports.showForm = async (req, res) => {
       ).trim();
     });
 
+    const editFormDisplayName = String(personName || '').trim() || 'Teacher';
+    const editFormRecordId = String(teacher.id || teacher.personId || '').trim();
+
     res.render('school/teacher/teacherForm', {
-      title: isEdit ? `Edit Teacher: ${teacher.id || teacher.personId}` : 'New Teacher',
+      title: isEdit ? `Edit Teacher: ${editFormDisplayName} (${editFormRecordId})` : 'New Teacher',
       teacher,
       personName,
       personOrganizations,

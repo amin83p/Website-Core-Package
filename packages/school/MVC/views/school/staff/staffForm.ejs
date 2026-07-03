@@ -3,11 +3,13 @@
   const isEdit = !!s.id;
   const routeId = (s.id || '');
   const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const entityDisplayName = String(typeof personName !== 'undefined' ? personName : '').trim() || 'Staff member';
+  const entityRecordId = String(routeId || s.personId || '').trim();
 %>
 
 <div class="sections-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
-    <h1 class="page-heading size-md m-0"><i class="bi bi-people-fill me-2"></i><%= title %></h1>
+    <h1 class="page-heading size-md m-0"><i class="bi bi-people-fill me-2"></i><% if (isEdit) { %>Edit Staff: <%= entityDisplayName %> <small class="text-muted fw-normal">(<%= entityRecordId %>)</small><% } else { %>New Staff<% } %></h1>
     <a href="/school/staff" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
   </div>
 

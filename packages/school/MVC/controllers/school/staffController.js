@@ -793,8 +793,11 @@ exports.showForm = async (req, res) => {
       ).trim();
     });
 
+    const editFormDisplayName = String(personName || '').trim() || 'Staff member';
+    const editFormRecordId = String(staff.id || staff.personId || '').trim();
+
     res.render('school/staff/staffForm', {
-      title: isEdit ? `Edit Staff: ${staff.id || staff.personId}` : 'New Staff',
+      title: isEdit ? `Edit Staff: ${editFormDisplayName} (${editFormRecordId})` : 'New Staff',
       staff,
       personName,
       personOrganizations,

@@ -11,11 +11,13 @@
   const routeIdJson = JSON.stringify(routeId).replace(/</g, '\\u003c');
   const initPersonOrganizationsJson = JSON.stringify(typeof personOrganizations !== 'undefined' ? (personOrganizations || []) : []).replace(/</g, '\\u003c');
   const initOrganizationLookupJson = JSON.stringify(typeof organizationLookup !== 'undefined' ? (organizationLookup || {}) : {}).replace(/</g, '\\u003c');
+  const entityDisplayName = String(typeof personName !== 'undefined' ? personName : '').trim() || 'Student';
+  const entityRecordId = String(routeId || s.personId || '').trim();
 %>
 
 <div class="sections-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
-      <h1 class="page-heading size-md m-0"><i class="bi bi-person-vcard me-2"></i><%= title %></h1>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-person-vcard me-2"></i><% if (isEdit) { %>Edit Student: <%= entityDisplayName %> <small class="text-muted fw-normal">(<%= entityRecordId %>)</small><% } else { %>Admit New Student<% } %></h1>
       <a href="/school/students" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
   </div>
 

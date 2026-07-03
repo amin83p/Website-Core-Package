@@ -881,8 +881,11 @@ exports.showForm = async (req, res) => {
 
         const countries = ['Canada', 'USA', 'UK', 'Australia', 'India', 'China', 'Brazil', 'Mexico', 'Nigeria', 'Iran', 'Other'];
 
+        const editFormDisplayName = String(personName || '').trim() || 'Student';
+        const editFormRecordId = String(student.id || student.personId || '').trim();
+
         res.render('school/student/studentForm', {
-            title: isEdit ? `Edit Student: ${student.id || student.personId}` : 'Admit New Student',
+            title: isEdit ? `Edit Student: ${editFormDisplayName} (${editFormRecordId})` : 'Admit New Student',
             student,
             personName,
             personOrganizations,
