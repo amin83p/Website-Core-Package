@@ -167,15 +167,147 @@
         color: #15803d;
     }
 
-    /* Info card: distinct tiles for session metadata */
+    /* Info card: collapsible header + expandable detail tiles */
     .session-manager-info-card {
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         border: 1px solid #dbe3ef !important;
         border-radius: 14px;
         overflow: hidden;
     }
+    .session-info-header {
+        display: flex;
+        align-items: stretch;
+        gap: 0.65rem;
+        padding: 0.7rem 0.85rem;
+        flex-wrap: wrap;
+    }
+    .session-info-details-toggle {
+        flex: 1 1 240px;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 11px;
+        background: #fff;
+        padding: 0.55rem 0.75rem;
+        text-align: left;
+        color: #0f172a;
+        cursor: pointer;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .session-info-details-toggle:focus-visible {
+        outline: 2px solid rgba(59, 130, 246, 0.45);
+        outline-offset: 2px;
+    }
+    .session-info-details-toggle:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+    .session-info-details-toggle[aria-expanded="true"] {
+        border-color: #93c5fd;
+        background: #f8fbff;
+        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.12);
+    }
+    .session-info-summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.3rem 0.45rem;
+        flex: 1;
+        min-width: 0;
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: #334155;
+        line-height: 1.3;
+    }
+    .session-info-summary-class {
+        color: #1d4ed8;
+        max-width: 11rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 700;
+    }
+    .session-info-summary-sep {
+        color: #cbd5e1;
+        font-weight: 400;
+    }
+    .session-info-summary-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.12rem 0.45rem;
+        border-radius: 999px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #475569;
+        white-space: nowrap;
+    }
+    .session-info-summary-chip.is-muted:empty {
+        display: none;
+    }
+    .session-info-expand-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.05rem;
+        flex-shrink: 0;
+    }
+    .session-info-expand-label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #64748b;
+        font-weight: 700;
+    }
+    .session-info-expand-chevron {
+        font-size: 0.95rem;
+        color: #64748b;
+        transition: transform 0.2s ease;
+    }
+    .session-info-details-toggle[aria-expanded="true"] .session-info-expand-chevron {
+        transform: rotate(180deg);
+    }
+    .session-info-status-slot {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-width: min(100%, 210px);
+        flex: 0 1 210px;
+        padding: 0.45rem 0.55rem;
+        border-radius: 11px;
+        border: 2px solid #f59e0b;
+        background: linear-gradient(180deg, #fffbeb 0%, #fff 100%);
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+    }
+    .session-info-status-slot-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.35rem;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #b45309;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .session-info-status-slot .session-status-button {
+        margin-top: 0;
+        min-height: 2.35rem;
+        font-size: 0.9rem;
+    }
+    .session-info-details-body {
+        padding: 0 0.85rem 0.85rem;
+        border-top: 1px solid #e8edf4;
+        margin-top: 0;
+        padding-top: 0.85rem;
+    }
     .session-manager-info-card .card-body {
-        padding: 1rem 1.1rem 1.1rem;
+        padding: 0;
     }
     .session-info-grid,
     .session-info-meta-grid {
@@ -582,6 +714,8 @@
                 ? 'This session date is outside the rolling cycle window. Update the class cycle dates or rebuild the session ledger before saving session changes.'
                 : `Rolling sessions are limited to the cycle window: ${smCycleWindowLabel}.`)
             : '';
+        const smRoomLabel = String(session.room || '').trim();
+        const smCurrentStatusLabel = String(currentSessionStatusMeta?.label || currentSessionStatus || 'Scheduled').trim();
     %>
 
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
@@ -639,89 +773,128 @@
     </div>
 
     <div class="card session-manager-info-card shadow-sm mb-3">
-        <div class="card-body">
-            <div class="session-info-grid">
-                <div class="session-info-tile session-info-tile--accent">
-                    <div class="session-info-tile-label">Class</div>
-                    <div class="session-info-tile-value session-info-tile-value-with-badge">
-                        <span class="text-truncate" title="<%= classData.title %>"><%= classData.title %></span>
-                        <% if (smIsRolling && smCycleTooltipText) { %>
-                            <button
-                                type="button"
-                                class="session-class-info-badge<%= smSessionOutsideCycle ? ' is-danger' : '' %>"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="<%= smCycleTooltipText %>"
-                                aria-label="Rolling cycle window information">
-                                <i class="bi <%= smSessionOutsideCycle ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill' %>" aria-hidden="true"></i>
-                            </button>
-                        <% } %>
-                    </div>
+        <div class="session-info-header">
+            <div
+                class="session-info-details-toggle"
+                id="btnToggleSessionInfoDetails"
+                role="button"
+                tabindex="0"
+                data-bs-toggle="collapse"
+                data-bs-target="#sessionInfoDetailsCollapse"
+                aria-expanded="false"
+                aria-controls="sessionInfoDetailsCollapse">
+                <div class="session-info-summary">
+                    <span class="session-info-summary-class text-truncate" title="<%= classData.title %>"><%= classData.title %></span>
+                    <% if (smIsRolling && smCycleTooltipText) { %>
+                        <button
+                            type="button"
+                            class="session-class-info-badge<%= smSessionOutsideCycle ? ' is-danger' : '' %>"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            title="<%= smCycleTooltipText %>"
+                            aria-label="Rolling cycle window information"
+                            onclick="event.stopPropagation();">
+                            <i class="bi <%= smSessionOutsideCycle ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill' %>" aria-hidden="true"></i>
+                        </button>
+                    <% } %>
+                    <span class="session-info-summary-sep" aria-hidden="true">·</span>
+                    <span class="session-info-summary-chip"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i><%= session.date %></span>
+                    <span class="session-info-summary-chip"><i class="bi bi-clock me-1" aria-hidden="true"></i><%= session.startTime %>–<%= session.endTime %></span>
+                    <% if (smIsRolling) { %>
+                        <span class="session-info-summary-chip d-none d-md-inline-flex" title="Cycle window"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i><%= smCycleWindowLabel %></span>
+                    <% } %>
+                    <span class="session-info-summary-chip session-info-summary-chip--location<%= smRoomLabel ? '' : ' is-muted' %>" id="sessionInfoSummaryLocation" title="Location"><% if (smRoomLabel) { %><i class="bi bi-geo-alt me-1" aria-hidden="true"></i><%= smRoomLabel %><% } %></span>
                 </div>
-                <div class="session-info-tile">
-                    <div class="session-info-tile-label">Date</div>
-                    <div class="session-info-tile-value"><%= session.date %></div>
-                </div>
-                <div class="session-info-tile">
-                    <div class="session-info-tile-label">Time</div>
-                    <div class="session-info-tile-value text-nowrap"><%= session.startTime %> – <%= session.endTime %></div>
-                </div>
-                <% if (smIsRolling) { %>
-                <div class="session-info-tile session-info-tile--cycle">
-                    <div class="session-info-tile-label">Cycle window</div>
-                    <div class="session-info-tile-value text-nowrap"><%= smCycleWindowLabel %></div>
-                </div>
-                <% } %>
-                <div class="session-info-tile session-info-tile--location">
-                    <label class="session-info-tile-label mb-0" for="sessionRoom">Location</label>
-                    <input type="text" id="sessionRoom" class="form-control form-control-sm" value="<%= session.room || '' %>" placeholder="Room, lab, field…" <%- disabledAttr %> autocomplete="off">
-                </div>
+                <span class="session-info-expand-meta">
+                    <span class="session-info-expand-label">Details</span>
+                    <i class="bi bi-chevron-down session-info-expand-chevron" aria-hidden="true"></i>
+                </span>
             </div>
-            <div class="session-info-meta-grid">
-                <div class="session-info-tile session-info-tile--status-required">
-                    <div class="session-info-tile-label">
-                        Session status
-                        <span class="badge bg-warning text-dark session-status-required-badge ms-1">Required</span>
-                    </div>
-                    <div class="session-status-required-hint">Click to set the workflow state for this session.</div>
-                    <button type="button" id="sessionStatusButton" class="btn session-status-button session-status-button--action-required" <%= disabledAttr ? 'disabled' : '' %>>
-                        <span id="sessionStatusButtonLabel">Session status</span>
-                        <i class="bi bi-chevron-down"></i>
-                    </button>
-                    <select id="sessionStatusSelect" class="d-none" aria-hidden="true" tabindex="-1" <%= disabledAttr ? 'disabled' : '' %>>
-                        <% availableStatusRows.forEach((statusRow) => { %>
-                            <% const statusCode = normalizeStatusCode(statusRow?.code); %>
-                            <% if (statusCode) { %>
-                                <option
-                                    value="<%= statusCode %>"
-                                    data-label="<%= statusRow?.label || statusCode %>"
-                                    data-color-bg="<%= statusRow?.colorBg || '#e2e3e5' %>"
-                                    data-color-text="<%= statusRow?.colorText || '#41464b' %>"
-                                    data-color-border="<%= statusRow?.colorBorder || '#c6c8ca' %>"
-                                    <%= currentSessionStatus === statusCode ? 'selected' : '' %>>
-                                    <%= statusRow?.label || statusCode %>
-                                </option>
-                            <% } %>
-                        <% }) %>
-                    </select>
+            <div class="session-info-status-slot">
+                <div class="session-info-status-slot-label">
+                    <span>Session status</span>
+                    <span class="badge bg-warning text-dark session-status-required-badge">Required</span>
                 </div>
-                <div class="session-info-tile">
-                    <div class="session-info-tile-label">Make-up</div>
-                    <div class="session-info-tile-value session-info-tile-value-sm">
-                        <% if (isMakeupSession) { %>
-                            <span><i class="bi bi-arrow-return-left me-1 text-warning"></i>For <%= session.makeup.originalSessionId || 'original session' %></span>
-                        <% } else if (existingMakeupHistory.length) { %>
-                            <span><i class="bi bi-calendar-check me-1 text-success"></i><%= existingMakeupHistory.length %> created</span>
-                        <% } else if (canCreateMakeupSession) { %>
-                            <span><i class="bi bi-calendar-plus me-1 text-warning"></i>Available</span>
-                        <% } else { %>
-                            <span class="session-info-tile-muted">Not required</span>
+                <button type="button" id="sessionStatusButton" class="btn session-status-button session-status-button--action-required" <%= disabledAttr ? 'disabled' : '' %>>
+                    <span id="sessionStatusButtonLabel"><%= smCurrentStatusLabel %></span>
+                    <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                </button>
+                <select id="sessionStatusSelect" class="d-none" aria-hidden="true" tabindex="-1" <%= disabledAttr ? 'disabled' : '' %>>
+                    <% availableStatusRows.forEach((statusRow) => { %>
+                        <% const statusCode = normalizeStatusCode(statusRow?.code); %>
+                        <% if (statusCode) { %>
+                            <option
+                                value="<%= statusCode %>"
+                                data-label="<%= statusRow?.label || statusCode %>"
+                                data-color-bg="<%= statusRow?.colorBg || '#e2e3e5' %>"
+                                data-color-text="<%= statusRow?.colorText || '#41464b' %>"
+                                data-color-border="<%= statusRow?.colorBorder || '#c6c8ca' %>"
+                                <%= currentSessionStatus === statusCode ? 'selected' : '' %>>
+                                <%= statusRow?.label || statusCode %>
+                            </option>
                         <% } %>
+                    <% }) %>
+                </select>
+            </div>
+        </div>
+        <div class="collapse" id="sessionInfoDetailsCollapse">
+            <div class="session-info-details-body">
+                <div class="session-info-grid">
+                    <div class="session-info-tile session-info-tile--accent">
+                        <div class="session-info-tile-label">Class</div>
+                        <div class="session-info-tile-value session-info-tile-value-with-badge">
+                            <span class="text-truncate" title="<%= classData.title %>"><%= classData.title %></span>
+                            <% if (smIsRolling && smCycleTooltipText) { %>
+                                <button
+                                    type="button"
+                                    class="session-class-info-badge<%= smSessionOutsideCycle ? ' is-danger' : '' %>"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="<%= smCycleTooltipText %>"
+                                    aria-label="Rolling cycle window information">
+                                    <i class="bi <%= smSessionOutsideCycle ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill' %>" aria-hidden="true"></i>
+                                </button>
+                            <% } %>
+                        </div>
+                    </div>
+                    <div class="session-info-tile">
+                        <div class="session-info-tile-label">Date</div>
+                        <div class="session-info-tile-value"><%= session.date %></div>
+                    </div>
+                    <div class="session-info-tile">
+                        <div class="session-info-tile-label">Time</div>
+                        <div class="session-info-tile-value text-nowrap"><%= session.startTime %> – <%= session.endTime %></div>
+                    </div>
+                    <% if (smIsRolling) { %>
+                    <div class="session-info-tile session-info-tile--cycle">
+                        <div class="session-info-tile-label">Cycle window</div>
+                        <div class="session-info-tile-value text-nowrap"><%= smCycleWindowLabel %></div>
+                    </div>
+                    <% } %>
+                    <div class="session-info-tile session-info-tile--location">
+                        <label class="session-info-tile-label mb-0" for="sessionRoom">Location</label>
+                        <input type="text" id="sessionRoom" class="form-control form-control-sm" value="<%= session.room || '' %>" placeholder="Room, lab, field…" <%- disabledAttr %> autocomplete="off">
                     </div>
                 </div>
-                <div class="session-info-tile">
-                    <div class="session-info-tile-label">Reserved</div>
-                    <div class="session-info-tile-value session-info-tile-value-sm session-info-tile-muted">—</div>
+                <div class="session-info-meta-grid">
+                    <div class="session-info-tile">
+                        <div class="session-info-tile-label">Make-up</div>
+                        <div class="session-info-tile-value session-info-tile-value-sm">
+                            <% if (isMakeupSession) { %>
+                                <span><i class="bi bi-arrow-return-left me-1 text-warning"></i>For <%= session.makeup.originalSessionId || 'original session' %></span>
+                            <% } else if (existingMakeupHistory.length) { %>
+                                <span><i class="bi bi-calendar-check me-1 text-success"></i><%= existingMakeupHistory.length %> created</span>
+                            <% } else if (canCreateMakeupSession) { %>
+                                <span><i class="bi bi-calendar-plus me-1 text-warning"></i>Available</span>
+                            <% } else { %>
+                                <span class="session-info-tile-muted">Not required</span>
+                            <% } %>
+                        </div>
+                    </div>
+                    <div class="session-info-tile">
+                        <div class="session-info-tile-label">Reserved</div>
+                        <div class="session-info-tile-value session-info-tile-value-sm session-info-tile-muted">—</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1990,6 +2163,47 @@ document.addEventListener('DOMContentLoaded', () => {
         const meta = resolveStatusMeta(statusCode);
         return Boolean(meta && meta.makeUpRequired === true);
     }
+    function initSessionManagerTooltips() {
+        if (typeof bootstrap === 'undefined' || !bootstrap?.Tooltip) return;
+        document.querySelectorAll('.session-manager-page [data-bs-toggle="tooltip"]').forEach((el) => {
+            if (!bootstrap.Tooltip.getInstance(el)) new bootstrap.Tooltip(el);
+        });
+    }
+    function syncSessionInfoSummary() {
+        const roomInput = document.getElementById('sessionRoom');
+        const summaryLocation = document.getElementById('sessionInfoSummaryLocation');
+        if (!roomInput || !summaryLocation) return;
+        const room = String(roomInput.value || '').trim();
+        if (!room) {
+            summaryLocation.innerHTML = '';
+            summaryLocation.classList.add('is-muted');
+            return;
+        }
+        summaryLocation.classList.remove('is-muted');
+        summaryLocation.innerHTML = `<i class="bi bi-geo-alt me-1" aria-hidden="true"></i>${scEscapeHtml(room)}`;
+    }
+    const sessionInfoDetailsCollapse = document.getElementById('sessionInfoDetailsCollapse');
+    const sessionInfoDetailsToggle = document.getElementById('btnToggleSessionInfoDetails');
+    if (sessionInfoDetailsCollapse && sessionInfoDetailsToggle) {
+        sessionInfoDetailsCollapse.addEventListener('shown.bs.collapse', () => {
+            sessionInfoDetailsToggle.setAttribute('aria-expanded', 'true');
+            initSessionManagerTooltips();
+        });
+        sessionInfoDetailsCollapse.addEventListener('hidden.bs.collapse', () => {
+            sessionInfoDetailsToggle.setAttribute('aria-expanded', 'false');
+        });
+        sessionInfoDetailsToggle.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                sessionInfoDetailsToggle.click();
+            }
+        });
+        sessionInfoDetailsToggle.querySelectorAll('.session-class-info-badge').forEach((badge) => {
+            badge.addEventListener('click', (event) => event.stopPropagation());
+        });
+    }
+    document.getElementById('sessionRoom')?.addEventListener('input', syncSessionInfoSummary);
+
     function styleSessionStatusSelect() {
         if (!statusSelect || !statusButton) return;
         const opt = statusSelect.selectedOptions && statusSelect.selectedOptions[0];
@@ -2056,11 +2270,8 @@ document.addEventListener('DOMContentLoaded', () => {
         statusSelect.addEventListener('change', () => styleSessionStatusSelect());
         styleSessionStatusSelect();
     }
-    if (typeof bootstrap !== 'undefined' && bootstrap?.Tooltip) {
-        document.querySelectorAll('.session-manager-page [data-bs-toggle="tooltip"]').forEach((el) => {
-            if (!bootstrap.Tooltip.getInstance(el)) new bootstrap.Tooltip(el);
-        });
-    }
+    initSessionManagerTooltips();
+    syncSessionInfoSummary();
     if (statusButton) {
         statusButton.addEventListener('click', () => {
             ensureSessionStatusModal();
