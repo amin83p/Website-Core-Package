@@ -1,7 +1,6 @@
 // MVC/controllers/school/payRateController.js
 const dataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
-const dataService1 = requireCoreModule('MVC/services/dataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields, normalizeSearchKeyword } = requireCoreModule('MVC/utils/generalTools');
@@ -9,7 +8,7 @@ const adminChekersService = requireCoreModule('MVC/services/adminChekersService'
 const { COMPENSATION_METHODS } = require('../../models/school/teacherModel');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 
 function getActiveOrgIdOrThrow(reqUser) {
   const activeOrgId = reqUser?.activeOrgId ? String(reqUser.activeOrgId) : '';
@@ -227,14 +226,14 @@ exports.showEditForm = async (req, res) => {
     if (!owner) throw new Error('Owner profile not found.');
     assertOwnerOrgAccess(owner, activeOrgId, req.user);
 
-    const person = await dataService1.getDataById('persons', owner.personId, req.user, PERSON_QUERY_OPTIONS);
+    const person = await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: owner.personId });
     const departments = await dataService.fetchData('departments', {}, req.user);
 
     const view = {
       ownerType,
       ownerId,
       personId: String(owner.personId || ''),
-      personName: person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : String(owner.personId || ''),
+      personName: person ? schoolPersonAccessService.formatPersonName(person, '') : String(owner.personId || ''),
       personRole: ownerType,
       compensationProfiles: Array.isArray(owner.compensationProfiles) ? owner.compensationProfiles : []
     };

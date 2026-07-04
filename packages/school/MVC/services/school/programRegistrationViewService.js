@@ -1,17 +1,16 @@
 const dataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const schoolRepositories = require('../../repositories/school');
 const programTransactionService = require('./programTransactionService');
 const registrationIntegrityService = require('./registrationIntegrityService');
 const programRegistrationDraftService = require('./programRegistrationDraftService');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const {
   normalizeDraftTransactionItems,
   buildDraftPreviewRowsFromItems
 } = programRegistrationDraftService;
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function asIdArray(value) {
   return Array.from(new Set((Array.isArray(value) ? value : [])
@@ -20,8 +19,7 @@ function asIdArray(value) {
 }
 
 function resolveStudentName(person, student) {
-  const full = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim();
-  return full || String(student?.id || '');
+  return schoolPersonAccessService.formatPersonName(person, String(student?.id || ''));
 }
 
 /** Fields exposed in the program registration list UI and advanced DB search modal. */
@@ -87,10 +85,9 @@ function isRolledBackStatus(status) {
 }
 
 async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, registrationId = '', filters = {} } = {}) {
-  const [registrations, students, persons, programs, allTransactions, allEntries, termRegistrations] = await Promise.all([
+  const [registrations, students, programs, allTransactions, allEntries, termRegistrations] = await Promise.all([
     schoolRepositories.studentProgramRegistrations.list({ query: {}, scope: { canViewAll: true } }),
     dataService.fetchData('students', {}, reqUser),
-    dataServiceGlobal.fetchData('persons', {}, reqUser, PERSON_QUERY_OPTIONS),
     dataService.fetchData('programs', {}, reqUser),
     schoolRepositories.globalTransactions.list({ query: {}, scope: { canViewAll: true } }),
     schoolRepositories.academicLedger.list({ query: {}, scope: { canViewAll: true } }),
@@ -98,7 +95,10 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
   ]);
 
   const studentMap = new Map(students.map((row) => [toPublicId(row.id), row]));
-  const personMap = new Map(persons.map((row) => [toPublicId(row.id), row]));
+  const personMap = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser,
+    personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
+  });
   const programMap = new Map(programs.map((row) => [toPublicId(row.id), row]));
   const transactionMap = new Map(allTransactions.map((row) => [toPublicId(row.id), row]));
   const academicMap = new Map(allEntries.map((row) => [toPublicId(row.id), row]));
@@ -257,7 +257,9 @@ async function buildRegistrationDetail(reqUser, activeOrgId, registrationId) {
 }
 
 async function buildStudentRegistrationPreview(program, student, reqUser, requestBody = {}) {
-  const person = student.personId ? await dataServiceGlobal.getDataById('persons', student.personId, reqUser, PERSON_QUERY_OPTIONS) : null;
+  const person = student.personId
+    ? await schoolPersonAccessService.getPersonById({ reqUser, personId: student.personId })
+    : null;
   const preview = {
     studentId: String(student.id || ''),
     personId: String(student.personId || ''),

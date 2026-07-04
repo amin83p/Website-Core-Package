@@ -7,7 +7,7 @@ const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const schoolAccountDomainService = require('../../services/school/schoolAccountDomainService');
-const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { ACCOUNT_TYPES, ACCOUNT_STATUSES, ACCOUNT_PARTY_ROLES, ACCOUNT_HEAD_CATEGORIES } = require('../../models/school/schoolAccountModel');
 const OWNER_LOCKED_FIELDS = Object.freeze([
@@ -424,14 +424,19 @@ exports.syncOwnerAccountNamesFromPersons = async (req, res) => {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Name sync is already running. Please wait.')) return;
 
-    const [students, teachers, staff, persons] = await Promise.all([
+    const [students, teachers, staff] = await Promise.all([
       dataService.fetchData('students', { orgId__eq: activeOrgId }, req.user),
       dataService.fetchData('teachers', { orgId__eq: activeOrgId }, req.user),
-      dataService.fetchData('staff', { orgId__eq: activeOrgId }, req.user),
-      dataServiceGlobal.fetchData('persons', {}, req.user, { enrichment: { includeSchoolRoles: false } })
+      dataService.fetchData('staff', { orgId__eq: activeOrgId }, req.user)
     ]);
 
-    const personMap = new Map((Array.isArray(persons) ? persons : []).map((p) => [toPublicId(p?.id), p]));
+    const personMap = await schoolPersonAccessService.buildPersonByIdMap({
+      reqUser: req.user,
+      personIds: []
+        .concat((Array.isArray(students) ? students : []).map((row) => row.personId))
+        .concat((Array.isArray(teachers) ? teachers : []).map((row) => row.personId))
+        .concat((Array.isArray(staff) ? staff : []).map((row) => row.personId))
+    });
 
     const updates = [];
     function pushUpdate(ownerType, ownerId, personId, accountId, suffixFallback) {

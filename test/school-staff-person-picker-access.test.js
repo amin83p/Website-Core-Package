@@ -71,8 +71,9 @@ async function assertRolePickerConfig(config) {
 
   const controllerSource = read(config.controllerPath);
   assert.match(controllerSource, /exports\.listEligiblePersons\s*=\s*async/, `${config.label} controller should export listEligiblePersons.`);
-  assert.match(controllerSource, /dataServiceGlobal\.fetchData\('persons'/, `${config.label} picker should read person rows through the data facade.`);
-  assert.match(controllerSource, /resolvePersonMembershipOrgIds/, `${config.label} picker should filter person rows by active organization membership.`);
+  assert.match(controllerSource, /schoolPersonAccessService\.listPickerPersons/, `${config.label} picker should read person rows through the School package person helper.`);
+  assert.doesNotMatch(controllerSource, /dataServiceGlobal\.fetchData\('persons'/, `${config.label} picker should not read global person rows directly.`);
+  assert.match(controllerSource, /enrichPersonPickerRowsWithAccountState/, `${config.label} picker should include linked account state.`);
 
   const authority = await adminAuthorityService.resolveAdminAuthorityAsync({
     user: userWithSchoolScopedAdmin(),

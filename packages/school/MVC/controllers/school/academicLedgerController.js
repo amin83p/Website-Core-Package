@@ -1,15 +1,14 @@
 const dataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
-const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const academicSnapshotModel = require('../../models/school/academicSnapshotModel');
 const academicLedgerModel = require('../../models/school/academicLedgerModel');
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function getProgramSubject(program, subjectId) {
   return (Array.isArray(program?.subjects) ? program.subjects : []).find((subject) => idsEqual(subject.subjectId || '', subjectId || '')) || null;
@@ -49,8 +48,7 @@ function hasLedgerFetchCriteria(filters) {
 }
 
 function formatStudentName(person, student) {
-  const full = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim();
-  return full || String(student?.id || '');
+  return schoolPersonAccessService.formatPersonName(person, String(student?.id || ''));
 }
 
 function sendGuardedResponse(res, guardResult, duplicateMessage, duplicateStatus = 409) {
@@ -126,15 +124,19 @@ exports.listLedger = async (req, res) => {
     let persons = [];
 
     if (shouldFetch) {
-      [entries, students, programs, terms, classes, subjects, persons] = await Promise.all([
+      [entries, students, programs, terms, classes, subjects] = await Promise.all([
         dataService.fetchData('academicLedger', {}, req.user),
         dataService.fetchData('students', {}, req.user),
         dataService.fetchData('programs', {}, req.user),
         dataService.fetchData('terms', {}, req.user),
         dataService.fetchData('classes', {}, req.user),
-        dataService.fetchData('subjects', {}, req.user),
-        dataServiceGlobal.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS)
+        dataService.fetchData('subjects', {}, req.user)
       ]);
+      const personById = await schoolPersonAccessService.buildPersonByIdMap({
+        reqUser: req.user,
+        personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
+      });
+      persons = [...personById.values()];
     }
 
     const maps = {
@@ -332,7 +334,9 @@ exports.showStudentStatement = async (req, res) => {
     const programs = await dataService.fetchData('programs', {}, req.user);
     const snapshots = (await dataService.fetchData('academicSnapshots', { studentId: student.id }, req.user))
       .filter((row) => !programId || String(row.programId || '') === programId);
-    const person = student.personId ? await dataServiceGlobal.getDataById('persons', student.personId, req.user, PERSON_QUERY_OPTIONS) : null;
+    const person = student.personId
+      ? await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: student.personId })
+      : null;
 
     res.render('school/academicLedger/studentStatement', {
       title: 'Student Academic Statement',

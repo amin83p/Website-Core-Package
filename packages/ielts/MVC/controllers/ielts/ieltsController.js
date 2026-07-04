@@ -15,7 +15,7 @@ const calibrationEvaluationService = require('../../services/ielts/calibrationEv
 const scoringRunControlService = require('../../services/ielts/scoringRunControlService');
 const { buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
 const { Parser } = require('json2csv');
-const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const {
     assertCreateOrgContextOrThrow: assertCreateOrgContextOrThrowShared,
     canCreateOrgScopedItem

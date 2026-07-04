@@ -78,7 +78,7 @@ async function resolveViewerAudienceTags(req) {
   if (personId) {
     try {
       const personTags = await personRepository.getAudienceTags(personId, {
-        enrichment: { includeSchoolRoles: true }
+        enrichment: { includeSchoolRoles: false }
       });
       if (Array.isArray(personTags)) tags.push(...personTags);
     } catch (_) {

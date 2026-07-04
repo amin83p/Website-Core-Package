@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../../middleware/authMiddleware');
-const { SECTIONS } = require('../../../config/accessConstants');
+const { SECTIONS } = require('../../../packages/activityQuota/config/accessConstants');
 
 router.use((req, res, next) => {
   res.locals.activityQuotaSectionDashboardHref = `/dashboard/section-nav/${encodeURIComponent(SECTIONS.ACTIVITY_QUOTA)}`;

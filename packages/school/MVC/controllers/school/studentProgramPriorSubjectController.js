@@ -1,15 +1,13 @@
 const schoolDataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
-const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const studentProgramPriorSubjectModel = require('../../models/school/studentProgramPriorSubjectModel');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { isAjax, normalizeSearchKeyword } = requireCoreModule('MVC/utils/generalTools');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
-
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 const PRIOR_LIST_SEARCHABLE_FIELDS = Object.freeze([
   'id',
@@ -45,9 +43,7 @@ function asIdArray(value) {
 }
 
 function buildPersonName(person) {
-  if (!person || !person.name) return '';
-  const n = person.name;
-  return [n.first, n.last].filter(Boolean).join(' ').trim();
+  return schoolPersonAccessService.formatPersonName(person, '');
 }
 
 function subjectLabelMapFromList(subjectRows) {
@@ -88,7 +84,7 @@ function applyPriorListFilters(rows, query) {
 }
 
 async function buildEnrichedPriorRowsForOrg(reqUser, activeOrgId) {
-  const [rawRows, students, persons, programs, subjects] = await Promise.all([
+  const [rawRows, students, programs, subjects] = await Promise.all([
     schoolDataService.fetchData('studentProgramPriorSubjects', {
       orgId__eq: activeOrgId,
       page: 1,
@@ -97,12 +93,14 @@ async function buildEnrichedPriorRowsForOrg(reqUser, activeOrgId) {
       order: 'desc'
     }, reqUser),
     schoolDataService.fetchData('students', { page: 1, limit: 5000 }, reqUser),
-    dataServiceGlobal.fetchData('persons', {}, reqUser, PERSON_QUERY_OPTIONS),
     schoolDataService.fetchData('programs', { page: 1, limit: 500 }, reqUser),
     schoolDataService.fetchData('subjects', { page: 1, limit: 3000 }, reqUser)
   ]);
 
-  const personById = new Map((Array.isArray(persons) ? persons : []).map((p) => [toPublicId(p.id), p]));
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser,
+    personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
+  });
   const studentById = new Map((Array.isArray(students) ? students : []).map((s) => [toPublicId(s.id), s]));
   const programById = new Map((Array.isArray(programs) ? programs : []).map((p) => [toPublicId(p.id), p]));
   const subjectLabelById = subjectLabelMapFromList(subjects);

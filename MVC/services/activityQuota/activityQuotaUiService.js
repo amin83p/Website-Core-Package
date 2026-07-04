@@ -1,5 +1,5 @@
 const accessUiService = require('../security/accessUiService');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../packages/activityQuota/config/accessConstants');
 
 const READ_ACTIONS = Object.freeze([
   { sectionId: SECTIONS.ACTIVITY_QUOTA_OVERVIEW, operationId: OPERATIONS.READ_ALL },

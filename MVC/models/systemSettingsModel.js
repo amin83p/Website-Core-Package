@@ -3,6 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { queueWrite } = require('./fileQueue'); 
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
+const packageSettingsDefaultsService = require('../services/packageSettingsDefaultsService');
 
 const settingsPath = path.join(__dirname, '../../data/systemSettings.json');
 
@@ -93,6 +94,8 @@ const DEFAULT_APP_PUBLIC_MENU = {
   items: DEFAULT_PUBLIC_MENU_ITEMS
 };
 
+const PACKAGE_SETTINGS_DEFAULTS = packageSettingsDefaultsService.getPackageSettingsDefaults();
+
 // Updated Defaults mapping to constants.js structure
 const DEFAULTS = {
   newsletter: {
@@ -118,14 +121,11 @@ const DEFAULTS = {
     buildVersionOverride: '',
     uploadsPath: 'uploads', // Store as string, resolve at runtime
     uploadFolders: uploadFolderSettingsService.getDefaultUploadFolders(),
-    schoolCanonicalEnrollmentRead: false,
-    schoolCanonicalEnrollmentWrite: false,
-    schoolIntentionalConflictMode: false,
-    schoolReadModelsEnabled: false,
     brand: DEFAULT_APP_BRAND,
     contact: DEFAULT_APP_CONTACT,
     contactPage: DEFAULT_APP_CONTACT_PAGE,
-    publicMenu: DEFAULT_APP_PUBLIC_MENU
+    publicMenu: DEFAULT_APP_PUBLIC_MENU,
+    ...(PACKAGE_SETTINGS_DEFAULTS.app || {})
   }
 };
 

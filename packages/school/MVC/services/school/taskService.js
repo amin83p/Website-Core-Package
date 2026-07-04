@@ -5,7 +5,7 @@ const taskRoutingRuleService = require('./taskRoutingRuleService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const OPEN_STATUSES = new Set(['open', 'in_progress']);
 const CLOSED_STATUSES = new Set(['resolved', 'dismissed']);

@@ -6,18 +6,16 @@ const activityService = require('./activityService');
 const reportViewService = require('./reportViewService');
 const personDisplayNameService = require('./personDisplayNameService');
 const sessionExplorerService = require('./sessionExplorerService');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
 const schoolIndexService = require('./schoolIndexService');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const accessService = requireCoreModule('MVC/services/security');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
-
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 const PEOPLE_MODULES = Object.freeze([
   {
@@ -104,29 +102,26 @@ function isArchived(moduleType, row) {
 }
 
 function buildPersonName(person) {
-  const firstName = normalizeText(person?.name?.first || 'Unknown');
-  const lastName = normalizeText(person?.name?.last || 'Person');
-  return `${firstName} ${lastName}`.trim();
+  return schoolPersonAccessService.formatPersonName(person, 'Unknown Person');
 }
 
-function enrichRows(moduleConfig, rows, persons, departments) {
-  const personRows = Array.isArray(persons) ? persons : [];
+function enrichRows(moduleConfig, rows, personById, departments) {
   const deptById = new Map((Array.isArray(departments) ? departments : []).map((row) => [
     String(row?.id || ''),
     normalizeText(row?.name || row?.id || '-')
   ]));
 
   return (Array.isArray(rows) ? rows : []).map((row) => {
-    const person = personRows.find((candidate) => idsEqual(candidate?.id, row?.personId));
-    const firstName = normalizeText(person?.name?.first || 'Unknown');
-    const lastName = normalizeText(person?.name?.last || 'Person');
+    const person = personById instanceof Map ? personById.get(toPublicId(row?.personId)) : null;
+    const firstName = normalizeText(person?.name?.first || person?.firstName || 'Unknown');
+    const lastName = normalizeText(person?.name?.last || person?.lastName || 'Person');
     const base = {
       id: normalizeText(row?.id),
       personId: normalizeText(row?.personId),
       firstName,
       lastName,
       name: buildPersonName(person),
-      email: normalizeText(person?.contact?.email || 'N/A'),
+      email: normalizeText(schoolPersonAccessService.readPersonEmail(person) || 'N/A'),
       phone: normalizeText(person?.contact?.phones?.[0]?.number || 'N/A'),
       orgId: normalizeText(row?.orgId),
       directoryUrl: `${moduleConfig.directoryUrl}/edit/${encodeURIComponent(normalizeText(row?.id))}`,
@@ -278,15 +273,18 @@ async function getPeoplePanelRows(type, queryInput, req) {
   delete fetchQuery.page;
   delete fetchQuery.limit;
 
-  const [peopleRows, persons, departments] = await Promise.all([
+  const [peopleRows, departments] = await Promise.all([
     dataService.fetchData(moduleConfig.entityType, fetchQuery, req.user, { scopeId: access.scopeId }),
-    dataServiceGlobal.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
     moduleConfig.type === 'students'
       ? Promise.resolve([])
       : dataService.fetchData('departments', {}, req.user)
   ]);
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser: req.user,
+    personIds: (Array.isArray(peopleRows) ? peopleRows : []).map((row) => row.personId)
+  });
 
-  const enriched = enrichRows(moduleConfig, peopleRows, persons, departments)
+  const enriched = enrichRows(moduleConfig, peopleRows, personById, departments)
     .filter((row) => !isArchived(moduleConfig.type, row))
     .filter((row) => rowMatchesSearch(row, searchTerm));
   const { data, pagination } = paginate(enriched, {

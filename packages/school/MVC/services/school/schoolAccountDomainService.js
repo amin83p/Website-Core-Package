@@ -1,8 +1,7 @@
 const schoolDataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function boolFromBody(value) {
   return value === 'true' || value === 'on' || value === true || value === 1 || value === '1';
@@ -13,10 +12,10 @@ function normalizeSearchText(value) {
 }
 
 function buildPersonNameVariants(person, fallbackId = '') {
-  const first = String(person?.name?.first || '').trim();
-  const middle = String(person?.name?.middle || '').trim();
-  const last = String(person?.name?.last || '').trim();
-  const preferred = String(person?.name?.preferred || '').trim();
+  const first = String(person?.name?.first || person?.firstName || '').trim();
+  const middle = String(person?.name?.middle || person?.middleName || '').trim();
+  const last = String(person?.name?.last || person?.lastName || '').trim();
+  const preferred = String(person?.name?.preferred || person?.preferredName || '').trim();
   const variants = [
     [first, middle, last].filter(Boolean).join(' '),
     [first, last].filter(Boolean).join(' '),
@@ -44,14 +43,19 @@ function matchesAccountSearch(account, searchQuery) {
 }
 
 async function buildAccountOwnerMap(reqUser) {
-  const [students, teachers, staff, persons] = await Promise.all([
+  const [students, teachers, staff] = await Promise.all([
     schoolDataService.fetchData('students', {}, reqUser),
     schoolDataService.fetchData('teachers', {}, reqUser),
-    schoolDataService.fetchData('staff', {}, reqUser),
-    dataServiceGlobal.fetchData('persons', {}, reqUser, PERSON_QUERY_OPTIONS)
+    schoolDataService.fetchData('staff', {}, reqUser)
   ]);
 
-  const personMap = new Map((persons || []).map((person) => [toPublicId(person?.id), person]));
+  const personMap = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser,
+    personIds: []
+      .concat((Array.isArray(students) ? students : []).map((row) => row.personId))
+      .concat((Array.isArray(teachers) ? teachers : []).map((row) => row.personId))
+      .concat((Array.isArray(staff) ? staff : []).map((row) => row.personId))
+  });
   const ownersByAccount = new Map();
 
   function pushOwner(accountId, type, ownerId, personId) {

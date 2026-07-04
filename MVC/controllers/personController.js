@@ -1,11 +1,11 @@
 // MVC/controllers/personController.js
 const dataService = require('../services/dataService'); 
 const {isAdmin} = require('../services/adminChekersService');
-const { normalizeOrgRoles } = require('../utils/orgContextUtils');
 const personRepository = require('../repositories/personRepository');
 const organizationRepository = require('../repositories/organizationRepository');
 const { buildDataServiceQuery } = require('../utils/generalTools');
 const publicRegistrationService = require('../services/person/publicRegistrationService');
+const packagePersonDependencyGuardService = require('../services/packagePersonDependencyGuardService');
 const {
   buildOrganizationDisplayMap,
   canonicalizeMembershipOrganizationNames,
@@ -15,7 +15,7 @@ const {
 const { DEFAULTS } = require('../../config/constants');
 const HIGH_ACCESS_MIN = Number(DEFAULTS?.HIGH_ACCESS_MIN || 8);
 const HIGH_ACCESS_MAX = Number(DEFAULTS?.HIGH_ACCESS_MAX || 10);
-const PERSON_WITH_SCHOOL_ENRICHMENT = Object.freeze({ enrichment: { includeSchoolRoles: true } });
+const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 const PERSON_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'active', 'name.first', 'name.last', 'name.preferred'],
   allowedSearchFields: [
@@ -90,65 +90,12 @@ async function extractUserOrganizations(reqUser) {
 
   let allowedOrgs = [];
   if (user.personId) {
-    const person = await dataService.getDataById('persons', user.personId, reqUser, PERSON_WITH_SCHOOL_ENRICHMENT);
+    const person = await dataService.getDataById('persons', user.personId, reqUser, PERSON_QUERY_OPTIONS);
     if (person && Array.isArray(person.organizations)) {
       allowedOrgs = person.organizations;
     }
   }
   return allowedOrgs;
-}
-
-const PERSON_ROLE_DELETE_BLOCK_ORDER = ['school_student', 'school_teacher', 'school_staff'];
-const PERSON_ROLE_DISPLAY_LABELS = Object.freeze({
-  school_student: 'student',
-  school_teacher: 'teacher',
-  school_staff: 'staff'
-});
-const PERSON_ROLE_ALIASES = {};
-const PERSON_ROLE_DELETE_BLOCKED_SET = new Set([
-  ...PERSON_ROLE_DELETE_BLOCK_ORDER,
-  ...Object.keys(PERSON_ROLE_ALIASES)
-]);
-
-function collectBlockedSchoolRoleLinks(person) {
-  const memberships = Array.isArray(person?.organizations) ? person.organizations : [];
-  const rolesSet = new Set();
-  const dedupe = new Set();
-  const matches = [];
-
-  memberships.forEach((org) => {
-    const rawRoles = normalizeOrgRoles(org);
-    rawRoles.forEach((roleValue) => {
-      const normalized = String(roleValue || '').trim().toLowerCase();
-      if (!normalized || !PERSON_ROLE_DELETE_BLOCKED_SET.has(normalized)) return;
-
-      const canonicalRole = PERSON_ROLE_ALIASES[normalized] || normalized;
-      const orgId = String(org?.orgId || '').trim() || 'UNKNOWN';
-      const orgName = String(org?.name || '').trim();
-      const key = `${canonicalRole}|${orgId}|${orgName}`;
-      if (dedupe.has(key)) return;
-      dedupe.add(key);
-
-      rolesSet.add(canonicalRole);
-      matches.push({ role: canonicalRole, orgId, orgName });
-    });
-  });
-
-  return { roles: Array.from(rolesSet), matches };
-}
-
-function buildDeleteBlockedBySchoolRoleMessage(roleScan) {
-  const roleLabels = roleScan.roles.map((r) => `<b>${PERSON_ROLE_DISPLAY_LABELS[r] || r}</b>`).join(', ');
-  const preview = roleScan.matches.slice(0, 8);
-  const rows = preview.map((item) => {
-    const orgLabel = item.orgName ? `${item.orgName} (${item.orgId})` : `Org ${item.orgId}`;
-    return `- ${PERSON_ROLE_DISPLAY_LABELS[item.role] || item.role} in ${orgLabel}`;
-  });
-  const extraCount = Math.max(0, roleScan.matches.length - preview.length);
-  const extraLine = extraCount ? `<br>...and ${extraCount} more linked role assignment(s).` : '';
-  const details = rows.length ? `<br><br>${rows.join('<br>')}${extraLine}` : '';
-
-  return `<b>Deletion blocked.</b><br>This person is assigned as ${roleLabels} in school records.<br>Please resolve/archive the related records in Students, Teachers, or Staff before deleting this person.${details}`;
 }
 
 /* ---------------- LIST ---------------- */
@@ -161,7 +108,7 @@ async function listPersons(req, res) {
       ...query,
       page,
       limit
-    }, req.user, PERSON_WITH_SCHOOL_ENRICHMENT);
+    }, req.user, PERSON_QUERY_OPTIONS);
     let data = Array.isArray(pagedPersons?.rows) ? pagedPersons.rows : [];
     const pagination = pagedPersons?.pagination || null;
     const organizationMap = await loadOrganizationDisplayMap();
@@ -285,7 +232,7 @@ async function addPerson(req, res) {
 
 async function showEditPersonForm(req, res) {
   try {
-    const person = await dataService.getDataById('persons', req.params.id, req.user, PERSON_WITH_SCHOOL_ENRICHMENT);
+    const person = await dataService.getDataById('persons', req.params.id, req.user, PERSON_QUERY_OPTIONS);
     if (!person) return res.status(404).render('404', { title: 'Person Not Found', user: req.user || null });
 
     const canEditOrganizations = canEditOrganizationsForUser(req.user);
@@ -323,7 +270,7 @@ async function showEditPersonForm(req, res) {
 
 async function editPerson(req, res) {
   try {
-    const existing = await dataService.getDataById('persons', req.params.id, req.user, PERSON_WITH_SCHOOL_ENRICHMENT);
+    const existing = await dataService.getDataById('persons', req.params.id, req.user, PERSON_QUERY_OPTIONS);
     if (!existing) throw new Error('Person not found!');
     await validatePersonInput(req.body, {
       isSelfRegistration: false,
@@ -359,13 +306,17 @@ async function editPerson(req, res) {
 async function deletePerson(req, res) {
   try {
     const personId = req.params.id;
-    const person = await dataService.getDataById('persons', personId, req.user, PERSON_WITH_SCHOOL_ENRICHMENT);
+    const person = await dataService.getDataById('persons', personId, req.user, PERSON_QUERY_OPTIONS);
     if (!person) throw new Error('Person not found.');
 
-    const roleScan = collectBlockedSchoolRoleLinks(person);
-    if (roleScan.roles.length > 0) {
-      const e = new Error(buildDeleteBlockedBySchoolRoleMessage(roleScan));
-      e.statusCode = 409;
+    const deleteBlocks = await packagePersonDependencyGuardService.collectPersonDeleteBlocks(person, {
+      user: req.user,
+      request: req
+    });
+    if (deleteBlocks.length > 0) {
+      const firstBlock = deleteBlocks[0];
+      const e = new Error(firstBlock.message || 'Deletion blocked by a package dependency guard.');
+      e.statusCode = Number(firstBlock.statusCode || 409);
       throw e;
     }
     // const linkedUsers = await dataService.fetchData('users', { q: personId, type: 'exact_match', searchFields: 'personId' }, req.user);

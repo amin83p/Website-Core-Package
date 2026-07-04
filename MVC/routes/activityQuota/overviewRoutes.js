@@ -4,7 +4,7 @@ const ctrl = require('../../controllers/activityQuota/overviewController');
 const { requireAuth } = require('../../middleware/authMiddleware');
 const { requireAccess } = require('../../middleware/accessMiddleware');
 const { trackActionState } = require('../../middleware/actionStateMiddleware');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../packages/activityQuota/config/accessConstants');
 
 router.use(requireAuth);
 

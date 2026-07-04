@@ -5,7 +5,6 @@ const accessService = requireCoreModule('MVC/services/security');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
-const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const schoolDataService = require('../../services/school/schoolDataService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const reportService = require('../../services/school/reportService');
@@ -15,6 +14,7 @@ const reportViewService = require('../../services/school/reportViewService');
 const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const { getPrefillValue } = require('../../services/school/reportPrefillKeyUtils');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const reportTemplateModel = require('../../models/school/reportTemplateModel');
@@ -25,7 +25,6 @@ const {
   assertCreateOrgContextOrThrow: assertCreateOrgContextOrThrowShared
 } = requireCoreModule('MVC/utils/orgContextUtils');
 
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 const HOME_CARD_VISIBLE_OPERATION_IDS = Object.freeze([
   OPERATIONS.READ_ALL,
   OPERATIONS.READ,
@@ -1027,13 +1026,13 @@ async function buildInstanceEditorRenderContext(req) {
   const [classSessions, teacherPerson, studentRowsByPerson, studentPersonDirect] = await Promise.all([
     schoolDataService.getClassSessions(latestInstance.classId, req.user),
     latestInstance.teacherId
-      ? dataServiceGlobal.getDataById('persons', latestInstance.teacherId, req.user, PERSON_QUERY_OPTIONS)
+      ? schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: latestInstance.teacherId })
       : Promise.resolve(null),
     studentPersonId
       ? schoolDataService.fetchData('students', { personId__eq: studentPersonId, page: 1, limit: 1 }, req.user)
       : Promise.resolve([]),
     studentPersonId
-      ? dataServiceGlobal.getDataById('persons', studentPersonId, req.user, PERSON_QUERY_OPTIONS)
+      ? schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: studentPersonId })
       : Promise.resolve(null)
   ]);
   let studentRegistry = Array.isArray(studentRowsByPerson) && studentRowsByPerson.length ? studentRowsByPerson[0] : null;
@@ -1041,7 +1040,7 @@ async function buildInstanceEditorRenderContext(req) {
     studentRegistry = await schoolDataService.getDataById('students', studentPersonId, req.user);
   }
   const studentPerson = studentPersonDirect || (studentRegistry && studentRegistry.personId
-    ? await dataServiceGlobal.getDataById('persons', studentRegistry.personId, req.user, PERSON_QUERY_OPTIONS)
+    ? await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: studentRegistry.personId })
     : null);
   const instanceDetails = buildReportInstanceDetailsForView(latestInstance, {
     assignment: effectiveAssignment,

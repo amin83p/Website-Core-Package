@@ -3,7 +3,7 @@ const ieltsService = require('../../services/ielts/ieltsDataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const BILLING_STATUS_OPTIONS = Object.freeze([

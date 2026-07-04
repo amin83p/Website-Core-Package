@@ -9,9 +9,8 @@ const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
-
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function normalizeEvaluation(classData) {
   const ev = classData?.evaluation && typeof classData.evaluation === 'object' ? classData.evaluation : {};
@@ -254,10 +253,7 @@ async function buildGradesMatrixPayload(req, query) {
   });
   filteredSessions.sort((a, b) => new Date(`${a.date}T${a.startTime || '00:00'}`) - new Date(`${b.date}T${b.startTime || '00:00'}`));
 
-  const [persons, students] = await Promise.all([
-    dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
-    schoolDataService.fetchData('students', {}, req.user)
-  ]);
+  const students = await schoolDataService.fetchData('students', {}, req.user);
 
   const studentToPersonMap = new Map(
     (Array.isArray(students) ? students : [])
@@ -287,10 +283,14 @@ async function buildGradesMatrixPayload(req, query) {
     if (!studentId) return;
     activePersonIds.add(String(studentToPersonMap.get(studentId) || studentId).trim());
   });
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser: req.user,
+    personIds: Array.from(activePersonIds)
+  });
 
   let studentList = Array.from(activePersonIds).map((uid) => {
-    const person = persons.find((p) => String(p.id) === uid);
-    const name = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : `Person ${uid}`;
+    const person = personById.get(String(uid || '').trim());
+    const name = person ? schoolPersonAccessService.formatPersonName(person, `Person ${uid}`) : `Person ${uid}`;
     return { personId: uid, name };
   });
   studentList.sort((a, b) => a.name.localeCompare(b.name));

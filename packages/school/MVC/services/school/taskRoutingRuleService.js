@@ -4,7 +4,7 @@ const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 function cleanString(value, max = 5000) {
   if (value === undefined || value === null) return '';

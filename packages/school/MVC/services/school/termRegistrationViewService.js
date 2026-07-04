@@ -1,14 +1,13 @@
 const dataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const schoolRepositories = require('../../repositories/school');
 const academicSnapshotService = require('./academicSnapshotService');
 const programTransactionService = require('./programTransactionService');
 const programRegistrationDraftService = require('./programRegistrationDraftService');
 const registrationIntegrityService = require('./registrationIntegrityService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function asIdArray(value) {
   return Array.from(new Set((Array.isArray(value) ? value : [])
@@ -23,8 +22,7 @@ function roundMoney(value) {
 }
 
 function resolveStudentName(person, student) {
-  const full = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim();
-  return full || String(student?.id || '');
+  return schoolPersonAccessService.formatPersonName(person, String(student?.id || ''));
 }
 
 function matchesSearch(haystacks, query) {
@@ -94,7 +92,9 @@ async function buildTermRegistrationPreview({
     reqUser
   });
   const student = dependencyContext.student;
-  const person = student?.personId ? await dataServiceGlobal.getDataById('persons', student.personId, reqUser, PERSON_QUERY_OPTIONS) : null;
+  const person = student?.personId
+    ? await schoolPersonAccessService.getPersonById({ reqUser, personId: student.personId })
+    : null;
 
   const [
     classes,
@@ -336,10 +336,9 @@ async function buildTermRegistrationPreview({
 }
 
 async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, registrationId = '', filters = {} } = {}) {
-  const [registrations, students, persons, programs, terms, allTransactions, allEntries] = await Promise.all([
+  const [registrations, students, programs, terms, allTransactions, allEntries] = await Promise.all([
     schoolRepositories.studentTermRegistrations.list({ query: {}, scope: { canViewAll: true } }),
     dataService.fetchData('students', {}, reqUser),
-    dataServiceGlobal.fetchData('persons', {}, reqUser, PERSON_QUERY_OPTIONS),
     dataService.fetchData('programs', {}, reqUser),
     dataService.fetchData('terms', {}, reqUser),
     schoolRepositories.globalTransactions.list({ query: {}, scope: { canViewAll: true } }),
@@ -347,7 +346,10 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
   ]);
 
   const studentMap = new Map(students.map((row) => [toPublicId(row.id), row]));
-  const personMap = new Map(persons.map((row) => [toPublicId(row.id), row]));
+  const personMap = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser,
+    personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
+  });
   const programMap = new Map(programs.map((row) => [toPublicId(row.id), row]));
   const termMap = new Map(terms.map((row) => [toPublicId(row.id), row]));
   const transactionMap = new Map(allTransactions.map((row) => [toPublicId(row.id), row]));
@@ -499,16 +501,18 @@ async function buildRegistrationDetail(reqUser, activeOrgId, registrationId) {
 }
 
 async function buildActiveProgramRegistrationOptions(reqUser, activeOrgId) {
-  const [students, persons, programs, terms, programRegistrations, termRegistrations] = await Promise.all([
+  const [students, programs, terms, programRegistrations, termRegistrations] = await Promise.all([
     dataService.fetchData('students', {}, reqUser),
-    dataServiceGlobal.fetchData('persons', {}, reqUser, PERSON_QUERY_OPTIONS),
     dataService.fetchData('programs', {}, reqUser),
     dataService.fetchData('terms', {}, reqUser),
     schoolRepositories.studentProgramRegistrations.list({ query: {}, scope: { canViewAll: true } }),
     schoolRepositories.studentTermRegistrations.list({ query: {}, scope: { canViewAll: true } })
   ]);
 
-  const personMap = new Map(persons.map((row) => [toPublicId(row.id), row]));
+  const personMap = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser,
+    personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
+  });
   const programMap = new Map(programs.map((row) => [toPublicId(row.id), row]));
   const termMap = new Map(terms.map((row) => [toPublicId(row.id), row]));
 

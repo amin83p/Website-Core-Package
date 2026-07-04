@@ -14,8 +14,6 @@ const {
     normalizeOrgRoles,
     getPrimaryOrgRole
 } = requireCoreModule('MVC/utils/orgContextUtils');
-const { normalizeOrgRoleTokens } = require('../../utils/schoolRoleTokenUtils');
-const { resolveCanonicalOrganizationName } = requireCoreModule('MVC/utils/organizationDisplay');
 
 // File handling helpers (centralized)
 const fileService = requireCoreModule('MVC/services/fileService');
@@ -30,9 +28,9 @@ const {
     assertNoDuplicatePersonAccount,
     enrichPersonPickerRowsWithAccountState
 } = require('../../services/school/schoolPeopleDuplicateGuardService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const { ACADEMIC_STATUSES } = require('../../models/school/studentModel');
 const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 const STUDENT_DELETE_FOOTPRINT_RULES = Object.freeze([
   { entityType: 'studentProgramRegistrations', field: 'studentId', label: 'Student Program Registrations' },
   { entityType: 'studentTermRegistrations', field: 'studentId', label: 'Student Term Registrations' },
@@ -137,35 +135,10 @@ async function collectStudentFootprint(studentId, activeOrgId, reqUser) {
 }
 
 async function removePersonSchoolRole(personId, orgId, role, reqUser, options = {}) {
-    const person = await dataServiceGlobal.getDataById('persons', personId, reqUser, PERSON_QUERY_OPTIONS);
-    if (!person) return { changed: false, skipped: true, reason: 'person_not_found' };
-
-    const targetRole = String(role || '').trim().toLowerCase();
-    if (!targetRole) return { changed: false, skipped: true, reason: 'role_not_defined' };
-
-    const list = Array.isArray(person.organizations) ? person.organizations.slice() : [];
-    const idx = list.findIndex((org) => idsEqual(org?.orgId || '', orgId || ''));
-    if (idx < 0) return { changed: false, personId: toPublicId(person.id), reason: 'organization_link_not_found' };
-
-  const orgEntry = { ...list[idx] };
-  const roles = normalizeOrgRoleTokens(orgEntry);
-  if (!roles.includes(targetRole)) return { changed: false, personId: toPublicId(person.id), reason: 'school_student_role_not_attached' };
-
-  const nextRoles = roles.filter((candidate) => candidate !== targetRole);
-  const nextOrg = { ...orgEntry, roles: Array.isArray(nextRoles) && nextRoles.length > 0 ? nextRoles : ['member'] };
-  nextOrg.role = Array.isArray(nextOrg.roles) && nextOrg.roles.length > 0 ? nextOrg.roles[0] : 'member';
-  if (!nextOrg.memberStatus) nextOrg.memberStatus = 'active';
-  if (!nextOrg.joinedAt) nextOrg.joinedAt = new Date().toISOString();
-    list[idx] = nextOrg;
-
-    const beforeOrganizations = Array.isArray(person.organizations) ? JSON.parse(JSON.stringify(person.organizations)) : [];
-    await dataServiceGlobal.updateData('persons', person.id, { ...person, organizations: list }, reqUser, options);
-
-    return {
-        changed: true,
-        personId: toPublicId(person.id),
-        beforeOrganizations
-    };
+    const result = await schoolPersonAccessService.removePersonSchoolRole({ personId, orgId, role, reqUser, options });
+    return result?.reason === 'school_role_not_attached'
+        ? { ...result, reason: 'school_student_role_not_attached' }
+        : result;
 }
 
 function formatStudentDisplayName(student, person) {
@@ -261,39 +234,6 @@ function resolvePersonDisplayName(person, fallback) {
     return full || String(fallback || '').trim() || 'Student';
 }
 
-function resolvePersonMembershipOrgIds(person = null) {
-    const list = Array.isArray(person?.organizations) ? person.organizations : [];
-    return list.map((entry) => String(entry?.orgId || '').trim()).filter(Boolean);
-}
-
-function mapPersonPickerRow(person = null) {
-    const firstName = String(person?.name?.first || person?.firstName || '').trim();
-    const lastName = String(person?.name?.last || person?.lastName || '').trim();
-    const preferredName = String(person?.name?.preferred || person?.preferredName || '').trim();
-    const personId = String(person?.id || '').trim();
-    const emails = Array.isArray(person?.contact?.emails) ? person.contact.emails : [];
-    const contactEmail = String(person?.contact?.email || person?.email || emails[0]?.email || '').trim();
-    const displayName = preferredName
-        || `${firstName} ${lastName}`.trim()
-        || String(person?.displayName || person?.fullName || '').trim()
-        || personId;
-
-    return {
-        id: personId,
-        personId,
-        firstName,
-        lastName,
-        preferredName,
-        email: contactEmail,
-        name: {
-            first: firstName,
-            last: lastName,
-            preferred: preferredName
-        },
-        displayName,
-        organizations: Array.isArray(person?.organizations) ? person.organizations : []
-    };
-}
 function findActiveOrgHeadAccount(accounts, orgId, headCategory, aliases = []) {
     const allowedCategories = new Set(
         [headCategory]
@@ -536,64 +476,7 @@ function buildInlinePersonPayload(body, reqUser) {
 }
 
 async function ensurePersonHasOrgRole(personId, orgId, role, reqUser, options = {}) {
-    const person = await dataServiceGlobal.getDataById('persons', personId, reqUser, PERSON_QUERY_OPTIONS);
-    if (!person) throw new Error('Linked person record was not found.');
-
-    const targetRole = String(role || '').trim().toLowerCase();
-    if (!targetRole) return;
-
-    const list = Array.isArray(person.organizations) ? person.organizations.slice() : [];
-    const now = new Date().toISOString();
-    const idx = list.findIndex((org) => idsEqual(org?.orgId || '', orgId || ''));
-    let orgName = '';
-    try {
-        const orgObj = await dataServiceGlobal.getDataById('organizations', orgId, reqUser);
-        orgName = resolveCanonicalOrganizationName(orgObj || {});
-    } catch (_) {}
-
-    let changed = false;
-    if (idx >= 0) {
-        const org = { ...list[idx] };
-        const roles = normalizeOrgRoles(org);
-        if (!roles.includes(targetRole)) {
-            roles.push(targetRole);
-            changed = true;
-        }
-        org.roles = roles;
-        org.role = getPrimaryOrgRole(org);
-        if (!org.memberStatus) {
-            org.memberStatus = 'active';
-            changed = true;
-        }
-        if (!org.joinedAt) {
-            org.joinedAt = now;
-            changed = true;
-        }
-        if (orgName && String(org.name || '').trim() !== orgName) {
-            org.name = orgName;
-            changed = true;
-        }
-        list[idx] = org;
-    } else {
-        list.push({
-            orgId: Number.isFinite(Number(orgId)) ? Number(orgId) : orgId,
-            name: orgName,
-            roles: ['member', targetRole].filter((v, i, arr) => arr.indexOf(v) === i),
-            role: 'member',
-            memberStatus: 'active',
-            joinedAt: now
-        });
-        changed = true;
-    }
-
-    if (changed) {
-        await dataServiceGlobal.updateData('persons', person.id, { ...person, organizations: list }, reqUser, options);
-    }
-    return {
-        changed,
-        personId: toPublicId(person.id),
-        beforeOrganizations: Array.isArray(person.organizations) ? JSON.parse(JSON.stringify(person.organizations)) : []
-    };
+    return schoolPersonAccessService.ensurePersonHasSchoolRole({ personId, orgId, role, reqUser, options });
 }
 
 async function archiveLinkedStudentAccount(student, reqUser) {
@@ -681,18 +564,13 @@ exports.listEligiblePersons = async (req, res) => {
     const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
     if (query.q === searchDefaultKeyword) query.q = '';
 
-    const persons = await dataServiceGlobal.fetchData('persons', {
+    const personPayload = await schoolPersonAccessService.listPickerPersons({
+      reqUser: req.user,
       q: query.q || '',
-      type: query.type || 'contains',
-      searchFields: query.searchFields || 'id,name.first,name.last,name.preferred,preferredName,contact.email,email'
-    }, req.user, PERSON_QUERY_OPTIONS);
-
-    const mapped = (Array.isArray(persons) ? persons : [])
-      .filter((person) => {
-        const orgIds = resolvePersonMembershipOrgIds(person);
-        return orgIds.length === 0 || orgIds.some((orgId) => idsEqual(orgId, activeOrgId));
-      })
-      .map(mapPersonPickerRow);
+      query,
+      requireSchoolRole: false
+    });
+    const mapped = personPayload.allRows || personPayload.rows || [];
     const enriched = await enrichPersonPickerRowsWithAccountState(mapped, {
       entityType: 'students',
       orgId: activeOrgId,
@@ -722,19 +600,22 @@ exports.listStudents = async (req, res) => {
         delete fetchQuery.searchFields;
 
         const allStudents = await dataService.fetchData('students', fetchQuery, req.user);
-        const persons = await dataServiceGlobal.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS);
+        const personById = await schoolPersonAccessService.buildPersonByIdMap({
+            reqUser: req.user,
+            personIds: (Array.isArray(allStudents) ? allStudents : []).map((student) => student.personId)
+        });
 
         const enrichedStudents = allStudents.map(student => {
-            const person = persons.find(p => idsEqual(p.id, student.personId));
-            const firstName = person?.name?.first || 'Unknown';
-            const lastName = person?.name?.last || 'Person';
-            const fullName = `${firstName} ${lastName}`.trim();
+            const person = personById.get(toPublicId(student.personId));
+            const firstName = person?.name?.first || person?.firstName || 'Unknown';
+            const lastName = person?.name?.last || person?.lastName || 'Person';
+            const fullName = schoolPersonAccessService.formatPersonName(person, `${firstName} ${lastName}`.trim());
             return {
                 ...student,
                 firstName,
                 lastName,
                 name: fullName,
-                email: person?.contact?.email || 'N/A',
+                email: schoolPersonAccessService.readPersonEmail(person) || 'N/A',
                 phone: person?.contact?.phones?.[0]?.number || 'N/A'
             };
         });
@@ -799,15 +680,18 @@ exports.listArchivedStudents = async (req, res) => {
 
         const archivedQuery = { ...query, academicStatus: 'Archived' };
         const allStudents = await dataService.fetchData('students', archivedQuery, req.user);
-        const persons = await dataServiceGlobal.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS);
+        const personById = await schoolPersonAccessService.buildPersonByIdMap({
+            reqUser: req.user,
+            personIds: (Array.isArray(allStudents) ? allStudents : []).map((student) => student.personId)
+        });
 
         const enrichedStudents = allStudents.map(student => {
-            const person = persons.find(p => idsEqual(p.id, student.personId));
+            const person = personById.get(toPublicId(student.personId));
             return {
                 ...student,
-                firstName: person?.name?.first || 'Unknown',
-                lastName: person?.name?.last || 'Person',
-                email: person?.contact?.email || 'N/A',
+                firstName: person?.name?.first || person?.firstName || 'Unknown',
+                lastName: person?.name?.last || person?.lastName || 'Person',
+                email: schoolPersonAccessService.readPersonEmail(person) || 'N/A',
                 phone: person?.contact?.phones?.[0]?.number || 'N/A'
             };
         });
@@ -854,9 +738,9 @@ exports.showForm = async (req, res) => {
             if (!student) throw new Error('Student not found.');
             assertStudentOrgAccess(student, activeOrgId, req.user);
             
-            const person = await dataServiceGlobal.getDataById('persons', student.personId, req.user, PERSON_QUERY_OPTIONS);
+            const person = await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: student.personId });
             if (person) {
-                personName = `${person.name?.first || ''} ${person.name?.last || ''}`.trim();
+                personName = schoolPersonAccessService.formatPersonName(person, '');
                 personOrganizations = Array.isArray(person.organizations) ? person.organizations : [];
             }
 
@@ -1104,15 +988,12 @@ exports.saveStudent = async (req, res) => {
         const roleUpdateResult = await ensurePersonHasOrgRole(payload.personId, payload.orgId, 'school_student', req.user, { transactionContext: txContext });
         if (roleUpdateResult?.changed && roleUpdateResult?.personId) {
             txContext.addCompensation(async () => {
-                const person = await dataServiceGlobal.getDataById('persons', roleUpdateResult.personId, req.user, PERSON_QUERY_OPTIONS);
-                if (!person) return;
-                await dataServiceGlobal.updateData(
-                    'persons',
-                    roleUpdateResult.personId,
-                    { ...person, organizations: roleUpdateResult.beforeOrganizations || [] },
-                    req.user,
-                    { transactionContext: txContext }
-                );
+                await schoolPersonAccessService.restorePersonOrganizations({
+                    personId: roleUpdateResult.personId,
+                    organizations: roleUpdateResult.beforeOrganizations || [],
+                    reqUser: req.user,
+                    options: { transactionContext: txContext }
+                });
             }, { type: 'restore_person_org_roles', personId: roleUpdateResult.personId });
         }
 
@@ -1134,7 +1015,7 @@ exports.saveStudent = async (req, res) => {
                 label: 'student_new_record'
             });
 
-            const person = await dataServiceGlobal.getDataById('persons', savedStudent.personId, req.user, PERSON_QUERY_OPTIONS);
+            const person = await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: savedStudent.personId });
             const studentAccount = await createStudentSubAccount({
                 student: savedStudent,
                 person,
@@ -1333,7 +1214,7 @@ exports.deleteStudent = async (req, res) => {
 
         const footprint = await collectStudentFootprint(student?.id, activeOrgId, req.user);
         const person = student?.personId
-            ? await dataServiceGlobal.getDataById('persons', student.personId, req.user, PERSON_QUERY_OPTIONS)
+            ? await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: student.personId })
             : null;
         const studentDisplayName = formatStudentDisplayName(student, person);
         if (footprint.length > 0) {
@@ -1386,15 +1267,12 @@ exports.deleteStudent = async (req, res) => {
         if (roleResult?.changed && roleResult?.personId) {
             removed.removedRole = true;
             txContext.addCompensation(async () => {
-                const personRecord = await dataServiceGlobal.getDataById('persons', roleResult.personId, req.user, PERSON_QUERY_OPTIONS);
-                if (!personRecord) return;
-                await dataServiceGlobal.updateData(
-                    'persons',
-                    roleResult.personId,
-                    { ...personRecord, organizations: roleResult.beforeOrganizations || [] },
-                    req.user,
-                    { transactionContext: txContext }
-                );
+                await schoolPersonAccessService.restorePersonOrganizations({
+                    personId: roleResult.personId,
+                    organizations: roleResult.beforeOrganizations || [],
+                    reqUser: req.user,
+                    options: { transactionContext: txContext }
+                });
             }, { type: 'restore_person_org_roles', personId: roleResult.personId });
         } else if (roleResult?.reason) {
         if (roleResult.reason === 'person_not_found') {

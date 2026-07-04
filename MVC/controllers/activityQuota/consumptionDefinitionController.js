@@ -1,7 +1,7 @@
 const paginate = require('../../utils/paginationHelper');
 const consumptionDefinitionDataService = require('../../services/activityQuota/consumptionDefinitionDataService');
 const activityQuotaUiService = require('../../services/activityQuota/activityQuotaUiService');
-const { SECTIONS } = require('../../../config/accessConstants');
+const { SECTIONS } = require('../../../packages/activityQuota/config/accessConstants');
 const {
   isAjax,
   buildDataServiceQuery,

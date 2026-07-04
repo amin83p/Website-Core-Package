@@ -14,7 +14,7 @@ const {
 } = require('../../services/benchpath/taskAuthoring/taskAuthoringCommon');
 const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
-const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const DEFAULT_SEARCH_FIELDS = [
   'id',

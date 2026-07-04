@@ -6,7 +6,7 @@ const activityQuotaUiService = require('../../services/activityQuota/activityQuo
 const dataService = require('../../services/dataService');
 const { toPublicId, idsEqual } = require('../../utils/idAdapter');
 const { SYSTEM_CONTEXT } = require('../../../config/constants');
-const { SECTIONS } = require('../../../config/accessConstants');
+const { SECTIONS } = require('../../../packages/activityQuota/config/accessConstants');
 const {
   isAjax,
   buildDataServiceQuery,

@@ -11,7 +11,7 @@ const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
 const adminApproval = requireCoreModule('MVC/middleware/adminApproval');
 const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
 const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
-const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const upload = requireCoreModule('MVC/middleware/upload');
 
 // --- Dashboard ---

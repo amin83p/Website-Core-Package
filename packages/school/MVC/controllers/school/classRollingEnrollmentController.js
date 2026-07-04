@@ -31,6 +31,7 @@ const registrationIntegrityService = require('../../services/school/registration
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
@@ -224,11 +225,9 @@ async function resolveActorDisplayName(reqUser) {
     const pid = reqUser?.personId;
     if (!pid) return String(reqUser?.username || reqUser?.email || 'User').trim().slice(0, 160) || 'User';
     try {
-        const person = await dataService.getDataById('persons', pid, reqUser, PERSON_QUERY_OPTIONS);
-        if (person?.name) {
-            const label = `${person.name.first || ''} ${person.name.last || ''}`.trim();
-            if (label) return label.slice(0, 160);
-        }
+        const person = await schoolPersonAccessService.getPersonById({ reqUser, personId: pid });
+        const label = schoolPersonAccessService.formatPersonName(person, '');
+        if (label) return label.slice(0, 160);
     } catch (e) { /* ignore */ }
     return String(reqUser?.username || pid).slice(0, 160);
 }
@@ -1170,20 +1169,16 @@ function filterPeriodRowsBySearchQuery(rows, query) {
 }
 
 async function attachStudentLabelsToEnrollmentPeriodRows(periodRows, user) {
-  const [students, persons] = await Promise.all([
-    schoolDataService.fetchData('students', {}, user),
-    dataService.fetchData('persons', {}, user, PERSON_QUERY_OPTIONS)
-  ]);
-  const personNameMap = new Map((Array.isArray(persons) ? persons : []).map((person) => {
-    const pid = toPublicId(person?.id);
-    const label = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim() || String(person?.displayName || pid || '').trim();
-    return [pid, label || pid];
-  }));
+  const students = await schoolDataService.fetchData('students', {}, user);
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser: user,
+    personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
+  });
   const studentOptions = (Array.isArray(students) ? students : [])
     .map((student) => {
       const studentId = toPublicId(student?.id);
       const personId = toPublicId(student?.personId);
-      const label = personNameMap.get(personId) || studentId;
+      const label = schoolPersonAccessService.formatPersonName(personById.get(personId), studentId);
       return {
         id: studentId,
         label: student?.studentNumber ? `${label} (${student.studentNumber})` : label
@@ -1203,22 +1198,15 @@ async function enrichCycleRolloverPreviewStudentLabels(preview, user) {
     : [];
   if (!studentRows.length) return preview;
 
-  const [students, persons] = await Promise.all([
-    schoolDataService.fetchData('students', {}, user),
-    dataService.fetchData('persons', {}, user, PERSON_QUERY_OPTIONS)
-  ]);
-
-  const personNameMap = new Map((Array.isArray(persons) ? persons : []).map((person) => {
-    const pid = toPublicId(person?.id);
-    const preferred = String(person?.preferredName || person?.name?.preferred || '').trim();
-    const fullName = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim();
-    const label = preferred || fullName || String(person?.displayName || pid || '').trim();
-    return [pid, label || pid];
-  }));
+  const students = await schoolDataService.fetchData('students', {}, user);
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser: user,
+    personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
+  });
   const studentLabelMap = new Map((Array.isArray(students) ? students : []).map((student) => {
     const studentId = toPublicId(student?.id);
     const personId = toPublicId(student?.personId);
-    const name = personNameMap.get(personId) || studentId;
+    const name = schoolPersonAccessService.formatPersonName(personById.get(personId), studentId);
     const studentNumber = String(student?.studentNumber || '').trim();
     return [studentId, studentNumber ? `${name} (${studentNumber})` : name];
   }));
@@ -1244,22 +1232,20 @@ async function showRollingEnrollmentPage(req, res) {
     assertRollingWorkflowEnabledForClass(req, classData);
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user);
 
-    const [periods, students, persons] = await Promise.all([
+    const [periods, students] = await Promise.all([
       schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user),
-      schoolDataService.fetchData('students', {}, req.user),
-      dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS)
+      schoolDataService.fetchData('students', {}, req.user)
     ]);
 
-    const personNameMap = new Map((Array.isArray(persons) ? persons : []).map((person) => {
-      const pid = toPublicId(person?.id);
-      const label = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim() || String(person?.displayName || pid || '').trim();
-      return [pid, label || pid];
-    }));
+    const personById = await schoolPersonAccessService.buildPersonByIdMap({
+      reqUser: req.user,
+      personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
+    });
     const studentOptions = (Array.isArray(students) ? students : [])
       .map((student) => {
         const studentId = toPublicId(student?.id);
         const personId = toPublicId(student?.personId);
-        const label = personNameMap.get(personId) || studentId;
+        const label = schoolPersonAccessService.formatPersonName(personById.get(personId), studentId);
         return {
           id: studentId,
           personId,
@@ -3132,9 +3118,11 @@ async function showEnrollmentOutcomesPage(req, res) {
         const finalByPerson = new Map((matrixPayload.matrix || []).map((row) => [String(row.personId), row.finalPercent]));
         const periods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user);
         const students = await schoolDataService.fetchData('students', {}, req.user);
-        const persons = await dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS);
         const studentToPerson = new Map((Array.isArray(students) ? students : []).map((s) => [String(s.id), String(s.personId || '')]));
-        const personName = new Map((Array.isArray(persons) ? persons : []).map((p) => [String(p.id), `${p.name?.first || ''} ${p.name?.last || ''}`.trim()]));
+        const personById = await schoolPersonAccessService.buildPersonByIdMap({
+            reqUser: req.user,
+            personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
+        });
 
         const pendingRows = (Array.isArray(periods) ? periods : [])
             .filter(periodNeedsCompletionDecision)
@@ -3145,7 +3133,7 @@ async function showEnrollmentOutcomesPage(req, res) {
                     periodId: p.id,
                     studentId: sid,
                     personId: pid,
-                    studentName: personName.get(pid) || sid,
+                    studentName: schoolPersonAccessService.formatPersonName(personById.get(pid), sid),
                     startDate: p.startDate,
                     endDate: p.endDate,
                     status: p.status,

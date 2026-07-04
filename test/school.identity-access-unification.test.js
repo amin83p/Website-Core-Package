@@ -78,3 +78,58 @@ test('eligible person endpoints expose normalized picker response payload', () =
   assert.match(scheduleController, /results:\s*items/);
   assert.match(scheduleController, /pagination/);
 });
+
+test('school role directory pickers use package person access helper', () => {
+  const studentController = read('packages/school/MVC/controllers/school/studentController.js');
+  const teacherController = read('packages/school/MVC/controllers/school/teacherController.js');
+  const staffController = read('packages/school/MVC/controllers/school/staffController.js');
+
+  for (const source of [studentController, teacherController, staffController]) {
+    assert.match(source, /schoolPersonAccessService\.listPickerPersons/);
+    assert.match(source, /schoolPersonAccessService\.ensurePersonHasSchoolRole/);
+    assert.match(source, /schoolPersonAccessService\.removePersonSchoolRole/);
+    assert.doesNotMatch(source, /dataServiceGlobal\.fetchData\('persons'/);
+    assert.doesNotMatch(source, /dataServiceGlobal\.updateData\('persons'/);
+  }
+});
+
+test('school package read-only person enrichments use package helper', () => {
+  const checkedSources = [
+    read('packages/school/MVC/controllers/school/programController.js'),
+    read('packages/school/MVC/controllers/school/classRollingEnrollmentController.js'),
+    read('packages/school/MVC/controllers/school/academicLedgerController.js'),
+    read('packages/school/MVC/controllers/school/gradesMatrixController.js'),
+    read('packages/school/MVC/controllers/school/reportController.js'),
+    read('packages/school/MVC/controllers/school/studentProgramPriorSubjectController.js'),
+    read('packages/school/MVC/services/school/programRegistrationViewService.js'),
+    read('packages/school/MVC/services/school/termRegistrationViewService.js'),
+    read('packages/school/MVC/services/school/schoolMasterAcademiaHubService.js'),
+    read('packages/school/MVC/services/school/sessionExplorerService.js'),
+    read('packages/school/MVC/services/school/schoolAccountDomainService.js')
+  ];
+
+  for (const source of checkedSources) {
+    assert.match(source, /schoolPersonAccessService/);
+    assert.doesNotMatch(source, /fetchData\('persons'/);
+    assert.doesNotMatch(source, /getDataById\('persons'/);
+  }
+});
+
+test('school views do not point pickers at the global persons endpoint', () => {
+  const viewPaths = [
+    'packages/school/MVC/views/school/staff/staffForm.ejs',
+    'packages/school/MVC/views/school/teacher/teacherForm.ejs',
+    'packages/school/MVC/views/school/student/studentForm.ejs',
+    'packages/school/MVC/views/school/schedule/mySchedule.ejs',
+    'packages/school/MVC/views/school/schedule/globalSchedule.ejs',
+    'packages/school/MVC/views/school/report/personReportList.ejs',
+    'packages/school/MVC/views/school/timesheet/timesheetList.ejs',
+    'packages/school/MVC/views/school/payRate/payRateForm.ejs'
+  ];
+
+  for (const viewPath of viewPaths) {
+    const source = read(viewPath);
+    assert.doesNotMatch(source, /apiEndpoint:\s*['"]\/persons['"]/);
+    assert.doesNotMatch(source, /url:\s*['"]\/persons['"]/);
+  }
+});

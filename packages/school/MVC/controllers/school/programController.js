@@ -4,7 +4,6 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const schoolRepositories = require('../../repositories/school');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
-const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields, normalizeSearchKeyword } = requireCoreModule('MVC/utils/generalTools');
@@ -18,13 +17,13 @@ const adminChekersService = requireCoreModule('MVC/services/adminChekersService'
 const postingPolicyService = require('../../services/school/postingPolicyService');
 const programTransactionService = require('../../services/school/programTransactionService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const {
   getActiveOrgIdOrThrow: getActiveOrgIdOrThrowShared,
   assertCreateOrgContextOrThrow: assertCreateOrgContextOrThrowShared,
   canCreateOrgScopedItem,
   assertOrgAccess
 } = requireCoreModule('MVC/utils/orgContextUtils');
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function parseJsonSafe(v, fallback) {
   if (v === undefined || v === null || v === '') return fallback;
@@ -83,17 +82,19 @@ async function resolveEligibleProgramAdministrators(reqUser, orgId, query = {}) 
   const targetOrgId = String(orgId || '').trim();
   if (!targetOrgId || String(targetOrgId).toUpperCase() === 'SYSTEM') return [];
 
-  const persons = await dataServiceGlobal.fetchData('persons', {
+  const scopedUser = { ...(reqUser || {}), activeOrgId: targetOrgId };
+  const persons = await schoolPersonAccessService.listActiveOrgPersons({
+    reqUser: scopedUser,
     q: String(query.q || '').trim(),
-    type: query.type || 'contains',
-    searchFields: 'id,name.first,name.last,contact.email,contact.emails[0].email'
-  }, reqUser, PERSON_QUERY_OPTIONS);
+    query: { ...query, limit: query.limit || 5000 },
+    requireSchoolRole: true,
+    allowedSchoolRoles: ['teacher', 'staff']
+  });
 
   return (persons || [])
-    .filter((p) => personHasTeacherOrStaffRoleInOrg(p, targetOrgId))
     .sort((a, b) => {
-      const aName = `${a?.name?.first || ''} ${a?.name?.last || ''}`.trim().toLowerCase();
-      const bName = `${b?.name?.first || ''} ${b?.name?.last || ''}`.trim().toLowerCase();
+      const aName = schoolPersonAccessService.formatPersonName(a, '').toLowerCase();
+      const bName = schoolPersonAccessService.formatPersonName(b, '').toLowerCase();
       return aName.localeCompare(bName);
     });
 }
@@ -101,11 +102,13 @@ async function resolveEligibleProgramAdministrators(reqUser, orgId, query = {}) 
 async function assertProgramAdministratorEligibleOrThrow(personId, orgId, reqUser) {
   const candidateId = String(personId || '').trim();
   if (!candidateId) throw new Error('Program Administrator is required.');
-  const person = await dataServiceGlobal.getDataById('persons', candidateId, reqUser, PERSON_QUERY_OPTIONS);
+  const person = await schoolPersonAccessService.getPersonById({
+    reqUser: { ...(reqUser || {}), activeOrgId: orgId },
+    personId: candidateId,
+    requireSchoolRole: true,
+    allowedSchoolRoles: ['teacher', 'staff']
+  });
   if (!person) throw new Error('Selected Program Administrator was not found.');
-  if (!personHasTeacherOrStaffRoleInOrg(person, orgId)) {
-    throw new Error('Program Administrator must have active teacher/staff role in the selected organization.');
-  }
 }
 
 function buildDuration(body) {
@@ -314,11 +317,14 @@ exports.listPrograms = async (req, res) => {
     const canCreatePrograms = await canCreateOrgScopedItem(req.user, { scopeLabel: 'programs' });
 
     const programs = await dataService.fetchData('programs', query, req.user);
-    const persons = await dataServiceGlobal.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS);
+    const personById = await schoolPersonAccessService.buildPersonByIdMap({
+      reqUser: req.user,
+      personIds: (Array.isArray(programs) ? programs : []).map((program) => program.programAdministratorPersonId)
+    });
 
     const enrichedPrograms = programs.map((program) => {
-      const admin = persons.find((p) => idsEqual(p.id, program.programAdministratorPersonId));
-      const adminName = admin ? `${admin.name?.first || ''} ${admin.name?.last || ''}`.trim() : 'N/A';
+      const admin = personById.get(toPublicId(program.programAdministratorPersonId));
+      const adminName = admin ? schoolPersonAccessService.formatPersonName(admin, '') : 'N/A';
       return {
         ...program,
         administratorName: adminName || 'N/A',
@@ -393,8 +399,8 @@ async function renderProgramFormView(req, res, viewName) {
       if (!program) throw new Error('Program not found.');
       assertProgramOrgAccess(program, activeOrgId, req.user);
 
-      const admin = await dataServiceGlobal.getDataById('persons', program.programAdministratorPersonId, req.user, PERSON_QUERY_OPTIONS);
-      if (admin) administratorName = `${admin.name?.first || ''} ${admin.name?.last || ''}`.trim();
+      const admin = await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: program.programAdministratorPersonId });
+      if (admin) administratorName = schoolPersonAccessService.formatPersonName(admin, '');
     }
 
     const transactionDefinitions = await getAccessibleTransactionDefinitionsForOrg(program.orgId || activeOrgId, req.user);

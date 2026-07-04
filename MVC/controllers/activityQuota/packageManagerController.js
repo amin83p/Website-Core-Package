@@ -1,7 +1,7 @@
 const paginate = require('../../utils/paginationHelper');
 const packageManagerDataService = require('../../services/activityQuota/packageManagerDataService');
 const activityQuotaUiService = require('../../services/activityQuota/activityQuotaUiService');
-const { SECTIONS } = require('../../../config/accessConstants');
+const { SECTIONS } = require('../../../packages/activityQuota/config/accessConstants');
 const { toPublicId } = require('../../utils/idAdapter');
 const {
   isAjax,

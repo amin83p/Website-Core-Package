@@ -6,7 +6,7 @@ const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const ACTIVE_REVIEW_STATUSES = new Set(['submitted', 'pending_reapproval']);
 const FINAL_STATUSES = new Set(['rejected', 'cancelled']);

@@ -1,11 +1,8 @@
-const accessService = require('../services/security');
+const { requireCoreModule } = require('../services/school/schoolCoreContracts');
+const accessService = requireCoreModule('MVC/services/security');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
-const adminAuthorityService = require('../services/adminAuthorityService');
 
-/**
- * Superusers, global admins (fullAdmin profile), or users with UPDATE or VIEW_DASHBOARD
- * on SCHOOL_ATTENDANCES may edit org-wide attendance matrix thresholds.
- */
 async function userCanManageAttendanceMatrixPolicy(user, ipAddress) {
   if (!user) return false;
   if (await adminAuthorityService.isAdminForRequestAsync(user, SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_ATTENDANCES } })) return true;

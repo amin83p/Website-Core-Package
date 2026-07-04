@@ -1,12 +1,10 @@
 const schoolDataService = require('./schoolDataService');
 const sessionStudentCaseService = require('./sessionStudentCaseService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
-const dataService = requireCoreModule('MVC/services/dataService');
-
-const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function normalizeStatusCode(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -115,7 +113,7 @@ async function listSessions(req, query = {}) {
     classes = classes.filter((row) => idsEqual(row?.id, filters.classId));
   }
 
-  const persons = await dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS);
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({ reqUser: req.user });
   let rows = [];
 
   for (const classRow of classes) {
@@ -135,9 +133,9 @@ async function listSessions(req, query = {}) {
       const sessionTeacherId = session?.delivery?.deliveredBy;
       if (filters.teacherIds.length && !filters.teacherIds.some((teacherFilterId) => idsEqual(sessionTeacherId, teacherFilterId))) return;
 
-      const teacher = (Array.isArray(persons) ? persons : []).find((person) => idsEqual(person?.id, sessionTeacherId));
+      const teacher = personById.get(String(sessionTeacherId || '').trim());
       const teacherName = teacher
-        ? `${teacher.name?.first || ''} ${teacher.name?.last || ''}`.trim()
+        ? schoolPersonAccessService.formatPersonName(teacher, '')
         : (session?.delivery?.deliveredByName || 'Unassigned');
       const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(session?.status, session?.notes);
       const statusDefinition = (Array.isArray(statusMeta) ? statusMeta : [])

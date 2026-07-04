@@ -11,7 +11,7 @@ const {
   OPERATIONS
 } = require('./schoolRouteDependencies');
 
-const { requireAttendanceMatrixPolicyAdmin } = requireCoreModule('MVC/middleware/attendanceMatrixPolicyAdminMiddleware');
+const { requireAttendanceMatrixPolicyAdmin } = require('../middleware/attendanceMatrixPolicyAdminMiddleware');
 const upload = requireCoreModule('MVC/middleware/upload');
 
 router.use(requireAuth);

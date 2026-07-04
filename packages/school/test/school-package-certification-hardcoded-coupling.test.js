@@ -59,6 +59,12 @@ test('school package constants should expose package-owned School section map', 
   assert.equal(constants.SCHOOL_SECTIONS.SCHOOL_STUDENTS, 'SCHOOL_STUDENTS');
 });
 
+test('school package settings defaults should be package-owned', () => {
+  const defaults = require(path.join(ROOT_DIR, 'packages/school/config/settingsDefaults.js'));
+  assert.equal(defaults.settingsDefaults.app.schoolCanonicalEnrollmentRead, false);
+  assert.equal(defaults.settingsDefaults.app.enableRollingClassWorkflow, true);
+});
+
 test('School runtime files should not use deep core relative imports', () => {
   const jsFiles = walkFiles(SCHOOL_RUNTIME_ROOT, (filePath) => filePath.endsWith('.js'));
   const offenders = [];
