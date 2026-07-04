@@ -2,9 +2,118 @@ const schoolDataService = require('./schoolDataService');
 const sessionStudentCaseService = require('./sessionStudentCaseService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
+const schoolRecordAccessService = require('./schoolRecordAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
+const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+
+function normalizeId(value) {
+  return String(value || '').trim();
+}
+
+function getUserPersonId(reqUser = {}) {
+  return normalizeId(
+    reqUser.personId
+    || reqUser.person?.id
+    || reqUser.person?._id
+    || reqUser.profile?.personId
+    || reqUser.account?.personId
+  );
+}
+
+function rowBelongsToActiveOrg(row = {}, activeOrgId = '') {
+  const orgId = normalizeId(activeOrgId);
+  if (!orgId) return true;
+  const rowOrgIds = [
+    row.orgId,
+    row.organizationId,
+    row.organizationID,
+    row.orgID,
+    row.schoolOrgId,
+    row.activeOrgId
+  ].map(normalizeId).filter(Boolean);
+  if (!rowOrgIds.length) return true;
+  return rowOrgIds.some((rowOrgId) => idsEqual(rowOrgId, orgId));
+}
+
+function isActiveSchoolIdentityRow(row = {}) {
+  const status = String(row.status || row.state || '').trim().toLowerCase();
+  return !['archived', 'deleted', 'inactive', 'disabled', 'removed'].includes(status);
+}
+
+function isSessionAdminViewer(reqUser) {
+  return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL, {
+    orgId: reqUser?.activeOrgId,
+    section: { id: SECTIONS.SCHOOL_SESSIONS, category: 'SCHOOL' }
+  });
+}
+
+async function hasLinkedTeacherRole(reqUser = {}) {
+  const personId = getUserPersonId(reqUser);
+  const activeOrgId = normalizeId(reqUser?.activeOrgId);
+  if (!personId) return false;
+
+  const teachers = await schoolDataService.fetchData('teachers', {}, reqUser);
+  return (Array.isArray(teachers) ? teachers : []).some((row) => (
+    idsEqual(row?.personId, personId)
+    && rowBelongsToActiveOrg(row, activeOrgId)
+    && isActiveSchoolIdentityRow(row)
+  ));
+}
+
+async function buildSessionExplorerViewer(req) {
+  const reqUser = req?.user || {};
+  const isAdminViewer = isSessionAdminViewer(reqUser);
+
+  if (isAdminViewer) {
+    return {
+      isAdminViewer: true,
+      canFilterByTeacher: true,
+      lockedTeacherPersonId: '',
+      lockedTeacherName: ''
+    };
+  }
+
+  const personId = getUserPersonId(reqUser);
+  const isTeacher = personId ? await hasLinkedTeacherRole(reqUser) : false;
+  let lockedTeacherName = '';
+
+  if (isTeacher && personId) {
+    const personById = await schoolPersonAccessService.buildPersonByIdMap({ reqUser });
+    const person = personById.get(personId);
+    lockedTeacherName = person
+      ? schoolPersonAccessService.formatPersonName(person, '')
+      : String(reqUser?.displayName || reqUser?.name || reqUser?.username || personId).trim();
+  }
+
+  return {
+    isAdminViewer: false,
+    canFilterByTeacher: false,
+    lockedTeacherPersonId: isTeacher ? personId : '',
+    lockedTeacherName
+  };
+}
+
+function applyViewerTeacherFilters(filters, viewer = {}) {
+  if (viewer.isAdminViewer) return filters;
+
+  if (viewer.lockedTeacherPersonId) {
+    const lockedIds = [viewer.lockedTeacherPersonId];
+    return {
+      ...filters,
+      teacherIds: lockedIds,
+      teacherId: lockedIds.join(',')
+    };
+  }
+
+  return {
+    ...filters,
+    teacherIds: [],
+    teacherId: ''
+  };
+}
 
 function normalizeStatusCode(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -104,11 +213,14 @@ function resolveSessionId(session) {
 }
 
 async function listSessions(req, query = {}) {
-  const filters = normalizeFilters(query);
+  const viewer = await buildSessionExplorerViewer(req);
+  const accessContext = schoolDataService.buildRouteAccessContext(req);
+  const access = schoolRecordAccessService.resolveAccessFromRequest(req);
+  const filters = applyViewerTeacherFilters(normalizeFilters(query), viewer);
   const activeOrgId = String(req?.user?.activeOrgId || '').trim();
   const statusMeta = await sessionStatusPolicyService.getClientStatusMeta(activeOrgId || '', { includeInactive: true });
 
-  let classes = await schoolDataService.fetchData('classes', {}, req.user);
+  let classes = await schoolDataService.fetchData('classes', {}, req.user, accessContext);
   if (filters.classId) {
     classes = classes.filter((row) => idsEqual(row?.id, filters.classId));
   }
@@ -118,19 +230,22 @@ async function listSessions(req, query = {}) {
 
   for (const classRow of classes) {
     // eslint-disable-next-line no-await-in-loop
-    const serviceSessions = await schoolDataService.getClassSessions(classRow.id, req.user);
+    const serviceSessions = await schoolDataService.getClassSessions(classRow.id, req.user, accessContext);
     const sessions = Array.isArray(serviceSessions) && serviceSessions.length
       ? serviceSessions
       : getEmbeddedClassSessions(classRow);
 
     (Array.isArray(sessions) ? sessions : []).forEach((session) => {
       if (session?.notes === 'Holiday/Off') return;
+      if (!schoolRecordAccessService.isSessionAccessible({ classRow, session, access, context: 'list' })) return;
+
       if (filters.startDate && session.date < filters.startDate) return;
       if (filters.endDate && session.date > filters.endDate) return;
       if (filters.startTime && session.startTime < filters.startTime) return;
       if (filters.endTime && session.startTime > filters.endTime) return;
 
       const sessionTeacherId = session?.delivery?.deliveredBy;
+      if (viewer.lockedTeacherPersonId && !idsEqual(sessionTeacherId, viewer.lockedTeacherPersonId)) return;
       if (filters.teacherIds.length && !filters.teacherIds.some((teacherFilterId) => idsEqual(sessionTeacherId, teacherFilterId))) return;
 
       const teacher = personById.get(String(sessionTeacherId || '').trim());
@@ -199,11 +314,16 @@ async function listSessions(req, query = {}) {
       limit: rows.length
     },
     statusMeta,
-    filters
+    filters,
+    viewer
   };
 }
 
 module.exports = {
   listSessions,
-  normalizeFilters
+  normalizeFilters,
+  buildSessionExplorerViewer,
+  applyViewerTeacherFilters,
+  isSessionAdminViewer,
+  hasLinkedTeacherRole
 };

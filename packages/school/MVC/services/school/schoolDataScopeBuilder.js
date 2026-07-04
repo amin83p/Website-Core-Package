@@ -3,8 +3,18 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
-const ORGANIZATION_SCOPE_NAMES = new Set(['ADMIN', 'ORGANIZATION', 'ORG', 'GLOBAL']);
-const OWNER_SCOPE_NAMES = new Set(['OWNER', 'USER', 'DEPARTMENT', 'DEPT', 'DIVISION', 'DIV']);
+const SCOPE_MODES = Object.freeze({
+  ORG_WIDE: 'orgWide',
+  ASSIGNMENT: 'assignment',
+  OWNER: 'owner',
+  USER: 'user'
+});
+
+const ORG_WIDE_SCOPE_NAMES = new Set(['ADMIN', 'ORGANIZATION', 'ORG', 'GLOBAL']);
+const ASSIGNMENT_SCOPE_NAMES = new Set(['DEPARTMENT', 'DEPT', 'DIVISION', 'DIV']);
+const OWNER_SCOPE_NAMES = new Set(['OWNER']);
+const USER_SCOPE_NAMES = new Set(['USER']);
+
 const SCOPE_NAME_BY_ID = Object.freeze({
   SCP_ADMIN: 'ADMIN',
   SCP_ORG: 'ORGANIZATION',
@@ -28,6 +38,16 @@ function normalizeScopeName(scopeName = '') {
   return '';
 }
 
+function resolveScopeModeFromName(scopeName = '') {
+  const normalized = normalizeScopeName(scopeName);
+  if (!normalized) return SCOPE_MODES.ORG_WIDE;
+  if (USER_SCOPE_NAMES.has(normalized)) return SCOPE_MODES.USER;
+  if (OWNER_SCOPE_NAMES.has(normalized)) return SCOPE_MODES.OWNER;
+  if (ASSIGNMENT_SCOPE_NAMES.has(normalized)) return SCOPE_MODES.ASSIGNMENT;
+  if (ORG_WIDE_SCOPE_NAMES.has(normalized)) return SCOPE_MODES.ORG_WIDE;
+  return SCOPE_MODES.ORG_WIDE;
+}
+
 function resolveScopeNameFromAccessContext(accessContext = {}) {
   const rawScope = accessContext?.scopeId
     || accessContext?.accessScope
@@ -45,6 +65,11 @@ function getScopedActiveOrgId(requestingUser) {
 function getScopedUserId(requestingUser) {
   if (!requestingUser) return null;
   return toPublicId(requestingUser.id || requestingUser.userId || requestingUser._id) || null;
+}
+
+function getScopedPersonId(requestingUser) {
+  if (!requestingUser) return null;
+  return toPublicId(requestingUser.personId) || null;
 }
 
 function isScopedSuperAdmin(requestingUser) {
@@ -69,7 +94,10 @@ function buildSchoolListScope(requestingUser, options = {}) {
       activeOrgId: null,
       allowSystemFallback: false,
       scopeName: '',
-      userId: null
+      scopeMode: SCOPE_MODES.USER,
+      userId: null,
+      personId: null,
+      ownerScoped: false
     };
   }
 
@@ -80,7 +108,10 @@ function buildSchoolListScope(requestingUser, options = {}) {
       activeOrgId: getScopedActiveOrgId(requestingUser),
       allowSystemFallback: false,
       scopeName: 'ADMIN',
-      userId: getScopedUserId(requestingUser)
+      scopeMode: SCOPE_MODES.ORG_WIDE,
+      userId: getScopedUserId(requestingUser),
+      personId: getScopedPersonId(requestingUser),
+      ownerScoped: false
     };
   }
 
@@ -92,22 +123,44 @@ function buildSchoolListScope(requestingUser, options = {}) {
       activeOrgId: null,
       allowSystemFallback: false,
       scopeName: '',
-      userId: null
+      scopeMode: SCOPE_MODES.USER,
+      userId: null,
+      personId: null,
+      ownerScoped: false
     };
   }
 
   const allowSystemFallback = allowSystemFallbackRequested && !adminChekersService.isSuperAdmin(requestingUser);
-  const ownerScoped = OWNER_SCOPE_NAMES.has(scopeName);
-  const scopedUserId = ownerScoped ? getScopedUserId(requestingUser) : null;
+  const resolvedScopeName = scopeName || 'ORGANIZATION';
+  const scopeMode = resolveScopeModeFromName(resolvedScopeName);
+  const userId = getScopedUserId(requestingUser);
+  const personId = getScopedPersonId(requestingUser);
+
+  if (scopeMode === SCOPE_MODES.USER) {
+    return {
+      denyAll: true,
+      canViewAll: false,
+      activeOrgId,
+      allowSystemFallback,
+      scopeName: resolvedScopeName,
+      scopeMode,
+      userId,
+      personId,
+      ownerScoped: false
+    };
+  }
 
   return {
     denyAll: false,
     canViewAll: false,
     activeOrgId,
     allowSystemFallback,
-    scopeName: scopeName || 'ORGANIZATION',
-    userId: scopedUserId,
-    ownerScoped
+    scopeName: resolvedScopeName,
+    scopeMode,
+    userId: (scopeMode === SCOPE_MODES.OWNER || scopeMode === SCOPE_MODES.ASSIGNMENT) ? userId : null,
+    personId: scopeMode === SCOPE_MODES.ASSIGNMENT ? personId : null,
+    ownerScoped: scopeMode === SCOPE_MODES.OWNER,
+    linkedAccountIds: []
   };
 }
 
@@ -142,9 +195,12 @@ async function isTimesheetAccessibleByOrg(timesheet, requestingUser, resolvePeri
 }
 
 module.exports = {
+  SCOPE_MODES,
   getScopedActiveOrgId,
   getScopedUserId,
+  getScopedPersonId,
   normalizeScopeName,
+  resolveScopeModeFromName,
   resolveScopeNameFromAccessContext,
   isScopedSuperAdmin,
   canBypassOrgScope,

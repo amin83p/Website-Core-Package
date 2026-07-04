@@ -42,11 +42,11 @@ function matchesAccountSearch(account, searchQuery) {
   return tokens.every((token) => haystack.includes(token));
 }
 
-async function buildAccountOwnerMap(reqUser) {
+async function buildAccountOwnerMap(reqUser, accessContext = {}) {
   const [students, teachers, staff] = await Promise.all([
-    schoolDataService.fetchData('students', {}, reqUser),
-    schoolDataService.fetchData('teachers', {}, reqUser),
-    schoolDataService.fetchData('staff', {}, reqUser)
+    schoolDataService.fetchData('students', {}, reqUser, accessContext),
+    schoolDataService.fetchData('teachers', {}, reqUser, accessContext),
+    schoolDataService.fetchData('staff', {}, reqUser, accessContext)
   ]);
 
   const personMap = await schoolPersonAccessService.buildPersonByIdMap({
@@ -101,15 +101,15 @@ function enrichAccountsWithOwners(accounts, ownersByAccount) {
   });
 }
 
-async function findAccountOwnerConflicts(accountId, reqUser) {
+async function findAccountOwnerConflicts(accountId, reqUser, accessContext = {}) {
   const targetAccountId = toPublicId(accountId);
   if (!targetAccountId) return [];
 
   const owners = [];
   const [students, teachers, staff] = await Promise.all([
-    schoolDataService.fetchData('students', {}, reqUser),
-    schoolDataService.fetchData('teachers', {}, reqUser),
-    schoolDataService.fetchData('staff', {}, reqUser)
+    schoolDataService.fetchData('students', {}, reqUser, accessContext),
+    schoolDataService.fetchData('teachers', {}, reqUser, accessContext),
+    schoolDataService.fetchData('staff', {}, reqUser, accessContext)
   ]);
 
   (students || []).forEach((student) => {

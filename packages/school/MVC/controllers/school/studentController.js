@@ -44,6 +44,10 @@ const STUDENT_DELETE_FOOTPRINT_RULES = Object.freeze([
 ]);
 const STUDENT_DELETE_MAX_FOOTPRINT_SAMPLE = 5;
 
+function routeAccess(req) {
+    return dataService.buildRouteAccessContext(req);
+}
+
 function getActiveOrgIdOrThrow(reqUser) {
     return getActiveOrgIdOrThrowShared(reqUser);
 }
@@ -479,11 +483,11 @@ async function ensurePersonHasOrgRole(personId, orgId, role, reqUser, options = 
     return schoolPersonAccessService.ensurePersonHasSchoolRole({ personId, orgId, role, reqUser, options });
 }
 
-async function archiveLinkedStudentAccount(student, reqUser) {
+async function archiveLinkedStudentAccount(student, reqUser, accessContext = {}) {
     const linkedAccountId = String(student?.studentAccountId || '').trim();
     if (!linkedAccountId) return null;
 
-    const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser);
+    const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser, accessContext);
     if (!account) return null;
     if (String(account.status || '').toLowerCase() === 'archived') return account;
 
@@ -495,11 +499,11 @@ async function archiveLinkedStudentAccount(student, reqUser) {
     );
 }
 
-async function recoverLinkedStudentAccount(student, reqUser) {
+async function recoverLinkedStudentAccount(student, reqUser, accessContext = {}) {
     const linkedAccountId = String(student?.studentAccountId || '').trim();
     if (!linkedAccountId) return null;
 
-    const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser);
+    const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser, accessContext);
     if (!account) return null;
     if (String(account.status || '').toLowerCase() !== 'archived') return account;
 
@@ -599,7 +603,7 @@ exports.listStudents = async (req, res) => {
         delete fetchQuery.type;
         delete fetchQuery.searchFields;
 
-        const allStudents = await dataService.fetchData('students', fetchQuery, req.user);
+        const allStudents = await dataService.fetchData('students', fetchQuery, req.user, dataService.buildRouteAccessContext(req));
         const personById = await schoolPersonAccessService.buildPersonByIdMap({
             reqUser: req.user,
             personIds: (Array.isArray(allStudents) ? allStudents : []).map((student) => student.personId)
@@ -679,7 +683,7 @@ exports.listArchivedStudents = async (req, res) => {
         if (query.q === searchDefaultKeyword) query.q = '';
 
         const archivedQuery = { ...query, academicStatus: 'Archived' };
-        const allStudents = await dataService.fetchData('students', archivedQuery, req.user);
+        const allStudents = await dataService.fetchData('students', archivedQuery, req.user, dataService.buildRouteAccessContext(req));
         const personById = await schoolPersonAccessService.buildPersonByIdMap({
             reqUser: req.user,
             personIds: (Array.isArray(allStudents) ? allStudents : []).map((student) => student.personId)
@@ -734,7 +738,7 @@ exports.showForm = async (req, res) => {
         let funderAccountName = '';
 
         if (isEdit) {
-            student = await dataService.getDataById('students', req.params.id, req.user);
+            student = await dataService.getDataById('students', req.params.id, req.user, routeAccess(req));
             if (!student) throw new Error('Student not found.');
             assertStudentOrgAccess(student, activeOrgId, req.user);
             
@@ -745,7 +749,7 @@ exports.showForm = async (req, res) => {
             }
 
             if (student.funderAccountId) {
-                const accessibleAccounts = await dataService.fetchData('schoolAccounts', {}, req.user);
+                const accessibleAccounts = await dataService.fetchData('schoolAccounts', {}, req.user, routeAccess(req));
                 const account = accessibleAccounts.find((a) => idsEqual(a.id, student.funderAccountId));
                 if (account) {
                     funderAccountName = `${account.code || ''} - ${account.name || ''}`.trim();
@@ -825,7 +829,7 @@ exports.saveStudent1 = async (req, res) => {
         };
 
         if (payload.funderAccountId) {
-            const accessibleAccounts = await dataService.fetchData('schoolAccounts', {}, req.user);
+            const accessibleAccounts = await dataService.fetchData('schoolAccounts', {}, req.user, routeAccess(req));
             const isValidFunder = accessibleAccounts.some((a) => idsEqual(a.id, payload.funderAccountId));
             if (!isValidFunder) throw new Error('Selected funder account is invalid or inaccessible.');
         }
@@ -883,7 +887,7 @@ exports.saveStudent = async (req, res) => {
 
         let existingStudent = null;
         if (id) {
-            existingStudent = await dataService.getDataById('students', id, req.user);
+            existingStudent = await dataService.getDataById('students', id, req.user, routeAccess(req));
             if (!existingStudent) throw new Error('Student not found.');
             assertStudentOrgAccess(existingStudent, activeOrgId, req.user);
         }
@@ -959,7 +963,7 @@ exports.saveStudent = async (req, res) => {
 
         const shouldLoadAccounts = !id || !!payload.funderAccountId;
         const accessibleAccounts = shouldLoadAccounts
-            ? await dataService.fetchData('schoolAccounts', {}, req.user)
+            ? await dataService.fetchData('schoolAccounts', {}, req.user, routeAccess(req))
             : [];
         if (payload.funderAccountId) {
             const selectedFunder = accessibleAccounts.find((a) => idsEqual(a.id || '', payload.funderAccountId));
@@ -1092,7 +1096,7 @@ exports.downloadAttachment = async (req, res) => {
     try {
         const { id, attId } = req.params;
         const activeOrgId = getActiveOrgIdOrThrow(req.user);
-        const student = await dataService.getDataById('students', id, req.user);
+        const student = await dataService.getDataById('students', id, req.user, routeAccess(req));
         if (!student) return res.status(404).send('Student not found.');
         assertStudentOrgAccess(student, activeOrgId, req.user);
 
@@ -1137,7 +1141,7 @@ exports.deleteAttachment = async (req, res) => {
         });
         if (sendGuardedResponse(req, res, guardResult, 'Attachment delete is already in progress. Please wait.')) return;
 
-        const student = await dataService.getDataById('students', id, req.user);
+        const student = await dataService.getDataById('students', id, req.user, routeAccess(req));
         if (!student) throw new Error('Student not found.');
         assertStudentOrgAccess(student, activeOrgId, req.user);
 
@@ -1208,7 +1212,7 @@ exports.deleteStudent = async (req, res) => {
         });
         if (sendGuardedResponse(req, res, guardResult, 'Student delete is already in progress. Please wait.')) return;
 
-        const student = await dataService.getDataById('students', req.params.id, req.user);
+        const student = await dataService.getDataById('students', req.params.id, req.user, routeAccess(req));
         if (!student) throw new Error('Student not found.');
         assertStudentOrgAccess(student, activeOrgId, req.user);
 
@@ -1359,7 +1363,7 @@ exports.archiveStudent = async (req, res) => {
         });
         if (sendGuardedResponse(req, res, guardResult, 'Student archive is already in progress. Please wait.')) return;
 
-        const student = await dataService.getDataById('students', req.params.id, req.user);
+        const student = await dataService.getDataById('students', req.params.id, req.user, routeAccess(req));
         if (!student) throw new Error('Student not found.');
         assertStudentOrgAccess(student, activeOrgId, req.user);
 
@@ -1382,7 +1386,7 @@ exports.archiveStudent = async (req, res) => {
             req.user
         );
         if (archivedStudent?.studentAccountId) {
-            await archiveLinkedStudentAccount(archivedStudent, req.user);
+            await archiveLinkedStudentAccount(archivedStudent, req.user, routeAccess(req));
         }
 
         const payloadOut = {
@@ -1417,7 +1421,7 @@ exports.recoverStudent = async (req, res) => {
         });
         if (sendGuardedResponse(req, res, guardResult, 'Student recovery is already in progress. Please wait.')) return;
 
-        const student = await dataService.getDataById('students', req.params.id, req.user);
+        const student = await dataService.getDataById('students', req.params.id, req.user, routeAccess(req));
         if (!student) throw new Error('Student not found.');
         assertStudentOrgAccess(student, activeOrgId, req.user);
 
@@ -1431,7 +1435,7 @@ exports.recoverStudent = async (req, res) => {
             { ...student, academicStatus: 'Active' },
           req.user
         );
-        await recoverLinkedStudentAccount(restoredStudent, req.user);
+        await recoverLinkedStudentAccount(restoredStudent, req.user, routeAccess(req));
 
         const payloadOut = {
             status: 'success',

@@ -31,6 +31,10 @@ const TEACHER_DELETE_FOOTPRINT_RULES = Object.freeze([
 ]);
 const TEACHER_DELETE_MAX_FOOTPRINT_SAMPLE = 5;
 
+function routeAccess(req) {
+  return dataService.buildRouteAccessContext(req);
+}
+
 function getActiveOrgIdOrThrow(reqUser) {
   return getActiveOrgIdOrThrowShared(reqUser);
 }
@@ -387,19 +391,19 @@ async function createTeacherSubAccount({ teacher, person, accessibleAccounts, re
   return await dataService.addData('schoolAccounts', accountPayload, reqUser, options);
 }
 
-async function archiveLinkedTeacherAccount(teacher, reqUser) {
+async function archiveLinkedTeacherAccount(teacher, reqUser, accessContext = {}) {
   const linkedAccountId = String(teacher?.teacherAccountId || '').trim();
   if (!linkedAccountId) return null;
-  const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser);
+  const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser, accessContext);
   if (!account) return null;
   if (String(account.status || '').toLowerCase() === 'archived') return account;
   return await dataService.updateData('schoolAccounts', linkedAccountId, { ...account, status: 'archived', allowPost: false }, reqUser);
 }
 
-async function recoverLinkedTeacherAccount(teacher, reqUser) {
+async function recoverLinkedTeacherAccount(teacher, reqUser, accessContext = {}) {
   const linkedAccountId = String(teacher?.teacherAccountId || '').trim();
   if (!linkedAccountId) return null;
-  const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser);
+  const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser, accessContext);
   if (!account) return null;
   if (String(account.status || '').toLowerCase() !== 'archived') return account;
   return await dataService.updateData('schoolAccounts', linkedAccountId, { ...account, status: 'active', allowPost: true }, reqUser);
@@ -554,12 +558,12 @@ exports.listTeachers = async (req, res) => {
       delete fetchQuery.status;
     }
 
-    const allTeachers = await dataService.fetchData('teachers', fetchQuery, req.user);
+    const allTeachers = await dataService.fetchData('teachers', fetchQuery, req.user, routeAccess(req));
     const personById = await schoolPersonAccessService.buildPersonByIdMap({
       reqUser: req.user,
       personIds: (Array.isArray(allTeachers) ? allTeachers : []).map((teacher) => teacher.personId)
     });
-    const departments = await dataService.fetchData('departments', {}, req.user);
+    const departments = await dataService.fetchData('departments', {}, req.user, routeAccess(req));
 
     const deptById = new Map((departments || []).map((d) => [String(d.id), d.name || d.id]));
     const enriched = allTeachers.map((teacher) => {
@@ -617,12 +621,12 @@ exports.listArchivedTeachers = async (req, res) => {
     delete archivedQuery.q;
     delete archivedQuery.type;
     delete archivedQuery.searchFields;
-    const allTeachers = await dataService.fetchData('teachers', archivedQuery, req.user);
+    const allTeachers = await dataService.fetchData('teachers', archivedQuery, req.user, routeAccess(req));
     const personById = await schoolPersonAccessService.buildPersonByIdMap({
       reqUser: req.user,
       personIds: (Array.isArray(allTeachers) ? allTeachers : []).map((teacher) => teacher.personId)
     });
-    const departments = await dataService.fetchData('departments', {}, req.user);
+    const departments = await dataService.fetchData('departments', {}, req.user, routeAccess(req));
     const deptById = new Map((departments || []).map((d) => [String(d.id), d.name || d.id]));
 
     const enriched = allTeachers.map((teacher) => {
@@ -675,7 +679,7 @@ exports.showForm = async (req, res) => {
     let personOrganizations = [];
 
     if (isEdit) {
-      teacher = await dataService.getDataById('teachers', req.params.id, req.user);
+      teacher = await dataService.getDataById('teachers', req.params.id, req.user, routeAccess(req));
       if (!teacher) throw new Error('Teacher not found.');
       assertTeacherOrgAccess(teacher, activeOrgId, req.user);
       const person = await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: teacher.personId });
@@ -686,7 +690,7 @@ exports.showForm = async (req, res) => {
     }
 
     const [departments, organizations] = await Promise.all([
-      dataService.fetchData('departments', {}, req.user),
+      dataService.fetchData('departments', {}, req.user, routeAccess(req)),
       dataServiceGlobal.fetchData('organizations', {}, req.user)
     ]);
     const organizationLookup = {};
@@ -757,7 +761,7 @@ exports.saveTeacher = async (req, res) => {
 
     let existingTeacher = null;
     if (id) {
-      existingTeacher = await dataService.getDataById('teachers', id, req.user);
+      existingTeacher = await dataService.getDataById('teachers', id, req.user, routeAccess(req));
       if (!existingTeacher) throw new Error('Teacher not found.');
       assertTeacherOrgAccess(existingTeacher, activeOrgId, req.user);
     }
@@ -929,7 +933,7 @@ exports.deleteTeacher = async (req, res) => {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Teacher delete is already in progress. Please wait.')) return;
 
-    const teacher = await dataService.getDataById('teachers', req.params.id, req.user);
+    const teacher = await dataService.getDataById('teachers', req.params.id, req.user, routeAccess(req));
     if (!teacher) throw new Error('Teacher not found.');
     assertTeacherOrgAccess(teacher, activeOrgId, req.user);
 
@@ -1082,7 +1086,7 @@ exports.archiveTeacher = async (req, res) => {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Teacher archive is already in progress. Please wait.')) return;
 
-    const teacher = await dataService.getDataById('teachers', req.params.id, req.user);
+    const teacher = await dataService.getDataById('teachers', req.params.id, req.user, routeAccess(req));
     if (!teacher) throw new Error('Teacher not found.');
     assertTeacherOrgAccess(teacher, activeOrgId, req.user);
 
@@ -1105,7 +1109,7 @@ exports.archiveTeacher = async (req, res) => {
       req.user
     );
     if (archivedTeacher?.teacherAccountId) {
-      await archiveLinkedTeacherAccount(archivedTeacher, req.user);
+      await archiveLinkedTeacherAccount(archivedTeacher, req.user, routeAccess(req));
     }
 
     const payloadOut = {
@@ -1140,7 +1144,7 @@ exports.recoverTeacher = async (req, res) => {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Teacher recovery is already in progress. Please wait.')) return;
 
-    const teacher = await dataService.getDataById('teachers', req.params.id, req.user);
+    const teacher = await dataService.getDataById('teachers', req.params.id, req.user, routeAccess(req));
     if (!teacher) throw new Error('Teacher not found.');
     assertTeacherOrgAccess(teacher, activeOrgId, req.user);
 
@@ -1154,7 +1158,7 @@ exports.recoverTeacher = async (req, res) => {
       { ...teacher, status: 'Active' },
       req.user
     );
-    await recoverLinkedTeacherAccount(restoredTeacher, req.user);
+    await recoverLinkedTeacherAccount(restoredTeacher, req.user, routeAccess(req));
 
     const payloadOut = {
       status: 'success',

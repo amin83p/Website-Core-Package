@@ -3124,6 +3124,29 @@ document.addEventListener('DOMContentLoaded', () => {
         gbSyncScoresFromInputs();
         const btn = saveButton;
         const orig = btn ? btn.innerHTML : '';
+        // #region agent log
+        const gbClientScoreIds = new Set();
+        (Array.isArray(gradebooksState) ? gradebooksState : []).forEach((gb) => {
+            if (!gb?.scores || typeof gb.scores !== 'object') return;
+            Object.keys(gb.scores).forEach((k) => { if (String(k || '').trim()) gbClientScoreIds.add(String(k).trim()); });
+        });
+        fetch('http://127.0.0.1:7310/ingest/ca0b8886-0efc-4766-ba47-26240dd949ea', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4ef284' },
+            body: JSON.stringify({
+                sessionId: '4ef284',
+                location: 'sessionManager.ejs:gbPersistGradebooks',
+                message: 'Client gradebook save payload',
+                data: {
+                    gradebookRosterCount: Array.isArray(gradebookRoster) ? gradebookRoster.length : 0,
+                    clientScorePersonCount: gbClientScoreIds.size,
+                    activityCount: Array.isArray(gradebooksState) ? gradebooksState.length : 0
+                },
+                hypothesisId: 'A',
+                timestamp: Date.now()
+            })
+        }).catch(() => {});
+        // #endregion
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';

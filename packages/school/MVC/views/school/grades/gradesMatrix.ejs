@@ -2,7 +2,7 @@
   .gm-cell-effective .gm-score { color: #0f5132; font-weight: 600; }
   .gm-cell-excluded .gm-score { color: #6c757d; }
   .gm-cell-excluded .gm-pct { text-decoration: line-through; opacity: 0.85; }
-  .matrix-wrapper.gm-matrix { max-height: min(70vh, 720px); overflow: auto; border: 1px solid #dee2e6; border-radius: 6px; }
+  .matrix-wrapper.gm-matrix { max-height: min(70vh, 720px); overflow: auto; border: 1px solid #dee2e6; border-radius: 12px; box-shadow: 0 0.15rem 0.5rem rgba(15, 23, 42, 0.05); }
   .gm-matrix-table th { position: sticky; top: 0; z-index: 2; background-color: #f8f9fa; box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.08); vertical-align: bottom; font-size: 0.78rem; }
   .gm-matrix-table th.gm-sticky-final,
   .gm-matrix-table td.gm-sticky-final {
@@ -33,51 +33,98 @@
   .gm-matrix-table th.gm-date-group { text-align: center; font-weight: 700; color: #334155; }
   .gm-matrix-table .gm-col-head { white-space: nowrap; max-width: 140px; }
   .gm-eval-card { font-size: 0.85rem; }
+  .schedule-shell .filter-panel {
+    background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
+    border: 1px solid #dce9ff;
+    border-radius: 14px;
+  }
+  .schedule-shell .range-chip.active {
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+  }
 </style>
 
-<div class="sections-page">
-  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-    <div>
-      <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-table me-2"></i> Grades Matrix</h1>
-      <p class="text-muted small mb-0 mt-1">Session gradebooks, quizzes, and assignments — aligned with class <strong>Evaluation Rules</strong>. Rolling classes use attendance and assignments weights only (no midterm/final exam weights).</p>
-    </div>
-    <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
-      <a href="<%= typeof schoolSectionDashboardHref !== 'undefined' ? schoolSectionDashboardHref : '/dashboard' %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2">
-        <i class="bi bi-speedometer2 me-1"></i> Dashboard
-      </a>
-      <a href="/school/attendances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-grid-3x3 me-1"></i> Attendance matrix</a>
-    </div>
-  </div>
+<%
+  const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
+    ? schoolSectionDashboardHref
+    : '/dashboard/section-nav/SCHOOL';
+%>
 
-  <div class="card border-0 shadow-sm mb-4">
-    <div class="card-body bg-light rounded">
-      <div class="row align-items-end g-3 mb-3">
-        <div class="col-md-4">
-          <label class="form-label fw-bold">Class</label>
-          <div class="input-group">
-            <input type="hidden" id="gm_classId">
-            <input type="text" id="gm_className" class="form-control bg-white" placeholder="Search class..." readonly>
-            <button type="button" class="btn btn-outline-primary" id="gm_btnClassPicker"><i class="bi bi-search"></i></button>
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName: typeof tableName !== 'undefined' ? tableName : 'Grades_Matrix',
+  btn_export: false,
+  print: false,
+  headerManageBtns: [
+    '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
+  ],
+  manageBtns: [
+    '<a href="/school/attendances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-grid-3x3 me-1"></i> Attendance Matrix</a>'
+  ]
+}) %>
+
+<div class="schedule-shell">
+  <p class="text-muted small mb-3">Session gradebooks, quizzes, and assignments aligned with class <strong>Evaluation Rules</strong>. Rolling classes use attendance and assignments weights only.</p>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+      <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Grades Matrix</div>
+      <button
+        id="gmFilterToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#gmFilterCollapse"
+        aria-expanded="true"
+        aria-controls="gmFilterCollapse"
+        aria-label="Close filters">
+        <i id="gmFilterToggleIcon" class="bi bi-chevron-up"></i>
+      </button>
+    </div>
+    <div class="collapse show" id="gmFilterCollapse">
+      <div class="card-body filter-panel p-3" id="gmFilterForm">
+        <div class="row g-3 align-items-end">
+          <div class="col-lg-4 col-md-6">
+            <label class="form-label" for="gm_className">Class</label>
+            <div class="input-group">
+              <input type="hidden" id="gm_classId">
+              <input type="text" id="gm_className" class="form-control bg-white" placeholder="All classes" readonly>
+              <button type="button" class="btn btn-outline-primary" id="gm_btnClassPicker" title="Select class">
+                <i class="bi bi-book"></i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="gm_btnClearClass" title="Clear class">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+          <div class="col-lg-2 col-md-3">
+            <label class="form-label" for="gm_startDate">Start Date</label>
+            <input type="date" id="gm_startDate" class="form-control size-md">
+          </div>
+          <div class="col-lg-2 col-md-3">
+            <label class="form-label" for="gm_endDate">End Date</label>
+            <input type="date" id="gm_endDate" class="form-control size-md">
+          </div>
+          <div class="col-12 col-lg-4 d-flex justify-content-lg-end gap-2 pt-lg-2">
+            <button type="button" id="gm_btnReset" class="btn btn-outline-secondary btn-md">Reset</button>
+            <button type="button" id="gm_btnLoad" class="btn btn-filled btn-primary btn-md">
+              <i class="bi bi-funnel me-1"></i> Apply
+            </button>
           </div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label fw-bold">Start date</label>
-          <input type="date" id="gm_startDate" class="form-control">
+        <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
+          <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm gm-range range-chip" data-range="today">Today</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm gm-range range-chip" data-range="twoWeeks">Two Weeks</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm gm-range range-chip" data-range="thisWeek">This Week</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm gm-range range-chip" data-range="thisMonth">This Month</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm gm-range range-chip" data-range="allTime">All Dates</button>
+          </div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label fw-bold">End date</label>
-          <input type="date" id="gm_endDate" class="form-control">
-        </div>
-        <div class="col-md-2">
-          <button type="button" id="gm_btnLoad" class="btn btn-primary w-100 fw-bold">Load</button>
-        </div>
-      </div>
-      <div class="d-flex flex-wrap gap-2">
-        <button type="button" class="btn btn-sm btn-outline-secondary gm-range" data-range="today">Today</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary gm-range" data-range="twoWeeks">Two weeks</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary gm-range" data-range="thisWeek">This week</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary gm-range" data-range="thisMonth">This month</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary gm-range" data-range="allTime">All dates in range</button>
       </div>
     </div>
   </div>
@@ -112,9 +159,30 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
+<%- include('partials/tablePages-end') %>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  function bindCollapseToggle(options = {}) {
+    const collapseEl = document.getElementById(String(options.collapseId || ''));
+    const buttonEl = document.getElementById(String(options.buttonId || ''));
+    const iconEl = document.getElementById(String(options.iconId || ''));
+    if (!collapseEl || !buttonEl || !iconEl) return;
+    const setState = (open) => {
+      iconEl.className = open ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+      buttonEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', open ? 'Close filters' : 'Open filters');
+    };
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+    collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+  }
+  bindCollapseToggle({
+    collapseId: 'gmFilterCollapse',
+    buttonId: 'gmFilterToggleBtn',
+    iconId: 'gmFilterToggleIcon'
+  });
+
   const INITIAL = <%- JSON.stringify({
     classId: typeof initialClassId !== 'undefined' ? initialClassId : '',
     className: typeof initialClassName !== 'undefined' ? initialClassName : '',
@@ -131,6 +199,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${y}-${m}-${day}`;
   };
   const startOfLocalDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+  function setActiveRangeChip(range) {
+    document.querySelectorAll('.gm-range.range-chip').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-range') === range);
+    });
+  }
 
   function setRange(range) {
     const today = new Date();
@@ -156,10 +230,12 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (range === 'allTime') {
       document.getElementById('gm_startDate').value = '';
       document.getElementById('gm_endDate').value = '';
+      setActiveRangeChip(range);
       return;
     } else return;
     document.getElementById('gm_startDate').value = toYmd(start);
     document.getElementById('gm_endDate').value = toYmd(end);
+    setActiveRangeChip(range);
   }
 
   document.querySelectorAll('.gm-range').forEach((btn) => {
@@ -169,11 +245,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  document.getElementById('gm_btnClearClass')?.addEventListener('click', () => {
+    document.getElementById('gm_classId').value = '';
+    document.getElementById('gm_className').value = '';
+    document.getElementById('gm_results').classList.add('d-none');
+    document.getElementById('gm_evalCard').classList.add('d-none');
+  });
+
+  document.getElementById('gm_btnReset')?.addEventListener('click', () => {
+    document.getElementById('gm_classId').value = '';
+    document.getElementById('gm_className').value = '';
+    document.getElementById('gm_startDate').value = '';
+    document.getElementById('gm_endDate').value = '';
+    document.getElementById('gm_results').classList.add('d-none');
+    document.getElementById('gm_evalCard').classList.add('d-none');
+    setActiveRangeChip('');
+  });
+
   if (INITIAL.classId) {
     document.getElementById('gm_classId').value = INITIAL.classId;
     document.getElementById('gm_className').value = INITIAL.className || '';
     document.getElementById('gm_startDate').value = INITIAL.startDate || '';
     document.getElementById('gm_endDate').value = INITIAL.endDate || '';
+    if (INITIAL.range) setActiveRangeChip(INITIAL.range);
   }
 
   document.getElementById('gm_btnClassPicker').addEventListener('click', () => {

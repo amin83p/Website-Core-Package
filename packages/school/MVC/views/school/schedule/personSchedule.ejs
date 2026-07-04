@@ -1,6 +1,16 @@
 <style>
+    .schedule-shell .filter-panel {
+        background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
+        border: 1px solid #dce9ff;
+        border-radius: 14px;
+    }
+
+    .schedule-shell .range-chip.active {
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+    }
+
     /* --- TIMELINE CSS (Daily/Weekly View) --- */
-    .timeline-container { position: relative; border: 1px solid #dee2e6; border-radius: 6px; background: #fff; margin-bottom: 1.5rem; overflow: hidden; }
+    .timeline-container { position: relative; border: 1px solid #dee2e6; border-radius: 12px; background: #fff; margin-bottom: 1.5rem; overflow: hidden; box-shadow: 0 0.25rem 0.75rem rgba(15, 23, 42, 0.06); }
     .timeline-header { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 8px 15px; font-weight: bold; display: flex; justify-content: space-between; }
     .timeline-body { position: relative; min-height: 50px; background-image: repeating-linear-gradient(to right, transparent, transparent calc(6.66% - 1px), #f1f3f5 calc(6.66% - 1px), #f1f3f5 6.66%); }
     .hour-markers { display: flex; position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
@@ -30,9 +40,9 @@
         border-color: rgba(122,77,0,0.2) !important;
     }
     .schedule-hours-summary {
-        border: 1px solid #e9ecef;
+        border: 1px solid #dce9ff;
         border-radius: 12px;
-        background: #fff;
+        background: rgba(255, 255, 255, 0.85);
         padding: 0.85rem;
         margin-top: 0.85rem;
     }
@@ -81,10 +91,11 @@
 
     .single-day-list .day-card {
         border: 1px solid #dee2e6;
-        border-radius: 10px;
+        border-radius: 12px;
         background: #fff;
         margin-bottom: 0.9rem;
         overflow: hidden;
+        box-shadow: 0 0.2rem 0.6rem rgba(15, 23, 42, 0.05);
     }
     .single-day-list .day-card-header {
         padding: 0.65rem 0.9rem;
@@ -158,106 +169,203 @@
     @keyframes pulseCal { 0% { box-shadow: 0 0 0 0 rgba(220,53,69,0.4); } 70% { box-shadow: 0 0 0 4px rgba(220,53,69,0); } 100% { box-shadow: 0 0 0 0 rgba(220,53,69,0); } }
 </style>
 
-<div class="sections-page">
-  <%
-    const scheduleAccess = (typeof viewerScheduleAccess !== 'undefined' && viewerScheduleAccess) ? viewerScheduleAccess : {};
-    const canSelectAnyPerson = scheduleAccess.canSelectAnyPerson === true;
-    const scheduleRoles = Array.isArray(scheduleAccess.availableRoles) ? scheduleAccess.availableRoles : [];
-    const defaultRole = scheduleAccess.selectedRole || (scheduleRoles.length >= 1 ? scheduleRoles[0].key : '');
-    const lockedPersonId = scheduleAccess.lockedPersonId || (typeof prefillId !== 'undefined' ? prefillId : '') || '';
-    const lockedPersonName = scheduleAccess.lockedPersonName || (typeof prefillName !== 'undefined' ? prefillName : '') || '';
-  %>
-  <div class="d-flex align-items-center justify-content-between mb-4">
-    <div>
-        <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-calendar-week me-2"></i> Master Schedule Viewer</h1>
+<%
+  const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
+    ? schoolSectionDashboardHref
+    : '/dashboard/section-nav/SCHOOL';
+  const scheduleAccess = (typeof viewerScheduleAccess !== 'undefined' && viewerScheduleAccess) ? viewerScheduleAccess : {};
+  const canSelectAnyPerson = scheduleAccess.canSelectAnyPerson === true;
+  const scheduleRoles = Array.isArray(scheduleAccess.availableRoles) ? scheduleAccess.availableRoles : [];
+  const defaultRole = scheduleAccess.selectedRole || (scheduleRoles.length >= 1 ? scheduleRoles[0].key : '');
+  const lockedPersonId = scheduleAccess.lockedPersonId || (typeof prefillId !== 'undefined' ? prefillId : '') || '';
+  const lockedPersonName = scheduleAccess.lockedPersonName || (typeof prefillName !== 'undefined' ? prefillName : '') || '';
+%>
+
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName: 'Master_Schedule_Viewer',
+  btn_export: false,
+  print: false,
+  headerManageBtns: [
+    '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
+  ],
+  manageBtns: [
+    '<a href="/school/schedules/global" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-layers me-1"></i> Global Comparison</a>',
+    '<a href="/school/classes" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-collection me-1"></i> Classes</a>'
+  ]
+}) %>
+
+<div class="schedule-shell">
+  <p class="text-muted small mb-3">Browse any school person's schedule across daily, weekly, and calendar views. Use quick ranges or custom dates, then load results.</p>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+      <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Schedule</div>
+      <button
+        id="scheduleFilterToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#scheduleFilterCollapse"
+        aria-expanded="true"
+        aria-controls="scheduleFilterCollapse"
+        aria-label="Close filters">
+        <i id="scheduleFilterToggleIcon" class="bi bi-chevron-up"></i>
+      </button>
     </div>
-    <a href="/school/classes" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Classes</a>
+    <div class="collapse show" id="scheduleFilterCollapse">
+      <div class="card-body filter-panel p-3" id="scheduleFilterForm">
+        <div class="row g-3 align-items-end">
+          <div class="col-lg-4 col-md-6">
+            <label class="form-label" for="sch_personName"><%= canSelectAnyPerson ? 'Select Person' : 'Your Schedule Identity' %></label>
+            <% if (canSelectAnyPerson) { %>
+              <div class="input-group">
+                <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
+                <input type="text" id="sch_personName" class="form-control bg-white" placeholder="All people" value="<%= lockedPersonName %>" readonly>
+                <button type="button" class="btn btn-outline-primary" id="btn_openPersonPicker" title="Select person">
+                  <i class="bi bi-person-badge"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="btn_clearPerson" title="Clear person">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            <% } else { %>
+              <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
+              <input type="text" id="sch_personName" class="form-control size-md bg-white" value="<%= lockedPersonName %>" readonly>
+            <% } %>
+          </div>
+          <div class="col-lg-2 col-md-4">
+            <label class="form-label" for="sch_role">Role</label>
+            <select id="sch_role" class="form-select size-md" <%= !canSelectAnyPerson && scheduleRoles.length <= 1 ? 'disabled' : '' %>>
+              <% if (canSelectAnyPerson) { %>
+                <option value="">All Roles</option>
+              <% } %>
+              <% if (!canSelectAnyPerson && !scheduleRoles.length) { %>
+                <option value="">No school role found</option>
+              <% } %>
+              <% scheduleRoles.forEach((role) => { %>
+                <option value="<%= role.key %>" <%= role.key === defaultRole ? 'selected' : '' %>><%= role.label %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="col-lg-2 col-md-4">
+            <label class="form-label" for="sch_startDate">Start Date</label>
+            <input type="date" id="sch_startDate" class="form-control size-md">
+          </div>
+          <div class="col-lg-2 col-md-4">
+            <label class="form-label" for="sch_endDate">End Date</label>
+            <input type="date" id="sch_endDate" class="form-control size-md">
+          </div>
+          <div class="col-lg-2 col-md-4">
+            <label class="form-label" for="sch_hasCases">Cases</label>
+            <div class="form-check form-switch pt-2">
+              <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
+              <label class="form-check-label small fw-semibold" for="sch_hasCases">With cases only</label>
+            </div>
+          </div>
+          <div class="col-12 d-flex justify-content-lg-end gap-2 pt-lg-2">
+            <button type="button" id="btn_resetScheduleFilters" class="btn btn-outline-secondary btn-md">Reset</button>
+            <button type="button" id="btn_loadSchedule" class="btn btn-filled btn-primary btn-md">
+              <i class="bi bi-funnel me-1"></i> Apply
+            </button>
+          </div>
+        </div>
+
+        <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
+          <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="day">Today</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="week">This Week</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="first15">First 15 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="second15">Second 15 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="month">This Month</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="season">Next 3 Months</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="year">This Year</button>
+          </div>
+        </div>
+
+        <div id="scheduleHoursSummary" class="schedule-hours-summary d-none">
+          <div class="schedule-hours-summary-title">Total Hours By Category</div>
+          <div id="lbl_totalHours" class="d-flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+    </div>
   </div>
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body bg-light rounded">
-            <div class="row align-items-end g-3 mb-3">
-                <div class="col-md-4">
-                    <label class="form-label fw-bold"><%= canSelectAnyPerson ? 'Select Person' : 'Your Schedule Identity' %></label>
-                    <div class="input-group">
-                        <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
-                        <input type="text" id="sch_personName" class="form-control bg-white" placeholder="<%= canSelectAnyPerson ? 'Search Person...' : 'No linked school profile found' %>" value="<%= lockedPersonName %>" readonly>
-                        <% if (canSelectAnyPerson) { %>
-                            <button type="button" class="btn btn-outline-primary" id="btn_openPersonPicker"><i class="bi bi-search"></i></button>
-                        <% } %>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold">Role</label>
-                    <select id="sch_role" class="form-select" <%= !canSelectAnyPerson && scheduleRoles.length <= 1 ? 'disabled' : '' %>>
-                        <% if (canSelectAnyPerson) { %>
-                            <option value="">All Roles</option>
-                        <% } %>
-                        <% if (!canSelectAnyPerson && !scheduleRoles.length) { %>
-                            <option value="">No school role found</option>
-                        <% } %>
-                        <% scheduleRoles.forEach((role) => { %>
-                            <option value="<%= role.key %>" <%= role.key === defaultRole ? 'selected' : '' %>><%= role.label %></option>
-                        <% }); %>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold">Start Date</label>
-                    <input type="date" id="sch_startDate" class="form-control">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold">End Date</label>
-                    <input type="date" id="sch_endDate" class="form-control">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold">Cases</label>
-                    <div class="form-check form-switch pt-2">
-                        <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
-                        <label class="form-check-label small fw-semibold" for="sch_hasCases">With cases only</label>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <button type="button" id="btn_loadSchedule" class="btn btn-primary w-100 fw-bold text-nowrap px-3">Load</button>
-                </div>
-            </div>
 
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="day">Today</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="week">This Week</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="first15">First 15 Days</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="second15">Second 15 Days</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="month">This Month</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="season">Next 3 Months</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="year">This Year</button>
-                </div>
-                <span class="badge bg-white text-muted border" id="viewModeIndicator">Ready</span>
-            </div>
-            <div id="scheduleHoursSummary" class="schedule-hours-summary d-none">
-                <div class="schedule-hours-summary-title">Total Hours By Category</div>
-                <div id="lbl_totalHours" class="d-flex flex-wrap gap-2"></div>
-            </div>
+  <div id="scheduleContainer" class="d-none">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          <div class="text-muted small">Viewing</div>
+          <div class="fw-bold text-primary m-0" id="scheduleTitle">Schedule</div>
         </div>
+        <span class="badge bg-light text-secondary border" id="viewModeIndicator">Ready</span>
+      </div>
     </div>
 
-    <div id="scheduleContainer" class="d-none">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div class="d-flex align-items-center gap-3">
-                <h5 class="fw-bold m-0 text-primary" id="scheduleTitle">Schedule</h5>
-            </div>
-            <div class="d-flex gap-3 align-items-center small" id="legendContainer">
-                </div>
-        </div>
-        
-        <div id="visualDisplayArea" class="px-2 pb-5" style="max-height: 800px; overflow-y: auto;">
-            </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2 py-2 px-3">
+        <div class="fw-bold text-dark"><i class="bi bi-calendar3-week me-2"></i>Schedule View</div>
+        <div class="d-flex gap-3 align-items-center flex-wrap small" id="legendContainer"></div>
+      </div>
+      <div class="card-body p-2 p-md-3">
+        <div id="visualDisplayArea" style="max-height: 800px; overflow-y: auto;"></div>
+      </div>
     </div>
+  </div>
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
-
+<%- include('partials/tablePages-end') %>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    function bindCollapseToggle(options = {}) {
+        const collapseEl = document.getElementById(String(options.collapseId || ''));
+        const buttonEl = document.getElementById(String(options.buttonId || ''));
+        const iconEl = document.getElementById(String(options.iconId || ''));
+        if (!collapseEl || !buttonEl || !iconEl) return;
+        const setState = (open) => {
+            iconEl.className = open ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+            buttonEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+            buttonEl.setAttribute('aria-label', open ? 'Close filters' : 'Open filters');
+        };
+        setState(collapseEl.classList.contains('show'));
+        collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+        collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+    bindCollapseToggle({
+        collapseId: 'scheduleFilterCollapse',
+        buttonId: 'scheduleFilterToggleBtn',
+        iconId: 'scheduleFilterToggleIcon'
+    });
+
+    function setActiveRangeChip(range) {
+        document.querySelectorAll('.btn-range.range-chip').forEach((btn) => {
+            btn.classList.toggle('active', btn.getAttribute('data-range') === range);
+        });
+    }
+
+    const setDateRange = (start, end) => {
+        document.getElementById('sch_startDate').value = start.toISOString().split('T')[0];
+        document.getElementById('sch_endDate').value = end.toISOString().split('T')[0];
+    };
+
+    function applyDefaultWeekRange() {
+        const today = new Date();
+        const day = today.getDay() || 7;
+        const start = new Date(today);
+        start.setHours(-24 * (day - 1));
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        setDateRange(start, end);
+        setActiveRangeChip('week');
+    }
+
     const normalizeSessionStatus = (status) => String(status || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'scheduled';
     let sessionStatusMetaMap = new Map();
     function getStatusMeta(status) {
@@ -442,15 +550,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return confirm(message);
     };
 
-    const setDateRange = (start, end) => {
-        document.getElementById('sch_startDate').value = start.toISOString().split('T')[0];
-        document.getElementById('sch_endDate').value = end.toISOString().split('T')[0];
-    };
+    document.getElementById('btn_resetScheduleFilters')?.addEventListener('click', () => {
+        if (canSelectAnyPerson) {
+            document.getElementById('sch_personId').value = '';
+            document.getElementById('sch_personName').value = '';
+            const roleEl = document.getElementById('sch_role');
+            if (roleEl) roleEl.value = '';
+        }
+        const hasCasesEl = document.getElementById('sch_hasCases');
+        if (hasCasesEl) hasCasesEl.checked = false;
+        applyDefaultWeekRange();
+        document.getElementById('scheduleContainer')?.classList.add('d-none');
+        document.getElementById('viewModeIndicator').innerText = 'Ready';
+        document.getElementById('scheduleTitle').innerText = 'Schedule';
+        document.getElementById('scheduleHoursSummary')?.classList.add('d-none');
+        const lblHours = document.getElementById('lbl_totalHours');
+        if (lblHours) lblHours.innerHTML = '';
+    });
 
     // --- 1. Control Logic & Event Listeners ---
     document.querySelectorAll('.btn-range').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const range = e.target.getAttribute('data-range');
+            const range = e.currentTarget.getAttribute('data-range');
+            setActiveRangeChip(range);
             const today = new Date();
             let start = new Date(today);
             let end = new Date(today);
@@ -527,6 +649,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         });
     }
+
+    document.getElementById('btn_clearPerson')?.addEventListener('click', () => {
+        document.getElementById('sch_personId').value = '';
+        document.getElementById('sch_personName').value = '';
+        const roleEl = document.getElementById('sch_role');
+        if (roleEl) {
+            roleEl.innerHTML = '<option value="">All Roles</option>';
+            roleEl.value = '';
+        }
+        document.getElementById('scheduleTitle').innerText = 'Schedule';
+        document.getElementById('scheduleContainer')?.classList.add('d-none');
+        document.getElementById('viewModeIndicator').innerText = 'Ready';
+        document.getElementById('scheduleHoursSummary')?.classList.add('d-none');
+        const lblHours = document.getElementById('lbl_totalHours');
+        if (lblHours) lblHours.innerHTML = '';
+    });
 
     const roleSelect = document.getElementById('sch_role');
     if (roleSelect) {
@@ -910,26 +1048,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             setDateRange(start, end);
         } else {
-            const today = new Date();
-            const day = today.getDay() || 7; 
-            const start = new Date(today);
-            start.setHours(-24 * (day - 1)); 
-            const end = new Date(start);
-            end.setDate(start.getDate() + 6);
-            
-            setDateRange(start, end);
+            applyDefaultWeekRange();
         }
         
         // Everything is defined, click immediately!
         document.getElementById('btn_loadSchedule').click();
     } else {
-        const today = new Date();
-        const day = today.getDay() || 7;
-        const start = new Date(today);
-        start.setHours(-24 * (day - 1));
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        setDateRange(start, end);
+        applyDefaultWeekRange();
         if (!canSelectAnyPerson && document.getElementById('sch_personId').value) {
             document.getElementById('btn_loadSchedule').click();
         }

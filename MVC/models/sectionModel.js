@@ -83,7 +83,7 @@ function buildSectionQueryPlan(options = {}) {
     pagination: options?.pagination || null,
     sort: options?.sort || null,
     fallback: {
-      defaultSearchFields: ['id', 'name', 'category', 'description'],
+      defaultSearchFields: ['id', 'name', 'category', 'description', 'displayText'],
       dateFields: ['createdAt', 'audit.createDateTime', 'audit.lastUpdateDateTime']
     }
   };

@@ -1,12 +1,34 @@
 const sessionExplorerService = require('../../services/school/sessionExplorerService');
 
+function resLocalSchoolDashboard(res) {
+    return res?.locals?.schoolSectionDashboardHref || '/dashboard/section-nav/SCHOOL';
+}
+
 async function showSessionListPage(req, res) {
     try {
+        const sessionExplorerAccess = await sessionExplorerService.buildSessionExplorerViewer(req);
         res.render('school/session/sessionList', {
-            title: 'Global Session Explorer',
+            title: 'Session Explorer',
+            tableName: 'Session_Explorer',
+            newUrl: 'school/sessions',
             includeModal: true,
+            includeModal_Table: true,
+            print: true,
             user: req.user,
-            actionStateId: req.actionStateId
+            actionStateId: req.actionStateId,
+            sessionExplorerAccess,
+            schoolSectionDashboardHref: resLocalSchoolDashboard(res),
+            searchableFields: [
+                'date',
+                'startTime',
+                'endTime',
+                'className',
+                'classId',
+                'teacherName',
+                'status',
+                'notes',
+                'sessionId'
+            ]
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

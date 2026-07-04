@@ -902,7 +902,7 @@ function assertClassOrgAccess(classData, activeOrgId, reqUser) {
 }
 
 function buildRouteAccessContext(req) {
-    return { scopeId: req?.accessScope || '' };
+    return schoolDataService.buildRouteAccessContext(req);
 }
 
 async function getClassByIdWithOrgCheck(classId, reqUser, accessContext = {}) {
@@ -1228,7 +1228,7 @@ async function enrichCycleRolloverPreviewStudentLabels(preview, user) {
 
 async function showRollingEnrollmentPage(req, res) {
   try {
-    const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user);
 
@@ -1294,7 +1294,7 @@ async function listClassEnrollmentPeriods(req, res) {
   try {
     const classId = toPublicId(req.params.classId || req.query.classId || req.query.id || '');
     if (!classId) throw new Error('classId is required.');
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
     const periods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user);
     let rows = (Array.isArray(periods) ? periods : [])
@@ -1330,7 +1330,7 @@ async function listClassEnrollmentPeriods(req, res) {
 
 async function showCycleRolloverWizard(req, res) {
   try {
-    const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user);
     res.render('school/class/cycleRolloverWizard', {
@@ -1350,7 +1350,7 @@ async function previewCycleRollover(req, res) {
   try {
     const classId = toPublicId(req.params.classId || req.body?.classId || '');
     if (!classId) throw new Error('classId is required.');
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     const preview = await schoolDataService.previewNextClassCycleFromTemplate(classData.id, {
@@ -1462,7 +1462,7 @@ async function assertRollingProgramRegistrationShortcutContext(req, res, next) {
     const classId = toPublicId(req.params?.classId || req.body?.classId || '');
     if (!classId) throw new Error('classId is required.');
 
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     const choices = buildRollingEnrollmentProgramChoices(classData);
@@ -1748,7 +1748,7 @@ async function previewRollingEnrollmentEligibility(req, res) {
     if (!classId) throw new Error('classId is required.');
     if (!studentId) throw new Error('studentId is required.');
 
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     const student = await schoolDataService.getDataById('students', studentId, req.user);
@@ -1855,7 +1855,7 @@ async function previewClassEnrollmentWithTransactions(req, res) {
     const startDate = String(req.body?.startDate || '').trim();
     if (!startDate) throw new Error('startDate is required.');
 
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     const student = await schoolDataService.getDataById('students', studentId, req.user);
@@ -1909,7 +1909,7 @@ async function createClassEnrollmentWithTransactions(req, res) {
   try {
     const classId = toPublicId(req.body?.classId || req.body?.id || req.params?.classId || '');
     if (!classId) throw new Error('classId is required.');
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     const studentIdEarly = toPublicId(req.body?.studentId || '');
@@ -1954,7 +1954,7 @@ async function createClassEnrollmentWithTransactions(req, res) {
       const createdPeriod = result?.period || null;
       let academicLedger = null;
       if (createdPeriod) {
-        const { classData: classAfterCreate } = await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData: classAfterCreate } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         academicLedger = await tryPostAcademicLedgerForRollingClassEnrollment({
           req,
           period: createdPeriod,
@@ -2092,7 +2092,7 @@ async function saveClassEnrollmentDraft(req, res) {
     const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
     if (!period) throw new Error('Enrollment period not found.');
 
-    const { classData } = await getClassByIdWithOrgCheck(period.classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     const currentStatus = String(period?.status || '').trim().toLowerCase();
@@ -2362,7 +2362,7 @@ async function syncAcademicLedgerForEnrollmentPeriod(req, res) {
         if (!periodId) throw new Error('periodId is required.');
         const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
         if (!period) throw new Error('Enrollment period not found.');
-        const { classData } = await getClassByIdWithOrgCheck(period.classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
         assertRollingWorkflowEnabledForClass(req, classData);
 
         const postedIds = Array.isArray(period?.transactionSummary?.postedTransactionIds)
@@ -2444,7 +2444,7 @@ async function approveClassEnrollmentDraft(req, res) {
     const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
     if (!period) throw new Error('Enrollment period not found.');
 
-    const { classData } = await getClassByIdWithOrgCheck(period.classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     const currentStatus = String(period?.status || '').trim().toLowerCase();
@@ -2546,7 +2546,7 @@ async function approveClassEnrollmentDraft(req, res) {
     }, req.user);
 
     const periodForLedger = updated || period;
-    const { classData: classAfterApprove } = await getClassByIdWithOrgCheck(period.classId, req.user);
+    const { classData: classAfterApprove } = await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
     const academicLedger = await tryPostAcademicLedgerForRollingClassEnrollment({
       req,
       period: periodForLedger,
@@ -2581,7 +2581,7 @@ async function editClassEnrollmentPeriod(req, res) {
     if (!periodId) throw new Error('periodId is required.');
     const periodRow = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
     if (!periodRow) throw new Error('Enrollment period not found.');
-    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     guardKey = idempotencyGuardService.createGuardKey([
@@ -2635,7 +2635,7 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
     if (!periodId) throw new Error('periodId is required.');
     const periodRow = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
     if (!periodRow) throw new Error('Enrollment period not found.');
-    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     guardKey = idempotencyGuardService.createGuardKey([
@@ -2722,7 +2722,7 @@ async function createClassEnrollmentPeriod(req, res) {
   try {
     const classId = toPublicId(req.body?.classId || req.body?.id || req.params?.classId || '');
     if (!classId) throw new Error('classId is required.');
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     guardKey = idempotencyGuardService.createGuardKey([
@@ -2762,7 +2762,7 @@ async function createClassEnrollmentPeriod(req, res) {
     const createdPeriod = result?.period || null;
     let academicLedger = null;
     if (createdPeriod && String(createdPeriod.status || '').trim().toLowerCase() === 'active') {
-      const { classData: classAfterCreate } = await getClassByIdWithOrgCheck(classId, req.user);
+      const { classData: classAfterCreate } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
       academicLedger = await tryPostAcademicLedgerForRollingClassEnrollment({
         req,
         period: createdPeriod,
@@ -2794,7 +2794,7 @@ async function closeClassEnrollmentPeriod(req, res) {
     if (!periodId) throw new Error('periodId is required.');
     const periodRow = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
     if (!periodRow) throw new Error('Enrollment period not found.');
-    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     guardKey = idempotencyGuardService.createGuardKey([
@@ -2840,7 +2840,7 @@ async function reopenClassEnrollmentPeriod(req, res) {
     if (!periodId) throw new Error('periodId is required.');
     const periodRow = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
     if (!periodRow) throw new Error('Enrollment period not found.');
-    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     guardKey = idempotencyGuardService.createGuardKey([
@@ -2891,7 +2891,7 @@ async function checkClassEnrollmentPeriodOverlap(req, res) {
   try {
     const classId = toPublicId(req.body?.classId || req.params?.classId || '');
     if (!classId) throw new Error('classId is required.');
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
     const result = await schoolDataService.checkClassEnrollmentPeriodOverlap({
       classId: classData.id,
@@ -2915,7 +2915,7 @@ async function evaluateClassEnrollmentReentry(req, res) {
   try {
     const classId = toPublicId(req.body?.classId || req.params?.classId || '');
     if (!classId) throw new Error('classId is required.');
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
     const result = await schoolDataService.evaluateClassEnrollmentReentryRules({
       classId: classData.id,
@@ -2938,7 +2938,7 @@ async function closeClassCycle(req, res) {
   try {
     const classId = toPublicId(req.params?.classId || req.body?.classId || '');
     if (!classId) throw new Error('classId is required.');
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     guardKey = idempotencyGuardService.createGuardKey([
@@ -2980,7 +2980,7 @@ async function createNextClassCycleFromTemplate(req, res) {
   try {
     const classId = toPublicId(req.params?.classId || req.body?.classId || '');
     if (!classId) throw new Error('classId is required.');
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
     const input = {
@@ -3025,8 +3025,8 @@ async function carryForwardClassCycleStudents(req, res) {
     const fromClassId = toPublicId(req.body?.fromClassId || '');
     const toClassId = toPublicId(req.body?.toClassId || '');
     if (!fromClassId || !toClassId) throw new Error('fromClassId and toClassId are required.');
-    const { classData: fromClass } = await getClassByIdWithOrgCheck(fromClassId, req.user);
-    const { classData: toClass } = await getClassByIdWithOrgCheck(toClassId, req.user);
+    const { classData: fromClass } = await getClassByIdWithOrgCheck(fromClassId, req.user, buildRouteAccessContext(req));
+    const { classData: toClass } = await getClassByIdWithOrgCheck(toClassId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, fromClass);
     assertRollingWorkflowEnabledForClass(req, toClass);
 
@@ -3068,8 +3068,8 @@ async function splitClassEnrollmentPeriodsForCycleBoundary(req, res) {
     const fromClassId = toPublicId(req.body?.fromClassId || '');
     const toClassId = toPublicId(req.body?.toClassId || '');
     if (!fromClassId || !toClassId) throw new Error('fromClassId and toClassId are required.');
-    const { classData: fromClass } = await getClassByIdWithOrgCheck(fromClassId, req.user);
-    const { classData: toClass } = await getClassByIdWithOrgCheck(toClassId, req.user);
+    const { classData: fromClass } = await getClassByIdWithOrgCheck(fromClassId, req.user, buildRouteAccessContext(req));
+    const { classData: toClass } = await getClassByIdWithOrgCheck(toClassId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, fromClass);
     assertRollingWorkflowEnabledForClass(req, toClass);
 
@@ -3109,7 +3109,7 @@ async function splitClassEnrollmentPeriodsForCycleBoundary(req, res) {
 async function showEnrollmentOutcomesPage(req, res) {
     try {
         const classId = toPublicId(req.params.id);
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         assertRollingWorkflowEnabledForClass(req, classData);
         if (getClassRegistrationModeKey(classData) !== 'rolling') {
             return res.redirect(`/school/classes/${encodeURIComponent(classId)}/final-grades`);
@@ -3167,7 +3167,7 @@ async function saveEnrollmentCompletionDecision(req, res) {
         if (!periodId) throw new Error('periodId is required.');
         const periodRow = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
         if (!periodRow) throw new Error('Enrollment period not found.');
-        const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
         assertRollingWorkflowEnabledForClass(req, classData);
         if (getClassRegistrationModeKey(classData) !== 'rolling') {
             return res.status(400).json({ status: 'error', message: 'Completion decisions apply to rolling classes only.' });

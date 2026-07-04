@@ -4,7 +4,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { runByRepositoryBackend } = requireCoreModule('MVC/repositories/backend/repositoryBackendSelector');
 const { getMongoCollection } = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');
 const { normalizeMongoDocument } = requireCoreModule('MVC/repositories/backend/mongoRepositoryUtils');
-const { buildSchoolListScope } = require('./schoolDataScopeBuilder');
+const { buildSchoolListScope, SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { normalizeQueryOptions } = requireCoreModule('MVC/utils/queryOptionsAdapter');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
@@ -119,6 +119,40 @@ function buildEntityScope(entityType, requestingUser, accessContext = {}) {
   return buildSchoolListScope(requestingUser, { allowSystemFallback, accessContext });
 }
 
+async function resolveLinkedAccountIdsForUser(requestingUser, scope = {}) {
+  const personId = toPublicId(scope?.personId);
+  if (!personId) return [];
+  const orgScope = buildSchoolListScope(requestingUser, { accessContext: { scopeId: 'SCP_ORG' } });
+  const personQuery = { personId__eq: personId, page: 1, limit: 100 };
+  const linkedIds = new Set();
+  const [teachers, staff, students] = await Promise.all([
+    schoolRepositories.teachers.list({ query: personQuery, scope: orgScope }),
+    schoolRepositories.staff.list({ query: personQuery, scope: orgScope }),
+    schoolRepositories.students.list({ query: personQuery, scope: orgScope })
+  ]);
+  (Array.isArray(teachers) ? teachers : []).forEach((row) => {
+    const accountId = toPublicId(row?.teacherAccountId);
+    if (accountId) linkedIds.add(accountId);
+  });
+  (Array.isArray(staff) ? staff : []).forEach((row) => {
+    const accountId = toPublicId(row?.staffAccountId);
+    if (accountId) linkedIds.add(accountId);
+  });
+  (Array.isArray(students) ? students : []).forEach((row) => {
+    const accountId = toPublicId(row?.studentAccountId);
+    if (accountId) linkedIds.add(accountId);
+  });
+  return Array.from(linkedIds);
+}
+
+async function buildEntityScopeForRequest(entityType, requestingUser, accessContext = {}) {
+  const scope = buildEntityScope(entityType, requestingUser, accessContext);
+  if (String(entityType || '') === 'schoolAccounts' && scope.scopeMode === SCOPE_MODES.ASSIGNMENT) {
+    scope.linkedAccountIds = await resolveLinkedAccountIdsForUser(requestingUser, scope);
+  }
+  return scope;
+}
+
 const schoolDataService = {
   fetchData: async (entityType, query, requestingUser, accessContext = {}) => {
     const config = resolveEntityConfig(entityType);
@@ -126,7 +160,7 @@ const schoolDataService = {
 
     return await config.repository.list({
       query: normalizeQueryOptions(query),
-      scope: buildEntityScope(entityType, requestingUser, accessContext)
+      scope: await buildEntityScopeForRequest(entityType, requestingUser, accessContext)
     });
   },
 
@@ -167,7 +201,7 @@ const schoolDataService = {
         page: 1,
         limit: 1
       }),
-      scope: buildEntityScope(entityType, requestingUser, accessContext)
+      scope: await buildEntityScopeForRequest(entityType, requestingUser, accessContext)
     });
 
     return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
@@ -226,8 +260,8 @@ const schoolDataService = {
   /* ----------------------------------------------------------------
     DIRECT FILE DELEGATES (Ensuring Controller has 0 fs logic)
   ---------------------------------------------------------------- */
-  getClassSessions: async (classId, requestingUser = null) => {
-    const cls = await schoolDataService.getDataById('classes', classId, requestingUser);
+  getClassSessions: async (classId, requestingUser = null, accessContext = null) => {
+    const cls = await schoolDataService.getDataById('classes', classId, requestingUser, accessContext);
     if (!cls) return [];
     return Array.isArray(cls.sessions) ? cls.sessions : [];
   },
@@ -368,7 +402,16 @@ const schoolDataService = {
   getAccessibleFeeDefinitions: async (requestingUser) => schoolDataService.fetchData('feeDefinitions', {}, requestingUser),
   getAccessibleSchoolAccounts: async (requestingUser) => schoolDataService.fetchData('schoolAccounts', {}, requestingUser),
   getAccessibleGlobalTransactions: async (requestingUser) => schoolDataService.fetchData('globalTransactions', {}, requestingUser),
-  getAccessibleTransactionJournals: async (requestingUser) => schoolDataService.fetchData('transactionJournals', {}, requestingUser)
+  getAccessibleTransactionJournals: async (requestingUser) => schoolDataService.fetchData('transactionJournals', {}, requestingUser),
+  buildRouteAccessContext(req) {
+    return { scopeId: req?.accessScope || '' };
+  },
+  fetchDataForRequest(req, entityType, query = {}) {
+    return schoolDataService.fetchData(entityType, query, req?.user, schoolDataService.buildRouteAccessContext(req));
+  },
+  getDataByIdForRequest(req, entityType, id) {
+    return schoolDataService.getDataById(entityType, id, req?.user, schoolDataService.buildRouteAccessContext(req));
+  }
 };
 
 module.exports = schoolDataService;

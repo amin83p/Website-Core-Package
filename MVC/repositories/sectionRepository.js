@@ -48,7 +48,7 @@ async function listMongoSections(options = {}) {
   const query = options?.query || {};
   const scopeFilter = buildSectionScopeFilter(options?.scope || {});
   const queryFilter = buildMongoFilterFromQuery(query, {
-    defaultSearchFields: ['id', 'name', 'description', 'category'],
+    defaultSearchFields: ['id', 'name', 'description', 'category', 'displayText'],
     dateFields: ['createdAt', 'audit.createDateTime', 'audit.lastUpdateDateTime']
   });
   const filter = combineMongoFilters(scopeFilter, queryFilter);
@@ -100,7 +100,7 @@ const sectionRepository = {
         const collection = getMongoCollection('sections');
         const scopeFilter = buildSectionScopeFilter(options?.scope || {});
         const queryFilter = buildMongoFilterFromQuery(query, {
-          defaultSearchFields: ['id', 'name', 'description', 'category'],
+          defaultSearchFields: ['id', 'name', 'description', 'category', 'displayText'],
           dateFields: ['createdAt', 'audit.createDateTime', 'audit.lastUpdateDateTime']
         });
         const filter = combineMongoFilters(scopeFilter, queryFilter);

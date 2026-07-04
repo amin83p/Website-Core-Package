@@ -28,6 +28,10 @@ const STAFF_DELETE_FOOTPRINT_RULES = Object.freeze([
 ]);
 const STAFF_DELETE_MAX_FOOTPRINT_SAMPLE = 5;
 
+function routeAccess(req) {
+  return dataService.buildRouteAccessContext(req);
+}
+
 function getActiveOrgIdOrThrow(reqUser) {
   return getActiveOrgIdOrThrowShared(reqUser);
 }
@@ -361,19 +365,19 @@ async function createStaffSubAccount({ staff, person, accessibleAccounts, reqUse
   return await dataService.addData('schoolAccounts', accountPayload, reqUser, options);
 }
 
-async function archiveLinkedStaffAccount(staff, reqUser) {
+async function archiveLinkedStaffAccount(staff, reqUser, accessContext = {}) {
   const linkedAccountId = String(staff?.staffAccountId || '').trim();
   if (!linkedAccountId) return null;
-  const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser);
+  const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser, accessContext);
   if (!account) return null;
   if (String(account.status || '').toLowerCase() === 'archived') return account;
   return await dataService.updateData('schoolAccounts', linkedAccountId, { ...account, status: 'archived', allowPost: false }, reqUser);
 }
 
-async function recoverLinkedStaffAccount(staff, reqUser) {
+async function recoverLinkedStaffAccount(staff, reqUser, accessContext = {}) {
   const linkedAccountId = String(staff?.staffAccountId || '').trim();
   if (!linkedAccountId) return null;
-  const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser);
+  const account = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser, accessContext);
   if (!account) return null;
   if (String(account.status || '').toLowerCase() !== 'archived') return account;
   return await dataService.updateData('schoolAccounts', linkedAccountId, { ...account, status: 'active', allowPost: true }, reqUser);
@@ -529,12 +533,12 @@ exports.listStaff = async (req, res) => {
       delete fetchQuery.status;
     }
 
-    const allStaff = await dataService.fetchData('staff', fetchQuery, req.user);
+    const allStaff = await dataService.fetchData('staff', fetchQuery, req.user, routeAccess(req));
     const personById = await schoolPersonAccessService.buildPersonByIdMap({
       reqUser: req.user,
       personIds: (Array.isArray(allStaff) ? allStaff : []).map((staff) => staff.personId)
     });
-    const departments = await dataService.fetchData('departments', {}, req.user);
+    const departments = await dataService.fetchData('departments', {}, req.user, routeAccess(req));
 
     const deptById = new Map((departments || []).map((d) => [String(d.id), d.name || d.id]));
     const enriched = allStaff.map((staff) => {
@@ -592,12 +596,12 @@ exports.listArchivedStaff = async (req, res) => {
     delete archivedQuery.q;
     delete archivedQuery.type;
     delete archivedQuery.searchFields;
-    const allStaff = await dataService.fetchData('staff', archivedQuery, req.user);
+    const allStaff = await dataService.fetchData('staff', archivedQuery, req.user, routeAccess(req));
     const personById = await schoolPersonAccessService.buildPersonByIdMap({
       reqUser: req.user,
       personIds: (Array.isArray(allStaff) ? allStaff : []).map((staff) => staff.personId)
     });
-    const departments = await dataService.fetchData('departments', {}, req.user);
+    const departments = await dataService.fetchData('departments', {}, req.user, routeAccess(req));
     const deptById = new Map((departments || []).map((d) => [String(d.id), d.name || d.id]));
 
     const enriched = allStaff.map((staff) => {
@@ -650,7 +654,7 @@ exports.showForm = async (req, res) => {
     let personOrganizations = [];
 
     if (isEdit) {
-      staff = await dataService.getDataById('staff', req.params.id, req.user);
+      staff = await dataService.getDataById('staff', req.params.id, req.user, routeAccess(req));
       if (!staff) throw new Error('Staff not found.');
       assertStaffOrgAccess(staff, activeOrgId, req.user);
       const person = await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: staff.personId });
@@ -661,7 +665,7 @@ exports.showForm = async (req, res) => {
     }
 
     const [departments, organizations] = await Promise.all([
-      dataService.fetchData('departments', {}, req.user),
+      dataService.fetchData('departments', {}, req.user, routeAccess(req)),
       dataServiceGlobal.fetchData('organizations', {}, req.user)
     ]);
     const organizationLookup = {};
@@ -731,7 +735,7 @@ exports.saveStaff = async (req, res) => {
 
     let existingStaff = null;
     if (id) {
-      existingStaff = await dataService.getDataById('staff', id, req.user);
+      existingStaff = await dataService.getDataById('staff', id, req.user, routeAccess(req));
       if (!existingStaff) throw new Error('Staff not found.');
       assertStaffOrgAccess(existingStaff, activeOrgId, req.user);
     }
@@ -901,7 +905,7 @@ exports.deleteStaff = async (req, res) => {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Staff delete is already in progress. Please wait.')) return;
 
-    const staff = await dataService.getDataById('staff', req.params.id, req.user);
+    const staff = await dataService.getDataById('staff', req.params.id, req.user, routeAccess(req));
     if (!staff) throw new Error('Staff not found.');
     assertStaffOrgAccess(staff, activeOrgId, req.user);
 
@@ -1054,7 +1058,7 @@ exports.archiveStaff = async (req, res) => {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Staff archive is already in progress. Please wait.')) return;
 
-    const staff = await dataService.getDataById('staff', req.params.id, req.user);
+    const staff = await dataService.getDataById('staff', req.params.id, req.user, routeAccess(req));
     if (!staff) throw new Error('Staff not found.');
     assertStaffOrgAccess(staff, activeOrgId, req.user);
 
@@ -1077,7 +1081,7 @@ exports.archiveStaff = async (req, res) => {
       req.user
     );
     if (archivedStaff?.staffAccountId) {
-      await archiveLinkedStaffAccount(archivedStaff, req.user);
+      await archiveLinkedStaffAccount(archivedStaff, req.user, routeAccess(req));
     }
 
     const payloadOut = {
@@ -1112,7 +1116,7 @@ exports.recoverStaff = async (req, res) => {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Staff recovery is already in progress. Please wait.')) return;
 
-    const staff = await dataService.getDataById('staff', req.params.id, req.user);
+    const staff = await dataService.getDataById('staff', req.params.id, req.user, routeAccess(req));
     if (!staff) throw new Error('Staff not found.');
     assertStaffOrgAccess(staff, activeOrgId, req.user);
 
@@ -1126,7 +1130,7 @@ exports.recoverStaff = async (req, res) => {
       { ...staff, status: 'Active' },
       req.user
     );
-    await recoverLinkedStaffAccount(restoredStaff, req.user);
+    await recoverLinkedStaffAccount(restoredStaff, req.user, routeAccess(req));
 
     const payloadOut = {
       status: 'success',

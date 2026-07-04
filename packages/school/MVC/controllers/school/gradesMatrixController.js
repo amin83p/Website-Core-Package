@@ -208,6 +208,7 @@ async function showGradesMatrixPage(req, res) {
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId,
+      tableName: 'Grades_Matrix',
       initialClassId,
       initialClassName,
       initialStartDate,

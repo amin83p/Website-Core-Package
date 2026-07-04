@@ -513,6 +513,39 @@ document.addEventListener('DOMContentLoaded', () => {
     if (adminCheckbox) adminCheckbox.addEventListener('change', onAdminAccessChange);
   }
 
+  function getSectionDisplayName(sec) {
+    const sys = systemSections.find(s => s.id === sec.sectionId);
+    return sys ? sys.name : sec.sectionId;
+  }
+
+  function showSectionDetailPlaceholder() {
+    document.getElementById('sectionDetailPanel').innerHTML = `<div class="h-100 d-flex flex-column align-items-center justify-content-center text-muted p-5"><i class="bi bi-layout-sidebar-inset fs-1 opacity-25 mb-2"></i><div>Select a section from the list to configure permissions.</div></div>`;
+  }
+
+  async function removeSectionAtIndex(idx) {
+    if (!Number.isFinite(idx) || idx < 0 || idx >= configured.length) return;
+    const name = getSectionDisplayName(configured[idx]);
+    const result = await showMessageModal({
+      title: 'Remove Section?',
+      message: `Remove <b>${name}</b>?`,
+      icon: 'warning',
+      buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: 'Remove', class: 'btn-danger' }]
+    });
+    if (result !== 'Remove') return;
+
+    configured.splice(idx, 1);
+    if (activeIndex === idx) {
+      activeIndex = -1;
+      showSectionDetailPlaceholder();
+    } else if (activeIndex > idx) {
+      activeIndex -= 1;
+    }
+    renderSidebar();
+    if (activeIndex > -1 && configured[activeIndex]) {
+      renderDetail();
+    }
+  }
+
   function renderSidebar() {
      const list = document.getElementById('sectionsSidebarList');
      list.innerHTML = '';
@@ -526,15 +559,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const item = document.createElement('div');
         item.className = `list-group-item list-group-item-action border-0 border-bottom py-3 px-3 cursor-pointer sidebar-item ${idx === activeIndex ? 'bg-primary-subtle text-primary border-primary-subtle' : ''}`;
         
-        const sys = systemSections.find(s => s.id === sec.sectionId);
-        const name = sys ? sys.name : sec.sectionId;
+        const name = getSectionDisplayName(sec);
         const opCount = (sec.operations || []).length;
         const isAdmin = sec.adminAccess === true;
 
         item.innerHTML = `
-           <div class="d-flex w-100 justify-content-between align-items-center">
-              <span class="fw-bold text-truncate" style="max-width: 180px;">${name}</span>
-              ${idx === activeIndex ? '<i class="bi bi-chevron-right small"></i>' : ''}
+           <div class="d-flex w-100 justify-content-between align-items-center gap-1">
+              <span class="fw-bold text-truncate flex-grow-1 min-w-0 sidebar-section-name" title="${name}">${name}</span>
+              <button type="button" class="btn btn-sm p-0 border-0 text-danger flex-shrink-0 sidebar-remove-section" data-index="${idx}" aria-label="Remove ${name}" title="Remove section">
+                <i class="bi bi-x-circle-fill"></i>
+              </button>
+              ${idx === activeIndex ? '<i class="bi bi-chevron-right small flex-shrink-0"></i>' : ''}
            </div>
            <div class="d-flex justify-content-between align-items-center mt-1">
               <small class="text-muted" style="font-size: 0.75rem;">ID: ${sec.sectionId}</small>
@@ -544,6 +579,13 @@ document.addEventListener('DOMContentLoaded', () => {
            </div>
         `;
         item.addEventListener('click', () => { activeIndex = idx; renderSidebar(); renderDetail(); });
+        const removeBtn = item.querySelector('.sidebar-remove-section');
+        if (removeBtn) {
+          removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeSectionAtIndex(parseInt(removeBtn.dataset.index, 10));
+          });
+        }
         list.appendChild(item);
      });
      const term = document.getElementById('sectionSearch').value.toLowerCase();
@@ -653,10 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
          });
      });
 
-     document.getElementById('removeSecBtn').addEventListener('click', async () => {
-        const result = await showMessageModal({ title: 'Remove Section?', message: `Remove <b>${name}</b>?`, icon: 'warning', buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: 'Remove', class: 'btn-danger' }] });
-        if (result === 'Remove') { configured.splice(activeIndex, 1); activeIndex = -1; renderSidebar(); }
-     });
+     document.getElementById('removeSecBtn').addEventListener('click', () => removeSectionAtIndex(activeIndex));
 
      panel.querySelectorAll('.op-check').forEach(chk => {
         chk.addEventListener('change', (e) => {
@@ -830,6 +869,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 <style>
   .cursor-pointer { cursor: pointer; }
+  .sidebar-section-name { min-width: 0; }
   .list-group-item.active { background-color: var(--bs-primary-bg-subtle) !important; color: var(--bs-primary-text-emphasis) !important; border-color: var(--bs-primary-border-subtle) !important; }
   #sectionsSidebarList::-webkit-scrollbar { width: 5px; }
   #sectionsSidebarList::-webkit-scrollbar-track { background: #f1f1f1; }

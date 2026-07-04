@@ -1,164 +1,223 @@
 <style>
-    /* Use the same timeline CSS base */
-    .timeline-container { position: relative; border: 1px solid #dee2e6; border-radius: 6px; background: #fff; margin-bottom: 1.5rem; overflow: hidden; }
+    .schedule-shell .filter-panel {
+        background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
+        border: 1px solid #dce9ff;
+        border-radius: 14px;
+    }
+    .schedule-shell .range-chip.active {
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+    }
+    .timeline-container { position: relative; border: 1px solid #dee2e6; border-radius: 12px; background: #fff; margin-bottom: 1.5rem; overflow: hidden; box-shadow: 0 0.25rem 0.75rem rgba(15, 23, 42, 0.06); }
     .timeline-header { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 8px 15px; font-weight: bold; display: flex; justify-content: space-between; }
     .timeline-body { position: relative; min-height: 50px; background-image: repeating-linear-gradient(to right, transparent, transparent calc(6.66% - 1px), #f1f3f5 calc(6.66% - 1px), #f1f3f5 6.66%); }
     .hour-markers { display: flex; position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
     .hour-marker { flex: 1; border-right: 1px dashed #e9ecef; position: relative; }
     .hour-label { position: absolute; bottom: -20px; left: -10px; font-size: 0.65rem; color: #adb5bd; }
-    
-    .event-block { position: absolute; height: 36px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-size: 0.7rem; line-height: 1.1; padding: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: transform 0.1s; color: #fff; z-index: 10; cursor: pointer; border: 1px solid rgba(0,0,0,0.1);}
+    .event-block { position: absolute; height: 36px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-size: 0.7rem; line-height: 1.1; padding: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: transform 0.1s; color: #fff; z-index: 10; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); }
     .event-block:hover { transform: scale(1.02); z-index: 20; }
-
-    .single-day-list .day-card {
-        border: 1px solid #dee2e6;
-        border-radius: 10px;
+    .single-day-list .day-card { border: 1px solid #dee2e6; border-radius: 12px; background: #fff; margin-bottom: 0.9rem; overflow: hidden; box-shadow: 0 0.2rem 0.6rem rgba(15, 23, 42, 0.05); }
+    .single-day-list .day-card-header { padding: 0.65rem 0.9rem; border-bottom: 1px solid #e9ecef; background: #f8f9fa; font-weight: 700; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+    .single-day-list .day-card-header.conflict { background: #f8d7da; color: #842029; }
+    .single-day-list .event-row { display: grid; grid-template-columns: 170px 1fr auto; gap: 0.85rem; align-items: start; padding: 0.7rem 0.9rem; border-bottom: 1px dashed #e9ecef; }
+    .single-day-list .event-row:last-child { border-bottom: none; }
+    .single-day-list .event-row.overlap { background: #fff5f5; }
+    .single-day-list .event-time { font-weight: 700; color: #0d6efd; white-space: nowrap; }
+    .single-day-list .event-main-title { font-weight: 700; line-height: 1.2; word-break: break-word; }
+    .single-day-list .event-meta-line { margin-top: 0.25rem; font-size: 0.8rem; color: #6c757d; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .single-day-list .person-chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(0, 0, 0, 0.15); color: #fff; }
+    .single-day-list .event-actions { display: flex; align-items: center; gap: 0.5rem; }
+    .single-day-list .event-open { white-space: nowrap; }
+    @media (max-width: 768px) {
+        .single-day-list .event-row { grid-template-columns: 1fr; }
+        .single-day-list .event-actions { justify-content: flex-start; }
+    }
+    .person-summary-tile {
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
         background: #fff;
-        margin-bottom: 0.9rem;
-        overflow: hidden;
+        padding: 0.85rem 1rem;
+        height: 100%;
+        box-shadow: 0 0.15rem 0.5rem rgba(15, 23, 42, 0.05);
     }
-    .single-day-list .day-card-header {
-        padding: 0.65rem 0.9rem;
-        border-bottom: 1px solid #e9ecef;
-        background: #f8f9fa;
-        font-weight: 700;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 0.75rem;
+    .person-summary-dot {
+        width: 0.75rem;
+        height: 0.75rem;
+        border-radius: 999px;
+        flex-shrink: 0;
     }
-    .single-day-list .day-card-header.conflict {
-        background: #f8d7da;
-        color: #842029;
-    }
-    .single-day-list .event-row {
-        display: grid;
-        grid-template-columns: 170px 1fr auto;
-        gap: 0.85rem;
-        align-items: start;
-        padding: 0.7rem 0.9rem;
-        border-bottom: 1px dashed #e9ecef;
-    }
-    .single-day-list .event-row:last-child {
-        border-bottom: none;
-    }
-    .single-day-list .event-row.overlap {
-        background: #fff5f5;
-    }
-    .single-day-list .event-time {
-        font-weight: 700;
-        color: #0d6efd;
-        white-space: nowrap;
-    }
-    .single-day-list .event-main-title {
-        font-weight: 700;
-        line-height: 1.2;
-        word-break: break-word;
-    }
-    .single-day-list .event-meta-line {
-        margin-top: 0.25rem;
-        font-size: 0.8rem;
-        color: #6c757d;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        align-items: center;
-    }
-    .single-day-list .person-chip {
+    .selected-person-chip {
         display: inline-flex;
         align-items: center;
+        gap: 0.35rem;
         border-radius: 999px;
-        padding: 0.1rem 0.55rem;
-        font-size: 0.72rem;
-        font-weight: 700;
-        border: 1px solid rgba(0, 0, 0, 0.15);
+        padding: 0.25rem 0.65rem;
+        font-size: 0.82rem;
+        font-weight: 600;
         color: #fff;
+        margin: 0.15rem;
     }
-    .single-day-list .event-actions {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+    .selected-person-chip .chip-remove {
+        cursor: pointer;
+        opacity: 0.85;
+        line-height: 1;
     }
-    .single-day-list .event-open {
-        white-space: nowrap;
-    }
-    @media (max-width: 768px) {
-        .single-day-list .event-row {
-            grid-template-columns: 1fr;
-        }
-        .single-day-list .event-actions {
-            justify-content: flex-start;
-        }
-    }
-    
-    .chip { display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.85rem; font-weight: bold; color: #fff; margin-right: 0.5rem; margin-bottom: 0.5rem; }
-    .chip-close { margin-left: 0.5rem; cursor: pointer; opacity: 0.7; }
-    .chip-close:hover { opacity: 1; }
+    .selected-person-chip .chip-remove:hover { opacity: 1; }
 </style>
 
-<div class="sections-page">
-  <div class="d-flex align-items-center justify-content-between mb-4">
-    <h1 class="page-heading size-md m-0"><i class="bi bi-layers me-2"></i> Global Schedule Comparison</h1>
-    <div>
-        <a href="/school/schedules" class="btn btn-filled btn-secondary btn-md me-2 mb-2"><i class="bi bi-person"></i> Single Person</a>
-        <a href="/school/classes" class="btn btn-filled btn-secondary btn-md me-2 mb-2"><i class="bi bi-arrow-left"></i> Classes</a>
-        <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2">
-            <i class="bi bi-speedometer2 me-1"></i> Dashboard
-        </a>
+<%
+  const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
+    ? schoolSectionDashboardHref
+    : '/dashboard/section-nav/SCHOOL';
+%>
 
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName: typeof tableName !== 'undefined' ? tableName : 'Global_Schedule_Comparison',
+  btn_export: false,
+  print: false,
+  headerManageBtns: [
+    '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
+  ],
+  manageBtns: [
+    '<a href="/school/schedules" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-person me-1"></i> Single Person Viewer</a>',
+    '<a href="/school/classes" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-collection me-1"></i> Classes</a>'
+  ]
+}) %>
+
+<div class="schedule-shell">
+  <p class="text-muted small mb-3">Compare schedules for multiple teachers, students, or staff side by side. Select a role, pick people, choose a date range, then apply.</p>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+      <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Comparison</div>
+      <button
+        id="globalScheduleFilterToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#globalScheduleFilterCollapse"
+        aria-expanded="true"
+        aria-controls="globalScheduleFilterCollapse"
+        aria-label="Close filters">
+        <i id="globalScheduleFilterToggleIcon" class="bi bi-chevron-up"></i>
+      </button>
+    </div>
+    <div class="collapse show" id="globalScheduleFilterCollapse">
+      <div class="card-body filter-panel p-3" id="globalScheduleFilterForm">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Role for Picker</label>
+            <div class="d-flex flex-wrap gap-2" id="globalRoleTypeWrap">
+              <input type="radio" class="btn-check" name="global_roleType" id="global_typeTeacher" value="teacher" checked>
+              <label class="btn btn-outline-primary btn-sm" for="global_typeTeacher">Teacher</label>
+              <input type="radio" class="btn-check" name="global_roleType" id="global_typeStudent" value="student">
+              <label class="btn btn-outline-primary btn-sm" for="global_typeStudent">Student</label>
+              <input type="radio" class="btn-check" name="global_roleType" id="global_typeStaff" value="staff">
+              <label class="btn btn-outline-primary btn-sm" for="global_typeStaff">Staff</label>
+            </div>
+          </div>
+          <div class="col-lg-8 col-md-7">
+            <label class="form-label" for="globalSelectedSummary">Selected People</label>
+            <div class="input-group">
+              <input type="text" id="globalSelectedSummary" class="form-control bg-white" placeholder="No people selected" readonly>
+              <button type="button" class="btn btn-outline-primary" id="btn_openGlobalPersonPicker" title="Select people">
+                <i class="bi bi-people-fill"></i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="btn_clearGlobalPersons" title="Clear all">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div id="selectedPersonsChips" class="mt-2 d-flex flex-wrap align-items-center border rounded bg-white p-2 min-h-42" style="min-height: 42px;">
+              <span class="text-muted small" id="emptyChipsMsg">Use the picker to add people for comparison.</span>
+            </div>
+          </div>
+          <div class="col-lg-2 col-md-3">
+            <label class="form-label" for="sch_startDate">Start Date</label>
+            <input type="date" id="sch_startDate" class="form-control size-md">
+          </div>
+          <div class="col-lg-2 col-md-2">
+            <label class="form-label" for="sch_endDate">End Date</label>
+            <input type="date" id="sch_endDate" class="form-control size-md">
+          </div>
+          <div class="col-lg-4 col-md-4">
+            <label class="form-label" for="sch_hasCases">Cases</label>
+            <div class="form-check form-switch pt-2">
+              <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
+              <label class="form-check-label small fw-semibold" for="sch_hasCases">With cases only</label>
+            </div>
+          </div>
+          <div class="col-lg-8 col-md-8 d-flex justify-content-lg-end gap-2 align-items-end">
+            <button type="button" id="btn_resetGlobalSchedule" class="btn btn-outline-secondary btn-md">Reset</button>
+            <button type="button" id="btn_loadSchedule" class="btn btn-filled btn-primary btn-md">
+              <i class="bi bi-funnel me-1"></i> Apply
+            </button>
+          </div>
+        </div>
+
+        <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
+          <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="day">Today</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip active" data-range="week">This Week</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="month">This Month</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body bg-light rounded">
-            
-            <div class="mb-3">
-                <label class="form-label fw-bold">Select Teachers to Compare</label>
-                <div class="d-flex align-items-start gap-2">
-                    <button type="button" class="btn btn-primary btn-sm" id="btn_addPerson"><i class="bi bi-plus-lg me-1"></i> Add Teacher</button>
-                    <div id="selectedPersonsContainer" class="d-flex flex-wrap flex-grow-1 align-items-center border bg-white rounded p-2 min-vh-25" style="min-height: 42px;">
-                        <span class="text-muted small ms-2" id="emptyChipsMsg">No one selected...</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row align-items-end g-3 mb-3">
-                <div class="col-md-2">
-                    <label class="form-label fw-bold">Start Date</label>
-                    <input type="date" id="sch_startDate" class="form-control">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold">End Date</label>
-                    <input type="date" id="sch_endDate" class="form-control">
-                </div>
-                <div class="col-md-4 d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range flex-grow-1" data-range="day">Today</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range flex-grow-1" data-range="week">This Week</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range flex-grow-1" data-range="month">This Month</button>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold">Cases</label>
-                    <div class="form-check form-switch pt-2">
-                        <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
-                        <label class="form-check-label small fw-semibold" for="sch_hasCases">With cases only</label>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <button type="button" id="btn_loadSchedule" class="btn btn-success w-100 fw-bold">Load</button>
-                </div>
-            </div>
-        </div>
+  <div id="scheduleContainer" class="d-none">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white border-bottom py-2 px-3">
+        <div class="fw-bold text-dark"><i class="bi bi-clock-history me-2"></i>Timesheet Hours Summary</div>
+      </div>
+      <div class="card-body p-3">
+        <div class="row g-3" id="personSummariesRow"></div>
+        <div class="small text-muted mt-2" id="personSummariesTotal"></div>
+      </div>
     </div>
 
-    <div id="scheduleContainer" class="d-none">
-        <div id="visualDisplayArea" class="px-2 pb-5" style="max-height: 800px; overflow-y: auto;"></div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2 py-2 px-3">
+        <div class="fw-bold text-dark"><i class="bi bi-calendar3-week me-2"></i>Schedule Comparison</div>
+        <span class="badge bg-light text-secondary border" id="viewModeIndicator">Ready</span>
+      </div>
+      <div class="card-body p-2 p-md-3">
+        <div id="visualDisplayArea" style="max-height: 800px; overflow-y: auto;"></div>
+      </div>
     </div>
+  </div>
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
+<%- include('partials/tablePages-end') %>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    function bindCollapseToggle(options = {}) {
+        const collapseEl = document.getElementById(String(options.collapseId || ''));
+        const buttonEl = document.getElementById(String(options.buttonId || ''));
+        const iconEl = document.getElementById(String(options.iconId || ''));
+        if (!collapseEl || !buttonEl || !iconEl) return;
+        const setState = (open) => {
+            iconEl.className = open ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+            buttonEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+            buttonEl.setAttribute('aria-label', open ? 'Close filters' : 'Open filters');
+        };
+        setState(collapseEl.classList.contains('show'));
+        collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+        collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+    bindCollapseToggle({
+        collapseId: 'globalScheduleFilterCollapse',
+        buttonId: 'globalScheduleFilterToggleBtn',
+        iconId: 'globalScheduleFilterToggleIcon'
+    });
+
     function escapeHtml(value) {
         return String(value || '')
             .replace(/&/g, '&amp;')
@@ -178,15 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
             muted: 'bg-secondary-subtle text-secondary-emphasis border-secondary-subtle'
         };
         const label = caseSummary.badgeLabel || `${caseSummary.totalCount || 0} case(s)`;
-        const title = [
-            `Cases: ${caseSummary.totalCount || 0}`,
-            `Active: ${caseSummary.activeCount || 0}`,
-            `Urgent: ${caseSummary.urgentCount || 0}`,
-            `Warning: ${caseSummary.warningCount || 0}`,
-            `Info: ${caseSummary.infoCount || 0}`,
-            `Resolved/closed: ${caseSummary.resolvedCount || 0}`
-        ].join(' | ');
-        return `<span class="badge border ms-1 ${classMap[tone] || classMap.muted}" title="${escapeHtml(title)}"><i class="bi bi-exclamation-diamond-fill me-1"></i>${escapeHtml(label)}</span>`;
+        return `<span class="badge border ms-1 ${classMap[tone] || classMap.muted}"><i class="bi bi-exclamation-diamond-fill me-1"></i>${escapeHtml(label)}</span>`;
     }
 
     function buildLifecycleInline(event) {
@@ -205,7 +256,6 @@ document.addEventListener('DOMContentLoaded', () => {
             + '<span class="small text-muted ms-1">Cycle Window: ' + escapeHtml(range) + '</span>';
     }
 
-    // --- Modal-friendly messaging helpers (fallback to alert/confirm if modal isn't available) ---
     const uiAlert = async (message, title = 'Notice') => {
         try {
             if (typeof showMessageModal === 'function') {
@@ -216,96 +266,214 @@ document.addEventListener('DOMContentLoaded', () => {
         alert(message);
     };
 
-    const uiConfirm = async (message, title = 'Confirm') => {
-        try {
-            if (typeof showMessageModal === 'function') {
-                const res = await showMessageModal({ title, message, type: 'confirm', okText: 'Yes', cancelText: 'No' });
-                return !!res;
-            }
-        } catch (e) { /* fall back */ }
-        return confirm(message);
-    };
-    
-    // --- 1. Multi-Select Logic ---
     let selectedPersons = [];
     const colorPalette = ['#0d6efd', '#198754', '#6f42c1', '#fd7e14', '#d63384', '#20c997', '#0dcaf0', '#343a40'];
-    
-    const renderChips = () => {
-        const container = document.getElementById('selectedPersonsContainer');
+
+    function getActiveRoleType() {
+        const checked = document.querySelector('input[name="global_roleType"]:checked');
+        return String(checked?.value || 'teacher').trim().toLowerCase();
+    }
+
+    function roleLabel(role) {
+        const key = String(role || '').trim().toLowerCase();
+        if (key === 'teacher') return 'Teacher';
+        if (key === 'student') return 'Student';
+        if (key === 'staff') return 'Staff';
+        return key ? key.charAt(0).toUpperCase() + key.slice(1) : 'Person';
+    }
+
+    function selectionKey(person) {
+        return `${person.personId}::${person.role}`;
+    }
+
+    function resolvePersonId(item) {
+        return String(item?.personId || item?.id || '').trim();
+    }
+
+    function resolvePersonName(item, fallbackId) {
+        const objectName = item?.name && typeof item.name === 'object'
+            ? `${item.name.first || ''} ${item.name.last || ''}`.trim()
+            : '';
+        return String(
+            item?.displayName
+            || item?.fullName
+            || item?.label
+            || (typeof item?.name === 'string' ? item.name : '')
+            || objectName
+            || `${item?.firstName || ''} ${item?.lastName || ''}`.trim()
+            || fallbackId
+            || ''
+        ).trim();
+    }
+
+    function syncSelectedSummaryInput() {
+        const summaryEl = document.getElementById('globalSelectedSummary');
+        if (!summaryEl) return;
+        if (!selectedPersons.length) {
+            summaryEl.value = '';
+            summaryEl.placeholder = 'No people selected';
+            return;
+        }
+        summaryEl.value = `${selectedPersons.length} person${selectedPersons.length === 1 ? '' : 's'} selected`;
+    }
+
+    function renderChips() {
+        const container = document.getElementById('selectedPersonsChips');
         const emptyMsg = document.getElementById('emptyChipsMsg');
-        
-        container.querySelectorAll('.chip').forEach(c => c.remove());
-        
-        if (selectedPersons.length === 0) {
-            emptyMsg.style.display = 'block';
+        if (!container) return;
+
+        container.querySelectorAll('.selected-person-chip').forEach((chip) => chip.remove());
+
+        if (!selectedPersons.length) {
+            if (emptyMsg) emptyMsg.style.display = 'block';
         } else {
-            emptyMsg.style.display = 'none';
+            if (emptyMsg) emptyMsg.style.display = 'none';
             selectedPersons.forEach((person, index) => {
                 const color = colorPalette[index % colorPalette.length];
-                const chip = document.createElement('div');
-                chip.className = 'chip shadow-sm';
+                const chip = document.createElement('span');
+                chip.className = 'selected-person-chip shadow-sm';
                 chip.style.backgroundColor = color;
-                chip.innerHTML = `${person.name} <i class="bi bi-x-circle-fill chip-close" data-id="${person.id}"></i>`;
+                chip.dataset.key = selectionKey(person);
+                chip.innerHTML = `
+                    ${escapeHtml(person.name)}
+                    <span class="badge bg-light text-dark border">${escapeHtml(roleLabel(person.role))}</span>
+                    <span class="chip-remove" title="Remove"><i class="bi bi-x-circle-fill"></i></span>
+                `;
                 container.appendChild(chip);
             });
         }
-    };
+        syncSelectedSummaryInput();
+    }
 
-    document.getElementById('selectedPersonsContainer').addEventListener('click', (e) => {
-        if (e.target.classList.contains('chip-close')) {
-            const idToRemove = e.target.getAttribute('data-id');
-            selectedPersons = selectedPersons.filter(p => p.id !== idToRemove);
-            renderChips();
+    document.getElementById('selectedPersonsChips')?.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('.chip-remove');
+        if (!removeBtn) return;
+        const chip = removeBtn.closest('.selected-person-chip');
+        const key = chip?.dataset?.key || '';
+        selectedPersons = selectedPersons.filter((person) => selectionKey(person) !== key);
+        renderChips();
+    });
+
+    function openRolePicker() {
+        const role = getActiveRoleType();
+        if (!window.GenericPicker || !window.GenericPickerPresets) {
+            uiAlert('Person picker is not available yet.');
+            return;
         }
-    });
 
-    document.getElementById('btn_addPerson').addEventListener('click', () => {
-        GenericPicker.open(GenericPickerPresets.person({
-            title: 'Add Teacher to Comparison',
-            icon: 'bi-person-plus',
-            apiEndpoint: '/school/identity/api/persons?allowedSchoolRoles=teacher',
-            placeholder: 'Search teachers...',
-            context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
-            onSelect: (item) => {
-                const teacherId = item.personId || item.id || '';
-                const name = `${item.firstName || ''} ${item.lastName || ''}`.trim() || item.name || teacherId;
-                if (!selectedPersons.find(p => p.id === teacherId)) {
-                    selectedPersons.push({ id: teacherId, name });
-                    renderChips();
+        const pickerContext = GenericPickerContexts?.activeOrganizationScope({ label: 'Active Organization' });
+        const onSelect = (items) => {
+            (Array.isArray(items) ? items : [items]).forEach((item) => {
+                const personId = resolvePersonId(item);
+                if (!personId) return;
+                const person = {
+                    personId,
+                    name: resolvePersonName(item, personId),
+                    role
+                };
+                if (!selectedPersons.some((row) => selectionKey(row) === selectionKey(person))) {
+                    selectedPersons.push(person);
                 }
-            }
-        }));
+            });
+            renderChips();
+        };
+
+        let config;
+        if (role === 'student') {
+            config = GenericPickerPresets.student({
+                title: 'Select Students to Compare',
+                placeholder: 'Search students, select one or more...',
+                multiselect: true,
+                context: pickerContext,
+                onSelect
+            });
+        } else if (role === 'staff') {
+            config = GenericPickerPresets.staff({
+                title: 'Select Staff to Compare',
+                placeholder: 'Search staff, select one or more...',
+                multiselect: true,
+                context: pickerContext,
+                onSelect
+            });
+        } else {
+            config = GenericPickerPresets.teacher({
+                title: 'Select Teachers to Compare',
+                placeholder: 'Search teachers, select one or more...',
+                multiselect: true,
+                context: pickerContext,
+                onSelect
+            });
+        }
+
+        GenericPicker.open(config);
+    }
+
+    document.getElementById('btn_openGlobalPersonPicker')?.addEventListener('click', openRolePicker);
+    document.getElementById('btn_clearGlobalPersons')?.addEventListener('click', () => {
+        selectedPersons = [];
+        renderChips();
+        document.getElementById('scheduleContainer')?.classList.add('d-none');
+        document.getElementById('personSummariesRow').innerHTML = '';
+        document.getElementById('personSummariesTotal').textContent = '';
     });
 
-    // --- 2. Date Controls ---
     const setDateRange = (start, end) => {
         document.getElementById('sch_startDate').value = start.toISOString().split('T')[0];
         document.getElementById('sch_endDate').value = end.toISOString().split('T')[0];
     };
 
-    document.querySelectorAll('.btn-range').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const range = e.target.getAttribute('data-range');
-            const today = new Date();
-            let start = new Date(today); let end = new Date(today);
+    function setActiveRangeChip(range) {
+        document.querySelectorAll('.btn-range.range-chip').forEach((btn) => {
+            btn.classList.toggle('active', btn.getAttribute('data-range') === range);
+        });
+    }
 
-            if (range === 'day') { /* Keep today */ } 
-            else if (range === 'week') {
-                const day = today.getDay() || 7; 
-                if (day !== 1) start.setHours(-24 * (day - 1)); 
+    function applyDefaultWeekRange() {
+        const today = new Date();
+        const day = today.getDay() || 7;
+        const start = new Date(today);
+        start.setHours(-24 * (day - 1));
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        setDateRange(start, end);
+        setActiveRangeChip('week');
+    }
+
+    document.querySelectorAll('.btn-range').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            const range = e.currentTarget.getAttribute('data-range');
+            setActiveRangeChip(range);
+            const today = new Date();
+            let start = new Date(today);
+            let end = new Date(today);
+
+            if (range === 'week') {
+                const day = today.getDay() || 7;
+                if (day !== 1) start.setHours(-24 * (day - 1));
                 end.setTime(start.getTime() + (6 * 24 * 60 * 60 * 1000));
             } else if (range === 'month') {
                 start = new Date(today.getFullYear(), today.getMonth(), 1);
                 end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
             }
             setDateRange(start, end);
-            if(selectedPersons.length > 0) document.getElementById('btn_loadSchedule').click();
+            if (selectedPersons.length > 0) document.getElementById('btn_loadSchedule').click();
         });
     });
-    document.querySelector('.btn-range[data-range="week"]').click(); // Init
 
-    // --- 3. Render Engine ---
-    const TIMELINE_START_HOUR = 7; const TIMELINE_END_HOUR = 22;  
+    document.getElementById('btn_resetGlobalSchedule')?.addEventListener('click', () => {
+        selectedPersons = [];
+        renderChips();
+        document.getElementById('sch_hasCases').checked = false;
+        document.getElementById('global_typeTeacher').checked = true;
+        applyDefaultWeekRange();
+        document.getElementById('scheduleContainer')?.classList.add('d-none');
+        document.getElementById('personSummariesRow').innerHTML = '';
+        document.getElementById('personSummariesTotal').textContent = '';
+        document.getElementById('viewModeIndicator').innerText = 'Ready';
+    });
+
+    const TIMELINE_START_HOUR = 7;
+    const TIMELINE_END_HOUR = 22;
     const TOTAL_MINUTES = (TIMELINE_END_HOUR - TIMELINE_START_HOUR) * 60;
 
     function timeToMinutes(timeStr) {
@@ -315,23 +483,71 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function calculatePosition(startStr, endStr) {
-        let startMin = timeToMinutes(startStr); let endMin = timeToMinutes(endStr);
-        const timelineStartMin = TIMELINE_START_HOUR * 60; const timelineEndMin = TIMELINE_END_HOUR * 60;
+        let startMin = timeToMinutes(startStr);
+        let endMin = timeToMinutes(endStr);
+        const timelineStartMin = TIMELINE_START_HOUR * 60;
+        const timelineEndMin = TIMELINE_END_HOUR * 60;
         if (startMin < timelineStartMin) startMin = timelineStartMin;
         if (endMin > timelineEndMin) endMin = timelineEndMin;
         if (endMin <= startMin) endMin = startMin + 30;
-        return { 
-            left: ((startMin - timelineStartMin) / TOTAL_MINUTES) * 100, 
-            width: ((endMin - startMin) / TOTAL_MINUTES) * 100, 
-            startMin, endMin 
+        return {
+            left: ((startMin - timelineStartMin) / TOTAL_MINUTES) * 100,
+            width: ((endMin - startMin) / TOTAL_MINUTES) * 100,
+            startMin,
+            endMin
         };
+    }
+
+    function renderPersonSummaries(summaries) {
+        const row = document.getElementById('personSummariesRow');
+        const totalEl = document.getElementById('personSummariesTotal');
+        if (!row) return;
+
+        const list = Array.isArray(summaries) ? summaries : [];
+        if (!list.length) {
+            row.innerHTML = '<div class="col-12 text-muted small">No summary data available.</div>';
+            if (totalEl) totalEl.textContent = '';
+            return;
+        }
+
+        let grandTotal = 0;
+        row.innerHTML = list.map((summary, index) => {
+            const color = colorPalette[index % colorPalette.length];
+            const hours = Number(summary.totalTimesheetHours || 0);
+            grandTotal += hours;
+            const overlapBadge = Number(summary.overlapCount || 0) > 0
+                ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1">${summary.overlapCount} overlap(s)</span>`
+                : '';
+            return `
+                <div class="col-md-6 col-xl-4">
+                    <div class="person-summary-tile">
+                        <div class="d-flex align-items-start gap-2">
+                            <span class="person-summary-dot mt-1" style="background:${escapeHtml(color)}"></span>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="fw-bold text-truncate">${escapeHtml(summary.personName || summary.personId)}</div>
+                                <div class="d-flex flex-wrap gap-1 mt-1">
+                                    <span class="badge bg-light text-dark border">${escapeHtml(roleLabel(summary.role))}</span>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">${hours.toFixed(2)} timesheet h</span>
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">${Number(summary.eventCount || 0)} events</span>
+                                    ${overlapBadge}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (totalEl) {
+            totalEl.textContent = `Combined timesheet hours: ${grandTotal.toFixed(2)} h across ${list.length} selected person${list.length === 1 ? '' : 's'}.`;
+        }
     }
 
     function renderSingleDayListView(eventsByDate, colorMap, container) {
         container.innerHTML = '';
         const dates = Object.keys(eventsByDate || {}).sort();
         if (!dates.length) {
-            container.innerHTML = `<div class="alert alert-light text-center border py-4 text-muted">No schedule items found for this day.</div>`;
+            container.innerHTML = '<div class="alert alert-light text-center border py-4 text-muted">No schedule items found for this day.</div>';
             return;
         }
 
@@ -356,12 +572,13 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
 
             dayEvents.forEach((ev) => {
-                const eventColor = colorMap[ev?.personId] || '#6c757d';
+                const chipKey = `${ev?.personId}::${ev?.selectionRole || ''}`;
+                const eventColor = colorMap[chipKey] || colorMap[ev?.personId] || '#6c757d';
                 const detailsUrl = String(ev?.detailsUrl || '').trim();
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
                 const openButton = detailsUrl
                     ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
-                    : `<span class="text-muted small">No details</span>`;
+                    : '<span class="text-muted small">No details</span>';
                 html += `
                     <div class="event-row ${ev?.hasOverlap ? 'overlap' : ''}">
                         <div class="event-time">${escapeHtml(ev?.start || '-')} - ${escapeHtml(ev?.end || '-')}</div>
@@ -389,15 +606,22 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn_loadSchedule').addEventListener('click', async () => {
         const startStr = document.getElementById('sch_startDate').value;
         const endStr = document.getElementById('sch_endDate').value;
-        if (selectedPersons.length === 0) { await uiAlert('Please select at least one person.'); return; }
+        if (!selectedPersons.length) {
+            await uiAlert('Please select at least one person.');
+            return;
+        }
 
         const container = document.getElementById('visualDisplayArea');
         document.getElementById('scheduleContainer').classList.remove('d-none');
-        container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted small">Loading schedules...</div></div>`;
+        container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted small">Loading schedules...</div></div>';
 
         try {
-            const idsParam = selectedPersons.map(p => p.id).join(',');
-            const params = new URLSearchParams({ personIds: idsParam, startDate: startStr, endDate: endStr });
+            const params = new URLSearchParams({
+                personIds: selectedPersons.map((p) => p.personId).join(','),
+                personRoles: selectedPersons.map((p) => p.role).join(','),
+                startDate: startStr,
+                endDate: endStr
+            });
             if (document.getElementById('sch_hasCases')?.checked) params.set('hasCases', '1');
             const res = await fetch(`/school/schedules/api/global-schedule?${params.toString()}`, { headers: { 'X-AJAX-Request': 'true' } });
             const result = await res.json();
@@ -408,17 +632,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (result.status !== 'success') throw new Error(result.message);
 
             const events = result.events || [];
-            if (events.length === 0) {
-                container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No scheduled classes found.</div>`;
+            renderPersonSummaries(result.personSummaries || []);
+
+            if (!events.length) {
+                container.innerHTML = '<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No scheduled items found.</div>';
+                document.getElementById('viewModeIndicator').innerText = 'Empty';
                 return;
             }
 
-            // Create a quick lookup for colors based on the current selection order
             const colorMap = {};
-            selectedPersons.forEach((p, idx) => colorMap[p.id] = colorPalette[idx % colorPalette.length]);
+            selectedPersons.forEach((p, idx) => {
+                const color = colorPalette[idx % colorPalette.length];
+                colorMap[selectionKey(p)] = color;
+                colorMap[p.personId] = color;
+            });
 
             const eventsByDate = {};
-            events.forEach(ev => {
+            events.forEach((ev) => {
                 if (!eventsByDate[ev.date]) eventsByDate[ev.date] = [];
                 eventsByDate[ev.date].push(ev);
             });
@@ -429,11 +659,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             container.innerHTML = '';
             if (startStr === endStr || diffDays <= 0) {
+                document.getElementById('viewModeIndicator').innerHTML = '<i class="bi bi-list-ul"></i> Single-Day List';
                 renderSingleDayListView(eventsByDate, colorMap, container);
                 return;
             }
-            
-            Object.keys(eventsByDate).sort().forEach(dateStr => {
+
+            document.getElementById('viewModeIndicator').innerHTML = '<i class="bi bi-distribute-vertical"></i> Timeline View';
+
+            Object.keys(eventsByDate).sort().forEach((dateStr) => {
                 const dayEvents = eventsByDate[dateStr];
                 const dateObj = new Date(dateStr + 'T00:00:00');
                 const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -441,19 +674,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 let tracks = [];
                 let hasDoubleBooking = false;
 
-                dayEvents.forEach(ev => {
+                dayEvents.forEach((ev) => {
                     const pos = calculatePosition(ev.start, ev.end);
                     ev.pos = pos;
-                    if(ev.hasOverlap) hasDoubleBooking = true;
+                    if (ev.hasOverlap) hasDoubleBooking = true;
 
                     let placed = false;
                     for (let i = 0; i < tracks.length; i++) {
                         const lastEv = tracks[i][tracks[i].length - 1];
                         if (lastEv.pos.endMin <= pos.startMin) {
-                            tracks[i].push(ev); ev.trackIndex = i; placed = true; break;
+                            tracks[i].push(ev);
+                            ev.trackIndex = i;
+                            placed = true;
+                            break;
                         }
                     }
-                    if (!placed) { tracks.push([ev]); ev.trackIndex = tracks.length - 1; }
+                    if (!placed) {
+                        tracks.push([ev]);
+                        ev.trackIndex = tracks.length - 1;
+                    }
                 });
 
                 const bodyHeight = Math.max(50, tracks.length * 45 + 10);
@@ -467,42 +706,45 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="timeline-body pb-3" style="height: ${bodyHeight}px;">
                 `;
-                
-                dayEvents.forEach(ev => {
+
+                dayEvents.forEach((ev) => {
                     const topPos = (ev.trackIndex * 42) + 5;
-                    const eventColor = colorMap[ev.personId] || '#6c757d';
+                    const chipKey = `${ev?.personId}::${ev?.selectionRole || ''}`;
+                    const eventColor = colorMap[chipKey] || colorMap[ev.personId] || '#6c757d';
                     const detailsUrl = String(ev.detailsUrl || '').trim();
                     const encodedDetailsUrl = encodeURIComponent(detailsUrl);
                     const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
                     const clickHandler = detailsUrl
                         ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"`
                         : '';
-                    
+
                     html += `
-                        <div class="event-block ${ev.hasOverlap ? 'border-danger border-3 shadow' : ''}" 
+                        <div class="event-block ${ev.hasOverlap ? 'border-danger border-3 shadow' : ''}"
                              style="left: ${ev.pos.left}%; width: ${ev.pos.width}%; top: ${topPos}px; background-color: ${eventColor};"
-                             title="${ev.personName} | ${ev.className} | ${ev.start} - ${ev.end}${String(ev?.classLifecycle?.registrationMode || '').trim().toLowerCase() === 'rolling' ? ' | Rolling' : ''}"
+                             title="${escapeHtml(ev.personName)} | ${escapeHtml(ev.className)} | ${escapeHtml(ev.start)} - ${escapeHtml(ev.end)}"
                              ${clickHandler}>
-                             <div class="fw-bold text-truncate"><i class="bi bi-person-fill"></i> ${ev.personName}</div>
-                             <div class="x-small text-truncate">${ev.className} (${ev.start}-${ev.end})</div>
+                             <div class="fw-bold text-truncate"><i class="bi bi-person-fill"></i> ${escapeHtml(ev.personName)}</div>
+                             <div class="x-small text-truncate">${escapeHtml(ev.className)} (${escapeHtml(ev.start)}-${escapeHtml(ev.end)})</div>
                              ${caseBadge ? `<div class="x-small">${caseBadge}</div>` : ''}
                         </div>
                     `;
                 });
 
-                html += `<div class="hour-markers">`;
+                html += '<div class="hour-markers">';
                 for (let h = TIMELINE_START_HOUR; h < TIMELINE_END_HOUR; h++) {
-                    let displayHour = h > 12 ? (h - 12) + 'p' : (h === 12 ? '12p' : h + 'a');
+                    const displayHour = h > 12 ? `${h - 12}p` : (h === 12 ? '12p' : `${h}a`);
                     html += `<div class="hour-marker"><span class="hour-label">${displayHour}</span></div>`;
                 }
-                html += `</div></div></div>`; 
+                html += '</div></div></div>';
 
                 container.innerHTML += html;
             });
-
         } catch (error) {
-            container.innerHTML = `<div class="alert alert-danger text-center"><i class="bi bi-x-circle me-2"></i> ${error.message}</div>`;
+            container.innerHTML = `<div class="alert alert-danger text-center"><i class="bi bi-x-circle me-2"></i> ${escapeHtml(error.message)}</div>`;
         }
     });
+
+    applyDefaultWeekRange();
+    renderChips();
 });
 </script>

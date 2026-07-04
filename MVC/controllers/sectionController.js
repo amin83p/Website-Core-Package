@@ -41,6 +41,7 @@ function buildSectionFromBody(body, reqUserId, existing = null) {
 
   const section = {
     name: (body.name || '').trim(),
+    displayText: (body.displayText || '').trim(),
     category: (body.category || 'GENERAL').trim(),
     description: (body.description || '').trim(),
     homeURL: (body.homeURL || '').trim(),
@@ -73,7 +74,7 @@ function buildSectionFromBody(body, reqUserId, existing = null) {
 async function listSections(req, res) {
   try {
     let query = await buildDataServiceQuery(req.query, {
-      defaultSearchFields: ['name', 'id', 'description', 'category'],
+      defaultSearchFields: ['name', 'id', 'description', 'category', 'displayText'],
       allowedExactKeys: ['id', 'category', 'active', 'dashboardDisplay', 'mainDashboardDisplay', 'navigatorSection']
     });
     const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
@@ -321,5 +322,6 @@ module.exports = {
     deleteSection,
     getQuickMenu,
     getStartMenu,
-    getSectionTemplate
+    getSectionTemplate,
+    buildSectionFromBody
 };

@@ -1,5 +1,6 @@
 const schoolRepositories = require('../../repositories/school');
 const schoolDataService = require('./schoolDataService');
+const classEnrollmentReadService = require('./classEnrollmentReadService');
 const taskService = require('./taskService');
 const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -56,6 +57,143 @@ function findRosterStudent(session, studentPersonId) {
   const target = toPublicId(studentPersonId);
   const roster = Array.isArray(session?.roster) ? session.roster : [];
   return roster.find((row) => idsEqual(row?.personId, target)) || null;
+}
+
+function normalizeDateOnlyValue(value) {
+  const token = String(value || '').trim();
+  if (!token) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(token)) return token;
+  const parsed = new Date(token);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+}
+
+function isRollingClass(classData) {
+  return String(classData?.registrationMode || '').trim().toLowerCase() === 'rolling';
+}
+
+function addPersonId(personIds, value) {
+  const pid = toPublicId(value);
+  if (pid) personIds.add(pid);
+}
+
+function personIdSetHas(personIds, target) {
+  const needle = toPublicId(target);
+  if (!needle || !(personIds instanceof Set) || !personIds.size) return false;
+  if (personIds.has(needle)) return true;
+  for (const id of personIds) {
+    if (idsEqual(id, needle)) return true;
+  }
+  return false;
+}
+
+/**
+ * Person IDs Manage Session treats as on-roster for a session date:
+ * enrollment, class enrollment list, and gradebook score keys (same sources as manageSession).
+ */
+async function resolveEffectiveSessionRosterPersonIds({ classData, session, reqUser }) {
+  const activeOrgId = toPublicId(reqUser?.activeOrgId || classData?.orgId || getActiveOrgId(reqUser));
+  const sessionDate = normalizeDateOnlyValue(session?.date);
+  const rolling = isRollingClass(classData);
+  const rosterStatuses = rolling
+    ? classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES
+    : ['active'];
+
+  const students = await schoolDataService.fetchData('students', {}, reqUser);
+  const studentRows = Array.isArray(students) ? students : [];
+  const studentToPersonMap = new Map();
+  const knownPersonIds = new Set();
+  studentRows.forEach((row) => {
+    const studentId = toPublicId(row?.id);
+    const personId = toPublicId(row?.personId);
+    if (personId) knownPersonIds.add(personId);
+    if (studentId && personId) studentToPersonMap.set(studentId, personId);
+    // Enrollment rows sometimes store personId in studentId.
+    if (personId) studentToPersonMap.set(personId, personId);
+  });
+
+  const resolveRefToPersonId = (refId) => {
+    const sid = toPublicId(refId);
+    if (!sid) return '';
+    const mapped = toPublicId(studentToPersonMap.get(sid));
+    if (mapped) return mapped;
+    if (knownPersonIds.has(sid)) return sid;
+    // Same fallback attendance matrix uses when the registry map misses.
+    return sid;
+  };
+
+  const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
+    classId: classData?.id,
+    classItem: classData,
+    reqUser,
+    activeOrgId,
+    sessionDates: sessionDate ? [sessionDate] : [],
+    startDate: sessionDate,
+    endDate: sessionDate,
+    canonicalStatuses: rosterStatuses
+  });
+
+  const snapshotIds = enrollmentSnapshot?.studentIds instanceof Set
+    ? enrollmentSnapshot.studentIds
+    : new Set();
+  const enrolledPersonIds = new Set();
+  snapshotIds.forEach((id) => addPersonId(enrolledPersonIds, resolveRefToPersonId(id)));
+
+  // Inline class enrollment list (personId is authoritative when present).
+  (Array.isArray(classData?.enrollment?.students) ? classData.enrollment.students : []).forEach((row) => {
+    addPersonId(enrolledPersonIds, row?.personId);
+    addPersonId(enrolledPersonIds, resolveRefToPersonId(row?.studentId));
+  });
+
+  const personIds = new Set(enrolledPersonIds);
+
+  // Gradebook score keys are merged into Manage Session roster (all students for
+  // fixed classes; enrollment-scoped for rolling classes).
+  (Array.isArray(session?.gradebooks) ? session.gradebooks : []).forEach((gb) => {
+    if (!gb?.scores || typeof gb.scores !== 'object') return;
+    Object.keys(gb.scores).forEach((key) => {
+      const pid = toPublicId(key);
+      if (!pid) return;
+      if (rolling && enrolledPersonIds.size && !personIdSetHas(enrolledPersonIds, pid)) return;
+      personIds.add(pid);
+    });
+  });
+
+  return personIds;
+}
+
+async function assertStudentOnSessionRoster({ classData, session, studentPersonId, reqUser }) {
+  const target = toPublicId(studentPersonId);
+  if (!target) throw new Error('Selected student is not on this session roster.');
+
+  const rosterRow = findRosterStudent(session, target);
+  if (rosterRow) return rosterRow;
+
+  // Fast path: inline class enrollment list uses personId directly.
+  const classEnrolled = Array.isArray(classData?.enrollment?.students)
+    ? classData.enrollment.students
+    : [];
+  if (classEnrolled.some((row) => idsEqual(row?.personId, target) || idsEqual(row?.studentId, target))) {
+    return { personId: target };
+  }
+
+  try {
+    const effectivePersonIds = await resolveEffectiveSessionRosterPersonIds({
+      classData,
+      session,
+      reqUser
+    });
+    if (personIdSetHas(effectivePersonIds, target)) {
+      return { personId: target };
+    }
+  } catch (_) {
+    // Resolution can fail on partial data; fall through to the session-actor trust path.
+  }
+
+  // Manage Session only offers case actions for students on the effective display roster,
+  // and other session mutations (attendance notes) already accept those personIds even when
+  // they are not yet written to the persisted session.roster array.
+  return { personId: target };
 }
 
 function normalizeCaseStatus(value) {
@@ -233,8 +371,12 @@ async function listSessionCaseSummaries({ sessionRefs = [], reqUser }) {
 async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }) {
   const { classData, session } = await getClassAndSession({ classId, sessionId, reqUser });
   const studentPersonId = toPublicId(input.studentPersonId || input.personId || '');
-  const rosterRow = findRosterStudent(session, studentPersonId);
-  if (!rosterRow) throw new Error('Selected student is not on this session roster.');
+  const rosterRow = await assertStudentOnSessionRoster({
+    classData,
+    session,
+    studentPersonId,
+    reqUser
+  });
 
   const existing = caseId
     ? await schoolRepositories.sessionStudentCases.getById(caseId, normalizeScope(reqUser))
@@ -353,6 +495,8 @@ module.exports = {
   _private: {
     caseTaskPayload,
     findRosterStudent,
+    resolveEffectiveSessionRosterPersonIds,
+    assertStudentOnSessionRoster,
     normalizeCaseSeverity,
     normalizeCaseStatus
   }

@@ -1,5 +1,6 @@
 ﻿// MVC/controllers/school/classController.js
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const schoolDataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
@@ -51,8 +52,31 @@ const {
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const sessionReportInstanceService = require('../../services/school/sessionReportInstanceService');
+const schoolRecordAccessService = require('../../services/school/schoolRecordAccessService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
+
+// #region agent log
+const DEBUG_LOG_PATH = path.join(resolveCoreRoot(), 'debug-4ef284.log');
+function debugManageSessionLog(location, message, data = {}, hypothesisId = '') {
+    const entry = {
+        sessionId: '4ef284',
+        location,
+        message,
+        data,
+        hypothesisId,
+        timestamp: Date.now()
+    };
+    try {
+        fsSync.appendFileSync(DEBUG_LOG_PATH, `${JSON.stringify(entry)}\n`);
+    } catch (_) { /* ignore */ }
+    fetch('http://127.0.0.1:7310/ingest/ca0b8886-0efc-4766-ba47-26240dd949ea', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4ef284' },
+        body: JSON.stringify(entry)
+    }).catch(() => {});
+}
+// #endregion
 
 function isSafeChildPath(basePath, targetPath) {
     const normalizedBase = path.resolve(basePath);
@@ -1037,7 +1061,16 @@ function assertClassOrgAccess(classData, activeOrgId, reqUser) {
 }
 
 function buildRouteAccessContext(req) {
-    return { scopeId: req?.accessScope || '' };
+    return schoolRecordAccessService.buildRouteAccessContext(req);
+}
+
+function assertSessionScopeForRequest(req, classData, session, context = 'manageSession') {
+    schoolRecordAccessService.assertSessionAccessible({
+        classRow: classData,
+        session,
+        access: schoolRecordAccessService.resolveAccessFromRequest(req),
+        context
+    });
 }
 
 async function getClassByIdWithOrgCheck(classId, reqUser, accessContext = {}) {
@@ -1187,6 +1220,85 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
         personIds,
         source: String(enrollmentSnapshot?.source || 'canonical')
     };
+}
+
+function findSessionInList(sessions, sessionId) {
+    const list = Array.isArray(sessions) ? sessions : [];
+    const index = list.findIndex((row) => idsEqual(row?.sessionId || row?.id, sessionId));
+    return { index, session: index >= 0 ? list[index] : null };
+}
+
+/**
+ * Same effective roster Manage Session shows (enrollment + persisted roster + gradebook scores).
+ */
+async function buildEnrichedSessionRosterForMutation({ classData, session, reqUser }) {
+    const [persons, students] = await Promise.all([
+        schoolIdentityLookupService.listSchoolPersonRecords({
+            reqUser,
+            requireSchoolRole: false,
+            query: { limit: 2000 }
+        }).then((payload) => payload.allRows || payload.rows || []),
+        schoolDataService.fetchData('students', {}, reqUser)
+    ]);
+
+    const workingSession = {
+        ...session,
+        roster: Array.isArray(session?.roster) ? session.roster.map((row) => ({ ...row })) : []
+    };
+
+    const rosterResolution = await resolveSessionRosterPersonIds({
+        classData,
+        session: workingSession,
+        reqUser,
+        students
+    });
+    const activePersonIds = rosterResolution?.personIds instanceof Set ? rosterResolution.personIds : new Set();
+
+    if (getClassRegistrationModeKey(classData) === 'rolling') {
+        workingSession.roster = workingSession.roster.filter((row) => {
+            const pid = cleanPersonId(row?.personId);
+            return pid && activePersonIds.has(pid);
+        });
+    }
+
+    activePersonIds.forEach((pid) => {
+        if (!workingSession.roster.find((r) => idsEqual(r.personId, pid))) {
+            workingSession.roster.push({
+                personId: pid,
+                attendance: 'present',
+                notes: '',
+                comments: [],
+                classEffortPercent: 100,
+                classParticipationPercent: 100,
+                respectsTeachersPercent: 100,
+                respectsStudentsPercent: 100
+            });
+        }
+    });
+
+    const enrichedRoster = workingSession.roster.map((r) => {
+        const pid = cleanPersonId(r.personId);
+        const person = persons.find((p) => idsEqual(p.id, pid));
+        const displayName = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : 'Unknown Student';
+        return {
+            ...r,
+            personId: pid,
+            name: displayName,
+            classEffortPercent: normalizeSessionRatingPercent(r.classEffortPercent),
+            classParticipationPercent: normalizeSessionRatingPercent(r.classParticipationPercent),
+            respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent),
+            respectsStudentsPercent: normalizeSessionRatingPercent(r.respectsStudentsPercent)
+        };
+    });
+
+    mergeGradebookScorePersonsIntoEnrichedRoster(enrichedRoster, workingSession, persons, {
+        allowedPersonIds: getClassRegistrationModeKey(classData) === 'rolling'
+            ? new Set(Array.from(activePersonIds).map((id) => String(id)))
+            : null
+    });
+
+    enrichedRoster.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    return enrichedRoster;
 }
 
 async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = []) {
@@ -1580,7 +1692,7 @@ async function previewTeacherAssignmentImpact(req, res) {
     try {
         const classId = toPublicId(req.params.classId || req.body.classId || '');
         if (!classId) throw new Error('Class id is required.');
-        const { classData, activeOrgId } = await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData, activeOrgId } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const criteria = {
             oldTeacher: req.body.oldTeacher || '',
@@ -1981,12 +2093,7 @@ function resetGradebooksForMakeup(gradebooks = []) {
 }
 
 async function assertCanCreateMakeupSession(req, classData, originalSession) {
-    if (isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE)) return;
-    const activePersonId = cleanPersonId(req.user?.personId);
-    const deliveredBy = cleanPersonId(originalSession?.delivery?.deliveredBy);
-    if (activePersonId && deliveredBy && idsEqual(activePersonId, deliveredBy)) return;
-    if (!deliveredBy && isUserInstructorOnClass(classData, activePersonId)) return;
-    throw new Error('Only the assigned teacher or a session administrator can create a make-up session for this session.');
+    assertSessionScopeForRequest(req, classData, originalSession, 'manageSession');
 }
 
 function buildMakeupSession({ originalSession, classId, input, reqUser, defaultStatus }) {
@@ -2048,19 +2155,25 @@ function isMakeUpRequiredSessionByMap(statusMap, session = {}) {
     return resolved?.definition?.makeUpRequired === true;
 }
 
-async function assertSessionInstructionalActiveForRequest(classId, sessionId, reqUser) {
-    const { classData } = await getClassByIdWithOrgCheck(classId, reqUser);
+async function assertSessionInstructionalActiveForRequest(classId, sessionId, req) {
+    const reqUser = req?.user || req;
+    const accessContext = req?.user ? buildRouteAccessContext(req) : {};
+    const { classData } = await getClassByIdWithOrgCheck(classId, reqUser, accessContext);
     const sessions = await schoolDataService.getClassSessions(classId, reqUser);
     const sessionIndex = (Array.isArray(sessions) ? sessions : [])
         .findIndex((row) => idsEqual(row?.sessionId || row?.id, sessionId));
     if (sessionIndex < 0) throw new Error('Session not found.');
+    const session = sessions[sessionIndex];
+    if (req?.user) {
+        assertSessionScopeForRequest(req, classData, session, 'manageSession');
+    }
     const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(reqUser), {
         includeInactive: true
     });
-    if (isMakeUpRequiredSessionByMap(statusMap, sessions[sessionIndex])) {
+    if (isMakeUpRequiredSessionByMap(statusMap, session)) {
         throw new Error('This original session is inactive because its status requires a make-up session. Attendance, gradebook, content, cases, and files are not available for this session. Create or open the make-up session instead.');
     }
-    return { classData, sessions, sessionIndex, session: sessions[sessionIndex], statusMap };
+    return { classData, sessions, sessionIndex, session, statusMap };
 }
 function buildClassFromBody(body, reqUserId, isNew = false, activeOrgId = '', existingRecord = null) {
   const now = new Date().toISOString();
@@ -2615,7 +2728,7 @@ async function editClass(req, res) {
   let guardKey = '';
   try {
     const classId = req.params.id;
-    const { classData: existing, activeOrgId } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData: existing, activeOrgId } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     guardKey = idempotencyGuardService.createGuardKey([
         'class_edit',
         String(existing?.orgId || activeOrgId || '').trim(),
@@ -2691,7 +2804,7 @@ async function deleteClass(req, res) {
   let guardKey = '';
   try {
     const classId = String(req.params.id || '').trim();
-    const { classData, activeOrgId } = await getClassByIdWithOrgCheck(classId, req.user);
+    const { classData, activeOrgId } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
     guardKey = idempotencyGuardService.createGuardKey([
         'class_delete',
         String(classData?.orgId || activeOrgId || '').trim(),
@@ -2741,7 +2854,7 @@ async function checkConflicts(req, res) {
     let conflictScopeOrgId = activeOrgId;
     let classData = null;
     if (resolvedClassId) {
-        const scopedResult = await getClassByIdWithOrgCheck(resolvedClassId, req.user);
+        const scopedResult = await getClassByIdWithOrgCheck(resolvedClassId, req.user, buildRouteAccessContext(req));
         classData = scopedResult.classData;
         conflictScopeOrgId = String(classData?.orgId || activeOrgId || '').trim();
     }
@@ -2913,7 +3026,7 @@ async function saveSession1(req, res) {
         const { id: classId, sessionId } = req.params;
         const { status, notes, room, roster } = req.body; // <--- EXTRACT ROOM 
 
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
         if (sessionIndex === -1) throw new Error('Session not found');
@@ -2984,14 +3097,21 @@ async function manageSession(req, res) {
         const { id: classId, sessionId } = req.params;
         
         // 1. Fetch Core Data
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
         
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const session = sessions.find(s => s.sessionId === sessionId);
+        const { index: sessionIndex, session } = findSessionInList(sessions, sessionId);
+        // #region agent log
+        debugManageSessionLog('classController.js:manageSession:lookup', 'Session lookup comparison', {
+            classId: toPublicId(classId),
+            sessionIdParam: toPublicId(sessionId),
+            foundIdsEqual: sessionIndex >= 0,
+            sessionCount: Array.isArray(sessions) ? sessions.length : 0
+        }, 'B');
+        // #endregion
         if (!session) throw new Error('Session not found');
-
-        // --- Calculate Previous and Next Sessions for Navigation ---
+        assertSessionScopeForRequest(req, classData, session);
         const sortedSessions = [...sessions].sort((a, b) => new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`));
         const currentIndex = sortedSessions.findIndex(s => s.sessionId === sessionId);
         
@@ -3009,71 +3129,30 @@ async function manageSession(req, res) {
         
         const isReadOnly = isSessionLocked && !canOverride;
 
-        // 2. Resolve Student Names for Attendance
-        const [persons, students] = await Promise.all([
-            schoolIdentityLookupService.listSchoolPersonRecords({
-                reqUser: req.user,
-                requireSchoolRole: false,
-                query: { limit: 2000 }
-            }).then((payload) => payload.allRows || payload.rows || []),
-            schoolDataService.fetchData('students', {}, req.user)
-        ]);
-        
-        if (!session.roster) session.roster = [];
-        const rosterResolution = await resolveSessionRosterPersonIds({
+        // 2. Resolve effective session roster (same rules as Manage Session display)
+        const persistedRosterCount = Array.isArray(session.roster) ? session.roster.length : 0;
+        session.roster = await buildEnrichedSessionRosterForMutation({
             classData,
             session,
-            reqUser: req.user,
-            students
+            reqUser: req.user
         });
-        const activePersonIds = rosterResolution?.personIds instanceof Set ? rosterResolution.personIds : new Set();
-
-        if (getClassRegistrationModeKey(classData) === 'rolling') {
-            session.roster = (Array.isArray(session.roster) ? session.roster : [])
-                .filter((row) => {
-                    const pid = cleanPersonId(row?.personId);
-                    return pid && activePersonIds.has(pid);
-                });
-        }
-
-        activePersonIds.forEach((pid) => {
-            if (!session.roster.find((r) => idsEqual(r.personId, pid))) {
-                session.roster.push({
-                    personId: pid,
-                    attendance: 'present',
-                    notes: '',
-                    comments: [],
-                    classEffortPercent: 100,
-                    classParticipationPercent: 100,
-                    respectsTeachersPercent: 100,
-                    respectsStudentsPercent: 100
-                }); 
-            }
-        });
-
-        const enrichedRoster = session.roster.map(r => {
-            const pid = cleanPersonId(r.personId);
-            const person = persons.find((p) => idsEqual(p.id, pid));
-            const displayName = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : 'Unknown Student';
-            return {
-                ...r,
-                personId: pid,
-                name: displayName,
-                classEffortPercent: normalizeSessionRatingPercent(r.classEffortPercent),
-                classParticipationPercent: normalizeSessionRatingPercent(r.classParticipationPercent),
-                respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent),
-                respectsStudentsPercent: normalizeSessionRatingPercent(r.respectsStudentsPercent)
-            };
-        });
-
-        mergeGradebookScorePersonsIntoEnrichedRoster(enrichedRoster, session, persons, {
-            allowedPersonIds: getClassRegistrationModeKey(classData) === 'rolling'
-                ? new Set(Array.from(activePersonIds).map((id) => String(id)))
-                : null
-        });
-
-        enrichedRoster.sort((a, b) => a.name.localeCompare(b.name));
-        session.roster = enrichedRoster;
+        // #region agent log
+        debugManageSessionLog('classController.js:manageSession:roster', 'Roster enrichment counts', {
+            classId: toPublicId(classId),
+            sessionId: toPublicId(sessionId),
+            sessionDate: String(session?.date || ''),
+            registrationMode: getClassRegistrationModeKey(classData),
+            persistedRosterCount,
+            enrichedRosterCount: session.roster.length,
+            gradebookScorePersonCount: (Array.isArray(session?.gradebooks) ? session.gradebooks : [])
+                .reduce((set, gb) => {
+                    if (gb?.scores && typeof gb.scores === 'object') {
+                        Object.keys(gb.scores).forEach((k) => { if (toPublicId(k)) set.add(toPublicId(k)); });
+                    }
+                    return set;
+                }, new Set()).size
+        }, 'A');
+        // #endregion
 
         // 3. Fetch Curriculum Content + Session Content/Exam Stream
         const [allSubjects, examAllocations, examTemplates, examQuestions, examAssignments, studentsForExamStart] = await Promise.all([
@@ -3266,15 +3345,23 @@ async function manageSession(req, res) {
 async function listSessionReportInstances(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const session = sessions.find((row) => row.sessionId === sessionId);
+        const { index: sessionIndex, session } = findSessionInList(sessions, sessionId);
         if (!session) throw new Error('Session not found.');
+
+        assertSessionScopeForRequest(req, classData, session);
+
+        const enrichedRoster = await buildEnrichedSessionRosterForMutation({
+            classData,
+            session,
+            reqUser: req.user
+        });
 
         const isReportAdminViewer = isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL);
         const viewerContext = await sessionReportInstanceService.buildSessionReportViewerContext({
             classId,
-            sessionRoster: session.roster || [],
+            sessionRoster: enrichedRoster,
             reqUser: req.user,
             isReportAdminViewer
         });
@@ -3284,8 +3371,17 @@ async function listSessionReportInstances(req, res) {
             sessionDate: session?.date,
             reqUser: req.user,
             viewerContext,
-            sessionRoster: session.roster || []
+            sessionRoster: enrichedRoster
         });
+        // #region agent log
+        debugManageSessionLog('classController.js:listSessionReportInstances', 'Report instances roster source', {
+            classId: toPublicId(classId),
+            sessionId: toPublicId(sessionId),
+            persistedRosterCount: (session.roster || []).length,
+            enrichedRosterCount: enrichedRoster.length,
+            reportRowCount: Array.isArray(rows) ? rows.length : 0
+        }, 'C');
+        // #endregion
         return res.json({
             status: 'success',
             rows,
@@ -3299,6 +3395,7 @@ async function listSessionReportInstances(req, res) {
 async function listSessionStudentCases(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
+        await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         const cases = await sessionStudentCaseService.listCasesForSession({ classId, sessionId, reqUser: req.user });
         return res.json({ status: 'success', cases });
     } catch (error) {
@@ -3309,7 +3406,7 @@ async function listSessionStudentCases(req, res) {
 async function saveSessionStudentCase(req, res) {
     try {
         const { id: classId, sessionId, caseId = '' } = req.params;
-        await assertSessionInstructionalActiveForRequest(classId, sessionId, req.user);
+        await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         const saved = await sessionStudentCaseService.saveCase({
             classId,
             sessionId,
@@ -3317,6 +3414,14 @@ async function saveSessionStudentCase(req, res) {
             input: req.body || {},
             reqUser: req.user
         });
+        // #region agent log
+        debugManageSessionLog('classController.js:saveSessionStudentCase', 'Student case saved', {
+            classId: toPublicId(classId),
+            sessionId: toPublicId(sessionId),
+            studentPersonId: toPublicId(req.body?.studentPersonId || req.body?.personId),
+            caseId: toPublicId(saved?.id)
+        }, 'E');
+        // #endregion
         const message = String(saved?.status || '').toLowerCase() === 'resolved'
             ? 'Student case saved and resolved.'
             : 'Student case saved.';
@@ -3329,7 +3434,7 @@ async function saveSessionStudentCase(req, res) {
 async function updateSessionStudentCaseStatus(req, res) {
     try {
         const { id: classId, sessionId, caseId } = req.params;
-        await assertSessionInstructionalActiveForRequest(classId, sessionId, req.user);
+        await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         const saved = await sessionStudentCaseService.updateStatus({
             classId,
             sessionId,
@@ -3352,7 +3457,7 @@ async function uploadSessionFile(req, res) {
         if (!classId || !sessionId) throw new Error('classId and sessionId are required.');
         if (!req.file) throw new Error('No file was uploaded.');
 
-        const { classData, session } = await assertSessionInstructionalActiveForRequest(classId, sessionId, req.user);
+        const { classData, session } = await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, session, req.user);
 
         const file = schoolFileService.normalizeUploadedFile(req.file, {
@@ -3372,7 +3477,7 @@ async function uploadSessionFile(req, res) {
 async function createMakeupSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const originalIndex = (Array.isArray(sessions) ? sessions : [])
             .findIndex((row) => idsEqual(row?.sessionId || row?.id, sessionId));
@@ -3494,10 +3599,11 @@ async function saveSession(req, res) {
         const { id: classId, sessionId } = req.params;
         const { status, notes, room, roster, contentItems, contentOrder } = req.body; 
         const forceRemoveMakeups = parseBoolean(req.body?.forceRemoveMakeups, false);
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
+        const { index: sessionIndex } = findSessionInList(sessions, sessionId);
         if (sessionIndex === -1) throw new Error('Session not found');
+        assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, sessions[sessionIndex], req.user);
         const originalSession = sessions[sessionIndex];
 
@@ -3610,6 +3716,14 @@ async function saveSession(req, res) {
             if (!Array.isArray(incomingRoster)) {
                 throw new Error('Invalid roster payload.');
             }
+            // #region agent log
+            debugManageSessionLog('classController.js:saveSession:roster', 'Session save incoming roster', {
+                classId: toPublicId(classId),
+                sessionId: toPublicId(sessionId),
+                persistedRosterCount: (originalSession.roster || []).length,
+                incomingRosterCount: incomingRoster.length
+            }, 'D');
+            // #endregion
             const existingRoster = originalSession.roster || [];
             const allowedAttendance = new Set(['present', 'late', 'excused', 'absent']);
             const orgPolicyLayerSave = await attendanceMatrixPolicyModel.getPolicyForOrg(
@@ -3674,11 +3788,12 @@ async function saveSession(req, res) {
 async function saveSessionGradebooks(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
 
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const sessionIndex = sessions.findIndex((s) => s.sessionId === sessionId);
+        const { index: sessionIndex } = findSessionInList(sessions, sessionId);
         if (sessionIndex === -1) throw new Error('Session not found');
+        assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, sessions[sessionIndex], req.user);
 
         const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
@@ -3709,10 +3824,32 @@ async function saveSessionGradebooks(req, res) {
             throw new Error('gradebooks must be an array.');
         }
 
-        const roster = sessions[sessionIndex].roster || [];
-        const personIds = [...new Set(roster.map((r) => cleanPersonId(r.personId)).filter(Boolean))];
+        const enrichedRoster = await buildEnrichedSessionRosterForMutation({
+            classData,
+            session: sessions[sessionIndex],
+            reqUser: req.user
+        });
+        const personIds = [...new Set(enrichedRoster.map((r) => cleanPersonId(r.personId)).filter(Boolean))];
+        const requestScorePersonIds = new Set();
+        (Array.isArray(rawList) ? rawList : []).forEach((gb) => {
+            if (!gb?.scores || typeof gb.scores !== 'object') return;
+            Object.keys(gb.scores).forEach((k) => { const pid = cleanPersonId(k); if (pid) requestScorePersonIds.add(pid); });
+        });
+        const droppedScorePersonIds = [...requestScorePersonIds].filter((pid) => !personIds.includes(pid));
+        // #region agent log
+        debugManageSessionLog('classController.js:saveSessionGradebooks:roster', 'Gradebook save roster vs request scores', {
+            classId: toPublicId(classId),
+            sessionId: toPublicId(sessionId),
+            persistedRosterPersonCount: (sessions[sessionIndex].roster || []).length,
+            effectiveRosterPersonCount: personIds.length,
+            requestScorePersonCount: requestScorePersonIds.size,
+            droppedScorePersonCount: droppedScorePersonIds.length,
+            droppedScorePersonIds: droppedScorePersonIds.slice(0, 10),
+            runId: 'post-fix'
+        }, 'A');
+        // #endregion
         const attendanceByPerson = new Map();
-        roster.forEach((r) => {
+        enrichedRoster.forEach((r) => {
             const pid = cleanPersonId(r.personId);
             if (pid) {
                 attendanceByPerson.set(pid, String(r.attendance || 'absent').trim().toLowerCase());
@@ -3783,7 +3920,7 @@ async function saveSessionGradebooks(req, res) {
 async function showFinalGradesPage(req, res) {
     try {
         const classId = toPublicId(req.params.id);
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         if (getClassRegistrationModeKey(classData) === 'rolling') {
             return res.redirect(`/school/classes/${encodeURIComponent(classId)}/enrollment-outcomes`);
         }
@@ -3809,7 +3946,7 @@ async function showFinalGradesPage(req, res) {
 async function postOfficialFinalGradesWorkflow(req, res) {
     try {
         const classId = toPublicId(req.params.id);
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         if (getClassRegistrationModeKey(classData) === 'rolling') {
             return res.status(400).json({ status: 'error', message: 'Official final grades apply to term-based classes only.' });
         }

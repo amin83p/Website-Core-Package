@@ -43,7 +43,12 @@ exports.listActivities = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
     const query = await buildDataServiceQuery(req.query, { allowedExactKeys: null });
-    const allRows = await activityService.listActivities({ orgId, reqUser: req.user, query });
+    const allRows = await activityService.listActivities({
+      orgId,
+      reqUser: req.user,
+      query,
+      accessContext: schoolDataService.buildRouteAccessContext(req)
+    });
     const status = String(req.query.status || '').trim().toLowerCase();
     const categoryId = String(req.query.categoryId || '').trim();
     const personControl = String(req.query.personControl || '').trim().toLowerCase();
@@ -98,7 +103,7 @@ exports.showCreateForm = async (req, res) => {
 exports.showEditForm = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
-    const activity = await activityService.getActivity(req.params.id, req.user);
+    const activity = await activityService.getActivity(req.params.id, req.user, schoolDataService.buildRouteAccessContext(req));
     if (!activity) throw new Error('School activity not found.');
     assertOrgAccess(activity, orgId);
     const lookups = await loadFormLookups(req);
@@ -120,7 +125,7 @@ exports.saveActivity = async (req, res) => {
     const orgId = getActiveOrgIdOrThrow(req.user);
     const id = String(req.params.id || req.body.id || '').trim();
     if (id) {
-      const existing = await activityService.getActivity(id, req.user);
+      const existing = await activityService.getActivity(id, req.user, schoolDataService.buildRouteAccessContext(req));
       if (!existing) throw new Error('School activity not found.');
       assertOrgAccess(existing, orgId);
     }
@@ -137,7 +142,7 @@ exports.saveActivity = async (req, res) => {
 exports.deleteActivity = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
-    const existing = await activityService.getActivity(req.params.id, req.user);
+    const existing = await activityService.getActivity(req.params.id, req.user, schoolDataService.buildRouteAccessContext(req));
     if (!existing) throw new Error('School activity not found.');
     assertOrgAccess(existing, orgId);
     schoolDependencyService.assertActivityNotTimesheetLocked(existing, `Activity "${existing.title || existing.id}"`);

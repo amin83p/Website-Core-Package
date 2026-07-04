@@ -94,6 +94,12 @@
                                 <% }) %>
                             </select>
                         </div>
+
+                        <div class="col-12 mb-3">
+                            <label class="form-label">Display Text</label>
+                            <input type="text" name="displayText" class="form-control size-md" value="<%= section ? (section.displayText || '') : '' %>" placeholder="Optional label shown on dashboards instead of the formatted name">
+                            <small class="form-text text-muted">When set, shown to users exactly as typed (case preserved). Leave empty to use the formatted name.</small>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -344,6 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const setCheck = (sel, checked) => { const el = f.querySelector(sel); if (el) el.checked = !!checked; };
 
     set('input[name="name"]', tpl.name);
+    set('input[name="displayText"]', tpl.displayText);
     const catEl = f.querySelector('#categorySelect');
     if (catEl && tpl.category) catEl.value = tpl.category;
     set('textarea[name="description"]', tpl.description);

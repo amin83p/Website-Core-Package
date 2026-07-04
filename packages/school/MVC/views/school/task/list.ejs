@@ -29,7 +29,7 @@
 
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
-    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filters</div>
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Tasks</div>
     <button
       id="taskFilterToggleBtn"
       type="button"
@@ -39,13 +39,12 @@
       aria-expanded="<%= hasTaskFiltersApplied ? 'true' : 'false' %>"
       aria-controls="taskFilterCollapse"
       aria-label="<%= hasTaskFiltersApplied ? 'Close filters' : 'Open filters' %>">
-      Filters
       <i id="taskFilterToggleIcon" class="bi <%= hasTaskFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
     </button>
   </div>
   <div class="collapse<%= hasTaskFiltersApplied ? ' show' : '' %>" id="taskFilterCollapse">
     <form class="card-body p-3" method="get" action="/school/tasks">
-      <div class="row g-2 align-items-end">
+      <div class="row g-3 align-items-end">
         <% if (canManageAll) { %>
           <div class="col-lg-4 col-md-6">
             <label class="form-label" for="taskAssignedPersonNameFilter">Person</label>
@@ -60,7 +59,7 @@
         <% } %>
         <div class="<%= canManageAll ? 'col-lg-2 col-md-6' : 'col-md-3' %>">
           <label class="form-label" for="taskAssignmentFilter">Assignment</label>
-          <select class="form-select" id="taskAssignmentFilter" name="assignment">
+          <select class="form-select size-md" id="taskAssignmentFilter" name="assignment">
             <option value="" <%= !taskStateFilters?.assignment ? 'selected' : '' %>>All assignments</option>
             <option value="mine" <%= taskStateFilters?.assignment === 'mine' ? 'selected' : '' %>>Assigned to me</option>
             <option value="unassigned" <%= taskStateFilters?.assignment === 'unassigned' ? 'selected' : '' %>>Unassigned</option>
@@ -68,7 +67,7 @@
         </div>
         <div class="<%= canManageAll ? 'col-lg-2 col-md-4' : 'col-md-3' %>">
           <label class="form-label" for="taskStatusFilter">Status</label>
-          <select class="form-select" id="taskStatusFilter" name="status">
+          <select class="form-select size-md" id="taskStatusFilter" name="status">
             <option value="" <%= !taskStateFilters?.status ? 'selected' : '' %>>All statuses</option>
             <% (statuses || []).forEach((value) => { %>
               <option value="<%= value %>" <%= taskStateFilters?.status === value ? 'selected' : '' %>><%= String(value).replace(/_/g, ' ').toUpperCase() %></option>
@@ -77,7 +76,7 @@
         </div>
         <div class="<%= canManageAll ? 'col-lg-1 col-md-4' : 'col-md-2' %>">
           <label class="form-label" for="taskSeverityFilter">Severity</label>
-          <select class="form-select" id="taskSeverityFilter" name="severity">
+          <select class="form-select size-md" id="taskSeverityFilter" name="severity">
             <option value="" <%= !taskStateFilters?.severity ? 'selected' : '' %>>All</option>
             <% (severities || []).forEach((value) => { %>
               <option value="<%= value %>" <%= taskStateFilters?.severity === value ? 'selected' : '' %>><%= String(value).toUpperCase() %></option>
@@ -86,16 +85,18 @@
         </div>
         <div class="<%= canManageAll ? 'col-lg-2 col-md-4' : 'col-md-2' %>">
           <label class="form-label" for="taskSourceFilter">Source</label>
-          <select class="form-select" id="taskSourceFilter" name="sourceType">
+          <select class="form-select size-md" id="taskSourceFilter" name="sourceType">
             <option value="" <%= !taskStateFilters?.sourceType ? 'selected' : '' %>>All</option>
             <% (sourceTypes || []).forEach((value) => { %>
               <option value="<%= value %>" <%= taskStateFilters?.sourceType === value ? 'selected' : '' %>><%= String(value).replace(/_/g, ' ') %></option>
             <% }) %>
           </select>
         </div>
-        <div class="<%= canManageAll ? 'col-lg-1 col-md-12' : 'col-md-2' %> d-flex gap-2">
-          <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-funnel me-1"></i> Filter</button>
-          <a href="/school/tasks" class="btn btn-outline-secondary"><i class="bi bi-x-circle"></i></a>
+        <div class="col-12 d-flex justify-content-lg-end gap-2 pt-2">
+          <a href="/school/tasks" class="btn btn-outline-secondary btn-md">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
         </div>
       </div>
     </form>

@@ -37,6 +37,7 @@ const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const taskModel = require('../../models/school/taskModel');
 const taskRoutingRuleModel = require('../../models/school/taskRoutingRuleModel');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
+const { SCOPE_MODES } = require('../../services/school/schoolDataScopeBuilder');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -83,17 +84,64 @@ function readOwnerUserIds(record = {}) {
   ].map((value) => toPublicId(value)).filter(Boolean);
 }
 
+function isOwnerScopeMode(scope = {}) {
+  return scope?.scopeMode === SCOPE_MODES.OWNER || scope?.ownerScoped === true;
+}
+
+function isAssignmentScopeMode(scope = {}) {
+  return scope?.scopeMode === SCOPE_MODES.ASSIGNMENT;
+}
+
 function isRecordOwnedByScopeUser(record = {}, scope = {}) {
-  if (scope?.ownerScoped !== true && !scope?.userId) return true;
+  if (!isOwnerScopeMode(scope) && !scope?.userId) return true;
   const scopedUserId = toPublicId(scope?.userId);
   if (!scopedUserId) return false;
   return readOwnerUserIds(record).some((ownerId) => idsEqual(ownerId, scopedUserId));
 }
 
-function buildOwnerScopeFilter(scope = {}) {
-  if (scope?.ownerScoped !== true && !scope?.userId) return null;
-  const scopedUserId = toPublicId(scope?.userId);
-  if (!scopedUserId) return { id: '__NO_MATCH__' };
+function isRecordOwnedByUser(record = {}, userId = '') {
+  const scopedUserId = toPublicId(userId);
+  if (!scopedUserId) return false;
+  return readOwnerUserIds(record).some((ownerId) => idsEqual(ownerId, scopedUserId));
+}
+
+function isRecordAccessibleByAssignment(record = {}, scope = {}, options = {}) {
+  if (!isAssignmentScopeMode(scope)) return true;
+  const kind = String(options?.assignmentScopeKind || 'personId').trim() || 'personId';
+  if (kind === 'catalog' || kind === 'none') return true;
+
+  if (kind === 'partyAccounts') {
+    const linkedIds = Array.isArray(scope?.linkedAccountIds) ? scope.linkedAccountIds : [];
+    const recordId = toPublicId(record?.id);
+    if (!recordId) return false;
+    return linkedIds.some((id) => idsEqual(id, recordId));
+  }
+
+  const personId = toPublicId(scope?.personId);
+  if (!personId) return false;
+
+  if (kind === 'instructor') {
+    const instructors = Array.isArray(record?.instructors) ? record.instructors : [];
+    return instructors.some((row) => idsEqual(row?.personId, personId));
+  }
+
+  if (kind === 'assignees') {
+    const assignees = Array.isArray(record?.assignees) ? record.assignees : [];
+    if (assignees.some((row) => idsEqual(row?.personId, personId))) return true;
+    const allowed = Array.isArray(record?.allowedPersonIds) ? record.allowedPersonIds : [];
+    return allowed.some((id) => idsEqual(id, personId));
+  }
+
+  if (kind === 'personId') {
+    return idsEqual(record?.personId, personId);
+  }
+
+  return false;
+}
+
+function buildOwnerScopeFilterForUser(userId = '') {
+  const scopedUserId = toPublicId(userId);
+  if (!scopedUserId) return null;
   return {
     $or: [
       { ownerUserId: scopedUserId },
@@ -103,6 +151,45 @@ function buildOwnerScopeFilter(scope = {}) {
       { 'audit.createUser': scopedUserId }
     ]
   };
+}
+
+function buildOwnerScopeFilter(scope = {}) {
+  if (!isOwnerScopeMode(scope)) return null;
+  return buildOwnerScopeFilterForUser(scope?.userId) || { id: '__NO_MATCH__' };
+}
+
+function buildAssignmentScopeFilter(scope = {}, options = {}) {
+  if (!isAssignmentScopeMode(scope)) return null;
+  const kind = String(options?.assignmentScopeKind || 'personId').trim() || 'personId';
+  if (kind === 'catalog' || kind === 'none') return null;
+
+  if (kind === 'partyAccounts') {
+    const linkedIds = (Array.isArray(scope?.linkedAccountIds) ? scope.linkedAccountIds : [])
+      .map((id) => toPublicId(id))
+      .filter(Boolean);
+    if (!linkedIds.length) return { id: '__NO_MATCH__' };
+    return { id: { $in: linkedIds } };
+  }
+
+  const personId = toPublicId(scope?.personId);
+  if (!personId) return { id: '__NO_MATCH__' };
+
+  if (kind === 'instructor') {
+    return { 'instructors.personId': personId };
+  }
+  if (kind === 'assignees') {
+    return {
+      $or: [
+        { 'assignees.personId': personId },
+        { allowedPersonIds: personId }
+      ]
+    };
+  }
+  if (kind === 'personId') {
+    return { personId };
+  }
+
+  return { id: '__NO_MATCH__' };
 }
 
 function getRequestingUserIdFromOptions(options = {}) {
@@ -166,6 +253,20 @@ function preserveExistingOwnershipFields(merged = {}, existing = {}) {
   return output;
 }
 
+function isRecordVisibleUnderScope(record = {}, scope = {}, options = {}) {
+  const scopeMode = scope?.scopeMode;
+  if (scope?.canViewAll === true || scopeMode === SCOPE_MODES.ORG_WIDE) return true;
+  if (scope?.denyAll === true || scopeMode === SCOPE_MODES.USER) return false;
+  if (scopeMode === SCOPE_MODES.OWNER) {
+    return isRecordOwnedByScopeUser(record, scope);
+  }
+  if (scopeMode === SCOPE_MODES.ASSIGNMENT) {
+    return isRecordAccessibleByAssignment(record, scope, options)
+      || isRecordOwnedByUser(record, scope.userId);
+  }
+  return false;
+}
+
 function applyOrgScope(rows, scope = {}, options = {}) {
   const list = normalizeRows(rows);
   if (scope?.canViewAll === true) return list;
@@ -186,12 +287,21 @@ function applyOrgScope(rows, scope = {}, options = {}) {
     return idsEqual(recordOrgId, activeOrgId);
   });
 
-  return orgScopedRows.filter((record) => isRecordOwnedByScopeUser(record, scope));
+  if (scope?.scopeMode === SCOPE_MODES.USER) return [];
+
+  const scopeMode = scope?.scopeMode;
+  const isOrgWide = scope?.canViewAll === true || scopeMode === SCOPE_MODES.ORG_WIDE;
+  if (isOrgWide) return orgScopedRows;
+
+  return orgScopedRows.filter((record) => isRecordVisibleUnderScope(record, scope, options));
 }
 
 function buildSchoolScopeFilter(scope = {}, options = {}) {
   if (scope?.canViewAll === true) return {};
-  if (scope?.denyAll === true) return { id: '__NO_MATCH__' };
+  if (scope?.denyAll === true || scope?.scopeMode === SCOPE_MODES.USER) return { id: '__NO_MATCH__' };
+
+  const scopeMode = scope?.scopeMode;
+  const isOrgWide = scopeMode === SCOPE_MODES.ORG_WIDE;
 
   const activeOrgId = toPublicId(scope?.activeOrgId) || null;
   if (!activeOrgId) return { id: '__NO_MATCH__' };
@@ -203,8 +313,23 @@ function buildSchoolScopeFilter(scope = {}, options = {}) {
   } else {
     clauses.push({ [orgField]: activeOrgId });
   }
-  const ownerFilter = buildOwnerScopeFilter(scope);
-  if (ownerFilter) clauses.push(ownerFilter);
+  if (!isOrgWide) {
+    if (scopeMode === SCOPE_MODES.ASSIGNMENT) {
+      const assignmentFilter = buildAssignmentScopeFilter(scope, options);
+      const ownerFilter = buildOwnerScopeFilterForUser(scope?.userId);
+      const visibilityFilters = [assignmentFilter, ownerFilter].filter(Boolean);
+      if (visibilityFilters.length === 1) {
+        clauses.push(visibilityFilters[0]);
+      } else if (visibilityFilters.length > 1) {
+        clauses.push({ $or: visibilityFilters });
+      } else {
+        clauses.push({ id: '__NO_MATCH__' });
+      }
+    } else if (scopeMode === SCOPE_MODES.OWNER) {
+      const ownerFilter = buildOwnerScopeFilter(scope);
+      if (ownerFilter) clauses.push(ownerFilter);
+    }
+  }
   if (!clauses.length) return {};
   if (clauses.length === 1) return clauses[0];
   return { $and: clauses };
@@ -288,6 +413,7 @@ function createSchoolRepository(config) {
   const mongoScopeInMemory = config.mongoScopeInMemory === true;
   const mongoRemoveUnsupported = config.mongoRemoveUnsupported === true;
   const mongoRemoveMessage = String(config.mongoRemoveMessage || 'Delete operation is not supported.');
+  const assignmentScopeKind = String(config.assignmentScopeKind || 'personId').trim() || 'personId';
 
   async function runLocalList(plan = {}, options = {}) {
     const query = plan?.query || {};
@@ -299,7 +425,8 @@ function createSchoolRepository(config) {
     const scopedRows = applyOrgScope(transformedRows, scope, {
       orgField,
       allowSystemFallback,
-      resolveOrgId
+      resolveOrgId,
+      assignmentScopeKind
     });
 
     return applyGenericFilter(scopedRows, query, { defaultSearchFields, dateFields });
@@ -310,7 +437,7 @@ function createSchoolRepository(config) {
     const query = options?.query || {};
     const scopeFilter = mongoScopeInMemory
       ? {}
-      : buildSchoolScopeFilter(options?.scope || {}, { orgField, allowSystemFallback });
+      : buildSchoolScopeFilter(options?.scope || {}, { orgField, allowSystemFallback, assignmentScopeKind });
     const queryFilter = buildMongoFilterFromQuery(query, {
       defaultSearchFields,
       dateFields
@@ -332,7 +459,12 @@ function createSchoolRepository(config) {
       ? await transformList(rows, { ...options, backendMode: 'mongo' })
       : rows;
     const scopedRows = mongoScopeInMemory
-      ? applyOrgScope(transformedRows, options?.scope || {}, { orgField, allowSystemFallback, resolveOrgId })
+      ? applyOrgScope(transformedRows, options?.scope || {}, {
+        orgField,
+        allowSystemFallback,
+        resolveOrgId,
+        assignmentScopeKind
+      })
       : transformedRows;
     return scopedRows;
   }
@@ -525,7 +657,8 @@ const schoolRepositories = {
     create: studentModel.addStudent,
     update: studentModel.updateStudent,
     remove: studentModel.deleteStudent,
-    defaultSearchFields: ['id', 'personId', 'studentCode', 'status']
+    defaultSearchFields: ['id', 'personId', 'studentCode', 'status'],
+    assignmentScopeKind: 'personId'
   }),
   programs: createSchoolRepository({
     entityName: 'programs',
@@ -556,7 +689,8 @@ const schoolRepositories = {
     create: schoolAccountModel.addAccount,
     update: schoolAccountModel.updateAccount,
     remove: schoolAccountModel.deleteAccount,
-    defaultSearchFields: ['id', 'name', 'partyId', 'status', 'category']
+    defaultSearchFields: ['id', 'name', 'partyId', 'status', 'category'],
+    assignmentScopeKind: 'partyAccounts'
   }),
   globalTransactions: createSchoolRepository({
     entityName: 'globalTransactions',
@@ -725,7 +859,8 @@ const schoolRepositories = {
     create: subjectModel.addSubject,
     update: subjectModel.updateSubject,
     remove: subjectModel.deleteSubject,
-    defaultSearchFields: ['id', 'name', 'code', 'description']
+    defaultSearchFields: ['id', 'name', 'code', 'description'],
+    assignmentScopeKind: 'catalog'
   }),
   classes: createSchoolRepository({
     entityName: 'classes',
@@ -736,6 +871,7 @@ const schoolRepositories = {
     update: classModel.updateClass,
     remove: classModel.deleteClass,
     defaultSearchFields: ['id', 'title', 'code', 'description', 'status'],
+    assignmentScopeKind: 'instructor',
     transformList: (rows) => normalizeRows(rows).map((row) => normalizeClassDataContract(row)),
     transformItem: (row) => normalizeClassDataContract(row)
   }),
@@ -747,7 +883,8 @@ const schoolRepositories = {
     create: holidayModel.addHoliday,
     update: holidayModel.updateHoliday,
     remove: holidayModel.deleteHoliday,
-    defaultSearchFields: ['id', 'title', 'type', 'description']
+    defaultSearchFields: ['id', 'title', 'type', 'description'],
+    assignmentScopeKind: 'catalog'
   }),
   terms: createSchoolRepository({
     entityName: 'terms',
@@ -757,7 +894,8 @@ const schoolRepositories = {
     create: termModel.addTerm,
     update: termModel.updateTerm,
     remove: termModel.deleteTerm,
-    defaultSearchFields: ['id', 'name', 'status', 'description']
+    defaultSearchFields: ['id', 'name', 'status', 'description'],
+    assignmentScopeKind: 'catalog'
   }),
   departments: createSchoolRepository({
     entityName: 'departments',
@@ -767,7 +905,8 @@ const schoolRepositories = {
     create: departmentModel.addDepartment,
     update: departmentModel.updateDepartment,
     remove: departmentModel.deleteDepartment,
-    defaultSearchFields: ['id', 'name', 'code', 'description']
+    defaultSearchFields: ['id', 'name', 'code', 'description'],
+    assignmentScopeKind: 'catalog'
   }),
   activityCategories: createSchoolRepository({
     entityName: 'activityCategories',
@@ -777,7 +916,8 @@ const schoolRepositories = {
     create: activityCategoryModel.addCategory,
     update: activityCategoryModel.updateCategory,
     remove: activityCategoryModel.deleteCategory,
-    defaultSearchFields: ['id', 'orgId', 'code', 'name', 'description']
+    defaultSearchFields: ['id', 'orgId', 'code', 'name', 'description'],
+    assignmentScopeKind: 'catalog'
   }),
   activities: createSchoolRepository({
     entityName: 'activities',
@@ -787,7 +927,8 @@ const schoolRepositories = {
     create: activityModel.addActivity,
     update: activityModel.updateActivity,
     remove: activityModel.deleteActivity,
-    defaultSearchFields: ['id', 'orgId', 'title', 'categoryId', 'departmentId', 'status', 'location']
+    defaultSearchFields: ['id', 'orgId', 'title', 'categoryId', 'departmentId', 'status', 'location'],
+    assignmentScopeKind: 'assignees'
   }),
   teachers: createSchoolRepository({
     entityName: 'teachers',
@@ -797,7 +938,8 @@ const schoolRepositories = {
     create: teacherModel.addTeacher,
     update: teacherModel.updateTeacher,
     remove: teacherModel.deleteTeacher,
-    defaultSearchFields: ['id', 'personId', 'status', 'employmentType']
+    defaultSearchFields: ['id', 'personId', 'status', 'employmentType'],
+    assignmentScopeKind: 'personId'
   }),
   staff: createSchoolRepository({
     entityName: 'staff',
@@ -807,7 +949,8 @@ const schoolRepositories = {
     create: staffModel.addStaff,
     update: staffModel.updateStaff,
     remove: staffModel.deleteStaff,
-    defaultSearchFields: ['id', 'personId', 'status', 'employmentType']
+    defaultSearchFields: ['id', 'personId', 'status', 'employmentType'],
+    assignmentScopeKind: 'personId'
   }),
   payRates: createSchoolRepository({
     entityName: 'payRates',
@@ -1918,6 +2061,11 @@ assertQueryableCrudRepository('schoolRepositories.tasks', schoolRepositories.tas
 assertQueryableCrudRepository('schoolRepositories.taskRoutingRules', schoolRepositories.taskRoutingRules);
 
 module.exports = schoolRepositories;
+module.exports.__scopeTestHelpers = {
+  isRecordVisibleUnderScope,
+  applyOrgScope,
+  buildSchoolScopeFilter
+};
 
 
 

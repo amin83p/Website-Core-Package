@@ -33,6 +33,10 @@
         <th class="draggable" data-column="name">
           Name <span class="sort-icon"></span>
         </th>
+
+        <th class="draggable" data-column="displayText">
+          Display Text <span class="sort-icon"></span>
+        </th>
         
         <th class="draggable" data-column="category">
           Category <span class="sort-icon"></span>
@@ -86,6 +90,7 @@
         %>
         <tr>
           <td><%= section.name %></td>
+          <td><%= section.displayText ? section.displayText : '—' %></td>
           
           <td>
               <% 

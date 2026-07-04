@@ -1717,6 +1717,12 @@ function initQuickMenu() {
             .join(' ');
     }
 
+    function resolveSectionDisplayTitle(section) {
+        const custom = String(section?.displayText || '').trim();
+        if (custom) return custom;
+        return prettifyName(section?.name);
+    }
+
     function escapeHtml(value) {
         return String(value || '')
             .replace(/&/g, '&amp;')
@@ -1842,9 +1848,9 @@ function initQuickMenu() {
             const homeUrl = String(section.homeURL || '').trim();
             const hasSubsections = Array.isArray(section.subsections) && section.subsections.length > 0;
             const url = homeUrl || (hasSubsections ? `/dashboard/section-nav/${encodeURIComponent(section.name || section.id || '')}` : '/sections');
-            const title = prettifyName(section.name);
+            const title = resolveSectionDisplayTitle(section);
             const desc = section.description || '';
-            const searchStr = `${section.name || ''} ${section.id || ''} ${title} ${desc}`.toLowerCase();
+            const searchStr = `${section.name || ''} ${section.displayText || ''} ${section.id || ''} ${title} ${desc}`.toLowerCase();
 
             const a = document.createElement('a');
             a.href = url;

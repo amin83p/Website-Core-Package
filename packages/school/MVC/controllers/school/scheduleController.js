@@ -876,6 +876,37 @@ function summarizeEvents(events, statusMeta = []) {
     };
 }
 
+function summarizeTimesheetHoursForEvents(events, statusMap) {
+    const list = Array.isArray(events) ? events : [];
+    let totalTimesheetHours = 0;
+    let overlapCount = 0;
+
+    for (const event of list) {
+        if (event?.hasOverlap) overlapCount += 1;
+
+        if (isApprovedLeaveScheduleEvent(event)) {
+            continue;
+        }
+
+        const eventType = String(event?.eventType || '').trim().toLowerCase();
+        if (eventType === 'class_session' || (!eventType && event?.sessionId)) {
+            totalTimesheetHours += sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
+                status: event?.status,
+                notes: event?.notes || '',
+                durationHours: Number(event?.duration || 0)
+            });
+        } else {
+            totalTimesheetHours += Number(event?.timesheetHours ?? event?.duration ?? 0);
+        }
+    }
+
+    return {
+        totalTimesheetHours: Number(totalTimesheetHours.toFixed(2)),
+        eventCount: list.length,
+        overlapCount
+    };
+}
+
 async function getPersonById(personId, reqUser) {
     const targetPersonId = normalizeId(personId);
     if (!targetPersonId) return null;
@@ -886,14 +917,14 @@ async function getPersonById(personId, reqUser) {
     return (persons || []).find((row) => idsEqual(row?.id, targetPersonId)) || null;
 }
 
-async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqUser, activeOrgId, statusMap = null }) {
+async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqUser, activeOrgId, statusMap = null, accessContext = {} }) {
     const [studentIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents] = await Promise.all([
         schoolDataService.getStudentIndex(),
-        schoolDataService.fetchData('classes', {}, reqUser),
+        schoolDataService.fetchData('classes', {}, reqUser, accessContext),
         schoolRepositories.reportAssignments.list({ query: {}, scope: { canViewAll: true } }),
         schoolRepositories.reportTemplates.list({ query: {}, scope: { canViewAll: true } }),
-        schoolDataService.fetchData('teachers', {}, reqUser),
-        schoolDataService.fetchData('students', {}, reqUser)
+        schoolDataService.fetchData('teachers', {}, reqUser, accessContext),
+        schoolDataService.fetchData('students', {}, reqUser, accessContext)
     ]);
     const teacherPersonMap = buildTeacherPersonMap(allTeachers);
     const normalizedPersonId = resolveLinkedPersonId(personId, teacherPersonMap);
@@ -1210,7 +1241,8 @@ async function getMyScheduleData(req, res) {
             endDate: scanRange.end,
             reqUser: req.user,
             activeOrgId,
-            statusMap
+            statusMap,
+            accessContext: schoolDataService.buildRouteAccessContext(req)
         });
 
         const yearlyEvents = result.events || [];
@@ -1266,8 +1298,7 @@ async function showSchedulePage(req, res) {
         const safePersonName = viewerScheduleAccess.canSelectAnyPerson ? (personName || '') : (viewerScheduleAccess.lockedPersonName || '');
 
         res.render('school/schedule/personSchedule', {
-            // Dynamically set the page title if a name is provided
-            title: safePersonName ? `Schedule: ${safePersonName}` : 'Master Schedule Viewer',
+            title: 'Master Schedule Viewer',
             includeModal: true,
             user: req.user,
             
@@ -1327,7 +1358,8 @@ async function getPersonSchedule(req, res) {
             endDate: String(endDate || '').trim(),
             reqUser: req.user,
             activeOrgId,
-            statusMap
+            statusMap,
+            accessContext: schoolDataService.buildRouteAccessContext(req)
         });
 
         const availableRoles = viewerScheduleAccess.canSelectAnyPerson
@@ -1455,21 +1487,31 @@ async function showGlobalSchedulePage(req, res) {
     res.render('school/schedule/globalSchedule', {
         title: 'Global Schedule Comparison',
         includeModal: true,
-        user: req.user
+        user: req.user,
+        tableName: 'Global_Schedule_Comparison'
     });
 }
 
 async function getGlobalSchedule(req, res) {
     try {
-        const { personIds, startDate, endDate } = req.query;
+        const { personIds, personRoles, startDate, endDate } = req.query;
         if (!personIds || !startDate || !endDate) throw new Error('Person IDs, Start Date, and End Date are required.');
         const activeOrgId = normalizeId(req.user?.activeOrgId);
         const statusMeta = await sessionStatusPolicyService.getClientStatusMeta(activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(statusMeta);
 
-        const pIdArray = personIds.split(',').map(id => id.trim()).filter(Boolean);
+        const pIdArray = String(personIds || '').split(',').map((id) => id.trim()).filter(Boolean);
+        const roleArray = String(personRoles || '').split(',').map((role) => role.trim());
+        const selections = pIdArray.map((personId, index) => ({
+            personId,
+            role: normalizeScheduleRole(roleArray[index] || '')
+        }));
+
         let events = [];
-        for (const personId of pIdArray) {
+        const personSummaries = [];
+
+        for (let selectionIndex = 0; selectionIndex < selections.length; selectionIndex += 1) {
+            const { personId, role } = selections[selectionIndex];
             // eslint-disable-next-line no-await-in-loop
             const result = await buildEventsForPersonAndRange({
                 personId,
@@ -1477,19 +1519,33 @@ async function getGlobalSchedule(req, res) {
                 endDate: String(endDate || '').trim(),
                 reqUser: req.user,
                 activeOrgId,
-                statusMap
+                statusMap,
+                accessContext: schoolDataService.buildRouteAccessContext(req)
             });
             const personName = String(result?.personName || personId).trim() || personId;
-            const personEvents = (Array.isArray(result?.events) ? result.events : []).map((event) => ({
+            let personEvents = Array.isArray(result?.events) ? result.events : [];
+            if (role) {
+                personEvents = filterScheduleEventsForRole(personEvents, role);
+            }
+            personEvents = filterEventsWithCasesIfRequested(personEvents, req.query);
+            personEvents = personEvents.map((event) => ({
                 ...event,
                 personId: normalizeId(event?.personId || personId),
                 personName,
+                selectionIndex,
+                selectionRole: role,
                 role: event?.roles?.[0] || event?.role || 'Participant'
             }));
+
+            personSummaries.push({
+                personId: normalizeId(personId),
+                personName,
+                role,
+                ...summarizeTimesheetHoursForEvents(personEvents, statusMap)
+            });
             events.push(...personEvents);
         }
 
-        events = filterEventsWithCasesIfRequested(events, req.query);
         events.sort((a, b) => {
             const dateA = new Date(`${a.date}T${a.start || '00:00'}`);
             const dateB = new Date(`${b.date}T${b.start || '00:00'}`);
@@ -1501,8 +1557,8 @@ async function getGlobalSchedule(req, res) {
             for (let j = i + 1; j < events.length; j++) {
                 const current = events[i];
                 const next = events[j];
-                if (current.date !== next.date) break; // Array is sorted, so we can break early
-                
+                if (current.date !== next.date) break;
+
                 if (current.personId === next.personId) {
                     const currentEnd = new Date(`${current.date}T${current.end}`);
                     const nextStart = new Date(`${next.date}T${next.start}`);
@@ -1515,7 +1571,15 @@ async function getGlobalSchedule(req, res) {
             }
         }
 
-        res.json({ status: 'success', events, statusMeta });
+        for (let i = 0; i < personSummaries.length; i += 1) {
+            const selectionEvents = events.filter((event) => event.selectionIndex === i);
+            const refreshed = summarizeTimesheetHoursForEvents(selectionEvents, statusMap);
+            personSummaries[i].totalTimesheetHours = refreshed.totalTimesheetHours;
+            personSummaries[i].eventCount = refreshed.eventCount;
+            personSummaries[i].overlapCount = refreshed.overlapCount;
+        }
+
+        res.json({ status: 'success', events, statusMeta, personSummaries });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
     }
@@ -1533,6 +1597,7 @@ module.exports = {
     buildScheduleViewerAccess,
     buildSchoolSchedulePersonPickerRows,
     buildEventsForPersonAndRange,
-    filterScheduleEventsForRole
+    filterScheduleEventsForRole,
+    summarizeTimesheetHoursForEvents
 };
 

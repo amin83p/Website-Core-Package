@@ -4,6 +4,7 @@ const accessService = require('../services/security/accessControl');
 const firstRunBootstrapService = require('../services/firstRunBootstrapService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const adminCheckersService = require('../services/adminChekersService');
+const { resolveSectionDisplayTitle } = require('../utils/sectionDisplay');
 
 const DASHBOARD_ALL_SECTIONS_CACHE_TTL_MS = 60 * 1000;
 const dashboardAllSectionsCache = new Map();
@@ -184,6 +185,7 @@ function normalizeDashboardSortToken(sortToken = '') {
 function buildDashboardSearchText(section = {}) {
   const parts = [
     section?.name,
+    section?.displayText,
     section?.description,
     section?.message,
     section?.category
@@ -482,7 +484,7 @@ function buildStartMenuTreeNodes(accessibleSections) {
     nextCyclePath.add(cycleKey);
 
     const childSections = resolveChildren(section);
-    const nextPathTitles = context.pathTitles.concat([formatDashboardLabel(sectionName || sectionId)]);
+    const nextPathTitles = context.pathTitles.concat([resolveSectionDisplayTitle(section, formatDashboardLabel)]);
     const nextPathKeyParts = context.pathKeyParts.concat([nodeIdentity]);
 
     const childNodes = [];
@@ -508,7 +510,7 @@ function buildStartMenuTreeNodes(accessibleSections) {
       key: nodeKey,
       id: sectionId,
       name: sectionName,
-      title: formatDashboardLabel(sectionName || sectionId),
+      title: resolveSectionDisplayTitle(section, formatDashboardLabel),
       description: String(section?.description || ''),
       url: buildSectionOpenUrl(section, hasChildren),
       icon,
@@ -706,9 +708,8 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
     let href = home || (hasSubs ? `/dashboard/section-nav/${navKey}` : '/sections');
     const colors = ['primary', 'secondary', 'success', 'info', 'warning', 'danger'];
     const color = colors[index % colors.length];
-    const displayName = s.name || s.code || s.id || 'Unknown';
     return {
-      title: formatDashboardLabel(displayName),
+      title: resolveSectionDisplayTitle(s, formatDashboardLabel),
       description: s.description || '',
       href,
       icon: 'bi-grid-fill',
@@ -723,7 +724,7 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
   // Keep icon/tile order exactly as configured in parentSection.subsections.
   const dashboardSections = subsections.map((s, i) => sectionToModule(s, i));
 
-  const displayName = formatDashboardLabel(parentSection.name);
+  const displayName = resolveSectionDisplayTitle(parentSection, formatDashboardLabel);
   const title = `${displayName} - Subsections`;
 
   return res.render('dashboard/sectionSubDashboard', {

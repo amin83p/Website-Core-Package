@@ -605,7 +605,7 @@ exports.getTimesheetManagementRoster = async (req, res) => {
 
         const [eligiblePeople, allTimesheets] = await Promise.all([
             loadTimesheetEligiblePeople(activeOrgId, req.user),
-            dataService.fetchData('timesheets', {}, req.user)
+            dataService.fetchData('timesheets', {}, req.user, dataService.buildRouteAccessContext(req))
         ]);
         const timesheetByPersonId = new Map(
             (Array.isArray(allTimesheets) ? allTimesheets : [])
@@ -892,7 +892,7 @@ exports.listMyTimesheets = async (req, res) => {
 
         const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: false, operationId: OPERATIONS.READ_ALL });
 
-        const allTimesheets = await dataService.fetchData('timesheets', {}, req.user);
+        const allTimesheets = await dataService.fetchData('timesheets', {}, req.user, dataService.buildRouteAccessContext(req));
         const targetTimesheets = teacherContext.targetTeacherId
             ? allTimesheets.filter((t) => idsEqual(t.teacherId, teacherContext.targetTeacherId))
             : [];
@@ -976,7 +976,7 @@ exports.viewTimesheet = async (req, res) => {
         const sessionStatusMeta = await sessionStatusPolicyService.getClientStatusMeta(period.orgId || activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(sessionStatusMeta);
 
-        const allTimesheets = await dataService.fetchData('timesheets', {}, req.user);
+        const allTimesheets = await dataService.fetchData('timesheets', {}, req.user, dataService.buildRouteAccessContext(req));
         let timesheet = allTimesheets.find(
             (t) => idsEqual(t.periodId, periodId) && idsEqual(t.teacherId, teacherContext.targetTeacherId)
         );

@@ -8,7 +8,7 @@
     .status-absent { color: #dc3545; font-weight: bold; }
     .status-na { color: #adb5bd; }
     
-    .matrix-wrapper { max-height: 600px; overflow: auto; border: 1px solid #dee2e6; border-radius: 6px; }
+    .matrix-wrapper { max-height: 600px; overflow: auto; border: 1px solid #dee2e6; border-radius: 12px; box-shadow: 0 0.15rem 0.5rem rgba(15, 23, 42, 0.05); }
     .matrix-table th { position: sticky; top: 0; background-color: #f8f9fa; z-index: 2; box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); }
     /* Sticky rollup + student name columns */
     .matrix-table th.matrix-sticky-rollup,
@@ -45,56 +45,104 @@
     .comment-author { font-weight: bold; font-size: 0.8rem; color: #495057; }
     .comment-time { font-size: 0.7rem; color: #adb5bd; float: right; }
     .mention-badge { background-color: #e7f1ff; color: #0d6efd; font-size: 0.75rem; padding: 2px 6px; border-radius: 12px; font-weight: bold; border: 1px solid #b6d4fe; }
+    .schedule-shell .filter-panel {
+        background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
+        border: 1px solid #dce9ff;
+        border-radius: 14px;
+    }
+    .schedule-shell .range-chip.active {
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+    }
 </style>
 
-<div class="sections-page">
-    <div class="d-flex align-items-center justify-content-between mb-4">
-        <div>
-            <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-grid-3x3 me-2"></i> Attendance Matrix</h1>
+<%
+  const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
+    ? schoolSectionDashboardHref
+    : '/dashboard/section-nav/SCHOOL';
+  const attManageBtns = [
+    '<a href="/school/grades-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-table me-1"></i> Grades Matrix</a>'
+  ];
+  if (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) {
+    attManageBtns.push('<a href="/school/attendances/settings" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-sliders me-1"></i> Matrix Thresholds</a>');
+  }
+%>
+
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName: typeof tableName !== 'undefined' ? tableName : 'Attendance_Matrix',
+  btn_export: false,
+  print: false,
+  headerManageBtns: [
+    '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
+  ],
+  manageBtns: attManageBtns
+}) %>
+
+<div class="schedule-shell">
+    <p class="text-muted small mb-3">View and manage class attendance across sessions. Pick a class, set a date range, then apply to load the matrix.</p>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+            <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Attendance Matrix</div>
+            <button
+                id="attFilterToggleBtn"
+                type="button"
+                class="btn btn-outline-secondary btn-sm px-2"
+                data-bs-toggle="collapse"
+                data-bs-target="#attFilterCollapse"
+                aria-expanded="true"
+                aria-controls="attFilterCollapse"
+                aria-label="Close filters">
+                <i id="attFilterToggleIcon" class="bi bi-chevron-up"></i>
+            </button>
         </div>
-        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
-            <% if (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) { %>
-            <a href="/school/attendances/settings" class="btn btn-outline-primary btn-md mb-2">
-                <i class="bi bi-sliders me-1"></i> Matrix thresholds
-            </a>
-            <% } %>
-            <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2">
-                <i class="bi bi-speedometer2 me-1"></i> Dashboard
-            </a>
-        </div>
-    </div>
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body bg-light rounded">
-            <div class="row align-items-end g-3 mb-3">
-                <div class="col-md-4">
-                    <label class="form-label fw-bold">Select Class</label>
-                    <div class="input-group">
-                        <input type="hidden" id="filter_classId">
-                        <input type="text" id="filter_className" class="form-control bg-white" placeholder="Search Class..." readonly>
-                        <button type="button" class="btn btn-outline-primary" id="btn_openClassPicker"><i class="bi bi-search"></i></button>
+        <div class="collapse show" id="attFilterCollapse">
+            <div class="card-body filter-panel p-3" id="attFilterForm">
+                <div class="row g-3 align-items-end">
+                    <div class="col-lg-4 col-md-6">
+                        <label class="form-label" for="filter_className">Class</label>
+                        <div class="input-group">
+                            <input type="hidden" id="filter_classId">
+                            <input type="text" id="filter_className" class="form-control bg-white" placeholder="Select class..." readonly>
+                            <button type="button" class="btn btn-outline-primary" id="btn_openClassPicker" title="Select class">
+                                <i class="bi bi-book"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="btn_clearClass" title="Clear class">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-lg-2 col-md-3">
+                        <label class="form-label" for="filter_startDate">Start Date</label>
+                        <input type="date" id="filter_startDate" class="form-control size-md">
+                    </div>
+                    <div class="col-lg-2 col-md-3">
+                        <label class="form-label" for="filter_endDate">End Date</label>
+                        <input type="date" id="filter_endDate" class="form-control size-md">
+                    </div>
+                    <div class="col-12 col-lg-4 d-flex justify-content-lg-end gap-2 pt-lg-2">
+                        <button type="button" id="btn_reset" class="btn btn-outline-secondary btn-md">Reset</button>
+                        <button type="button" id="btn_loadData" class="btn btn-filled btn-primary btn-md">
+                            <i class="bi bi-funnel me-1"></i> Apply
+                        </button>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold">Start Date</label>
-                    <input type="date" id="filter_startDate" class="form-control">
+                <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
+                    <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="today">Today</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="twoWeeks">Two Weeks</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="thisWeek">This Week</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="prevWeek">Prev Week</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="thisMonth">This Month</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="prevMonth">Prev Month</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="allTime">Whole Class (All Time)</button>
+                    </div>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold">End Date</label>
-                    <input type="date" id="filter_endDate" class="form-control">
-                </div>
-                <div class="col-md-2">
-                    <button type="button" id="btn_loadData" class="btn btn-primary w-100 fw-bold">Load Matrix</button>
-                </div>
-            </div>
-
-            <div class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="today">Today</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="twoWeeks">Two Weeks</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="thisWeek">This Week</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="prevWeek">Prev Week</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="thisMonth">This Month</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="prevMonth">Prev Month</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="allTime">Whole Class Date (All Time)</button>
             </div>
         </div>
     </div>
@@ -219,6 +267,7 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
+<%- include('partials/tablePages-end') %>
 
 <script>
 // Store the loaded matrix globally so we can access it on clicks
@@ -316,6 +365,26 @@ window.ATTENDANCE_PAGE_INITIAL = <%- JSON.stringify({
 }) %>;
 
 document.addEventListener('DOMContentLoaded', () => {
+    function bindCollapseToggle(options = {}) {
+        const collapseEl = document.getElementById(String(options.collapseId || ''));
+        const buttonEl = document.getElementById(String(options.buttonId || ''));
+        const iconEl = document.getElementById(String(options.iconId || ''));
+        if (!collapseEl || !buttonEl || !iconEl) return;
+        const setState = (open) => {
+            iconEl.className = open ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+            buttonEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+            buttonEl.setAttribute('aria-label', open ? 'Close filters' : 'Open filters');
+        };
+        setState(collapseEl.classList.contains('show'));
+        collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+        collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+    bindCollapseToggle({
+        collapseId: 'attFilterCollapse',
+        buttonId: 'attFilterToggleBtn',
+        iconId: 'attFilterToggleIcon'
+    });
+
     const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
     window.ATTENDANCE_ACTION_STATE_ID = actionStateId;
     window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
@@ -338,6 +407,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('filter_endDate').value = end ? toYmd(end) : '';
     };
     const startOfLocalDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+    function setActiveRangeChip(range) {
+        document.querySelectorAll('.btn-range.range-chip').forEach((btn) => {
+            btn.classList.toggle('active', btn.getAttribute('data-range') === range);
+        });
+    }
 
     document.querySelectorAll('.btn-range').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -375,6 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 end = new Date(today.getFullYear(), today.getMonth(), 0);
             } else if (range === 'allTime') {
                 setDateRange(null, null);
+                setActiveRangeChip(range);
                 if (document.getElementById('filter_classId').value) document.getElementById('btn_loadData').click();
                 return;
             } else {
@@ -382,8 +458,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             setDateRange(start, end);
+            setActiveRangeChip(range);
             if (document.getElementById('filter_classId').value) document.getElementById('btn_loadData').click();
         });
+    });
+
+    document.getElementById('btn_clearClass')?.addEventListener('click', () => {
+        document.getElementById('filter_classId').value = '';
+        document.getElementById('filter_className').value = '';
+        document.getElementById('resultsContainer').classList.add('d-none');
+    });
+
+    document.getElementById('btn_reset')?.addEventListener('click', () => {
+        document.getElementById('filter_classId').value = '';
+        document.getElementById('filter_className').value = '';
+        document.getElementById('filter_startDate').value = '';
+        document.getElementById('filter_endDate').value = '';
+        document.getElementById('resultsContainer').classList.add('d-none');
+        setActiveRangeChip('');
     });
 
     // --- 2. Pickers ---

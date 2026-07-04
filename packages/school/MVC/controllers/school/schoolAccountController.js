@@ -23,6 +23,10 @@ const OWNER_LOCKED_FIELDS = Object.freeze([
   'status'
 ]);
 
+function routeAccess(req) {
+  return dataService.buildRouteAccessContext(req);
+}
+
 function getActiveOrgIdOrThrow(reqUser) {
   const activeOrgId = toPublicId(reqUser?.activeOrgId);
   if (!activeOrgId) throw new Error('<b>Security Violation</b><br>No active organization context found.');
@@ -93,8 +97,8 @@ exports.listAccounts = async (req, res) => {
     delete accountQuery.page;
     delete accountQuery.limit;
     const [allAccounts, ownersByAccount] = await Promise.all([
-      dataService.fetchData('schoolAccounts', accountQuery, req.user),
-      schoolAccountDomainService.buildAccountOwnerMap(req.user)
+      dataService.fetchData('schoolAccounts', accountQuery, req.user, routeAccess(req)),
+      schoolAccountDomainService.buildAccountOwnerMap(req.user, routeAccess(req))
     ]);
     const enriched = schoolAccountDomainService
       .enrichAccountsWithOwners(allAccounts, ownersByAccount)
@@ -141,7 +145,7 @@ exports.listArchivedAccounts = async (req, res) => {
     // Fetch full archived set, then paginate once in this controller.
     delete archivedQuery.page;
     delete archivedQuery.limit;
-    const all = await dataService.fetchData('schoolAccounts', archivedQuery, req.user);
+    const all = await dataService.fetchData('schoolAccounts', archivedQuery, req.user, routeAccess(req));
     const searchableFields = await inferSearchableFields(all, { exclude: ['audit'] });
     const ownerByAccount = await schoolAccountDomainService.buildAccountOwnerMap(req.user);
     const idToName = new Map(all.map((a) => [toPublicId(a.id), `${a.code} - ${a.name}`]));
@@ -185,17 +189,17 @@ async function renderAccountFormView(req, res, viewName, titleOverride) {
     let account = {};
 
     if (isEdit) {
-      account = await dataService.getDataById('schoolAccounts', req.params.id, req.user);
+      account = await dataService.getDataById('schoolAccounts', req.params.id, req.user, routeAccess(req));
       if (!account) throw new Error('Account not found.');
       assertAccountOrgAccess(account, activeOrgId, req.user);
     }
-    const ownerConflicts = isEdit ? await schoolAccountDomainService.findAccountOwnerConflicts(account.id, req.user) : [];
+    const ownerConflicts = isEdit ? await schoolAccountDomainService.findAccountOwnerConflicts(account.id, req.user, routeAccess(req)) : [];
     const ownerLock = {
       isLocked: ownerConflicts.length > 0,
       owners: ownerConflicts
     };
 
-    const accounts = await dataService.fetchData('schoolAccounts', {}, req.user);
+    const accounts = await dataService.fetchData('schoolAccounts', {}, req.user, routeAccess(req));
     const parentAccounts = accounts
       .filter((a) => !isEdit || !idsEqual(a.id, account.id))
       .sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
@@ -248,7 +252,7 @@ exports.saveAccount = async (req, res) => {
 
     let existing = null;
     if (id) {
-      existing = await dataService.getDataById('schoolAccounts', id, req.user);
+      existing = await dataService.getDataById('schoolAccounts', id, req.user, routeAccess(req));
       if (!existing) throw new Error('Account not found.');
       assertAccountOrgAccess(existing, activeOrgId, req.user);
     }
@@ -257,7 +261,7 @@ exports.saveAccount = async (req, res) => {
     if (!id && req.body.accountId) payload.id = String(req.body.accountId).trim();
 
     if (id) {
-      const ownerConflicts = await schoolAccountDomainService.findAccountOwnerConflicts(id, req.user);
+      const ownerConflicts = await schoolAccountDomainService.findAccountOwnerConflicts(id, req.user, routeAccess(req));
       if (ownerConflicts.length) {
         const changedLockedFields = OWNER_LOCKED_FIELDS.filter((field) => {
           const beforeVal = existing[field];
@@ -300,11 +304,11 @@ exports.deleteAccount = async (req, res) => {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Account archive is already in progress. Please wait.')) return;
 
-    const existing = await dataService.getDataById('schoolAccounts', req.params.id, req.user);
+    const existing = await dataService.getDataById('schoolAccounts', req.params.id, req.user, routeAccess(req));
     if (!existing) throw new Error('Account not found.');
     assertAccountOrgAccess(existing, activeOrgId, req.user);
 
-    const ownerConflicts = await schoolAccountDomainService.findAccountOwnerConflicts(req.params.id, req.user);
+    const ownerConflicts = await schoolAccountDomainService.findAccountOwnerConflicts(req.params.id, req.user, routeAccess(req));
     if (ownerConflicts.length) {
       const ownerLabel = ownerConflicts
         .map((o) => `${String(o.type || '').toUpperCase()}: ${o.id} (${o.status})`)
@@ -347,7 +351,7 @@ exports.recoverAccount = async (req, res) => {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Account recovery is already in progress. Please wait.')) return;
 
-    const existing = await dataService.getDataById('schoolAccounts', req.params.id, req.user);
+    const existing = await dataService.getDataById('schoolAccounts', req.params.id, req.user, routeAccess(req));
     if (!existing) throw new Error('Account not found.');
     assertAccountOrgAccess(existing, activeOrgId, req.user);
 
@@ -355,7 +359,7 @@ exports.recoverAccount = async (req, res) => {
       throw new Error('Only archived accounts can be recovered.');
     }
 
-    const ownerConflicts = await schoolAccountDomainService.findAccountOwnerConflicts(req.params.id, req.user);
+    const ownerConflicts = await schoolAccountDomainService.findAccountOwnerConflicts(req.params.id, req.user, routeAccess(req));
     if (ownerConflicts.length) {
       const ownerLabel = ownerConflicts
         .map((o) => `${String(o.type || '').toUpperCase()}: ${o.id} (${o.status})`)
@@ -425,9 +429,9 @@ exports.syncOwnerAccountNamesFromPersons = async (req, res) => {
     if (sendGuardedResponse(req, res, guardResult, 'Name sync is already running. Please wait.')) return;
 
     const [students, teachers, staff] = await Promise.all([
-      dataService.fetchData('students', { orgId__eq: activeOrgId }, req.user),
-      dataService.fetchData('teachers', { orgId__eq: activeOrgId }, req.user),
-      dataService.fetchData('staff', { orgId__eq: activeOrgId }, req.user)
+      dataService.fetchData('students', { orgId__eq: activeOrgId }, req.user, routeAccess(req)),
+      dataService.fetchData('teachers', { orgId__eq: activeOrgId }, req.user, routeAccess(req)),
+      dataService.fetchData('staff', { orgId__eq: activeOrgId }, req.user, routeAccess(req))
     ]);
 
     const personMap = await schoolPersonAccessService.buildPersonByIdMap({
@@ -487,7 +491,7 @@ exports.syncOwnerAccountNamesFromPersons = async (req, res) => {
     for (const row of uniqueUpdates) {
       try {
         // eslint-disable-next-line no-await-in-loop
-        const account = await dataService.getDataById('schoolAccounts', row.accountId, req.user);
+        const account = await dataService.getDataById('schoolAccounts', row.accountId, req.user, routeAccess(req));
         if (!account) {
           results.skipped.missingAccount += 1;
           continue;

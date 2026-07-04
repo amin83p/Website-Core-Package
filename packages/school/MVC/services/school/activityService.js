@@ -283,8 +283,8 @@ async function loadActivityLookups(reqUser) {
   return { categories, departments, categoryMap, departmentMap };
 }
 
-async function listActivitiesForOrg(orgId, reqUser, query = {}) {
-  const rows = await schoolDataService.fetchData('activities', query, reqUser);
+async function listActivitiesForOrg(orgId, reqUser, query = {}, accessContext = {}) {
+  const rows = await schoolDataService.fetchData('activities', query, reqUser, accessContext);
   return (Array.isArray(rows) ? rows : []).filter((row) => belongsToOrg(row, orgId));
 }
 
@@ -309,16 +309,16 @@ async function listActivityCategories({ orgId, reqUser, includeInactive = false 
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 }
 
-async function listActivities({ orgId, reqUser, query = {} } = {}) {
+async function listActivities({ orgId, reqUser, query = {}, accessContext = {} } = {}) {
   const lookups = await loadActivityLookups(reqUser);
-  const rows = await listActivitiesForOrg(orgId, reqUser, query);
+  const rows = await listActivitiesForOrg(orgId, reqUser, query, accessContext);
   return rows
     .map((row) => enrichActivity(row, lookups))
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(a.startTime || '').localeCompare(String(b.startTime || '')));
 }
 
-async function getActivity(id, reqUser) {
-  const activity = await schoolDataService.getDataById('activities', id, reqUser);
+async function getActivity(id, reqUser, accessContext = {}) {
+  const activity = await schoolDataService.getDataById('activities', id, reqUser, accessContext);
   if (!activity) return null;
   const lookups = await loadActivityLookups(reqUser);
   return enrichActivityAttendeeNames(enrichActivity(activity, lookups), reqUser);
