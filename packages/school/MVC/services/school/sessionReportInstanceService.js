@@ -48,6 +48,32 @@ function buildInstanceHref(row = {}) {
   return `/school/reports/instances/edit-v2/${encodeURIComponent(instanceId)}`;
 }
 
+const SUBMITTED_REPORT_STATUSES = new Set(['submitted', 'locked']);
+
+function isReportRowSubmitted(row = {}) {
+  if (row?.isPendingAssignment) return false;
+  return SUBMITTED_REPORT_STATUSES.has(String(row?.status || '').trim().toLowerCase());
+}
+
+function isSessionCompletionStatusByMeta(meta = {}) {
+  if (!meta || typeof meta !== 'object') return false;
+  return meta.isFinal === true
+    && meta.makeUpRequired !== true
+    && meta.excludeFromAttendance !== true;
+}
+
+function mapPendingReportDto(row = {}) {
+  return {
+    templateTitle: String(row.templateTitle || 'Report').trim(),
+    studentName: String(row.studentName || 'Whole class').trim(),
+    teacherName: String(row.teacherName || '-').trim(),
+    status: String(row.status || 'draft').trim().toLowerCase(),
+    statusLabel: String(row.statusLabel || row.status || 'draft').trim(),
+    href: String(row.href || '').trim(),
+    isPending: Boolean(row.isPending)
+  };
+}
+
 function mapRowToDto(row = {}, assignmentMap = new Map()) {
   const isPending = Boolean(row?.isPendingAssignment);
   const status = isPending ? 'pending' : String(row?.status || 'draft').trim().toLowerCase();
@@ -194,6 +220,32 @@ async function buildSessionReportInstanceRows({
     });
 }
 
+async function listUnsubmittedSessionReports({
+  classId,
+  sessionId,
+  sessionDate = '',
+  reqUser,
+  sessionRoster = []
+} = {}) {
+  const viewerContext = await buildSessionReportViewerContext({
+    classId,
+    sessionRoster,
+    reqUser,
+    isReportAdminViewer: true
+  });
+  const rows = await buildSessionReportInstanceRows({
+    classId,
+    sessionId,
+    sessionDate,
+    reqUser,
+    viewerContext,
+    sessionRoster
+  });
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => !isReportRowSubmitted(row))
+    .map(mapPendingReportDto);
+}
+
 module.exports = {
   parseDateOnly,
   instanceRowMatchesSession,
@@ -201,5 +253,9 @@ module.exports = {
   canViewerSeeSessionReportRow,
   buildSessionReportViewerContext,
   buildSessionReportInstanceRows,
-  mapRowToDto
+  mapRowToDto,
+  isReportRowSubmitted,
+  isSessionCompletionStatusByMeta,
+  listUnsubmittedSessionReports,
+  mapPendingReportDto
 };

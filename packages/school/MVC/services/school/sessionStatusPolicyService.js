@@ -227,6 +227,14 @@ function isFinalStatusByMap(statusMap, { status, notes = '' } = {}) {
   return definition.isFinal === true;
 }
 
+function isSessionCompletionStatusByMap(statusMap, { status, notes = '' } = {}) {
+  const { definition } = resolveStatusDefinition(statusMap, { status, notes });
+  if (!definition) return normalizeSessionStatus(status, notes) === 'completed';
+  return definition.isFinal === true
+    && definition.makeUpRequired !== true
+    && definition.excludeFromAttendance !== true;
+}
+
 function shouldExcludeFromAttendanceByMap(statusMap, { status, notes = '' } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
   if (normalized === 'holiday') return true;
@@ -343,6 +351,7 @@ module.exports = {
   getStatusMetaMap,
   resolveStatusDefinition,
   isFinalStatusByMap,
+  isSessionCompletionStatusByMap,
   shouldExcludeFromAttendanceByMap,
   shouldExcludeFromTeacherIndexByMap,
   shouldExcludeFromStudentIndexByMap,

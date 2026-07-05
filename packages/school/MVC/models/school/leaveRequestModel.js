@@ -159,6 +159,20 @@ function buildLeaveWindowSnapshot(row) {
   };
 }
 
+function sanitizeSessionResolutions(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      classId: cleanId(row?.classId, { max: 100, allowEmpty: true }) || '',
+      sessionId: cleanId(row?.sessionId, { max: 100, allowEmpty: true }) || '',
+      action: cleanString(row?.action, { max: 40, allowEmpty: true }).toLowerCase() || 'substitute',
+      substituteTeacherId: cleanId(row?.substituteTeacherId, { max: 100, allowEmpty: true }) || '',
+      substituteTeacherName: cleanString(row?.substituteTeacherName, { max: 160, allowEmpty: true }),
+      resolvedAt: cleanString(row?.resolvedAt, { max: 40, allowEmpty: true }),
+      resolvedBy: cleanId(row?.resolvedBy, { max: 100, allowEmpty: true }) || ''
+    }))
+    .filter((row) => row.classId && row.sessionId && row.substituteTeacherId);
+}
+
 function sanitizeApprovedSnapshot(value) {
   if (!isPlainObject(value)) return null;
   const active = value.active !== false;
@@ -226,6 +240,7 @@ function sanitizeLeaveRequestInput(input, { isUpdate = false } = {}) {
     lifecycle: sanitizeLifecycleEvents(input.lifecycle),
     approval: sanitizeApproval(input.approval),
     lastApprovedSnapshot: sanitizeApprovedSnapshot(input.lastApprovedSnapshot),
+    sessionResolutions: sanitizeSessionResolutions(input.sessionResolutions),
     revisionNo: Number.isFinite(Number(input.revisionNo)) ? Math.max(1, Math.floor(Number(input.revisionNo))) : 1
   };
 
@@ -349,6 +364,7 @@ module.exports = {
   LEAVE_REQUEST_REASON_LABELS,
   REQUESTER_ROLES,
   buildLeaveWindowSnapshot,
+  sanitizeSessionResolutions,
   sanitizeLeaveRequestInput,
   getAllLeaveRequests,
   getLeaveRequestById,

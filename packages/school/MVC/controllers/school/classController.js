@@ -56,28 +56,6 @@ const schoolRecordAccessService = require('../../services/school/schoolRecordAcc
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 
-// #region agent log
-const DEBUG_LOG_PATH = path.join(resolveCoreRoot(), 'debug-4ef284.log');
-function debugManageSessionLog(location, message, data = {}, hypothesisId = '') {
-    const entry = {
-        sessionId: '4ef284',
-        location,
-        message,
-        data,
-        hypothesisId,
-        timestamp: Date.now()
-    };
-    try {
-        fsSync.appendFileSync(DEBUG_LOG_PATH, `${JSON.stringify(entry)}\n`);
-    } catch (_) { /* ignore */ }
-    fetch('http://127.0.0.1:7310/ingest/ca0b8886-0efc-4766-ba47-26240dd949ea', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4ef284' },
-        body: JSON.stringify(entry)
-    }).catch(() => {});
-}
-// #endregion
-
 function isSafeChildPath(basePath, targetPath) {
     const normalizedBase = path.resolve(basePath);
     const normalizedTarget = path.resolve(targetPath);
@@ -2046,6 +2024,53 @@ function calculateSessionDurationHours(startTime = '', endTime = '', fallback = 
     return minutes > 0 ? Number((minutes / 60).toFixed(2)) : 0;
 }
 
+function sessionMetadataFieldsPresentInBody(body = {}) {
+    return ['date', 'startTime', 'endTime', 'teacherId', 'teacherName'].some((key) => body[key] !== undefined);
+}
+
+function applyAdminSessionMetadataUpdate(session = {}, body = {}, canOverride = false) {
+    if (!canOverride || !sessionMetadataFieldsPresentInBody(body)) {
+        return { changed: false };
+    }
+
+    const priorDate = normalizeDateOnlyValue(session.date);
+    const priorStart = normalizeClockTime(session.startTime);
+    const priorEnd = normalizeClockTime(session.endTime);
+    const priorTeacherId = cleanPersonId(session?.delivery?.deliveredBy);
+    const priorTeacherName = String(session?.delivery?.deliveredByName || '').trim();
+
+    const date = body.date !== undefined ? normalizeDateOnlyValue(body.date) : priorDate;
+    const startTime = body.startTime !== undefined ? normalizeClockTime(body.startTime) : priorStart;
+    const endTime = body.endTime !== undefined ? normalizeClockTime(body.endTime) : priorEnd;
+    if (!date) throw new Error('Session date is required.');
+    if (!startTime || !endTime || startTime >= endTime) {
+        throw new Error('Session start time must be before end time.');
+    }
+
+    const teacherId = body.teacherId !== undefined
+        ? cleanPersonId(body.teacherId)
+        : priorTeacherId;
+    const teacherName = body.teacherName !== undefined
+        ? String(body.teacherName || teacherId || '').trim().slice(0, 180)
+        : (priorTeacherName || teacherId || '');
+
+    session.date = date;
+    session.startTime = startTime;
+    session.endTime = endTime;
+    session.durationHours = calculateSessionDurationHours(startTime, endTime, session.durationHours);
+    if (!session.delivery || typeof session.delivery !== 'object') session.delivery = {};
+    session.delivery.deliveredBy = teacherId;
+    session.delivery.deliveredByName = teacherName;
+
+    const changed = date !== priorDate
+        || startTime !== priorStart
+        || endTime !== priorEnd
+        || !idsEqual(teacherId, priorTeacherId)
+        || teacherName !== priorTeacherName;
+
+    return { changed };
+}
+
 function generateMakeupSessionId(existingSessions = []) {
     const used = new Set((Array.isArray(existingSessions) ? existingSessions : [])
         .map((row) => toPublicId(row?.sessionId || row?.id))
@@ -3101,15 +3126,7 @@ async function manageSession(req, res) {
         const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
         
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { index: sessionIndex, session } = findSessionInList(sessions, sessionId);
-        // #region agent log
-        debugManageSessionLog('classController.js:manageSession:lookup', 'Session lookup comparison', {
-            classId: toPublicId(classId),
-            sessionIdParam: toPublicId(sessionId),
-            foundIdsEqual: sessionIndex >= 0,
-            sessionCount: Array.isArray(sessions) ? sessions.length : 0
-        }, 'B');
-        // #endregion
+        const { session } = findSessionInList(sessions, sessionId);
         if (!session) throw new Error('Session not found');
         assertSessionScopeForRequest(req, classData, session);
         const sortedSessions = [...sessions].sort((a, b) => new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`));
@@ -3130,29 +3147,11 @@ async function manageSession(req, res) {
         const isReadOnly = isSessionLocked && !canOverride;
 
         // 2. Resolve effective session roster (same rules as Manage Session display)
-        const persistedRosterCount = Array.isArray(session.roster) ? session.roster.length : 0;
         session.roster = await buildEnrichedSessionRosterForMutation({
             classData,
             session,
             reqUser: req.user
         });
-        // #region agent log
-        debugManageSessionLog('classController.js:manageSession:roster', 'Roster enrichment counts', {
-            classId: toPublicId(classId),
-            sessionId: toPublicId(sessionId),
-            sessionDate: String(session?.date || ''),
-            registrationMode: getClassRegistrationModeKey(classData),
-            persistedRosterCount,
-            enrichedRosterCount: session.roster.length,
-            gradebookScorePersonCount: (Array.isArray(session?.gradebooks) ? session.gradebooks : [])
-                .reduce((set, gb) => {
-                    if (gb?.scores && typeof gb.scores === 'object') {
-                        Object.keys(gb.scores).forEach((k) => { if (toPublicId(k)) set.add(toPublicId(k)); });
-                    }
-                    return set;
-                }, new Set()).size
-        }, 'A');
-        // #endregion
 
         // 3. Fetch Curriculum Content + Session Content/Exam Stream
         const [allSubjects, examAllocations, examTemplates, examQuestions, examAssignments, studentsForExamStart] = await Promise.all([
@@ -3331,6 +3330,7 @@ async function manageSession(req, res) {
             nextSessionId,    
             isSessionLocked, 
             isReadOnly,
+            canEditSessionMetadata: canOverride,
             attendanceMatrixPolicyResolved,
             sessionStudentCases,
             includeModal: true,  
@@ -3373,15 +3373,6 @@ async function listSessionReportInstances(req, res) {
             viewerContext,
             sessionRoster: enrichedRoster
         });
-        // #region agent log
-        debugManageSessionLog('classController.js:listSessionReportInstances', 'Report instances roster source', {
-            classId: toPublicId(classId),
-            sessionId: toPublicId(sessionId),
-            persistedRosterCount: (session.roster || []).length,
-            enrichedRosterCount: enrichedRoster.length,
-            reportRowCount: Array.isArray(rows) ? rows.length : 0
-        }, 'C');
-        // #endregion
         return res.json({
             status: 'success',
             rows,
@@ -3414,14 +3405,6 @@ async function saveSessionStudentCase(req, res) {
             input: req.body || {},
             reqUser: req.user
         });
-        // #region agent log
-        debugManageSessionLog('classController.js:saveSessionStudentCase', 'Student case saved', {
-            classId: toPublicId(classId),
-            sessionId: toPublicId(sessionId),
-            studentPersonId: toPublicId(req.body?.studentPersonId || req.body?.personId),
-            caseId: toPublicId(saved?.id)
-        }, 'E');
-        // #endregion
         const message = String(saved?.status || '').toLowerCase() === 'resolved'
             ? 'Student case saved and resolved.'
             : 'Student case saved.';
@@ -3599,12 +3582,12 @@ async function saveSession(req, res) {
         const { id: classId, sessionId } = req.params;
         const { status, notes, room, roster, contentItems, contentOrder } = req.body; 
         const forceRemoveMakeups = parseBoolean(req.body?.forceRemoveMakeups, false);
+        const forceMetadataConflicts = parseBoolean(req.body?.force, false);
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const { index: sessionIndex } = findSessionInList(sessions, sessionId);
         if (sessionIndex === -1) throw new Error('Session not found');
         assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
-        await assertSessionManagerSessionWithinClassWindowOrThrow(classData, sessions[sessionIndex], req.user);
         const originalSession = sessions[sessionIndex];
 
         const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
@@ -3629,6 +3612,37 @@ async function saveSession(req, res) {
         const normalizedStatus = sessionStatusPolicyService.normalizeStatusCode(status || originalSession.status || '');
         if (!normalizedStatus || !statusMap.has(normalizedStatus)) {
             throw new Error('Invalid session status.');
+        }
+        const wasCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap(statusMap, originalSession);
+        const willBeCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap(statusMap, {
+            ...originalSession,
+            status: normalizedStatus
+        });
+        if (!wasCompletion && willBeCompletion) {
+            const enrichedRosterForReports = await buildEnrichedSessionRosterForMutation({
+                classData,
+                session: originalSession,
+                reqUser: req.user
+            });
+            const pendingReports = await sessionReportInstanceService.listUnsubmittedSessionReports({
+                classId,
+                sessionId,
+                sessionDate: originalSession?.date,
+                reqUser: req.user,
+                sessionRoster: enrichedRosterForReports
+            });
+            if (pendingReports.length) {
+                const blockMessage = 'This session cannot be marked completed until all assigned reports are submitted.';
+                if (req.headers['x-ajax-request']) {
+                    return res.status(400).json({
+                        status: 'error',
+                        code: 'PENDING_REPORTS_BLOCK_COMPLETION',
+                        message: blockMessage,
+                        data: { pendingReports }
+                    });
+                }
+                throw new Error(blockMessage);
+            }
         }
         const currentMakeupInactive = isMakeUpRequiredSessionByMap(statusMap, originalSession);
         const nextMakeupInactive = isMakeUpRequiredSessionByMap(statusMap, {
@@ -3716,14 +3730,6 @@ async function saveSession(req, res) {
             if (!Array.isArray(incomingRoster)) {
                 throw new Error('Invalid roster payload.');
             }
-            // #region agent log
-            debugManageSessionLog('classController.js:saveSession:roster', 'Session save incoming roster', {
-                classId: toPublicId(classId),
-                sessionId: toPublicId(sessionId),
-                persistedRosterCount: (originalSession.roster || []).length,
-                incomingRosterCount: incomingRoster.length
-            }, 'D');
-            // #endregion
             const existingRoster = originalSession.roster || [];
             const allowedAttendance = new Set(['present', 'late', 'excused', 'absent']);
             const orgPolicyLayerSave = await attendanceMatrixPolicyModel.getPolicyForOrg(
@@ -3765,6 +3771,50 @@ async function saveSession(req, res) {
                 };
                 return attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(merged, matrixPolicySave);
             }).filter(Boolean);
+        }
+
+        const { changed: metadataChanged } = applyAdminSessionMetadataUpdate(
+            originalSession,
+            req.body || {},
+            canOverride
+        );
+        await assertSessionManagerSessionWithinClassWindowOrThrow(classData, originalSession, req.user);
+        if (metadataChanged) {
+            assertSessionManagerSessionWithinCycleWindowOrThrow(classData, originalSession);
+
+            const mergedSessions = sessions.map((row, idx) => (idx === sessionIndex ? originalSession : row));
+            const conflicts = await detectSessionConflicts({
+                classId,
+                sessions: mergedSessions,
+                activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+                reqUser: req.user,
+                fallbackTeacherId: resolveSessionTeacherId(originalSession)
+            });
+            if (Array.isArray(conflicts) && conflicts.length && !forceMetadataConflicts) {
+                const warningMessage = 'Schedule conflicts were detected for the updated session date, time, or teacher.';
+                if (req.headers['x-ajax-request']) {
+                    return res.status(409).json({
+                        status: 'warning',
+                        code: 'SESSION_METADATA_CONFLICTS',
+                        message: warningMessage,
+                        data: {
+                            requiresConfirmation: true,
+                            conflicts: conflicts.slice(0, 12).map((row) => ({
+                                date: row?.date || originalSession.date,
+                                teacherName: row?.teacherName || '',
+                                conflictClass: row?.conflictClass || 'schedule conflict',
+                                existTime: row?.existTime || ''
+                            }))
+                        }
+                    });
+                }
+                throw new Error(warningMessage);
+            }
+            originalSession.audit = {
+                ...(originalSession.audit || {}),
+                lastUpdateUser: toPublicId(req.user?.id || req.user?.username || ''),
+                lastUpdateDateTime: new Date().toISOString()
+            };
         }
 
         await schoolDataService.saveClassSessions(classId, sessions, req.user);
@@ -3830,24 +3880,6 @@ async function saveSessionGradebooks(req, res) {
             reqUser: req.user
         });
         const personIds = [...new Set(enrichedRoster.map((r) => cleanPersonId(r.personId)).filter(Boolean))];
-        const requestScorePersonIds = new Set();
-        (Array.isArray(rawList) ? rawList : []).forEach((gb) => {
-            if (!gb?.scores || typeof gb.scores !== 'object') return;
-            Object.keys(gb.scores).forEach((k) => { const pid = cleanPersonId(k); if (pid) requestScorePersonIds.add(pid); });
-        });
-        const droppedScorePersonIds = [...requestScorePersonIds].filter((pid) => !personIds.includes(pid));
-        // #region agent log
-        debugManageSessionLog('classController.js:saveSessionGradebooks:roster', 'Gradebook save roster vs request scores', {
-            classId: toPublicId(classId),
-            sessionId: toPublicId(sessionId),
-            persistedRosterPersonCount: (sessions[sessionIndex].roster || []).length,
-            effectiveRosterPersonCount: personIds.length,
-            requestScorePersonCount: requestScorePersonIds.size,
-            droppedScorePersonCount: droppedScorePersonIds.length,
-            droppedScorePersonIds: droppedScorePersonIds.slice(0, 10),
-            runId: 'post-fix'
-        }, 'A');
-        // #endregion
         const attendanceByPerson = new Map();
         enrichedRoster.forEach((r) => {
             const pid = cleanPersonId(r.personId);

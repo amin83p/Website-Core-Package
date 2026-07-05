@@ -434,7 +434,11 @@
         color: #94a3b8;
         font-weight: 600;
     }
-    .session-info-tile #sessionRoom {
+    .session-info-tile #sessionRoom,
+    .session-info-tile #sessionDate,
+    .session-info-tile #sessionStartTime,
+    .session-info-tile #sessionEndTime,
+    .session-info-tile #sessionTeacherName {
         border-radius: 8px;
         border: 1px solid #cbd5e1;
         font-weight: 600;
@@ -443,7 +447,11 @@
         background: #fff;
         margin-top: 0.1rem;
     }
-    .session-info-tile #sessionRoom:focus {
+    .session-info-tile #sessionRoom:focus,
+    .session-info-tile #sessionDate:focus,
+    .session-info-tile #sessionStartTime:focus,
+    .session-info-tile #sessionEndTime:focus,
+    .session-info-tile #sessionTeacherName:focus {
         border-color: #3b82f6;
         box-shadow: 0 0 0 0.15rem rgba(59, 130, 246, 0.15);
     }
@@ -715,7 +723,9 @@
                 : `Rolling sessions are limited to the cycle window: ${smCycleWindowLabel}.`)
             : '';
         const smRoomLabel = String(session.room || '').trim();
+        const smTeacherLabel = String(session.delivery?.deliveredByName || session.delivery?.deliveredBy || '').trim();
         const smCurrentStatusLabel = String(currentSessionStatusMeta?.label || currentSessionStatus || 'Scheduled').trim();
+        const canEditSessionMetadataFlag = typeof canEditSessionMetadata !== 'undefined' && canEditSessionMetadata === true;
     %>
 
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
@@ -798,8 +808,13 @@
                         </button>
                     <% } %>
                     <span class="session-info-summary-sep" aria-hidden="true">·</span>
-                    <span class="session-info-summary-chip"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i><%= session.date %></span>
-                    <span class="session-info-summary-chip"><i class="bi bi-clock me-1" aria-hidden="true"></i><%= session.startTime %>–<%= session.endTime %></span>
+                    <span class="session-info-summary-chip" id="sessionInfoSummaryDate"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i><%= session.date %></span>
+                    <span class="session-info-summary-chip" id="sessionInfoSummaryTime"><i class="bi bi-clock me-1" aria-hidden="true"></i><%= session.startTime %>–<%= session.endTime %></span>
+                    <% if (smTeacherLabel) { %>
+                        <span class="session-info-summary-chip d-none d-lg-inline-flex" id="sessionInfoSummaryTeacher" title="Teacher"><i class="bi bi-person-badge me-1" aria-hidden="true"></i><%= smTeacherLabel %></span>
+                    <% } else if (canEditSessionMetadataFlag) { %>
+                        <span class="session-info-summary-chip d-none d-lg-inline-flex is-muted" id="sessionInfoSummaryTeacher" title="Teacher"></span>
+                    <% } %>
                     <% if (smIsRolling) { %>
                         <span class="session-info-summary-chip d-none d-md-inline-flex" title="Cycle window"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i><%= smCycleWindowLabel %></span>
                     <% } %>
@@ -835,6 +850,7 @@
                         <% } %>
                     <% }) %>
                 </select>
+                <div id="sessionPendingReportsHint" class="small text-warning mt-1 d-none" role="status"></div>
             </div>
         </div>
         <div class="collapse" id="sessionInfoDetailsCollapse">
@@ -859,12 +875,38 @@
                     </div>
                     <div class="session-info-tile">
                         <div class="session-info-tile-label">Date</div>
-                        <div class="session-info-tile-value"><%= session.date %></div>
+                        <% if (canEditSessionMetadataFlag) { %>
+                            <input type="date" id="sessionDate" class="form-control form-control-sm" value="<%= session.date || '' %>" <%- disabledAttr %>>
+                        <% } else { %>
+                            <div class="session-info-tile-value"><%= session.date %></div>
+                        <% } %>
                     </div>
                     <div class="session-info-tile">
                         <div class="session-info-tile-label">Time</div>
-                        <div class="session-info-tile-value text-nowrap"><%= session.startTime %> – <%= session.endTime %></div>
+                        <% if (canEditSessionMetadataFlag) { %>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <input type="time" id="sessionStartTime" class="form-control form-control-sm" value="<%= session.startTime || '' %>" aria-label="Start time" <%- disabledAttr %>>
+                                <input type="time" id="sessionEndTime" class="form-control form-control-sm" value="<%= session.endTime || '' %>" aria-label="End time" <%- disabledAttr %>>
+                            </div>
+                        <% } else { %>
+                            <div class="session-info-tile-value text-nowrap"><%= session.startTime %> – <%= session.endTime %></div>
+                        <% } %>
                     </div>
+                    <% if (canEditSessionMetadataFlag) { %>
+                    <div class="session-info-tile">
+                        <div class="session-info-tile-label">Teacher</div>
+                        <input type="hidden" id="sessionTeacherId" value="<%= session.delivery?.deliveredBy || '' %>">
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control bg-white" id="sessionTeacherName" value="<%= session.delivery?.deliveredByName || session.delivery?.deliveredBy || '' %>" readonly placeholder="Select teacher" <%- disabledAttr %>>
+                            <button type="button" class="btn btn-outline-primary" id="sessionPickTeacher" <%= disabledAttr ? 'disabled' : '' %> aria-label="Pick teacher"><i class="bi bi-person-check"></i></button>
+                        </div>
+                    </div>
+                    <% } else if (smTeacherLabel) { %>
+                    <div class="session-info-tile">
+                        <div class="session-info-tile-label">Teacher</div>
+                        <div class="session-info-tile-value text-truncate" title="<%= smTeacherLabel %>"><%= smTeacherLabel %></div>
+                    </div>
+                    <% } %>
                     <% if (smIsRolling) { %>
                     <div class="session-info-tile session-info-tile--cycle">
                         <div class="session-info-tile-label">Cycle window</div>
@@ -1469,6 +1511,7 @@ let currentMentions = [];
 document.addEventListener('DOMContentLoaded', () => {
     const actionStateId = <%- jsonForScript((typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '') %>;
     const defaultSessionStatusCode = <%- jsonForScript(fallbackStatusCode) %>;
+    const sessionInitialStatusCode = <%- jsonForScript(currentSessionStatus) %>;
     const sessionManagerClassId = <%- jsonForScript(classData.id) %>;
     const sessionManagerSessionId = <%- jsonForScript(session.sessionId) %>;
     const sessionStatusMeta = <%- jsonForScript(availableStatusRows || []) %>;
@@ -1478,8 +1521,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionDefaultTeacherId = <%- jsonForScript(session.delivery?.deliveredBy || '') %>;
     const sessionDefaultTeacherName = <%- jsonForScript(session.delivery?.deliveredByName || '') %>;
     const sessionDefaultRoom = <%- jsonForScript(session.room || '') %>;
+    const sessionDefaultDate = <%- jsonForScript(session.date || '') %>;
     const sessionDefaultStartTime = <%- jsonForScript(session.startTime || '') %>;
     const sessionDefaultEndTime = <%- jsonForScript(session.endTime || '') %>;
+    const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag)) %>;
     const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     const sessionStatusMap = new Map((sessionStatusMeta || []).map((row) => [normalizeStatusCode(row.code), row]));
     const resolveStatusMeta = (statusCode) => sessionStatusMap.get(normalizeStatusCode(statusCode)) || null;
@@ -1797,6 +1842,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const rows = Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : [];
         if (!rows.length) {
             body.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No report instances for this session, or none visible for your account.</td></tr>';
+            syncPendingReportsHint();
             return;
         }
         body.innerHTML = rows.map((row) => {
@@ -1818,6 +1864,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </td>
                 </tr>`;
         }).join('');
+        syncPendingReportsHint();
     }
 
     async function refreshSessionReportInstances() {
@@ -1832,6 +1879,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to load report instances.');
             sessionReportInstancesState = result.rows || [];
             renderSessionReportInstances();
+            renderSessionStatusButtons();
         } finally {
             if (btn) btn.disabled = false;
             if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
@@ -2157,11 +2205,76 @@ document.addEventListener('DOMContentLoaded', () => {
     let sessionStatusModalInstance = null;
     let sessionStatusModalEl = null;
     function getSelectedSessionStatus() {
-        return normalizeStatusCode(statusSelect?.value || defaultSessionStatusCode) || 'scheduled';
+        const select = document.getElementById('sessionStatusSelect');
+        return normalizeStatusCode(select?.value || defaultSessionStatusCode) || 'scheduled';
     }
     function isSessionStatusMakeupRequired(statusCode) {
         const meta = resolveStatusMeta(statusCode);
         return Boolean(meta && meta.makeUpRequired === true);
+    }
+    function isSessionCompletionStatus(statusCode) {
+        const meta = resolveStatusMeta(statusCode);
+        if (!meta) return normalizeStatusCode(statusCode) === 'completed';
+        return meta.isFinal === true && meta.makeUpRequired !== true && meta.excludeFromAttendance !== true;
+    }
+    function isReportRowSubmitted(row) {
+        if (row?.isPending) return false;
+        const status = String(row?.status || '').trim().toLowerCase();
+        return status === 'submitted' || status === 'locked';
+    }
+    function getUnsubmittedSessionReports() {
+        return (Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : [])
+            .filter((row) => !isReportRowSubmitted(row));
+    }
+    function wouldBlockCompletionStatus(statusCode) {
+        if (!isSessionCompletionStatus(statusCode)) return false;
+        const target = normalizeStatusCode(statusCode);
+        const saved = normalizeStatusCode(sessionInitialStatusCode);
+        if (target === saved && isSessionCompletionStatus(saved)) return false;
+        return getUnsubmittedSessionReports().length > 0;
+    }
+    function buildPendingReportsMessageHtml(rows) {
+        const list = Array.isArray(rows) ? rows : [];
+        if (!list.length) return '';
+        const items = list.map((row) => {
+            const title = attendanceAttachmentEscape(row.templateTitle || 'Report');
+            const student = attendanceAttachmentEscape(row.studentName || 'Whole class');
+            const teacher = attendanceAttachmentEscape(row.teacherName || '-');
+            const status = attendanceAttachmentEscape(row.statusLabel || row.status || 'draft');
+            const href = String(row.href || '').trim();
+            const link = href
+                ? ` <a href="${attendanceAttachmentEscape(href)}" target="_blank" rel="noopener noreferrer" class="ms-1">${attendanceAttachmentEscape(row.isPending ? 'Start' : 'Open')}</a>`
+                : '';
+            return `<li><strong>${title}</strong> — ${student} · ${teacher} · <span class="text-capitalize">${status}</span>${link}</li>`;
+        }).join('');
+        return `<div class="mt-3"><strong>Pending reports:</strong><ul class="mt-2 mb-0 text-start">${items}</ul></div><div class="mt-3">Open the <strong>Report instances</strong> panel to submit each report before marking this session completed.</div>`;
+    }
+    async function showPendingReportsBlockModal(rows) {
+        const message = 'This session cannot be marked completed until all assigned reports are submitted.'
+            + buildPendingReportsMessageHtml(rows);
+        if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+                title: 'Reports Still Pending',
+                icon: 'warning',
+                message,
+                buttons: [{ text: 'OK', class: 'btn-primary' }]
+            });
+        } else {
+            alert(message.replace(/<[^>]*>/g, ''));
+        }
+    }
+    function syncPendingReportsHint() {
+        const hint = document.getElementById('sessionPendingReportsHint');
+        if (!hint) return;
+        const pending = getUnsubmittedSessionReports();
+        const currentIsCompletion = isSessionCompletionStatus(getSelectedSessionStatus());
+        if (!pending.length || currentIsCompletion) {
+            hint.classList.add('d-none');
+            hint.textContent = '';
+            return;
+        }
+        hint.classList.remove('d-none');
+        hint.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i>${pending.length} assigned report(s) must be submitted before this session can be marked completed.`;
     }
     function initSessionManagerTooltips() {
         if (typeof bootstrap === 'undefined' || !bootstrap?.Tooltip) return;
@@ -2172,15 +2285,49 @@ document.addEventListener('DOMContentLoaded', () => {
     function syncSessionInfoSummary() {
         const roomInput = document.getElementById('sessionRoom');
         const summaryLocation = document.getElementById('sessionInfoSummaryLocation');
-        if (!roomInput || !summaryLocation) return;
-        const room = String(roomInput.value || '').trim();
-        if (!room) {
-            summaryLocation.innerHTML = '';
-            summaryLocation.classList.add('is-muted');
-            return;
+        if (roomInput && summaryLocation) {
+            const room = String(roomInput.value || '').trim();
+            if (!room) {
+                summaryLocation.innerHTML = '';
+                summaryLocation.classList.add('is-muted');
+            } else {
+                summaryLocation.classList.remove('is-muted');
+                summaryLocation.innerHTML = `<i class="bi bi-geo-alt me-1" aria-hidden="true"></i>${scEscapeHtml(room)}`;
+            }
         }
-        summaryLocation.classList.remove('is-muted');
-        summaryLocation.innerHTML = `<i class="bi bi-geo-alt me-1" aria-hidden="true"></i>${scEscapeHtml(room)}`;
+
+        const dateInput = document.getElementById('sessionDate');
+        const summaryDate = document.getElementById('sessionInfoSummaryDate');
+        if (dateInput && summaryDate) {
+            const date = String(dateInput.value || '').trim();
+            summaryDate.innerHTML = date
+                ? `<i class="bi bi-calendar3 me-1" aria-hidden="true"></i>${scEscapeHtml(date)}`
+                : '<i class="bi bi-calendar3 me-1" aria-hidden="true"></i>—';
+        }
+
+        const startInput = document.getElementById('sessionStartTime');
+        const endInput = document.getElementById('sessionEndTime');
+        const summaryTime = document.getElementById('sessionInfoSummaryTime');
+        if (summaryTime) {
+            const startTime = String(startInput?.value || sessionDefaultStartTime || '').trim();
+            const endTime = String(endInput?.value || sessionDefaultEndTime || '').trim();
+            summaryTime.innerHTML = (startTime || endTime)
+                ? `<i class="bi bi-clock me-1" aria-hidden="true"></i>${scEscapeHtml(startTime || '--:--')}–${scEscapeHtml(endTime || '--:--')}`
+                : '<i class="bi bi-clock me-1" aria-hidden="true"></i>—';
+        }
+
+        const teacherNameInput = document.getElementById('sessionTeacherName');
+        const summaryTeacher = document.getElementById('sessionInfoSummaryTeacher');
+        if (teacherNameInput && summaryTeacher) {
+            const teacherName = String(teacherNameInput.value || '').trim();
+            if (!teacherName) {
+                summaryTeacher.innerHTML = '';
+                summaryTeacher.classList.add('is-muted');
+            } else {
+                summaryTeacher.classList.remove('is-muted');
+                summaryTeacher.innerHTML = `<i class="bi bi-person-badge me-1" aria-hidden="true"></i>${scEscapeHtml(teacherName)}`;
+            }
+        }
     }
     const sessionInfoDetailsCollapse = document.getElementById('sessionInfoDetailsCollapse');
     const sessionInfoDetailsToggle = document.getElementById('btnToggleSessionInfoDetails');
@@ -2203,6 +2350,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     document.getElementById('sessionRoom')?.addEventListener('input', syncSessionInfoSummary);
+    document.getElementById('sessionDate')?.addEventListener('input', syncSessionInfoSummary);
+    document.getElementById('sessionDate')?.addEventListener('change', syncSessionInfoSummary);
+    document.getElementById('sessionStartTime')?.addEventListener('input', syncSessionInfoSummary);
+    document.getElementById('sessionStartTime')?.addEventListener('change', syncSessionInfoSummary);
+    document.getElementById('sessionEndTime')?.addEventListener('input', syncSessionInfoSummary);
+    document.getElementById('sessionEndTime')?.addEventListener('change', syncSessionInfoSummary);
+    document.getElementById('sessionPickTeacher')?.addEventListener('click', function () {
+        if (!sessionCanEditMetadata) return;
+        if (!window.GenericPicker || !window.GenericPickerPresets) {
+            if (typeof showMessageModal === 'function') {
+                showMessageModal({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+            }
+            return;
+        }
+        window.GenericPicker.open(window.GenericPickerPresets.teacher({
+            title: 'Select session teacher',
+            placeholder: 'Search teachers...',
+            context: window.GenericPickerContexts
+                ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+                : undefined,
+            onSelect: function (item) {
+                const id = String(item?.id || item?.personId || item?.value || '').trim();
+                const name = String(item?.name || item?.label || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || id).trim();
+                const teacherIdInput = document.getElementById('sessionTeacherId');
+                const teacherNameInput = document.getElementById('sessionTeacherName');
+                if (teacherIdInput) teacherIdInput.value = id;
+                if (teacherNameInput) teacherNameInput.value = name;
+                syncSessionInfoSummary();
+            }
+        }));
+    });
 
     function styleSessionStatusSelect() {
         if (!statusSelect || !statusButton) return;
@@ -2251,6 +2429,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Array.from(statusSelect.options || []).forEach((opt) => {
             const code = normalizeStatusCode(opt.value);
             if (!code) return;
+            const blocked = wouldBlockCompletionStatus(code);
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = `btn session-status-option-btn${selected === code ? ' is-selected' : ''}`;
@@ -2258,13 +2437,23 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.style.color = opt.getAttribute('data-color-text') || '#0f172a';
             btn.style.borderColor = opt.getAttribute('data-color-border') || '#cbd5e1';
             btn.innerHTML = `<span>${opt.getAttribute('data-label') || opt.textContent || code}</span><i class="bi ${selected === code ? 'bi-check-circle-fill' : 'bi-circle'}"></i>`;
-            btn.addEventListener('click', () => {
+            if (blocked) {
+                btn.disabled = true;
+                btn.title = 'Submit all assigned reports before marking this session completed.';
+                btn.classList.add('opacity-50');
+            }
+            btn.addEventListener('click', async () => {
+                if (wouldBlockCompletionStatus(code)) {
+                    await showPendingReportsBlockModal(getUnsubmittedSessionReports());
+                    return;
+                }
                 statusSelect.value = code;
                 styleSessionStatusSelect();
                 if (sessionStatusModalInstance) sessionStatusModalInstance.hide();
             });
             grid.appendChild(btn);
         });
+        syncPendingReportsHint();
     }
     if (statusSelect) {
         statusSelect.addEventListener('change', () => styleSessionStatusSelect());
@@ -3124,29 +3313,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gbSyncScoresFromInputs();
         const btn = saveButton;
         const orig = btn ? btn.innerHTML : '';
-        // #region agent log
-        const gbClientScoreIds = new Set();
-        (Array.isArray(gradebooksState) ? gradebooksState : []).forEach((gb) => {
-            if (!gb?.scores || typeof gb.scores !== 'object') return;
-            Object.keys(gb.scores).forEach((k) => { if (String(k || '').trim()) gbClientScoreIds.add(String(k).trim()); });
-        });
-        fetch('http://127.0.0.1:7310/ingest/ca0b8886-0efc-4766-ba47-26240dd949ea', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4ef284' },
-            body: JSON.stringify({
-                sessionId: '4ef284',
-                location: 'sessionManager.ejs:gbPersistGradebooks',
-                message: 'Client gradebook save payload',
-                data: {
-                    gradebookRosterCount: Array.isArray(gradebookRoster) ? gradebookRoster.length : 0,
-                    clientScorePersonCount: gbClientScoreIds.size,
-                    activityCount: Array.isArray(gradebooksState) ? gradebooksState.length : 0
-                },
-                hypothesisId: 'A',
-                timestamp: Date.now()
-            })
-        }).catch(() => {});
-        // #endregion
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
@@ -3437,6 +3603,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 room,
                 actionStateId
             };
+            if (sessionCanEditMetadata) {
+                payload.date = document.getElementById('sessionDate')?.value || '';
+                payload.startTime = document.getElementById('sessionStartTime')?.value || '';
+                payload.endTime = document.getElementById('sessionEndTime')?.value || '';
+                payload.teacherId = document.getElementById('sessionTeacherId')?.value || '';
+                payload.teacherName = document.getElementById('sessionTeacherName')?.value || '';
+            }
             if (shouldSendInstructionalPayload) {
                 payload.roster = JSON.stringify(roster);
                 payload.contentItems = JSON.stringify(Array.isArray(manualSessionContentState) ? manualSessionContentState : []);
@@ -3447,6 +3620,17 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
 
             try {
+                const transitioningToCompletion = !isSessionCompletionStatus(sessionInitialStatusCode)
+                    && isSessionCompletionStatus(status);
+                if (transitioningToCompletion) {
+                    await refreshSessionReportInstances();
+                    const clientPending = getUnsubmittedSessionReports();
+                    if (clientPending.length) {
+                        await showPendingReportsBlockModal(clientPending);
+                        return;
+                    }
+                }
+
                 const submitSessionSave = async (savePayload) => {
                     const response = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/save`, {
                         method: 'POST',
@@ -3466,6 +3650,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 let { result } = await submitSessionSave(payload);
                 let guarded = await applySaveGuard(result);
                 if (guarded.stop) return;
+
+                if (result.code === 'PENDING_REPORTS_BLOCK_COMPLETION') {
+                    const pendingRows = Array.isArray(result?.data?.pendingReports) ? result.data.pendingReports : [];
+                    await showPendingReportsBlockModal(pendingRows.length ? pendingRows : getUnsubmittedSessionReports());
+                    return;
+                }
 
                 if (result.status === 'warning' && result.code === 'MAKEUP_SESSIONS_EXIST') {
                     const makeupRows = Array.isArray(result?.data?.makeupSessions) ? result.data.makeupSessions : [];
@@ -3501,6 +3691,41 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     ({ result } = await submitSessionSave({ ...payload, forceRemoveMakeups: true }));
+                    guarded = await applySaveGuard(result);
+                    if (guarded.stop) return;
+                }
+
+                if (result.status === 'warning' && result.code === 'SESSION_METADATA_CONFLICTS') {
+                    const conflictRows = Array.isArray(result?.data?.conflicts) ? result.data.conflicts : [];
+                    const detailHtml = conflictRows.length
+                        ? '<div class="mt-3"><strong>Detected conflicts:</strong><ul class="mt-2 mb-0 text-start">'
+                            + conflictRows.map((row) => {
+                                const date = attendanceAttachmentEscape(row?.date || '-');
+                                const teacher = attendanceAttachmentEscape(row?.teacherName || '-');
+                                const conflictClass = attendanceAttachmentEscape(row?.conflictClass || 'schedule conflict');
+                                const existTime = attendanceAttachmentEscape(row?.existTime || '');
+                                return `<li>${date} | ${teacher} | ${conflictClass}${existTime ? ` (${existTime})` : ''}</li>`;
+                            }).join('')
+                            + '</ul></div>'
+                        : '';
+                    const warningMessage = attendanceAttachmentEscape(result.message || 'Schedule conflicts were detected for the updated session.');
+                    if (typeof showMessageModal === 'function') {
+                        const selected = await showMessageModal({
+                            title: 'Session Schedule Conflicts',
+                            icon: 'warning',
+                            message: `${warningMessage}${detailHtml}<div class="mt-3">Save anyway with these conflicts?</div>`,
+                            buttons: [
+                                { text: 'Cancel', class: 'btn-secondary' },
+                                { text: 'Save Anyway', class: 'btn-warning' }
+                            ]
+                        });
+                        if (selected !== 'Save Anyway') return;
+                    } else {
+                        const ok = window.confirm(`${result.message || 'Schedule conflicts were detected.'}\n\nSave anyway?`);
+                        if (!ok) return;
+                    }
+
+                    ({ result } = await submitSessionSave({ ...payload, force: true }));
                     guarded = await applySaveGuard(result);
                     if (guarded.stop) return;
                 }

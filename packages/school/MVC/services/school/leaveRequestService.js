@@ -1,8 +1,11 @@
 const schoolRepositories = require('../../repositories/school');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
+const leaveSessionResolutionService = require('./leaveSessionResolutionService');
 const taskService = require('./taskService');
 const personDisplayNameService = require('./personDisplayNameService');
 const schoolIdentityLookupService = require('./schoolIdentityLookupService');
+const schoolRecordAccessService = require('./schoolRecordAccessService');
+const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
@@ -83,6 +86,17 @@ function isAdminViewer(user) {
     orgId: getActiveOrgId(user),
     section: { id: SECTIONS.SCHOOL_LEAVE_REQUESTS, category: 'SCHOOL' }
   }));
+}
+
+function resolveLeaveAccess(reqUser, accessContext = {}) {
+  return schoolRecordAccessService.resolveAccessFromUser(reqUser, {
+    scopeId: accessContext?.scopeId || accessContext?.accessScope || ''
+  });
+}
+
+function canViewAllLeaveRequests(reqUser, accessContext = {}) {
+  if (isAdminViewer(reqUser)) return true;
+  return schoolRecordAccessService.isOrgWideScope(resolveLeaveAccess(reqUser, accessContext));
 }
 
 function getRequesterPersonId(user) {
@@ -238,13 +252,18 @@ function inferRequesterRole(user, preferredRole = '', options = {}) {
   return 'staff';
 }
 
-function normalizeQueryScope(reqUser, query = {}) {
+function normalizeQueryScope(reqUser, query = {}, accessContext = {}) {
   const orgId = getActiveOrgId(reqUser);
+  const viewAll = canViewAllLeaveRequests(reqUser, accessContext);
+  if (viewAll) {
+    return {
+      query,
+      scope: { canViewAll: true, activeOrgId: orgId, scopeMode: SCOPE_MODES.ORG_WIDE }
+    };
+  }
   return {
     query,
-    scope: isAdminViewer(reqUser)
-      ? { canViewAll: true, activeOrgId: orgId }
-      : { activeOrgId: orgId }
+    scope: { activeOrgId: orgId, scopeMode: SCOPE_MODES.ORG_WIDE }
   };
 }
 
@@ -283,16 +302,19 @@ function isOwner(row, reqUser) {
   return Boolean(personId && idsEqual(row?.requesterPersonId, personId));
 }
 
-function assertCanView(row, reqUser) {
+function assertCanView(row, reqUser, accessContext = {}) {
   if (!row) throw new Error('Leave request was not found.');
-  if (isAdminViewer(reqUser) || isOwner(row, reqUser)) return;
+  const orgId = getActiveOrgId(reqUser);
+  if (isAdminViewer(reqUser)) return;
+  if (canViewAllLeaveRequests(reqUser, accessContext) && (!orgId || idsEqual(row?.orgId, orgId))) return;
+  if (isOwner(row, reqUser)) return;
   const error = new Error('You can only view your own leave requests.');
   error.statusCode = 403;
   throw error;
 }
 
-function assertCanEdit(row, reqUser) {
-  assertCanView(row, reqUser);
+function assertCanEdit(row, reqUser, accessContext = {}) {
+  assertCanView(row, reqUser, accessContext);
   if (isAdminViewer(reqUser)) return;
   if (FINAL_STATUSES.has(String(row?.status || '').toLowerCase())) {
     const error = new Error('Finalized leave requests cannot be edited.');
@@ -363,25 +385,27 @@ async function enrichLeaveRequestForDisplay(row, reqUser = null) {
 }
 
 async function getRequestById(id, reqUser, options = {}) {
-  const row = await schoolRepositories.leaveRequests.getById(id, options);
+  const accessContext = options?.accessContext || {};
+  const row = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser, {}, accessContext));
   if (!row) return null;
-  assertCanView(row, reqUser);
+  assertCanView(row, reqUser, accessContext);
   return enrichLeaveRequestForDisplay(row, reqUser);
 }
 
-async function listVisibleRequests(reqUser, filters = {}) {
+async function listVisibleRequests(reqUser, filters = {}, accessContext = {}) {
   const orgId = getActiveOrgId(reqUser);
   const query = {};
   const status = cleanString(filters.status, 40).toLowerCase();
   if (status) query.status = status;
   const reason = cleanString(filters.reason, 60).toLowerCase();
   if (reason) query.reason = reason;
-  const requesterPersonId = isAdminViewer(reqUser)
+  const viewAll = canViewAllLeaveRequests(reqUser, accessContext);
+  const requesterPersonId = viewAll
     ? toPublicId(filters.requesterPersonId || '')
     : getRequesterPersonId(reqUser);
   if (requesterPersonId) query.requesterPersonId = requesterPersonId;
 
-  const rows = await schoolRepositories.leaveRequests.list(normalizeQueryScope(reqUser, query));
+  const rows = await schoolRepositories.leaveRequests.list(normalizeQueryScope(reqUser, query, accessContext));
   const sorted = (Array.isArray(rows) ? rows : [])
     .filter((row) => !orgId || idsEqual(row?.orgId, orgId))
     .sort((a, b) => String(b?.audit?.createDateTime || b?.requestDate || '').localeCompare(String(a?.audit?.createDateTime || a?.requestDate || '')));
@@ -442,9 +466,10 @@ function hasMaterialScheduleChange(existing, next) {
 }
 
 async function updateRequest(reqUser, id, input = {}, options = {}) {
-  const existing = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser));
+  const accessContext = options?.accessContext || {};
+  const existing = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser, {}, accessContext));
   if (!existing) throw new Error('Leave request was not found.');
-  assertCanEdit(existing, reqUser);
+  assertCanEdit(existing, reqUser, accessContext);
 
   const wasApproved = String(existing.status || '').toLowerCase() === 'approved';
   const confirmReapproval = normalizeBool(options.confirmReapproval ?? input.confirmReapproval, false);
@@ -482,7 +507,8 @@ async function updateRequest(reqUser, id, input = {}, options = {}) {
       throw error;
     }
     next.status = 'pending_reapproval';
-    next.lastApprovedSnapshot = existing.lastApprovedSnapshot || leaveRequestModel.buildLeaveWindowSnapshot(existing);
+    const priorSnapshot = existing.lastApprovedSnapshot || leaveRequestModel.buildLeaveWindowSnapshot(existing);
+    next.lastApprovedSnapshot = priorSnapshot ? { ...priorSnapshot, active: false } : null;
   } else if (!isAdminViewer(reqUser)) {
     next.status = existing.status === 'pending_reapproval' ? 'pending_reapproval' : 'submitted';
   }
@@ -500,7 +526,7 @@ async function updateRequest(reqUser, id, input = {}, options = {}) {
     })
   ];
 
-  const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser, {}, accessContext));
   return updated;
 }
 
@@ -508,6 +534,8 @@ async function approveRequest(reqUser, id, note = '') {
   assertAdmin(reqUser);
   const existing = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser));
   if (!existing) throw new Error('Leave request was not found.');
+
+  await leaveSessionResolutionService.assertReadyForApproval(existing, reqUser);
 
   const now = new Date().toISOString();
   const actorName = await resolveActorName(reqUser);
@@ -591,10 +619,11 @@ async function rejectRequest(reqUser, id, note = '') {
   return updated;
 }
 
-async function cancelRequest(reqUser, id, note = '') {
-  const existing = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser));
+async function cancelRequest(reqUser, id, note = '', options = {}) {
+  const accessContext = options?.accessContext || {};
+  const existing = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser, {}, accessContext));
   if (!existing) throw new Error('Leave request was not found.');
-  assertCanView(existing, reqUser);
+  assertCanView(existing, reqUser, accessContext);
   if (!isAdminViewer(reqUser) && !isOwner(existing, reqUser)) {
     throw new Error('You can only cancel your own leave requests.');
   }
@@ -631,7 +660,7 @@ async function cancelRequest(reqUser, id, note = '') {
     ]
   };
 
-  const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser, {}, accessContext));
   return updated;
 }
 
@@ -676,10 +705,11 @@ async function syncLeaveRequestTask(action, row, reqUser, options = {}) {
   }
 }
 
-async function createTaskForRequest(reqUser, id, input = {}) {
-  const existing = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser));
+async function createTaskForRequest(reqUser, id, input = {}, options = {}) {
+  const accessContext = options?.accessContext || {};
+  const existing = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser, {}, accessContext));
   if (!existing) throw new Error('Leave request was not found.');
-  assertCanView(existing, reqUser);
+  assertCanView(existing, reqUser, accessContext);
 
   const assignedPersonId = toPublicId(input.assignedPersonId || '');
   if (!assignedPersonId) {
@@ -922,6 +952,8 @@ module.exports = {
   canCreateRequest,
   assertCreateAllowed,
   isAdminViewer,
+  resolveLeaveAccess,
+  canViewAllLeaveRequests,
   getRequesterRoleOptions,
   getSelfRequesterContext,
   isOwner,
@@ -942,6 +974,7 @@ module.exports = {
     timeRangesOverlap,
     computeDurationHours,
     snapshotOverlapsWindow,
-    hasMaterialScheduleChange
+    hasMaterialScheduleChange,
+    assertCanView
   }
 };

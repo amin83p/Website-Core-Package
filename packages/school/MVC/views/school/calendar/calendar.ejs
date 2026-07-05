@@ -4,7 +4,7 @@
   const lockedPersonId = access.lockedPersonId || '';
   const lockedPersonName = access.lockedPersonName || '';
   const availableRoles = Array.isArray(access.availableRoles) ? access.availableRoles : [];
-  const activityCategoryLayers = Array.isArray(calendarActivityCategories) ? calendarActivityCategories : [];
+  const activityCategoryLayers = [];
   const initialRoleKeys = Array.isArray(calendarActiveRoleKeys) ? calendarActiveRoleKeys : [];
   const calendarLayerStorageKeySafe = String(calendarLayerStorageKey || 'schoolCalendar:selectedLayers:global');
 %>
@@ -537,16 +537,15 @@
               <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="timesheet_deadlines" data-layer-kind="fixed" checked>
               <span><strong>Timesheet Deadlines</strong>Submission deadlines for available timesheet periods</span>
             </label>
-            <% if (activityCategoryLayers.length) { %>
-              <% activityCategoryLayers.forEach((category) => { %>
-                <label class="school-calendar-layer-option">
-                  <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="<%= category.layerKey %>" data-layer-kind="activity-category" checked>
-                  <span><strong><%= category.name %></strong><%= category.defaultPaid ? 'Paid by default category' : 'Activity category layer' %></span>
-                </label>
-              <% }) %>
-            <% } else { %>
-              <div class="px-2 py-1 small text-muted">No active activity categories available.</div>
-            <% } %>
+            <label class="school-calendar-layer-option">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="school_public_activities" data-layer-kind="activity-fixed" checked>
+              <span><strong>Public School Activities</strong>All public school activities for everyone, regardless of assignment</span>
+            </label>
+            <label class="school-calendar-layer-option" id="calendarAssignedActivitiesLayerOption">
+              <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="my_assigned_activities" data-layer-kind="activity-fixed" checked>
+              <span><strong>My Assigned Activities</strong>Activities assigned to the active person across all categories</span>
+            </label>
+            <div id="calendarAssignedActivitiesHint" class="px-2 py-1 small text-muted d-none">Select an active person to use the assigned activities layer.</div>
             <label class="school-calendar-layer-option calendar-role-layer-option d-none" data-role-key="teacher">
               <input class="form-check-input calendar-layer-toggle mt-1" type="checkbox" value="schedule_teacher" data-layer-kind="role">
               <span><strong>Teacher Schedule</strong>Teaching and classroom schedule events</span>
@@ -649,10 +648,9 @@
 (() => {
   const canSelectAnyPerson = <%- JSON.stringify(canSelectAnyPerson) %>;
   const lockedPersonId = <%- JSON.stringify(lockedPersonId) %>;
-  const calendarActivityCategories = <%- JSON.stringify(activityCategoryLayers || []).replace(/</g, '\\u003c') %>;
   const initialRoleKeys = <%- JSON.stringify(initialRoleKeys || []).replace(/</g, '\\u003c') %>;
   const layerStorageKey = <%- JSON.stringify(calendarLayerStorageKeySafe) %>;
-  const DEFAULT_BASE_LAYERS = ['school_days_off', 'timesheet_deadlines'];
+  const DEFAULT_BASE_LAYERS = ['school_days_off', 'timesheet_deadlines', 'school_public_activities', 'my_assigned_activities'];
   const monthNames = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
   const monthOnlyNames = new Intl.DateTimeFormat(undefined, { month: 'long' });
   const compactDateNames = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
@@ -683,16 +681,11 @@
   const eventDetailOpenSourceLink = document.getElementById('calendarEventDetailOpenSourceLink');
   const layerSummary = document.getElementById('calendarLayerSummary');
   const roleLayerOptions = Array.from(document.querySelectorAll('.calendar-role-layer-option'));
-  const activityLayerLabels = (Array.isArray(calendarActivityCategories) ? calendarActivityCategories : []).reduce((map, category) => {
-    const key = String(category?.layerKey || '').trim();
-    const label = String(category?.name || category?.code || key).trim();
-    if (key && label) map[key] = label;
-    return map;
-  }, {});
   const layerLabels = {
     school_days_off: 'Days Off',
     timesheet_deadlines: 'Timesheet Deadlines',
-    ...activityLayerLabels,
+    school_public_activities: 'Public School Activities',
+    my_assigned_activities: 'My Assigned Activities',
     schedule_teacher: 'Teacher',
     schedule_staff: 'Staff',
     schedule_student: 'Student'
@@ -879,12 +872,23 @@
   function defaultLayers() {
     const defaults = new Set(DEFAULT_BASE_LAYERS);
     getVisibleLayerInputs()
-      .filter((input) => String(input.dataset.layerKind || '') === 'activity-category')
-      .forEach((input) => defaults.add(String(input.value || '').trim()));
-    getVisibleLayerInputs()
       .filter((input) => String(input.dataset.layerKind || '') === 'role')
       .forEach((input) => defaults.add(String(input.value || '').trim()));
     return Array.from(defaults).filter(Boolean);
+  }
+
+  function syncAssignedActivitiesLayerState() {
+    const assignedInput = document.querySelector('.calendar-layer-toggle[value="my_assigned_activities"]');
+    const hint = document.getElementById('calendarAssignedActivitiesHint');
+    const option = document.getElementById('calendarAssignedActivitiesLayerOption');
+    const personId = String(personIdInput?.value || lockedPersonId || '').trim();
+    const hasPerson = Boolean(personId);
+    if (assignedInput) {
+      assignedInput.disabled = !hasPerson;
+      if (!hasPerson) assignedInput.checked = false;
+    }
+    if (hint) hint.classList.toggle('d-none', hasPerson);
+    if (option) option.classList.toggle('opacity-50', !hasPerson);
   }
 
   function applyLayerSelection(layerKeys = []) {
@@ -938,6 +942,7 @@
     selectedPerson = personId ? { ...person, id: personId, personId, displayName: displayName || personId } : null;
     const roleKeys = personId ? extractRoleKeysFromPerson(selectedPerson) : [];
     updateRoleLayerVisibility(roleKeys);
+    syncAssignedActivitiesLayerState();
     reconcileLayerSelectionAfterRoleChange();
   }
 
@@ -1669,6 +1674,7 @@
   updateViewButtons();
   updateRoleLayerVisibility(initialRoleKeys);
   initializeLayerSelection();
+  syncAssignedActivitiesLayerState();
   loadEvents();
 })();
 </script>

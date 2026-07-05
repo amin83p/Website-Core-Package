@@ -8,6 +8,94 @@
 <% const selfRequesterName = row.requesterName || self.requesterName || ''; %>
 <% const selfRequesterPersonId = row.requesterPersonId || self.requesterPersonId || ''; %>
 
+<style>
+  .leave-range-calendar {
+    border: 1px solid rgba(20, 45, 75, 0.1);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 1rem;
+  }
+  .leave-range-calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: .75rem;
+  }
+  .leave-range-calendar-title {
+    font-weight: 700;
+    color: #123047;
+    margin: 0;
+    font-size: 1rem;
+  }
+  .leave-range-weekdays,
+  .leave-range-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .35rem;
+  }
+  .leave-range-weekdays {
+    margin-bottom: .35rem;
+    color: #607489;
+    font-weight: 700;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .leave-range-weekdays span,
+  .leave-range-day {
+    text-align: center;
+  }
+  .leave-range-day {
+    border: 1px solid transparent;
+    border-radius: .65rem;
+    background: transparent;
+    color: #123047;
+    font-weight: 600;
+    font-size: .88rem;
+    line-height: 1;
+    min-height: 2.25rem;
+    padding: .45rem .2rem;
+    transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+  .leave-range-day:hover:not(:disabled) {
+    background: rgba(13, 110, 253, 0.08);
+  }
+  .leave-range-day.is-outside-month {
+    color: #9aa8b6;
+    opacity: .72;
+  }
+  .leave-range-day.is-today {
+    box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.22);
+  }
+  .leave-range-day.is-range-between {
+    background: rgba(13, 110, 253, 0.16);
+    color: #123047;
+    border-radius: .35rem;
+  }
+  .leave-range-day.is-range-start,
+  .leave-range-day.is-range-end {
+    background: #0d6efd;
+    color: #fff;
+    border-color: #0d6efd;
+  }
+  .leave-range-day.is-range-start.is-range-end {
+    border-radius: .65rem;
+  }
+  .leave-range-day.is-range-start:not(.is-range-end) {
+    border-top-right-radius: .2rem;
+    border-bottom-right-radius: .2rem;
+  }
+  .leave-range-day.is-range-end:not(.is-range-start) {
+    border-top-left-radius: .2rem;
+    border-bottom-left-radius: .2rem;
+  }
+  .leave-range-summary {
+    margin-top: .75rem;
+    color: #607489;
+  }
+</style>
+
 <div class="container-fluid py-3">
   <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
     <div>
@@ -25,7 +113,7 @@
     <div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
       <i class="bi bi-exclamation-triangle-fill mt-1"></i>
       <div>
-        This request is already approved. Saving schedule-related changes will move it to pending reapproval while the last approved snapshot remains active for schedule blocking.
+        This request is already approved. Saving schedule-related changes will move it to pending reapproval and remove it from the schedule until the change is reviewed again.
       </div>
     </div>
   <% } %>
@@ -97,6 +185,24 @@
                 <input class="form-control" type="date" id="endDate" name="endDate" value="<%= row.endDate || row.startDate || '' %>" required>
               </div>
               <div class="col-12">
+                <div id="leaveRangeCalendar" class="leave-range-calendar" aria-label="Leave date range preview">
+                  <div class="leave-range-calendar-header">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="leaveRangePrevMonth" aria-label="Previous month">
+                      <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <h3 class="leave-range-calendar-title" id="leaveRangeMonthLabel">Calendar</h3>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="leaveRangeNextMonth" aria-label="Next month">
+                      <i class="bi bi-chevron-right"></i>
+                    </button>
+                  </div>
+                  <div class="leave-range-weekdays" aria-hidden="true">
+                    <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                  </div>
+                  <div id="leaveRangeCalendarGrid" class="leave-range-grid"></div>
+                  <div id="leaveRangeSummary" class="leave-range-summary"></div>
+                </div>
+              </div>
+              <div class="col-12">
                 <input type="hidden" id="allDay" name="allDay" value="<%= row.allDay === false ? 'false' : 'true' %>">
                 <label class="form-label d-block">Leave Duration</label>
                 <div class="btn-group" role="group" aria-label="Leave duration">
@@ -158,7 +264,7 @@
               <span class="badge bg-secondary"><%= String(row.status || 'new').replace(/_/g, ' ').toUpperCase() %></span>
             </div>
             <div class="small text-muted">
-              Approved requests block overlapping teacher or staff assignment. If an approved request is changed, the approved snapshot keeps blocking until the revision is reviewed.
+              Approved requests block overlapping teacher or staff assignment. If an approved request is changed, it is removed from the schedule until the revision is reviewed.
             </div>
           </div>
         </div>
@@ -185,8 +291,18 @@
     const requesterName = document.getElementById('requesterName');
     const requesterPickerLabel = document.getElementById('requesterPickerLabel');
     const btnPickRequester = document.getElementById('btnPickRequester');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const leaveRangeCalendar = document.getElementById('leaveRangeCalendar');
+    const leaveRangeCalendarGrid = document.getElementById('leaveRangeCalendarGrid');
+    const leaveRangeMonthLabel = document.getElementById('leaveRangeMonthLabel');
+    const leaveRangeSummary = document.getElementById('leaveRangeSummary');
+    const leaveRangePrevMonth = document.getElementById('leaveRangePrevMonth');
+    const leaveRangeNextMonth = document.getElementById('leaveRangeNextMonth');
     const wasApproved = form?.dataset?.approvedRequest === 'true';
     const initial = form ? new FormData(form) : null;
+    let leaveRangeAnchor = new Date();
+    let leaveRangeSelectingEnd = false;
 
     function escapeHtml(value) {
       return String(value || '').replace(/[&<>"']/g, (ch) => ({
@@ -312,6 +428,196 @@
       });
     }
 
+    function parseYmd(value) {
+      const text = String(value || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+      const parsed = new Date(`${text}T00:00:00`);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function toYmd(date) {
+      if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function compareYmd(a, b) {
+      if (!a || !b) return 0;
+      return String(a).localeCompare(String(b));
+    }
+
+    function formatDisplayDate(ymd) {
+      const parsed = parseYmd(ymd);
+      if (!parsed) return '';
+      return parsed.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function countInclusiveDays(startYmd, endYmd) {
+      const start = parseYmd(startYmd);
+      const end = parseYmd(endYmd);
+      if (!start || !end || end < start) return 0;
+      const msPerDay = 24 * 60 * 60 * 1000;
+      return Math.floor((end - start) / msPerDay) + 1;
+    }
+
+    function getRangeState(ymd) {
+      const startYmd = String(startDateInput?.value || '').trim();
+      const endYmd = String(endDateInput?.value || '').trim();
+      if (!startYmd || !ymd) return '';
+      if (ymd === startYmd && (!endYmd || endYmd === startYmd)) return 'range-start range-end';
+      if (ymd === startYmd) return 'range-start';
+      if (endYmd && ymd === endYmd) return 'range-end';
+      if (endYmd && compareYmd(ymd, startYmd) > 0 && compareYmd(ymd, endYmd) < 0) return 'range-between';
+      return '';
+    }
+
+    function updateLeaveRangeSummary() {
+      if (!leaveRangeSummary) return;
+      const startYmd = String(startDateInput?.value || '').trim();
+      const endYmd = String(endDateInput?.value || '').trim();
+      if (!startYmd) {
+        leaveRangeSummary.textContent = 'Select a start date to begin your leave range.';
+        return;
+      }
+      if (!endYmd) {
+        leaveRangeSummary.textContent = `Start selected: ${formatDisplayDate(startYmd)}. Choose an end date.`;
+        return;
+      }
+      const dayCount = countInclusiveDays(startYmd, endYmd);
+      const dayLabel = dayCount === 1 ? '1 day included' : `${dayCount} days included`;
+      leaveRangeSummary.textContent = `${dayLabel} (${formatDisplayDate(startYmd)} – ${formatDisplayDate(endYmd)})`;
+    }
+
+    function renderLeaveRangeCalendar(anchorDate = leaveRangeAnchor) {
+      if (!leaveRangeCalendarGrid) return;
+      leaveRangeAnchor = anchorDate instanceof Date && !Number.isNaN(anchorDate.getTime())
+        ? new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1)
+        : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+      const year = leaveRangeAnchor.getFullYear();
+      const month = leaveRangeAnchor.getMonth();
+      if (leaveRangeMonthLabel) {
+        leaveRangeMonthLabel.textContent = leaveRangeAnchor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      }
+
+      const firstOfMonth = new Date(year, month, 1);
+      const startOffset = firstOfMonth.getDay();
+      const gridStart = new Date(year, month, 1 - startOffset);
+      const todayYmd = toYmd(new Date());
+      leaveRangeCalendarGrid.innerHTML = '';
+
+      for (let i = 0; i < 42; i += 1) {
+        const cellDate = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+        const ymd = toYmd(cellDate);
+        const rangeState = getRangeState(ymd);
+        const classes = ['leave-range-day'];
+        if (cellDate.getMonth() !== month) classes.push('is-outside-month');
+        if (ymd === todayYmd) classes.push('is-today');
+        if (rangeState.includes('range-start')) classes.push('is-range-start');
+        if (rangeState.includes('range-end')) classes.push('is-range-end');
+        if (rangeState.includes('range-between')) classes.push('is-range-between');
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = classes.join(' ');
+        button.dataset.ymd = ymd;
+        button.textContent = String(cellDate.getDate());
+        const ariaBits = [formatDisplayDate(ymd)];
+        if (rangeState.includes('range-start')) ariaBits.push('range start');
+        if (rangeState.includes('range-end')) ariaBits.push('range end');
+        if (rangeState.includes('range-between')) ariaBits.push('included in leave');
+        button.setAttribute('aria-label', ariaBits.join(', '));
+        button.setAttribute('aria-pressed', rangeState.includes('range-start') || rangeState.includes('range-end') ? 'true' : 'false');
+        button.addEventListener('click', () => applyLeaveRangeDaySelection(ymd));
+        leaveRangeCalendarGrid.appendChild(button);
+      }
+
+      updateLeaveRangeSummary();
+    }
+
+    function syncLeaveRangeFromInputs() {
+      const startYmd = String(startDateInput?.value || '').trim();
+      const endYmd = String(endDateInput?.value || '').trim();
+
+      if (startYmd && endDateInput) {
+        endDateInput.min = startYmd;
+      } else if (endDateInput) {
+        endDateInput.removeAttribute('min');
+      }
+
+      const anchor = parseYmd(startYmd) || parseYmd(endYmd) || new Date();
+      renderLeaveRangeCalendar(anchor);
+    }
+
+    function applyLeaveRangeDaySelection(ymd) {
+      if (!startDateInput || !endDateInput || !ymd) return;
+      const startYmd = String(startDateInput.value || '').trim();
+      const endYmd = String(endDateInput.value || '').trim();
+
+      if (!startYmd || (startYmd && endYmd) || leaveRangeSelectingEnd === false) {
+        startDateInput.value = ymd;
+        endDateInput.value = '';
+        leaveRangeSelectingEnd = true;
+      } else {
+        if (compareYmd(ymd, startYmd) < 0) {
+          endDateInput.value = startYmd;
+          startDateInput.value = ymd;
+        } else {
+          endDateInput.value = ymd;
+        }
+        leaveRangeSelectingEnd = false;
+      }
+
+      syncLeaveRangeFromInputs();
+    }
+
+    function handleStartDateChange() {
+      if (!startDateInput || !endDateInput) return;
+      const startYmd = String(startDateInput.value || '').trim();
+      if (!startYmd) {
+        endDateInput.removeAttribute('min');
+        leaveRangeSelectingEnd = false;
+        syncLeaveRangeFromInputs();
+        return;
+      }
+
+      endDateInput.min = startYmd;
+      const endYmd = String(endDateInput.value || '').trim();
+      if (!endYmd || compareYmd(endYmd, startYmd) < 0) {
+        endDateInput.value = startYmd;
+      }
+      leaveRangeSelectingEnd = true;
+      syncLeaveRangeFromInputs();
+    }
+
+    function handleEndDateChange() {
+      if (!startDateInput || !endDateInput) return;
+      const startYmd = String(startDateInput.value || '').trim();
+      const endYmd = String(endDateInput.value || '').trim();
+      if (startYmd && endYmd && compareYmd(endYmd, startYmd) < 0) {
+        endDateInput.value = startYmd;
+      }
+      leaveRangeSelectingEnd = false;
+      syncLeaveRangeFromInputs();
+    }
+
+    leaveRangePrevMonth?.addEventListener('click', () => {
+      renderLeaveRangeCalendar(new Date(leaveRangeAnchor.getFullYear(), leaveRangeAnchor.getMonth() - 1, 1));
+    });
+    leaveRangeNextMonth?.addEventListener('click', () => {
+      renderLeaveRangeCalendar(new Date(leaveRangeAnchor.getFullYear(), leaveRangeAnchor.getMonth() + 1, 1));
+    });
+    startDateInput?.addEventListener('change', handleStartDateChange);
+    endDateInput?.addEventListener('change', handleEndDateChange);
+    if (leaveRangeCalendar) {
+      const initialAnchor = parseYmd(startDateInput?.value) || parseYmd(endDateInput?.value) || new Date();
+      leaveRangeSelectingEnd = Boolean(startDateInput?.value && !endDateInput?.value);
+      renderLeaveRangeCalendar(initialAnchor);
+      syncLeaveRangeFromInputs();
+    }
+
     durationDays?.addEventListener('change', toggleTimeFields);
     durationHours?.addEventListener('change', toggleTimeFields);
     if (btnPickRequester) requesterRole?.addEventListener('change', clearRequesterPick);
@@ -332,7 +638,7 @@
       event.preventDefault();
       const ok = await confirmLeaveRequestMessage({
         title: 'Approval Required Again',
-        message: 'Changing an approved leave request requires approval again. The last approved snapshot will remain active until this change is reviewed.',
+        message: 'Changing an approved leave request requires approval again. It will be removed from the schedule until this change is reviewed.',
         confirmText: 'Continue',
         confirmClass: 'btn-warning'
       });

@@ -1,5 +1,6 @@
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
+const leaveSessionResolutionService = require('../../services/school/leaveSessionResolutionService');
 
 function getStatusCode(error, fallback = 500) {
   const status = Number(error?.statusCode || error?.status || fallback);
@@ -16,7 +17,8 @@ function sendError(req, res, error, fallback = 500) {
     return res.status(status).json({
       status: 'error',
       message: error?.message || 'Request failed.',
-      code: error?.code || undefined
+      code: error?.code || undefined,
+      data: error?.data || undefined
     });
   }
   return res.status(status).render('error', {
@@ -62,6 +64,10 @@ function buildCreateTaskPayload(body = {}) {
   };
 }
 
+function buildAccessContext(req) {
+  return { scopeId: req?.accessScope || '' };
+}
+
 async function baseViewModel(req, res, extra = {}) {
   const requesterRoleOptions = leaveRequestService.getRequesterRoleOptions(req.user);
   return {
@@ -86,7 +92,7 @@ function resLocalSchoolDashboard(res) {
 
 async function showList(req, res) {
   try {
-    const leaveRequests = await leaveRequestService.listVisibleRequests(req.user, req.query);
+    const leaveRequests = await leaveRequestService.listVisibleRequests(req.user, req.query, buildAccessContext(req));
     return res.render('school/leaveRequest/list', await baseViewModel(req, res, {
       title: 'Leave Requests',
       leaveRequests,
@@ -122,7 +128,9 @@ async function createRequest(req, res) {
 
 async function showEditForm(req, res) {
   try {
-    const request = await leaveRequestService.getRequestById(req.params.id, req.user);
+    const request = await leaveRequestService.getRequestById(req.params.id, req.user, {
+      accessContext: buildAccessContext(req)
+    });
     return res.render('school/leaveRequest/form', await baseViewModel(req, res, {
       title: 'Edit Leave Request',
       mode: 'edit',
@@ -140,7 +148,10 @@ async function updateRequest(req, res) {
       req.user,
       req.params.id,
       buildFormPayload(req.body || {}),
-      { confirmReapproval: req.body?.confirmReapproval === 'true' || req.body?.confirmReapproval === true }
+      {
+        confirmReapproval: req.body?.confirmReapproval === 'true' || req.body?.confirmReapproval === true,
+        accessContext: buildAccessContext(req)
+      }
     );
     return res.redirect(`/school/leave-requests/detail/${encodeURIComponent(updated.id)}`);
   } catch (error) {
@@ -150,7 +161,9 @@ async function updateRequest(req, res) {
 
 async function showDetail(req, res) {
   try {
-    const request = await leaveRequestService.getRequestById(req.params.id, req.user);
+    const request = await leaveRequestService.getRequestById(req.params.id, req.user, {
+      accessContext: buildAccessContext(req)
+    });
     return res.render('school/leaveRequest/detail', await baseViewModel(req, res, {
       title: 'Leave Request Detail',
       request,
@@ -166,7 +179,20 @@ async function approveRequest(req, res) {
     const row = await leaveRequestService.approveRequest(req.user, req.params.id, req.body?.note || req.body?.adminNote || '');
     return res.json({ status: 'success', message: 'Leave request approved.', request: row });
   } catch (error) {
-    return sendError(req, res, error, 400);
+    if (wantsJson(req) && error?.code === 'LEAVE_SESSIONS_UNRESOLVED') {
+      const resolveSessionsUrl = error?.data?.resolveSessionsUrl
+        || `/school/leave-requests/resolve-sessions/${encodeURIComponent(req.params.id)}`;
+      return res.status(getStatusCode(error, 409)).json({
+        status: 'error',
+        code: error.code,
+        message: error.message,
+        data: {
+            ...(error.data || {}),
+            resolveSessionsUrl
+        }
+      });
+    }
+    return sendError(req, res, error, getStatusCode(error, 400));
   }
 }
 
@@ -181,7 +207,12 @@ async function rejectRequest(req, res) {
 
 async function cancelRequest(req, res) {
   try {
-    const row = await leaveRequestService.cancelRequest(req.user, req.params.id, req.body?.note || req.body?.adminNote || '');
+    const row = await leaveRequestService.cancelRequest(
+      req.user,
+      req.params.id,
+      req.body?.note || req.body?.adminNote || '',
+      { accessContext: buildAccessContext(req) }
+    );
     return res.json({ status: 'success', message: 'Leave request cancelled.', request: row });
   } catch (error) {
     return sendError(req, res, error, 400);
@@ -199,7 +230,12 @@ async function deleteRequest(req, res) {
 
 async function createTask(req, res) {
   try {
-    const task = await leaveRequestService.createTaskForRequest(req.user, req.params.id, buildCreateTaskPayload(req.body || {}));
+    const task = await leaveRequestService.createTaskForRequest(
+      req.user,
+      req.params.id,
+      buildCreateTaskPayload(req.body || {}),
+      { accessContext: buildAccessContext(req) }
+    );
     return res.json({
       status: 'success',
       message: 'School Task created for this leave request.',
@@ -207,6 +243,70 @@ async function createTask(req, res) {
     });
   } catch (error) {
     return sendError(req, res, error, 400);
+  }
+}
+
+async function getSessionConflicts(req, res) {
+  try {
+    if (!leaveRequestService.isAdminViewer(req.user)) {
+      const error = new Error('Only school administrators can review session conflicts.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const request = await leaveRequestService.getRequestById(req.params.id, req.user, {
+      accessContext: buildAccessContext(req)
+    });
+    const state = await leaveSessionResolutionService.getResolutionState(request, req.user);
+    return res.json({
+      status: 'success',
+      data: state
+    });
+  } catch (error) {
+    return sendError(req, res, error, getStatusCode(error, 400));
+  }
+}
+
+async function applySessionResolutions(req, res) {
+  try {
+    const resolutions = Array.isArray(req.body?.resolutions) ? req.body.resolutions : [];
+    const result = await leaveSessionResolutionService.applySessionResolutions({
+      requestId: req.params.id,
+      resolutions,
+      reqUser: req.user
+    });
+    return res.json({
+      status: 'success',
+      message: `Saved ${result.appliedCount} session resolution(s).`,
+      data: result
+    });
+  } catch (error) {
+    return sendError(req, res, error, getStatusCode(error, 400));
+  }
+}
+
+async function showResolveSessions(req, res) {
+  try {
+    if (!leaveRequestService.isAdminViewer(req.user)) {
+      const error = new Error('Only school administrators can resolve leave session conflicts.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const request = await leaveRequestService.getRequestById(req.params.id, req.user, {
+      accessContext: buildAccessContext(req)
+    });
+    const state = await leaveSessionResolutionService.getResolutionState(request, req.user);
+    if (!state.requiresResolution) {
+      return res.redirect(`/school/leave-requests/detail/${encodeURIComponent(req.params.id)}`);
+    }
+    return res.render('school/leaveRequest/resolveSessions', await baseViewModel(req, res, {
+      title: 'Resolve Leave Sessions',
+      request,
+      resolutionState: state,
+      resolveSessionsUrl: `/school/leave-requests/resolve-sessions/${encodeURIComponent(req.params.id)}`,
+      detailUrl: `/school/leave-requests/detail/${encodeURIComponent(req.params.id)}`
+    }));
+  } catch (error) {
+    return sendError(req, res, error);
   }
 }
 
@@ -221,5 +321,8 @@ module.exports = {
   rejectRequest,
   cancelRequest,
   deleteRequest,
-  createTask
+  createTask,
+  getSessionConflicts,
+  applySessionResolutions,
+  showResolveSessions
 };

@@ -1,6 +1,5 @@
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const schoolCalendarService = require('../../services/school/schoolCalendarService');
-const activityService = require('../../services/school/activityService');
 const scheduleController = require('./scheduleController');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -87,11 +86,6 @@ async function showCalendarPage(req, res) {
   try {
     const calendarAccess = await buildCalendarAccess(req.user);
     const orgId = getActiveOrgId(req.user);
-    const calendarActivityCategories = await activityService.listActivityCategories({
-      orgId,
-      reqUser: req.user,
-      includeInactive: false
-    });
     const activeRoleKeys = (Array.isArray(calendarAccess?.availableRoles) ? calendarAccess.availableRoles : [])
       .map((role) => normalizeId(role?.key || role))
       .filter(Boolean);
@@ -101,18 +95,6 @@ async function showCalendarPage(req, res) {
       user: req.user,
       actionStateId: req.actionStateId || '',
       calendarAccess,
-      calendarActivityCategories: (Array.isArray(calendarActivityCategories) ? calendarActivityCategories : [])
-        .map((category) => {
-          const categoryId = normalizeId(category?.id);
-          return {
-            id: categoryId,
-            name: String(category?.name || category?.code || categoryId).trim(),
-            code: String(category?.code || '').trim(),
-            layerKey: schoolCalendarService.buildActivityCategoryLayerKey(categoryId),
-            defaultPaid: category?.defaultPaid === true
-          };
-        })
-        .filter((category) => category.id && category.layerKey),
       calendarActiveRoleKeys: activeRoleKeys,
       calendarLayerStorageKey: `schoolCalendar:selectedLayers:${orgId || 'global'}`
     });

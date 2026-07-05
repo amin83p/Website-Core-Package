@@ -11,7 +11,9 @@ const LAYER_KEYS = Object.freeze({
   SCHEDULE_TEACHER: 'schedule_teacher',
   SCHEDULE_STAFF: 'schedule_staff',
   SCHEDULE_STUDENT: 'schedule_student',
-  TIMESHEET_DEADLINES: 'timesheet_deadlines'
+  TIMESHEET_DEADLINES: 'timesheet_deadlines',
+  SCHOOL_PUBLIC_ACTIVITIES: 'school_public_activities',
+  MY_ASSIGNED_ACTIVITIES: 'my_assigned_activities'
 });
 
 const ACTIVITY_CATEGORY_LAYER_PREFIX = 'activity_category:';
@@ -152,7 +154,24 @@ function normalizeHolidayEvent(holiday) {
   };
 }
 
-function normalizeActivityEvent(activity = {}, { layerKey = '', subtype = '', entry = null } = {}) {
+function buildAssignedActivityTitle(activity = {}, entry = {}) {
+  const activityName = String(activity.title || activity.name || 'School Activity').trim();
+  const categoryName = String(activity.categoryName || '').trim();
+  const entryTitle = String(entry.title || '').trim();
+  const base = categoryName ? `${categoryName} · ${activityName}` : activityName;
+  if (entryTitle && entryTitle !== activityName) {
+    return `${base} · ${entryTitle}`;
+  }
+  return base;
+}
+
+function normalizeActivityEvent(activity = {}, {
+  layerKey = '',
+  subtype = '',
+  entry = null,
+  titleMode = 'default',
+  tone = ''
+} = {}) {
   const activityEntry = entry || {};
   const date = normalizeDate(activityEntry.date || activity.date || activity.activityDate || activity.startDate);
   if (!date) return null;
@@ -162,11 +181,20 @@ function normalizeActivityEvent(activity = {}, { layerKey = '', subtype = '', en
   const resolvedSubtype = normalizeId(subtype || categoryId || 'activity') || 'activity';
   const resolvedLayerKey = normalizeId(layerKey) || buildActivityCategoryLayerKey(categoryId) || 'activity_category:unknown';
   const isPaid = normalizeBoolean(activity.paid || activity.isPaid || activity.payable);
-  const title = activityEntry.title && activityEntry.title !== activity.title
-    ? `${activity.title || activity.name || 'School Activity'}: ${activityEntry.title}`
-    : (activity.title || activity.name || 'School Professional Development');
+  let title;
+  if (titleMode === 'assigned') {
+    title = buildAssignedActivityTitle(activity, activityEntry);
+  } else {
+    title = activityEntry.title && activityEntry.title !== activity.title
+      ? `${activity.title || activity.name || 'School Activity'}: ${activityEntry.title}`
+      : (activity.title || activity.name || 'School Professional Development');
+  }
+  const resolvedTone = normalizeId(tone)
+    || (isPaid ? 'success' : 'info');
+  const assignedToActivePerson = titleMode === 'assigned'
+    || resolvedLayerKey === LAYER_KEYS.MY_ASSIGNED_ACTIVITIES;
   return {
-    id: `activity-${id}${entryId ? `-${entryId}` : ''}`,
+    id: `activity-${id}${entryId ? `-${entryId}` : ''}${assignedToActivePerson ? '-assigned' : ''}`,
     sourceId: entryId ? `${id}:${entryId}` : id,
     date,
     startTime: normalizeTime(activityEntry.startTime || activity.startTime),
@@ -175,7 +203,7 @@ function normalizeActivityEvent(activity = {}, { layerKey = '', subtype = '', en
     type: 'school_activity',
     layer: resolvedLayerKey,
     subtype: resolvedSubtype,
-    tone: isPaid ? 'success' : 'info',
+    tone: resolvedTone,
     detailsUrl: `/school/activities/edit/${encodeURIComponent(id)}`,
     meta: {
       source: 'activities',
@@ -189,7 +217,8 @@ function normalizeActivityEvent(activity = {}, { layerKey = '', subtype = '', en
       visibilityScope: normalizeActivityVisibilityScope(activity.visibilityScope),
       durationHours: activityEntry.durationHours || activity.durationHours || '',
       paid: isPaid,
-      notes: activityEntry.notes || activity.notes || ''
+      notes: activityEntry.notes || activity.notes || '',
+      assignedToActivePerson
     }
   };
 }
@@ -284,6 +313,48 @@ async function getHolidayEvents({ reqUser, orgId, startDate, endDate } = {}) {
     .map(normalizeHolidayEvent)
     .filter(Boolean)
     .filter((event) => inDateRange(event.date, startDate, endDate));
+}
+
+async function getPublicSchoolActivityEvents({ reqUser, orgId, startDate, endDate } = {}) {
+  const activities = await activityService.listActivities({ orgId, reqUser });
+  return (Array.isArray(activities) ? activities : [])
+    .filter((row) => rowBelongsToOrg(row, orgId))
+    .filter((row) => String(row.status || 'posted').toLowerCase() === 'posted')
+    .filter((row) => normalizeActivityVisibilityScope(row.visibilityScope) === 'school')
+    .flatMap((row) => activityService.getActivityEntries(row).map((entry) => ({ row, entry })))
+    .filter(({ entry }) => String(entry.status || 'posted').toLowerCase() === 'posted')
+    .filter(({ entry }) => normalizeDate(entry.date))
+    .filter(({ entry }) => inDateRange(entry.date, startDate, endDate))
+    .map(({ row, entry }) => normalizeActivityEvent(row, {
+      entry,
+      layerKey: LAYER_KEYS.SCHOOL_PUBLIC_ACTIVITIES,
+      subtype: 'public',
+      tone: 'purple'
+    }))
+    .filter(Boolean);
+}
+
+async function getAssignedActivityEventsForPerson({ reqUser, orgId, personId, startDate, endDate } = {}) {
+  const targetPersonId = normalizeId(personId);
+  if (!targetPersonId) return [];
+
+  const activities = await activityService.listActivities({ orgId, reqUser });
+  return (Array.isArray(activities) ? activities : [])
+    .filter((row) => rowBelongsToOrg(row, orgId))
+    .filter((row) => String(row.status || 'posted').toLowerCase() === 'posted')
+    .flatMap((row) => activityService.getActivityEntries(row).map((entry) => ({ row, entry })))
+    .filter(({ entry }) => String(entry.status || 'posted').toLowerCase() === 'posted')
+    .filter(({ entry }) => normalizeDate(entry.date))
+    .filter(({ row, entry }) => activityService.isPersonEligibleForEntry(row, entry, targetPersonId))
+    .filter(({ entry }) => inDateRange(entry.date, startDate, endDate))
+    .map(({ row, entry }) => normalizeActivityEvent(row, {
+      entry,
+      layerKey: LAYER_KEYS.MY_ASSIGNED_ACTIVITIES,
+      subtype: 'assigned',
+      titleMode: 'assigned',
+      tone: normalizeActivityVisibilityScope(row.visibilityScope) === 'school' ? 'purple' : (normalizeBoolean(row.paid) ? 'success' : 'info')
+    }))
+    .filter(Boolean);
 }
 
 async function getActivityEventsByCategoryLayers({ reqUser, orgId, startDate, endDate, selectedCategoryIds = new Set(), personId = '' } = {}) {
@@ -389,24 +460,31 @@ async function getCalendarEvents({
   const safeStartDate = normalizeDate(startDate);
   const safeEndDate = normalizeDate(endDate);
   const selectedLayers = parseLayers(layers);
-  const selectedActivityCategoryIds = parseSelectedActivityCategoryIds(selectedLayers);
   const events = [];
-  let activityCategoryEvents = [];
+  let publicActivityEvents = [];
 
   if (selectedLayers.has(LAYER_KEYS.DAYS_OFF)) {
     events.push(...await getHolidayEvents({ reqUser, orgId, startDate: safeStartDate, endDate: safeEndDate }));
   }
 
-  if (selectedActivityCategoryIds.size) {
-    activityCategoryEvents = await getActivityEventsByCategoryLayers({
+  if (selectedLayers.has(LAYER_KEYS.SCHOOL_PUBLIC_ACTIVITIES)) {
+    publicActivityEvents = await getPublicSchoolActivityEvents({
       reqUser,
       orgId,
       startDate: safeStartDate,
-      endDate: safeEndDate,
-      selectedCategoryIds: selectedActivityCategoryIds,
-      personId
+      endDate: safeEndDate
     });
-    events.push(...activityCategoryEvents);
+    events.push(...publicActivityEvents);
+  }
+
+  if (selectedLayers.has(LAYER_KEYS.MY_ASSIGNED_ACTIVITIES)) {
+    events.push(...await getAssignedActivityEventsForPerson({
+      reqUser,
+      orgId,
+      personId: normalizeId(personId),
+      startDate: safeStartDate,
+      endDate: safeEndDate
+    }));
   }
 
   if (selectedLayers.has(LAYER_KEYS.TIMESHEET_DEADLINES)) {
@@ -418,7 +496,7 @@ async function getCalendarEvents({
     }));
   }
 
-  const publicActivityKeys = new Set(activityCategoryEvents
+  const publicActivityKeys = new Set(publicActivityEvents
     .filter(isPublicActivityEvent)
     .map(getActivityDuplicateKeyFromEvent)
     .filter(Boolean));
@@ -450,5 +528,8 @@ module.exports = {
   ACTIVITY_CATEGORY_LAYER_PREFIX,
   buildActivityCategoryLayerKey,
   buildActivityDuplicateKey,
+  buildAssignedActivityTitle,
+  getPublicSchoolActivityEvents,
+  getAssignedActivityEventsForPerson,
   getCalendarEvents
 };

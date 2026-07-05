@@ -46,6 +46,27 @@ router.get('/detail/:id',
   leaveRequestController.showDetail
 );
 
+router.get('/resolve-sessions/:id',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.UPDATE),
+  trackActionState(SECTION, OPERATIONS.UPDATE),
+  leaveRequestController.showResolveSessions
+);
+
+router.get('/api/:id/session-conflicts',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.UPDATE),
+  trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  leaveRequestController.getSessionConflicts
+);
+
+router.post('/api/:id/session-resolutions',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.UPDATE),
+  trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  leaveRequestController.applySessionResolutions
+);
+
 router.get('/edit/:id',
   requireAuth,
   requireAccess(SECTION, OPERATIONS.UPDATE),

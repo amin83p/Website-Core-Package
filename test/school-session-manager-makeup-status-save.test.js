@@ -60,3 +60,64 @@ test('session manager handles make-up warning with confirmation and force resubm
   assert.match(source, /selected !== 'Remove Make-up Sessions and Continue'/);
   assert.match(source, /submitSessionSave\(\{ \.\.\.payload,\s*forceRemoveMakeups:\s*true \}\)/);
 });
+
+test('saveSession controller blocks completion when session reports are pending', () => {
+  const source = read('packages/school/MVC/controllers/school/classController.js');
+  assert.match(source, /isSessionCompletionStatusByMap\(statusMap, originalSession\)/);
+  assert.match(source, /listUnsubmittedSessionReports\(/);
+  assert.match(source, /code:\s*'PENDING_REPORTS_BLOCK_COMPLETION'/);
+  assert.match(source, /pendingReports/);
+});
+
+test('session manager warns when completion is blocked by pending reports', () => {
+  const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.match(source, /function isSessionCompletionStatus\(statusCode\)/);
+  assert.match(source, /function getUnsubmittedSessionReports\(\)/);
+  assert.match(source, /function showPendingReportsBlockModal\(rows\)/);
+  assert.match(source, /result\.code === 'PENDING_REPORTS_BLOCK_COMPLETION'/);
+  assert.match(source, /Reports Still Pending/);
+  assert.match(source, /sessionPendingReportsHint/);
+  assert.match(source, /wouldBlockCompletionStatus\(code\)/);
+});
+
+test('manageSession passes canEditSessionMetadata for admin session metadata editing', () => {
+  const source = read('packages/school/MVC/controllers/school/classController.js');
+  assert.match(source, /canEditSessionMetadata:\s*canOverride/);
+});
+
+test('session manager renders admin metadata inputs behind canEditSessionMetadata', () => {
+  const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.match(source, /canEditSessionMetadataFlag/);
+  assert.match(source, /id="sessionDate"/);
+  assert.match(source, /id="sessionStartTime"/);
+  assert.match(source, /id="sessionEndTime"/);
+  assert.match(source, /id="sessionPickTeacher"/);
+  assert.match(source, /id="sessionTeacherId"/);
+  assert.match(source, /sessionCanEditMetadata/);
+});
+
+test('session manager includes metadata in save payload for admins', () => {
+  const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.match(source, /if \(sessionCanEditMetadata\) \{[\s\S]*payload\.date =/);
+  assert.match(source, /payload\.startTime =/);
+  assert.match(source, /payload\.endTime =/);
+  assert.match(source, /payload\.teacherId =/);
+  assert.match(source, /payload\.teacherName =/);
+});
+
+test('saveSession applies admin metadata updates with conflict warnings', () => {
+  const source = read('packages/school/MVC/controllers/school/classController.js');
+  assert.match(source, /function applyAdminSessionMetadataUpdate\(/);
+  assert.match(source, /applyAdminSessionMetadataUpdate\([\s\S]*canOverride/);
+  assert.match(source, /code:\s*'SESSION_METADATA_CONFLICTS'/);
+  assert.match(source, /forceMetadataConflicts = parseBoolean\(req\.body\?\.force/);
+  assert.match(source, /if \(metadataChanged\) \{[\s\S]*assertSessionManagerSessionWithinCycleWindowOrThrow\(classData, originalSession\)/);
+});
+
+test('session manager handles metadata conflict warning with force resubmit', () => {
+  const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.match(source, /result\.status === 'warning' && result\.code === 'SESSION_METADATA_CONFLICTS'/);
+  assert.match(source, /Session Schedule Conflicts/);
+  assert.match(source, /Save Anyway/);
+  assert.match(source, /submitSessionSave\(\{ \.\.\.payload,\s*force:\s*true \}\)/);
+});

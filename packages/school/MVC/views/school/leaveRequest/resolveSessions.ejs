@@ -1,0 +1,305 @@
+<% const row = request || {}; %>
+<% const state = resolutionState || { sessions: [], unresolvedCount: 0, totalCount: 0, readyForApproval: true }; %>
+<% const sessions = Array.isArray(state.sessions) ? state.sessions : []; %>
+<% const reasonLabel = (reasons || {})[row.reason] || row.reason || '-'; %>
+<% const status = String(row.status || '').toLowerCase(); %>
+<% function formatFriendlyDate(value) {
+  const token = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return token || '-';
+  const date = new Date(token + 'T12:00:00');
+  if (Number.isNaN(date.getTime())) return token;
+  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+} %>
+
+<style>
+  .leave-resolve-table th { white-space: nowrap; }
+  .leave-resolve-sub-input { min-width: 10rem; }
+  .leave-resolve-row.is-resolved { opacity: .72; }
+  .leave-resolve-row.is-resolved td { background: rgba(25, 135, 84, .04); }
+</style>
+
+<div class="container-fluid py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1"><i class="bi bi-calendar2-week me-2 text-primary"></i>Resolve Sessions</h1>
+      <div class="text-muted">Assign substitute instructors before approving this leave request.</div>
+      <div class="mt-2">
+        <span class="fw-semibold"><%= row.requesterName || row.requesterPersonId || '-' %></span>
+        <span class="text-muted"> &middot; </span>
+        <span><%= formatFriendlyDate(row.startDate) %><% if (row.endDate && row.endDate !== row.startDate) { %> to <%= formatFriendlyDate(row.endDate) %><% } %></span>
+        <span class="badge bg-light text-dark border ms-1"><%= reasonLabel %></span>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="<%= detailUrl %>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back to detail</a>
+      <a href="/school/leave-requests" class="btn btn-outline-secondary"><i class="bi bi-list-ul me-1"></i> Leave requests</a>
+    </div>
+  </div>
+
+  <div id="leaveResolveStatusAlert" class="alert <%= state.readyForApproval ? 'alert-success' : 'alert-warning' %> border shadow-sm">
+    <% if (state.totalCount === 0) { %>
+      <i class="bi bi-check2-circle me-1"></i>No class sessions overlap this leave window. You can approve the request from the detail page.
+    <% } else if (state.readyForApproval) { %>
+      <i class="bi bi-check2-circle me-1"></i>All <%= state.totalCount %> overlapping session(s) have substitutes assigned. You may approve this leave request.
+    <% } else { %>
+      <i class="bi bi-exclamation-triangle me-1"></i><strong><%= state.unresolvedCount %></strong> of <strong><%= state.totalCount %></strong> overlapping session(s) still need a substitute instructor.
+    <% } %>
+  </div>
+
+  <% if (sessions.length) { %>
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <h2 class="h5 mb-0">Overlapping class sessions</h2>
+      <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btnBulkSubstitute" <%= state.readyForApproval ? '' : '' %>><i class="bi bi-people me-1"></i>Apply substitute to selected</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSaveResolutions"><i class="bi bi-save me-1"></i>Save resolutions</button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 leave-resolve-table">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3" style="width:2.5rem;"><input type="checkbox" class="form-check-input" id="leaveResolveSelectAll" aria-label="Select all unresolved sessions"></th>
+              <th>Class</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Room</th>
+              <th>Status</th>
+              <th>Current teacher</th>
+              <th>Substitute</th>
+              <th class="text-end pe-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="leaveResolveSessionBody">
+            <% sessions.forEach((session) => { %>
+              <tr class="leave-resolve-row<%= session.resolved ? ' is-resolved' : '' %>"
+                  data-class-id="<%= session.classId %>"
+                  data-session-id="<%= session.sessionId %>"
+                  data-resolved="<%= session.resolved ? 'true' : 'false' %>">
+                <td class="ps-3">
+                  <% if (!session.resolved) { %>
+                    <input type="checkbox" class="form-check-input leave-resolve-select" aria-label="Select session">
+                  <% } %>
+                </td>
+                <td><%= session.classTitle || session.classId %></td>
+                <td><%= session.date %></td>
+                <td class="text-nowrap"><%= session.startTime %> – <%= session.endTime %></td>
+                <td><%= session.room || '—' %></td>
+                <td><span class="badge bg-light text-dark border text-capitalize"><%= session.status || 'scheduled' %></span></td>
+                <td><%= session.currentTeacherName || session.currentTeacherId || '—' %></td>
+                <td>
+                  <% if (session.resolved) { %>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">Resolved</span>
+                  <% } else { %>
+                    <input type="hidden" class="leave-resolve-teacher-id" value="">
+                    <div class="input-group input-group-sm leave-resolve-sub-input">
+                      <input type="text" class="form-control bg-white leave-resolve-teacher-name" readonly placeholder="Pick substitute">
+                      <button type="button" class="btn btn-outline-primary leave-resolve-pick-teacher" aria-label="Pick substitute"><i class="bi bi-person-check"></i></button>
+                    </div>
+                  <% } %>
+                </td>
+                <td class="text-end pe-3">
+                  <a href="<%= session.manageSessionUrl %>" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="d-flex flex-wrap justify-content-end gap-2">
+    <button type="button" class="btn btn-success" id="btnApproveLeaveFromResolve" <%= state.readyForApproval ? '' : 'disabled' %>>
+      <i class="bi bi-check2-circle me-1"></i>Approve leave
+    </button>
+  </div>
+</div>
+
+<%- include('partials/modal_GenericPicker') %>
+
+<script>
+(function () {
+  const requestId = <%- JSON.stringify(row.id || '') %>;
+  const detailUrl = <%- JSON.stringify(detailUrl || '') %>;
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  async function showMessage(options) {
+    if (typeof showMessageModal === 'function') {
+      return showMessageModal(options);
+    }
+    window.alert(options?.message || '');
+    return 'OK';
+  }
+
+  function collectPendingResolutions() {
+    const rows = [];
+    document.querySelectorAll('#leaveResolveSessionBody tr[data-resolved="false"]').forEach((tr) => {
+      const teacherId = tr.querySelector('.leave-resolve-teacher-id')?.value || '';
+      const teacherName = tr.querySelector('.leave-resolve-teacher-name')?.value || '';
+      if (!teacherId) return;
+      rows.push({
+        classId: tr.getAttribute('data-class-id') || '',
+        sessionId: tr.getAttribute('data-session-id') || '',
+        substituteTeacherId: teacherId,
+        substituteTeacherName: teacherName
+      });
+    });
+    return rows;
+  }
+
+  function wireTeacherPickers() {
+    document.querySelectorAll('.leave-resolve-pick-teacher').forEach((button) => {
+      button.addEventListener('click', function () {
+        const row = button.closest('tr');
+        if (!row || !window.GenericPicker || !window.GenericPickerPresets) {
+          showMessage({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+          return;
+        }
+        window.GenericPicker.open(window.GenericPickerPresets.teacher({
+          title: 'Select substitute instructor',
+          placeholder: 'Search teachers...',
+          context: window.GenericPickerContexts
+            ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+            : undefined,
+          onSelect: function (item) {
+            const id = String(item?.id || item?.personId || item?.value || '').trim();
+            const name = String(item?.name || item?.label || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || id).trim();
+            const idInput = row.querySelector('.leave-resolve-teacher-id');
+            const nameInput = row.querySelector('.leave-resolve-teacher-name');
+            if (idInput) idInput.value = id;
+            if (nameInput) nameInput.value = name;
+          }
+        }));
+      });
+    });
+  }
+
+  async function refreshState() {
+    const response = await fetch(`/school/leave-requests/api/${encodeURIComponent(requestId)}/session-conflicts`, {
+      headers: { 'X-Ajax-Request': 'true', Accept: 'application/json' },
+      credentials: 'same-origin'
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.status === 'error') {
+      throw new Error(payload.message || 'Could not refresh session conflict state.');
+    }
+    return payload.data || {};
+  }
+
+  async function saveResolutions() {
+    const resolutions = collectPendingResolutions();
+    if (!resolutions.length) {
+      await showMessage({
+        title: 'No changes',
+        icon: 'info',
+        message: 'Pick at least one substitute instructor for an unresolved session before saving.',
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+    const response = await fetch(`/school/leave-requests/api/${encodeURIComponent(requestId)}/session-resolutions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Ajax-Request': 'true' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ resolutions })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.status === 'error') {
+      throw new Error(payload.message || 'Could not save session resolutions.');
+    }
+    await showMessage({
+      title: 'Saved',
+      icon: 'success',
+      message: escapeHtml(payload.message || 'Session resolutions saved.'),
+      buttons: [{ text: 'OK', class: 'btn-success' }]
+    });
+    window.location.reload();
+  }
+
+  document.getElementById('leaveResolveSelectAll')?.addEventListener('change', function () {
+    const checked = this.checked;
+    document.querySelectorAll('.leave-resolve-select').forEach((box) => { box.checked = checked; });
+  });
+
+  document.getElementById('btnBulkSubstitute')?.addEventListener('click', function () {
+    const selected = Array.from(document.querySelectorAll('.leave-resolve-select:checked')).map((box) => box.closest('tr')).filter(Boolean);
+    if (!selected.length) {
+      showMessage({ title: 'Select sessions', icon: 'info', message: 'Select one or more unresolved sessions first.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      return;
+    }
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    window.GenericPicker.open(window.GenericPickerPresets.teacher({
+      title: 'Substitute for selected sessions',
+      placeholder: 'Search teachers...',
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (item) {
+        const id = String(item?.id || item?.personId || item?.value || '').trim();
+        const name = String(item?.name || item?.label || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || id).trim();
+        selected.forEach((row) => {
+          const idInput = row.querySelector('.leave-resolve-teacher-id');
+          const nameInput = row.querySelector('.leave-resolve-teacher-name');
+          if (idInput) idInput.value = id;
+          if (nameInput) nameInput.value = name;
+        });
+      }
+    }));
+  });
+
+  document.getElementById('btnSaveResolutions')?.addEventListener('click', async function () {
+    try {
+      await saveResolutions();
+    } catch (error) {
+      await showMessage({ title: 'Save failed', icon: 'error', message: escapeHtml(error.message || 'Save failed.'), buttons: [{ text: 'OK', class: 'btn-danger' }] });
+    }
+  });
+
+  document.getElementById('btnApproveLeaveFromResolve')?.addEventListener('click', async function () {
+    const noteResult = await showMessage({
+      title: 'Approve Leave Request',
+      icon: 'success',
+      size: 'lg',
+      message: '<label class="form-label" for="leaveApproveNote">Optional review note</label><textarea class="form-control" id="leaveApproveNote" rows="3" maxlength="2000"></textarea>',
+      buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: 'Approve', class: 'btn-success' }]
+    });
+    if (noteResult !== 'Approve') return;
+    const note = document.getElementById('leaveApproveNote')?.value || '';
+    const response = await fetch(`/school/leave-requests/api/${encodeURIComponent(requestId)}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Ajax-Request': 'true' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ note })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.status === 'error') {
+      if (payload.code === 'LEAVE_SESSIONS_UNRESOLVED') {
+        const resolveUrl = payload?.data?.resolveSessionsUrl || `/school/leave-requests/resolve-sessions/${encodeURIComponent(requestId)}`;
+        const result = await showMessage({
+          title: 'Sessions Still Unresolved',
+          icon: 'warning',
+          message: `${escapeHtml(payload.message || 'Resolve all overlapping sessions before approving.')}<div class="mt-2">Assign substitutes for every listed session, save, then try again.</div>`,
+          buttons: [{ text: 'Stay Here', class: 'btn-secondary' }, { text: 'Reload Page', class: 'btn-warning' }]
+        });
+        if (result === 'Reload Page') window.location.href = resolveUrl;
+        return;
+      }
+      await showMessage({ title: 'Approval blocked', icon: 'error', message: escapeHtml(payload.message || 'Leave request could not be approved.'), buttons: [{ text: 'OK', class: 'btn-danger' }] });
+      return;
+    }
+    window.location.href = detailUrl;
+  });
+
+  wireTeacherPickers();
+})();
+</script>

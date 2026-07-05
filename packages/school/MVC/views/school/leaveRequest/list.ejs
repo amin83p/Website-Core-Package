@@ -78,7 +78,7 @@
                   <a href="/school/leave-requests/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
                 <% } %>
                 <% if (canManageAll && ['submitted', 'pending_reapproval'].includes(status)) { %>
-                  <button class="btn btn-outline-success btn-sm leave-request-action" data-action="approve" data-id="<%= row.id %>"><i class="bi bi-check2-circle me-2"></i>Approve</button>
+                  <button class="btn btn-outline-success btn-sm leave-request-action" data-action="approve" data-id="<%= row.id %>" data-requester-role="<%= row.requesterRole || '' %>"><i class="bi bi-check2-circle me-2"></i>Approve</button>
                   <button class="btn btn-outline-danger btn-sm leave-request-action" data-action="reject" data-id="<%= row.id %>"><i class="bi bi-x-circle me-2"></i>Reject</button>
                 <% } %>
                 <% if (!['rejected', 'cancelled'].includes(status)) { %>
@@ -170,6 +170,51 @@
       return result === 'Delete Request';
     }
 
+    async function fetchLeaveSessionConflictState(requestId) {
+      const response = await fetch(`/school/leave-requests/api/${encodeURIComponent(requestId)}/session-conflicts`, {
+        headers: { 'X-Ajax-Request': 'true', Accept: 'application/json' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status === 'error') {
+        throw new Error(payload.message || 'Could not verify session conflicts.');
+      }
+      return payload.data || {};
+    }
+
+    async function promptResolveSessionsBeforeApproval(requestId, state) {
+      const unresolved = Number(state?.unresolvedCount || 0);
+      const total = Number(state?.totalCount || 0);
+      const resolveUrl = state?.resolveSessionsUrl || `/school/leave-requests/resolve-sessions/${encodeURIComponent(requestId)}`;
+      const detailHtml = total > 0
+        ? `<div class="mt-2">${unresolved} of ${total} overlapping class session(s) still assign the leave requester.</div>`
+        : '';
+      const result = await showLeaveRequestMessage({
+        title: 'Resolve Sessions Before Approval',
+        icon: 'warning',
+        size: 'lg',
+        message: `This leave request cannot be approved until substitute instructors are assigned for every overlapping class session.${detailHtml}`,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Resolve Sessions', class: 'btn-warning' }
+        ]
+      });
+      if (result === 'Resolve Sessions') {
+        window.location.href = resolveUrl;
+      }
+      return false;
+    }
+
+    async function ensureReadyToApprove(requestId, requesterRole) {
+      const teacherStaffRoles = ['teacher', 'staff', 'admin'];
+      const role = String(requesterRole || '').trim().toLowerCase();
+      if (!teacherStaffRoles.includes(role)) return true;
+      const state = await fetchLeaveSessionConflictState(requestId);
+      if (!state.requiresResolution || state.readyForApproval) return true;
+      await promptResolveSessionsBeforeApproval(requestId, state);
+      return false;
+    }
+
     async function postAction(action, id, note = '') {
       if (action === 'delete') {
         const confirmed = await confirmDelete();
@@ -185,6 +230,10 @@
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.status === 'error') {
+        if (payload.code === 'LEAVE_SESSIONS_UNRESOLVED') {
+          await promptResolveSessionsBeforeApproval(id, payload.data || {});
+          return;
+        }
         await showLeaveRequestMessage({
           title: 'Leave Request',
           icon: 'error',
@@ -209,6 +258,11 @@
         }
         const note = ['approve', 'reject'].includes(action) ? await requestReviewNote(action) : '';
         if (note === null) return;
+        if (action === 'approve') {
+          const requesterRole = button.dataset.requesterRole || '';
+          const ready = await ensureReadyToApprove(id, requesterRole);
+          if (!ready) return;
+        }
         await postAction(action, id, note);
       });
     });

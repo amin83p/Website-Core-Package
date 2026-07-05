@@ -21,6 +21,47 @@
     const token = String(value || '').trim();
     return token ? token.replace(/_/g, ' ').toUpperCase() : 'NONE';
   }
+  function formatFriendlyDate(value) {
+    const token = String(value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return token || '-';
+    const date = new Date(token + 'T12:00:00');
+    if (Number.isNaN(date.getTime())) return token;
+    return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  function formatDateTime(value) {
+    const token = String(value || '').trim();
+    if (!token) return '-';
+    const date = new Date(token);
+    if (Number.isNaN(date.getTime())) return token;
+    return date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  }
+  function countInclusiveDays(startDate, endDate) {
+    const start = String(startDate || '').trim();
+    const end = String(endDate || startDate || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) return 0;
+    const startMs = new Date(start + 'T00:00:00').getTime();
+    const endMs = new Date(end + 'T00:00:00').getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) return 0;
+    return Math.floor((endMs - startMs) / 86400000) + 1;
+  }
+  function capitalizeToken(value) {
+    const token = String(value || '').trim();
+    if (!token) return '-';
+    return token.charAt(0).toUpperCase() + token.slice(1);
+  }
+  function statusBadgeClass(value) {
+    const token = String(value || '').trim().toLowerCase();
+    if (token === 'approved') return 'bg-success';
+    if (token === 'submitted' || token === 'pending_reapproval') return 'bg-warning text-dark';
+    if (token === 'rejected' || token === 'cancelled') return 'bg-danger';
+    return 'bg-secondary';
+  }
   function addDaysIso(value, days) {
     const token = String(value || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return '';
@@ -38,6 +79,12 @@
   if (leaveScheduleEndDate) leaveScheduleParams.set('endDate', leaveScheduleEndDate);
   if (row.requesterRole) leaveScheduleParams.set('role', row.requesterRole);
   const leaveScheduleUrl = `/school/schedules${leaveScheduleParams.toString() ? '?' + leaveScheduleParams.toString() : ''}`;
+  const leaveDayCount = countInclusiveDays(row.startDate, row.endDate || row.startDate);
+  const leaveDayLabel = leaveDayCount === 1 ? '1 day' : `${leaveDayCount} days`;
+  const isSingleDay = !row.endDate || row.endDate === row.startDate;
+  const approval = row.approval && typeof row.approval === 'object' ? row.approval : {};
+  const needsSessionResolution = ['teacher', 'staff', 'admin'].includes(String(row.requesterRole || '').toLowerCase())
+    && ['submitted', 'pending_reapproval'].includes(status);
 %>
 
 <style>
@@ -115,6 +162,65 @@
     color: #495057;
     font-weight: 600;
   }
+  .leave-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem;
+    margin-bottom: 1rem;
+  }
+  .leave-detail-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .45rem .7rem;
+    border-radius: 999px;
+    background: #f8f9fa;
+    border: 1px solid rgba(33, 37, 41, .08);
+    color: #495057;
+    font-size: .82rem;
+    font-weight: 600;
+  }
+  .leave-detail-panel {
+    border: 1px solid rgba(33, 37, 41, .08);
+    border-radius: 10px;
+    background: linear-gradient(180deg, #fff, #fbfcfe);
+    padding: .9rem 1rem;
+    height: 100%;
+  }
+  .leave-detail-panel-label {
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #6c757d;
+    margin-bottom: .35rem;
+  }
+  .leave-detail-window-range {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #123047;
+    line-height: 1.35;
+  }
+  .leave-detail-subtle {
+    color: #6c757d;
+    font-size: .88rem;
+  }
+  .leave-detail-details-copy {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 0;
+    color: #212529;
+  }
+  .leave-detail-empty {
+    color: #adb5bd;
+    font-style: italic;
+  }
+  .leave-detail-review-box {
+    border-left: 4px solid rgba(13, 110, 253, .35);
+    background: rgba(248, 249, 250, .95);
+    border-radius: 8px;
+    padding: .75rem .9rem;
+  }
   @media (max-width: 575.98px) {
     .leave-lifecycle-item {
       grid-template-columns: 40px minmax(0, 1fr);
@@ -140,8 +246,19 @@
 
   <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
     <div>
-      <h1 class="h3 mb-1">Leave Request <span class="text-muted"><%= row.id %></span></h1>
-      <div class="text-muted"><%= row.requesterName || row.requesterPersonId || '-' %> - <%= row.startDate || '-' %><%= row.endDate && row.endDate !== row.startDate ? ' to ' + row.endDate : '' %></div>
+      <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+        <h1 class="h3 mb-0">Leave Request</h1>
+        <span class="badge <%= statusBadgeClass(status) %>"><%= status.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN' %></span>
+      </div>
+      <div class="text-muted"><span class="font-monospace"><%= row.id %></span></div>
+      <div class="mt-1">
+        <span class="fw-semibold text-dark"><%= row.requesterName || row.requesterPersonId || '-' %></span>
+        <span class="text-muted"> &middot; </span>
+        <span><%= formatFriendlyDate(row.startDate) %><%= isSingleDay ? '' : ' to ' + formatFriendlyDate(row.endDate) %></span>
+        <% if (leaveDayCount > 0) { %>
+          <span class="badge bg-light text-dark border ms-1"><%= leaveDayLabel %></span>
+        <% } %>
+      </div>
     </div>
       <div class="d-flex flex-wrap gap-2">
       <a href="<%= schoolSectionDashboardHref %>" class="btn btn-filled btn-secondary"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>
@@ -150,6 +267,16 @@
       <% if (!['rejected', 'cancelled'].includes(status)) { %>
         <a href="/school/leave-requests/edit/<%= row.id %>" class="btn btn-primary"><i class="bi bi-pencil-square me-1"></i> Edit</a>
       <% } %>
+    </div>
+  </div>
+
+  <div id="leaveSessionConflictBanner" class="alert alert-warning border shadow-sm d-none mb-3" role="alert">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+      <div>
+        <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i><span id="leaveSessionConflictSummary">Overlapping class sessions require substitute instructors before approval.</span></div>
+        <div class="small mt-1" id="leaveSessionConflictDetail"></div>
+      </div>
+      <a href="/school/leave-requests/resolve-sessions/<%= row.id %>" class="btn btn-warning btn-sm fw-bold" id="leaveResolveSessionsLink"><i class="bi bi-calendar2-week me-1"></i>Resolve sessions</a>
     </div>
   </div>
 
@@ -169,10 +296,18 @@
       </div>
       <div class="card-body">
         <% if (row.lastApprovedSnapshot && row.lastApprovedSnapshot.active !== false) { %>
-          <div class="small">
-            <div><span class="text-muted">Active approved window:</span></div>
-            <div class="fw-bold"><%= row.lastApprovedSnapshot.startDate %><%= row.lastApprovedSnapshot.endDate && row.lastApprovedSnapshot.endDate !== row.lastApprovedSnapshot.startDate ? ' to ' + row.lastApprovedSnapshot.endDate : '' %></div>
-            <div class="text-muted"><%= row.lastApprovedSnapshot.allDay === false ? ((row.lastApprovedSnapshot.startTime || '--:--') + ' - ' + (row.lastApprovedSnapshot.endTime || '--:--')) : 'All day' %></div>
+          <div class="leave-detail-panel">
+            <div class="leave-detail-panel-label">Active Approved Window</div>
+            <div class="leave-detail-window-range">
+              <%= formatFriendlyDate(row.lastApprovedSnapshot.startDate) %><%= row.lastApprovedSnapshot.endDate && row.lastApprovedSnapshot.endDate !== row.lastApprovedSnapshot.startDate ? ' to ' + formatFriendlyDate(row.lastApprovedSnapshot.endDate) : '' %>
+            </div>
+            <div class="leave-detail-subtle mt-1">
+              <% if (row.lastApprovedSnapshot.allDay === false) { %>
+                <i class="bi bi-clock me-1"></i><%= row.lastApprovedSnapshot.startTime || '--:--' %> - <%= row.lastApprovedSnapshot.endTime || '--:--' %>
+              <% } else { %>
+                <i class="bi bi-calendar-day me-1"></i>All day
+              <% } %>
+            </div>
           </div>
         <% } else if (status === 'approved') { %>
           <div class="small text-muted">This approved request is the active schedule-blocking source.</div>
@@ -192,39 +327,104 @@
             <% if (row.requesterPersonId && leaveScheduleStartDate && leaveScheduleEndDate) { %>
               <a href="<%= leaveScheduleUrl %>" class="btn btn-outline-info btn-sm" target="_blank" rel="noopener"><i class="bi bi-calendar-week me-1"></i> View Schedule +/- 3 Days</a>
             <% } %>
-            <span class="badge <%= status === 'approved' ? 'bg-success' : (status === 'submitted' || status === 'pending_reapproval' ? 'bg-warning text-dark' : 'bg-secondary') %>"><%= status.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN' %></span>
+            <span class="badge <%= statusBadgeClass(status) %>"><%= status.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN' %></span>
           </div>
         </div>
         <div class="card-body">
+          <div class="leave-detail-meta">
+            <span class="leave-detail-meta-item"><i class="bi bi-calendar-plus"></i> Requested <%= formatFriendlyDate(row.requestDate) %></span>
+            <span class="leave-detail-meta-item"><i class="bi bi-arrow-repeat"></i> Revision <%= row.revisionNo || 1 %></span>
+            <% if (row.audit?.lastUpdateDateTime) { %>
+              <span class="leave-detail-meta-item"><i class="bi bi-clock-history"></i> Updated <%= formatDateTime(row.audit.lastUpdateDateTime) %></span>
+            <% } %>
+          </div>
           <dl class="row mb-0">
             <dt class="col-sm-4">Requester</dt>
             <dd class="col-sm-8">
-              <div class="fw-bold"><%= row.requesterName || '-' %></div>
-              <div class="small text-muted"><%= row.requesterRole || '-' %> - <span class="font-monospace"><%= row.requesterPersonId || '-' %></span></div>
+              <div class="leave-detail-panel">
+                <div class="fw-bold fs-5"><%= row.requesterName || '-' %></div>
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                  <span class="badge bg-light text-dark border"><%= capitalizeToken(row.requesterRole) %></span>
+                  <span class="small text-muted font-monospace"><%= row.requesterPersonId || '-' %></span>
+                </div>
+              </div>
             </dd>
             <dt class="col-sm-4">Leave Window</dt>
             <dd class="col-sm-8">
-              <%= row.startDate || '-' %><%= row.endDate && row.endDate !== row.startDate ? ' to ' + row.endDate : '' %>
-              <% if (row.allDay === false) { %>
-                <div class="small text-muted"><%= row.startTime || '--:--' %> - <%= row.endTime || '--:--' %></div>
-              <% } else { %>
-                <div class="small text-muted">All day</div>
-              <% } %>
+              <div class="leave-detail-panel">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle"><%= leaveDayLabel %></span>
+                  <% if (row.allDay === false) { %>
+                    <span class="badge bg-light text-dark border"><i class="bi bi-clock me-1"></i>Partial day</span>
+                  <% } else { %>
+                    <span class="badge bg-light text-dark border"><i class="bi bi-calendar-day me-1"></i>All day</span>
+                  <% } %>
+                </div>
+                <div class="leave-detail-window-range">
+                  <%= formatFriendlyDate(row.startDate) %><%= isSingleDay ? '' : ' to ' + formatFriendlyDate(row.endDate) %>
+                </div>
+                <div class="leave-detail-subtle mt-1">
+                  <span class="font-monospace"><%= row.startDate || '-' %><%= isSingleDay ? '' : ' to ' + (row.endDate || '-') %></span>
+                </div>
+                <% if (row.allDay === false) { %>
+                  <div class="leave-detail-subtle mt-2"><i class="bi bi-clock me-1"></i><%= row.startTime || '--:--' %> - <%= row.endTime || '--:--' %></div>
+                <% } %>
+              </div>
             </dd>
             <dt class="col-sm-4">Reason</dt>
-            <dd class="col-sm-8"><%= reasonLabel %></dd>
+            <dd class="col-sm-8">
+              <div class="leave-detail-panel">
+                <div class="fw-semibold"><%= reasonLabel %></div>
+                <% if (row.reason && row.reason !== reasonLabel) { %>
+                  <div class="leave-detail-subtle font-monospace mt-1"><%= row.reason %></div>
+                <% } %>
+              </div>
+            </dd>
             <dt class="col-sm-4">Details</dt>
-            <dd class="col-sm-8"><%= row.details || '-' %></dd>
+            <dd class="col-sm-8">
+              <div class="leave-detail-panel">
+                <% if (row.details) { %>
+                  <p class="leave-detail-details-copy"><%= row.details %></p>
+                <% } else { %>
+                  <div class="leave-detail-empty">No additional details provided.</div>
+                <% } %>
+              </div>
+            </dd>
+            <% if (approval.approvedAt || approval.rejectedAt || approval.cancelledAt) { %>
+              <dt class="col-sm-4">Review</dt>
+              <dd class="col-sm-8">
+                <div class="leave-detail-review-box">
+                  <% if (approval.approvedAt) { %>
+                    <div class="fw-semibold text-success"><i class="bi bi-check2-circle me-1"></i>Approved</div>
+                    <div class="leave-detail-subtle">By <%= approval.approvedByName || approval.approvedBy || 'System' %> on <%= formatDateTime(approval.approvedAt) %></div>
+                    <% if (approval.note) { %><div class="mt-2 small"><%= approval.note %></div><% } %>
+                  <% } %>
+                  <% if (approval.rejectedAt) { %>
+                    <div class="fw-semibold text-danger"><i class="bi bi-x-circle me-1"></i>Rejected</div>
+                    <div class="leave-detail-subtle">By <%= approval.rejectedByName || approval.rejectedBy || 'System' %> on <%= formatDateTime(approval.rejectedAt) %></div>
+                    <% if (approval.note) { %><div class="mt-2 small"><%= approval.note %></div><% } %>
+                  <% } %>
+                  <% if (approval.cancelledAt) { %>
+                    <div class="fw-semibold text-secondary"><i class="bi bi-slash-circle me-1"></i>Cancelled</div>
+                    <div class="leave-detail-subtle">By <%= approval.cancelledByName || approval.cancelledBy || 'System' %> on <%= formatDateTime(approval.cancelledAt) %></div>
+                  <% } %>
+                </div>
+              </dd>
+            <% } %>
             <% if (row.adminNote) { %>
               <dt class="col-sm-4">Admin Note</dt>
-              <dd class="col-sm-8"><%= row.adminNote %></dd>
+              <dd class="col-sm-8">
+                <div class="leave-detail-panel">
+                  <p class="leave-detail-details-copy mb-0"><%= row.adminNote %></p>
+                </div>
+              </dd>
             <% } %>
           </dl>
         </div>
         <% if (canApprove || !['rejected', 'cancelled'].includes(status)) { %>
           <div class="card-footer bg-white d-flex flex-wrap justify-content-end gap-2">
             <% if (canApprove && ['submitted', 'pending_reapproval'].includes(status)) { %>
-              <button class="btn btn-success leave-request-action" data-action="approve" data-id="<%= row.id %>"><i class="bi bi-check2-circle me-1"></i> Approve</button>
+              <button class="btn btn-success leave-request-action" id="leaveApproveBtn" data-action="approve" data-id="<%= row.id %>" data-requester-role="<%= row.requesterRole || '' %>" <%= needsSessionResolution ? 'disabled' : '' %>><i class="bi bi-check2-circle me-1"></i> Approve</button>
               <button class="btn btn-outline-danger leave-request-action" data-action="reject" data-id="<%= row.id %>"><i class="bi bi-x-circle me-1"></i> Reject</button>
             <% } %>
       <% if (!['rejected', 'cancelled'].includes(status)) { %>
@@ -273,7 +473,7 @@
                       </div>
                     </div>
                     <div class="text-lg-end small text-muted mt-2 mt-lg-0">
-                      <i class="bi bi-calendar3 me-1"></i><%= event.at || '-' %>
+                      <i class="bi bi-calendar3 me-1"></i><%= formatDateTime(event.at) %>
                     </div>
                   </header>
                   <div class="leave-lifecycle-status-chain">
@@ -378,6 +578,32 @@
       }
       console.warn(`${title || 'Leave Request'}: ${message || ''}`);
       return buttons?.[0]?.text || 'OK';
+    }
+
+    function showLeaveRequestWaitingModal({
+      title = 'Please wait',
+      note = 'Processing your request...',
+      operation = ''
+    } = {}) {
+      if (typeof window.showLoading !== 'function') return null;
+      return window.showLoading({ title, note, operation });
+    }
+
+    function hideLeaveRequestWaitingModal(token = null) {
+      if (typeof window.hideLoading !== 'function') return;
+      if (token) {
+        window.hideLoading(token);
+        return;
+      }
+      window.hideLoading();
+    }
+
+    function runAfterPageLoad(callback) {
+      if (document.readyState === 'complete') {
+        setTimeout(callback, 0);
+      } else {
+        window.addEventListener('load', () => setTimeout(callback, 0), { once: true });
+      }
     }
 
     function displayNameForPickerItem(item) {
@@ -535,6 +761,51 @@
       return result === 'Delete Request';
     }
 
+    async function fetchLeaveSessionConflictState(requestId) {
+      const response = await fetch(`/school/leave-requests/api/${encodeURIComponent(requestId)}/session-conflicts`, {
+        headers: { 'X-Ajax-Request': 'true', Accept: 'application/json' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status === 'error') {
+        throw new Error(payload.message || 'Could not verify session conflicts.');
+      }
+      return payload.data || {};
+    }
+
+    async function promptResolveSessionsBeforeApproval(requestId, state) {
+      const unresolved = Number(state?.unresolvedCount || 0);
+      const total = Number(state?.totalCount || 0);
+      const resolveUrl = state?.resolveSessionsUrl || `/school/leave-requests/resolve-sessions/${encodeURIComponent(requestId)}`;
+      const detailHtml = total > 0
+        ? `<div class="mt-2">${unresolved} of ${total} overlapping class session(s) still assign the leave requester.</div>`
+        : '';
+      const result = await showLeaveRequestMessage({
+        title: 'Resolve Sessions Before Approval',
+        icon: 'warning',
+        size: 'lg',
+        message: `This leave request cannot be approved until substitute instructors are assigned for every overlapping class session.${detailHtml}`,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Resolve Sessions', class: 'btn-warning' }
+        ]
+      });
+      if (result === 'Resolve Sessions') {
+        window.location.href = resolveUrl;
+      }
+      return false;
+    }
+
+    async function ensureReadyToApprove(requestId, requesterRole) {
+      const teacherStaffRoles = ['teacher', 'staff', 'admin'];
+      const role = String(requesterRole || '').trim().toLowerCase();
+      if (!teacherStaffRoles.includes(role)) return true;
+      const state = await fetchLeaveSessionConflictState(requestId);
+      if (!state.requiresResolution || state.readyForApproval) return true;
+      await promptResolveSessionsBeforeApproval(requestId, state);
+      return false;
+    }
+
     async function postAction(action, id, note = '') {
       if (action === 'delete') {
         const confirmed = await confirmDelete();
@@ -550,6 +821,10 @@
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.status === 'error') {
+        if (payload.code === 'LEAVE_SESSIONS_UNRESOLVED') {
+          await promptResolveSessionsBeforeApproval(id, payload.data || {});
+          return;
+        }
         await showLeaveRequestMessage({
           title: 'Leave Request',
           icon: 'error',
@@ -574,6 +849,12 @@
         }
         const note = ['approve', 'reject'].includes(action) ? await requestReviewNote(action) : '';
         if (note === null) return;
+        if (action === 'approve') {
+          const approveBtn = document.getElementById('leaveApproveBtn');
+          const requesterRole = approveBtn?.dataset?.requesterRole || <%- JSON.stringify(String(row.requesterRole || '')) %>;
+          const ready = await ensureReadyToApprove(id, requesterRole);
+          if (!ready) return;
+        }
         await postAction(action, id, note);
       });
     });
@@ -581,5 +862,77 @@
     document.getElementById('createLeaveTaskFooterBtn')?.addEventListener('click', openLeaveTaskModal);
     document.getElementById('leaveTaskPickPersonBtn')?.addEventListener('click', pickLeaveTaskPerson);
     document.getElementById('leaveTaskCreateForm')?.addEventListener('submit', createLeaveTask);
+
+    async function syncLeaveSessionConflictState() {
+      const requestId = <%- JSON.stringify(row.id || '') %>;
+      const requesterRole = <%- JSON.stringify(String(row.requesterRole || '').toLowerCase()) %>;
+      const requestStatus = <%- JSON.stringify(status) %>;
+      const canApprove = <%- JSON.stringify(Boolean(canApprove)) %>;
+      const teacherStaffRoles = ['teacher', 'staff'];
+      const reviewableStatuses = ['submitted', 'pending_reapproval'];
+      if (!canApprove || !teacherStaffRoles.includes(requesterRole) || !reviewableStatuses.includes(requestStatus)) return;
+
+      const banner = document.getElementById('leaveSessionConflictBanner');
+      const summary = document.getElementById('leaveSessionConflictSummary');
+      const detail = document.getElementById('leaveSessionConflictDetail');
+      const approveBtn = document.getElementById('leaveApproveBtn');
+      const resolveLink = document.getElementById('leaveResolveSessionsLink');
+      let loadingToken = null;
+
+      try {
+        loadingToken = showLeaveRequestWaitingModal({
+          title: 'Please wait',
+          note: 'Checking for overlapping class sessions...',
+          operation: 'Leave request conflict review'
+        });
+
+        const response = await fetch(`/school/leave-requests/api/${encodeURIComponent(requestId)}/session-conflicts`, {
+          headers: { 'X-Ajax-Request': 'true', Accept: 'application/json' },
+          credentials: 'same-origin'
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.status === 'error') return;
+        const state = payload.data || {};
+        const total = Number(state.totalCount || 0);
+        const unresolved = Number(state.unresolvedCount || 0);
+
+        if (total === 0) {
+          banner?.classList.add('d-none');
+          if (approveBtn) {
+            approveBtn.disabled = false;
+            approveBtn.title = '';
+          }
+          return;
+        }
+
+        banner?.classList.remove('d-none');
+        if (summary) {
+          summary.textContent = unresolved > 0
+            ? `${unresolved} of ${total} overlapping class session(s) still need substitute instructors.`
+            : `All ${total} overlapping session(s) have substitutes assigned.`;
+        }
+        if (detail) {
+          detail.textContent = unresolved > 0
+            ? 'Open Resolve sessions to assign substitutes before approval.'
+            : 'You can approve this leave request now.';
+        }
+        if (approveBtn) {
+          approveBtn.disabled = unresolved > 0;
+          approveBtn.title = unresolved > 0 ? 'Resolve all overlapping sessions before approving.' : '';
+        }
+        if (resolveLink && unresolved === 0) {
+          resolveLink.classList.remove('btn-warning');
+          resolveLink.classList.add('btn-outline-success');
+          resolveLink.innerHTML = '<i class="bi bi-check2-circle me-1"></i>View resolutions';
+        }
+      } catch (_) { /* ignore banner failures */ }
+      finally {
+        hideLeaveRequestWaitingModal(loadingToken);
+      }
+    }
+
+    runAfterPageLoad(() => {
+      syncLeaveSessionConflictState();
+    });
   })();
 </script>
