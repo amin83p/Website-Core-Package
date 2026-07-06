@@ -48,6 +48,16 @@ router.get('/api/eligible-persons',
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.listEligibleTimesheetPersons);
 
+router.get('/api/manual-entry-classes',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.listManualEntryClasses);
+
+router.post('/editor/:periodId/api/validate-manual-row',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.validateManualTimesheetRow);
+
 router.get('/editor/:periodId',
   requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),

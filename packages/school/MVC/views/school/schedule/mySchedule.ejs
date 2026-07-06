@@ -670,8 +670,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    if (els.anchorDate) els.anchorDate.value = toIsoDate(today);
-    setPeriodActive('week');
+    const urlParams = new URLSearchParams(window.location.search);
+    const prefillAnchorDate = String(urlParams.get('anchorDate') || '').trim();
+    const prefillPeriod = String(urlParams.get('period') || '').trim();
+    const validPeriods = ['day', 'week', 'month', 'season', 'year'];
+    if (els.anchorDate) {
+        els.anchorDate.value = /^\d{4}-\d{2}-\d{2}$/.test(prefillAnchorDate) ? prefillAnchorDate : toIsoDate(today);
+    }
+    setPeriodActive(validPeriods.includes(prefillPeriod) ? prefillPeriod : 'week');
 
     if (state.isAdminViewer) {
         if (els.pickPerson) els.pickPerson.addEventListener('click', openPersonPicker);

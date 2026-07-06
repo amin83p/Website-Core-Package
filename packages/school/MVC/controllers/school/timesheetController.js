@@ -14,6 +14,9 @@ const activityService = require('../../services/school/activityService');
 const timesheetManualConflictService = require('../../services/school/timesheetManualConflictService');
 const priorPeriodAdjustmentService = require('../../services/school/timesheetPriorPeriodAdjustmentService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
+const timesheetManualMaterializationService = require('../../services/school/timesheetManualMaterializationService');
+const timesheetPayrollContextService = require('../../services/school/timesheetPayrollContextService');
+const timesheetPayRateService = require('../../services/school/timesheetPayRateService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const { sanitizeSnapshotEntry } = require('../../models/school/timesheetModel');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -207,6 +210,53 @@ function isInactiveSchoolRecord(row) {
     return ['archived', 'deleted', 'inactive', 'terminated'].includes(status);
 }
 
+function isActiveClassForManualEntry(row) {
+    const status = String(row?.status || '').trim().toLowerCase();
+    return status === 'active';
+}
+
+async function runTimesheetConflictValidation({
+    activeOrgId,
+    personId,
+    period,
+    candidateEntries = [],
+    draftEntries = [],
+    timesheetEntries = [],
+    ignoreSessionId = '',
+    reqUser
+}) {
+    const scheduleRoles = await resolveScheduleRolesForPerson({
+        activeOrgId,
+        personId,
+        reqUser
+    });
+    const manualCandidates = (Array.isArray(candidateEntries) ? candidateEntries : [])
+        .filter((entry) => entry && entry.isDeleted !== true && entry.isManual === true);
+    if (!manualCandidates.length && !(Array.isArray(timesheetEntries) ? timesheetEntries : []).some((row) => row?.startTime && row?.endTime)) {
+        return [];
+    }
+    return timesheetManualConflictService.detectRoleAwareManualEntryConflicts({
+        activeOrgId,
+        personId,
+        activeRoles: scheduleRoles,
+        startDate: period.startDate,
+        endDate: period.endDate,
+        candidateEntries: manualCandidates,
+        draftEntries,
+        timesheetEntries,
+        ignoreSessionId,
+        reqUser
+    });
+}
+
+function throwTimesheetConflictError(conflicts = []) {
+    const warning = new Error('Selected date/time conflicts with your schedule or another timesheet row. Adjust and try again.');
+    warning.status = 'warning';
+    warning.code = 'MANUAL_ENTRY_SCHEDULE_CONFLICT';
+    warning.conflicts = (Array.isArray(conflicts) ? conflicts : []).slice(0, 20);
+    throw warning;
+}
+
 function buildDepartmentMap(departments = []) {
     return new Map((Array.isArray(departments) ? departments : [])
         .map((row) => [String(row?.id || '').trim(), row])
@@ -226,11 +276,11 @@ function resolveTimesheetEntryHours(entry) {
     const approvalStatus = String(entry?.approvalStatus || '').trim().toLowerCase();
     if (entry?.excludeFromTotals === true || approvalStatus === 'pending_approval') return 0;
     if (entry.isManual || entry.isPriorPeriodAdjustment) {
-        return Number(parseFloat(entry.durationHours) || parseFloat(entry.hours) || 0);
+        return Number(parseFloat(entry.requestedHours ?? entry.durationHours ?? entry.hours) || 0);
     }
     const formulaHours = Number(entry.timesheetHours);
     if (Number.isFinite(formulaHours)) return Number(formulaHours.toFixed(2));
-    return Number(parseFloat(entry.durationHours) || parseFloat(entry.hours) || 0);
+    return Number(parseFloat(entry.durationHours ?? entry.hours) || 0);
 }
 
 function buildSubmissionSnapshot({ normalizedEntries, period, existingTimesheet }) {
@@ -261,9 +311,7 @@ function formatPeriodDeadlineLabel(period) {
 }
 
 function formatHourlyRateLabel(value) {
-    const amount = Number(value);
-    if (!Number.isFinite(amount) || amount <= 0) return 'N/D';
-    return `$${amount.toFixed(2)}/hr`;
+    return timesheetPayRateService.formatHourlyRateLabel(value);
 }
 
 function dateOrBoundary(value, fallback) {
@@ -272,52 +320,39 @@ function dateOrBoundary(value, fallback) {
 }
 
 function ratePeriodOverlapsTimesheetPeriod(ratePeriod, period) {
-    const rateStart = dateOrBoundary(ratePeriod?.effectiveFrom, '0001-01-01');
-    const rateEnd = dateOrBoundary(ratePeriod?.effectiveTo, '9999-12-31');
-    const periodStart = dateOrBoundary(period?.startDate, '0001-01-01');
-    const periodEnd = dateOrBoundary(period?.endDate, '9999-12-31');
-    return rateStart <= periodEnd && periodStart <= rateEnd;
+    return timesheetPayRateService.profileOverlapsPeriod(ratePeriod, period);
 }
 
-function resolvePayRateForDepartment({ payRates, activeOrgId, personId, roles, departmentId, period }) {
-    const deptId = String(departmentId || '').trim();
-    if (!deptId) return null;
-
-    const roleSet = new Set((Array.isArray(roles) ? roles : [])
-        .map((role) => String(role || '').trim().toLowerCase())
-        .filter(Boolean));
-    const candidates = [];
-
-    (Array.isArray(payRates) ? payRates : []).forEach((profile) => {
-        if (!idsEqual(profile?.orgId, activeOrgId)) return;
-        if (!idsEqual(profile?.personId || profile?.teacherUserId, personId)) return;
-        if (!idsEqual(profile?.departmentId, deptId)) return;
-        const role = String(profile?.personRole || 'teacher').trim().toLowerCase();
-        if (roleSet.size && role && !roleSet.has(role)) return;
-
-        (Array.isArray(profile?.ratePeriods) ? profile.ratePeriods : []).forEach((ratePeriod) => {
-            if (!ratePeriodOverlapsTimesheetPeriod(ratePeriod, period)) return;
-            const hourlyRate = Number(ratePeriod?.hourlyRate);
-            if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) return;
-            candidates.push({
-                payRateId: String(profile?.id || '').trim(),
-                ratePeriodId: String(ratePeriod?.id || '').trim(),
-                personRole: role || '',
-                hourlyRate,
-                effectiveFrom: String(ratePeriod?.effectiveFrom || '').trim(),
-                effectiveTo: String(ratePeriod?.effectiveTo || '').trim(),
-                contractId: String(ratePeriod?.contractId || '').trim()
-            });
-        });
+function withPayrollStamp(entry, payrollContext, period, hoursOverride) {
+    if (!entry || entry.isDeleted === true) return entry;
+    const hours = hoursOverride !== undefined ? hoursOverride : resolveTimesheetEntryHours(entry);
+    const payrollFields = timesheetPayrollContextService.stampEntryPayrollFields({
+        entry,
+        payrollContext,
+        period,
+        payRateService: timesheetPayRateService,
+        hours
     });
+    return { ...entry, ...payrollFields };
+}
 
-    candidates.sort((a, b) => {
-        const byDate = dateOrBoundary(b.effectiveFrom, '0001-01-01').localeCompare(dateOrBoundary(a.effectiveFrom, '0001-01-01'));
-        if (byDate) return byDate;
-        return String(b.ratePeriodId || '').localeCompare(String(a.ratePeriodId || ''));
+function shapePayrollContextForEditor(payrollContext) {
+    const roles = Array.isArray(payrollContext?.roles) ? payrollContext.roles : [];
+    const roleAccounts = {};
+    roles.forEach((role) => {
+        const meta = payrollContext?.roleRecords?.[role] || {};
+        roleAccounts[role] = {
+            roleRecordId: meta.roleRecordId || '',
+            accountId: meta.accountId || '',
+            accountLabel: meta.accountLabel || ''
+        };
     });
-
-    return candidates[0] || null;
+    return {
+        payrollRoles: roles,
+        payrollDefaultRole: payrollContext?.defaultRole || roles[0] || 'teacher',
+        roleAccounts,
+        payrollWarnings: Array.isArray(payrollContext?.warnings) ? payrollContext.warnings : []
+    };
 }
 
 function shapeTimesheetPeriodPickerRow(period) {
@@ -362,6 +397,7 @@ function shapeManualActivityRows(activityRows = []) {
 
 function buildIncompleteSessionWarningRow(classRow, sessionRow, statusLabel = '') {
     return {
+        sessionType: 'class',
         sessionId: String(sessionRow?.sessionId || ''),
         classId: String(classRow?.id || ''),
         className: String(classRow?.title || classRow?.name || classRow?.id || ''),
@@ -371,6 +407,14 @@ function buildIncompleteSessionWarningRow(classRow, sessionRow, statusLabel = ''
         status: String(sessionRow?.status || ''),
         statusLabel: String(statusLabel || '')
     };
+}
+
+function sortIncompleteSessions(rows = []) {
+    return [...rows].sort((a, b) => {
+        const dateCmp = String(a?.date || '').localeCompare(String(b?.date || ''));
+        if (dateCmp !== 0) return dateCmp;
+        return String(a?.startTime || '').localeCompare(String(b?.startTime || ''));
+    });
 }
 
 async function loadTimesheetManagementPeriods(req, query = {}) {
@@ -754,20 +798,20 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
         if (!periodId) throw new Error('Timesheet period is required.');
         if (!personId) throw new Error('Person is required.');
 
-        const [period, person, departments, payRates] = await Promise.all([
+        const [period, departments] = await Promise.all([
             dataService.getDataById('timesheetPeriods', periodId, req.user),
-            getPersonById(personId, req.user),
-            dataService.fetchData('departments', {}, req.user),
-            dataService.fetchData('payRates', { orgId__eq: activeOrgId, personId__eq: personId }, req.user)
+            dataService.fetchData('departments', {}, req.user)
         ]);
         if (!period) throw new Error('Timesheet period not found.');
         assertPeriodOrgAccess(period, activeOrgId, req.user);
-        if (!person || !personHasTeacherOrStaffRoleInOrg(person, activeOrgId)) {
-            throw new Error('Selected person is not an active teacher/staff member in this organization.');
-        }
+
+        const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
+            orgId: activeOrgId,
+            personId,
+            reqUser: req.user
+        });
 
         const departmentMap = buildDepartmentMap(departments);
-        const personRoles = getTimesheetRolesForPersonInOrg(person, activeOrgId);
         const effective = await buildEffectiveTimesheetEntries({ period, personId, activeOrgId, reqUser: req.user });
         const classMap = new Map((effective.classes || []).map((row) => [String(row?.id || '').trim(), row]));
         const buckets = new Map();
@@ -775,66 +819,97 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
         effective.entries.forEach((entry) => {
             const hours = resolveTimesheetEntryHours(entry);
             if (!Number.isFinite(hours) || hours <= 0) return;
+            const stamped = withPayrollStamp(entry, payrollContext, period, hours);
             const classRow = entry?.classId ? classMap.get(String(entry.classId || '').trim()) : null;
             const isReport = entry?.isReportReflection === true || String(entry?.sessionId || '').startsWith('rptref-');
-            const source = entry?.isManual ? 'manual' : (isReport ? 'report' : 'auto');
-            const departmentId = String(entry?.deliveryDepartmentId || classRow?.deliveryDepartmentId || '').trim();
+            const isActivity = entry?.isSchoolActivity === true || String(entry?.sessionId || '').startsWith('act-');
+            const source = entry?.isManual ? 'manual' : (isReport ? 'report' : (isActivity ? 'activity' : 'auto'));
+            const departmentId = String(entry?.deliveryDepartmentId || entry?.departmentId || classRow?.deliveryDepartmentId || '').trim();
             const departmentName = resolveDepartmentName(
                 departmentId,
-                entry?.deliveryDepartmentName || classRow?.deliveryDepartmentName || '',
+                entry?.deliveryDepartmentName || entry?.departmentName || classRow?.deliveryDepartmentName || '',
                 departmentMap
             ) || (entry?.isManual && !entry?.classId ? 'No Department / Manual' : 'No Department');
-            const key = departmentId || departmentName || 'NO_DEPARTMENT';
+            const personRole = stamped.personRole || payrollContext.defaultRole || 'teacher';
+            const roleMeta = payrollContext.roleRecords?.[personRole] || {};
+            const key = `${personRole}::${departmentId || departmentName || 'NO_DEPARTMENT'}`;
             const bucket = buckets.get(key) || {
+                personRole,
+                roleRecordId: stamped.roleRecordId || roleMeta.roleRecordId || '',
+                payrollAccountId: stamped.payrollAccountId || roleMeta.accountId || '',
+                accountLabel: roleMeta.accountLabel || '',
                 departmentId,
                 departmentName,
                 autoHours: 0,
                 manualHours: 0,
                 reportHours: 0,
+                activityHours: 0,
                 totalHours: 0,
+                grossPay: 0,
                 entryCount: 0
             };
             if (source === 'manual') bucket.manualHours += hours;
             else if (source === 'report') bucket.reportHours += hours;
+            else if (source === 'activity') bucket.activityHours += hours;
             else bucket.autoHours += hours;
             bucket.totalHours += hours;
+            if (Number.isFinite(stamped.grossPay)) bucket.grossPay += stamped.grossPay;
             bucket.entryCount += 1;
             buckets.set(key, bucket);
         });
 
         const rows = [...buckets.values()]
             .map((row) => {
-                const resolvedRate = resolvePayRateForDepartment({
-                    payRates,
-                    activeOrgId,
-                    personId,
-                    roles: personRoles,
+                const roleMeta = payrollContext.roleRecords?.[row.personRole] || {};
+                const resolvedRate = timesheetPayRateService.resolveHourlyRate({
+                    compensationProfiles: roleMeta.compensationProfiles || [],
                     departmentId: row.departmentId,
                     period
                 });
+                const grossPay = Number.isFinite(row.grossPay) && row.grossPay > 0
+                    ? row.grossPay
+                    : timesheetPayRateService.computeGrossPay(row.totalHours, resolvedRate?.hourlyRate);
                 return {
                     ...row,
                     autoHours: Number(row.autoHours.toFixed(2)),
                     manualHours: Number(row.manualHours.toFixed(2)),
                     reportHours: Number(row.reportHours.toFixed(2)),
+                    activityHours: Number(row.activityHours.toFixed(2)),
                     totalHours: Number(row.totalHours.toFixed(2)),
+                    hourlyRate: resolvedRate ? Number(resolvedRate.hourlyRate.toFixed(2)) : null,
                     payRate: resolvedRate ? Number(resolvedRate.hourlyRate.toFixed(2)) : null,
-                    payRateLabel: resolvedRate ? formatHourlyRateLabel(resolvedRate.hourlyRate) : 'N/D',
-                    payRateId: resolvedRate?.payRateId || '',
-                    ratePeriodId: resolvedRate?.ratePeriodId || '',
-                    payRateRole: resolvedRate?.personRole || '',
-                    payRateContractId: resolvedRate?.contractId || ''
+                    payRateLabel: resolvedRate ? timesheetPayRateService.formatHourlyRateLabel(resolvedRate.hourlyRate) : 'N/D',
+                    payRateRole: row.personRole,
+                    payRateContractId: resolvedRate?.contractId || '',
+                    rateStatus: resolvedRate ? 'hourly' : 'missing_hourly_rate',
+                    grossPay: grossPay !== null ? Number(grossPay.toFixed(2)) : null,
+                    grossPayLabel: timesheetPayRateService.formatGrossPayLabel(grossPay)
                 };
             })
-            .sort((a, b) => String(a.departmentName).localeCompare(String(b.departmentName)));
+            .sort((a, b) => {
+                const roleCmp = String(a.personRole).localeCompare(String(b.personRole));
+                if (roleCmp) return roleCmp;
+                return String(a.departmentName).localeCompare(String(b.departmentName));
+            });
+
+        const roleTotals = {};
         const totals = rows.reduce((acc, row) => {
             acc.autoHours += row.autoHours;
             acc.manualHours += row.manualHours;
             acc.reportHours += row.reportHours;
+            acc.activityHours += row.activityHours;
             acc.totalHours += row.totalHours;
+            acc.grossPay += Number(row.grossPay || 0);
             acc.entryCount += row.entryCount;
+            const roleKey = row.personRole || 'teacher';
+            if (!roleTotals[roleKey]) {
+                roleTotals[roleKey] = { personRole: roleKey, totalHours: 0, grossPay: 0, entryCount: 0 };
+            }
+            roleTotals[roleKey].totalHours += row.totalHours;
+            roleTotals[roleKey].grossPay += Number(row.grossPay || 0);
+            roleTotals[roleKey].entryCount += row.entryCount;
             return acc;
-        }, { autoHours: 0, manualHours: 0, reportHours: 0, totalHours: 0, entryCount: 0 });
+        }, { autoHours: 0, manualHours: 0, reportHours: 0, activityHours: 0, totalHours: 0, grossPay: 0, entryCount: 0 });
 
         return res.json({
             status: 'success',
@@ -845,20 +920,28 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
                 endDate: String(period?.endDate || '')
             },
             person: {
-                id: String(person?.id || ''),
-                name: buildPersonName(person),
-                roles: personRoles
+                id: payrollContext.personId,
+                name: payrollContext.personName,
+                roles: payrollContext.roles
             },
+            payrollWarnings: payrollContext.warnings || [],
             timesheet: {
                 id: effective.timesheet?.id || '',
                 status: effective.timesheet?.status || 'not_started'
             },
             rows,
+            roleTotals: Object.values(roleTotals).map((row) => ({
+                ...row,
+                totalHours: Number(row.totalHours.toFixed(2)),
+                grossPay: Number(row.grossPay.toFixed(2))
+            })),
             totals: {
                 autoHours: Number(totals.autoHours.toFixed(2)),
                 manualHours: Number(totals.manualHours.toFixed(2)),
                 reportHours: Number(totals.reportHours.toFixed(2)),
+                activityHours: Number(totals.activityHours.toFixed(2)),
                 totalHours: Number(totals.totalHours.toFixed(2)),
+                grossPay: Number(totals.grossPay.toFixed(2)),
                 entryCount: totals.entryCount
             }
         });
@@ -1019,6 +1102,10 @@ exports.viewTimesheet = async (req, res) => {
                     return normalizedStatus || normalizedCode;
                 })();
                 if (!isFinalStatus) {
+                    const duePeriodId = String(s?.attendanceDuePeriodId || '').trim();
+                    if (duePeriodId && !idsEqual(duePeriodId, period.id)) {
+                        return;
+                    }
                     incompleteSessions.push(buildIncompleteSessionWarningRow(c, s, statusLabel));
                     return;
                 }
@@ -1046,6 +1133,39 @@ exports.viewTimesheet = async (req, res) => {
             });
         }
 
+        for (const c of scopedClasses) {
+            const sessions = await dataService.getClassSessions(c.id, req.user);
+            (Array.isArray(sessions) ? sessions : []).forEach((s) => {
+                if (!idsEqual(s.delivery?.deliveredBy, teacherContext.targetTeacherId)) return;
+                const duePeriodId = String(s?.attendanceDuePeriodId || '').trim();
+                if (!duePeriodId || !idsEqual(duePeriodId, period.id)) return;
+                const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(s.status, s.notes);
+                const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
+                    status: s.status,
+                    notes: s.notes
+                });
+                if (isFinalStatus) return;
+                const statusLabel = (() => {
+                    const normalizedCode = normalizeStatusCode(s.status);
+                    const meta = (Array.isArray(sessionStatusMeta) ? sessionStatusMeta : []).find((row) => normalizeStatusCode(row?.code) === normalizedCode);
+                    if (meta?.label) return String(meta.label);
+                    return normalizedStatus || normalizedCode;
+                })();
+                if (incompleteSessions.some((row) => row.sessionId === s.sessionId && row.classId === c.id)) return;
+                incompleteSessions.push(buildIncompleteSessionWarningRow(c, s, statusLabel));
+            });
+        }
+
+        const incompleteActivitySessions = await activityService.getIncompleteActivityWorkSessionsForPerson({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            periodStartDate: period.startDate,
+            periodEndDate: period.endDate,
+            reqUser: req.user
+        });
+        incompleteSessions.push(...(Array.isArray(incompleteActivitySessions) ? incompleteActivitySessions : []));
+        const sortedIncompleteSessions = sortIncompleteSessions(incompleteSessions);
+
         const reportReflectionSessions = await buildReportReflectionLiveSessions({
             teacherPersonId: teacherContext.targetTeacherId,
             periodStartDate: period.startDate,
@@ -1053,17 +1173,33 @@ exports.viewTimesheet = async (req, res) => {
             activeOrgId,
             reqUser: req.user
         });
-        const mergedLiveSessions = [...liveSessions, ...reportReflectionSessions];
+        const activityLiveSessions = await activityService.getTimesheetEntriesForPerson({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            periodStartDate: period.startDate,
+            periodEndDate: period.endDate,
+            reqUser: req.user
+        });
+        const mergedLiveSessions = [...liveSessions, ...reportReflectionSessions, ...(Array.isArray(activityLiveSessions) ? activityLiveSessions : [])];
 
-        const [allHolidays, allActivities] = await Promise.all([
-            dataService.fetchData('holidays', {}, req.user),
-            activityService.listActivities({ orgId: activeOrgId, reqUser: req.user })
+        const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            reqUser: req.user
+        });
+        const payrollEditor = shapePayrollContextForEditor(payrollContext);
+        const stampedLiveSessions = mergedLiveSessions.map((row) => withPayrollStamp(row, payrollContext, period));
+
+        const [allHolidays] = await Promise.all([
+            dataService.fetchData('holidays', {}, req.user)
         ]);
         const holidays = allHolidays.filter((h) => h.date >= period.startDate && h.date <= period.endDate);
-        const manualActivities = shapeManualActivityRows((Array.isArray(allActivities) ? allActivities : [])
-            .filter((row) => idsEqual(row?.orgId, activeOrgId))
-            .filter((row) => isActiveActivityRow(row))
-            .filter((row) => activityService.isPersonEligibleForActivity(row, teacherContext.targetTeacherId)));
+        const eligibleManualActivities = await activityService.listManualEntryActivitiesForPerson({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            reqUser: req.user
+        });
+        const manualActivities = shapeManualActivityRows(eligibleManualActivities);
 
         const useFrozenSnapshot = ['submitted', 'approved', 'processed'].includes(String(timesheet.status || '').toLowerCase())
             && Array.isArray(timesheet?.submissionSnapshot?.entries)
@@ -1094,12 +1230,19 @@ exports.viewTimesheet = async (req, res) => {
             }
         }
 
+        const viewingOtherPerson = Boolean(
+            teacherContext.isAdmin &&
+            teacherContext.targetTeacherId &&
+            teacherContext.currentTeacherId &&
+            !idsEqual(teacherContext.targetTeacherId, teacherContext.currentTeacherId)
+        );
+
         res.render('school/timesheet/timesheetEditor', {
             title: `Timesheet: ${period.name}`,
             period,
             timesheet,
-            liveSessions: mergedLiveSessions,
-            incompleteSessions,
+            liveSessions: stampedLiveSessions,
+            incompleteSessions: sortedIncompleteSessions,
             holidays,
             manualActivities,
             maxDailyHours,
@@ -1109,6 +1252,12 @@ exports.viewTimesheet = async (req, res) => {
             isReadOnly,
             user: req.user,
             targetTeacherId: teacherContext.targetTeacherId,
+            personName: teacherContext.selectedTeacherName || '',
+            viewingOtherPerson,
+            payrollRoles: payrollEditor.payrollRoles,
+            payrollDefaultRole: payrollEditor.payrollDefaultRole,
+            roleAccounts: payrollEditor.roleAccounts,
+            payrollWarnings: payrollEditor.payrollWarnings,
             includeModal: true,
             actionStateId: req.actionStateId,
             showPriorAdjustmentReview: priorReviewPending,
@@ -1169,6 +1318,12 @@ exports.saveTimesheet = async (req, res) => {
         const parsedEntries = typeof entries === 'string' ? JSON.parse(entries) : entries;
         const entryRows = Array.isArray(parsedEntries) ? parsedEntries : [];
 
+        const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            reqUser: req.user
+        });
+
         const sessionStatusMeta = await sessionStatusPolicyService.getClientStatusMeta(period.orgId || activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(sessionStatusMeta);
         const classes = await dataService.fetchData('classes', {}, req.user);
@@ -1197,6 +1352,19 @@ exports.saveTimesheet = async (req, res) => {
             });
         }
 
+        const activityLiveSessions = await activityService.getTimesheetEntriesForPerson({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            periodStartDate: period.startDate,
+            periodEndDate: period.endDate,
+            reqUser: req.user
+        });
+        const activityLiveById = new Map();
+        (Array.isArray(activityLiveSessions) ? activityLiveSessions : []).forEach((row) => {
+            const key = String(row?.sessionId || '').trim();
+            if (key) activityLiveById.set(key, row);
+        });
+
         const hasManualRows = entryRows.some((entry) => entry && entry.isDeleted !== true && entry.isManual === true);
         let activityById = new Map();
         if (hasManualRows) {
@@ -1224,6 +1392,9 @@ exports.saveTimesheet = async (req, res) => {
                 if (activityRow && !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {
                     throw new Error('You are not eligible for the selected activity. Please choose another activity.');
                 }
+                if (activityRow && String(activityRow?.status || '').toLowerCase() !== 'posted') {
+                    throw new Error('Selected activity must be posted before it can be used on a timesheet.');
+                }
 
                 const dateValue = normalizeDateOnly(entry.date);
                 if (!dateValue || dateValue < period.startDate || dateValue > period.endDate) {
@@ -1233,13 +1404,13 @@ exports.saveTimesheet = async (req, res) => {
                 let startTime = normalizeClockTime(entry.startTime || '');
                 let endTime = normalizeClockTime(entry.endTime || '');
                 let requestedHours = Number(parseFloat(entry.requestedHours ?? entry.durationHours ?? entry.hours) || 0);
-                if (classId) {
+                if (classId || activityId) {
                     if (!startTime || !endTime) {
-                        throw new Error('Class-based manual entries require start and end time.');
+                        throw new Error('Manual entries with a class or activity require start and end time.');
                     }
                     const calculatedHours = calculateHoursFromTimes(startTime, endTime);
                     if (!Number.isFinite(calculatedHours) || calculatedHours <= 0) {
-                        throw new Error('Class-based manual entries require a valid time range where end time is after start time.');
+                        throw new Error('Manual entries with a class or activity require a valid time range where end time is after start time.');
                     }
                     requestedHours = calculatedHours;
                 } else {
@@ -1265,6 +1436,13 @@ exports.saveTimesheet = async (req, res) => {
                 const classNameRaw = String(entry.className || '').trim();
                 const description = String(entry.description || '').trim();
                 const resolvedClassName = classNameRaw || description || activityName || 'Manual Activity';
+                const requestedRole = timesheetPayrollContextService.normalizePayrollRole(entry.personRole);
+                if (payrollContext.roles.length > 1 && !requestedRole) {
+                    throw new Error('Manual entries require a payroll role when the person has multiple teacher/staff roles.');
+                }
+                if (requestedRole && !payrollContext.roles.includes(requestedRole)) {
+                    throw new Error('Selected payroll role is not valid for this person.');
+                }
 
                 const normalizedManual = {
                     ...entry,
@@ -1291,7 +1469,8 @@ exports.saveTimesheet = async (req, res) => {
                     deliveryDepartmentId: String(entry.deliveryDepartmentId || activityRow?.departmentId || '').trim(),
                     deliveryDepartmentName: String(entry.deliveryDepartmentName || activityRow?.departmentName || '').trim(),
                     categoryName: String(entry.categoryName || activityRow?.categoryName || '').trim(),
-                    description
+                    description,
+                    personRole: requestedRole || payrollContext.defaultRole || 'teacher'
                 };
                 if (!activityId) {
                     normalizedManual.activityPaid = false;
@@ -1312,6 +1491,35 @@ exports.saveTimesheet = async (req, res) => {
                     timesheetHours: hours,
                     isFinalStatus: true,
                     isReportReflection: true
+                };
+            }
+
+            if (entry.isSchoolActivity === true || sessionId.startsWith('act-')) {
+                const activityRef = activityLiveById.get(sessionId);
+                if (!activityRef) {
+                    return {
+                        sessionId,
+                        isDeleted: true,
+                        ignoredReason: 'ineligible_or_missing_activity_session'
+                    };
+                }
+                const hours = Number(parseFloat(entry.hours ?? entry.timesheetHours ?? entry.durationHours ?? activityRef.timesheetHours) || 0);
+                return {
+                    ...entry,
+                    sessionId,
+                    classId: entry.classId || null,
+                    className: String(entry.className || activityRef.className || ''),
+                    activityId: String(entry.activityId || activityRef.activityId || ''),
+                    activityEntryId: String(entry.activityEntryId || activityRef.activityEntryId || ''),
+                    deliveryDepartmentId: String(entry.deliveryDepartmentId || activityRef.deliveryDepartmentId || activityRef.departmentId || ''),
+                    deliveryDepartmentName: String(entry.deliveryDepartmentName || activityRef.deliveryDepartmentName || activityRef.departmentName || ''),
+                    status: String(entry.status || activityRef.status || 'activity'),
+                    hours,
+                    timesheetHours: hours,
+                    durationHours: hours,
+                    isFinalStatus: true,
+                    isSchoolActivity: true,
+                    compensationLookup: entry.compensationLookup || activityRef.compensationLookup
                 };
             }
 
@@ -1347,47 +1555,29 @@ exports.saveTimesheet = async (req, res) => {
             };
         });
 
-        const scheduleRoles = await resolveScheduleRolesForPerson({
-            activeOrgId,
-            personId: teacherContext.targetTeacherId,
-            reqUser: req.user
+        const payrollStampedEntries = normalizedEntries.map((entry) => {
+            if (!entry || entry.isDeleted === true) return entry;
+            return withPayrollStamp(entry, payrollContext, period);
         });
-        const manualClassEntries = normalizedEntries.filter((entry) => (
-            entry &&
-            entry.isDeleted !== true &&
-            entry.isManual === true &&
-            entry.classId &&
-            entry.startTime &&
-            entry.endTime
-        ));
-        if (manualClassEntries.length && scheduleRoles.length) {
-            const conflicts = await timesheetManualConflictService.detectRoleAwareManualEntryConflicts({
+
+        const manualRows = payrollStampedEntries.filter((entry) => entry && entry.isDeleted !== true && entry.isManual === true);
+        if (manualRows.length || payrollStampedEntries.some((entry) => entry?.startTime && entry?.endTime)) {
+            const conflicts = await runTimesheetConflictValidation({
                 activeOrgId,
                 personId: teacherContext.targetTeacherId,
-                activeRoles: scheduleRoles,
-                startDate: period.startDate,
-                endDate: period.endDate,
-                candidateEntries: manualClassEntries,
+                period,
+                candidateEntries: manualRows,
+                draftEntries: manualRows,
+                timesheetEntries: payrollStampedEntries.filter((entry) => entry && entry.isDeleted !== true),
                 reqUser: req.user
             });
             if (Array.isArray(conflicts) && conflicts.length) {
-                const warning = new Error('Selected class date/time conflicts with your role-based schedule. Adjust the row and try again.');
-                warning.status = 'warning';
-                warning.code = 'MANUAL_ENTRY_SCHEDULE_CONFLICT';
-                warning.conflicts = conflicts.slice(0, 20);
-                throw warning;
+                throwTimesheetConflictError(conflicts);
             }
         }
 
         if (nextStatus === 'submitted') {
-            const hasPendingApprovalManualRows = normalizedEntries.some((entry) => {
-                if (!entry || entry.isDeleted === true || entry.isManual !== true) return false;
-                return String(entry.approvalStatus || '').trim().toLowerCase() === 'pending_approval';
-            });
-            if (hasPendingApprovalManualRows) {
-                throw new Error('Some paid manual activities are pending authority approval. Approve or remove them before submission.');
-            }
-            const hasNonFinalAutoSession = normalizedEntries.some((entry) => {
+            const hasNonFinalAutoSession = payrollStampedEntries.some((entry) => {
                 if (!entry || entry.isDeleted || entry.isManual) return false;
                 if (entry.isPriorPeriodAdjustment === true) return false;
                 return entry.isFinalStatus === false;
@@ -1402,13 +1592,13 @@ exports.saveTimesheet = async (req, res) => {
             periodId: String(periodId),
             teacherId: String(teacherContext.targetTeacherId),
             status: nextStatus,
-            entries: normalizedEntries,
+            entries: payrollStampedEntries,
             totalHours: parseFloat(totalHours) || 0
         };
 
         if (nextStatus === 'submitted') {
             payload.submissionSnapshot = buildSubmissionSnapshot({
-                normalizedEntries,
+                normalizedEntries: payrollStampedEntries,
                 period,
                 existingTimesheet: existing
             });
@@ -1651,6 +1841,80 @@ exports.applyPriorAdjustments = async (req, res) => {
     }
 };
 
+exports.listManualEntryClasses = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const classes = await dataService.fetchData('classes', {}, req.user);
+        const results = (Array.isArray(classes) ? classes : [])
+            .filter((row) => idsEqual(row?.orgId, activeOrgId))
+            .filter((row) => isActiveClassForManualEntry(row))
+            .filter((row) => !isInactiveSchoolRecord(row))
+            .map((row) => ({
+                id: String(row?.id || '').trim(),
+                title: String(row?.title || row?.name || row?.id || '').trim(),
+                name: String(row?.title || row?.name || row?.id || '').trim(),
+                status: String(row?.status || '').trim()
+            }))
+            .filter((row) => row.id)
+            .sort((a, b) => String(a.title).localeCompare(String(b.title)));
+        return res.json({ status: 'success', results, data: results, items: results, total: results.length });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.validateManualTimesheetRow = async (req, res) => {
+    try {
+        const { periodId } = req.params;
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.UPDATE });
+        const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
+        if (!period) throw new Error('Period not found.');
+        assertPeriodOrgAccess(period, activeOrgId, req.user);
+
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const proposed = body.proposed || body.row || body;
+        const draftEntries = Array.isArray(body.draftEntries) ? body.draftEntries : [];
+        const timesheetEntries = Array.isArray(body.timesheetEntries) ? body.timesheetEntries : draftEntries;
+        const ignoreSessionId = String(body.editSessionId || proposed?.editSessionId || '').trim();
+
+        if (String(proposed?.activityId || '').trim()) {
+            const activityRow = await activityService.getActivity(proposed.activityId, req.user);
+            if (!activityRow || !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {
+                throw new Error('You are not eligible for the selected activity.');
+            }
+        }
+        if (String(proposed?.classId || '').trim()) {
+            const classRow = await dataService.getDataById('classes', proposed.classId, req.user);
+            if (!classRow || !isActiveClassForManualEntry(classRow) || isInactiveSchoolRecord(classRow)) {
+                throw new Error('Selected class is not active or is no longer available.');
+            }
+        }
+
+        const conflicts = await runTimesheetConflictValidation({
+            activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            period,
+            candidateEntries: [{ ...proposed, isManual: true }],
+            draftEntries,
+            timesheetEntries,
+            ignoreSessionId,
+            reqUser: req.user
+        });
+        if (conflicts.length) {
+            return res.status(409).json({
+                status: 'warning',
+                code: 'MANUAL_ENTRY_SCHEDULE_CONFLICT',
+                message: 'Selected date/time conflicts with your schedule or another timesheet row.',
+                conflicts
+            });
+        }
+        return res.json({ status: 'success', conflicts: [] });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+};
+
 exports.approveTimesheet = async (req, res) => {
     let guardKey = '';
     try {
@@ -1681,17 +1945,25 @@ exports.approveTimesheet = async (req, res) => {
             throw new Error('Submission snapshot is missing. Ask the teacher to resubmit the timesheet.');
         }
 
-        const lockSummary = await schoolDependencyService.lockSourcesForApprovedTimesheet(existing, req.user);
+        const materialized = await timesheetManualMaterializationService.materializeApprovedTimesheetManualEntries({
+            timesheet: existing,
+            period,
+            reqUser: req.user
+        });
+        const timesheetForLock = materialized?.timesheet || existing;
+
+        const lockSummary = await schoolDependencyService.lockSourcesForApprovedTimesheet(timesheetForLock, req.user);
         const payload = {
-            ...existing,
-            orgId: existing.orgId || period.orgId || activeOrgId,
+            ...timesheetForLock,
+            orgId: timesheetForLock.orgId || period.orgId || activeOrgId,
             status: 'approved',
             approvedAt: new Date().toISOString(),
             approvedBy: String(req.user?.id || req.user?.username || '').trim(),
-            lockedSourceRefs: lockSummary.lockedSourceRefs || []
+            lockedSourceRefs: lockSummary.lockedSourceRefs || [],
+            materializationSummary: materialized?.summary || null
         };
         await dataService.updateData('timesheets', existing.id, payload, req.user);
-        const payloadOut = { status: 'success', message: 'Timesheet approved and linked sessions/activities were locked.', lockSummary };
+        const payloadOut = { status: 'success', message: 'Timesheet approved and linked sessions/activities were locked.', lockSummary, materializationSummary: materialized?.summary || null };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);
         return res.json(payloadOut);
     } catch (error) {
@@ -1728,6 +2000,10 @@ exports.reopenTimesheet = async (req, res) => {
             throw new Error('Only approved or processed timesheets can be reopened.');
         }
 
+        await timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet({
+            timesheetId: existing.id,
+            reqUser: req.user
+        });
         await schoolDependencyService.unlockSourcesForTimesheet(existing, req.user);
         const payload = {
             ...existing,

@@ -204,7 +204,9 @@ function normalizeActivityEvent(activity = {}, {
     layer: resolvedLayerKey,
     subtype: resolvedSubtype,
     tone: resolvedTone,
-    detailsUrl: `/school/activities/edit/${encodeURIComponent(id)}`,
+    detailsUrl: entryId && String(activityEntry.status || activity.status || 'posted').toLowerCase() === 'posted'
+      ? `/school/activities/${encodeURIComponent(id)}/work-sessions/${encodeURIComponent(entryId)}/manage`
+      : `/school/activities/edit/${encodeURIComponent(id)}`,
     meta: {
       source: 'activities',
       activityId: id,

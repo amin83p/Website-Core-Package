@@ -142,6 +142,7 @@
         <% const excludedPersonIds = Array.isArray(item.excludedPersonIds) ? item.excludedPersonIds : []; %>
         <% const entryExcludedCount = entries.reduce((sum, entry) => sum + (Array.isArray(entry?.excludedPersonIds) ? entry.excludedPersonIds.length : 0), 0); %>
         <% const totalDurationHours = Number(item.totalDurationHours || entries.reduce((sum, entry) => sum + (Number(entry.durationHours) || 0), 0) || item.durationHours || 0); %>
+        <% const evaluationType = String(item.evaluationType || 'attendance').toLowerCase() === 'completion' ? 'completion' : 'attendance'; %>
         <% const status = String(item.status || 'draft').toLowerCase(); %>
         <% const statusClass = status === 'posted' ? 'bg-success' : (status === 'cancelled' ? 'bg-secondary' : 'bg-info text-dark'); %>
         <% const hasTimesheetLock = (item.locked === true || String(item.locked) === 'true') && String(item.lockReason || '') === 'timesheet_approved'
@@ -152,6 +153,7 @@
             <div class="fw-bold text-dark"><%= item.title || '-' %></div>
             <div class="x-small text-muted font-monospace mb-1"><%= item.id || '-' %></div>
             <span class="badge <%= itemVisibilityScope === 'school' ? 'bg-primary' : 'bg-secondary' %>"><%= itemVisibilityScope === 'school' ? 'School / Public' : 'Individual' %></span>
+            <span class="badge bg-light text-dark border ms-1"><%= evaluationType === 'completion' ? 'Completion' : 'Attendance' %></span>
             <% if (item.location) { %>
               <div class="x-small text-muted mt-1"><i class="bi bi-geo-alt me-1"></i><%= item.location %></div>
             <% } %>
@@ -193,6 +195,11 @@
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
               <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <% if (status === 'posted' && entries.some((entry) => String(entry.status || 'posted').toLowerCase() === 'posted')) { %>
+                  <a href="/school/activities/<%= encodeURIComponent(item.id) %>/work-sessions/manage" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-kanban me-2"></i>Manage
+                  </a>
+                <% } %>
                 <a href="/school/activities/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
                   <i class="bi bi-pencil-square me-2"></i>Edit
                 </a>

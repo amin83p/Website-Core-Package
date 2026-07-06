@@ -10,41 +10,24 @@
   const deadlineDate = period && period.submissionDeadline ? String(period.submissionDeadline) : '-';
   const deadlineTime = period && period.submissionDeadlineTime ? String(period.submissionDeadlineTime) : '23:59';
   const deadlineLabel = deadlineDate === '-' ? '-' : `${deadlineDate} ${deadlineTime}`;
+  const personDisplayName = typeof personName !== 'undefined' ? String(personName || '').trim() : '';
+  const timesheetStatus = String(timesheet?.status || 'draft').toLowerCase();
+  const viewingOther = typeof viewingOtherPerson !== 'undefined' && viewingOtherPerson;
 %>
 
 <style>
     /* IMPORTANT:
        Bootstrap applies background on td/th, not tr. So we style tr > * and set BS vars. */
 
-    /* Weekday zebra */
-    .bg-date-even > * { 
-        --bs-table-bg: #ffffff !important;
-        --bs-table-accent-bg: #ffffff !important;
-        background-color: #ffffff !important;
-    }
-    .bg-date-odd > *  { 
-        --bs-table-bg: #f8f9fa !important;
-        --bs-table-accent-bg: #f8f9fa !important;
-        background-color: #f8f9fa !important;
-    }
+    /* Alternating background per calendar day */
+    .bg-day-0 > * { --bs-table-bg: #ffffff !important; --bs-table-accent-bg: #ffffff !important; background-color: #ffffff !important; }
+    .bg-day-1 > * { --bs-table-bg: #eef2f7 !important; --bs-table-accent-bg: #eef2f7 !important; background-color: #eef2f7 !important; }
 
-    /* Weekend zebra (light red but alternating) */
-    .bg-weekend-even > * { 
-        --bs-table-bg: #ffe8e8 !important;
-        --bs-table-accent-bg: #ffe8e8 !important;
-        background-color: #ffe8e8 !important;
-    }
-    .bg-weekend-odd > *  { 
-        --bs-table-bg: #ffdede !important;
-        --bs-table-accent-bg: #ffdede !important;
-        background-color: #ffdede !important;
-    }
-
-    /* Holiday (stronger red) */
+    /* Holiday & weekend (Sat/Sun) — light danger */
     .bg-holiday > * { 
-        --bs-table-bg: #ff9a9a !important;
-        --bs-table-accent-bg: #ff9a9a !important;
-        background-color: #ff9a9a !important;
+        --bs-table-bg: #f8d7da !important;
+        --bs-table-accent-bg: #f8d7da !important;
+        background-color: #f8d7da !important;
     }
 
     .row-hover:hover > * { 
@@ -69,43 +52,97 @@
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
-  .incomplete-sessions-table tbody tr.incomplete-row-weekday-even > * {
-    --bs-table-bg: #ffffff;
-    background-color: #ffffff !important;
-  }
-  .incomplete-sessions-table tbody tr.incomplete-row-weekday-odd > * {
-    --bs-table-bg: #f8f9fa;
-    background-color: #f8f9fa !important;
-  }
-  .incomplete-sessions-table tbody tr.incomplete-row-weekend-even > * {
-    --bs-table-bg: #ffe8e8;
-    background-color: #ffe8e8 !important;
-  }
-  .incomplete-sessions-table tbody tr.incomplete-row-weekend-odd > * {
-    --bs-table-bg: #ffdede;
-    background-color: #ffdede !important;
-  }
+  .incomplete-sessions-table tbody tr.incomplete-row-day-0 > * { --bs-table-bg: #ffffff; background-color: #ffffff !important; }
+  .incomplete-sessions-table tbody tr.incomplete-row-day-1 > * { --bs-table-bg: #eef2f7; background-color: #eef2f7 !important; }
   .incomplete-sessions-table tbody tr.incomplete-row-holiday > * {
-    --bs-table-bg: #ff9a9a;
-    background-color: #ff9a9a !important;
+    --bs-table-bg: #f8d7da;
+    background-color: #f8d7da !important;
+  }
+  #incompleteSessionsToggle .incomplete-sessions-chevron {
+    transition: transform 0.2s ease;
+  }
+  #incompleteSessionsToggle.collapsed .incomplete-sessions-chevron,
+  #incompleteSessionsToggle[aria-expanded="false"] .incomplete-sessions-chevron {
+    transform: rotate(-90deg);
+  }
+
+  .ts-page-header {
+    text-align: left;
+  }
+  .ts-page-header__main {
+    min-width: 0;
+    text-align: left;
+  }
+  .ts-page-header .page-heading {
+    text-align: left;
+    margin-bottom: 0.25rem;
+  }
+  .ts-period-name {
+    font-size: 1.35rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #212529;
+  }
+  .ts-person-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0d6efd;
+  }
+  .ts-meta-line {
+    line-height: 1.5;
+  }
+  #tsTable thead th {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom-width: 2px;
+  }
+  #tsTable tbody td {
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+    vertical-align: middle;
+  }
+  .ts-date-label {
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+  }
+  .ts-day-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-top: 0.1rem;
+  }
+  .ts-time-label {
+    font-size: 0.95rem;
+    font-weight: 500;
   }
 </style>
 
 <div class="sections-page">
-    <div class="d-flex align-items-center justify-content-between mb-4">
-        <div>
-            <div class="d-flex align-items-center gap-2">
-                <h1 class="page-heading size-md m-0"><i class="bi bi-calendar2-week me-2"></i>Timesheet: <%= period.name %></h1>
+    <div class="d-flex align-items-start justify-content-between mb-4 ts-page-header">
+        <div class="ts-page-header__main">
+            <h1 class="page-heading size-md text-start m-0 mb-1"><i class="bi bi-calendar2-week me-2"></i>Timesheet</h1>
+            <div class="ts-period-name"><%= period.name %></div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-2 mb-2">
+                <% if (personDisplayName) { %>
+                    <span class="ts-person-name"><%= personDisplayName %></span>
+                <% } %>
+                <span class="badge bg-<%= timesheetStatus === 'approved' ? 'success' : (timesheetStatus === 'submitted' ? 'warning text-dark' : (timesheetStatus === 'processed' ? 'primary' : 'secondary')) %> text-uppercase"><%= timesheetStatus %></span>
                 <span id="badge_manualEdit" class="badge bg-warning text-dark shadow-sm <%= isManuallyEdited ? '' : 'd-none' %>">
                     <i class="bi bi-pencil-square me-1"></i> Manually Edited
                 </span>
             </div>
-            <div class="text-muted small mt-1">
-                <strong>Period:</strong> <%= period.startDate %> to <%= period.endDate %> |
+            <div class="ts-meta-line text-muted small">
+                <strong>Period:</strong> <%= period.startDate %> to <%= period.endDate %>
+                <span class="mx-1">|</span>
                 <strong>Deadline:</strong> <span class="text-danger fw-bold"><%= deadlineLabel %></span>
+                <% if (viewingOther) { %>
+                    <span class="mx-1">|</span>
+                    <span class="text-info fw-semibold"><i class="bi bi-person-badge me-1"></i>Viewing another person's timesheet</span>
+                <% } %>
             </div>
         </div>
-        <a href="/school/timesheets/my-timesheets" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back</a>
+        <a href="/school/timesheets/my-timesheets" class="btn btn-outline-secondary btn-sm flex-shrink-0"><i class="bi bi-arrow-left"></i> Back</a>
     </div>
 
     <% if (isReadOnly) { %>
@@ -125,29 +162,45 @@
         </div>
     <% } %>
 
+    <% if (typeof payrollWarnings !== 'undefined' && Array.isArray(payrollWarnings) && payrollWarnings.length) { %>
+        <div class="alert alert-warning border-warning shadow-sm mb-4">
+            <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> Payroll setup warnings</div>
+            <ul class="small mb-0 ps-3">
+                <% payrollWarnings.forEach((warning) => { %>
+                    <li><%= warning %></li>
+                <% }); %>
+            </ul>
+        </div>
+    <% } %>
+
     <div id="incompleteSessionsPanel" class="card border-warning shadow-sm mb-4 d-none">
-        <div class="card-header bg-warning-subtle border-warning d-flex align-items-center justify-content-between py-3">
+        <button type="button" class="card-header bg-warning-subtle border-warning d-flex align-items-center justify-content-between py-3 w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#incompleteSessionsCollapse" aria-expanded="false" aria-controls="incompleteSessionsCollapse" id="incompleteSessionsToggle">
             <div class="fw-bold text-warning-emphasis">
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>
                 Incomplete Sessions Detected
                 <span class="badge bg-warning text-dark ms-2" id="incompleteSessionsCount">0</span>
             </div>
-            <div class="small text-muted">Open Manage Session in a new tab to update status, then refresh this timesheet.</div>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-bordered align-middle mb-0 incomplete-sessions-table">
-                    <thead class="table-warning">
-                        <tr>
-                            <th class="ps-4" style="width: 140px;">Date</th>
-                            <th>Class</th>
-                            <th style="width: 160px;">Time</th>
-                            <th style="width: 150px;">Status</th>
-                            <th class="text-center pe-4" style="width: 150px;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="incompleteSessionsBody"></tbody>
-                </table>
+            <div class="d-flex align-items-center gap-3">
+                <span class="small text-muted d-none d-md-inline">Expand to review class and activity work sessions, then refresh this timesheet.</span>
+                <i class="bi bi-chevron-down incomplete-sessions-chevron" aria-hidden="true"></i>
+            </div>
+        </button>
+        <div id="incompleteSessionsCollapse" class="collapse">
+            <div class="card-body p-0 border-top border-warning">
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle mb-0 incomplete-sessions-table">
+                        <thead class="table-warning">
+                            <tr>
+                                <th class="ps-4" style="width: 140px;">Date</th>
+                                <th>Class / Activity</th>
+                                <th style="width: 160px;">Time</th>
+                                <th style="width: 150px;">Status</th>
+                                <th class="text-center pe-4" style="width: 170px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="incompleteSessionsBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -156,11 +209,11 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-bordered align-middle mb-0" id="tsTable">
-                    <thead class="table-dark">
+                    <thead class="table-light border-bottom">
                         <tr>
                             <th class="ps-4" style="width: 140px;">Date</th>
                             <th>Class / Description</th>
-                            <th>Time / Session</th>
+                            <th>Time</th>
                             <th style="width: 120px;">Status</th>
                             <th>Comment</th>
                             <th class="text-end" style="width: 90px;">Hours</th>
@@ -199,7 +252,7 @@
 </div>
 
 <div class="modal fade" id="manualEntryModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content border-0 shadow">
       <div class="modal-header bg-light">
         <h5 class="modal-title fw-bold" id="modalTitle"><i class="bi bi-plus-circle me-2 text-primary"></i>Add Manual Entry</h5>
@@ -211,7 +264,12 @@
           
           <div class="mb-3">
               <label class="form-label fw-bold small text-muted">Selected Date</label>
-              <div id="man_date_display" class="form-control bg-light fw-bold"></div>
+              <div class="d-flex align-items-stretch gap-2">
+                  <div id="man_date_display" class="form-control bg-light fw-bold flex-grow-1"></div>
+                  <button type="button" class="btn btn-outline-primary text-nowrap" id="btnViewDaySchedule" title="Open schedule for this day in a new tab">
+                      <i class="bi bi-calendar-week"></i><span class="d-none d-sm-inline ms-1">View Day</span>
+                  </button>
+              </div>
           </div>
           
           <div class="mb-3">
@@ -230,6 +288,16 @@
                   <% }) %>
               </select>
               <div class="form-text">Select an activity definition, or leave blank for class-based entry.</div>
+          </div>
+
+          <div class="mb-3 <%= (typeof payrollRoles !== 'undefined' && payrollRoles.length > 1) ? '' : 'd-none' %>" id="div_man_payrollRole">
+              <label class="form-label fw-bold">Payroll Role *</label>
+              <select id="man_personRole" class="form-select">
+                  <% (payrollRoles || []).forEach((role) => { %>
+                    <option value="<%= role %>"><%= String(role).charAt(0).toUpperCase() + String(role).slice(1) %></option>
+                  <% }) %>
+              </select>
+              <div class="form-text">Choose whether this work should be paid under your teacher or staff profile.</div>
           </div>
 
           <div class="mb-3" id="div_man_classPicker">
@@ -256,7 +324,7 @@
                   <input type="time" id="man_endTime" class="form-control">
               </div>
               <div class="col-12">
-                  <div class="form-text">For class-based rows, total hours are calculated from start/end time.</div>
+                  <div class="form-text">For class or activity rows, total hours are calculated from start/end time and applied to the materialized session.</div>
               </div>
           </div>
 
@@ -335,6 +403,9 @@
     const TARGET_TEACHER_ID = "<%= targetTeacherId %>";
     const MAX_DAILY_HOURS = <%= maxDailyHours || 24 %>;
     const MAX_SESSION_HOURS = <%= maxSessionHours || 12 %>;
+    const PAYROLL_ROLES = <%- JSON.stringify(typeof payrollRoles !== 'undefined' ? payrollRoles : []) %>;
+    const PAYROLL_DEFAULT_ROLE = "<%= typeof payrollDefaultRole !== 'undefined' ? payrollDefaultRole : 'teacher' %>";
+    const PAYROLL_WARNINGS = <%- JSON.stringify(typeof payrollWarnings !== 'undefined' ? payrollWarnings : []) %>;
     let actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
 
     function buildMutationQuery() {
@@ -343,6 +414,22 @@
         if (actionStateId) params.set('actionStateId', actionStateId);
         const query = params.toString();
         return query ? `?${query}` : '';
+    }
+
+    function buildManualEntryScheduleUrl(dateStr) {
+        const date = String(dateStr || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+        if (IS_ADMIN && TARGET_TEACHER_ID) {
+            const params = new URLSearchParams();
+            params.set('personId', TARGET_TEACHER_ID);
+            params.set('startDate', date);
+            params.set('endDate', date);
+            return `/school/schedules/viewer?${params.toString()}`;
+        }
+        const params = new URLSearchParams();
+        params.set('anchorDate', date);
+        params.set('period', 'day');
+        return `/school/schedules/my?${params.toString()}`;
     }
 </script>
 
@@ -359,24 +446,24 @@ function toggleManualType() {
     const usingActivity = Boolean(String(type || '').trim());
     document.getElementById('div_man_desc').classList.remove('d-none');
     classPickerWrap.classList.toggle('opacity-50', usingActivity);
-    document.getElementById('div_man_timeRange').classList.toggle('d-none', usingActivity);
     if (classNameInput) {
         classNameInput.disabled = usingActivity;
         classNameInput.placeholder = usingActivity ? 'Disabled for activity-based entry' : 'Choose a class...';
     }
     if (classButton) classButton.disabled = usingActivity;
-    if (startInput) startInput.disabled = usingActivity;
-    if (endInput) endInput.disabled = usingActivity;
+    if (startInput) startInput.disabled = false;
+    if (endInput) endInput.disabled = false;
+    const classId = String(classIdInput?.value || '').trim();
+    const usesTimedEntry = usingActivity || Boolean(classId);
     if (hoursInput) {
-        hoursInput.readOnly = !usingActivity;
-        hoursInput.placeholder = usingActivity ? 'e.g. 1.5' : 'Calculated from start/end time';
+        hoursInput.readOnly = usesTimedEntry;
+        hoursInput.placeholder = usesTimedEntry ? 'Calculated from start/end time' : 'e.g. 1.5';
     }
     if (usingActivity) {
-        if (startInput) startInput.value = '';
-        if (endInput) endInput.value = '';
         if (classIdInput) classIdInput.value = '';
         if (classNameInput) classNameInput.value = '';
-    } else if (typeof window.updateManualComputedHoursFromTimes === 'function') {
+    }
+    if (typeof window.updateManualComputedHoursFromTimes === 'function') {
         window.updateManualComputedHoursFromTimes();
     }
 }
@@ -411,6 +498,46 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         alert(message);
+    }
+
+    function showTimesheetWaitingModal({
+        title = 'Please wait',
+        note = 'Processing your request...',
+        operation = ''
+    } = {}) {
+        if (typeof window.showLoading !== 'function') return null;
+        return window.showLoading({ title, note, operation });
+    }
+
+    function hideTimesheetWaitingModal(token = null) {
+        if (typeof window.hideLoading !== 'function') return;
+        if (token) {
+            window.hideLoading(token);
+            return;
+        }
+        window.hideLoading();
+    }
+
+    function setManualSaveBusy(isBusy) {
+        const manualSaveBtn = document.getElementById('btnSaveManualEntry');
+        if (!manualSaveBtn) return;
+        manualSaveBtn.disabled = isBusy === true;
+    }
+
+    function resolveManualPersonRole() {
+        if (!Array.isArray(PAYROLL_ROLES) || PAYROLL_ROLES.length <= 1) {
+            return PAYROLL_DEFAULT_ROLE || 'teacher';
+        }
+        const selected = String(document.getElementById('man_personRole')?.value || '').trim().toLowerCase();
+        return PAYROLL_ROLES.includes(selected) ? selected : '';
+    }
+
+    function payrollRoleBadge(personRole) {
+        if (!Array.isArray(PAYROLL_ROLES) || PAYROLL_ROLES.length <= 1) return '';
+        const role = String(personRole || PAYROLL_DEFAULT_ROLE || 'teacher').trim().toLowerCase();
+        const klass = role === 'staff' ? 'bg-success' : 'bg-primary';
+        const label = role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Role';
+        return `<span class="badge ${klass} ms-1">${label}</span>`;
     }
 
     const manualActivityMap = new Map((Array.isArray(MANUAL_ACTIVITIES) ? MANUAL_ACTIVITIES : [])
@@ -518,6 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!entry || entry.isManual) return true;
         if (entry.isPriorPeriodAdjustment === true) return true;
         if (entry.isReportReflection === true) return true;
+        if (entry.isSchoolActivity === true || String(entry?.sessionId || '').startsWith('act-')) return true;
         if (entry.isFinalStatus === true) return true;
         if (entry.isFinalStatus === false) return false;
         return normalizeStatusCode(entry.status) === 'completed';
@@ -557,13 +685,25 @@ document.addEventListener('DOMContentLoaded', () => {
             GenericPicker.open(GenericPickerPresets.class({
                 title: 'Select Class',
                 icon: 'bi-journal-bookmark',
-                apiEndpoint: '/school/classes/',
+                apiEndpoint: '/school/timesheets/api/manual-entry-classes',
                 onSelect: (item) => {
                     document.getElementById('man_classId').value = item.id;
                     document.getElementById('man_className').value = item.title || item.name || item.id;
-                    if (typeof window.updateManualComputedHoursFromTimes === 'function') window.updateManualComputedHoursFromTimes();
+                    toggleManualType();
                 }
             }));
+        });
+    }
+    const viewDayScheduleBtn = document.getElementById('btnViewDaySchedule');
+    if (viewDayScheduleBtn) {
+        viewDayScheduleBtn.addEventListener('click', () => {
+            const dateStr = String(document.getElementById('man_date')?.value || '').trim();
+            const url = buildManualEntryScheduleUrl(dateStr);
+            if (!url) {
+                messageBox({ title: 'Missing Date', icon: 'warning', message: 'Select a valid date before opening the schedule.' });
+                return;
+            }
+            window.open(url, '_blank', 'noopener');
         });
     }
     const manualStartInput = document.getElementById('man_startTime');
@@ -619,15 +759,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const dates = getDatesInRange(P_START, P_END);
+    const dateDayIndexMap = new Map();
+    dates.forEach((dObj, index) => {
+        dateDayIndexMap.set(dObj.toISOString().split('T')[0], index);
+    });
 
-    function resolveBgClass(isHoliday, isWeekend, index) {
-        if (isHoliday) return 'bg-holiday';
-        if (isWeekend) return (index % 2 === 0) ? 'bg-weekend-even' : 'bg-weekend-odd';
-        return (index % 2 === 0) ? 'bg-date-even' : 'bg-date-odd';
+    function isWeekendDay(dayOfWeek) {
+        return dayOfWeek === 0 || dayOfWeek === 6;
+    }
+
+    function isWeekendDate(dateStr) {
+        const d = dateStr ? new Date(`${dateStr}T00:00:00`) : null;
+        if (!d || Number.isNaN(d.getTime())) return false;
+        return isWeekendDay(d.getDay());
+    }
+
+    function resolveDayBgClass(dayIndex) {
+        return `bg-day-${Math.abs(Number(dayIndex) || 0) % 2}`;
+    }
+
+    function resolveBgClass(isHoliday, isWeekend, dateStr) {
+        if (isHoliday || isWeekend) return 'bg-holiday';
+        const dayIndex = dateDayIndexMap.get(dateStr) ?? 0;
+        return resolveDayBgClass(dayIndex);
     }
 
     function holidayName(hol) {
         return (hol && (hol.name || hol.title || hol.holidayName || hol.label)) || 'Holiday';
+    }
+
+    function buildAddDayButton(dateStr) {
+        if (IS_READONLY) return '';
+        return `<button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold shadow-sm mt-2" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg"></i> Add</button>`;
+    }
+
+    function buildDateCellHtml(dateStr, dayName, isHoliday, hol, showAddButton) {
+        const holidayLine = isHoliday
+            ? `<div class="ts-holiday-label small text-danger fw-semibold mt-1"><i class="bi bi-balloon-fill me-1"></i>${holidayName(hol)}</div>`
+            : '';
+        const dayClass = isHoliday ? 'text-danger' : '';
+        const addBtn = showAddButton ? buildAddDayButton(dateStr) : '';
+        return `
+            <div class="ts-date-label text-muted">${dateStr}</div>
+            <div class="ts-day-name ${dayClass}">${dayName}</div>
+            ${holidayLine}
+            ${addBtn}`;
     }
 
     function renderTable() {
@@ -635,44 +811,39 @@ document.addEventListener('DOMContentLoaded', () => {
         grandTotalHours = 0;
         hasUncompletedSessions = Array.isArray(INCOMPLETE_SESSIONS) && INCOMPLETE_SESSIONS.length > 0;
         hasPendingApprovals = false;
-        let weeklyTotal = 0;
 
-        dates.forEach((dObj, index) => {
+        dates.forEach((dObj) => {
             const dateStr = dObj.toISOString().split('T')[0];
-            const dayName = dObj.toLocaleDateString('en-US', { weekday: 'short' });
-            const dayOfWeek = dObj.getDay(); // 0 Sun ... 6 Sat
-            
+            const dayName = dObj.toLocaleDateString('en-US', { weekday: 'long' });
+            const dayOfWeek = dObj.getDay();
+
             const hol = holidayMap.get(dateStr);
             const isHoliday = !!hol;
-            const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-            const bgClass = resolveBgClass(isHoliday, isWeekend, index);
+            const isWeekend = isWeekendDay(dayOfWeek);
+            const bgClass = resolveBgClass(isHoliday, isWeekend, dateStr);
 
             const dayEntries = activeEntries.filter(e => e.date === dateStr);
-            let dailyTotal = 0;
 
-            // If No entries for the day
             if (dayEntries.length === 0) {
+                const dateCell = buildDateCellHtml(dateStr, dayName, isHoliday, hol, !IS_READONLY);
                 if (isHoliday) {
-                    tbody.innerHTML += `<tr class="${bgClass} row-hover text-muted">
-                        <td class="ps-4 fw-bold align-middle">${dateStr} <br><small>${dayName}</small></td>
+                    tbody.innerHTML += `<tr class="${bgClass} row-hover border-bottom border-2">
+                        <td class="ps-4 align-middle border-end border-2">${dateCell}</td>
                         <td colspan="4" class="align-middle text-danger fw-bold"><i class="bi bi-calendar-x-fill me-1"></i> Holiday: ${holidayName(hol)}</td>
                         <td class="text-end align-middle fw-bold">0.00</td>
-                        ${IS_READONLY ? '' : `<td class="text-center align-middle"><button class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold shadow-sm" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg"></i> Add</button></td>`}
+                        ${IS_READONLY ? '' : '<td></td>'}
                     </tr>`;
                 } else {
-                    tbody.innerHTML += `<tr class="${bgClass} row-hover">
-                        <td class="ps-4 fw-bold text-muted align-middle">${dateStr} <br><small>${dayName}</small></td>
-                        <td colspan="4" class="text-muted fst-italic small align-middle">No sessions logged.</td>
+                    tbody.innerHTML += `<tr class="${bgClass} row-hover border-bottom border-2">
+                        <td class="ps-4 align-middle border-end border-2">${dateCell}</td>
+                        <td colspan="4" class="text-muted fst-italic align-middle">No sessions logged.</td>
                         <td class="text-end align-middle fw-bold">0.00</td>
-                        ${IS_READONLY ? '' : `<td class="text-center align-middle"><button class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold shadow-sm" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg"></i> Add</button></td>`}
+                        ${IS_READONLY ? '' : '<td></td>'}
                     </tr>`;
                 }
             } else {
-                // Render Day Entries
                 dayEntries.forEach((ses, sIdx) => {
                     const hrs = resolveEntryHours(ses);
-                    dailyTotal += hrs;
-                    weeklyTotal += hrs;
                     grandTotalHours += hrs;
 
                     const statusBadge = buildStatusBadgeHtml(ses);
@@ -684,7 +855,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     const isPriorAdj = ses.isPriorPeriodAdjustment === true;
-                    const rowClass = isPriorAdj ? `${bgClass} row-hover row-prior-adjustment` : `${bgClass} row-hover`;
+                    const isLastEntry = sIdx === dayEntries.length - 1;
+                    const rowClass = isPriorAdj
+                        ? `${bgClass} row-hover row-prior-adjustment${isLastEntry ? ' border-bottom border-2' : ''}`
+                        : `${bgClass} row-hover${isLastEntry ? ' border-bottom border-2' : ''}`;
 
                     const commentInput = (IS_READONLY || isPriorAdj)
                         ? `<span class="text-muted fst-italic">${ses.comment || '-'}</span>`
@@ -703,11 +877,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     const actHtml = IS_READONLY ? '' : `<td class="text-center align-middle text-nowrap">${actBtns}</td>`;
-                    const dateCell = sIdx === 0 
-                        ? `<td class="ps-4 fw-bold align-top border-end border-2" rowspan="${dayEntries.length + 1}">
-                            ${dateStr} <br><small class="${isHoliday ? 'text-danger fw-bold' : 'text-muted'}">${dayName}</small>
-                            ${isHoliday ? `<br><small class="text-danger"><i class="bi bi-balloon-fill"></i> Holiday</small>` : ''}
-                           </td>` 
+                    const dateCell = sIdx === 0
+                        ? `<td class="ps-4 align-top border-end border-2" rowspan="${dayEntries.length}">
+                            ${buildDateCellHtml(dateStr, dayName, isHoliday, hol, !IS_READONLY)}
+                           </td>`
                         : '';
 
                     const requestedHours = resolveRequestedHours(ses);
@@ -715,18 +888,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         ? `<span class="text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><br><small class="text-warning fw-semibold">0.00 payable (pending)</small>`
                         : (isPriorAdj && hrs < 0 ? hrs.toFixed(2) : hrs.toFixed(2));
                     const timeLabel = isPriorAdj
-                        ? `<div class="small text-muted">Prior period correction</div><div class="small text-muted">Ref: ${(ses.adjustmentMeta?.sourceSessionDate || ses.date || '').toString()}</div>`
-                        : `<div class="small">${ses.startTime ? `<i class="bi bi-clock"></i> ${ses.startTime} - ${ses.endTime}` : 'Manual Time'}</div><div class="small text-muted">ID: ${(ses.sessionId || '').substring(0,8)}...</div>`;
+                        ? `<div class="ts-time-label text-muted">Prior period correction<div class="small mt-1">Ref: ${(ses.adjustmentMeta?.sourceSessionDate || ses.date || '').toString()}</div></div>`
+                        : `<div class="ts-time-label">${ses.startTime ? `<i class="bi bi-clock me-1"></i>${ses.startTime} – ${ses.endTime}` : 'Manual Time'}</div>`;
                     const classMeta = ses.isManual && ses.activityName
                         ? `<div class="small text-muted"><i class="bi bi-list-check me-1"></i>${ses.activityName}${ses.activityPaid ? ' (paid)' : ' (unpaid)'}</div>`
                         : (ses.isManual && ses.deliveryDepartmentName
                             ? `<div class="small text-muted"><i class="bi bi-building me-1"></i>${ses.deliveryDepartmentName}</div>`
-                            : (ses.isManual && !ses.classId && !isPriorAdj ? '' : `<div class="small text-muted">${ses.classId || ''}</div>`));
+                            : '');
 
                     tbody.innerHTML += `
                         <tr class="${rowClass}">
                             ${dateCell}
-                            <td><div class="fw-bold text-primary">${ses.className || ''}</div>${classMeta}</td>
+                            <td><div class="fw-bold text-primary">${ses.className || ''}${payrollRoleBadge(ses.personRole)}</div>${classMeta}</td>
                             <td>${timeLabel}</td>
                             <td>${statusBadge}</td>
                             <td>${commentInput}</td>
@@ -735,57 +908,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </tr>
                     `;
                 });
-
-                // Daily Total Row (Date cell is rowspanned, so do NOT include Date column here)
-                tbody.innerHTML += `
-                    <tr class="${bgClass} row-hover border-bottom border-2">
-                        <td colspan="4" class="text-end small text-muted text-uppercase align-middle">Daily Total:</td>
-                        <td class="text-end pe-4 fw-bold text-dark align-middle">${dailyTotal.toFixed(2)}</td>
-                        ${IS_READONLY ? '' : `<td class="text-center align-middle"><button class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold shadow-sm" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg"></i> Add</button></td>`}
-                    </tr>
-                `;
-            }
-
-            // FIX: End-of-week row must match column count exactly
-            // Columns:
-            // - readonly: Date, Class, Time, Status, Comment, Hours => 6
-            // - editable: + Act => 7
-            if (dayOfWeek === 0 && weeklyTotal > 0) {
-                if (IS_READONLY) {
-                    tbody.innerHTML += `
-                      <tr class="table-light border-bottom border-2">
-                        <td colspan="5" class="text-end small text-muted text-uppercase">End of Week Total:</td>
-                        <td class="text-end pe-4 fw-bold text-dark">${weeklyTotal.toFixed(2)}</td>
-                      </tr>`;
-                } else {
-                    tbody.innerHTML += `
-                      <tr class="table-light border-bottom border-2">
-                        <td colspan="5" class="text-end small text-muted text-uppercase">End of Week Total:</td>
-                        <td class="text-end pe-4 fw-bold text-dark">${weeklyTotal.toFixed(2)}</td>
-                        <td></td>
-                      </tr>`;
-                }
-                weeklyTotal = 0; 
             }
         });
-
-        // leftover week total
-        if (weeklyTotal > 0) {
-            if (IS_READONLY) {
-                tbody.innerHTML += `
-                  <tr class="table-light border-bottom border-2">
-                    <td colspan="5" class="text-end small text-muted text-uppercase">End of Week Total:</td>
-                    <td class="text-end pe-4 fw-bold text-dark">${weeklyTotal.toFixed(2)}</td>
-                  </tr>`;
-            } else {
-                tbody.innerHTML += `
-                  <tr class="table-light border-bottom border-2">
-                    <td colspan="5" class="text-end small text-muted text-uppercase">End of Week Total:</td>
-                    <td class="text-end pe-4 fw-bold text-dark">${weeklyTotal.toFixed(2)}</td>
-                    <td></td>
-                  </tr>`;
-            }
-        }
 
         document.getElementById('lbl_grandTotal').innerText = grandTotalHours.toFixed(2);
 
@@ -814,7 +938,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.updateManualComputedHoursFromTimes = function() {
         const type = String(document.getElementById('man_type')?.value || '').trim();
-        if (type) return;
+        const classId = String(document.getElementById('man_classId')?.value || '').trim();
+        const usesTimedEntry = Boolean(type) || Boolean(classId);
+        if (!usesTimedEntry) return;
         const startTime = document.getElementById('man_startTime')?.value || '';
         const endTime = document.getElementById('man_endTime')?.value || '';
         const hours = calculateHoursFromRange(startTime, endTime);
@@ -850,6 +976,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('man_classId').value = '';
                 document.getElementById('man_className').value = '';
                 document.getElementById('man_desc').value = e.description || e.className || '';
+                document.getElementById('man_startTime').value = normalizeClock(e.startTime || '');
+                document.getElementById('man_endTime').value = normalizeClock(e.endTime || '');
             } else if (e.classId) {
                 document.getElementById('man_type').value = '';
                 document.getElementById('man_classId').value = e.classId;
@@ -867,6 +995,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             document.getElementById('man_hours').value = existingHoursToIgnore ? existingHoursToIgnore.toFixed(2) : '';
             document.getElementById('man_comment').value = e.comment || '';
+            const roleSelect = document.getElementById('man_personRole');
+            if (roleSelect) roleSelect.value = e.personRole || PAYROLL_DEFAULT_ROLE || 'teacher';
         } else {
             document.getElementById('modalTitle').innerHTML = '<i class="bi bi-plus-circle me-2 text-primary"></i>Add Manual Entry';
             document.getElementById('btnSaveManualEntry').innerText = 'Add Entry';
@@ -878,6 +1008,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('man_endTime').value = '';
             document.getElementById('man_hours').value = '';
             document.getElementById('man_comment').value = '';
+            const roleSelect = document.getElementById('man_personRole');
+            if (roleSelect) roleSelect.value = PAYROLL_DEFAULT_ROLE || 'teacher';
         }
         
         toggleManualType();
@@ -915,6 +1047,50 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTable();
         }
     };
+
+    async function validateManualRowBeforeSave(proposedRow, editId) {
+        const loadingToken = showTimesheetWaitingModal({
+            title: 'Checking Schedule',
+            note: 'Validating this manual entry for conflicts and eligibility...',
+            operation: 'Manual entry validation'
+        });
+        try {
+            const response = await fetch(`/school/timesheets/editor/${encodeURIComponent(PERIOD_ID)}/api/validate-manual-row${buildMutationQuery()}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-ajax-request': 'true'
+                },
+                body: JSON.stringify({
+                    proposed: proposedRow,
+                    editSessionId: editId || '',
+                    draftEntries: activeEntries.filter((entry) => entry && entry.isDeleted !== true),
+                    timesheetEntries: activeEntries.filter((entry) => entry && entry.isDeleted !== true)
+                })
+            });
+            const result = await response.json().catch(() => ({}));
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(result, { busyTitle: 'Validation In Progress', replayTitle: 'Validation Already Completed' })
+                : { stop: false };
+            if (guarded.stop) return false;
+            if (response.ok && result.status === 'success') return true;
+            const conflicts = Array.isArray(result?.conflicts) ? result.conflicts : [];
+            const detail = conflicts.length
+                ? conflicts.slice(0, 3).map((row) => `${row.conflictLabel || 'Conflict'} (${row.conflictDate || row.date || ''})`).join('; ')
+                : (result.message || 'Schedule conflict detected.');
+            await messageBox({
+                title: 'Schedule Conflict Detected',
+                icon: 'error',
+                message: detail
+            });
+            return false;
+        } catch (error) {
+            await messageBox({ title: 'Validation Failed', icon: 'error', message: error.message || 'Unable to validate manual entry.' });
+            return false;
+        } finally {
+            hideTimesheetWaitingModal(loadingToken);
+        }
+    }
 
     // SAVE MANUAL ENTRY LOGIC WITH MODAL ALERTS
     document.getElementById('btnSaveManualEntry').addEventListener('click', async () => {
@@ -956,6 +1132,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             finalClassName = descInput || finalActivityName;
             finalClassId = null;
+            finalStartTime = normalizeClock(startTimeRaw);
+            finalEndTime = normalizeClock(endTimeRaw);
+            if (!finalStartTime || !finalEndTime) {
+                await messageBox({ title: 'Missing Time', icon: 'warning', message: 'Activity-based manual rows require both start time and end time.' });
+                return;
+            }
+            hrs = calculateHoursFromRange(finalStartTime, finalEndTime);
+            if (!hrs || hrs <= 0) {
+                await messageBox({ title: 'Invalid Time Range', icon: 'warning', message: 'End time must be later than start time for activity-based manual rows.' });
+                return;
+            }
+            document.getElementById('man_hours').value = hrs.toFixed(2);
             if (finalActivityPaid) {
                 const proceed = await confirmAction({
                     title: 'Paid Activity Requires Approval',
@@ -1016,23 +1204,57 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const finalPersonRole = resolveManualPersonRole();
+        if (Array.isArray(PAYROLL_ROLES) && PAYROLL_ROLES.length > 1 && !finalPersonRole) {
+            await messageBox({ title: 'Missing Payroll Role', icon: 'warning', message: 'Please select whether this work belongs to your teacher or staff payroll profile.' });
+            return;
+        }
+
         if (!activityId && finalClassId) {
-            const overlaps = activeEntries.filter((entry) => {
-                if (!entry || entry.sessionId === editId) return false;
-                if (entry.date !== d) return false;
-                const entryStart = normalizeClock(entry.startTime || '');
-                const entryEnd = normalizeClock(entry.endTime || '');
-                if (!entryStart || !entryEnd) return false;
-                return hasTimeOverlap(finalStartTime, finalEndTime, entryStart, entryEnd);
-            });
-            if (overlaps.length) {
-                await messageBox({
-                    title: 'Schedule Conflict Detected',
-                    icon: 'error',
-                    message: 'This class time overlaps another session/activity in the current timesheet draft. Adjust start/end time and try again.'
-                });
-                return;
+            const proposedRow = {
+                sessionId: editId || `MAN_PREVIEW_${Date.now()}`,
+                date: d,
+                classId: finalClassId,
+                className: finalClassName,
+                activityId: finalActivityId,
+                activityName: finalActivityName,
+                startTime: finalStartTime,
+                endTime: finalEndTime,
+                personRole: finalPersonRole,
+                durationHours: hrs,
+                requestedHours: hrs,
+                isManual: true
+            };
+            setManualSaveBusy(true);
+            let ok = false;
+            try {
+                ok = await validateManualRowBeforeSave(proposedRow, editId);
+            } finally {
+                setManualSaveBusy(false);
             }
+            if (!ok) return;
+        } else if (activityId) {
+            const proposedRow = {
+                sessionId: editId || `MAN_PREVIEW_${Date.now()}`,
+                date: d,
+                activityId: finalActivityId,
+                activityName: finalActivityName,
+                className: finalClassName,
+                startTime: finalStartTime,
+                endTime: finalEndTime,
+                personRole: finalPersonRole,
+                durationHours: hrs,
+                requestedHours: hrs,
+                isManual: true
+            };
+            setManualSaveBusy(true);
+            let ok = false;
+            try {
+                ok = await validateManualRowBeforeSave(proposedRow, editId);
+            } finally {
+                setManualSaveBusy(false);
+            }
+            if (!ok) return;
         }
 
         // Daily Limit Enforcement Check
@@ -1066,6 +1288,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.deliveryDepartmentName = finalDepartmentName;
             e.categoryName = finalCategoryName;
             e.description = descInput;
+            e.personRole = finalPersonRole;
             e.requestedHours = hrs;
             e.durationHours = hrs;
             e.hours = finalExcludeFromTotals ? 0 : hrs;
@@ -1089,6 +1312,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 deliveryDepartmentName: finalDepartmentName,
                 categoryName: finalCategoryName,
                 description: descInput,
+                personRole: finalPersonRole,
                 requestedHours: hrs,
                 hours: finalExcludeFromTotals ? 0 : hrs, 
                 durationHours: hrs, 
@@ -1106,9 +1330,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function executeSave(statusStr) {
         const btn = statusStr === 'submitted' ? document.getElementById('btnSubmit') : document.getElementById('btnSaveDraft');
-        const origHtml = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
-        btn.disabled = true;
+        if (btn) btn.disabled = true;
+        const loadingToken = showTimesheetWaitingModal({
+            title: statusStr === 'submitted' ? 'Submitting Timesheet' : 'Saving Timesheet',
+            note: 'Please wait while your entries are saved and validated...',
+            operation: statusStr === 'submitted' ? 'Submit' : 'Save draft'
+        });
 
         const payloadEntries = activeEntries.map(e => {
             const row = {
@@ -1134,6 +1361,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.deliveryDepartmentName) row.deliveryDepartmentName = e.deliveryDepartmentName;
             if (e.categoryName) row.categoryName = e.categoryName;
             if (e.description) row.description = e.description;
+            if (e.personRole) row.personRole = e.personRole;
             if (e.isReportReflection === true) row.isReportReflection = true;
             if (e.isPriorPeriodAdjustment === true) {
                 row.isPriorPeriodAdjustment = true;
@@ -1158,11 +1386,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const guarded = typeof window.applyGuardedApiResult === 'function'
                 ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
                 : { stop: false };
-            if (guarded.stop) {
-                btn.innerHTML = origHtml;
-                btn.disabled = false;
-                return;
-            }
+            if (guarded.stop) return;
             if (result.status === 'warning' && result.code === 'MANUAL_ENTRY_SCHEDULE_CONFLICT') {
                 const rows = Array.isArray(result?.data?.conflicts) ? result.data.conflicts : [];
                 const detailText = rows.length
@@ -1178,19 +1402,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     icon: 'warning',
                     message: `${result.message || 'Manual class entry conflicts with your schedule.'}${detailText ? `\n\n${detailText}` : ''}`
                 });
-                btn.innerHTML = origHtml;
-                btn.disabled = false;
                 return;
             }
             
             if (result.status !== 'success') throw new Error(result.message);
 
+            hideTimesheetWaitingModal(loadingToken);
             await messageBox({ title: 'Success', icon: 'success', message: result.message, okText: 'OK', okClass: 'btn-success' });
             window.location.href = '/school/timesheets/my-timesheets';
         } catch (e) {
             await messageBox({ title: 'Error', icon: 'error', message: e.message });
-            btn.innerHTML = origHtml;
-            btn.disabled = false;
+        } finally {
+            hideTimesheetWaitingModal(loadingToken);
+            if (btn) btn.disabled = false;
         }
     }
 
@@ -1223,6 +1447,11 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmBtnClass: 'btn-primary'
         });
         if (!ok) return;
+        const loadingToken = showTimesheetWaitingModal({
+            title: successTitle || 'Processing Request',
+            note: 'Please wait while this timesheet action completes...',
+            operation: endpoint
+        });
         try {
             const res = await fetch(`/school/timesheets/editor/${PERIOD_ID}/${endpoint}${buildMutationQuery()}`, {
                 method: 'POST',
@@ -1235,6 +1464,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 : { stop: false };
             if (guarded.stop) return;
             if (result.status === 'success') {
+                hideTimesheetWaitingModal(loadingToken);
                 await messageBox({ title: successTitle, icon: 'success', message: result.message || 'Done.' });
                 window.location.reload();
                 return;
@@ -1242,6 +1472,8 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error(result.message || 'Request failed.');
         } catch (error) {
             await messageBox({ title: 'Error', icon: 'error', message: error.message });
+        } finally {
+            hideTimesheetWaitingModal(loadingToken);
         }
     }
 
@@ -1304,6 +1536,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadPriorAdjustmentsReview() {
         if (!SHOW_PRIOR_ADJUSTMENT_REVIEW || IS_READONLY) return;
 
+        const loadingToken = showTimesheetWaitingModal({
+            title: 'Loading Review',
+            note: 'Checking prior-period adjustments for this timesheet...',
+            operation: 'Prior-period review'
+        });
         try {
             const res = await fetch(`/school/timesheets/editor/${PERIOD_ID}/prior-adjustments${buildMutationQuery()}`, {
                 headers: { 'X-AJAX-Request': 'true' }
@@ -1373,12 +1610,16 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btnPriorAdjustmentLater').onclick = () => modal.hide();
 
             const runAcknowledgement = async (buttonEl, successTitle) => {
-                const orig = buttonEl.innerHTML;
                 buttonEl.disabled = true;
-                buttonEl.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
+                const loadingToken = showTimesheetWaitingModal({
+                    title: successTitle || 'Processing Review',
+                    note: 'Please wait while prior-period adjustments are applied...',
+                    operation: 'Prior-period acknowledgement'
+                });
                 try {
                     const applyResult = await submitPriorReviewAcknowledgement();
                     modal.hide();
+                    hideTimesheetWaitingModal(loadingToken);
                     await messageBox({
                         title: successTitle,
                         icon: 'success',
@@ -1389,8 +1630,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (error) {
                     await messageBox({ title: 'Error', icon: 'error', message: error.message });
                 } finally {
+                    hideTimesheetWaitingModal(loadingToken);
                     buttonEl.disabled = false;
-                    buttonEl.innerHTML = orig;
                 }
             };
 
@@ -1404,35 +1645,31 @@ document.addEventListener('DOMContentLoaded', () => {
             modal.show();
         } catch (error) {
             console.error('Failed to load prior-period adjustments', error);
+        } finally {
+            hideTimesheetWaitingModal(loadingToken);
         }
     }
 
     async function showIncompleteSessionWarningOnLoad() {
         const rows = Array.isArray(INCOMPLETE_SESSIONS) ? INCOMPLETE_SESSIONS : [];
         if (!rows.length) return;
-        const tableHtml = `
-            <p class="mb-3">You have <strong>${rows.length}</strong> incomplete session(s) in this period. Finalize session statuses before submission.</p>
-            <div class="table-responsive">
-                <table class="table table-bordered table-sm align-middle mb-0 incomplete-sessions-table">
-                    <thead class="table-warning">
-                        <tr>
-                            <th class="ps-3">Date</th>
-                            <th>Class</th>
-                            <th>Time</th>
-                            <th>Status</th>
-                            <th class="text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>${buildIncompleteSessionsTableBodyHtml(rows)}</tbody>
-                </table>
-            </div>
-            <p class="small text-muted mb-0 mt-2">These sessions are excluded from auto-pulled timesheet rows until marked final.</p>`;
+        const classCount = rows.filter((row) => String(row?.sessionType || 'class') === 'class').length;
+        const activityCount = rows.filter((row) => row?.sessionType === 'activity').length;
+        const breakdownParts = [];
+        if (classCount) breakdownParts.push(`<strong>${classCount}</strong> class`);
+        if (activityCount) breakdownParts.push(`<strong>${activityCount}</strong> activity work`);
+        const breakdownText = breakdownParts.length
+            ? ` (${breakdownParts.join(', ')} session${rows.length === 1 ? '' : 's'})`
+            : '';
+        const summaryHtml = `
+            <p class="mb-2">You have <strong>${rows.length}</strong> incomplete session(s) in this period${breakdownText}.</p>
+            <p class="mb-2">Finalize class session statuses and complete activity work sessions before submission.</p>
+            <p class="small text-muted mb-0">Use the collapsible <strong>Incomplete Sessions</strong> panel below for the full list.</p>`;
         if (typeof showMessageModal === 'function') {
             await showMessageModal({
                 title: 'Incomplete Sessions Detected',
                 icon: 'warning',
-                size: 'lg',
-                message: tableHtml,
+                message: summaryHtml,
                 buttons: [{ text: 'OK', class: 'btn-warning' }]
             });
             return;
@@ -1440,7 +1677,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await messageBox({
             title: 'Incomplete Sessions Detected',
             icon: 'warning',
-            message: `You have ${rows.length} incomplete session(s) in this period.`
+            message: `You have ${rows.length} incomplete session(s) in this period. Review the list below before submitting.`
         });
     }
 
@@ -1463,18 +1700,21 @@ document.addEventListener('DOMContentLoaded', () => {
             .find((row) => normalizeIncompleteStatusCode(row?.code) === code) || null;
     }
 
-    function resolveIncompleteRowClass(dateStr, index) {
-        if (holidayMap.get(dateStr)) return 'incomplete-row-holiday';
-        const d = dateStr ? new Date(`${dateStr}T00:00:00`) : null;
-        const day = d ? d.getDay() : -1;
-        if (day === 0 || day === 6) {
-            return index % 2 === 0 ? 'incomplete-row-weekend-even' : 'incomplete-row-weekend-odd';
-        }
-        return index % 2 === 0 ? 'incomplete-row-weekday-even' : 'incomplete-row-weekday-odd';
+    function resolveIncompleteRowClass(dateStr) {
+        if (holidayMap.get(dateStr) || isWeekendDate(dateStr)) return 'incomplete-row-holiday';
+        const dayIndex = dateDayIndexMap.get(dateStr) ?? 0;
+        return `incomplete-row-day-${Math.abs(dayIndex) % 2}`;
     }
 
     function buildIncompleteStatusBadge(row) {
         const label = row?.statusLabel || row?.status || 'In progress';
+        if (row?.sessionType === 'activity') {
+            const isPendingCompletion = String(row?.evaluationType || '').toLowerCase() === 'completion'
+                || String(label).toLowerCase().includes('pending');
+            const bg = isPendingCompletion ? '#fff3cd' : '#f8f9fa';
+            const border = isPendingCompletion ? '#ffc107' : '#dee2e6';
+            return `<span class="badge border text-dark" style="background-color:${escapeHtml(bg)};border-color:${escapeHtml(border)} !important;">${escapeHtml(label)}</span>`;
+        }
         const meta = getIncompleteSessionStatusMeta(row?.status);
         const bg = meta?.colorBg || '#fff3cd';
         const border = meta?.colorBorder || '#ffc107';
@@ -1482,6 +1722,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildIncompleteSessionManagerHref(row) {
+        if (row?.sessionType === 'activity') {
+            const activityId = String(row?.activityId || '').trim();
+            const entryId = String(row?.activityEntryId || '').trim();
+            if (!activityId || !entryId) return '';
+            return `/school/activities/${encodeURIComponent(activityId)}/work-sessions/${encodeURIComponent(entryId)}/manage`;
+        }
         const classId = String(row?.classId || '').trim();
         const sessionId = String(row?.sessionId || '').trim();
         if (!classId || !sessionId) return '';
@@ -1493,7 +1739,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!href) {
             return '<span class="text-muted small">Unavailable</span>';
         }
-        return `<a href="${escapeHtml(href)}" class="btn btn-sm btn-outline-primary fw-semibold" target="_blank" rel="noopener noreferrer" title="Open Manage Session in a new tab"><i class="bi bi-box-arrow-up-right me-1"></i>Manage Session</a>`;
+        const isActivity = row?.sessionType === 'activity';
+        const label = isActivity ? 'Manage Work Session' : 'Manage Session';
+        const title = isActivity
+            ? 'Open activity work session management in a new tab'
+            : 'Open Manage Session in a new tab';
+        return `<a href="${escapeHtml(href)}" class="btn btn-sm btn-outline-primary fw-semibold" target="_blank" rel="noopener noreferrer" title="${escapeHtml(title)}"><i class="bi bi-box-arrow-up-right me-1"></i>${escapeHtml(label)}</a>`;
     }
 
     function buildIncompleteSessionsTableBodyHtml(rows) {
@@ -1505,21 +1756,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const timeLabel = row?.startTime && row?.endTime
                 ? `${row.startTime} - ${row.endTime}`
                 : 'Time not set';
-            const rowClass = resolveIncompleteRowClass(dateStr, index);
+            const rowClass = resolveIncompleteRowClass(dateStr);
             const hol = holidayMap.get(dateStr);
             const holidayNote = hol
                 ? `<div class="small text-danger fw-semibold mt-1"><i class="bi bi-calendar-x me-1"></i>${escapeHtml(holidayName(hol))}</div>`
                 : '';
+            const isActivity = row?.sessionType === 'activity';
+            const typeBadge = isActivity
+                ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1">Activity</span>'
+                : '';
+            const subtitle = isActivity
+                ? `<div class="small text-muted font-monospace">${escapeHtml(row?.activityEntryId || row?.sessionId || '')}</div>`
+                : `<div class="small text-muted font-monospace">${escapeHtml(row?.sessionId || '')}</div>`;
             return `
                 <tr class="${rowClass}">
-                    <td class="ps-3 fw-semibold">
+                    <td class="ps-4 fw-semibold">
                         <div>${escapeHtml(dateStr || '-')}</div>
                         <div class="small text-muted">${escapeHtml(dayName)}</div>
                         ${holidayNote}
                     </td>
                     <td>
-                        <div class="fw-bold text-dark">${escapeHtml(row?.className || row?.classId || 'Class')}</div>
-                        <div class="small text-muted font-monospace">${escapeHtml(row?.sessionId || '')}</div>
+                        <div class="fw-bold text-dark">${escapeHtml(row?.className || row?.classId || 'Session')}${typeBadge}</div>
+                        ${subtitle}
                     </td>
                     <td><i class="bi bi-clock me-1 text-muted"></i>${escapeHtml(timeLabel)}</td>
                     <td>${buildIncompleteStatusBadge(row)}</td>
@@ -1533,6 +1791,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const panel = document.getElementById('incompleteSessionsPanel');
         const tbody = document.getElementById('incompleteSessionsBody');
         const countEl = document.getElementById('incompleteSessionsCount');
+        const toggleBtn = document.getElementById('incompleteSessionsToggle');
         if (!panel || !tbody) return;
         if (!rows.length) {
             panel.classList.add('d-none');
@@ -1541,6 +1800,23 @@ document.addEventListener('DOMContentLoaded', () => {
         panel.classList.remove('d-none');
         if (countEl) countEl.textContent = String(rows.length);
         tbody.innerHTML = buildIncompleteSessionsTableBodyHtml(rows);
+        if (toggleBtn) {
+            toggleBtn.classList.add('collapsed');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    const incompleteSessionsCollapse = document.getElementById('incompleteSessionsCollapse');
+    const incompleteSessionsToggle = document.getElementById('incompleteSessionsToggle');
+    if (incompleteSessionsCollapse && incompleteSessionsToggle) {
+        incompleteSessionsCollapse.addEventListener('show.bs.collapse', () => {
+            incompleteSessionsToggle.classList.remove('collapsed');
+            incompleteSessionsToggle.setAttribute('aria-expanded', 'true');
+        });
+        incompleteSessionsCollapse.addEventListener('hide.bs.collapse', () => {
+            incompleteSessionsToggle.classList.add('collapsed');
+            incompleteSessionsToggle.setAttribute('aria-expanded', 'false');
+        });
     }
 
     renderIncompleteSessionsPanel();

@@ -74,5 +74,42 @@ router.delete('/delete/:id',
   }),
   ctrl.deleteActivity);
 
+router.get('/:activityId/work-sessions/manage',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.manageWorkSessionsOverview);
+router.get('/:activityId/work-sessions/api/overview',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.getWorkSessionsOverviewJson);
+router.get('/:activityId/work-sessions/:entryId/api/context',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.getWorkSessionContextJson);
+router.get('/:activityId/work-sessions/:entryId/manage',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.manageWorkSession);
+router.post('/:activityId/work-sessions/:entryId/save',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true,
+    allowSectionTokenFallback: true
+  }),
+  ctrl.saveWorkSessionAssignee);
+router.post('/:activityId/work-sessions/:entryId/complete',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true,
+    allowSectionTokenFallback: true
+  }),
+  ctrl.completeWorkSessionAssignee);
+
 module.exports = router;
 

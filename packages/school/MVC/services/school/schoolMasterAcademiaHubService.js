@@ -502,10 +502,23 @@ function buildActivityActionLinks(row) {
   const id = normalizeText(row?.id);
   if (!id) return [];
   const encodedId = encodeURIComponent(id);
-  return [
+  const actions = [
     { label: 'Edit', href: `/school/activities/edit/${encodedId}`, icon: 'bi bi-pencil-square', tone: 'primary' },
     { label: 'Open List', href: '/school/activities', icon: 'bi bi-box-arrow-up-right', tone: 'secondary' }
   ];
+  if (String(row?.status || '').toLowerCase() === 'posted') {
+    const entries = activityService.getActivityEntries(row);
+    const hasPostedEntry = entries.some((entry) => String(entry.status || 'posted').toLowerCase() === 'posted');
+    if (hasPostedEntry) {
+      actions.unshift({
+        label: 'Manage',
+        href: `/school/activities/${encodedId}/work-sessions/manage`,
+        icon: 'bi bi-kanban',
+        tone: 'success'
+      });
+    }
+  }
+  return actions;
 }
 
 function normalizeActivityAssignee(row = {}) {

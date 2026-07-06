@@ -1,4 +1,5 @@
 const activityService = require('../../services/school/activityService');
+const activityWorkSessionService = require('../../services/school/activityWorkSessionService');
 const schoolDataService = require('../../services/school/schoolDataService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
@@ -89,7 +90,7 @@ exports.showCreateForm = async (req, res) => {
     const lookups = await loadFormLookups(req);
     res.render('school/activity/activityForm', {
       title: 'New School Activity',
-      activity: { status: 'draft', paid: false, visibilityScope: 'school', attendees: [], allowedPersonIds: [], excludedPersonIds: [] },
+      activity: { status: 'draft', paid: false, evaluationType: 'attendance', visibilityScope: 'school', attendees: [], allowedPersonIds: [], excludedPersonIds: [] },
       isEdit: false,
       ...lookups,
       user: req.user,
@@ -253,6 +254,132 @@ exports.deleteCategory = async (req, res) => {
     const payload = { status: 'success', message: 'Activity category deleted successfully.' };
     if (isAjax(req)) return res.json(payload);
     res.redirect('/school/activities/categories');
+  } catch (error) {
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+};
+
+exports.manageWorkSessionsOverview = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const { activityId } = req.params;
+    const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const context = await activityWorkSessionService.getWorkSessionsOverview(activityId, req.user, accessContext);
+    assertOrgAccess(context.activity, orgId);
+    if (context.sessions.length === 1) {
+      const onlySession = context.sessions[0];
+      return res.redirect(activityWorkSessionService.buildSessionManageUrl(activityId, onlySession.entryId));
+    }
+    res.render('school/activity/activityWorkSessionsOverview', {
+      title: `Manage Work Sessions — ${context.activity.title || activityId}`,
+      ...context,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+};
+
+exports.getWorkSessionsOverviewJson = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const { activityId } = req.params;
+    const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const context = await activityWorkSessionService.getWorkSessionsOverview(activityId, req.user, accessContext);
+    assertOrgAccess(context.activity, orgId);
+    return res.json({ status: 'success', ...context });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.getWorkSessionContextJson = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const { activityId, entryId } = req.params;
+    const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const context = await activityWorkSessionService.getWorkSessionContext(activityId, entryId, req.user, accessContext);
+    assertOrgAccess(context.activity, orgId);
+    return res.json({ status: 'success', context, actionStateId: req.actionStateId });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.manageWorkSession = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const { activityId, entryId } = req.params;
+    const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const context = await activityWorkSessionService.getWorkSessionContext(activityId, entryId, req.user, accessContext);
+    assertOrgAccess(context.activity, orgId);
+    res.render('school/activity/activityWorkSessionManager', {
+      title: 'Manage Work Session',
+      ...context,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+};
+
+exports.saveWorkSessionAssignee = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const { activityId, entryId } = req.params;
+    const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const result = await activityWorkSessionService.saveAssigneeRow({
+      activityId,
+      entryId,
+      personId: req.body.personId,
+      reqUser: req.user,
+      input: req.body,
+      accessContext
+    });
+    assertOrgAccess(result.context.activity, orgId);
+    const payload = { status: 'success', message: 'Assignee row saved.', actionStateId: req.actionStateId, ...result };
+    if (isAjax(req)) return res.json(payload);
+    const target = await activityWorkSessionService.resolveWorkSessionManageTargetForRequest({
+      activityId,
+      entryId,
+      reqUser: req.user,
+      accessContext
+    });
+    res.redirect(target.url);
+  } catch (error) {
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+};
+
+exports.completeWorkSessionAssignee = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const { activityId, entryId } = req.params;
+    const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const result = await activityWorkSessionService.completeAssignee({
+      activityId,
+      entryId,
+      personId: req.body.personId,
+      reqUser: req.user,
+      input: req.body,
+      accessContext
+    });
+    assertOrgAccess(result.context.activity, orgId);
+    const payload = { status: 'success', message: 'Assignment marked complete.', actionStateId: req.actionStateId, ...result };
+    if (isAjax(req)) return res.json(payload);
+    const target = await activityWorkSessionService.resolveWorkSessionManageTargetForRequest({
+      activityId,
+      entryId,
+      reqUser: req.user,
+      accessContext
+    });
+    res.redirect(target.url);
   } catch (error) {
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });

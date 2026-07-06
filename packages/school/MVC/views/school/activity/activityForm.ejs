@@ -16,6 +16,17 @@
   const visibilityScope = ['individual', 'private', 'personal', 'assigned', 'assigned_only', 'attendee', 'attendees', 'attendees_only'].includes(rawVisibilityScope)
     ? 'individual'
     : 'school';
+  const rawEvaluationType = String(row.evaluationType || 'attendance').trim().toLowerCase();
+  const evaluationType = rawEvaluationType === 'completion' ? 'completion' : 'attendance';
+  const evaluationTypeLocked = (() => {
+    const entries = Array.isArray(row.entries) ? row.entries : [];
+    for (const entry of entries) {
+      const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+      if (assignees.some((assignee) => (assignee.locked === true || String(assignee.locked) === 'true') && String(assignee.lockReason || '') === 'timesheet_approved')) return true;
+      if ((entry.locked === true || String(entry.locked) === 'true') && String(entry.lockReason || '') === 'timesheet_approved') return true;
+    }
+    return (row.locked === true || String(row.locked) === 'true') && String(row.lockReason || '') === 'timesheet_approved';
+  })();
   const initialAllowedPersonIds = normalizePersonIdListServer(row.allowedPersonIds || []);
   const initialExcludedPersonIds = normalizePersonIdListServer(row.excludedPersonIds || []);
   const initialEntries = Array.isArray(row.entries) && row.entries.length
@@ -120,6 +131,19 @@
                 <label class="form-check-label fw-bold" for="activityPaid">Payable activity</label>
               </div>
               <div class="form-text small">Assignees can still be marked unpaid per work session.</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Evaluation type *</label>
+              <select name="evaluationType" id="activityEvaluationType" class="form-select size-md" required <%= evaluationTypeLocked ? 'disabled' : '' %>>
+                <option value="attendance" <%= evaluationType === 'attendance' ? 'selected' : '' %>>Attendance — presence/absence is the criterion</option>
+                <option value="completion" <%= evaluationType === 'completion' ? 'selected' : '' %>>Completion — assignees must mark complete</option>
+              </select>
+              <% if (evaluationTypeLocked) { %>
+                <input type="hidden" name="evaluationType" value="<%= evaluationType %>">
+                <div class="form-text small text-warning">Cannot change evaluation type while timesheet-locked assignee rows exist.</div>
+              <% } else { %>
+                <div class="form-text small">Attendance activities use attendance recording on the manage page; completion activities require an explicit complete action.</div>
+              <% } %>
             </div>
             <div class="col-12">
               <label class="form-label fw-bold">Parent Notes</label>

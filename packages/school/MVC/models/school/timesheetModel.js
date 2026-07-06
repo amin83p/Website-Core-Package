@@ -62,6 +62,31 @@ function cleanHours(v, { min = 0, max = 24 } = {}) {
     return Number(n.toFixed(2));
 }
 
+function cleanPayrollRole(v) {
+    const token = cleanString(v, { max: 20, allowEmpty: true }).toLowerCase();
+    if (token === 'teacher' || token === 'staff') return token;
+    return '';
+}
+
+function cleanMoney(v) {
+    if (v === undefined || v === null || v === '') return null;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return Number(n.toFixed(2));
+}
+
+function applyPayrollFields(row, entry) {
+    const personRole = cleanPayrollRole(entry?.personRole);
+    if (personRole) row.personRole = personRole;
+    const roleRecordId = cleanId(entry?.roleRecordId, { max: 64, allowEmpty: true });
+    if (roleRecordId) row.roleRecordId = roleRecordId;
+    const payrollAccountId = cleanId(entry?.payrollAccountId, { max: 64, allowEmpty: true });
+    if (payrollAccountId) row.payrollAccountId = payrollAccountId;
+    const grossPay = cleanMoney(entry?.grossPay);
+    if (grossPay !== null) row.grossPay = grossPay;
+    return row;
+}
+
 function sanitizeSnapshotEntry(entry) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry) || entry.isDeleted === true) return null;
     const sessionId = cleanString(entry.sessionId, { max: 80, allowEmpty: false });
@@ -92,7 +117,7 @@ function sanitizeSnapshotEntry(entry) {
     if (entry.isSchoolActivity === true || sessionId.startsWith('act-')) row.isSchoolActivity = true;
     if (entry.isFinalStatus === true) row.isFinalStatus = true;
     if (entry.isFinalStatus === false) row.isFinalStatus = false;
-    return row;
+    return applyPayrollFields(row, entry);
 }
 
 function sanitizeSubmissionSnapshot(input) {
@@ -197,7 +222,7 @@ function sanitizeEntry(entry) {
             }
             : {};
     }
-    return row;
+    return applyPayrollFields(row, entry);
 }
 
 function sanitizeTimesheetPayload(input) {

@@ -1,0 +1,360 @@
+<%
+  const activityRow = activity || {};
+  const sessionRows = Array.isArray(sessions) ? sessions : [];
+  const isCompletion = evaluationType === 'completion';
+  const activityPaid = activityRow.paid === true;
+%>
+
+<div class="sections-page activity-work-sessions-overview-page">
+  <div class="activity-work-sessions-header mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-kanban me-2"></i>Manage Work Sessions</h1>
+      <a href="/school/activities" class="btn btn-outline-secondary btn-sm ms-auto"><i class="bi bi-list-ul me-1"></i>All Activities</a>
+    </div>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+      <div class="text-start fw-semibold text-dark mb-0"><%= activityRow.title || '' %></div>
+      <a href="/school/activities/edit/<%= encodeURIComponent(activityRow.id) %>" class="btn btn-outline-secondary btn-sm ms-auto"><i class="bi bi-pencil-square me-1"></i>Edit Activity</a>
+    </div>
+  </div>
+
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <span class="badge bg-<%= isCompletion ? 'primary' : 'info' %>"><%= evaluationTypeLabel %></span>
+    <% if (activityPaid) { %><span class="badge bg-success">Payable</span><% } %>
+    <% if (activityRow.categoryName) { %><span class="badge bg-light text-dark border"><%= activityRow.categoryName %></span><% } %>
+    <% if (activityRow.departmentName) { %><span class="badge bg-light text-dark border"><%= activityRow.departmentName %></span><% } %>
+    <span class="badge bg-light text-dark border" id="workSessionCountBadge"><%= sessionRows.length %> work session<%= sessionRows.length === 1 ? '' : 's' %></span>
+  </div>
+
+  <div class="alert alert-light border mb-4">
+    <i class="bi bi-info-circle me-2"></i>
+    Click a work session to <%= isCompletion ? 'mark assignments complete' : 'record attendance' %> for assignees. Changes save without leaving this page.
+  </div>
+
+  <div class="table-scroll-wrapper" data-floating-row-actions="true">
+    <table class="table-responsive size-md" id="workSessionsTable">
+      <thead>
+        <tr>
+          <th class="ps-4">Session</th>
+          <th>Date / Time</th>
+          <th>Assignees</th>
+          <th>Progress</th>
+          <th class="text-end pe-4">Action</th>
+        </tr>
+      </thead>
+      <tbody id="workSessionsTableBody">
+        <% if (!sessionRows.length) { %>
+          <tr>
+            <td colspan="5" class="text-center py-4 text-muted">No posted work sessions are available for you to manage.</td>
+          </tr>
+        <% } %>
+        <% sessionRows.forEach((session) => { %>
+          <tr class="js-work-session-row" data-entry-id="<%= session.entryId %>" style="cursor: pointer;">
+            <td class="ps-4">
+              <div class="fw-bold text-dark"><%= session.title %></div>
+              <% if (session.location) { %>
+                <div class="x-small text-muted mt-1"><i class="bi bi-geo-alt me-1"></i><%= session.location %></div>
+              <% } %>
+              <% if (session.hasLockedAssignees) { %>
+                <span class="badge bg-secondary mt-1"><i class="bi bi-lock-fill me-1"></i>Locked rows</span>
+              <% } %>
+            </td>
+            <td>
+              <div class="small fw-bold text-dark"><%= session.date || '-' %></div>
+              <div class="x-small text-muted"><%= session.startTime || '-' %> - <%= session.endTime || '-' %> | <%= Number(session.durationHours || 0).toFixed(2) %> h</div>
+            </td>
+            <td>
+              <div class="small text-dark js-row-assignee-summary"><%= session.assigneeCount %> assignee<%= session.assigneeCount === 1 ? '' : 's' %></div>
+              <div class="x-small text-muted js-row-assignee-names"><%= session.assigneeNames || '-' %></div>
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border js-row-progress"><%= session.readyCount %>/<%= session.assigneeCount %> ready</span>
+            </td>
+            <td class="text-end pe-4">
+              <button type="button" class="btn btn-primary btn-sm js-open-work-session" data-entry-id="<%= session.entryId %>">
+                <i class="bi bi-pencil-square me-1"></i>Manage
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="activityWorkSessionModal" tabindex="-1" aria-labelledby="activityWorkSessionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold" id="activityWorkSessionModalLabel">Work session</h5>
+          <div class="small text-muted" id="activityWorkSessionModalMeta"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0" id="activityWorkSessionModalBody">
+        <div class="text-center text-muted py-5">Loading…</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="workSessionsPageData"><%- JSON.stringify({
+  activityId: activityRow.id,
+  evaluationType: evaluationType || 'attendance',
+  evaluationTypeLabel: evaluationTypeLabel || '',
+  activityPaid,
+  actionStateId: actionStateId || '',
+  sessions: sessionRows
+}) %></script>
+
+<script>
+(function () {
+  const pageData = JSON.parse(document.getElementById('workSessionsPageData').textContent || '{}');
+  const activityId = String(pageData.activityId || '').trim();
+  let actionStateId = String(pageData.actionStateId || '').trim();
+  const isCompletion = pageData.evaluationType === 'completion';
+  const activityPaid = pageData.activityPaid === true;
+  let sessionsById = new Map((Array.isArray(pageData.sessions) ? pageData.sessions : []).map((row) => [String(row.entryId), row]));
+  let activeEntryId = '';
+  let activeContext = null;
+  let modalInstance = null;
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function getModal() {
+    const el = document.getElementById('activityWorkSessionModal');
+    if (!el || typeof bootstrap === 'undefined') return null;
+    if (!modalInstance) {
+      modalInstance = typeof bootstrap.Modal.getOrCreateInstance === 'function'
+        ? bootstrap.Modal.getOrCreateInstance(el)
+        : new bootstrap.Modal(el);
+    }
+    return modalInstance;
+  }
+
+  async function fetchJson(url, options) {
+    const headers = {
+      'X-Requested-With': 'XMLHttpRequest',
+      'x-ajax-request': 'true',
+      ...(options && options.headers ? options.headers : {})
+    };
+    if (actionStateId) headers['x-action-state-id'] = actionStateId;
+    const response = await fetch(url, {
+      ...options,
+      headers
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.status === 'error') {
+      throw new Error(payload.message || 'Request failed.');
+    }
+    return payload;
+  }
+
+  function patchSessionRow(summary) {
+    if (!summary || !summary.entryId) return;
+    sessionsById.set(String(summary.entryId), summary);
+    const row = document.querySelector('.js-work-session-row[data-entry-id="' + CSS.escape(summary.entryId) + '"]');
+    if (!row) return;
+    const namesEl = row.querySelector('.js-row-assignee-names');
+    const summaryEl = row.querySelector('.js-row-assignee-summary');
+    const progressEl = row.querySelector('.js-row-progress');
+    if (namesEl) namesEl.textContent = summary.assigneeNames || '-';
+    if (summaryEl) summaryEl.textContent = (summary.assigneeCount || 0) + ' assignee' + ((summary.assigneeCount || 0) === 1 ? '' : 's');
+    if (progressEl) progressEl.textContent = (summary.readyCount || 0) + '/' + (summary.assigneeCount || 0) + ' ready';
+  }
+
+  function renderAssigneeTable(context) {
+    const entry = context.entry || {};
+    const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+    const canManageAll = context.canManageAll === true;
+    const paid = activityPaid;
+    const rowIsCompletion = (context.evaluationType || pageData.evaluationType) === 'completion';
+
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr>';
+    html += '<th>Person</th><th>Role</th>';
+    if (!rowIsCompletion) html += '<th>Attendance</th>';
+    if (paid) html += '<th>Paid hours</th>';
+    html += '<th>Notes</th><th>Status</th><th class="text-end">Action</th>';
+    html += '</tr></thead><tbody>';
+
+    if (!assignees.length) {
+      html += '<tr><td colspan="8" class="text-center text-muted py-4">No assignees on this work session.</td></tr>';
+    }
+
+    assignees.forEach((assignee) => {
+      const rowEditable = assignee.editable && (canManageAll || assignee.isSelf);
+      const statusClass = assignee.locked ? 'secondary' : (assignee.readyForTimesheet ? 'success' : 'warning');
+      html += '<tr data-person-id="' + escapeHtml(assignee.personId) + '"' + (assignee.locked ? ' class="table-secondary"' : '') + '>';
+      html += '<td><div class="fw-semibold">' + escapeHtml(assignee.personName || assignee.personId) + '</div>';
+      if (assignee.locked) html += '<span class="badge bg-secondary">Timesheet locked</span>';
+      html += '</td><td>' + escapeHtml(assignee.role || 'participant') + '</td>';
+
+      if (!rowIsCompletion) {
+        html += '<td>';
+        if (rowEditable) {
+          html += '<select class="form-select form-select-sm ws-field-status" data-person-id="' + escapeHtml(assignee.personId) + '">';
+          ['attended', 'absent', 'excused'].forEach((status) => {
+            const selected = String(assignee.status || 'attended') === status ? ' selected' : '';
+            html += '<option value="' + status + '"' + selected + '>' + status + '</option>';
+          });
+          html += '</select>';
+        } else {
+          html += '<span class="badge bg-light text-dark border">' + escapeHtml(assignee.status || 'pending') + '</span>';
+        }
+        html += '</td>';
+      }
+
+      if (paid) {
+        html += '<td>';
+        if (rowEditable) {
+          html += '<input type="number" step="0.25" min="0" max="24" class="form-control form-control-sm ws-field-paid-hours" data-person-id="' + escapeHtml(assignee.personId) + '" style="max-width:6rem;" value="' + Number(assignee.paidHours || entry.durationHours || 0).toFixed(2) + '">';
+        } else {
+          html += Number(assignee.paidHours || 0).toFixed(2);
+        }
+        html += '</td>';
+      }
+
+      html += '<td>';
+      if (rowEditable) {
+        html += '<input type="text" class="form-control form-control-sm ws-field-notes" data-person-id="' + escapeHtml(assignee.personId) + '" value="' + escapeHtml(assignee.notes || '') + '" maxlength="500">';
+      } else {
+        html += escapeHtml(assignee.notes || '-');
+      }
+      html += '</td>';
+
+      html += '<td><span class="badge bg-' + statusClass + '">' + escapeHtml(assignee.completionLabel || '') + '</span></td>';
+      html += '<td class="text-end">';
+      if (rowEditable) {
+        if (rowIsCompletion) {
+          html += '<button type="button" class="btn btn-primary btn-sm js-complete-assignee" data-person-id="' + escapeHtml(assignee.personId) + '"><i class="bi bi-check2-circle me-1"></i>Complete</button>';
+        } else {
+          html += '<button type="button" class="btn btn-primary btn-sm js-save-assignee" data-person-id="' + escapeHtml(assignee.personId) + '"><i class="bi bi-save me-1"></i>Save attendance</button>';
+        }
+      } else {
+        html += '<span class="text-muted small">Read only</span>';
+      }
+      html += '</td></tr>';
+    });
+
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  function collectAssigneeInput(personId) {
+    const data = new FormData();
+    data.append('actionStateId', actionStateId);
+    data.append('personId', personId);
+    const statusEl = document.querySelector('.ws-field-status[data-person-id="' + CSS.escape(personId) + '"]');
+    const paidHoursEl = document.querySelector('.ws-field-paid-hours[data-person-id="' + CSS.escape(personId) + '"]');
+    const notesEl = document.querySelector('.ws-field-notes[data-person-id="' + CSS.escape(personId) + '"]');
+    if (statusEl) data.append('status', statusEl.value);
+    if (paidHoursEl) data.append('paidHours', paidHoursEl.value);
+    if (notesEl) data.append('notes', notesEl.value);
+    return data;
+  }
+
+  async function openWorkSessionModal(entryId) {
+    activeEntryId = String(entryId || '').trim();
+    if (!activeEntryId) return;
+    const modal = getModal();
+    const body = document.getElementById('activityWorkSessionModalBody');
+    const title = document.getElementById('activityWorkSessionModalLabel');
+    const meta = document.getElementById('activityWorkSessionModalMeta');
+    if (body) body.innerHTML = '<div class="text-center text-muted py-5">Loading…</div>';
+    if (modal) modal.show();
+    if (typeof window.showLoading === 'function') window.showLoading('Loading work session…');
+    try {
+      const payload = await fetchJson('/school/activities/' + encodeURIComponent(activityId) + '/work-sessions/' + encodeURIComponent(activeEntryId) + '/api/context');
+      if (payload.actionStateId) actionStateId = String(payload.actionStateId).trim();
+      activeContext = payload.context || null;
+      const entry = activeContext?.entry || {};
+      if (title) title.textContent = entry.title || 'Work session';
+      if (meta) {
+        meta.textContent = [
+          entry.date || '',
+          entry.startTime && entry.endTime ? (entry.startTime + ' – ' + entry.endTime) : '',
+          pageData.evaluationTypeLabel || ''
+        ].filter(Boolean).join(' · ');
+      }
+      if (body) body.innerHTML = renderAssigneeTable(activeContext);
+    } catch (error) {
+      if (body) body.innerHTML = '<div class="alert alert-danger m-3">' + escapeHtml(error.message) + '</div>';
+    } finally {
+      if (typeof window.hideLoading === 'function') window.hideLoading();
+    }
+  }
+
+  async function postAssigneeAction(action, personId) {
+    if (!activeEntryId || !personId) return;
+    if (action === 'complete') {
+      const confirmed = typeof window.showMessageModal === 'function'
+        ? await showMessageModal({ title: 'Mark complete', message: 'Mark this assignment complete?', icon: 'question', showCancel: true })
+        : true;
+      if (!confirmed) return;
+    }
+    if (typeof window.showLoading === 'function') window.showLoading('Saving…');
+    try {
+      const data = collectAssigneeInput(personId);
+      const url = '/school/activities/' + encodeURIComponent(activityId) + '/work-sessions/' + encodeURIComponent(activeEntryId) + '/' + action;
+      const payload = await fetchJson(url, { method: 'POST', body: data });
+      if (payload.actionStateId) actionStateId = String(payload.actionStateId).trim();
+      activeContext = payload.context || activeContext;
+      if (payload.sessionSummary) patchSessionRow(payload.sessionSummary);
+      const body = document.getElementById('activityWorkSessionModalBody');
+      if (body && activeContext) body.innerHTML = renderAssigneeTable(activeContext);
+      if (typeof window.showMessageModal === 'function') {
+        await showMessageModal({ title: 'Saved', message: payload.message || 'Changes saved.', icon: 'success' });
+      }
+    } catch (error) {
+      if (typeof window.showMessageModal === 'function') {
+        await showMessageModal({ title: 'Error', message: error.message, icon: 'error' });
+      }
+    } finally {
+      if (typeof window.hideLoading === 'function') window.hideLoading();
+    }
+  }
+
+  document.addEventListener('click', function (event) {
+    const openBtn = event.target.closest('.js-open-work-session');
+    if (openBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkSessionModal(openBtn.getAttribute('data-entry-id'));
+      return;
+    }
+    const row = event.target.closest('.js-work-session-row');
+    if (row && !event.target.closest('button')) {
+      openWorkSessionModal(row.getAttribute('data-entry-id'));
+      return;
+    }
+    const saveBtn = event.target.closest('.js-save-assignee');
+    if (saveBtn) {
+      event.preventDefault();
+      postAssigneeAction('save', saveBtn.getAttribute('data-person-id'));
+      return;
+    }
+    const completeBtn = event.target.closest('.js-complete-assignee');
+    if (completeBtn) {
+      event.preventDefault();
+      postAssigneeAction('complete', completeBtn.getAttribute('data-person-id'));
+    }
+  });
+
+  const params = new URLSearchParams(window.location.search);
+  const openEntryId = String(params.get('openEntryId') || '').trim();
+  if (openEntryId) {
+    window.addEventListener('load', function () {
+      openWorkSessionModal(openEntryId);
+    });
+  }
+})();
+</script>

@@ -84,6 +84,45 @@ function buildConflictRow(entry, conflictingEvent, type = 'schedule') {
   };
 }
 
+function normalizeManualConflictCandidate(row = {}, { provisionalSessionId = '' } = {}) {
+  const sessionId = normalizeId(row?.sessionId) || provisionalSessionId;
+  const classId = normalizeId(row?.classId);
+  const activityId = normalizeId(row?.activityId);
+  const date = normalizeDate(row?.date);
+  if (!sessionId || !date) return null;
+  if (!classId && !activityId) return null;
+  const startTime = normalizeClockTime(row?.startTime);
+  const endTime = normalizeClockTime(row?.endTime);
+  return {
+    sessionId,
+    classId,
+    activityId,
+    className: String(row?.className || row?.activityName || '').trim(),
+    date,
+    startTime,
+    endTime,
+    isTimed: Boolean(startTime && endTime),
+    isActivity: Boolean(activityId)
+  };
+}
+
+function normalizeTimesheetOverlapCandidate(row = {}) {
+  const sessionId = normalizeId(row?.sessionId);
+  const date = normalizeDate(row?.date);
+  const startTime = normalizeClockTime(row?.startTime);
+  const endTime = normalizeClockTime(row?.endTime);
+  if (!sessionId || !date || !startTime || !endTime) return null;
+  return {
+    sessionId,
+    classId: normalizeId(row?.classId),
+    activityId: normalizeId(row?.activityId),
+    className: String(row?.className || '').trim(),
+    date,
+    startTime,
+    endTime
+  };
+}
+
 async function listClassSessionScheduleEvents({ activeOrgId, personId, activeRoles, startDate, endDate, reqUser }) {
   const roles = normalizeActiveRoles(activeRoles);
   if (!roles.length) return [];
@@ -173,17 +212,29 @@ async function listRoleAwareActivityScheduleEvents({ activeOrgId, personId, acti
 function detectManualOverlapConflicts(candidates = [], scheduleEvents = []) {
   const conflicts = [];
   candidates.forEach((entry, index) => {
-    scheduleEvents.forEach((event) => {
-      if (normalizeDate(event?.date) !== normalizeDate(entry?.date)) return;
-      if (!hasOverlap(entry?.startTime, entry?.endTime, event?.startTime, event?.endTime)) return;
-      conflicts.push(buildConflictRow(entry, event, 'schedule'));
-    });
+    if (entry.isTimed) {
+      scheduleEvents.forEach((event) => {
+        if (normalizeDate(event?.date) !== normalizeDate(entry?.date)) return;
+        if (!hasOverlap(entry?.startTime, entry?.endTime, event?.startTime, event?.endTime)) return;
+        conflicts.push(buildConflictRow(entry, event, 'schedule'));
+      });
+    } else {
+      scheduleEvents.forEach((event) => {
+        if (normalizeDate(event?.date) !== normalizeDate(entry?.date)) return;
+        conflicts.push(buildConflictRow(entry, {
+          ...event,
+          label: `${event?.label || 'Scheduled event'} (same day)`
+        }, 'same_day_schedule'));
+      });
+    }
 
     for (let pointer = 0; pointer < candidates.length; pointer += 1) {
       if (pointer === index) continue;
       const other = candidates[pointer];
       if (normalizeDate(other?.date) !== normalizeDate(entry?.date)) continue;
-      if (!hasOverlap(entry?.startTime, entry?.endTime, other?.startTime, other?.endTime)) continue;
+      if (entry.isTimed && other.isTimed) {
+        if (!hasOverlap(entry?.startTime, entry?.endTime, other?.startTime, other?.endTime)) continue;
+      }
       conflicts.push(buildConflictRow(entry, {
         id: normalizeId(other?.sessionId),
         role: 'manual',
@@ -199,6 +250,49 @@ function detectManualOverlapConflicts(candidates = [], scheduleEvents = []) {
   return conflicts;
 }
 
+function detectTimesheetInternalOverlaps(entries = [], { ignoreSessionId = '' } = {}) {
+  const candidates = (Array.isArray(entries) ? entries : [])
+    .filter((row) => row && row.isDeleted !== true)
+    .filter((row) => !ignoreSessionId || normalizeId(row?.sessionId) !== normalizeId(ignoreSessionId))
+    .map((row) => normalizeTimesheetOverlapCandidate(row))
+    .filter(Boolean);
+  const conflicts = [];
+  candidates.forEach((entry, index) => {
+    for (let pointer = index + 1; pointer < candidates.length; pointer += 1) {
+      const other = candidates[pointer];
+      if (other.date !== entry.date) continue;
+      if (!hasOverlap(entry.startTime, entry.endTime, other.startTime, other.endTime)) continue;
+      conflicts.push(buildConflictRow(entry, {
+        id: other.sessionId,
+        role: 'timesheet',
+        label: 'Another timesheet row overlaps this time',
+        date: other.date,
+        startTime: other.startTime,
+        endTime: other.endTime,
+        sessionId: other.sessionId
+      }, 'timesheet_overlap'));
+    }
+  });
+  return conflicts;
+}
+
+function dedupeConflicts(conflicts = []) {
+  const seen = new Set();
+  return (Array.isArray(conflicts) ? conflicts : []).filter((row) => {
+    const key = [
+      row.entrySessionId,
+      row.conflictType,
+      row.conflictDate,
+      row.conflictStartTime,
+      row.conflictEndTime,
+      row.conflictLabel
+    ].join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 async function detectRoleAwareManualEntryConflicts({
   activeOrgId = '',
   personId = '',
@@ -206,6 +300,9 @@ async function detectRoleAwareManualEntryConflicts({
   startDate = '',
   endDate = '',
   candidateEntries = [],
+  draftEntries = [],
+  timesheetEntries = [],
+  ignoreSessionId = '',
   reqUser
 } = {}) {
   const normalizedPersonId = normalizeId(personId);
@@ -213,19 +310,14 @@ async function detectRoleAwareManualEntryConflicts({
   const periodStart = normalizeDate(startDate);
   const periodEnd = normalizeDate(endDate);
   const candidates = (Array.isArray(candidateEntries) ? candidateEntries : [])
-    .map((row) => ({
-      sessionId: normalizeId(row?.sessionId),
-      classId: normalizeId(row?.classId),
-      className: String(row?.className || '').trim(),
-      date: normalizeDate(row?.date),
-      startTime: normalizeClockTime(row?.startTime),
-      endTime: normalizeClockTime(row?.endTime)
-    }))
-    .filter((row) => row.sessionId && row.classId && row.date && row.startTime && row.endTime);
-  if (!normalizedPersonId || !normalizedOrgId || !periodStart || !periodEnd || !candidates.length) return [];
+    .map((row, index) => normalizeManualConflictCandidate(row, { provisionalSessionId: `candidate-${index}` }))
+    .filter(Boolean);
+  if (!normalizedPersonId || !normalizedOrgId || !periodStart || !periodEnd || !candidates.length) {
+    return detectTimesheetInternalOverlaps(timesheetEntries, { ignoreSessionId });
+  }
 
   const roles = normalizeActiveRoles(activeRoles);
-  if (!roles.length) return [];
+  if (!roles.length) return dedupeConflicts(detectTimesheetInternalOverlaps(timesheetEntries, { ignoreSessionId }));
 
   const [classEvents, activityEvents] = await Promise.all([
     listClassSessionScheduleEvents({
@@ -246,8 +338,20 @@ async function detectRoleAwareManualEntryConflicts({
     })
   ]);
 
-  const scheduleConflicts = detectManualOverlapConflicts(candidates, [...classEvents, ...activityEvents]);
-  const leaveWindows = candidates.map((entry, index) => ({
+  const draftManualCandidates = (Array.isArray(draftEntries) ? draftEntries : [])
+    .filter((row) => row?.isManual === true && row?.isDeleted !== true)
+    .filter((row) => !ignoreSessionId || normalizeId(row?.sessionId) !== normalizeId(ignoreSessionId))
+    .map((row, index) => normalizeManualConflictCandidate(row, { provisionalSessionId: `draft-${index}` }))
+    .filter(Boolean);
+
+  const mergedCandidates = [...draftManualCandidates];
+  candidates.forEach((row) => {
+    if (!mergedCandidates.some((item) => item.sessionId === row.sessionId)) mergedCandidates.push(row);
+  });
+
+  const scheduleConflicts = detectManualOverlapConflicts(mergedCandidates, [...classEvents, ...activityEvents]);
+  const timedCandidates = mergedCandidates.filter((row) => row.isTimed);
+  const leaveWindows = timedCandidates.map((entry, index) => ({
     sessionIndex: index,
     personId: normalizedPersonId,
     personName: normalizedPersonId,
@@ -262,7 +366,7 @@ async function detectRoleAwareManualEntryConflicts({
   });
   leaveConflicts.forEach((leaveConflict) => {
     const sessionIndex = Number(leaveConflict?.sessionIndex);
-    const entry = candidates[Number.isInteger(sessionIndex) ? sessionIndex : -1];
+    const entry = timedCandidates[Number.isInteger(sessionIndex) ? sessionIndex : -1];
     if (!entry) return;
     scheduleConflicts.push(buildConflictRow(entry, {
       id: normalizeId(leaveConflict?.leaveRequestId),
@@ -274,23 +378,13 @@ async function detectRoleAwareManualEntryConflicts({
     }, 'approved_leave'));
   });
 
-  const dedupe = new Set();
-  return scheduleConflicts.filter((row) => {
-    const key = [
-      row.entrySessionId,
-      row.conflictType,
-      row.conflictDate,
-      row.conflictStartTime,
-      row.conflictEndTime,
-      row.conflictLabel
-    ].join('|');
-    if (dedupe.has(key)) return false;
-    dedupe.add(key);
-    return true;
-  });
+  const internalConflicts = detectTimesheetInternalOverlaps(timesheetEntries, { ignoreSessionId });
+  return dedupeConflicts([...scheduleConflicts, ...internalConflicts]);
 }
 
 module.exports = {
   detectRoleAwareManualEntryConflicts,
+  detectTimesheetInternalOverlaps,
+  normalizeManualConflictCandidate,
   normalizeClockTime
 };

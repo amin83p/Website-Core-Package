@@ -5658,28 +5658,47 @@
     const rows = Array.isArray(payload.rows)
       ? payload.rows
       : (Array.isArray(payload.departments) ? payload.departments : []);
+    const totals = payload.totals || {};
+    const roleTotals = Array.isArray(payload.roleTotals) ? payload.roleTotals : [];
+    const warnings = Array.isArray(payload.payrollWarnings) ? payload.payrollWarnings : [];
     if (!rows.length) {
       content.innerHTML = '<div class="hub-empty"><div><i class="bi bi-pie-chart display-6 d-block mb-3"></i><div class="fw-semibold">No department hours found.</div><div class="text-muted small mt-1">This timesheet has no effective hours for department grouping.</div></div></div>';
       return;
     }
+    const warningHtml = warnings.length
+      ? '<div class="alert alert-warning py-2 small mb-3">' + warnings.map(function (item) { return escapeHtml(item); }).join('<br>') + '</div>'
+      : '';
+    const roleTotalsHtml = roleTotals.length > 1
+      ? '<div class="d-flex flex-wrap gap-2 mb-3">' + roleTotals.map(function (row) {
+        return '<span class="badge bg-light text-dark border">' + escapeHtml(String(row.personRole || '').toUpperCase()) + ': ' + Number(row.totalHours || 0).toFixed(2) + ' hrs / ' + escapeHtml(row.grossPay !== undefined ? '$' + Number(row.grossPay || 0).toFixed(2) : 'N/D') + '</span>';
+      }).join('') + '</div>'
+      : '';
     const body = rows.map(function (row) {
+      const roleBadge = '<span class="badge ' + (row.personRole === 'staff' ? 'bg-success' : 'bg-primary') + '">' + escapeHtml(String(row.personRole || '').toUpperCase()) + '</span>';
       return [
         '<tr>',
-        '<td class="ps-3"><div class="fw-semibold">' + escapeHtml(row.departmentName || row.department || row.name || 'No Department / Manual') + '</div><div class="small text-muted">' + escapeHtml(row.departmentId || row.id || '-') + '</div></td>',
+        '<td class="ps-3">' + roleBadge + '</td>',
+        '<td><div class="fw-semibold">' + escapeHtml(row.departmentName || row.department || row.name || 'No Department / Manual') + '</div><div class="small text-muted">' + escapeHtml(row.departmentId || row.id || '-') + '</div></td>',
+        '<td class="small text-muted">' + escapeHtml(row.accountLabel || row.payrollAccountId || '-') + '</td>',
         '<td>' + escapeHtml(formatHubTimesheetHours(row.autoHours)) + '</td>',
         '<td>' + escapeHtml(formatHubTimesheetHours(row.manualHours)) + '</td>',
         '<td>' + escapeHtml(formatHubTimesheetHours(row.reportTaskHours || row.reportHours)) + '</td>',
+        '<td>' + escapeHtml(formatHubTimesheetHours(row.activityHours)) + '</td>',
         '<td>' + escapeHtml(String(row.entryCount || row.count || 0)) + '</td>',
         '<td class="fw-semibold">' + escapeHtml(row.payRateLabel || 'N/D') + '</td>',
-        '<td class="fw-bold pe-3">' + escapeHtml(formatHubTimesheetHours(row.totalHours || row.hours)) + '</td>',
+        '<td class="fw-bold">' + escapeHtml(formatHubTimesheetHours(row.totalHours || row.hours)) + '</td>',
+        '<td class="fw-bold pe-3">' + escapeHtml(row.grossPayLabel || 'N/D') + '</td>',
         '</tr>'
       ].join('');
     }).join('');
     content.innerHTML = [
+      warningHtml,
+      roleTotalsHtml,
       '<div class="hub-table-wrap">',
       '<table class="table table-sm table-hover align-middle hub-workspace-table mb-0">',
-      '<thead><tr><th class="ps-3">Department</th><th>Auto Hours</th><th>Manual Hours</th><th>Report Task Hours</th><th>Entries</th><th>Pay Rate</th><th class="pe-3">Total Hours</th></tr></thead>',
+      '<thead><tr><th class="ps-3">Role</th><th>Department</th><th>Account</th><th>Auto</th><th>Manual</th><th>Report</th><th>Activity</th><th>Entries</th><th>Pay Rate</th><th>Hours</th><th class="pe-3">Gross Pay</th></tr></thead>',
       '<tbody>', body, '</tbody>',
+      '<tfoot><tr class="table-light"><th class="ps-3" colspan="3">Total</th><th>' + escapeHtml(formatHubTimesheetHours(totals.autoHours)) + '</th><th>' + escapeHtml(formatHubTimesheetHours(totals.manualHours)) + '</th><th>' + escapeHtml(formatHubTimesheetHours(totals.reportHours)) + '</th><th>' + escapeHtml(formatHubTimesheetHours(totals.activityHours)) + '</th><th>' + escapeHtml(String(totals.entryCount || 0)) + '</th><th>-</th><th class="fw-bold">' + escapeHtml(formatHubTimesheetHours(totals.totalHours)) + '</th><th class="fw-bold pe-3">' + (totals.grossPay !== undefined ? '$' + Number(totals.grossPay || 0).toFixed(2) : 'N/D') + '</th></tr></tfoot>',
       '</table>',
       '</div>'
     ].join('');

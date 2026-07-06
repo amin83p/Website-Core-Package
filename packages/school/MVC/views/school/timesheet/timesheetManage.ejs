@@ -345,6 +345,8 @@
   function renderSummary(payload) {
     const rows = Array.isArray(payload.rows) ? payload.rows : [];
     const totals = payload.totals || {};
+    const roleTotals = Array.isArray(payload.roleTotals) ? payload.roleTotals : [];
+    const warnings = Array.isArray(payload.payrollWarnings) ? payload.payrollWarnings : [];
     summarySubtitle.textContent = `${payload.person?.name || payload.person?.id || ''} | ${payload.period?.name || payload.period?.id || ''}`;
 
     if (!rows.length) {
@@ -352,44 +354,68 @@
       return;
     }
 
+    const warningHtml = warnings.length
+      ? `<div class="alert alert-warning py-2 small mb-3">${warnings.map((item) => escapeHtml(item)).join('<br>')}</div>`
+      : '';
+    const roleTotalsHtml = roleTotals.length > 1
+      ? `<div class="d-flex flex-wrap gap-2 mb-3">${roleTotals.map((row) => `
+          <span class="badge bg-light text-dark border">
+            ${escapeHtml(String(row.personRole || '').toUpperCase())}:
+            ${Number(row.totalHours || 0).toFixed(2)} hrs /
+            ${escapeHtml(row.grossPay !== undefined ? '$' + Number(row.grossPay || 0).toFixed(2) : 'N/D')}
+          </span>`).join('')}</div>`
+      : '';
+
     summaryContent.innerHTML = `
+      ${warningHtml}
+      ${roleTotalsHtml}
       <table class="table table-sm table-hover align-middle">
         <thead class="table-light">
           <tr>
+            <th>Role</th>
             <th>Department</th>
-            <th class="text-end">Auto Session Hours</th>
-            <th class="text-end">Manual Hours</th>
-            <th class="text-end">Report Task Hours</th>
+            <th>Account</th>
+            <th class="text-end">Auto</th>
+            <th class="text-end">Manual</th>
+            <th class="text-end">Report</th>
+            <th class="text-end">Activity</th>
             <th class="text-end">Entries</th>
             <th class="text-end">Pay Rate</th>
-            <th class="text-end">Total</th>
+            <th class="text-end">Hours</th>
+            <th class="text-end">Gross Pay</th>
           </tr>
         </thead>
         <tbody>
           ${rows.map((row) => `
             <tr>
+              <td><span class="badge ${row.personRole === 'staff' ? 'bg-success' : 'bg-primary'}">${escapeHtml(String(row.personRole || '').toUpperCase())}</span></td>
               <td>
                 <div class="fw-bold">${escapeHtml(row.departmentName || 'No Department')}</div>
                 ${row.departmentId ? `<div class="small text-muted font-monospace">${escapeHtml(row.departmentId)}</div>` : ''}
               </td>
+              <td class="small text-muted">${escapeHtml(row.accountLabel || row.payrollAccountId || '-')}</td>
               <td class="text-end">${Number(row.autoHours || 0).toFixed(2)}</td>
               <td class="text-end">${Number(row.manualHours || 0).toFixed(2)}</td>
               <td class="text-end">${Number(row.reportHours || 0).toFixed(2)}</td>
+              <td class="text-end">${Number(row.activityHours || 0).toFixed(2)}</td>
               <td class="text-end">${Number(row.entryCount || 0)}</td>
               <td class="text-end fw-bold">${escapeHtml(row.payRateLabel || 'N/D')}</td>
               <td class="text-end fw-bold text-success">${Number(row.totalHours || 0).toFixed(2)}</td>
+              <td class="text-end fw-bold">${escapeHtml(row.grossPayLabel || 'N/D')}</td>
             </tr>
           `).join('')}
         </tbody>
         <tfoot class="table-light">
           <tr>
-            <th>Total</th>
+            <th colspan="3">Total</th>
             <th class="text-end">${Number(totals.autoHours || 0).toFixed(2)}</th>
             <th class="text-end">${Number(totals.manualHours || 0).toFixed(2)}</th>
             <th class="text-end">${Number(totals.reportHours || 0).toFixed(2)}</th>
+            <th class="text-end">${Number(totals.activityHours || 0).toFixed(2)}</th>
             <th class="text-end">${Number(totals.entryCount || 0)}</th>
             <th class="text-end">-</th>
             <th class="text-end text-success">${Number(totals.totalHours || 0).toFixed(2)}</th>
+            <th class="text-end">${totals.grossPay !== undefined ? '$' + Number(totals.grossPay || 0).toFixed(2) : 'N/D'}</th>
           </tr>
         </tfoot>
       </table>

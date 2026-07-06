@@ -36,26 +36,35 @@ test('timesheet management period API returns picker-friendly rows', () => {
   assert.match(controller, /results: data\.map\(shapeTimesheetPeriodPickerRow\)/);
 });
 
-test('timesheet management department summary includes pay rate labels', () => {
+test('timesheet management department summary includes role-aware pay rate labels', () => {
   const view = read('packages/school/MVC/views/school/timesheet/timesheetManage.ejs');
   const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
 
-  assert.match(controller, /function resolvePayRateForDepartment/);
-  assert.match(controller, /dataService\.fetchData\('payRates', \{ orgId__eq: activeOrgId, personId__eq: personId \}/);
-  assert.match(controller, /payRateLabel: resolvedRate \? formatHourlyRateLabel\(resolvedRate\.hourlyRate\) : 'N\/D'/);
-  assert.match(controller, /dateOrBoundary\(b\.effectiveFrom, '0001-01-01'\)/);
+  assert.match(controller, /timesheetPayRateService\.resolveHourlyRate/);
+  assert.match(controller, /timesheetPayrollContextService\.resolvePayrollPersonContext/);
+  assert.match(controller, /payRateLabel: resolvedRate \? timesheetPayRateService\.formatHourlyRateLabel\(resolvedRate\.hourlyRate\) : 'N\/D'/);
+  assert.match(controller, /grossPayLabel/);
+  assert.match(controller, /roleTotals/);
+  assert.doesNotMatch(controller, /function resolvePayRateForDepartment/);
 
-  assert.match(view, /<th class="text-end">Pay Rate<\/th>/);
+  assert.match(view, /<th>Role<\/th>/);
+  assert.match(view, /<th>Account<\/th>/);
+  assert.match(view, /<th class="text-end">Gross Pay<\/th>/);
   assert.match(view, /row\.payRateLabel \|\| 'N\/D'/);
+  assert.match(view, /payload\.roleTotals/);
+  assert.match(view, /payload\.payrollWarnings/);
 });
-test('master academia hub timesheet summary mirrors pay rate display', () => {
+test('master academia hub timesheet summary mirrors role-aware pay display', () => {
   const view = read('packages/school/MVC/views/school/masterAcademiaHub.ejs');
 
   assert.match(view, /function renderHubTimesheetManagementSummary\(payload\)/);
   assert.match(view, /hubTimesheetManagementSummaryModal/);
   assert.match(view, /modal-dialog modal-xl modal-dialog-scrollable/);
-  assert.match(view, /<th>Pay Rate<\/th>/);
+  assert.match(view, /<th class="ps-3">Role<\/th>/);
+  assert.match(view, /<th>Account<\/th>/);
+  assert.match(view, /<th class="pe-3">Gross Pay<\/th>/);
   assert.match(view, /row\.payRateLabel \|\| 'N\/D'/);
+  assert.match(view, /row\.grossPayLabel/);
 });
 test('master academia hub timesheet management filters periods by available year', () => {
   const view = read('packages/school/MVC/views/school/masterAcademiaHub.ejs');

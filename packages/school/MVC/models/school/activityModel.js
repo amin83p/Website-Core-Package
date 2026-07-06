@@ -7,6 +7,8 @@ const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const dataPath = path.join(resolveCoreRoot(), 'data/school/activities.json');
 const ACTIVITY_STATUSES = new Set(['draft', 'posted', 'cancelled']);
 const ATTENDANCE_STATUSES = new Set(['attended', 'absent', 'excused']);
+const COMPLETION_STATUSES = new Set(['pending', 'completed']);
+const EVALUATION_TYPES = new Set(['attendance', 'completion']);
 const ACTIVITY_VISIBILITY_SCOPES = new Set(['school', 'individual']);
 
 if (!fsSync.existsSync(dataPath)) {
@@ -72,6 +74,14 @@ function calculateDurationHours(startTime, endTime) {
   return Number(((end - start) / 60).toFixed(2));
 }
 
+function normalizeEvaluationType(value) {
+  const raw = cleanString(value, { max: 40, allowEmpty: true }).toLowerCase().replace(/[\s-]+/g, '_');
+  if (!raw || raw === 'attendance' || raw === 'attendance_based' || raw === 'presence') return 'attendance';
+  if (raw === 'completion' || raw === 'completion_based' || raw === 'task') return 'completion';
+  if (!EVALUATION_TYPES.has(raw)) throw new Error('Invalid activity evaluation type.');
+  return raw;
+}
+
 function normalizeActivityVisibilityScope(value) {
   const raw = cleanString(value, { max: 40, allowEmpty: true }).toLowerCase().replace(/[\s-]+/g, '_');
   if (!raw) return 'school';
@@ -100,6 +110,17 @@ function sanitizeAttendee(input = {}, activityPaid = false, durationHours = 0) {
   if (!ATTENDANCE_STATUSES.has(status)) throw new Error('Invalid attendee status.');
   const paid = input.paid === undefined ? Boolean(activityPaid) : (input.paid === true || input.paid === 'true' || input.paid === 'on');
   const paidHours = cleanHours(input.paidHours === undefined || input.paidHours === '' ? durationHours : input.paidHours);
+  const completionStatusRaw = cleanString(input.completionStatus || 'pending', { max: 40, allowEmpty: true }).toLowerCase() || 'pending';
+  const completionStatus = COMPLETION_STATUSES.has(completionStatusRaw) ? completionStatusRaw : 'pending';
+  const locked = input.locked === true || input.locked === 'true';
+  const lockReason = locked ? cleanString(input.lockReason, { max: 80, allowEmpty: true }) : '';
+  const lockedTimesheetId = locked ? cleanId(input.lockedTimesheetId, { allowEmpty: true }) : '';
+  const completedAt = completionStatus === 'completed'
+    ? cleanString(input.completedAt || '', { max: 40, allowEmpty: true })
+    : '';
+  const completedBy = completionStatus === 'completed'
+    ? cleanId(input.completedBy, { allowEmpty: true })
+    : '';
   return {
     personId,
     personName,
@@ -108,7 +129,15 @@ function sanitizeAttendee(input = {}, activityPaid = false, durationHours = 0) {
     status,
     paid,
     paidHours,
-    notes: cleanString(input.notes, { max: 500, allowEmpty: true })
+    notes: cleanString(input.notes, { max: 500, allowEmpty: true }),
+    completionStatus,
+    completedAt,
+    completedBy,
+    locked,
+    lockedAt: locked ? cleanString(input.lockedAt, { max: 40, allowEmpty: true }) : '',
+    lockedBy: locked ? cleanId(input.lockedBy, { allowEmpty: true }) : '',
+    lockReason,
+    lockedTimesheetId
   };
 }
 
@@ -295,6 +324,7 @@ function sanitizeActivityPayload(input = {}) {
   const categoryId = cleanId(input.categoryId, { allowEmpty: false });
   const departmentId = cleanId(input.departmentId, { allowEmpty: false });
   const status = cleanString(input.status || 'draft', { max: 30, allowEmpty: true }).toLowerCase() || 'draft';
+  const evaluationType = normalizeEvaluationType(input.evaluationType || 'attendance');
   const visibilityScope = normalizeActivityVisibilityScope(input.visibilityScope || input.calendarScope || input.scope);
   const paid = input.paid === true || input.paid === 'true' || input.paid === 'on';
   const { allowedPersonIds, excludedPersonIds } = sanitizeAllowedExcludedLists(
@@ -335,6 +365,7 @@ function sanitizeActivityPayload(input = {}) {
     totalDurationHours,
     paid,
     status,
+    evaluationType,
     visibilityScope,
     allowedPersonIds,
     excludedPersonIds,
@@ -385,11 +416,33 @@ async function updateActivity(id, payload) {
     const existing = rows[index];
     const sanitized = sanitizeActivityPayload({ ...payload, orgId: existing.orgId || payload.orgId });
     const existingEntries = new Map((Array.isArray(existing.entries) ? existing.entries : []).map((entry) => [String(entry.entryId), entry]));
+    const mergeAssigneeLocks = (nextAssignees = [], priorAssignees = []) => {
+      const priorByPerson = new Map((Array.isArray(priorAssignees) ? priorAssignees : [])
+        .map((row) => [String(row.personId), row]));
+      return (Array.isArray(nextAssignees) ? nextAssignees : []).map((assignee) => {
+        const prior = priorByPerson.get(String(assignee.personId));
+        if (!prior || prior.locked !== true) return assignee;
+        return {
+          ...assignee,
+          completionStatus: prior.completionStatus || assignee.completionStatus,
+          completedAt: prior.completedAt || assignee.completedAt,
+          completedBy: prior.completedBy || assignee.completedBy,
+          locked: prior.locked,
+          lockedAt: prior.lockedAt,
+          lockedBy: prior.lockedBy,
+          lockReason: prior.lockReason,
+          lockedTimesheetId: prior.lockedTimesheetId
+        };
+      });
+    };
     const mergedEntries = (Array.isArray(sanitized.entries) ? sanitized.entries : []).map((entry) => {
       const prior = existingEntries.get(String(entry.entryId));
-      if (!prior || prior.locked !== true) return entry;
+      if (!prior) return entry;
+      const assignees = mergeAssigneeLocks(entry.assignees, prior.assignees);
+      if (prior.locked !== true) return { ...entry, assignees };
       return {
         ...entry,
+        assignees,
         locked: prior.locked,
         lockedAt: prior.lockedAt,
         lockedBy: prior.lockedBy,
@@ -426,6 +479,7 @@ module.exports = {
   sanitizeActivityPayload,
   sanitizeAttendee,
   sanitizeActivityEntry,
+  normalizeEvaluationType,
   normalizeActivityVisibilityScope,
   calculateDurationHours,
   resolveActivityScopeAllowedSet,

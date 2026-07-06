@@ -79,6 +79,12 @@ test('School activities package route, repository, service, views, and seed scri
 
   const timesheetController = readText('packages/school/MVC/controllers/school/timesheetController.js');
   assert.match(timesheetController, /activityService\.getTimesheetEntriesForPerson/);
+  assert.match(timesheetController, /activityLiveSessions/);
+  assert.match(timesheetController, /mergedLiveSessions/);
+
+  const timesheetEditor = readText('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
+  assert.match(timesheetEditor, /isSchoolActivity === true/);
+  assert.match(timesheetEditor, /startsWith\('act-'\)/);
 
   const timesheetModel = readText('packages/school/MVC/models/school/timesheetModel.js');
   assert.match(timesheetModel, /isSchoolActivity/);

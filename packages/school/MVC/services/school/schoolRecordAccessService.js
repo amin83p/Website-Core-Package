@@ -8,6 +8,7 @@ const {
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 const SESSION_ACCESS_DENIED = 'You do not have access to this session.';
+const ACTIVITY_WORK_SESSION_ACCESS_DENIED = 'You do not have access to this work session.';
 const CLASS_ACCESS_DENIED = 'You do not have access to this class.';
 const DATA_ACCESS_DENIED = 'You do not have access to this record.';
 
@@ -135,6 +136,49 @@ function assertClassAccessible(classRow, access = {}, message = CLASS_ACCESS_DEN
   }
 }
 
+function isAssigneeOnActivityEntry(entry = {}, personId = '') {
+  const normalizedPersonId = toPublicId(personId);
+  if (!normalizedPersonId || !entry) return false;
+  return (Array.isArray(entry.assignees) ? entry.assignees : [])
+    .some((row) => idsEqual(row?.personId, normalizedPersonId));
+}
+
+function isActivityWorkSessionAccessible({ activity, entry, access = {}, context = 'manageWorkSession' } = {}) {
+  if (!activity || !entry) return false;
+  if (access?.denyAll === true || access?.scopeMode === SCOPE_MODES.USER) return false;
+  if (isOrgWideScope(access)) return true;
+
+  if (context === 'manageWorkSession' || context === 'mutation') {
+    if (access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
+      return isAssigneeOnActivityEntry(entry, access.personId);
+    }
+    if (access?.scopeMode === SCOPE_MODES.OWNER) {
+      return isRecordOwnedByUser(activity, access.userId);
+    }
+    return isOrgWideScope(access);
+  }
+
+  if (access?.scopeMode === SCOPE_MODES.OWNER) {
+    return isRecordOwnedByUser(activity, access.userId);
+  }
+  if (access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
+    return isAssigneeOnActivityEntry(entry, access.personId);
+  }
+  return true;
+}
+
+function assertActivityWorkSessionAccessible({
+  activity,
+  entry,
+  access = {},
+  context = 'manageWorkSession',
+  message = ACTIVITY_WORK_SESSION_ACCESS_DENIED
+} = {}) {
+  if (!isActivityWorkSessionAccessible({ activity, entry, access, context })) {
+    throw new Error(message);
+  }
+}
+
 function assertSessionAccessible({
   classRow,
   session,
@@ -159,6 +203,7 @@ function assertRecordAccessible(record, access = {}, message = DATA_ACCESS_DENIE
 
 module.exports = {
   SESSION_ACCESS_DENIED,
+  ACTIVITY_WORK_SESSION_ACCESS_DENIED,
   CLASS_ACCESS_DENIED,
   DATA_ACCESS_DENIED,
   readOwnerUserIds,
@@ -174,6 +219,8 @@ module.exports = {
   isSessionAccessible,
   assertClassAccessible,
   assertSessionAccessible,
+  assertActivityWorkSessionAccessible,
+  isActivityWorkSessionAccessible,
   assertRecordAccessible,
   buildRouteAccessContext
 };
