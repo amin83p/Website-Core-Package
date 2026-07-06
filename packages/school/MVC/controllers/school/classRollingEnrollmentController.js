@@ -31,6 +31,7 @@ const registrationIntegrityService = require('../../services/school/registration
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
+const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
@@ -1192,6 +1193,53 @@ async function attachStudentLabelsToEnrollmentPeriodRows(periodRows, user) {
   }));
 }
 
+async function attachSessionProgressToEnrollmentPeriodRows(periodRows, classData, user, students = null) {
+  const rows = Array.isArray(periodRows) ? periodRows : [];
+  if (String(classData?.registrationMode || '').trim().toLowerCase() !== 'rolling' || !rows.length) return rows;
+  const [sessions, effectiveStudents] = await Promise.all([
+    schoolDataService.getClassSessions(classData.id, user),
+    Array.isArray(students) ? students : schoolDataService.fetchData('students', {}, user)
+  ]);
+  const studentToPersonMap = new Map(
+    (Array.isArray(effectiveStudents) ? effectiveStudents : [])
+      .map((student) => [toPublicId(student?.id), toPublicId(student?.personId)])
+      .filter(([studentId, personId]) => studentId && personId)
+  );
+  const orgId = toPublicId(classData?.orgId || user?.activeOrgId || '');
+  const applicability = await classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicabilityWithLeaves({
+    sessions,
+    periodRows: rows,
+    studentToPersonMap,
+    activeOrgId: orgId,
+    orgId,
+    reqUser: user,
+    allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+  });
+  return rows.map((row) => {
+    const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(row?.targetSessionCount);
+    const summary = applicability.summariesByPeriodId.get(toPublicId(row?.id)) || null;
+    const consumedSessionCount = Number(summary?.consumedCount || 0);
+    const reservedSessionCount = Number(summary?.reservedCount || 0);
+    return {
+      ...row,
+      targetSessionCount,
+      sessionCountPolicy: targetSessionCount ? classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(row?.sessionCountPolicy) : '',
+      consumedSessionCount: targetSessionCount ? consumedSessionCount : null,
+      reservedSessionCount: targetSessionCount ? reservedSessionCount : null,
+      remainingSessionCount: targetSessionCount ? Math.max(0, targetSessionCount - consumedSessionCount) : null,
+      sessionCompletion: row?.completionDate ? {
+        date: row.completionDate,
+        sessionId: row.completionSessionId || '',
+        reason: row.completionReason || ''
+      } : (summary?.completionCandidate ? {
+        date: summary.completionCandidate.date,
+        sessionId: summary.completionCandidate.sessionId,
+        reason: 'target_session_count_reached'
+      } : null)
+    };
+  });
+}
+
 async function enrichCycleRolloverPreviewStudentLabels(preview, user) {
   const studentRows = Array.isArray(preview?.carryForwardPreview?.students)
     ? preview.carryForwardPreview.students
@@ -1833,6 +1881,8 @@ function buildClassEnrollmentCreatePayloadFromRequest(classData, req) {
     authorizationRef: String(req.body?.authorizationRef || '').trim(),
     reasonStart: String(req.body?.reasonStart || '').trim(),
     reasonEnd: String(req.body?.reasonEnd || '').trim(),
+    targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount),
+    sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy),
     sequenceNo: req.body?.sequenceNo,
     personId: toPublicId(req.body?.personId || ''),
     programRegistrationId: toPublicId(req.body?.programRegistrationId || ''),
@@ -1940,6 +1990,8 @@ async function createClassEnrollmentWithTransactions(req, res) {
       String(enrollmentPayload.termId || '').trim(),
       String(enrollmentPayload.startDate || '').trim(),
       String(enrollmentPayload.endDate || '').trim(),
+      String(enrollmentPayload.targetSessionCount || '').trim(),
+      String(enrollmentPayload.sessionCountPolicy || '').trim(),
       String(enrollmentPayload.status || '').trim().toLowerCase()
     ]);
     const guardResult = idempotencyGuardService.beginGuard({
@@ -2150,6 +2202,8 @@ async function saveClassEnrollmentDraft(req, res) {
       funderId: String(req.body?.funderId || period?.funderId || '').trim(),
       authorizationRef: String(req.body?.authorizationRef || period?.authorizationRef || '').trim(),
       reasonStart: String(req.body?.reasonStart || period?.reasonStart || '').trim(),
+      targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount || period?.targetSessionCount),
+      sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || period?.sessionCountPolicy),
       notes: String(req.body?.notes || period?.notes || '').trim(),
       transactionSummary: {
         mode: 'chargeable',
@@ -2530,6 +2584,8 @@ async function approveClassEnrollmentDraft(req, res) {
       funderId: String(req.body?.funderId || period?.funderId || '').trim(),
       authorizationRef: String(req.body?.authorizationRef || period?.authorizationRef || '').trim(),
       reasonStart: String(req.body?.reasonStart || period?.reasonStart || '').trim(),
+      targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount || period?.targetSessionCount),
+      sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || period?.sessionCountPolicy),
       notes: String(req.body?.notes || period?.notes || '').trim(),
       transactionSummary: {
         mode: 'chargeable',
@@ -2612,7 +2668,9 @@ async function editClassEnrollmentPeriod(req, res) {
       funderType: String(req.body?.funderType || periodRow?.funderType || '').trim(),
       funderId: String(req.body?.funderId || periodRow?.funderId || '').trim(),
       authorizationRef: String(req.body?.authorizationRef || periodRow?.authorizationRef || '').trim(),
-      reasonStart: String(req.body?.reasonStart || periodRow?.reasonStart || '').trim()
+      reasonStart: String(req.body?.reasonStart || periodRow?.reasonStart || '').trim(),
+      targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount || periodRow?.targetSessionCount),
+      sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || periodRow?.sessionCountPolicy)
     }, req.user);
 
     const payloadOut = {
@@ -2733,6 +2791,8 @@ async function createClassEnrollmentPeriod(req, res) {
             studentId: toPublicId(req.body?.studentId || ''),
             startDate: String(req.body?.startDate || '').trim(),
             endDate: String(req.body?.endDate || '').trim(),
+            targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount),
+            sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy),
             status: String(req.body?.status || '').trim().toLowerCase()
         }
     ]);

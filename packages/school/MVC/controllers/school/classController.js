@@ -33,6 +33,7 @@ const schoolDependencyService = require('../../services/school/schoolDependencyS
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
+const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
@@ -1172,6 +1173,44 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
             .map((row) => [toPublicId(row?.id), cleanPersonId(row?.personId)])
             .filter(([studentId, personId]) => Boolean(studentId && personId))
     );
+
+    if (getClassRegistrationModeKey(classData) === 'rolling') {
+        const [periodRows, allSessions] = await Promise.all([
+            schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, reqUser),
+            schoolDataService.getClassSessions(classData?.id, reqUser)
+        ]);
+        const applicability = await classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicabilityWithLeaves({
+            sessions: Array.isArray(allSessions) && allSessions.length ? allSessions : [session],
+            periodRows,
+            studentToPersonMap,
+            activeOrgId,
+            orgId: classData?.orgId || activeOrgId,
+            reqUser,
+            allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+        });
+        const personIds = new Set();
+        const applicabilityByPersonId = new Map();
+        applicability.personIds.forEach((personId) => {
+            const state = classEnrollmentSessionApplicabilityService.getApplicabilityState(
+                applicability.stateByKey,
+                personId,
+                session,
+                session?.sessionId || session?.id
+            );
+            if (!state) return;
+            if (state.expected || state.reason === 'approved_leave' || state.reason === 'manual_not_applicable') {
+                const normalizedPersonId = cleanPersonId(personId);
+                personIds.add(normalizedPersonId);
+                applicabilityByPersonId.set(normalizedPersonId, state);
+            }
+        });
+        return {
+            personIds,
+            source: 'canonical_session_applicability',
+            applicabilityByPersonId
+        };
+    }
+
     const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
         classId: classData?.id,
         classItem: classData,
@@ -1196,7 +1235,8 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
 
     return {
         personIds,
-        source: String(enrollmentSnapshot?.source || 'canonical')
+        source: String(enrollmentSnapshot?.source || 'canonical'),
+        applicabilityByPersonId: new Map()
     };
 }
 
@@ -1231,6 +1271,7 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
         students
     });
     const activePersonIds = rosterResolution?.personIds instanceof Set ? rosterResolution.personIds : new Set();
+    const activeApplicabilityByPersonId = rosterResolution?.applicabilityByPersonId instanceof Map ? rosterResolution.applicabilityByPersonId : new Map();
 
     if (getClassRegistrationModeKey(classData) === 'rolling') {
         workingSession.roster = workingSession.roster.filter((row) => {
@@ -1238,12 +1279,14 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
             return pid && activePersonIds.has(pid);
         });
     }
+    const getApplicabilityForPerson = (pid) => activeApplicabilityByPersonId.get(cleanPersonId(pid)) || null;
+    const hasApprovedLeaveFor = (pid) => getApplicabilityForPerson(pid)?.reason === 'approved_leave';
 
     activePersonIds.forEach((pid) => {
         if (!workingSession.roster.find((r) => idsEqual(r.personId, pid))) {
             workingSession.roster.push({
                 personId: pid,
-                attendance: 'present',
+                attendance: hasApprovedLeaveFor(pid) ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : 'present',
                 notes: '',
                 comments: [],
                 classEffortPercent: 100,
@@ -1252,6 +1295,17 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
                 respectsStudentsPercent: 100
             });
         }
+    });
+
+    workingSession.roster = workingSession.roster.map((row) => {
+        const pid = cleanPersonId(row?.personId);
+        if (!pid || !hasApprovedLeaveFor(pid)) return row;
+        const normalized = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
+        if (normalized !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+            && normalized !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
+            return row;
+        }
+        return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0 };
     });
 
     const enrichedRoster = workingSession.roster.map((r) => {
@@ -3102,6 +3156,12 @@ async function saveSession1(req, res) {
 
         // Save back to file via Data Service
         await schoolDataService.saveClassSessions(classId, sessions, req.user);
+        await classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass({
+            classData,
+            sessions,
+            reqUser: req.user,
+            activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user)
+        });
         
         // Rebuild index in case the session was cancelled
         const indexService = require('../../services/school/schoolIndexService');
@@ -3731,7 +3791,6 @@ async function saveSession(req, res) {
                 throw new Error('Invalid roster payload.');
             }
             const existingRoster = originalSession.roster || [];
-            const allowedAttendance = new Set(['present', 'late', 'excused', 'absent']);
             const orgPolicyLayerSave = await attendanceMatrixPolicyModel.getPolicyForOrg(
                 classData?.orgId || getActiveOrgIdOrThrow(req.user)
             );
@@ -3741,8 +3800,10 @@ async function saveSession(req, res) {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 if (!incomingPersonId) return null;
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
-                const normalizedAttendance = String(incRec.attendance || 'absent').trim().toLowerCase();
-                const attendance = allowedAttendance.has(normalizedAttendance) ? normalizedAttendance : 'absent';
+                const attendance = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(
+                    incRec.attendance,
+                    attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+                );
                 const existingClassEffort = normalizeSessionRatingPercent(existRec.classEffortPercent);
                 const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent);
                 const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent);
@@ -3818,6 +3879,12 @@ async function saveSession(req, res) {
         }
 
         await schoolDataService.saveClassSessions(classId, sessions, req.user);
+        await classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass({
+            classData,
+            sessions,
+            reqUser: req.user,
+            activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user)
+        });
         
         const indexService = require('../../services/school/schoolIndexService');
         await indexService.rebuildIndexesForClass(classId);
@@ -3884,7 +3951,7 @@ async function saveSessionGradebooks(req, res) {
         enrichedRoster.forEach((r) => {
             const pid = cleanPersonId(r.personId);
             if (pid) {
-                attendanceByPerson.set(pid, String(r.attendance || 'absent').trim().toLowerCase());
+                attendanceByPerson.set(pid, attendanceMatrixMetricsService.normalizeStatus(r.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT));
             }
         });
 
@@ -3905,7 +3972,7 @@ async function saveSessionGradebooks(req, res) {
 
             for (const pid of personIds) {
                 const att = attendanceByPerson.get(pid) || 'absent';
-                const isAbsent = att === 'absent';
+                const isAbsent = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
                 let v = rawScores[pid];
                 if (v === undefined) v = rawScores[String(pid)];
                 if (v === '' || v === undefined) v = null;

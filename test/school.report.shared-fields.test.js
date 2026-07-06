@@ -4,7 +4,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const PizZip = require('pizzip');
 
 const reportService = require('../packages/school/MVC/services/school/reportService');
 const reportDocxRenderService = require('../packages/school/MVC/services/school/reportDocxRenderService');
@@ -13,12 +15,20 @@ const schoolDataService = require('../packages/school/MVC/services/school/school
 const schoolIdentityLookupService = require('../packages/school/MVC/services/school/schoolIdentityLookupService');
 const sessionStatusPolicyService = require('../packages/school/MVC/services/school/sessionStatusPolicyService');
 const attendanceMatrixPolicyModel = require('../packages/school/MVC/models/school/attendanceMatrixPolicyModel');
+const classEnrollmentReadService = require('../packages/school/MVC/services/school/classEnrollmentReadService');
 const { requireCoreModule } = require('../packages/school/MVC/services/school/schoolCoreContracts');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
 
 const ROOT = path.resolve(__dirname, '..');
+function createMinimalDocxBuffer(documentBodyXml) {
+  const zip = new PizZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+  zip.folder('_rels').file('.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  zip.folder('word').file('document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${documentBodyXml}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`);
+  return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
 
 function withPatched(target, replacements, callback) {
   const originals = {};
@@ -151,6 +161,49 @@ test('DOCX render data normalizes braced and bare keys and blanks missing values
   assert.match(renderServiceSource, /nullGetter:\s*\(\)\s*=>\s*''/);
 });
 
+test('DOCX render data preserves repeat collection rows beside flat placeholders', () => {
+  const renderData = reportDocxRenderService.buildRenderData(
+    { '{{teacher_name}}': 'Teacher One' },
+    {
+      students: [
+        { student_full_name: 'Ada Lovelace', student_attendance_span_percent: 100 },
+        { '{{student_full_name}}': 'Grace Hopper', student_attendance_span_percent: null }
+      ]
+    }
+  );
+
+  assert.equal(renderData.teacher_name, 'Teacher One');
+  assert.deepEqual(renderData.students, [
+    { student_full_name: 'Ada Lovelace', student_attendance_span_percent: '100' },
+    { student_full_name: 'Grace Hopper', student_attendance_span_percent: '' }
+  ]);
+});
+
+test('DOCX renderer expands repeat collection data', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'school-report-docx-'));
+  const filePath = path.join(tmpDir, 'repeat.docx');
+  fs.writeFileSync(filePath, createMinimalDocxBuffer('<w:p><w:r><w:t>{{#students}}{{student_full_name}}={{student_attendance_span_percent}};{{/students}}</w:t></w:r></w:p>'));
+
+  try {
+    const rendered = await reportDocxRenderService.renderReportInstanceDocx({
+      template: { id: 'TPL-REPEAT', title: 'Repeat Template', docxTemplate: { path: filePath } },
+      instance: { id: 'INST-REPEAT' },
+      placeholders: { '{{class_name}}': 'Dynamic Class' },
+      collections: {
+        students: [
+          { student_full_name: 'Ada Lovelace', student_attendance_span_percent: 100 },
+          { student_full_name: 'Grace Hopper', student_attendance_span_percent: 75 }
+        ]
+      }
+    });
+    const zip = new PizZip(rendered.buffer);
+    const xml = zip.file('word/document.xml').asText();
+    assert.match(xml, /Ada Lovelace=100;/);
+    assert.match(xml, /Grace Hopper=75;/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
 test('DOCX template resolver treats /app/uploads paths as upload storage references', () => {
   const storedPath = '/app/uploads/ORG_900000/reports/Semi-Monthly-Report_1783055912591.docx';
   const railwayVolumeRoot = '/app/uploads';
@@ -276,6 +329,186 @@ test('buildPrefillSnapshot uses attendance matrix percent and counts missing mar
   });
 });
 
+
+test('buildPrefillSnapshot excludes N/A attendance from percentage denominators', async () => {
+  const assignment = {
+    id: 'ASN-NA',
+    orgId: '900000',
+    classId: 'CLASS-NA',
+    sessionId: 'SES-3',
+    sessionDate: '2026-06-18',
+    reportStartDate: '2026-06-16',
+    reportDueDate: '2026-06-18',
+    teacherIds: ['TEACHER-1']
+  };
+  const sessions = [
+    { sessionId: 'SES-1', date: '2026-06-16', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'present' }] },
+    { sessionId: 'SES-2', date: '2026-06-17', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'absent' }] },
+    { sessionId: 'SES-3', date: '2026-06-18', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'not_applicable' }] }
+  ];
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-NA') return { id: 'CLASS-NA', orgId: '900000', title: 'Class N/A' };
+      return null;
+    },
+    getClassSessions: async () => sessions,
+    fetchData: async (entityType) => {
+      if (entityType === 'students') return [{ id: 'STU-1', orgId: '900000', personId: 'STUDENT-PERSON-1' }];
+      if (entityType === 'examAssignments') return [];
+      return [];
+    }
+  }, async () => {
+    await withPatched(dataServiceGlobal, {
+      fetchData: async (entityType) => {
+        if (entityType === 'persons') {
+          return [
+            { id: 'TEACHER-1', name: { preferred: 'Teacher One' } },
+            { id: 'STUDENT-PERSON-1', name: { first: 'Student', last: 'One' } }
+          ];
+        }
+        if (entityType === 'organizations') return [{ id: '900000', name: 'Org One' }];
+        return [];
+      }
+    }, async () => {
+      await withPatched(sessionStatusPolicyService, {
+        getStatusMap: async () => new Map()
+      }, async () => {
+        await withPatched(attendanceMatrixPolicyModel, {
+          getPolicyForOrg: async () => ({
+            scheduledMinutes: 60,
+            disqualifyLateMinutes: 30,
+            disqualifyEarlyLeaveMinutes: 30,
+            disqualifyCombinedMissedMinutes: null
+          })
+        }, async () => {
+          const snapshot = await reportService.buildPrefillSnapshot({
+            assignment,
+            teacherId: 'TEACHER-1',
+            studentId: 'STUDENT-PERSON-1',
+            reqUser: { id: 'USER-1', activeOrgId: '900000' }
+          });
+
+          assert.equal(snapshot.student_attendance_span_total_sessions, 2);
+          assert.equal(snapshot.student_attendance_span_absent, 1);
+          assert.equal(snapshot.student_attendance_span_na, 1);
+          assert.equal(snapshot.student_attendance_span_percent, 50);
+          assert.equal(snapshot.class_attendance_na, 1);
+          assert.equal(snapshot.class_attendance_span_total, 2);
+          assert.equal(snapshot.class_attendance_span_na, 1);
+          assert.equal(snapshot.class_attendance_span_percent, 50);
+        });
+      });
+    });
+  });
+});
+
+test('buildReportDocxCollections builds students, sessions, and N/A-aware attendance rows', async () => {
+  const assignment = {
+    id: 'ASN-COLLECTIONS',
+    orgId: '900000',
+    classId: 'CLASS-COLLECTIONS',
+    reportScope: 'class',
+    reportStartDate: '2026-06-16',
+    reportDueDate: '2026-06-17'
+  };
+  const sessions = [
+    {
+      sessionId: 'SES-1',
+      date: '2026-06-16',
+      status: 'completed',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: [
+        { personId: 'STUDENT-PERSON-1', attendance: 'present' },
+        { personId: 'STUDENT-PERSON-2', attendance: 'not_applicable' }
+      ]
+    },
+    {
+      sessionId: 'SES-2',
+      date: '2026-06-17',
+      status: 'completed',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: [
+        { personId: 'STUDENT-PERSON-1', attendance: 'late', lateMinutes: 10 }
+      ]
+    },
+    {
+      sessionId: 'SES-OUT',
+      date: '2026-07-01',
+      status: 'completed',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'present' }]
+    }
+  ];
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-COLLECTIONS') {
+        return { id: 'CLASS-COLLECTIONS', orgId: '900000', title: 'Collections Class' };
+      }
+      return null;
+    },
+    getClassSessions: async () => sessions,
+    fetchData: async (entityType) => {
+      if (entityType === 'students') {
+        return [
+          { id: 'STU-1', orgId: '900000', personId: 'STUDENT-PERSON-1', localId: 'L-1' },
+          { id: 'STU-2', orgId: '900000', personId: 'STUDENT-PERSON-2', localId: 'L-2' }
+        ];
+      }
+      return [];
+    }
+  }, async () => {
+    await withPatched(schoolIdentityLookupService, {
+      listSchoolPersonRecords: async () => ({
+        rows: [
+          { id: 'STUDENT-PERSON-1', name: { first: 'Ada', last: 'Lovelace' } },
+          { id: 'STUDENT-PERSON-2', name: { preferred: 'Grace', first: 'Grace', last: 'Hopper' } }
+        ]
+      })
+    }, async () => {
+      await withPatched(classEnrollmentReadService, {
+        listActiveStudentIdsForClass: async () => ({ studentIds: new Set(['STU-1', 'STU-2']) })
+      }, async () => {
+        await withPatched(sessionStatusPolicyService, {
+          getStatusMap: async () => new Map()
+        }, async () => {
+          await withPatched(attendanceMatrixPolicyModel, {
+            getPolicyForOrg: async () => ({
+              scheduledMinutes: 60,
+              disqualifyLateMinutes: 30,
+              disqualifyEarlyLeaveMinutes: 30,
+              disqualifyCombinedMissedMinutes: null
+            })
+          }, async () => {
+            const collections = await reportService.buildReportDocxCollections({
+              instance: { id: 'INST-COLLECTIONS' },
+              assignment,
+              reqUser: { id: 'USER-1', activeOrgId: '900000' }
+            });
+
+            assert.equal(collections.students.length, 2);
+            assert.equal(collections.students[0].student_full_name, 'Ada Lovelace');
+            assert.equal(collections.students[1].student_preferred_name, 'Grace');
+            assert.equal(collections.attendance_sessions.length, 2);
+            assert.equal(collections.student_attendance_rows.length, 4);
+            assert.equal(
+              collections.student_attendance_rows.find((row) => row.student_id === 'STUDENT-PERSON-2' && row.session_id === 'SES-1').attendance_status_label,
+              'N/A'
+            );
+            assert.equal(
+              collections.student_attendance_rows.find((row) => row.student_id === 'STUDENT-PERSON-2' && row.session_id === 'SES-2').attendance_status_label,
+              'Absent'
+            );
+          });
+        });
+      });
+    });
+  });
+});
 test('report template prefill catalog keys are all produced with correct representative calculations', async () => {
   const assignment = {
     id: 'ASN-FULL',
@@ -790,13 +1023,13 @@ test('buildPrefillSnapshot handles student with all absent attendance marks', as
 test('validateTemplatePrefillKeys rejects all live templates with invalid keys', () => {
   const templatesPath = path.join(ROOT, 'data/school/reportTemplates.json');
   if (!fs.existsSync(templatesPath)) {
-    console.warn('⚠ Live templates file not found; skipping validation check');
+    console.warn('ÃƒÂ¢Ã…Â¡Ã‚Â  Live templates file not found; skipping validation check');
     return;
   }
 
   const templates = JSON.parse(fs.readFileSync(templatesPath, 'utf8'));
   if (!Array.isArray(templates)) {
-    console.warn('⚠ reportTemplates.json is not an array; skipping validation check');
+    console.warn('ÃƒÂ¢Ã…Â¡Ã‚Â  reportTemplates.json is not an array; skipping validation check');
     return;
   }
 

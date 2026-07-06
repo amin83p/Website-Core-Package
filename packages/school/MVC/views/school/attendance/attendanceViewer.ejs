@@ -202,6 +202,8 @@
                         <label class="btn btn-outline-info text-dark" for="modal_att_excused" title="Excused"><i class="bi bi-envelope-paper me-1"></i>Excused</label>
                         <input type="radio" class="btn-check" name="modal_cell_attendance" id="modal_att_absent" value="absent">
                         <label class="btn btn-outline-danger" for="modal_att_absent" title="Absent"><i class="bi bi-x-lg me-1"></i>Absent</label>
+                        <input type="radio" class="btn-check" name="modal_cell_attendance" id="modal_att_na" value="not_applicable">
+                        <label class="btn btn-outline-secondary" for="modal_att_na" title="Not applicable"><i class="bi bi-dash-circle me-1"></i>N/A</label>
                     </div>
 
                     <div class="row g-3 mb-3">
@@ -615,19 +617,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const s = stu.summary || {};
                 const p = Number(s.totalPresentSessions) || 0;
                 const a = Number(s.totalAbsentSessions) || 0;
+                const na = Number(s.totalNotApplicableSessions) || 0;
                 const pct = s.performancePercent;
                 const pctStr = pct == null ? '—' : `${pct}%`;
                 const dq = Number(s.disqualifiedSessionCount) || 0;
                 const rollupTitle = [
                   `Present (marked): ${p}`,
                   `Absent: ${a}`,
+                  na ? `N/A: ${na}` : null,
                   `Efficiency: ${pctStr}`,
                   dq ? `Disqualified sessions (late/leave cutoffs): ${dq}` : null
                 ].filter(Boolean).join(' · ');
 
                 let rowHtml = `
                   <td class="matrix-sticky-rollup px-2 py-2 text-center small" title="${rollupTitle.replace(/"/g, '&quot;')}">
-                    <div><span class="text-success fw-semibold">${p}</span><span class="text-muted"> / </span><span class="text-danger fw-semibold">${a}</span></div>
+                    <div><span class="text-success fw-semibold">${p}</span><span class="text-muted"> / </span><span class="text-danger fw-semibold">${a}</span>${na ? `<span class="text-muted"> / </span><span class="text-secondary fw-semibold">${na}</span>` : ''}</div>
                     <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${pctStr}</div>
                   </td>
                   <td class="ps-3 matrix-sticky-name">${stu.name}</td>`;
@@ -640,6 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (rec.status === 'late') { icon = `<i class="bi bi-clock-fill status-late"></i>`; tooltip = `Late`; }
                     else if (rec.status === 'excused') { icon = '<i class="bi bi-envelope-paper-fill status-excused"></i>'; tooltip = 'Excused'; }
                     else if (rec.status === 'absent') { icon = '<i class="bi bi-x-circle-fill status-absent"></i>'; tooltip = 'Absent'; }
+                    else if (rec.status === 'not_applicable') { icon = '<i class="bi bi-dash-circle-fill status-na"></i>'; tooltip = rec.applicability === 'approved_leave' ? 'N/A - approved leave' : 'N/A'; }
 
                     // UPDATED: Badge now strictly checks the comments array (ignores general teacherNotes)
                     const hasComments = (rec.comments && rec.comments.length > 0);
@@ -780,7 +785,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const attendance = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value;
             if (!attendance) {
                 if (typeof showMessageModal === 'function') {
-                    showMessageModal({ title: 'Attendance', icon: 'warning', message: 'Select a status (Present, Late, Excused, or Absent).', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+                    showMessageModal({ title: 'Attendance', icon: 'warning', message: 'Select a status (Present, Late, Excused, Absent, or N/A).', buttons: [{ text: 'OK', class: 'btn-primary' }] });
                 } else { alert('Select an attendance status.'); }
                 return;
             }
@@ -913,8 +918,8 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     document.getElementById('det_studentName').innerText = student.name;
     document.getElementById('det_date').innerText = `Session Date: ${record.date}`;
 
-    const allowed = ['present', 'late', 'excused', 'absent'];
-    const effStatus = allowed.includes(record.status) ? record.status : 'present';
+    const allowed = ['present', 'late', 'excused', 'absent', 'not_applicable'];
+    const effStatus = allowed.includes(record.status) ? record.status : 'absent';
     document.querySelectorAll('input[name="modal_cell_attendance"]').forEach((el) => {
         el.checked = el.value === effStatus;
     });

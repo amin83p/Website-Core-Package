@@ -20,6 +20,10 @@ const reportAssignmentMutationActionState = {
   allowOperationTokenFallback: true,
   allowInactiveTokenFallback: true
 };
+const reportTemplateCreateActionState = {
+  requireToken: true,
+  allowOperationTokenFallback: true
+};
 const reportAssignmentBulkActionState = {
   requireToken: false,
   keepActive: true
@@ -128,8 +132,12 @@ router.get('/templates/new',
 router.post('/templates/new',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
   upload('school-reports').single('docxTemplate'),
-  trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, reportTemplateCreateActionState),
   ctrl.saveTemplate);
+router.get('/templates/copy/:id',
+  requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
+  ctrl.showTemplateCopyForm);
 
 router.get('/templates/edit/:id',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),

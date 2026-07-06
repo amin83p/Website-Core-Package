@@ -7,15 +7,51 @@
  * Rules (Option A + optional combined cap):
  * - absent → 0 credit
  * - excused → full session weight
- * - N/A / unknown → 0 credit (still counts toward N)
+ * - N/A / not_applicable -> excluded from the denominator
  * - present / late → proportional credit = weight × attendedMinutes / scheduledMinutes
  *   attendedMinutes = max(0, scheduled - late - early)
  * - Hard zero if late >= disqualifyLateMinutes OR early >= disqualifyEarlyMinutes
  * - Optional: late + early >= disqualifyCombinedMissedMinutes → 0
  */
 
-function normalizeStatus(status) {
-  return String(status || '').trim().toLowerCase();
+const ATTENDANCE_STATUS = Object.freeze({
+  PRESENT: 'present',
+  LATE: 'late',
+  EXCUSED: 'excused',
+  ABSENT: 'absent',
+  NOT_APPLICABLE: 'not_applicable'
+});
+
+const ATTENDANCE_STATUS_ALIASES = Object.freeze({
+  present: ATTENDANCE_STATUS.PRESENT,
+  late: ATTENDANCE_STATUS.LATE,
+  excused: ATTENDANCE_STATUS.EXCUSED,
+  absent: ATTENDANCE_STATUS.ABSENT,
+  na: ATTENDANCE_STATUS.NOT_APPLICABLE,
+  'n/a': ATTENDANCE_STATUS.NOT_APPLICABLE,
+  n_a: ATTENDANCE_STATUS.NOT_APPLICABLE,
+  not_applicable: ATTENDANCE_STATUS.NOT_APPLICABLE,
+  notapplicable: ATTENDANCE_STATUS.NOT_APPLICABLE
+});
+
+function normalizeStatus(status, fallback = '') {
+  const raw = String(status || '').trim().toLowerCase();
+  if (!raw) return fallback;
+  const compact = raw.replace(/\s+/g, '_');
+  return ATTENDANCE_STATUS_ALIASES[compact] || fallback || compact;
+}
+
+function isNotApplicableStatus(status) {
+  return normalizeStatus(status) === ATTENDANCE_STATUS.NOT_APPLICABLE;
+}
+
+function isEligibleAttendanceStatus(status) {
+  return !isNotApplicableStatus(status);
+}
+
+function normalizeAttendanceStatusForSave(status, fallback = ATTENDANCE_STATUS.ABSENT) {
+  const normalized = normalizeStatus(status, fallback);
+  return Object.values(ATTENDANCE_STATUS).includes(normalized) ? normalized : fallback;
 }
 
 const MINUTES_PER_DAY = 24 * 60;
@@ -84,12 +120,14 @@ function applyAttendanceMatrixRosterRules(record, policy) {
   const pol = policy && typeof policy === 'object' ? policy : resolvePolicy({}, {});
   const base = record && typeof record === 'object' ? { ...record } : {};
 
-  let attendance = String(base.attendance || 'absent').trim().toLowerCase();
-  const allowed = new Set(['present', 'late', 'excused', 'absent']);
-  if (!allowed.has(attendance)) attendance = 'absent';
+  const attendance = normalizeAttendanceStatusForSave(base.attendance, ATTENDANCE_STATUS.ABSENT);
 
   const late = parseNonNegIntRoster(base.lateMinutes);
   const early = parseNonNegIntRoster(base.earlyLeaveMinutes);
+
+  if (attendance === ATTENDANCE_STATUS.NOT_APPLICABLE) {
+    return { ...base, attendance, lateMinutes: 0, earlyLeaveMinutes: 0 };
+  }
 
   const lateCut = pol.disqualifyLateMinutes;
   const earlyCut = pol.disqualifyEarlyLeaveMinutes;
@@ -156,16 +194,19 @@ function computeSessionCredit(record, sessionWeight, policy) {
   const early = Math.max(0, Number(record?.earlyLeaveMinutes) || 0);
   const st = normalizeStatus(record?.status);
 
-  if (st === 'n/a' || st === '') {
-    return { credit: 0, disqualified: false, reason: 'no_record' };
+  if (st === ATTENDANCE_STATUS.NOT_APPLICABLE) {
+    return { credit: 0, disqualified: false, exempt: true, reason: 'not_applicable' };
   }
-  if (st === 'absent') {
+  if (st === '') {
+    return { credit: 0, disqualified: false, exempt: false, reason: 'no_record' };
+  }
+  if (st === ATTENDANCE_STATUS.ABSENT) {
     return { credit: 0, disqualified: false, reason: 'absent' };
   }
-  if (st === 'excused') {
+  if (st === ATTENDANCE_STATUS.EXCUSED) {
     return { credit: sessionWeight, disqualified: false, reason: 'excused_full' };
   }
-  if (st !== 'present' && st !== 'late') {
+  if (st !== ATTENDANCE_STATUS.PRESENT && st !== ATTENDANCE_STATUS.LATE) {
     return { credit: 0, disqualified: false, reason: 'unknown_status' };
   }
 
@@ -191,11 +232,16 @@ function computeSessionCredit(record, sessionWeight, policy) {
  */
 function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {}) {
   const policy = resolvePolicy(classData, orgPolicyLayer);
-  const n = Array.isArray(records) ? records.length : 0;
+  const allRecords = Array.isArray(records) ? records : [];
+  const eligibleRecords = allRecords.filter((rec) => isEligibleAttendanceStatus(rec?.status));
+  const n = eligibleRecords.length;
+  const notApplicableSessionCount = allRecords.length - n;
   if (!n) {
     return {
       totalPresentSessions: 0,
       totalAbsentSessions: 0,
+      totalEligibleSessions: 0,
+      totalNotApplicableSessions: notApplicableSessionCount,
       disqualifiedSessionCount: 0,
       performancePercent: null,
       performancePercentRaw: null
@@ -208,10 +254,10 @@ function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {
   let totalPresentSessions = 0;
   let totalAbsentSessions = 0;
 
-  for (const rec of records) {
+  for (const rec of eligibleRecords) {
     const st = normalizeStatus(rec?.status);
-    if (st === 'present' || st === 'late') totalPresentSessions += 1;
-    if (st === 'absent') totalAbsentSessions += 1;
+    if (st === ATTENDANCE_STATUS.PRESENT || st === ATTENDANCE_STATUS.LATE) totalPresentSessions += 1;
+    if (st === ATTENDANCE_STATUS.ABSENT) totalAbsentSessions += 1;
 
     const { credit, disqualified } = computeSessionCredit(rec, sessionWeight, policy);
     sumCredit += credit;
@@ -224,6 +270,8 @@ function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {
   return {
     totalPresentSessions,
     totalAbsentSessions,
+    totalEligibleSessions: n,
+    totalNotApplicableSessions: notApplicableSessionCount,
     disqualifiedSessionCount,
     performancePercent,
     performancePercentRaw
@@ -231,6 +279,11 @@ function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {
 }
 
 module.exports = {
+  ATTENDANCE_STATUS,
+  normalizeStatus,
+  isNotApplicableStatus,
+  isEligibleAttendanceStatus,
+  normalizeAttendanceStatusForSave,
   resolvePolicy,
   parseTimeToMinutes,
   scheduledMinutesFromSession,

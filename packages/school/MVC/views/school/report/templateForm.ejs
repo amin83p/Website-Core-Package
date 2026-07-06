@@ -1,5 +1,6 @@
 <%
-  const isEdit = !!template;
+  const isEdit = !!(template && template.id);
+  const sourceTemplateForCopy = (typeof copySourceTemplate !== 'undefined' && copySourceTemplate) ? copySourceTemplate : null;
   const initialFields = Array.isArray(template?.schema?.fields) && template.schema.fields.length
     ? template.schema.fields
     : [
@@ -61,6 +62,9 @@
     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
     <input type="hidden" name="schemaJson" id="schemaJsonInput">
     <input type="hidden" name="placeholderMapJson" id="placeholderMapJsonInput">
+    <% if (!isEdit && sourceTemplateForCopy?.id) { %>
+      <input type="hidden" name="copySourceTemplateId" value="<%= sourceTemplateForCopy.id %>">
+    <% } %>
 
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-body p-3">
@@ -172,7 +176,7 @@
           <div class="accordion-item">
             <h2 class="accordion-header" id="prefillGbClassHeading">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#prefillGbClassPanel" aria-expanded="false" aria-controls="prefillGbClassPanel">
-                Gradebook — report period (class)
+                Gradebook - report period (class)
               </button>
             </h2>
             <div id="prefillGbClassPanel" class="accordion-collapse collapse" aria-labelledby="prefillGbClassHeading" data-bs-parent="#prefillCatalogAccordion">
@@ -194,7 +198,7 @@
           <div class="accordion-item">
             <h2 class="accordion-header" id="prefillExamClassHeading">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#prefillExamClassPanel" aria-expanded="false" aria-controls="prefillExamClassPanel">
-                Exams — report period (class)
+                Exams - report period (class)
               </button>
             </h2>
             <div id="prefillExamClassPanel" class="accordion-collapse collapse" aria-labelledby="prefillExamClassHeading" data-bs-parent="#prefillCatalogAccordion">
@@ -238,7 +242,7 @@
           <div class="accordion-item">
             <h2 class="accordion-header" id="prefillGbStudentHeading">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#prefillGbStudentPanel" aria-expanded="false" aria-controls="prefillGbStudentPanel">
-                Gradebook — report period (student)
+                Gradebook - report period (student)
               </button>
             </h2>
             <div id="prefillGbStudentPanel" class="accordion-collapse collapse" aria-labelledby="prefillGbStudentHeading" data-bs-parent="#prefillCatalogAccordion">
@@ -260,7 +264,7 @@
           <div class="accordion-item">
             <h2 class="accordion-header" id="prefillExamStudentHeading">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#prefillExamStudentPanel" aria-expanded="false" aria-controls="prefillExamStudentPanel">
-                Exams — report period (student)
+                Exams - report period (student)
               </button>
             </h2>
             <div id="prefillExamStudentPanel" class="accordion-collapse collapse" aria-labelledby="prefillExamStudentHeading" data-bs-parent="#prefillCatalogAccordion">
@@ -283,6 +287,46 @@
       </div>
     </div>
 
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="m-0 fw-bold">DOCX Repeat Tables</h5>
+        <span class="badge bg-light text-dark border">Dynamic Rows</span>
+      </div>
+      <div class="card-body p-3">
+        <div class="alert alert-light border small mb-3">
+          Use one sample row in the Word table. Put the loop start in the first cell and the loop end in the last cell of the same row.
+        </div>
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100">
+              <div class="fw-bold mb-2">Students</div>
+              <pre class="small bg-light border rounded p-2 mb-2 text-wrap"><code>{{#students}}{{student_no}} {{student_full_name}} {{student_attendance_span_percent}}{{/students}}</code></pre>
+              <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key" data-copy-token="{{#students}}{{student_no}} {{student_full_name}} {{student_attendance_span_percent}}{{/students}}">
+                <i class="bi bi-copy me-1"></i>Copy Example
+              </button>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100">
+              <div class="fw-bold mb-2">Attendance Sessions</div>
+              <pre class="small bg-light border rounded p-2 mb-2 text-wrap"><code>{{#attendance_sessions}}{{session_no}} {{session_date}} {{session_start_time}} {{session_end_time}}{{/attendance_sessions}}</code></pre>
+              <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key" data-copy-token="{{#attendance_sessions}}{{session_no}} {{session_date}} {{session_start_time}} {{session_end_time}}{{/attendance_sessions}}">
+                <i class="bi bi-copy me-1"></i>Copy Example
+              </button>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100">
+              <div class="fw-bold mb-2">Student Attendance Rows</div>
+              <pre class="small bg-light border rounded p-2 mb-2 text-wrap"><code>{{#student_attendance_rows}}{{student_full_name}} {{session_date}} {{attendance_status_label}}{{/student_attendance_rows}}</code></pre>
+              <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key" data-copy-token="{{#student_attendance_rows}}{{student_full_name}} {{session_date}} {{attendance_status_label}}{{/student_attendance_rows}}">
+                <i class="bi bi-copy me-1"></i>Copy Example
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <div>

@@ -26,6 +26,20 @@ function toDocxSafeValue(value) {
   }
 }
 
+function normalizeCollectionRows(rows = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => row && typeof row === 'object' && !Array.isArray(row))
+    .map((row) => {
+      const out = {};
+      Object.keys(row).forEach((key) => {
+        const cleanKey = normalizeTokenKey(key);
+        if (!cleanKey) return;
+        out[cleanKey] = toDocxSafeValue(row[key]);
+      });
+      return out;
+    });
+}
+
 function resolveTemplateFilePath(docxTemplate = {}) {
   const fromRecord = String(docxTemplate.path || '').trim();
   if (!fromRecord) return '';
@@ -38,12 +52,17 @@ function resolveTemplateFilePath(docxTemplate = {}) {
   return path.resolve(process.cwd(), fromRecord);
 }
 
-function buildRenderData(placeholders = {}) {
+function buildRenderData(placeholders = {}, collections = {}) {
   const out = {};
   Object.keys(placeholders || {}).forEach((token) => {
     const normalizedKey = normalizeTokenKey(token);
     if (!normalizedKey) return;
     out[normalizedKey] = toDocxSafeValue(placeholders[token]);
+  });
+  Object.keys(collections || {}).forEach((key) => {
+    const normalizedKey = normalizeTokenKey(key);
+    if (!normalizedKey) return;
+    out[normalizedKey] = normalizeCollectionRows(collections[key]);
   });
   return out;
 }
@@ -102,7 +121,7 @@ function getDocxDependencies() {
   return { PizZip, Docxtemplater };
 }
 
-async function renderReportInstanceDocx({ template, instance, placeholders }) {
+async function renderReportInstanceDocx({ template, instance, placeholders, collections }) {
   if (!template || !instance) throw new Error('Template and report instance are required.');
 
   const docxTemplate = template.docxTemplate || {};
@@ -126,7 +145,7 @@ async function renderReportInstanceDocx({ template, instance, placeholders }) {
     throw error;
   }
 
-  const renderData = buildRenderData(placeholders);
+  const renderData = buildRenderData(placeholders, collections);
 
   let doc;
   try {
@@ -161,6 +180,7 @@ async function renderReportInstanceDocx({ template, instance, placeholders }) {
 
 module.exports = {
   normalizeTokenKey,
+  normalizeCollectionRows,
   buildRenderData,
   resolveTemplateFilePath,
   renderReportInstanceDocx

@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const classController = require('../packages/school/MVC/controllers/school/classController');
+const rollingController = require('../packages/school/MVC/controllers/school/classRollingEnrollmentController');
 const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
 const idempotencyGuardService = require('../packages/school/MVC/services/school/idempotencyGuardService');
 
@@ -177,7 +178,7 @@ test('listClassEnrollmentPeriods returns sorted periods', async () => {
 
   const req = createReq({ params: { classId: 'CLS-1' } });
   const res = createRes();
-  await classController.listClassEnrollmentPeriods(req, res);
+  await rollingController.listClassEnrollmentPeriods(req, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.status, 'success');
@@ -209,7 +210,7 @@ test('createClassEnrollmentPeriod uses guard + writes period', async () => {
     }
   });
   const res = createRes();
-  await classController.createClassEnrollmentPeriod(req, res);
+  await rollingController.createClassEnrollmentPeriod(req, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.status, 'success');
@@ -238,7 +239,7 @@ test('createClassEnrollmentPeriod returns busy guard response', async () => {
     }
   });
   const res = createRes();
-  await classController.createClassEnrollmentPeriod(req, res);
+  await rollingController.createClassEnrollmentPeriod(req, res);
 
   assert.equal(res.statusCode, 409);
   assert.equal(res.payload.status, 'warning');
@@ -261,7 +262,7 @@ test('closeClassEnrollmentPeriod closes existing period', async () => {
     body: { endDate: '2026-05-10', status: 'completed' }
   });
   const res = createRes();
-  await classController.closeClassEnrollmentPeriod(req, res);
+  await rollingController.closeClassEnrollmentPeriod(req, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.status, 'success');
@@ -283,7 +284,7 @@ test('reopenClassEnrollmentPeriod reopens via new period', async () => {
     body: { startDate: '2026-06-01', status: 'active' }
   });
   const res = createRes();
-  await classController.reopenClassEnrollmentPeriod(req, res);
+  await rollingController.reopenClassEnrollmentPeriod(req, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.status, 'success');
@@ -308,7 +309,7 @@ test('checkClassEnrollmentPeriodOverlap returns overlap result', async () => {
     }
   });
   const res = createRes();
-  await classController.checkClassEnrollmentPeriodOverlap(req, res);
+  await rollingController.checkClassEnrollmentPeriodOverlap(req, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.status, 'success');
@@ -332,7 +333,7 @@ test('evaluateClassEnrollmentReentry returns rule result', async () => {
     }
   });
   const res = createRes();
-  await classController.evaluateClassEnrollmentReentry(req, res);
+  await rollingController.evaluateClassEnrollmentReentry(req, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.status, 'success');
@@ -355,7 +356,7 @@ test('closeClassCycle closes cycle with guard', async () => {
     body: { cycleEndDate: '2026-06-30', isClosedForNewEnrollment: true }
   });
   const res = createRes();
-  await classController.closeClassCycle(req, res);
+  await rollingController.closeClassCycle(req, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.status, 'success');
@@ -381,7 +382,7 @@ test('createNextClassCycleFromTemplate creates next cycle with guard', async () 
     }
   });
   const res = createRes();
-  await classController.createNextClassCycleFromTemplate(req, res);
+  await rollingController.createNextClassCycleFromTemplate(req, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.status, 'success');
@@ -417,7 +418,7 @@ test('carryForwardClassCycleStudents runs guarded carry-forward', async () => {
     }
   });
   const res = createRes();
-  await classController.carryForwardClassCycleStudents(req, res);
+  await rollingController.carryForwardClassCycleStudents(req, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.status, 'success');
@@ -454,7 +455,7 @@ test('splitClassEnrollmentPeriodsForCycleBoundary runs guarded split', async () 
     }
   });
   const res = createRes();
-  await classController.splitClassEnrollmentPeriodsForCycleBoundary(req, res);
+  await rollingController.splitClassEnrollmentPeriodsForCycleBoundary(req, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.status, 'success');
@@ -479,7 +480,7 @@ test('rolling workflow endpoints reject when feature flag is disabled', async ()
       }
     });
     const res = createRes();
-    await classController.createClassEnrollmentPeriod(req, res);
+    await rollingController.createClassEnrollmentPeriod(req, res);
 
     assert.equal(res.statusCode, 400);
     assert.equal(res.payload.status, 'error');

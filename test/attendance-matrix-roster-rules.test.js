@@ -43,3 +43,13 @@ test('combined late + early over threshold becomes absent', () => {
   );
   assert.equal(out.attendance, 'absent');
 });
+
+test('not_applicable is not converted by late or early thresholds', () => {
+  const out = applyAttendanceMatrixRosterRules(
+    { attendance: 'N/A', lateMinutes: 100, earlyLeaveMinutes: 100 },
+    policy
+  );
+  assert.equal(out.attendance, 'not_applicable');
+  assert.equal(out.lateMinutes, 0);
+  assert.equal(out.earlyLeaveMinutes, 0);
+});

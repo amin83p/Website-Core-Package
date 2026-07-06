@@ -8,9 +8,33 @@ const dataService = requireCoreModule('MVC/services/dataService');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
+const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
+const leaveRequestService = require('../../services/school/leaveRequestService');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
+
+function normalizeDateOnly(value) {
+  const token = String(value || '').trim();
+  if (!token) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(token)) return token;
+  const parsed = new Date(token);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+}
+
+function enrollmentPeriodCoversDate(period, sessionDate) {
+  const status = String(period?.status || '').trim().toLowerCase();
+  if (!classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES.includes(status)) return false;
+  const date = normalizeDateOnly(sessionDate);
+  const start = normalizeDateOnly(period?.startDate);
+  const end = normalizeDateOnly(period?.endDate) || '9999-12-31';
+  return Boolean(date && start && start <= date && end >= date);
+}
+
+function buildApplicabilityKey(personId, sessionId) {
+  return String(personId || '').trim() + '::' + String(sessionId || '').trim();
+}
 
 function normalizeEvaluation(classData) {
   const ev = classData?.evaluation && typeof classData.evaluation === 'object' ? classData.evaluation : {};
@@ -277,13 +301,28 @@ async function buildGradesMatrixPayload(req, query) {
       ? classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES
       : null
   });
-  const studentIds = enrollmentSnapshot.studentIds instanceof Set ? enrollmentSnapshot.studentIds : new Set();
+  let rollingApplicability = null;
   const activePersonIds = new Set();
-  studentIds.forEach((id) => {
-    const studentId = String(id || '').trim();
-    if (!studentId) return;
-    activePersonIds.add(String(studentToPersonMap.get(studentId) || studentId).trim());
-  });
+  if (isRollingClass) {
+    const rollingPeriodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user);
+    rollingApplicability = await classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicabilityWithLeaves({
+      sessions: filteredSessions,
+      periodRows: Array.isArray(rollingPeriodRows) ? rollingPeriodRows : [],
+      studentToPersonMap,
+      activeOrgId,
+      orgId: classData?.orgId || activeOrgId,
+      reqUser: req.user,
+      allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+    });
+    rollingApplicability.personIds.forEach((personId) => activePersonIds.add(String(personId || '').trim()));
+  } else {
+    const studentIds = enrollmentSnapshot.studentIds instanceof Set ? enrollmentSnapshot.studentIds : new Set();
+    studentIds.forEach((id) => {
+      const studentId = String(id || '').trim();
+      if (!studentId) return;
+      activePersonIds.add(String(studentToPersonMap.get(studentId) || studentId).trim());
+    });
+  }
   const personById = await schoolPersonAccessService.buildPersonByIdMap({
     reqUser: req.user,
     personIds: Array.from(activePersonIds)
@@ -309,16 +348,33 @@ async function buildGradesMatrixPayload(req, query) {
   });
 
   const evaluation = normalizeEvaluation(classData);
-
+  const getApplicabilityForSession = (stu, ses) => {
+    if (!isRollingClass) return { expected: true, reason: 'date_window' };
+    return classEnrollmentSessionApplicabilityService.getApplicabilityState(
+      rollingApplicability?.stateByKey,
+      stu.personId,
+      ses,
+      ses?.sessionId || ses?.id
+    ) || { expected: false, reason: 'not_enrolled' };
+  };
   const matrix = studentList.map((stu) => {
     const attendanceRecords = filteredSessions.map((ses) => {
       const rosterRecord = ses.roster?.find((r) => idsEqual(r.personId, stu.personId));
+      const applicabilityState = getApplicabilityForSession(stu, ses);
+      const expectedForSession = Boolean(applicabilityState.expected);
+      const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
+      let status = rosterRecord
+        ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
+        : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE);
+      if (hasApprovedLeave && (!rosterRecord || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
+        status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+      }
       return {
         sessionId: ses.sessionId,
         date: ses.date,
-        status: rosterRecord ? rosterRecord.attendance : 'N/A',
-        lateMinutes: rosterRecord?.lateMinutes || 0,
-        earlyLeaveMinutes: rosterRecord?.earlyLeaveMinutes || 0,
+        status,
+        lateMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.lateMinutes || 0),
+        earlyLeaveMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.earlyLeaveMinutes || 0),
         scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(ses, attendancePolicy.scheduledMinutes)
       };
     });
@@ -328,15 +384,23 @@ async function buildGradesMatrixPayload(req, query) {
     const cells = columns.map((col) => {
       const ses = sessionById.get(col.sessionId);
       if (!ses) {
-        return { score: null, percent: null, absent: true, effective: false, includeInGradeCalculation: false };
+        return { score: null, percent: null, absent: true, attendanceStatus: attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT, effective: false, includeInGradeCalculation: false };
       }
       const rosterRecord = ses.roster?.find((r) => idsEqual(r.personId, stu.personId));
-      const att = String(rosterRecord?.attendance || 'absent').trim().toLowerCase();
-      const absent = att === 'absent';
+      const applicabilityState = getApplicabilityForSession(stu, ses);
+      const expectedForSession = Boolean(applicabilityState.expected);
+      const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
+      let att = rosterRecord
+        ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
+        : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE);
+      if (hasApprovedLeave && (!rosterRecord || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
+        att = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+      }
+      const absent = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
 
       const payload = pickPayload(ses, col);
       if (!payload) {
-        return { score: null, percent: null, absent, effective: false, includeInGradeCalculation: !!col.includeInGradeCalculation };
+        return { score: null, percent: null, absent, attendanceStatus: att, effective: false, includeInGradeCalculation: !!col.includeInGradeCalculation };
       }
 
       const total = Number(col.totalScore) > 0 ? Number(col.totalScore) : Number(payload.totalScore) || 0;
@@ -351,6 +415,7 @@ async function buildGradesMatrixPayload(req, query) {
         score: absent ? null : raw,
         percent,
         absent,
+        attendanceStatus: att,
         effective,
         includeInGradeCalculation: col.includeInGradeCalculation
       };

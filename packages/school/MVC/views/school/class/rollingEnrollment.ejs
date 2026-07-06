@@ -121,6 +121,10 @@
           <th class="ps-4">Student / ID</th>
           <th>Start Date</th>
           <th>End Date</th>
+          <th class="text-center">Target</th>
+          <th class="text-center">Consumed</th>
+          <th class="text-center">Remaining</th>
+          <th>Completion</th>
           <th class="text-center">Period Status</th>
           <th>Funder (Type / ID)</th>
           <th>Auth Ref</th>
@@ -135,7 +139,7 @@
 </div>
 
 <div class="modal fade" id="addEnrollmentPeriodModal" tabindex="-1" aria-labelledby="addEnrollmentPeriodModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="addEnrollmentPeriodModalLabel"><i class="bi bi-person-plus me-1"></i>New Enrollment Period</h5>
@@ -160,35 +164,42 @@
           </div>
         </div>
         <div class="row g-2">
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label class="form-label">Start Date *</label>
             <input type="date" id="inp_startDate" class="form-control">
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label class="form-label">End Date</label>
             <input type="date" id="inp_endDate" class="form-control">
           </div>
+          <div class="col-md-4">
+            <label class="form-label">Number of Sessions</label>
+            <input type="number" id="inp_targetSessionCount" class="form-control" min="1" step="1" placeholder="Optional, e.g. 10">
+            <div class="form-text compact-help">N/A sessions do not count.</div>
+          </div>
         </div>
         <div class="row g-2 mt-2">
-          <div class="col-md-6">
+          <div class="col-md-4">
+            <label class="form-label">Funder ID</label>
+            <input type="text" id="inp_funderId" class="form-control" placeholder="Optional">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Funder Type</label>
+            <input type="text" id="inp_funderType" class="form-control" placeholder="e.g. WCB">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Authorization Ref</label>
+            <input type="text" id="inp_authorizationRef" class="form-control" placeholder="Optional">
+          </div>
+        </div>
+        <div class="row g-2 mt-2">
+          <div class="col-md-4">
             <label class="form-label">Status</label>
             <select id="inp_status" class="form-select">
               <option value="active" selected>Active</option>
               <option value="planned">Planned</option>
               <option value="draft">Draft</option>
             </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Funder Type</label>
-            <input type="text" id="inp_funderType" class="form-control" placeholder="e.g. WCB">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Funder ID</label>
-            <input type="text" id="inp_funderId" class="form-control" placeholder="Optional">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Authorization Ref</label>
-            <input type="text" id="inp_authorizationRef" class="form-control" placeholder="Optional">
           </div>
         </div>
         <div class="mt-2">
@@ -420,6 +431,12 @@
             <label class="form-label">End Date</label>
             <input type="date" id="edit_endDate" class="form-control">
           </div>
+          <div class="col-md-6">
+            <label class="form-label">Target Sessions</label>
+            <input type="number" id="edit_targetSessionCount" class="form-control" min="1" step="1" placeholder="Optional, e.g. 10">
+            <div class="form-text compact-help">N/A sessions do not count against this cap.</div>
+          </div>
+
           <div class="col-md-6">
             <label class="form-label">Status</label>
             <select id="edit_status" class="form-select">
@@ -1226,7 +1243,9 @@
       funderType: String(qs('inp_funderType')?.value || '').trim(),
       funderId: String(qs('inp_funderId')?.value || '').trim(),
       authorizationRef: String(qs('inp_authorizationRef')?.value || '').trim(),
-      reasonStart: String(qs('inp_reasonStart')?.value || '').trim()
+      reasonStart: String(qs('inp_reasonStart')?.value || '').trim(),
+      targetSessionCount: String(qs('inp_targetSessionCount')?.value || '').trim(),
+      sessionCountPolicy: 'all_non_na'
     };
   }
 
@@ -1250,7 +1269,9 @@
       funderType: String(qs('inp_funderType')?.value || '').trim(),
       funderId: String(qs('inp_funderId')?.value || '').trim(),
       authorizationRef: String(qs('inp_authorizationRef')?.value || '').trim(),
-      reasonStart: String(qs('inp_reasonStart')?.value || '').trim()
+      reasonStart: String(qs('inp_reasonStart')?.value || '').trim(),
+      targetSessionCount: String(pendingEnrollmentPayload?.targetSessionCount || '').trim(),
+      sessionCountPolicy: String(pendingEnrollmentPayload?.sessionCountPolicy || 'all_non_na').trim() || 'all_non_na'
     };
   }
 
@@ -1601,6 +1622,8 @@
         funderId: draftContext.funderId,
         authorizationRef: draftContext.authorizationRef,
         reasonStart: draftContext.reasonStart,
+        targetSessionCount: draftContext.targetSessionCount,
+        sessionCountPolicy: draftContext.sessionCountPolicy,
         draftTransactionItems: pendingDraftTransactionItems,
         editedRows: collectEditedRows(),
         addedRows: collectAddedRows()
@@ -1642,6 +1665,8 @@
         funderId: draftContext.funderId,
         authorizationRef: draftContext.authorizationRef,
         reasonStart: draftContext.reasonStart,
+        targetSessionCount: draftContext.targetSessionCount,
+        sessionCountPolicy: draftContext.sessionCountPolicy,
         draftTransactionItems: pendingDraftTransactionItems,
         editedRows: collectEditedRows(),
         addedRows: collectAddedRows()
@@ -1679,6 +1704,8 @@
         funderId: draftContext.funderId,
         authorizationRef: draftContext.authorizationRef,
         reasonStart: draftContext.reasonStart,
+        targetSessionCount: draftContext.targetSessionCount,
+        sessionCountPolicy: draftContext.sessionCountPolicy,
         draftTransactionItems: pendingDraftTransactionItems,
         editedRows: collectEditedRows(),
         addedRows: collectAddedRows()
@@ -1720,7 +1747,9 @@
       funderType: String(row?.funderType || '').trim(),
       funderId: String(row?.funderId || '').trim(),
       authorizationRef: String(row?.authorizationRef || '').trim(),
-      reasonStart: String(row?.reasonStart || '').trim()
+      reasonStart: String(row?.reasonStart || '').trim(),
+      targetSessionCount: String(row?.targetSessionCount || '').trim(),
+      sessionCountPolicy: String(row?.sessionCountPolicy || 'all_non_na').trim() || 'all_non_na'
     };
 
     openChargeModalWithDraft(payload, {
@@ -1782,7 +1811,7 @@
     rows.sort((a, b) => String(a?.startDate || '').localeCompare(String(b?.startDate || '')));
     periodCount.textContent = `${rows.length} row${rows.length === 1 ? '' : 's'}`;
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No enrollment periods found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-muted">No enrollment periods found.</td></tr>';
       return;
     }
 
@@ -1799,6 +1828,14 @@
       const canSyncAcademicLedger = hasPostedTransactions || status === 'active';
       const removeLabel = hasPostedTransactions ? 'Rollback' : 'Delete';
       const funderLabel = [row?.funderType, row?.funderId].filter(Boolean).join(' / ') || '-';
+      const targetSessionCount = Number(row?.targetSessionCount || 0);
+      const consumedSessionCount = Number(row?.consumedSessionCount || 0);
+      const remainingSessionCount = targetSessionCount ? Math.max(0, Number(row?.remainingSessionCount ?? (targetSessionCount - consumedSessionCount))) : null;
+      const completion = row?.sessionCompletion || (row?.completionDate ? { date: row.completionDate, sessionId: row?.completionSessionId || '', reason: row?.completionReason || '' } : null);
+      const completionHtml = completion?.date
+        ? '<div class="small fw-semibold">' + htmlEscape(String(completion.date || '')) + '</div>'
+          + (completion.sessionId ? '<div class="x-small text-muted font-monospace">' + htmlEscape(String(completion.sessionId)) + '</div>' : '')
+        : '<span class="text-muted">-</span>';
       return `
         <tr>
           <td class="ps-4">
@@ -1807,6 +1844,10 @@
           </td>
           <td>${htmlEscape(String(row?.startDate || '-'))}</td>
           <td>${htmlEscape(String(row?.endDate || 'Open'))}</td>
+          <td class="text-center">${targetSessionCount ? htmlEscape(String(targetSessionCount)) : '<span class="text-muted">-</span>'}</td>
+          <td class="text-center">${targetSessionCount ? htmlEscape(String(consumedSessionCount)) : '<span class="text-muted">-</span>'}</td>
+          <td class="text-center">${targetSessionCount ? htmlEscape(String(remainingSessionCount)) : '<span class="text-muted">-</span>'}</td>
+          <td>${completionHtml}</td>
           <td class="text-center"><span class="badge ${badgeClass}">${htmlEscape(status || '-')}</span></td>
           <td>${htmlEscape(funderLabel)}</td>
           <td>${htmlEscape(String(row?.authorizationRef || '-'))}</td>
@@ -1868,6 +1909,7 @@
     qs('inp_funderId').value = '';
     qs('inp_authorizationRef').value = '';
     qs('inp_reasonStart').value = '';
+    if (qs('inp_targetSessionCount')) qs('inp_targetSessionCount').value = '';
     lastRollingEligibility = null;
     setRollingRegistrationPanelHtml('<span class="text-muted">Select a student to verify program registration and prerequisites.</span>');
   }
@@ -1982,6 +2024,7 @@
     qs('edit_funderId').value = String(row?.funderId || '').trim();
     qs('edit_authorizationRef').value = String(row?.authorizationRef || '').trim();
     qs('edit_reasonStart').value = String(row?.reasonStart || '').trim();
+    if (qs('edit_targetSessionCount')) qs('edit_targetSessionCount').value = row?.targetSessionCount ? String(row.targetSessionCount) : '';
     editModal.show();
   }
 
@@ -2108,7 +2151,9 @@
         funderType: String(qs('edit_funderType')?.value || '').trim(),
         funderId: String(qs('edit_funderId')?.value || '').trim(),
         authorizationRef: String(qs('edit_authorizationRef')?.value || '').trim(),
-        reasonStart: String(qs('edit_reasonStart')?.value || '').trim()
+        reasonStart: String(qs('edit_reasonStart')?.value || '').trim(),
+        targetSessionCount: String(qs('edit_targetSessionCount')?.value || '').trim(),
+        sessionCountPolicy: 'all_non_na'
       });
       if (!result) return;
       editModal?.hide();

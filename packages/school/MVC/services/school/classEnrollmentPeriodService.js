@@ -1,6 +1,7 @@
 const schoolRepositories = require('../../repositories/school');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const classEnrollmentPolicyService = require('./classEnrollmentPolicyService');
+const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const TERMINAL_STATUSES = new Set(['cancelled', 'archived', 'error']);
@@ -188,6 +189,7 @@ async function createPeriod(input = {}, requestingUser = null, options = {}) {
   const endDate = normalizeDateOnly(input.endDate);
   if (endDate && endDate < startDate) throw new Error('endDate cannot be before startDate.');
   const requestedStatus = normalizeStatus(input.status, 'active');
+  const sessionCap = classEnrollmentSessionApplicabilityService.sanitizeSessionCapFields(input);
 
   if (
     String(classRow?.registrationMode || '').trim().toLowerCase() === 'rolling' &&
@@ -271,6 +273,11 @@ async function createPeriod(input = {}, requestingUser = null, options = {}) {
     pricing: (input.pricing && typeof input.pricing === 'object')
       ? { ...input.pricing }
       : {},
+    targetSessionCount: sessionCap.targetSessionCount,
+    sessionCountPolicy: sessionCap.sessionCountPolicy,
+    completionDate: sessionCap.completionDate,
+    completionSessionId: sessionCap.completionSessionId,
+    completionReason: sessionCap.completionReason,
     funderType: String(input.funderType || '').trim(),
     funderId: String(input.funderId || '').trim(),
     authorizationRef: String(input.authorizationRef || '').trim(),

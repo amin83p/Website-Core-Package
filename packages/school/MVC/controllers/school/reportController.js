@@ -434,6 +434,41 @@ async function listTemplates(req, res) {
   }
 }
 
+function clonePlainValue(value, fallback) {
+  if (value === undefined) return fallback;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function resolveNextTemplateVersion(templates = [], sourceTemplate = {}, orgId = '') {
+  const sourceType = String(sourceTemplate?.type || '').trim().toLowerCase();
+  const targetOrgId = String(orgId || sourceTemplate?.orgId || '').trim();
+  const versions = (Array.isArray(templates) ? templates : [])
+    .filter((row) => idsEqual(row?.orgId, targetOrgId))
+    .filter((row) => String(row?.type || '').trim().toLowerCase() === sourceType)
+    .map((row) => Number(row?.version || 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const maxVersion = versions.length ? Math.max(...versions) : Number(sourceTemplate?.version || 0);
+  return Math.min(1000, Math.max(1, maxVersion + 1));
+}
+
+function buildCopiedTemplateDraft(sourceTemplate = {}, templates = [], activeOrgId = '') {
+  const originalTitle = String(sourceTemplate?.title || 'Report Template').trim() || 'Report Template';
+  return {
+    orgId: activeOrgId || sourceTemplate.orgId,
+    type: String(sourceTemplate?.type || 'progress_report_v1').trim().toLowerCase() || 'progress_report_v1',
+    version: resolveNextTemplateVersion(templates, sourceTemplate, activeOrgId || sourceTemplate.orgId),
+    title: `Copy of ${originalTitle}`.slice(0, 180),
+    status: 'draft',
+    description: String(sourceTemplate?.description || '').trim(),
+    schema: clonePlainValue(sourceTemplate?.schema, { version: 1, fields: [] }),
+    placeholderMap: clonePlainValue(sourceTemplate?.placeholderMap, {}),
+    docxTemplate: clonePlainValue(sourceTemplate?.docxTemplate, null)
+  };
+}
 async function showTemplateForm(req, res) {
   try {
     const id = String(req.params.id || '').trim();
@@ -461,6 +496,31 @@ async function showTemplateForm(req, res) {
   }
 }
 
+async function showTemplateCopyForm(req, res) {
+  try {
+    const activeOrgId = await assertCreateOrgContextOrThrow(req.user);
+    const sourceTemplate = await reportIntegrityService.assertTemplateAccessible(req.params.id, req.user);
+    if (sourceTemplate?.orgId && !idsEqual(sourceTemplate.orgId, activeOrgId)) {
+      throw new Error('Activate the source template organization before copying this report template.');
+    }
+    const allTemplates = await schoolDataService.fetchData('reportTemplates', {}, req.user);
+    const template = buildCopiedTemplateDraft(sourceTemplate, allTemplates, activeOrgId);
+
+    res.render('school/report/templateForm', {
+      title: 'Copy Report Template',
+      template,
+      copySourceTemplate: sourceTemplate,
+      fieldTypes: reportTemplateModel.FIELD_TYPES,
+      templateStatuses: reportTemplateModel.TEMPLATE_STATUSES,
+      prefillCatalog: reportService.getPrefillCatalog(),
+      includeModal: true,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
 async function saveTemplate(req, res) {
   try {
     const id = String(req.params.id || '').trim();
@@ -470,6 +530,16 @@ async function saveTemplate(req, res) {
 
     if (isEdit) {
       existing = await reportIntegrityService.assertTemplateAccessible(id, req.user);
+    }
+
+    
+    let copySourceTemplate = null;
+    const copySourceTemplateId = String(req.body.copySourceTemplateId || '').trim();
+    if (!isEdit && copySourceTemplateId) {
+      copySourceTemplate = await reportIntegrityService.assertTemplateAccessible(copySourceTemplateId, req.user);
+      if (copySourceTemplate?.orgId && !idsEqual(copySourceTemplate.orgId, activeOrgId)) {
+        throw new Error('Activate the source template organization before saving this copied report template.');
+      }
     }
 
     const payload = reportViewService.buildTemplateSavePayload({
@@ -482,6 +552,10 @@ async function saveTemplate(req, res) {
     // Validate prefill keys against catalog whitelist before saving template
     // This prevents templates from referencing undefined/non-existent prefill values
     // Audit test (school.report.shared-fields.test.js) ensures all catalog keys are produced by buildPrefillSnapshot
+    if (!isEdit && copySourceTemplate && !req.file && copySourceTemplate.docxTemplate) {
+      payload.docxTemplate = clonePlainValue(copySourceTemplate.docxTemplate, null);
+    }
+
     const invalidPrefillKeys = reportService.validateTemplatePrefillKeys(payload.schema);
     if (invalidPrefillKeys.length) {
       const details = invalidPrefillKeys
@@ -1390,16 +1464,27 @@ async function exportInstance(req, res) {
     );
     const placeholderBundle = reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
     const placeholders = placeholderBundle.placeholders;
+    const collections = await reportService.buildReportDocxCollections({
+      template,
+      instance,
+      assignment: effectiveAssignment,
+      reqUser: req.user
+    });
     const mergedAnswers = reportService.mergeTemplateData(template, instance, effectiveAssignment);
+    const collectionDiagnostics = Object.fromEntries(
+      Object.entries(collections || {}).map(([key, rows]) => [key, { rowCount: Array.isArray(rows) ? rows.length : 0 }])
+    );
     const payload = {
       instanceId: instance.id,
       templateId: template.id,
       templateVersion: template.version,
       status: instance.status,
       placeholders,
+      collections,
       answers: instance.answers || {},
       mergedAnswers,
       conversionDiagnostics: placeholderBundle.conversionDiagnostics || [],
+      collectionDiagnostics,
       assignmentSharedAnswers: effectiveAssignment?.sharedAnswers || {},
       prefillSnapshot: instance.prefillSnapshot || {}
     };
@@ -1410,7 +1495,8 @@ async function exportInstance(req, res) {
       const rendered = await reportDocxRenderService.renderReportInstanceDocx({
         template,
         instance,
-        placeholders
+        placeholders,
+        collections
       });
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="${rendered.fileName}"`);
@@ -1435,6 +1521,7 @@ module.exports = {
   showHome,
   listTemplates,
   showTemplateForm,
+  showTemplateCopyForm,
   saveTemplate,
   deleteTemplate,
   listAssignments,

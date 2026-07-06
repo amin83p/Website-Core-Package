@@ -1,6 +1,7 @@
 const schoolDataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 
 const OPEN_PERIOD_STATUSES = new Set(['active', 'planned']);
 const REPORT_ROSTER_OPEN_STATUSES = Object.freeze(['active', 'planned']);
@@ -28,7 +29,7 @@ function isOpenCanonicalPeriod(row, referenceDate = '') {
   if (!OPEN_PERIOD_STATUSES.has(status)) return false;
   const day = getReferenceDate(referenceDate);
   const start = normalizeDateOnly(row?.startDate);
-  const end = normalizeDateOnly(row?.endDate);
+  const end = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(row);
   if (start && start > day && status !== 'planned') return false;
   if (end && end < day) return false;
   return true;
@@ -64,7 +65,7 @@ function periodOverlapsWindow(row, windowStart, windowEnd, allowedStatuses = OPE
   const statusSet = allowedStatuses instanceof Set ? allowedStatuses : OPEN_PERIOD_STATUSES;
   if (!statusSet.has(status)) return false;
   const start = normalizeDateOnly(row?.startDate);
-  const end = normalizeDateOnly(row?.endDate) || '9999-12-31';
+  const end = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(row);
   if (!start) return false;
   const normalizedStart = normalizeDateOnly(windowStart);
   const normalizedEnd = normalizeDateOnly(windowEnd);

@@ -4,6 +4,9 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const leaveRequestService = require('./leaveRequestService');
+const classEnrollmentReadService = require('./classEnrollmentReadService');
+const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const reportRuleEngineService = require('./reportRuleEngineService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
@@ -22,10 +25,10 @@ const { getPrefillValue, normalizePrefillKey } = require('./reportPrefillKeyUtil
  * - `examPeriodClass` / `examPeriodStudent`: Period-based exam stats
  * 
  * CRITICAL NOTES:
- * - Attendance Matrix percent treats missing/unmarked attendance marks as absent
+ * - Attendance Matrix percent treats missing/unmarked expected attendance marks as absent; N/A is excluded
  * - All keys must be produced by buildPrefillSnapshot(); audit test verifies this
  * - Keys are validated at template save-time via validateTemplatePrefillKeys()
- * - Type conversion applied at runtime (checkbox→boolean, number→finite)
+ * - Type conversion applied at runtime (checkbox to boolean, number to finite)
  * - Braced keys {{key}} normalized to bare keys at save time
  */
 const PREFILL_CATALOG = Object.freeze({
@@ -51,6 +54,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'class_attendance_late', label: 'Class Attendance Late', description: 'Class late count, or report-period late count for each-student reports.' }),
     Object.freeze({ key: 'class_attendance_excused', label: 'Class Attendance Excused', description: 'Class excused count, or report-period excused count for each-student reports.' }),
     Object.freeze({ key: 'class_attendance_absent', label: 'Class Attendance Absent', description: 'Class absent count, or missing/absent report-period session count for each-student reports.' }),
+    Object.freeze({ key: 'class_attendance_na', label: 'Class Attendance N/A', description: 'Class not-applicable count, or report-period N/A count for each-student reports.' }),
     Object.freeze({ key: 'class_attendance_span_sessions', label: 'Class Attendance Span Sessions', description: 'Number of sessions in the report period.' }),
     Object.freeze({ key: 'class_attendance_span_unique_students', label: 'Class Attendance Span Unique Students', description: 'Unique students observed across sessions in the report period.' }),
     Object.freeze({ key: 'class_attendance_span_total', label: 'Class Attendance Span Total', description: 'Total attendance rows across sessions in the report period.' }),
@@ -58,6 +62,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'class_attendance_span_late', label: 'Class Attendance Span Late', description: 'Late count across report-period sessions.' }),
     Object.freeze({ key: 'class_attendance_span_excused', label: 'Class Attendance Span Excused', description: 'Excused count across report-period sessions.' }),
     Object.freeze({ key: 'class_attendance_span_absent', label: 'Class Attendance Span Absent', description: 'Absent count across report-period sessions.' }),
+    Object.freeze({ key: 'class_attendance_span_na', label: 'Class Attendance Span N/A', description: 'Not-applicable count across report-period sessions, excluded from attendance percent.' }),
     Object.freeze({ key: 'class_attendance_span_percent', label: 'Class Attendance Span Percent', description: 'Computed attendance percentage across report-period sessions.' })
   ]),
   gradebookPeriodClass: Object.freeze([
@@ -116,6 +121,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_attendance_late', label: 'Student Attendance Late', description: 'Count of late sessions for this student.' }),
     Object.freeze({ key: 'student_attendance_excused', label: 'Student Attendance Excused', description: 'Count of excused sessions for this student.' }),
     Object.freeze({ key: 'student_attendance_absent', label: 'Student Attendance Absent', description: 'Count of absent sessions for this student.' }),
+    Object.freeze({ key: 'student_attendance_na', label: 'Student Attendance N/A', description: 'Count of not-applicable sessions for this student.' }),
     Object.freeze({ key: 'student_attendance_percent', label: 'Student Attendance Percent', description: 'Computed attendance percentage.' }),
     Object.freeze({ key: 'student_late_minutes', label: 'Student Late Minutes', description: 'Accumulated late minutes for this student.' }),
     Object.freeze({ key: 'student_early_leave_minutes', label: 'Student Early Leave Minutes', description: 'Accumulated early-leave minutes for this student.' }),
@@ -124,6 +130,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_attendance_span_late', label: 'Student Attendance Span Late', description: 'Late count for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_excused', label: 'Student Attendance Span Excused', description: 'Excused count for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_absent', label: 'Student Attendance Span Absent', description: 'Absent count for this student within report period.' }),
+    Object.freeze({ key: 'student_attendance_span_na', label: 'Student Attendance Span N/A', description: 'Not-applicable count for this student within report period, excluded from attendance percent.' }),
     Object.freeze({ key: 'student_attendance_span_percent', label: 'Student Attendance Span Percent', description: 'Attendance percentage for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_late_minutes', label: 'Student Attendance Span Late Minutes', description: 'Late minutes for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_early_leave_minutes', label: 'Student Attendance Span Early Leave Minutes', description: 'Early-leave minutes for this student within report period.' }),
@@ -149,7 +156,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_gradebook_period_points_possible', label: 'Student Gradebook Period Points Possible', description: 'Sum of activity totals.' })
   ]),
   examPeriodStudent: Object.freeze([
-    Object.freeze({ key: 'student_exam_period_assignment_count', label: 'Student Exam Period Assignments', description: 'This student’s exam rows overlapping report period.' }),
+    Object.freeze({ key: 'student_exam_period_assignment_count', label: 'Student Exam Period Assignments', description: 'This student\'s exam rows overlapping report period.' }),
     Object.freeze({ key: 'student_exam_period_graded_count', label: 'Student Exam Period Graded', description: 'Graded count in period.' }),
     Object.freeze({ key: 'student_exam_period_avg_percent', label: 'Student Exam Period Avg %', description: 'Average percentage (submitted, auto-submitted, or graded).' }),
     Object.freeze({ key: 'student_exam_period_total_score', label: 'Student Exam Period Total Score', description: 'Sum of scoreComputed.' }),
@@ -202,31 +209,104 @@ function getRangeDaysInclusive(startDate, dueDate) {
 
 function filterSessionsByDateRange(sessions, startDate, dueDate) {
   const rows = Array.isArray(sessions) ? sessions : [];
-  const startTs = parseDateOnlyToUtcDay(startDate);
-  const dueTs = parseDateOnlyToUtcDay(dueDate);
+  const startTs = parseDateOnlyToUtcDay(String(startDate || '').trim());
+  const dueTs = parseDateOnlyToUtcDay(String(dueDate || '').trim());
   if (!Number.isFinite(startTs) || !Number.isFinite(dueTs)) return rows;
   return rows.filter((session) => {
-    const dateTs = parseDateOnlyToUtcDay(session?.date);
-    if (!Number.isFinite(dateTs)) return false;
-    return dateTs >= startTs && dateTs <= dueTs;
+    const dateTs = parseDateOnlyToUtcDay(String(session?.date || '').trim());
+    return Number.isFinite(dateTs) && dateTs >= startTs && dateTs <= dueTs;
   });
+}
+
+function buildSessionMetricKey(session = {}) {
+  return String(session?.sessionId || session?.id || session?.date || '').trim();
+}
+
+function enrollmentPeriodCoversSession(period = {}, session = {}) {
+  const status = String(period?.status || '').trim().toLowerCase();
+  if (!classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES.includes(status)) return false;
+  const sessionDate = String(session?.date || '').trim();
+  const start = String(period?.startDate || '').trim();
+  const end = String(period?.endDate || '9999-12-31').trim();
+  return Boolean(sessionDate && start && start <= sessionDate && end >= sessionDate);
+}
+
+async function buildStudentAttendanceApplicabilityContext({ classData, sessions, studentRecord, studentPersonId, reqUser, orgId }) {
+  const targetPersonId = toPublicId(studentPersonId);
+  const sessionRows = Array.isArray(sessions) ? sessions : [];
+  const notApplicableSessionIds = new Set();
+  const expectedSessionIds = new Set(sessionRows.map(buildSessionMetricKey).filter(Boolean));
+  if (!targetPersonId || !sessionRows.length) return { notApplicableSessionIds, expectedSessionIds };
+
+  const registrationMode = String(classData?.registrationMode || '').trim().toLowerCase();
+  if (registrationMode === 'rolling') {
+    expectedSessionIds.clear();
+    const periods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id || '', reqUser);
+    const studentToPersonMap = new Map([[toPublicId(studentRecord?.id), targetPersonId]].filter(([studentId, personId]) => studentId && personId));
+    const applicability = await classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicabilityWithLeaves({
+      sessions: sessionRows,
+      periodRows: periods,
+      studentToPersonMap,
+      activeOrgId: orgId || classData?.orgId || reqUser?.activeOrgId || '',
+      orgId: orgId || classData?.orgId || reqUser?.activeOrgId || '',
+      reqUser,
+      allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+    });
+    sessionRows.forEach((session) => {
+      const key = buildSessionMetricKey(session);
+      if (!key) return;
+      const state = classEnrollmentSessionApplicabilityService.getApplicabilityState(
+        applicability.stateByKey,
+        targetPersonId,
+        session,
+        session?.sessionId || session?.id
+      );
+      if (state?.expected) expectedSessionIds.add(key);
+      else notApplicableSessionIds.add(key);
+    });
+    return { notApplicableSessionIds, expectedSessionIds };
+  }
+
+  const leaveConflicts = await leaveRequestService.findApprovedLeaveConflicts({
+    orgId,
+    reqUser,
+    windows: sessionRows.map((session) => ({
+      sessionIndex: buildSessionMetricKey(session),
+      personId: targetPersonId,
+      date: session?.date,
+      startTime: session?.startTime,
+      endTime: session?.endTime
+    })).filter((row) => row.sessionIndex && row.date)
+  });
+  leaveConflicts.forEach((row) => {
+    const key = String(row?.sessionIndex || '').trim();
+    if (key) notApplicableSessionIds.add(key);
+  });
+
+  return { notApplicableSessionIds, expectedSessionIds };
 }
 
 function buildClassAttendanceSummary(session) {
   const roster = Array.isArray(session?.roster) ? session.roster : [];
   const summary = {
-    total: roster.length,
+    total: 0,
     present: 0,
     late: 0,
     excused: 0,
-    absent: 0
+    absent: 0,
+    notApplicable: 0
   };
 
   roster.forEach((row) => {
-    const status = String(row?.attendance || '').toLowerCase();
-    if (status === 'present') summary.present += 1;
-    else if (status === 'late') summary.late += 1;
-    else if (status === 'excused') summary.excused += 1;
+    const status = attendanceMatrixMetricsService.normalizeStatus(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
+    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
+      summary.notApplicable += 1;
+      return;
+    }
+    summary.total += 1;
+    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) summary.present += 1;
+    else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) summary.late += 1;
+    else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) summary.excused += 1;
     else summary.absent += 1;
   });
 
@@ -240,6 +320,7 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
     late: 0,
     excused: 0,
     absent: 0,
+    notApplicable: 0,
     lateMinutes: 0,
     earlyLeaveMinutes: 0
   };
@@ -248,6 +329,8 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
   if (!target) return out;
   const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
   const countMissingAsAbsent = options?.countMissingAsAbsent === true;
+  const notApplicableSessionIds = options?.notApplicableSessionIds instanceof Set ? options.notApplicableSessionIds : new Set();
+  const expectedSessionIds = options?.expectedSessionIds instanceof Set ? options.expectedSessionIds : null;
   const classData = options?.classData && typeof options.classData === 'object' ? options.classData : {};
   const orgPolicyLayer = options?.orgPolicyLayer && typeof options.orgPolicyLayer === 'object' ? options.orgPolicyLayer : {};
   const matrixPolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
@@ -259,9 +342,20 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
       notes: session?.notes
     })) return;
     const roster = Array.isArray(session?.roster) ? session.roster : [];
+    const sessionKey = buildSessionMetricKey(session);
+    const derivedNotApplicable = sessionKey && notApplicableSessionIds.has(sessionKey);
+    const expectedForSession = !expectedSessionIds || !sessionKey || expectedSessionIds.has(sessionKey);
     const row = roster.find((item) => idsEqual(item?.personId, target));
     if (!row) {
-      if (countMissingAsAbsent) {
+      if (derivedNotApplicable || !expectedForSession) {
+        out.notApplicable += 1;
+        matrixRecords.push({
+          status: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE,
+          lateMinutes: 0,
+          earlyLeaveMinutes: 0,
+          scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(session, matrixPolicy.scheduledMinutes)
+        });
+      } else if (countMissingAsAbsent) {
         out.totalSessions += 1;
         out.absent += 1;
         matrixRecords.push({
@@ -273,12 +367,22 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
       }
       return;
     }
-    out.totalSessions += 1;
+    const status = attendanceMatrixMetricsService.normalizeStatus(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
+    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
+      out.notApplicable += 1;
+      matrixRecords.push({
+        status,
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+        scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(session, matrixPolicy.scheduledMinutes)
+      });
+      return;
+    }
 
-    const status = String(row?.attendance || '').toLowerCase();
-    if (status === 'present') out.present += 1;
-    else if (status === 'late') out.late += 1;
-    else if (status === 'excused') out.excused += 1;
+    out.totalSessions += 1;
+    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) out.present += 1;
+    else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) out.late += 1;
+    else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) out.excused += 1;
     else out.absent += 1;
 
     out.lateMinutes += normalizeNumber(row?.lateMinutes);
@@ -458,6 +562,7 @@ async function buildClassAttendanceSpanSummary(sessions, statusMap = null) {
     late: 0,
     excused: 0,
     absent: 0,
+    notApplicable: 0,
     attendancePercent: 0
   };
   const uniqueStudents = new Set();
@@ -473,11 +578,15 @@ async function buildClassAttendanceSpanSummary(sessions, statusMap = null) {
     roster.forEach((row) => {
       const personId = String(row?.personId || '').trim();
       if (personId) uniqueStudents.add(personId);
+      const status = attendanceMatrixMetricsService.normalizeStatus(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
+      if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
+        out.notApplicable += 1;
+        return;
+      }
       out.total += 1;
-      const status = String(row?.attendance || '').toLowerCase();
-      if (status === 'present') out.present += 1;
-      else if (status === 'late') out.late += 1;
-      else if (status === 'excused') out.excused += 1;
+      if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) out.present += 1;
+      else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) out.late += 1;
+      else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) out.excused += 1;
       else out.absent += 1;
     });
   });
@@ -525,7 +634,7 @@ function getScoreFromScoresMap(scores, personId) {
 function rosterAttendanceLower(session, personId) {
   const roster = Array.isArray(session?.roster) ? session.roster : [];
   const row = roster.find((item) => idsEqual(item?.personId, personId));
-  return String(row?.attendance || 'absent').trim().toLowerCase();
+  return attendanceMatrixMetricsService.normalizeStatus(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
 }
 
 function collectPeriodGradeColumns(periodSessions) {
@@ -582,7 +691,7 @@ function computeReportPeriodGradebookStats(periodSessions, studentPersonId) {
       const pid = toPublicId(r?.personId);
       if (!pid) return;
       const att = rosterAttendanceLower(ses, pid);
-      const absent = att === 'absent';
+      const absent = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       const raw = absent ? null : getScoreFromScoresMap(col.scores, pid);
       const total = col.totalScore > 0 ? col.totalScore : 0;
       let pct = null;
@@ -749,6 +858,272 @@ function resolveReportPeriod(assignment, session) {
   return normalizeDateRange(explicitStart || fallbackStart, explicitDue || fallbackDue);
 }
 
+function buildPersonMap(persons = []) {
+  const map = new Map();
+  (Array.isArray(persons) ? persons : []).forEach((person) => {
+    const id = toPublicId(person?.id);
+    if (!id) return;
+    map.set(id, person);
+  });
+  return map;
+}
+
+function buildRosterNameMap(sessions = []) {
+  const map = new Map();
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    (Array.isArray(session?.roster) ? session.roster : []).forEach((row) => {
+      const personId = toPublicId(row?.personId);
+      const name = String(row?.name || row?.studentName || '').trim();
+      if (personId && name && !map.has(personId)) map.set(personId, name);
+    });
+  });
+  return map;
+}
+
+function buildStudentRecordMaps(students = []) {
+  const byPersonId = new Map();
+  const personByStudentRecordId = new Map();
+  (Array.isArray(students) ? students : []).forEach((row) => {
+    const personId = toPublicId(row?.personId);
+    const studentRecordId = toPublicId(row?.id);
+    if (personId && !byPersonId.has(personId)) byPersonId.set(personId, row);
+    if (studentRecordId && personId) personByStudentRecordId.set(studentRecordId, personId);
+  });
+  return { byPersonId, personByStudentRecordId };
+}
+
+function attendanceStatusDetails(statusValue) {
+  const status = attendanceMatrixMetricsService.normalizeStatus(
+    statusValue,
+    attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+  );
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
+    return { status, label: 'N/A' };
+  }
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) return { status, label: 'Present' };
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) return { status, label: 'Late' };
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) return { status, label: 'Absent Excused' };
+  return { status: attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT, label: 'Absent' };
+}
+
+function sessionIncludedForAttendance(session, statusMap) {
+  const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
+  return !sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(effectiveStatusMap, {
+    status: session?.status,
+    notes: session?.notes
+  });
+}
+
+function buildStudentCollectionRow({ personId, person, studentRecord, rosterNameMap, attendanceSummary, index }) {
+  const nameParts = getPersonNameParts(person);
+  const fallbackName = rosterNameMap?.get(personId) || personId;
+  const displayName = getPersonDisplayName(person, fallbackName) || fallbackName;
+  const fullName = nameParts.full || displayName;
+  return {
+    student_no: index + 1,
+    student_id: personId,
+    student_person_id: personId,
+    student_record_id: String(studentRecord?.id || ''),
+    student_local_id: String(studentRecord?.localId || ''),
+    student_first_name: nameParts.first,
+    student_middle_name: nameParts.middle,
+    student_last_name: nameParts.last,
+    student_full_name: fullName,
+    student_preferred_name: nameParts.preferred || displayName,
+    student_display_name: displayName,
+    student_attendance_span_total_sessions: attendanceSummary.totalSessions,
+    student_attendance_span_present: attendanceSummary.present,
+    student_attendance_span_late: attendanceSummary.late,
+    student_attendance_span_excused: attendanceSummary.excused,
+    student_attendance_span_absent: attendanceSummary.absent,
+    student_attendance_span_na: attendanceSummary.notApplicable,
+    student_attendance_span_percent: attendanceSummary.attendancePercent,
+    student_attendance_span_late_minutes: attendanceSummary.lateMinutes,
+    student_attendance_span_early_leave_minutes: attendanceSummary.earlyLeaveMinutes
+  };
+}
+
+function buildSessionCollectionRow(session, index) {
+  const summary = buildClassAttendanceSummary(session);
+  const percent = summary.total > 0
+    ? Number((((summary.present + summary.late + summary.excused) / summary.total) * 100).toFixed(2))
+    : 0;
+  return {
+    session_no: index + 1,
+    session_id: String(session?.sessionId || session?.id || ''),
+    session_date: String(session?.date || ''),
+    session_start_time: String(session?.startTime || ''),
+    session_end_time: String(session?.endTime || ''),
+    session_status: String(session?.status || ''),
+    session_attendance_total: summary.total,
+    session_attendance_present: summary.present,
+    session_attendance_late: summary.late,
+    session_attendance_excused: summary.excused,
+    session_attendance_absent: summary.absent,
+    session_attendance_na: summary.notApplicable,
+    session_attendance_percent: percent
+  };
+}
+
+async function resolveReportCollectionStudentIds({ assignment, instance, classData, periodSessions, students, reqUser, reportPeriod }) {
+  const instanceStudentId = toPublicId(instance?.studentId);
+  if (instanceStudentId) return [instanceStudentId];
+
+  const scope = String(assignment?.reportScope || '').trim().toLowerCase();
+  if (scope === 'selected_students') {
+    return [...new Set((Array.isArray(assignment?.targetStudentIds) ? assignment.targetStudentIds : [])
+      .map((id) => toPublicId(id))
+      .filter(Boolean))];
+  }
+  if (scope === 'each_student') return [];
+
+  const classId = toPublicId(classData?.id || assignment?.classId);
+  const { personByStudentRecordId } = buildStudentRecordMaps(students);
+  const snapshot = classId
+    ? await classEnrollmentReadService.listActiveStudentIdsForClass({
+      classId,
+      classItem: classData,
+      reqUser,
+      activeOrgId: classData?.orgId || assignment?.orgId || reqUser?.activeOrgId || '',
+      sessionDates: (Array.isArray(periodSessions) ? periodSessions : []).map((row) => String(row?.date || '').trim()).filter(Boolean),
+      startDate: reportPeriod?.startDate || '',
+      endDate: reportPeriod?.dueDate || '',
+      canonicalStatuses: classEnrollmentReadService.getReportRosterStatusesForClass(classData)
+    })
+    : null;
+  const fromEnrollment = snapshot?.studentIds instanceof Set ? [...snapshot.studentIds] : [];
+  const resolved = fromEnrollment
+    .map((studentId) => personByStudentRecordId.get(toPublicId(studentId)))
+    .filter(Boolean);
+  if (resolved.length) return [...new Set(resolved)];
+
+  const fromRoster = [];
+  (Array.isArray(periodSessions) ? periodSessions : []).forEach((session) => {
+    (Array.isArray(session?.roster) ? session.roster : []).forEach((row) => {
+      const personId = toPublicId(row?.personId);
+      if (personId) fromRoster.push(personId);
+    });
+  });
+  return [...new Set(fromRoster)];
+}
+
+async function buildReportDocxCollections({ instance, assignment, reqUser }) {
+  const classId = toPublicId(assignment?.classId || instance?.classId);
+  const [classData, allSessionsRaw, students, persons] = await Promise.all([
+    classId ? schoolDataService.getDataById('classes', classId, reqUser) : Promise.resolve(null),
+    classId ? schoolDataService.getClassSessions(classId, reqUser) : Promise.resolve([]),
+    schoolDataService.fetchData('students', {}, reqUser),
+    schoolIdentityLookupService.listSchoolPersonRecords({
+      reqUser,
+      requireSchoolRole: false,
+      query: { limit: 5000 }
+    }).then((payload) => payload.allRows || payload.rows || [])
+  ]);
+
+  const allSessions = Array.isArray(allSessionsRaw) ? allSessionsRaw : [];
+  const selectedSession = allSessions.find((row) => idsEqual(row?.sessionId, assignment?.sessionId || instance?.sessionId)) ||
+    allSessions.find((row) => String(row?.date || '') === String(assignment?.sessionDate || instance?.sessionDate || '')) ||
+    null;
+  const reportPeriod = resolveReportPeriod(assignment || instance || {}, selectedSession);
+  const statusMap = await sessionStatusPolicyService.getStatusMap(
+    toPublicId(classData?.orgId || assignment?.orgId || reqUser?.activeOrgId || ''),
+    { includeInactive: true }
+  );
+  const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(
+    toPublicId(classData?.orgId || assignment?.orgId || reqUser?.activeOrgId || '')
+  );
+  const periodSessions = filterSessionsByDateRange(allSessions, reportPeriod.startDate, reportPeriod.dueDate)
+    .filter((session) => sessionIncludedForAttendance(session, statusMap))
+    .sort((a, b) => `${String(a?.date || '')}T${String(a?.startTime || '00:00')}`.localeCompare(`${String(b?.date || '')}T${String(b?.startTime || '00:00')}`));
+  const rosterNameMap = buildRosterNameMap(periodSessions);
+  const personMap = buildPersonMap(persons);
+  const studentMaps = buildStudentRecordMaps(students);
+  const targetStudentIds = await resolveReportCollectionStudentIds({
+    assignment,
+    instance,
+    classData,
+    periodSessions,
+    students,
+    reqUser,
+    reportPeriod
+  });
+
+  const studentContexts = [];
+  for (const personId of targetStudentIds) {
+    const studentRecord = studentMaps.byPersonId.get(personId) || null;
+    // eslint-disable-next-line no-await-in-loop
+    const applicability = await buildStudentAttendanceApplicabilityContext({
+      classData,
+      sessions: periodSessions,
+      studentRecord,
+      studentPersonId: personId,
+      reqUser,
+      orgId: toPublicId(classData?.orgId || assignment?.orgId || reqUser?.activeOrgId || '')
+    });
+    // eslint-disable-next-line no-await-in-loop
+    const attendanceSummary = await buildStudentAttendanceSummary(periodSessions, personId, statusMap, {
+      countMissingAsAbsent: true,
+      classData,
+      orgPolicyLayer,
+      ...applicability
+    });
+    studentContexts.push({
+      personId,
+      studentRecord,
+      person: personMap.get(personId) || null,
+      applicability,
+      attendanceSummary
+    });
+  }
+
+  const studentRows = studentContexts.map((context, index) => buildStudentCollectionRow({
+    ...context,
+    rosterNameMap,
+    index
+  }));
+  const sessionRows = periodSessions.map((session, index) => buildSessionCollectionRow(session, index));
+  const attendanceRows = [];
+  studentContexts.forEach((context, studentIndex) => {
+    periodSessions.forEach((session, sessionIndex) => {
+      const sessionKey = buildSessionMetricKey(session);
+      const roster = Array.isArray(session?.roster) ? session.roster : [];
+      const rosterRow = roster.find((row) => idsEqual(row?.personId, context.personId));
+      const derivedNotApplicable = sessionKey && context.applicability?.notApplicableSessionIds instanceof Set && context.applicability.notApplicableSessionIds.has(sessionKey);
+      const expectedSessionIds = context.applicability?.expectedSessionIds instanceof Set ? context.applicability.expectedSessionIds : null;
+      const expectedForSession = !expectedSessionIds || !sessionKey || expectedSessionIds.has(sessionKey);
+      const statusSource = rosterRow
+        ? rosterRow.attendance
+        : (derivedNotApplicable || !expectedForSession
+          ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+          : attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
+      const statusDetails = attendanceStatusDetails(statusSource);
+      const studentRow = studentRows[studentIndex] || {};
+      attendanceRows.push({
+        row_no: attendanceRows.length + 1,
+        student_no: studentIndex + 1,
+        session_no: sessionIndex + 1,
+        student_id: context.personId,
+        student_person_id: context.personId,
+        student_full_name: studentRow.student_full_name || context.personId,
+        student_display_name: studentRow.student_display_name || studentRow.student_full_name || context.personId,
+        session_id: String(session?.sessionId || session?.id || ''),
+        session_date: String(session?.date || ''),
+        session_start_time: String(session?.startTime || ''),
+        session_end_time: String(session?.endTime || ''),
+        attendance_status: statusDetails.status,
+        attendance_status_label: statusDetails.label,
+        attendance_late_minutes: rosterRow ? normalizeNumber(rosterRow?.lateMinutes) : 0,
+        attendance_early_leave_minutes: rosterRow ? normalizeNumber(rosterRow?.earlyLeaveMinutes) : 0
+      });
+    });
+  });
+
+  return {
+    students: studentRows,
+    attendance_sessions: sessionRows,
+    student_attendance_rows: attendanceRows
+  };
+}
 async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = '', reqUser }) {
   const classIdForQuery = toPublicId(assignment.classId);
   const [classData, sessions, students, persons, organizations, examAssignmentsForClass] = await Promise.all([
@@ -786,9 +1161,18 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
   const statusMap = await sessionStatusPolicyService.getStatusMap(reportOrgId || reqUser?.activeOrgId || '', { includeInactive: true });
   const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(reportOrgId || reqUser?.activeOrgId || '');
   const classAttendance = buildClassAttendanceSummary(session);
+  const allAttendanceApplicabilityContext = await buildStudentAttendanceApplicabilityContext({
+    classData,
+    sessions,
+    studentRecord,
+    studentPersonId,
+    reqUser,
+    orgId: reportOrgId || reqUser?.activeOrgId || ''
+  });
   const studentAttendance = await buildStudentAttendanceSummary(sessions, studentId, statusMap, {
     classData,
-    orgPolicyLayer
+    orgPolicyLayer,
+    ...allAttendanceApplicabilityContext
   });
   const periodSessions = filterSessionsByDateRange(sessions, reportPeriod.startDate, reportPeriod.dueDate);
   const periodSessionsGrade = filterPeriodSessionsForGradeMetrics(sessions, reportPeriod.startDate, reportPeriod.dueDate, statusMap);
@@ -801,11 +1185,20 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     reportPeriod.dueDate,
     studentRecord?.id
   );
+  const attendanceApplicabilityContext = await buildStudentAttendanceApplicabilityContext({
+    classData,
+    sessions: periodSessions,
+    studentRecord,
+    studentPersonId,
+    reqUser,
+    orgId: reportOrgId || reqUser?.activeOrgId || ''
+  });
   const classAttendanceSpan = await buildClassAttendanceSpanSummary(periodSessions, statusMap);
   const studentAttendanceSpan = await buildStudentAttendanceSummary(periodSessions, studentId, statusMap, {
     countMissingAsAbsent: true,
     classData,
-    orgPolicyLayer
+    orgPolicyLayer,
+    ...attendanceApplicabilityContext
   });
   const studentPunctualitySpan = buildStudentPunctualitySummary(periodSessions, studentId, statusMap, {
     classData,
@@ -821,7 +1214,8 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
         present: studentAttendanceSpan.attendancePercent,
         late: studentAttendanceSpan.late,
         excused: studentAttendanceSpan.excused,
-        absent: studentAttendanceSpan.absent
+        absent: studentAttendanceSpan.absent,
+        notApplicable: studentAttendanceSpan.notApplicable
       }
     : classAttendance;
   const reportOrg = organizations.find((row) => idsEqual(row?.id, reportOrgId)) || null;
@@ -886,6 +1280,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     class_attendance_late: primaryAttendance.late,
     class_attendance_excused: primaryAttendance.excused,
     class_attendance_absent: primaryAttendance.absent,
+    class_attendance_na: primaryAttendance.notApplicable || 0,
     class_attendance_span_sessions: classAttendanceSpan.sessionCount,
     class_attendance_span_unique_students: classAttendanceSpan.uniqueStudents,
     class_attendance_span_total: classAttendanceSpan.total,
@@ -893,12 +1288,14 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     class_attendance_span_late: classAttendanceSpan.late,
     class_attendance_span_excused: classAttendanceSpan.excused,
     class_attendance_span_absent: classAttendanceSpan.absent,
+    class_attendance_span_na: classAttendanceSpan.notApplicable,
     class_attendance_span_percent: classAttendanceSpan.attendancePercent,
     student_attendance_total_sessions: studentAttendance.totalSessions,
     student_attendance_present: studentAttendance.present,
     student_attendance_late: studentAttendance.late,
     student_attendance_excused: studentAttendance.excused,
     student_attendance_absent: studentAttendance.absent,
+    student_attendance_na: studentAttendance.notApplicable,
     student_attendance_percent: studentAttendance.attendancePercent,
     student_late_minutes: studentAttendance.lateMinutes,
     student_early_leave_minutes: studentAttendance.earlyLeaveMinutes,
@@ -907,6 +1304,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_attendance_span_late: studentAttendanceSpan.late,
     student_attendance_span_excused: studentAttendanceSpan.excused,
     student_attendance_span_absent: studentAttendanceSpan.absent,
+    student_attendance_span_na: studentAttendanceSpan.notApplicable,
     student_attendance_span_percent: studentAttendanceSpan.attendancePercent,
     student_attendance_span_late_minutes: studentAttendanceSpan.lateMinutes,
     student_attendance_span_early_leave_minutes: studentAttendanceSpan.earlyLeaveMinutes,
@@ -1111,6 +1509,7 @@ module.exports = {
   partitionInstanceSave,
   buildPlaceholderPayloadDetailed,
   buildPlaceholderPayload,
+  buildReportDocxCollections,
   getPrefillCatalog,
   validateTemplatePrefillKeys,
   normalizePrefillKey

@@ -5,7 +5,8 @@ const {
   computeStudentMatrixSummary,
   resolvePolicy,
   scheduledMinutesFromSession,
-  parseTimeToMinutes
+  parseTimeToMinutes,
+  normalizeAttendanceStatusForSave
 } = require('../packages/school/MVC/services/school/attendanceMatrixMetricsService');
 
 const policy180 = {
@@ -180,4 +181,24 @@ test('rollup: user example mix across 5 sessions', () => {
   const sum = c1 + c2 + c3 + c4 + c5;
   assert.ok(Math.abs(s.performancePercentRaw - sum) < 1e-6);
   assert.equal(s.disqualifiedSessionCount, 2);
+});
+
+test('N/A aliases normalize to not_applicable', () => {
+  assert.equal(normalizeAttendanceStatusForSave('N/A'), 'not_applicable');
+  assert.equal(normalizeAttendanceStatusForSave('na'), 'not_applicable');
+  assert.equal(normalizeAttendanceStatusForSave('not applicable'), 'not_applicable');
+});
+
+test('rollup excludes not_applicable from denominator and reports N/A count', () => {
+  const records = [
+    { status: 'present', lateMinutes: 0, earlyLeaveMinutes: 0 },
+    { status: 'not_applicable', lateMinutes: 0, earlyLeaveMinutes: 0 },
+    { status: 'absent', lateMinutes: 0, earlyLeaveMinutes: 0 }
+  ];
+  const s = computeStudentMatrixSummary(records, {});
+  assert.equal(s.totalEligibleSessions, 2);
+  assert.equal(s.totalNotApplicableSessions, 1);
+  assert.equal(s.totalPresentSessions, 1);
+  assert.equal(s.totalAbsentSessions, 1);
+  assert.equal(s.performancePercent, 50);
 });

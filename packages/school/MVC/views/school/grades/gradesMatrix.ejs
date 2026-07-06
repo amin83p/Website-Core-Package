@@ -285,7 +285,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderCellHtml(c) {
     if (!c) return '—';
-    if (c.absent) return '<span class="text-muted small">N/A</span>';
+    if (c.absent) {
+      const label = c.attendanceStatus === 'not_applicable' ? 'N/A' : 'Absent';
+      return `<span class="text-muted small">${label}</span>`;
+    }
     if (c.score == null || c.score === '') return '—';
     const pct = c.percent != null ? `<span class="gm-pct small ms-1">${c.percent}%</span>` : '';
     const incl = c.includeInGradeCalculation !== false;

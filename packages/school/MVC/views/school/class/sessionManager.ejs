@@ -6,6 +6,7 @@
     .btn-check[value="late"]:checked + .att-label { background-color: #ffc107; color: #000; font-weight: bold; }
     .btn-check[value="excused"]:checked + .att-label { background-color: #0dcaf0; color: #000; font-weight: bold; }
     .btn-check[value="absent"]:checked + .att-label { background-color: #dc3545; color: #fff; font-weight: bold; }
+    .btn-check[value="not_applicable"]:checked + .att-label { background-color: #6c757d; color: #fff; font-weight: bold; }
     .conduct-rating-input {
         max-width: 7rem;
         text-align: center;
@@ -686,10 +687,11 @@
         const fallbackStatusCode = String(defaultSessionStatusCode || availableStatusRows.find((row) => row?.code === 'scheduled')?.code || availableStatusRows[0]?.code || 'scheduled').toLowerCase();
         const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
         const attendanceSummary = (session.roster || []).reduce((acc, row) => {
-            const key = String(row?.attendance || '').trim().toLowerCase();
+            const rawKey = String(row?.attendance || '').trim().toLowerCase();
+            const key = (rawKey === 'n/a' || rawKey === 'na') ? 'not_applicable' : rawKey;
             if (Object.prototype.hasOwnProperty.call(acc, key)) acc[key] += 1;
             return acc;
-        }, { present: 0, late: 0, excused: 0, absent: 0 });
+        }, { present: 0, late: 0, excused: 0, absent: 0, not_applicable: 0 });
         const normalizedSessionStatus = normalizeStatusCode(session.status || fallbackStatusCode);
         const currentSessionStatus = availableStatusRows.some((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus)
             ? normalizedSessionStatus
@@ -1027,28 +1029,34 @@
             <% } %>
             <div class="session-panel active" id="session-panel-attendance" role="tabpanel">
                 <div class="row g-2 mb-3">
-                    <div class="col-6 col-md-3">
+                    <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Present</div>
                             <div class="session-summary-value text-success"><%= attendanceSummary.present %></div>
                         </div>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Late</div>
                             <div class="session-summary-value text-warning"><%= attendanceSummary.late %></div>
                         </div>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Excused</div>
                             <div class="session-summary-value text-info"><%= attendanceSummary.excused %></div>
                         </div>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Absent</div>
                             <div class="session-summary-value text-danger"><%= attendanceSummary.absent %></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md">
+                        <div class="session-summary-card h-100">
+                            <div class="session-summary-label">N/A</div>
+                            <div class="session-summary-value text-secondary"><%= attendanceSummary.not_applicable %></div>
                         </div>
                     </div>
                 </div>
@@ -1062,6 +1070,7 @@
                                     <button type="button" class="btn btn-outline-success" id="btnAllPresent">All Present</button>
                                     <button type="button" class="btn btn-outline-warning" id="btnAllLate">All Late</button>
                                     <button type="button" class="btn btn-outline-danger" id="btnAllAbsent">All Absent</button>
+                                    <button type="button" class="btn btn-outline-secondary" id="btnAllNotApplicable">All N/A</button>
                                 </div>
                             <% } %>
                             <span class="badge bg-light text-dark border"><%= session.roster.length %> Students</span>
@@ -1099,6 +1108,8 @@
                                                             <label class="btn att-label" for="e_<%= i %>" title="Excused Absence"><i class="bi bi-envelope-paper"></i> Excused</label>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="a_<%= i %>" value="absent" <%= student.attendance === 'absent' ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="a_<%= i %>" title="Absent"><i class="bi bi-x-lg"></i> Absent</label>
+                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="na_<%= i %>" value="not_applicable" <%= (student.attendance === 'not_applicable' || student.attendance === 'N/A' || student.attendance === 'n/a') ? 'checked' : '' %> <%- disabledAttr %>>
+                                                            <label class="btn att-label" for="na_<%= i %>" title="Not applicable"><i class="bi bi-dash-circle"></i> N/A</label>
                                                         </div>
                                                         <% const hasDetails = student.lateMinutes || student.earlyLeaveMinutes || student.excuseRef || student.excuseAttachment || (student.comments && student.comments.length > 0); %>
                                                         <% if (!isReadOnly) { %>
@@ -1321,7 +1332,7 @@
                     <% } %>
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                    <p class="small text-muted mb-0 flex-grow-1">Add activities (name, skill focus, total points, instructions). Scores follow the <strong>attendance roster</strong>; <strong>absent</strong> shows N/A. Save attendance with <strong>Save session</strong> before saving scores if you changed who was present.</p>
+                    <p class="small text-muted mb-0 flex-grow-1">Add activities (name, skill focus, total points, instructions). Scores follow the <strong>attendance roster</strong>; <strong>absent</strong> and <strong>N/A</strong> show N/A. Save attendance with <strong>Save session</strong> before saving scores if you changed who was present.</p>
                     <% if (!isReadOnly) { %>
                     <button type="button" class="btn btn-success btn-sm flex-shrink-0" id="btnSaveGradebooks"><i class="bi bi-check2-circle me-1"></i>Save gradebook</button>
                     <% } %>
@@ -2041,6 +2052,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const late = parseNonNegAttendanceMins(row.querySelector('.att-late')?.value);
         const early = parseNonNegAttendanceMins(row.querySelector('.att-leave')?.value);
         let att = row.querySelector('.att-radio:checked')?.value || 'absent';
+        if (att === 'not_applicable') {
+            const lateInput = row.querySelector('.att-late');
+            const leaveInput = row.querySelector('.att-leave');
+            if (lateInput) lateInput.value = '';
+            if (leaveInput) leaveInput.value = '';
+            return;
+        }
 
         const lateCut = Number(pol.disqualifyLateMinutes);
         const earlyCut = Number(pol.disqualifyEarlyLeaveMinutes);
@@ -3080,10 +3098,15 @@ document.addEventListener('DOMContentLoaded', () => {
         ? (s) => CSS.escape(String(s))
         : (s) => String(s).replace(/["\\.#:[\],]/g, (ch) => '\\' + ch);
 
-    function gbIsPersonAbsent(personId) {
+    function gbAttendanceStatus(personId) {
         const row = document.querySelector(`.roster-row[data-personid="${gbCssEscape(personId)}"]`);
-        if (!row) return true;
-        return (row.querySelector('.att-radio:checked')?.value || 'absent') === 'absent';
+        if (!row) return 'absent';
+        return row.querySelector('.att-radio:checked')?.value || 'absent';
+    }
+
+    function gbIsPersonAbsent(personId) {
+        const status = gbAttendanceStatus(personId);
+        return status === 'absent' || status === 'not_applicable';
     }
 
     function gbNormalizeIncoming(list) {
@@ -3197,9 +3220,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const absent = gbIsPersonAbsent(pid);
                     const sc = gb.scores[pid];
                     if (absent) {
+                        const attendanceStatus = gbAttendanceStatus(pid);
+                        const blockedLabel = attendanceStatus === 'not_applicable' ? 'N/A' : 'Absent';
                         return `<tr>
                         <td class="ps-3">${gbEscapeHtml(name)}</td>
-                        <td class="text-muted"><span class="badge bg-light text-muted border">N/A</span></td>
+                        <td class="text-muted"><span class="badge bg-light text-muted border">${gbEscapeHtml(blockedLabel)}</span></td>
                         <td class="text-muted">N/A</td>
                     </tr>`;
                     }
@@ -3518,6 +3543,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnAllLateGb) btnAllLateGb.addEventListener('click', () => { applyBulkAttendance('late'); gbOnAttendanceChanged(); });
     const btnAllAbsentGb = document.getElementById('btnAllAbsent');
     if (btnAllAbsentGb) btnAllAbsentGb.addEventListener('click', () => { applyBulkAttendance('absent'); gbOnAttendanceChanged(); });
+    const btnAllNotApplicableGb = document.getElementById('btnAllNotApplicable');
+    if (btnAllNotApplicableGb) btnAllNotApplicableGb.addEventListener('click', () => { applyBulkAttendance('not_applicable'); gbOnAttendanceChanged(); });
 
     const btnSaveGradebooks = document.getElementById('btnSaveGradebooks');
     if (btnSaveGradebooks) {

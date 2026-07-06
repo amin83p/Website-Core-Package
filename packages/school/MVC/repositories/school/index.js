@@ -1086,7 +1086,7 @@ const schoolRepositories = {
       'reason',
       'details'
     ],
-    dateFields: ['requestDate', 'startDate', 'endDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
+    dateFields: ['requestDate', 'startDate', 'endDate', 'completionDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
   }),
   sessionStudentCases: createSchoolRepository({
     entityName: 'sessionStudentCases',

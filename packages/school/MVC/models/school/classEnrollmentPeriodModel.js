@@ -4,6 +4,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/classEnrollmentPeriods.json');
 
@@ -133,6 +134,7 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
 
   const programId = cleanId(input.programId, { max: 64, allowEmpty: true }) || '';
   const termId = cleanId(input.termId, { max: 64, allowEmpty: true }) || '';
+  const sessionCap = classEnrollmentSessionApplicabilityService.sanitizeSessionCapFields(input);
 
   const out = {
     orgId,
@@ -154,6 +156,11 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
       return ['pass', 'continue', 'withdraw'].includes(raw) ? raw : '';
     })(),
     completionDecisionNotes: cleanString(input.completionDecisionNotes, { max: 2000, allowEmpty: true }),
+    targetSessionCount: sessionCap.targetSessionCount,
+    sessionCountPolicy: sessionCap.sessionCountPolicy,
+    completionDate: sessionCap.completionDate,
+    completionSessionId: sessionCap.completionSessionId,
+    completionReason: sessionCap.completionReason,
     transactionSummary: sanitizeTransactionSummary(input.transactionSummary),
     sequenceNo,
     createdBy: createdBy || '',
