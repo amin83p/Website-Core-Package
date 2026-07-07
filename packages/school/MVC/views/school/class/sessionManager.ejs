@@ -665,6 +665,11 @@
         color: #1d4ed8;
         background: #f1f5f9 !important;
     }
+    .roster-row.attendance-late-missing-minutes {
+        outline: 2px solid rgba(245, 158, 11, 0.55);
+        outline-offset: -2px;
+        background: #fff8e1;
+    }
 </style>
 
 <div class="sections-page session-manager-page">
@@ -1090,7 +1095,7 @@
                                         <tr><td colspan="2" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
                                     <% } else { %>
                                         <% session.roster.forEach((student, i) => { %>
-                                            <tr class="roster-row" data-personid="<%= student.personId %>">
+                                            <tr class="roster-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
                                                 <td class="ps-4 fw-bold align-middle">
                                                     <%= student.name %>
                                                     <% if (student.comments && student.comments.length > 0) { %>
@@ -2041,6 +2046,73 @@ document.addEventListener('DOMContentLoaded', () => {
         return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
     }
 
+    function getRosterStudentName(row) {
+        const fromDataset = String(row?.dataset?.studentName || '').trim();
+        if (fromDataset) return fromDataset;
+        return String(row?.querySelector('td')?.textContent || 'student').trim().replace(/\s+/g, ' ') || 'student';
+    }
+
+    function isLateMissingMinutes(row) {
+        if (!row) return false;
+        const attendance = row.querySelector('.att-radio:checked')?.value || '';
+        if (attendance !== 'late') return false;
+        const late = parseNonNegAttendanceMins(row.querySelector('.att-late')?.value);
+        const early = parseNonNegAttendanceMins(row.querySelector('.att-leave')?.value);
+        return late <= 0 && early <= 0;
+    }
+
+    function updateLateMissingMinuteState(row) {
+        if (!row) return false;
+        const missing = isLateMissingMinutes(row);
+        row.classList.toggle('attendance-late-missing-minutes', missing);
+        return missing;
+    }
+
+    function getLateMissingMinuteRows() {
+        return Array.from(document.querySelectorAll('.roster-row')).filter((row) => updateLateMissingMinuteState(row));
+    }
+
+    function focusLateInputInDetailsModal() {
+        const lateInput = document.getElementById('modalLateMins');
+        if (!lateInput) return;
+        window.setTimeout(() => {
+            lateInput.focus();
+            if (typeof lateInput.select === 'function') lateInput.select();
+        }, 220);
+    }
+
+    function openLateDetailsForRow(row) {
+        if (!row) return;
+        const personId = row.getAttribute('data-personid');
+        if (!personId) return;
+        openDetailsModal(personId, getRosterStudentName(row));
+        focusLateInputInDetailsModal();
+    }
+
+    async function showLateMinutesRequiredWarning(rows, options = {}) {
+        const issueRows = Array.isArray(rows) ? rows : getLateMissingMinuteRows();
+        if (!issueRows.length) return true;
+        setActivePanel('attendance');
+        const names = issueRows.slice(0, 6).map(getRosterStudentName).filter(Boolean);
+        const extraCount = Math.max(0, issueRows.length - names.length);
+        const listHtml = names.length
+            ? '<ul class="text-start mt-2 mb-0">' + names.map((name) => '<li>' + attendanceAttachmentEscape(name) + '</li>').join('') + (extraCount ? '<li>+' + extraCount + ' more</li>' : '') + '</ul>'
+            : '';
+        const message = 'Late attendance needs either Late Arrival minutes or Left Early minutes before saving.' + listHtml;
+        if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+                title: 'Late Minutes Required',
+                icon: 'warning',
+                message,
+                buttons: [{ text: 'OK', class: 'btn-warning' }]
+            });
+        } else {
+            window.alert('Late attendance needs either Late Arrival minutes or Left Early minutes before saving.');
+        }
+        if (options.openFirst !== false) openLateDetailsForRow(issueRows[0]);
+        return false;
+    }
+
     function setAttendanceRadio(row, value) {
         const r = row.querySelector(`.att-radio[value="${value}"]`);
         if (r && !r.disabled) r.checked = true;
@@ -2647,6 +2719,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (excuseAttachmentInput) excuseAttachmentInput.value = JSON.stringify(excuseAttachment || null);
 
                 applyAttendanceRulesToRow(row);
+                updateLateMissingMinuteState(row);
                 if (typeof gbOnAttendanceChanged === 'function') gbOnAttendanceChanged();
 
                 const btn = row.querySelector('.btn-details');
@@ -3532,7 +3605,13 @@ document.addEventListener('DOMContentLoaded', () => {
         attendanceTableEl.addEventListener('change', (e) => {
             if (!e.target || !e.target.classList.contains('att-radio')) return;
             const row = e.target.closest('.roster-row');
-            if (row) applyAttendanceRulesToRow(row);
+            if (row) {
+                applyAttendanceRulesToRow(row);
+                updateLateMissingMinuteState(row);
+                if (e.target.value === 'late' && isLateMissingMinutes(row)) {
+                    openLateDetailsForRow(row);
+                }
+            }
             gbOnAttendanceChanged();
         });
     }
@@ -3540,7 +3619,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAllPresentGb = document.getElementById('btnAllPresent');
     if (btnAllPresentGb) btnAllPresentGb.addEventListener('click', () => { applyBulkAttendance('present'); gbOnAttendanceChanged(); });
     const btnAllLateGb = document.getElementById('btnAllLate');
-    if (btnAllLateGb) btnAllLateGb.addEventListener('click', () => { applyBulkAttendance('late'); gbOnAttendanceChanged(); });
+    if (btnAllLateGb) btnAllLateGb.addEventListener('click', async () => {
+        applyBulkAttendance('late');
+        document.querySelectorAll('.roster-row').forEach((row) => updateLateMissingMinuteState(row));
+        gbOnAttendanceChanged();
+        await showLateMinutesRequiredWarning(getLateMissingMinuteRows(), { openFirst: false });
+    });
     const btnAllAbsentGb = document.getElementById('btnAllAbsent');
     if (btnAllAbsentGb) btnAllAbsentGb.addEventListener('click', () => { applyBulkAttendance('absent'); gbOnAttendanceChanged(); });
     const btnAllNotApplicableGb = document.getElementById('btnAllNotApplicable');
@@ -3584,6 +3668,12 @@ document.addEventListener('DOMContentLoaded', () => {
         btnSaveSession.addEventListener('click', async () => {
             const btn = document.getElementById('btnSaveSession');
             const originalHtml = btn.innerHTML;
+
+            const lateMissingRows = getLateMissingMinuteRows();
+            if (lateMissingRows.length) {
+                await showLateMinutesRequiredWarning(lateMissingRows, { openFirst: true });
+                return;
+            }
 
             const status = getSelectedSessionStatus();
             const notes = document.getElementById('sessionNotes').value;

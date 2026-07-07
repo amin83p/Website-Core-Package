@@ -168,6 +168,32 @@ function parseBoolean(value, fallback = false) {
     return fallback;
 }
 
+function parsePositiveAttendanceMinute(value) {
+    const n = Number(String(value ?? '').trim());
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+function createLateMinutesRequiredError(personId = '') {
+    const suffix = personId ? ` for ${personId}` : '';
+    const error = new Error(`Late attendance${suffix} requires Late Arrival minutes or Left Early minutes.`);
+    error.code = 'LATE_MINUTES_REQUIRED';
+    error.statusCode = 400;
+    return error;
+}
+
+function assertLateAttendanceMinutesPresent(record = {}) {
+    const attendance = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(
+        record.attendance,
+        attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+    );
+    if (attendance !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) return;
+    const late = parsePositiveAttendanceMinute(record.lateMinutes);
+    const early = parsePositiveAttendanceMinute(record.earlyLeaveMinutes);
+    if (late <= 0 && early <= 0) {
+        throw createLateMinutesRequiredError(toPublicId(record.personId || ''));
+    }
+}
+
 function normalizeSessionRatingPercent(value, fallback = 100) {
     const fallbackNumber = Number(fallback);
     const safeFallback = Number.isFinite(fallbackNumber) ? fallbackNumber : 100;
@@ -3125,6 +3151,15 @@ async function saveSession1(req, res) {
             sessions[sessionIndex].roster = incomingRoster.map(incRec => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
+                const attendance = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(
+                    incRec.attendance,
+                    attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+                );
+                assertLateAttendanceMinutesPresent({
+                    ...incRec,
+                    personId: incomingPersonId,
+                    attendance
+                });
                 const existingClassEffort = normalizeSessionRatingPercent(existRec.classEffortPercent);
                 const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent);
                 const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent);
@@ -3804,6 +3839,11 @@ async function saveSession(req, res) {
                     incRec.attendance,
                     attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
                 );
+                assertLateAttendanceMinutesPresent({
+                    ...incRec,
+                    personId: incomingPersonId,
+                    attendance
+                });
                 const existingClassEffort = normalizeSessionRatingPercent(existRec.classEffortPercent);
                 const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent);
                 const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent);
@@ -3897,8 +3937,12 @@ async function saveSession(req, res) {
         }
         res.redirect(`/school/classes/sessions/${classId}/${sessionId}`);
     } catch (error) {
-        if (req.headers['x-ajax-request']) return res.status(400).json({ status: 'error', message: error.message });
-        res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+        if (req.headers['x-ajax-request']) {
+            const payload = { status: 'error', message: error.message };
+            if (error.code) payload.code = error.code;
+            return res.status(error.statusCode || 400).json(payload);
+        }
+        res.status(error.statusCode || 400).render('error', { title: 'Error', message: error.message, user: req.user });
     }
 }
 

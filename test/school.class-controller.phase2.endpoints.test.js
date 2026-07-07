@@ -5,6 +5,8 @@ const classController = require('../packages/school/MVC/controllers/school/class
 const rollingController = require('../packages/school/MVC/controllers/school/classRollingEnrollmentController');
 const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
 const idempotencyGuardService = require('../packages/school/MVC/services/school/idempotencyGuardService');
+const schoolIndexService = require('../packages/school/MVC/services/school/schoolIndexService');
+const classEnrollmentSessionApplicabilityService = require('../packages/school/MVC/services/school/classEnrollmentSessionApplicabilityService');
 
 const schoolMethodNames = [
   'getDataById',
@@ -37,6 +39,12 @@ const schoolOriginals = Object.fromEntries(
 const guardOriginals = Object.fromEntries(
   guardMethodNames.map((name) => [name, idempotencyGuardService[name]])
 );
+const schoolIndexOriginals = {
+  rebuildIndexesForClass: schoolIndexService.rebuildIndexesForClass
+};
+const applicabilityOriginals = {
+  recomputeSessionCappedEnrollmentCompletionsForClass: classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass
+};
 
 function restoreStubs() {
   schoolMethodNames.forEach((name) => {
@@ -45,6 +53,8 @@ function restoreStubs() {
   guardMethodNames.forEach((name) => {
     idempotencyGuardService[name] = guardOriginals[name];
   });
+  schoolIndexService.rebuildIndexesForClass = schoolIndexOriginals.rebuildIndexesForClass;
+  classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = applicabilityOriginals.recomputeSessionCappedEnrollmentCompletionsForClass;
 }
 
 function createReq(overrides = {}) {
@@ -588,6 +598,90 @@ test('editClass saves rolling session payload when legacy class audit is missing
   assert.equal(saveSessionCalls, 1);
   assert.equal(capturedUpdates.updates.audit.createUser, 'USR-1');
   assert.ok(capturedUpdates.updates.audit.createDateTime);
+});
+test('saveSession rejects late roster rows without late or early minutes', async () => {
+  applyDefaultGuardStubs();
+  let saveCalled = false;
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes') {
+      return {
+        id: String(id || 'CLS-1'),
+        orgId: 'ORG-1',
+        title: 'Rolling Class A',
+        registrationMode: 'rolling',
+        cycleStartDate: '2026-07-01',
+        cycleEndDate: '2026-07-31',
+        status: 'active'
+      };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    { sessionId: 'SES-1', date: '2026-07-10', startTime: '09:00', endTime: '11:00', status: 'scheduled', roster: [] }
+  ]);
+  schoolDataService.saveClassSessions = async () => {
+    saveCalled = true;
+  };
+  schoolIndexService.rebuildIndexesForClass = async () => {};
+  classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = async () => {};
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    body: {
+      status: 'scheduled',
+      roster: JSON.stringify([{ personId: 'STU-1', attendance: 'late', lateMinutes: '', earlyLeaveMinutes: '' }])
+    }
+  });
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.payload.status, 'error');
+  assert.equal(res.payload.code, 'LATE_MINUTES_REQUIRED');
+  assert.match(String(res.payload.message || ''), /requires Late Arrival minutes or Left Early minutes/i);
+  assert.equal(saveCalled, false);
+});
+
+test('saveSession accepts late roster rows with a positive minute value', async () => {
+  applyDefaultGuardStubs();
+  let savedSessions = null;
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes') {
+      return {
+        id: String(id || 'CLS-1'),
+        orgId: 'ORG-1',
+        title: 'Rolling Class A',
+        registrationMode: 'rolling',
+        cycleStartDate: '2026-07-01',
+        cycleEndDate: '2026-07-31',
+        status: 'active'
+      };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    { sessionId: 'SES-1', date: '2026-07-10', startTime: '09:00', endTime: '11:00', status: 'scheduled', roster: [] }
+  ]);
+  schoolDataService.saveClassSessions = async (classId, sessions) => {
+    savedSessions = sessions;
+  };
+  schoolIndexService.rebuildIndexesForClass = async () => {};
+  classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = async () => {};
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    body: {
+      status: 'scheduled',
+      roster: JSON.stringify([{ personId: 'STU-1', attendance: 'late', lateMinutes: '', earlyLeaveMinutes: '5' }])
+    }
+  });
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.payload.status, 'success');
+  assert.equal(savedSessions?.[0]?.roster?.[0]?.attendance, 'late');
+  assert.equal(savedSessions?.[0]?.roster?.[0]?.earlyLeaveMinutes, 5);
 });
 test('saveSession rejects an existing rolling session outside the cycle window', async () => {
   applyDefaultGuardStubs();
