@@ -355,6 +355,7 @@
   </div>
 </div>
 
+<%- include('partials/modal') %>
 <%- include('partials/modal_GenericPicker') %>
 
 <script>
@@ -414,8 +415,15 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  function resolveMessageModalFn() {
+    if (typeof showMessageModal === 'function') return showMessageModal;
+    if (typeof window !== 'undefined' && typeof window.showMessageModal === 'function') return window.showMessageModal;
+    return null;
+  }
+
   async function safeShowMessage(options) {
-    if (typeof window.showMessageModal === 'function') return window.showMessageModal(options);
+    const modalFn = resolveMessageModalFn();
+    if (modalFn) return modalFn(options || {});
     console.error('Message modal is not available on this page.', options);
     return false;
   }

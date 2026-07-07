@@ -56,11 +56,33 @@ test('Activity work session routes, controller, service, and view are wired', ()
 
   const manager = readText('packages/school/MVC/views/school/activity/activityWorkSessionManager.ejs');
   assert.match(manager, /evaluationTypeLabel/);
-  assert.match(manager, /Save attendance/);
+  assert.match(manager, /Save session/);
+  assert.match(manager, /session-info-header/);
+  assert.match(manager, /workSessionStatusButton/);
+  assert.match(manager, /btnSaveWorkSession/);
+  assert.match(manager, /Session status/);
   assert.match(manager, /Complete/);
   assert.match(manager, /Manage Work Session/);
   assert.match(manager, /All Activities/);
   assert.match(manager, /All work sessions/);
+  assert.match(manager, /session-manager-toolbar-row/);
+  assert.match(manager, /session-manager-shell/);
+  assert.match(manager, /session-manager-sidebar/);
+  assert.match(manager, /session-manager-main/);
+  assert.match(manager, /Session Detail/);
+  assert.match(manager, /session-manager-info-card/);
+  assert.match(manager, /session-manager-class-nav-toggle/);
+  assert.match(manager, /session-summary-card/);
+  assert.match(manager, /work-session-assignee-form/);
+  assert.match(manager, /ws-assignee-save-form/);
+  assert.match(manager, /ws-notes-input/);
+  assert.doesNotMatch(manager, /Attendance roster/);
+  assert.match(manager, /att-label/);
+  assert.match(manager, /btn-check ws-att-radio/);
+  assert.match(manager, /btnCloseWorkSessionManager/);
+  assert.match(manager, /POST" action="<%= manageUrl %>\/save/);
+  assert.match(manager, /POST" action="<%= manageUrl %>\/complete/);
+  assert.match(manager, /evaluationTypeLocked/);
   assert.match(manager, /if \(!isCompletion\)/);
   assert.doesNotMatch(manager, /Switch session:/);
 

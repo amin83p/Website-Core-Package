@@ -101,6 +101,8 @@
   </div>
 </div>
 
+<%- include('partials/modal') %>
+
 <script type="application/json" id="workSessionsPageData"><%- JSON.stringify({
   activityId: activityRow.id,
   evaluationType: evaluationType || 'attendance',
@@ -120,6 +122,18 @@
   let sessionsById = new Map((Array.isArray(pageData.sessions) ? pageData.sessions : []).map((row) => [String(row.entryId), row]));
   let activeEntryId = '';
   let activeContext = null;
+
+  function resolveMessageModalFn() {
+    if (typeof showMessageModal === 'function') return showMessageModal;
+    if (typeof window !== 'undefined' && typeof window.showMessageModal === 'function') return window.showMessageModal;
+    return null;
+  }
+
+  async function safeShowMessage(options) {
+    const showMessageModalFn = resolveMessageModalFn();
+    if (!showMessageModalFn) return false;
+    return showMessageModalFn(options || {});
+  }
   let modalInstance = null;
 
   function escapeHtml(value) {
@@ -296,8 +310,9 @@
   async function postAssigneeAction(action, personId) {
     if (!activeEntryId || !personId) return;
     if (action === 'complete') {
-      const confirmed = typeof window.showMessageModal === 'function'
-        ? await showMessageModal({ title: 'Mark complete', message: 'Mark this assignment complete?', icon: 'question', showCancel: true })
+      const modalFn = resolveMessageModalFn();
+      const confirmed = modalFn
+        ? await modalFn({ title: 'Mark complete', message: 'Mark this assignment complete?', icon: 'question', showCancel: true })
         : true;
       if (!confirmed) return;
     }
@@ -311,13 +326,9 @@
       if (payload.sessionSummary) patchSessionRow(payload.sessionSummary);
       const body = document.getElementById('activityWorkSessionModalBody');
       if (body && activeContext) body.innerHTML = renderAssigneeTable(activeContext);
-      if (typeof window.showMessageModal === 'function') {
-        await showMessageModal({ title: 'Saved', message: payload.message || 'Changes saved.', icon: 'success' });
-      }
+      await safeShowMessage({ title: 'Saved', message: payload.message || 'Changes saved.', icon: 'success' });
     } catch (error) {
-      if (typeof window.showMessageModal === 'function') {
-        await showMessageModal({ title: 'Error', message: error.message, icon: 'error' });
-      }
+      await safeShowMessage({ title: 'Error', message: error.message, icon: 'error' });
     } finally {
       if (typeof window.hideLoading === 'function') window.hideLoading();
     }

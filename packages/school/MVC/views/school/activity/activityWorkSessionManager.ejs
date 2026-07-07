@@ -6,209 +6,930 @@
   const hasMultipleSessions = sessionSwitcher.length > 1;
   const isCompletion = evaluationType === 'completion';
   const manageUrl = `/school/activities/${encodeURIComponent(activityRow.id)}/work-sessions/${encodeURIComponent(entryRow.entryId)}`;
-  const entryTitle = entryRow.title || '';
-  const entrySubtitleParts = [entryTitle, entryRow.date || ''].filter(Boolean);
   const overviewManageUrl = overviewUrl || ('/school/activities/' + encodeURIComponent(activityRow.id) + '/work-sessions/manage');
+  const dashboardHref = (typeof schoolSectionDashboardHref !== 'undefined' && schoolSectionDashboardHref)
+    ? schoolSectionDashboardHref
+    : '/school/activities';
+  const visibleRows = assigneeRows.filter((row) => canManageAll || row.isSelf);
+  const lockedCount = visibleRows.filter((row) => row.locked).length;
+  const readyCount = visibleRows.filter((row) => row.readyForTimesheet).length;
+  const completionDoneCount = visibleRows.filter((row) => String(row.completionStatus || '').toLowerCase() === 'completed').length;
+  const completionPendingCount = visibleRows.filter((row) => String(row.completionStatus || '').toLowerCase() !== 'completed').length;
+  const attendanceAttendedCount = visibleRows.filter((row) => String(row.status || '').toLowerCase() === 'attended').length;
+  const allAssigneesCompleted = isCompletion && visibleRows.length > 0 && completionPendingCount === 0;
+  const allAttendanceRecorded = !isCompletion && visibleRows.length > 0 && attendanceAttendedCount === visibleRows.length;
+  const workSessionStatusLabel = isCompletion
+    ? (allAssigneesCompleted ? 'Completed' : 'Pending completion')
+    : (allAttendanceRecorded ? 'Attendance recorded' : 'Pending attendance');
+  const workSessionStatusActionRequired = isCompletion ? !allAssigneesCompleted : !allAttendanceRecorded;
+  const workSessionLocationLabel = String(entryRow.location || activityRow.location || '').trim();
+  const editableAssigneeRows = visibleRows.filter((row) => row.editable && !row.locked);
+  const currentSessionIndex = sessionSwitcher.findIndex((row) => row && row.isCurrent === true);
+  const prevSession = currentSessionIndex > 0 ? sessionSwitcher[currentSessionIndex - 1] : null;
+  const nextSession = currentSessionIndex >= 0 && currentSessionIndex < (sessionSwitcher.length - 1)
+    ? sessionSwitcher[currentSessionIndex + 1]
+    : null;
 %>
 
+<style>
+  .activity-work-session-page .att-label { background-color: transparent; border: 1px solid transparent; color: #adb5bd; transition: all 0.2s ease-in-out; }
+  .activity-work-session-page .att-label:hover { background-color: #f8f9fa; color: #495057; }
+  .activity-work-session-page .btn-check[value="attended"]:checked + .att-label { background-color: #198754; color: #fff; font-weight: bold; }
+  .activity-work-session-page .btn-check[value="excused"]:checked + .att-label { background-color: #0dcaf0; color: #000; font-weight: bold; }
+  .activity-work-session-page .btn-check[value="absent"]:checked + .att-label { background-color: #dc3545; color: #fff; font-weight: bold; }
+
+  .activity-work-session-page { --session-sidebar-w: 260px; --session-sidebar-collapsed-w: 72px; }
+  .activity-work-session-page .session-summary-card {
+    border: 1px solid #e6ecf5;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    padding: 10px 12px;
+  }
+  .activity-work-session-page .session-summary-label { color: #6c757d; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .activity-work-session-page .session-summary-value { color: #1f2a37; font-size: 1.1rem; font-weight: 700; line-height: 1.1; }
+  .activity-work-session-page .session-manager-shell {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    min-height: 60vh;
+    width: 100%;
+  }
+  .activity-work-session-page .session-manager-sidebar {
+    flex: 0 0 var(--session-sidebar-w);
+    width: var(--session-sidebar-w);
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px 0 0 12px;
+    display: flex;
+    flex-direction: column;
+    transition: width 0.22s ease, flex-basis 0.22s ease;
+    overflow: hidden;
+  }
+  .activity-work-session-page .session-manager-sidebar.collapsed {
+    flex-basis: var(--session-sidebar-collapsed-w);
+    width: var(--session-sidebar-collapsed-w);
+  }
+  .activity-work-session-page .session-manager-sidebar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.5rem 0.5rem 0.65rem;
+    border-bottom: 1px solid #f1f5f9;
+    background: #fafbfc;
+  }
+  .activity-work-session-page .session-manager-sidebar-nav {
+    flex: 1;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    overflow-y: auto;
+  }
+  .activity-work-session-page .session-manager-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #475569;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .activity-work-session-page .session-manager-nav-item:hover:not(:disabled) {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+  .activity-work-session-page .session-manager-nav-item.active {
+    background: #e0ecff;
+    color: #1d4ed8;
+  }
+  .activity-work-session-page .session-manager-nav-item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .activity-work-session-page .session-manager-sidebar.collapsed .session-manager-nav-label {
+    display: none;
+  }
+  .activity-work-session-page .session-manager-sidebar.collapsed .session-manager-nav-item {
+    justify-content: center;
+    padding: 0.65rem;
+  }
+  .activity-work-session-page .session-manager-sidebar.collapsed .session-manager-sidebar-head .session-manager-nav-label {
+    display: none;
+  }
+  .activity-work-session-page .session-manager-main {
+    flex: 1;
+    min-width: 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+    padding: 1rem 1.15rem 1.25rem;
+  }
+  .activity-work-session-page .session-panel {
+    display: none;
+    animation: sessionPanelIn 0.2s ease;
+  }
+  .activity-work-session-page .session-panel.active {
+    display: block;
+  }
+  @keyframes sessionPanelIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (max-width: 991.98px) {
+    .activity-work-session-page .session-manager-shell {
+      flex-direction: column;
+    }
+    .activity-work-session-page .session-manager-sidebar {
+      flex-basis: auto;
+      width: 100%;
+      border-radius: 12px 12px 0 0;
+      border-bottom: none;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .activity-work-session-page .session-manager-sidebar.collapsed {
+      width: 100%;
+      flex-basis: auto;
+    }
+    .activity-work-session-page .session-manager-sidebar-nav {
+      flex-direction: row;
+      flex-wrap: wrap;
+      width: 100%;
+      padding: 0.35rem;
+    }
+    .activity-work-session-page .session-manager-nav-item {
+      flex: 1 1 auto;
+      min-width: 120px;
+      justify-content: center;
+    }
+    .activity-work-session-page .session-manager-main {
+      border-radius: 0 0 12px 12px;
+      border: 1px solid #e2e8f0;
+      border-top: none;
+    }
+  }
+
+  .activity-work-session-page .session-manager-toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .activity-work-session-page .session-manager-toolbar-row .btn-save-session,
+  .activity-work-session-page .session-manager-toolbar-row .btn-close-session {
+    min-width: 7.5rem;
+    font-weight: 600;
+  }
+
+  .activity-work-session-page .session-manager-quick-nav {
+    margin-bottom: 1rem;
+  }
+  .activity-work-session-page .session-manager-class-nav {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: min(100%, 320px);
+  }
+  .activity-work-session-page .session-manager-class-nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    padding: 0.62rem 0.95rem;
+    border: 1px solid #a5b4fc;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #ffffff 0%, #eef2ff 55%, #e0e7ff 100%);
+    color: #312e81;
+    font-weight: 700;
+    text-align: left;
+    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.14);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .activity-work-session-page .session-manager-class-nav-toggle:hover:not(:disabled) {
+    border-color: #818cf8;
+    box-shadow: 0 8px 22px rgba(79, 70, 229, 0.2);
+    transform: translateY(-1px);
+    color: #1e1b4b;
+  }
+  .activity-work-session-page .session-manager-class-nav-toggle[aria-expanded="true"] {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom-color: #c7d2fe;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
+  }
+  .activity-work-session-page .session-manager-class-nav-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9px;
+    background: rgba(99, 102, 241, 0.14);
+    color: #4338ca;
+    flex-shrink: 0;
+  }
+  .activity-work-session-page .session-manager-class-nav-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+    flex: 1;
+  }
+  .activity-work-session-page .session-manager-class-nav-title {
+    font-size: 0.92rem;
+    line-height: 1.2;
+  }
+  .activity-work-session-page .session-manager-class-nav-sub {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #6366f1;
+    letter-spacing: 0.02em;
+  }
+  .activity-work-session-page .session-class-nav-chevron {
+    transition: transform 0.2s ease;
+    font-size: 0.9em;
+    color: #6366f1;
+    flex-shrink: 0;
+  }
+  .activity-work-session-page .session-manager-class-nav-toggle[aria-expanded="true"] .session-class-nav-chevron {
+    transform: rotate(180deg);
+  }
+  .activity-work-session-page .session-manager-class-nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.55rem;
+    border: 1px solid #a5b4fc;
+    border-top: 1px solid #c7d2fe;
+    border-radius: 0 0 12px 12px;
+    background: #fff;
+    box-shadow: 0 10px 24px rgba(79, 70, 229, 0.1);
+  }
+  .activity-work-session-page .session-manager-class-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 9px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #1e293b;
+    border: 1px solid transparent;
+  }
+  .activity-work-session-page .session-manager-class-nav-link:hover {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #1d4ed8;
+  }
+
+  .activity-work-session-page .session-manager-info-card {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #dbe3ef !important;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .activity-work-session-page .session-info-header {
+    display: flex;
+    align-items: stretch;
+    gap: 0.65rem;
+    padding: 0.7rem 0.85rem;
+    flex-wrap: wrap;
+  }
+  .activity-work-session-page .session-info-details-toggle {
+    flex: 1 1 240px;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 11px;
+    background: #fff;
+    padding: 0.55rem 0.75rem;
+    text-align: left;
+    color: #0f172a;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .activity-work-session-page .session-info-details-toggle:focus-visible {
+    outline: 2px solid rgba(59, 130, 246, 0.45);
+    outline-offset: 2px;
+  }
+  .activity-work-session-page .session-info-details-toggle:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  }
+  .activity-work-session-page .session-info-details-toggle[aria-expanded="true"] {
+    border-color: #93c5fd;
+    background: #f8fbff;
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.12);
+  }
+  .activity-work-session-page .session-info-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.45rem;
+    flex: 1;
+    min-width: 0;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #334155;
+    line-height: 1.3;
+  }
+  .activity-work-session-page .session-info-summary-class {
+    color: #1d4ed8;
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 700;
+  }
+  .activity-work-session-page .session-info-summary-sep {
+    color: #cbd5e1;
+    font-weight: 400;
+  }
+  .activity-work-session-page .session-info-summary-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+  }
+  .activity-work-session-page .session-info-summary-chip.is-muted:empty {
+    display: none;
+  }
+  .activity-work-session-page .session-info-expand-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.05rem;
+    flex-shrink: 0;
+  }
+  .activity-work-session-page .session-info-expand-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+    font-weight: 700;
+  }
+  .activity-work-session-page .session-info-expand-chevron {
+    font-size: 0.95rem;
+    color: #64748b;
+    transition: transform 0.2s ease;
+  }
+  .activity-work-session-page .session-info-details-toggle[aria-expanded="true"] .session-info-expand-chevron {
+    transform: rotate(180deg);
+  }
+  .activity-work-session-page .session-info-status-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: min(100%, 210px);
+    flex: 0 1 210px;
+    padding: 0.45rem 0.55rem;
+    border-radius: 11px;
+    border: 2px solid #f59e0b;
+    background: linear-gradient(180deg, #fffbeb 0%, #fff 100%);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+  }
+  .activity-work-session-page .session-info-status-slot.is-complete {
+    border-color: #86efac;
+    background: linear-gradient(180deg, #f0fdf4 0%, #fff 100%);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+  }
+  .activity-work-session-page .session-info-status-slot-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #b45309;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .activity-work-session-page .session-info-status-slot.is-complete .session-info-status-slot-label {
+    color: #15803d;
+  }
+  .activity-work-session-page .session-info-status-slot .session-status-button {
+    margin-top: 0;
+    min-height: 2.35rem;
+    font-size: 0.9rem;
+  }
+  .activity-work-session-page .session-status-required-badge {
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+  }
+  .activity-work-session-page .session-status-button {
+    width: 100%;
+    max-width: 100%;
+    font-weight: 600;
+    font-size: 0.875rem;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    padding: 0.45rem 0.7rem;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    text-align: left;
+  }
+  .activity-work-session-page .session-status-button--action-required:not(:disabled) {
+    border-width: 2px !important;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22), inset 0 1px 2px rgba(15, 23, 42, 0.05);
+    animation: session-status-attention 2.4s ease-in-out infinite;
+  }
+  @keyframes session-status-attention {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18), inset 0 1px 2px rgba(15, 23, 42, 0.05); }
+    50% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.28), inset 0 1px 2px rgba(15, 23, 42, 0.05); }
+  }
+  .activity-work-session-page .session-info-details-body {
+    padding: 0 0.85rem 0.85rem;
+    border-top: 1px solid #e8edf4;
+    margin-top: 0;
+    padding-top: 0.85rem;
+  }
+  .activity-work-session-page .session-info-grid,
+  .activity-work-session-page .session-info-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.65rem;
+  }
+  .activity-work-session-page .session-info-meta-grid {
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid #e8edf4;
+  }
+  @media (min-width: 992px) {
+    .activity-work-session-page .session-info-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .activity-work-session-page .session-info-tile {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.7rem 0.85rem;
+    min-width: 0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+  .activity-work-session-page .session-info-tile--accent {
+    background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+    border-color: #c7d7f5;
+  }
+  .activity-work-session-page .session-info-tile-label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #64748b;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+    line-height: 1.2;
+  }
+  .activity-work-session-page .session-info-tile-value {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .activity-work-session-page .session-info-tile-value-sm {
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+  .activity-work-session-page .session-info-tile-muted {
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  .activity-work-session-page .work-session-assignee-form .form-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+  }
+  .activity-work-session-page .work-session-assignee-form.is-locked {
+    background: #f8fafc;
+  }
+  .activity-work-session-page .work-session-assignee-forms {
+    display: grid;
+    gap: 1rem;
+  }
+</style>
+
 <div class="sections-page activity-work-session-page">
-  <% if (hasMultipleSessions) { %>
-    <div class="mb-2">
-      <a href="<%= overviewManageUrl %>" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-arrow-left me-1"></i>All work sessions
-      </a>
-    </div>
-  <% } %>
-  <div class="activity-work-session-header mb-3">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-kanban me-2"></i>Manage Work Session</h1>
-      <a href="/school/activities" class="btn btn-outline-secondary btn-sm ms-auto"><i class="bi bi-list-ul me-1"></i>All Activities</a>
-    </div>
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
-      <div class="text-start mb-0">
-        <div class="fw-semibold text-dark"><%= activityRow.title || '' %></div>
-        <% if (entrySubtitleParts.length) { %>
-          <div class="small text-muted"><%= entrySubtitleParts.join(' — ') %></div>
-        <% } %>
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-journal-check me-2 text-primary"></i>Manage Work Session</h1>
+    <a href="<%= dashboardHref %>" class="btn btn-filled btn-secondary btn-md">
+      <i class="bi bi-speedometer2 me-1"></i>Dashboard
+    </a>
+  </div>
+
+  <div class="session-manager-quick-nav">
+    <div class="session-manager-class-nav">
+      <button
+        type="button"
+        class="session-manager-class-nav-toggle"
+        id="btnToggleWorkSessionNav"
+        data-bs-toggle="collapse"
+        data-bs-target="#workSessionNavCollapse"
+        aria-expanded="false"
+        aria-controls="workSessionNavCollapse">
+        <span class="session-manager-class-nav-icon" aria-hidden="true"><i class="bi bi-box-arrow-up-right"></i></span>
+        <span class="session-manager-class-nav-copy">
+          <span class="session-manager-class-nav-title">Activity navigation</span>
+          <span class="session-manager-class-nav-sub">Manage and browse</span>
+        </span>
+        <i class="bi bi-chevron-down session-class-nav-chevron" aria-hidden="true"></i>
+      </button>
+      <div class="collapse" id="workSessionNavCollapse">
+        <div class="session-manager-class-nav-links">
+          <a href="/school/activities" class="session-manager-class-nav-link"><i class="bi bi-list-ul"></i>All Activities</a>
+          <a href="<%= overviewManageUrl %>" class="session-manager-class-nav-link"><i class="bi bi-kanban"></i>All work sessions</a>
+          <a href="/school/activities/edit/<%= encodeURIComponent(activityRow.id) %>" class="session-manager-class-nav-link"><i class="bi bi-pencil-square"></i>Edit Activity</a>
+        </div>
       </div>
-      <a href="/school/activities/edit/<%= encodeURIComponent(activityRow.id) %>" class="btn btn-outline-secondary btn-sm ms-auto"><i class="bi bi-pencil-square me-1"></i>Edit Activity</a>
     </div>
   </div>
 
-  <div class="d-flex flex-wrap gap-2 mb-3">
-    <span class="badge bg-<%= isCompletion ? 'primary' : 'info' %>"><%= evaluationTypeLabel %></span>
-    <% if (activityRow.paid) { %><span class="badge bg-success">Payable</span><% } %>
-    <% if (activityRow.categoryName) { %><span class="badge bg-light text-dark border"><%= activityRow.categoryName %></span><% } %>
-    <% if (activityRow.departmentName) { %><span class="badge bg-light text-dark border"><%= activityRow.departmentName %></span><% } %>
+  <div class="session-manager-toolbar-row">
+    <div class="btn-group shadow-sm">
+      <% if (prevSession && prevSession.manageUrl) { %>
+        <a href="<%= prevSession.manageUrl %>" class="btn btn-outline-primary bg-grey btn-md" title="Previous work session"><i class="bi bi-chevron-left"></i></a>
+      <% } else { %>
+        <button type="button" class="btn btn-outline-secondary bg-light btn-md" disabled><i class="bi bi-chevron-left"></i></button>
+      <% } %>
+      <% if (nextSession && nextSession.manageUrl) { %>
+        <a href="<%= nextSession.manageUrl %>" class="btn btn-outline-primary bg-grey btn-md" title="Next work session"><i class="bi bi-chevron-right"></i></a>
+      <% } else { %>
+        <button type="button" class="btn btn-outline-secondary bg-light btn-md" disabled><i class="bi bi-chevron-right"></i></button>
+      <% } %>
+    </div>
+    <% if (editableAssigneeRows.length) { %>
+      <button type="button" class="btn btn-primary btn-md btn-filled btn-save-session shadow-md" id="btnSaveWorkSession">
+        <i class="bi bi-save me-1"></i>Save session
+      </button>
+    <% } %>
+    <button type="button" class="btn btn-warning btn-md btn-filled btn-close-session" id="btnCloseWorkSessionManager"><i class="bi bi-x-lg me-1"></i>Close</button>
   </div>
 
-  <div class="card border-0 shadow-sm mb-4">
-    <div class="card-body p-4">
-      <div class="row g-3">
-        <div class="col-md-3">
-          <div class="text-muted small text-uppercase">Date</div>
-          <div class="fw-bold"><%= entryRow.date || '-' %></div>
+  <div class="card session-manager-info-card shadow-sm mb-3">
+    <div class="session-info-header">
+      <div
+        class="session-info-details-toggle"
+        id="btnToggleWorkSessionInfoDetails"
+        role="button"
+        tabindex="0"
+        data-bs-toggle="collapse"
+        data-bs-target="#workSessionInfoDetailsCollapse"
+        aria-expanded="false"
+        aria-controls="workSessionInfoDetailsCollapse">
+        <div class="session-info-summary">
+          <span class="session-info-summary-class text-truncate" title="<%= activityRow.title || 'Activity' %>"><%= activityRow.title || 'Activity' %></span>
+          <span class="session-info-summary-sep" aria-hidden="true">·</span>
+          <span class="session-info-summary-chip" id="workSessionInfoSummaryDate"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i><%= entryRow.date || '-' %></span>
+          <span class="session-info-summary-chip" id="workSessionInfoSummaryTime"><i class="bi bi-clock me-1" aria-hidden="true"></i><%= entryRow.startTime || '-' %>–<%= entryRow.endTime || '-' %></span>
+          <span class="session-info-summary-chip session-info-summary-chip--location<%= workSessionLocationLabel ? '' : ' is-muted' %>" id="workSessionInfoSummaryLocation" title="Location"><% if (workSessionLocationLabel) { %><i class="bi bi-geo-alt me-1" aria-hidden="true"></i><%= workSessionLocationLabel %><% } %></span>
+          <span class="session-info-summary-chip d-none d-lg-inline-flex" title="Evaluation"><i class="bi bi-ui-checks me-1" aria-hidden="true"></i><%= evaluationTypeLabel %></span>
         </div>
-        <div class="col-md-3">
-          <div class="text-muted small text-uppercase">Time</div>
-          <div class="fw-bold"><%= entryRow.startTime || '-' %> – <%= entryRow.endTime || '-' %></div>
+        <span class="session-info-expand-meta">
+          <span class="session-info-expand-label">Details</span>
+          <i class="bi bi-chevron-down session-info-expand-chevron" aria-hidden="true"></i>
+        </span>
+      </div>
+      <div class="session-info-status-slot<%= workSessionStatusActionRequired ? '' : ' is-complete' %>" id="workSessionStatusSlot">
+        <div class="session-info-status-slot-label">
+          <span>Session status</span>
+          <% if (workSessionStatusActionRequired) { %>
+            <span class="badge bg-warning text-dark session-status-required-badge">Required</span>
+          <% } %>
         </div>
-        <div class="col-md-3">
-          <div class="text-muted small text-uppercase">Duration</div>
-          <div class="fw-bold"><%= Number(entryRow.durationHours || 0).toFixed(2) %> h</div>
+        <button
+          type="button"
+          id="workSessionStatusButton"
+          class="btn session-status-button<%= workSessionStatusActionRequired ? ' session-status-button--action-required' : '' %>"
+          <%= (isCompletion && workSessionStatusActionRequired && editableAssigneeRows.length) ? '' : 'disabled' %>
+          style="<%= !workSessionStatusActionRequired ? 'background-color:#d1e7dd;color:#0f5132;border-color:#badbcc;' : '' %>">
+          <span id="workSessionStatusButtonLabel"><%= workSessionStatusLabel %></span>
+          <i class="bi bi-pencil-square" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <div class="collapse" id="workSessionInfoDetailsCollapse">
+      <div class="session-info-details-body">
+        <div class="session-info-grid">
+          <div class="session-info-tile session-info-tile--accent">
+            <div class="session-info-tile-label">Activity</div>
+            <div class="session-info-tile-value text-truncate" title="<%= activityRow.title || '-' %>"><%= activityRow.title || '-' %></div>
+          </div>
+          <div class="session-info-tile">
+            <div class="session-info-tile-label">Session title</div>
+            <div class="session-info-tile-value"><%= entryRow.title || '-' %></div>
+          </div>
+          <div class="session-info-tile">
+            <div class="session-info-tile-label">Date</div>
+            <div class="session-info-tile-value"><%= entryRow.date || '-' %></div>
+          </div>
+          <div class="session-info-tile">
+            <div class="session-info-tile-label">Time</div>
+            <div class="session-info-tile-value text-nowrap"><%= entryRow.startTime || '-' %> – <%= entryRow.endTime || '-' %></div>
+          </div>
+          <div class="session-info-tile">
+            <div class="session-info-tile-label">Duration</div>
+            <div class="session-info-tile-value"><%= Number(entryRow.durationHours || 0).toFixed(2) %> h</div>
+          </div>
+          <div class="session-info-tile">
+            <div class="session-info-tile-label">Category</div>
+            <div class="session-info-tile-value"><%= activityRow.categoryName || '-' %></div>
+          </div>
+          <div class="session-info-tile">
+            <div class="session-info-tile-label">Department</div>
+            <div class="session-info-tile-value"><%= activityRow.departmentName || '-' %></div>
+          </div>
         </div>
-        <div class="col-md-3">
-          <div class="text-muted small text-uppercase">Location</div>
-          <div class="fw-bold"><%= entryRow.location || activityRow.location || '-' %></div>
+        <div class="session-info-meta-grid">
+          <div class="session-info-tile">
+            <div class="session-info-tile-label">Evaluation</div>
+            <div class="session-info-tile-value session-info-tile-value-sm"><%= evaluationTypeLabel %></div>
+          </div>
+          <div class="session-info-tile">
+            <div class="session-info-tile-label">Assignees</div>
+            <div class="session-info-tile-value session-info-tile-value-sm"><%= assigneeRows.length %> total · <%= readyCount %> ready for timesheet</div>
+          </div>
+          <div class="session-info-tile">
+            <div class="session-info-tile-label">Payable</div>
+            <div class="session-info-tile-value session-info-tile-value-sm"><%= activityRow.paid ? 'Yes' : 'No' %></div>
+          </div>
         </div>
         <% if (entryRow.notes || activityRow.notes) { %>
-          <div class="col-12">
-            <div class="text-muted small text-uppercase">Notes</div>
-            <div><%= entryRow.notes || activityRow.notes %></div>
+          <div class="session-info-tile mt-2">
+            <div class="session-info-tile-label">Notes</div>
+            <div class="session-info-tile-value session-info-tile-value-sm"><%= entryRow.notes || activityRow.notes %></div>
           </div>
         <% } %>
       </div>
     </div>
   </div>
 
-  <% if (isCompletion) { %>
-    <div class="alert alert-light border mb-4">
-      <i class="bi bi-check2-circle me-2"></i>
-      Assignees must explicitly mark their assignment <strong>complete</strong>. Paid rows also require <strong>attended</strong> status.
-    </div>
-  <% } else { %>
-    <div class="alert alert-light border mb-4">
-      <i class="bi bi-person-check me-2"></i>
-      Record attendance for each assignee. Paid timesheet rows require <strong>attended</strong> status.
-    </div>
-  <% } %>
+  <form method="POST" action="<%= manageUrl %>/complete" id="frmCompleteWorkSessionStatus" class="d-none">
+    <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+    <input type="hidden" name="personId" id="completeWorkSessionPersonId" value="">
+    <input type="hidden" name="status" id="completeWorkSessionStatus" value="attended">
+    <input type="hidden" name="paidHours" id="completeWorkSessionPaidHours" value="<%= Number(entryRow.durationHours || 0).toFixed(2) %>">
+    <input type="hidden" name="notes" id="completeWorkSessionNotes" value="">
+  </form>
 
-  <div class="card border-0 shadow-sm">
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Person</th>
-              <th>Role</th>
-              <% if (!isCompletion) { %><th>Attendance</th><% } %>
-              <% if (activityRow.paid) { %><th>Paid hours</th><% } %>
-              <th>Notes</th>
-              <th>Status</th>
-              <% if (isCompletion) { %><th class="text-end">Actions</th><% } else { %><th class="text-end">Save</th><% } %>
-            </tr>
-          </thead>
-          <tbody>
-            <% const tableColSpan = 5 + (isCompletion ? 0 : 1) + (activityRow.paid ? 1 : 0); %>
-            <% assigneeRows.forEach((assignee) => {
-              const rowVisible = canManageAll || assignee.isSelf;
-              const rowEditable = assignee.editable && (canManageAll || assignee.isSelf);
-              const statusClass = assignee.locked ? 'secondary' : (assignee.readyForTimesheet ? 'success' : 'warning');
-            %>
-              <tr class="<%= assignee.locked ? 'table-secondary' : '' %>">
-                <td>
-                  <div class="fw-semibold"><%= assignee.personName || assignee.personId %></div>
-                  <% if (assignee.locked) { %><span class="badge bg-secondary">Timesheet locked</span><% } %>
-                </td>
-                <td><%= assignee.role || 'participant' %></td>
-                <% if (!isCompletion) { %>
-                <td>
-                  <% if (rowEditable) { %>
-                    <select class="form-select form-select-sm ws-status-input" data-person-id="<%= assignee.personId %>" style="min-width: 8rem;">
-                      <% ['attended', 'absent', 'excused'].forEach((status) => { %>
-                        <option value="<%= status %>" <%= String(assignee.status || 'attended') === status ? 'selected' : '' %>><%= status %></option>
-                      <% }) %>
-                    </select>
-                  <% } else { %>
-                    <span class="badge bg-light text-dark border"><%= assignee.status || 'pending' %></span>
-                  <% } %>
-                </td>
-                <% } %>
-                <% if (activityRow.paid) { %>
-                  <td>
-                    <% if (rowEditable) { %>
-                      <input type="number" step="0.25" min="0" max="24" class="form-control form-control-sm ws-paid-hours-input" data-person-id="<%= assignee.personId %>" style="max-width: 6rem;" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>">
-                    <% } else { %>
-                      <%= Number(assignee.paidHours || 0).toFixed(2) %>
+  <div class="session-manager-shell" id="workSessionManagerShell">
+    <aside class="session-manager-sidebar" id="workSessionManagerSidebar" aria-label="Work session sections">
+      <div class="session-manager-sidebar-head w-100">
+        <span class="session-manager-nav-label small fw-bold text-secondary text-uppercase" style="letter-spacing:0.06em;">Sections</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" id="btnToggleWorkSessionSidebar" title="Collapse sidebar" aria-expanded="true" aria-controls="workSessionManagerSidebar">
+          <i class="bi bi-layout-sidebar-inset" id="workSessionSidebarToggleIcon"></i>
+        </button>
+      </div>
+      <nav class="session-manager-sidebar-nav" role="tablist">
+        <button type="button" class="session-manager-nav-item active" data-work-panel="session-detail" role="tab" aria-selected="true">
+          <i class="bi bi-journal-text fs-5"></i><span class="session-manager-nav-label">Session Detail</span>
+        </button>
+      </nav>
+    </aside>
+
+    <main class="session-manager-main">
+      <div class="session-panel active" id="work-panel-session-detail" role="tabpanel">
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-md">
+            <div class="session-summary-card h-100">
+              <div class="session-summary-label">Assignees</div>
+              <div class="session-summary-value"><%= visibleRows.length %></div>
+            </div>
+          </div>
+          <div class="col-6 col-md">
+            <div class="session-summary-card h-100">
+              <div class="session-summary-label">Ready for timesheet</div>
+              <div class="session-summary-value text-success"><%= readyCount %></div>
+            </div>
+          </div>
+          <div class="col-6 col-md">
+            <div class="session-summary-card h-100">
+              <div class="session-summary-label"><%= isCompletion ? 'Completed' : 'Attended' %></div>
+              <div class="session-summary-value <%= isCompletion ? 'text-primary' : 'text-success' %>"><%= isCompletion ? completionDoneCount : attendanceAttendedCount %></div>
+            </div>
+          </div>
+          <% if (lockedCount > 0) { %>
+            <div class="col-6 col-md">
+              <div class="session-summary-card h-100">
+                <div class="session-summary-label">Locked</div>
+                <div class="session-summary-value text-secondary"><%= lockedCount %></div>
+              </div>
+            </div>
+          <% } %>
+        </div>
+
+        <% if (evaluationTypeLocked) { %>
+          <div class="alert alert-warning border-warning shadow-sm mb-3">
+            <div class="fw-semibold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Evaluation type is locked</div>
+            <div class="small mt-1">One or more assignee rows are tied to approved timesheets.</div>
+          </div>
+        <% } %>
+
+        <% if (isCompletion) { %>
+          <div class="alert alert-info border-info shadow-sm mb-3">
+            <div class="fw-semibold"><i class="bi bi-check2-circle me-2"></i>Completion workflow</div>
+            <div class="small mt-1">Use <strong>Session status</strong> in the header to mark completion, then <strong>Save session</strong> for assignee details.</div>
+          </div>
+        <% } else { %>
+          <div class="alert alert-info border-info shadow-sm mb-3">
+            <div class="fw-semibold"><i class="bi bi-person-check me-2"></i>Attendance workflow</div>
+            <div class="small mt-1">Set attendance per assignee below, then use <strong>Save session</strong> in the toolbar.</div>
+          </div>
+        <% } %>
+
+        <div class="work-session-assignee-forms">
+          <% assigneeRows.forEach((assignee, idx) => {
+            const rowVisible = canManageAll || assignee.isSelf;
+            if (!rowVisible && !canManageAll) return;
+            const rowEditable = assignee.editable && (canManageAll || assignee.isSelf);
+            const statusClass = assignee.locked ? 'secondary' : (assignee.readyForTimesheet ? 'success' : 'warning');
+            const rowKey = String(assignee.personId || ('row_' + idx)).replace(/[^A-Za-z0-9_-]/g, '_') + '_' + String(idx);
+          %>
+            <div class="card border-0 shadow-sm work-session-assignee-form<%= assignee.locked ? ' is-locked' : '' %>" data-person-id="<%= assignee.personId %>">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                  <div>
+                    <h6 class="fw-bold mb-1"><%= assignee.personName || assignee.personId %></h6>
+                    <div class="small text-muted"><%= assignee.role || 'participant' %></div>
+                    <% if (assignee.locked) { %><span class="badge bg-secondary mt-2">Timesheet locked</span><% } %>
+                  </div>
+                  <div class="text-end">
+                    <span class="badge bg-<%= statusClass %>"><%= assignee.completionLabel %></span>
+                    <% if (isCompletion && String(assignee.completionStatus || '').toLowerCase() === 'completed' && assignee.completedAt) { %>
+                      <div class="small text-muted mt-1"><%= assignee.completedAt.slice(0, 10) %></div>
                     <% } %>
-                  </td>
-                <% } %>
-                <td>
-                  <% if (rowEditable) { %>
-                    <input type="text" class="form-control form-control-sm ws-notes-input" data-person-id="<%= assignee.personId %>" value="<%= assignee.notes || '' %>" maxlength="500">
-                  <% } else { %>
-                    <%= assignee.notes || '-' %>
-                  <% } %>
-                </td>
-                <td>
-                  <span class="badge bg-<%= statusClass %>"><%= assignee.completionLabel %></span>
-                  <% if (isCompletion && String(assignee.completionStatus || '').toLowerCase() === 'completed' && assignee.completedAt) { %>
-                    <div class="small text-muted"><%= assignee.completedAt.slice(0, 10) %></div>
-                  <% } %>
-                </td>
-                <td class="text-end">
-                  <% if (rowEditable) { %>
-                    <% if (isCompletion) { %>
-                      <div class="d-inline-flex gap-2 flex-wrap justify-content-end">
-                        <form method="POST" action="<%= manageUrl %>/save" class="d-inline">
-                          <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
-                          <input type="hidden" name="personId" value="<%= assignee.personId %>">
-                          <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>">
-                          <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>">
-                          <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>">
-                          <button type="submit" class="btn btn-outline-secondary btn-sm btn-ws-save" data-person-id="<%= assignee.personId %>"><i class="bi bi-save me-1"></i>Save</button>
-                        </form>
-                        <form method="POST" action="<%= manageUrl %>/complete" class="d-inline">
-                          <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
-                          <input type="hidden" name="personId" value="<%= assignee.personId %>">
-                          <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>">
-                          <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>">
-                          <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>">
-                          <button type="submit" class="btn btn-primary btn-sm btn-ws-complete" data-person-id="<%= assignee.personId %>" onclick="return confirm('Mark this assignment complete?');">
-                            <i class="bi bi-check2-circle me-1"></i>Complete
-                          </button>
-                        </form>
+                  </div>
+                </div>
+
+                <% if (!isCompletion) { %>
+                  <div class="mb-3">
+                    <label class="form-label">Attendance</label>
+                    <% if (rowEditable) { %>
+                      <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Attendance status for <%= assignee.personName || assignee.personId %>">
+                        <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="attended_<%= rowKey %>" value="attended" <%= String(assignee.status || 'attended') === 'attended' ? 'checked' : '' %>>
+                        <label class="btn att-label" for="attended_<%= rowKey %>" title="Attended"><i class="bi bi-check-lg me-1"></i>Attended</label>
+                        <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="excused_<%= rowKey %>" value="excused" <%= String(assignee.status || '') === 'excused' ? 'checked' : '' %>>
+                        <label class="btn att-label" for="excused_<%= rowKey %>" title="Excused"><i class="bi bi-envelope-paper me-1"></i>Excused</label>
+                        <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="absent_<%= rowKey %>" value="absent" <%= String(assignee.status || '') === 'absent' ? 'checked' : '' %>>
+                        <label class="btn att-label" for="absent_<%= rowKey %>" title="Absent"><i class="bi bi-x-lg me-1"></i>Absent</label>
                       </div>
                     <% } else { %>
-                      <form method="POST" action="<%= manageUrl %>/save" class="d-inline">
-                        <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
-                        <input type="hidden" name="personId" value="<%= assignee.personId %>">
-                        <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>">
-                        <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>">
-                        <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>">
-                        <button type="submit" class="btn btn-primary btn-sm btn-ws-save" data-person-id="<%= assignee.personId %>"><i class="bi bi-save me-1"></i>Save attendance</button>
-                      </form>
+                      <div class="form-control-plaintext"><span class="badge bg-light text-dark border"><%= assignee.status || 'pending' %></span></div>
                     <% } %>
-                  <% } else if (!rowVisible && canManageAll === false) { %>
-                    <span class="text-muted small">Hidden</span>
+                  </div>
+                <% } %>
+
+                <% if (activityRow.paid) { %>
+                  <div class="mb-3">
+                    <label class="form-label" for="paidHours_<%= rowKey %>">Paid hours</label>
+                    <% if (rowEditable) { %>
+                      <input type="number" step="0.25" min="0" max="24" class="form-control ws-paid-hours-input" id="paidHours_<%= rowKey %>" data-person-id="<%= assignee.personId %>" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>">
+                    <% } else { %>
+                      <div class="form-control-plaintext fw-semibold"><%= Number(assignee.paidHours || 0).toFixed(2) %></div>
+                    <% } %>
+                  </div>
+                <% } %>
+
+                <div class="mb-3">
+                  <label class="form-label" for="notes_<%= rowKey %>">Notes</label>
+                  <% if (rowEditable) { %>
+                    <textarea class="form-control ws-notes-input" id="notes_<%= rowKey %>" data-person-id="<%= assignee.personId %>" rows="3" maxlength="500" placeholder="Add notes for this assignee"><%= assignee.notes || '' %></textarea>
                   <% } else { %>
-                    <span class="text-muted small">Read only</span>
+                    <div class="form-control-plaintext"><%= assignee.notes || '-' %></div>
                   <% } %>
-                </td>
-              </tr>
-            <% }) %>
-            <% if (!assigneeRows.length) { %>
-              <tr><td colspan="<%= tableColSpan %>" class="text-center text-muted py-4">No assignees on this work session.</td></tr>
-            <% } %>
-          </tbody>
-        </table>
+                </div>
+
+                <% if (isCompletion && rowEditable) { %>
+                  <div class="form-check">
+                    <input type="radio" class="form-check-input ws-complete-target" name="ws_complete_target" id="completeTarget_<%= rowKey %>" value="<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                    <label class="form-check-label" for="completeTarget_<%= rowKey %>">Use this assignee when marking session completed</label>
+                  </div>
+                <% } %>
+
+                <% if (rowEditable) { %>
+                  <form method="POST" action="<%= manageUrl %>/save" class="d-none ws-assignee-save-form" data-person-id="<%= assignee.personId %>">
+                    <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+                    <input type="hidden" name="personId" value="<%= assignee.personId %>">
+                    <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>">
+                    <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>">
+                    <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>">
+                  </form>
+                <% } %>
+              </div>
+            </div>
+          <% }) %>
+          <% if (!assigneeRows.length) { %>
+            <div class="text-center text-muted py-4 border rounded bg-light">No assignees on this work session.</div>
+          <% } %>
+        </div>
       </div>
-    </div>
+    </main>
   </div>
 
   <% if (!canManageAll && assigneeRows.every((row) => !row.isSelf)) { %>
-    <div class="alert alert-warning mt-4">You are not assigned to this work session.</div>
+    <div class="alert alert-warning mt-3 border-warning shadow-sm">
+      <div class="fw-semibold"><i class="bi bi-exclamation-circle me-1"></i>Not assigned</div>
+      <div class="small mt-1">You are not assigned to this work session.</div>
+    </div>
   <% } %>
 </div>
 
+<%- include('partials/modal') %>
+
 <script>
   (function () {
+    const fallbackCloseHref = "<%= overviewManageUrl %>";
+    const isCompletionMode = <%= isCompletion ? 'true' : 'false' %>;
+
+    function resolveMessageModalFn() {
+      if (typeof showMessageModal === 'function') return showMessageModal;
+      if (typeof window !== 'undefined' && typeof window.showMessageModal === 'function') return window.showMessageModal;
+      return null;
+    }
+
+    function resolveMessageBoxFn() {
+      if (typeof messageBox === 'function') return messageBox;
+      if (typeof window !== 'undefined' && typeof window.messageBox === 'function') return window.messageBox;
+      return null;
+    }
+
+    async function showUiMessage(options) {
+      try {
+        const showMessageModalFn = resolveMessageModalFn();
+        if (showMessageModalFn) return await showMessageModalFn(options || {});
+        const messageBoxFn = resolveMessageBoxFn();
+        if (messageBoxFn) return await messageBoxFn(options || {});
+      } catch (error) { /* ignore and fall back */ }
+      window.alert((options && options.message) ? options.message : 'Done');
+      return false;
+    }
+
+    async function showUiConfirm(options) {
+      const opts = { showCancel: true, ...(options || {}) };
+      try {
+        const showMessageModalFn = resolveMessageModalFn();
+        if (showMessageModalFn) {
+          const okText = String(opts.okText || 'Yes').trim() || 'Yes';
+          const cancelText = String(opts.cancelText || 'No').trim() || 'No';
+          const modalPayload = {
+            title: opts.title || 'Confirm',
+            message: opts.message || 'Are you sure?',
+            type: opts.type || 'confirm',
+            okText: okText,
+            cancelText: cancelText,
+            icon: opts.icon || 'warning',
+            buttons: [
+              { text: okText, class: 'btn-primary' },
+              { text: cancelText, class: 'btn-secondary' }
+            ]
+          };
+          const modalResult = await showMessageModalFn(modalPayload);
+          const normalizedResult = typeof modalResult === 'string'
+            ? modalResult.trim().toLowerCase()
+            : modalResult;
+          return normalizedResult === true || normalizedResult === okText.toLowerCase();
+        }
+        const messageBoxFn = resolveMessageBoxFn();
+        if (messageBoxFn) return !!(await messageBoxFn(opts));
+      } catch (error) { /* ignore and fall back */ }
+      return window.confirm((opts && opts.message) ? opts.message : 'Are you sure?');
+    }
+
     function syncRowFields(personId) {
-      const status = document.querySelector('.ws-status-input[data-person-id="' + personId + '"]');
+      const status = document.querySelector('input.ws-att-radio[data-person-id="' + personId + '"]:checked');
       const paidHours = document.querySelector('.ws-paid-hours-input[data-person-id="' + personId + '"]');
       const notes = document.querySelector('.ws-notes-input[data-person-id="' + personId + '"]');
       document.querySelectorAll('.ws-status-' + personId).forEach((input) => {
         if (status) input.value = status.value;
+        else if (isCompletionMode) input.value = input.value || 'attended';
       });
       document.querySelectorAll('.ws-paid-hours-' + personId).forEach((input) => {
         if (paidHours) input.value = paidHours.value;
@@ -217,12 +938,131 @@
         if (notes) input.value = notes.value;
       });
     }
-    document.querySelectorAll('.btn-ws-save, .btn-ws-complete').forEach((button) => {
-      button.addEventListener('click', function () {
-        const personId = button.getAttribute('data-person-id');
-        if (personId) syncRowFields(personId);
-        if (typeof window.showLoading === 'function') window.showLoading('Saving…');
+
+    function syncCompleteWorkSessionForm(personId) {
+      syncRowFields(personId);
+      const statusSource = document.querySelector('.ws-status-' + personId);
+      const paidSource = document.querySelector('.ws-paid-hours-' + personId);
+      const notesSource = document.querySelector('.ws-notes-' + personId);
+      const personInput = document.getElementById('completeWorkSessionPersonId');
+      const statusInput = document.getElementById('completeWorkSessionStatus');
+      const paidInput = document.getElementById('completeWorkSessionPaidHours');
+      const notesInput = document.getElementById('completeWorkSessionNotes');
+      if (personInput) personInput.value = personId || '';
+      if (statusInput) statusInput.value = statusSource ? statusSource.value : 'attended';
+      if (paidInput) paidInput.value = paidSource ? paidSource.value : '';
+      if (notesInput) notesInput.value = notesSource ? notesSource.value : '';
+    }
+
+    function resolveCompletionTargetPersonId() {
+      const selected = document.querySelector('input.ws-complete-target:checked');
+      if (selected) return selected.getAttribute('data-person-id') || selected.value || '';
+      const editableTargets = Array.from(document.querySelectorAll('input.ws-complete-target'));
+      if (editableTargets.length === 1) {
+        return editableTargets[0].getAttribute('data-person-id') || editableTargets[0].value || '';
+      }
+      const saveForms = Array.from(document.querySelectorAll('.ws-assignee-save-form[data-person-id]'));
+      if (saveForms.length === 1) return saveForms[0].getAttribute('data-person-id') || '';
+      return '';
+    }
+
+    const saveSessionBtn = document.getElementById('btnSaveWorkSession');
+    if (saveSessionBtn) {
+      saveSessionBtn.addEventListener('click', async function () {
+        const saveForms = Array.from(document.querySelectorAll('.ws-assignee-save-form[data-person-id]'));
+        if (!saveForms.length) return;
+        if (typeof window.showLoading === 'function') window.showLoading('Saving session…');
+        try {
+          for (const form of saveForms) {
+            const personId = form.getAttribute('data-person-id');
+            if (personId) syncRowFields(personId);
+            const response = await fetch(form.action, {
+              method: 'POST',
+              body: new FormData(form),
+              headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.status === 'error') {
+              throw new Error(payload.message || 'Save failed.');
+            }
+          }
+          window.location.reload();
+        } catch (error) {
+          if (typeof window.hideLoading === 'function') window.hideLoading();
+          const message = error && error.message ? error.message : 'Save failed.';
+          await showUiMessage({ title: 'Save failed', icon: 'error', message: message });
+        }
+      });
+    }
+    const completeForm = document.getElementById('frmCompleteWorkSessionStatus');
+    const statusButton = document.getElementById('workSessionStatusButton');
+    if (statusButton && completeForm && isCompletionMode) {
+      statusButton.addEventListener('click', async function () {
+        if (statusButton.disabled) return;
+        const personId = resolveCompletionTargetPersonId();
+        if (!personId) {
+          const message = 'Select an assignee below before marking this work session completed.';
+          await showUiMessage({ title: 'Select assignee', icon: 'warning', message: message });
+          return;
+        }
+        const confirmed = await showUiConfirm({
+          title: 'Mark completed',
+          icon: 'warning',
+          message: 'Mark this work session as completed for the selected assignee?'
+        });
+        if (!confirmed) return;
+        syncCompleteWorkSessionForm(personId);
+        if (typeof window.showLoading === 'function') window.showLoading('Completing…');
+        completeForm.submit();
+      });
+    }
+
+    function setActiveWorkPanel(panelId) {
+      document.querySelectorAll('.session-manager-nav-item[data-work-panel]').forEach((btn) => {
+        const isActive = btn.getAttribute('data-work-panel') === panelId;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+      document.querySelectorAll('.session-panel[id^="work-panel-"]').forEach((panel) => {
+        panel.classList.toggle('active', panel.id === 'work-panel-' + panelId);
+      });
+    }
+
+    document.querySelectorAll('.session-manager-nav-item[data-work-panel]').forEach((btn) => {
+      btn.addEventListener('click', function () {
+        const panelId = btn.getAttribute('data-work-panel');
+        if (!panelId) return;
+        setActiveWorkPanel(panelId);
       });
     });
+
+    const sidebarEl = document.getElementById('workSessionManagerSidebar');
+    const btnToggleSidebar = document.getElementById('btnToggleWorkSessionSidebar');
+    const sidebarIcon = document.getElementById('workSessionSidebarToggleIcon');
+    const SIDEBAR_KEY = 'workSessionManagerSidebarCollapsed';
+    if (sidebarEl && btnToggleSidebar) {
+      try {
+        if (localStorage.getItem(SIDEBAR_KEY) === '1') {
+          sidebarEl.classList.add('collapsed');
+          btnToggleSidebar.setAttribute('aria-expanded', 'false');
+          if (sidebarIcon) sidebarIcon.className = 'bi bi-layout-sidebar';
+        }
+      } catch (e) { /* ignore */ }
+      btnToggleSidebar.addEventListener('click', function () {
+        sidebarEl.classList.toggle('collapsed');
+        const collapsed = sidebarEl.classList.contains('collapsed');
+        btnToggleSidebar.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        if (sidebarIcon) sidebarIcon.className = collapsed ? 'bi bi-layout-sidebar' : 'bi bi-layout-sidebar-inset';
+        try { localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0'); } catch (e) { /* ignore */ }
+      });
+    }
+
+    const closeBtn = document.getElementById('btnCloseWorkSessionManager');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        if (window.history.length > 1) window.history.back();
+        else window.location.href = fallbackCloseHref;
+      });
+    }
   })();
 </script>
