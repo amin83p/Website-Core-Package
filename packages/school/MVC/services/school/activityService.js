@@ -88,8 +88,8 @@ function formatPersonName(person = {}, fallback = '') {
 async function enrichActivityAttendeeNames(activity = {}, reqUser) {
   const normalized = normalizeActivityRecord(activity);
   const entries = getActivityEntries(normalized);
-  const attendees = Array.isArray(normalized.attendees) ? normalized.attendees : [];
-  const entryAssignees = entries.flatMap((entry) => Array.isArray(entry.assignees) ? entry.assignees : []);
+  const attendees = normalizeActivityAssigneeRows(normalized.attendees);
+  const entryAssignees = entries.flatMap((entry) => normalizeActivityAssigneeRows(entry.assignees));
   if (!attendees.length && !entryAssignees.length) return normalized;
   const personIds = [...new Set([...attendees, ...entryAssignees].map((row) => normalizeId(row.personId)).filter(Boolean))];
   if (!personIds.length) return normalized;
@@ -108,17 +108,19 @@ async function enrichActivityAttendeeNames(activity = {}, reqUser) {
     .map((person) => [normalizeId(person.id || person.personId), person])
     .filter(([id]) => personIds.includes(id)));
   const enrichAssignee = (assignee) => {
+    if (!assignee || typeof assignee !== 'object') return null;
     const personId = normalizeId(assignee.personId);
+    if (!personId) return null;
     const person = personMap.get(personId);
     const personName = person ? formatPersonName(person, assignee.personName || personId) : (assignee.personName || personId);
     return { ...assignee, personName };
   };
   return {
     ...normalized,
-    attendees: attendees.map(enrichAssignee),
+    attendees: attendees.map(enrichAssignee).filter(Boolean),
     entries: entries.map((entry) => ({
       ...entry,
-      assignees: (Array.isArray(entry.assignees) ? entry.assignees : []).map(enrichAssignee)
+      assignees: normalizeActivityAssigneeRows(entry.assignees).map(enrichAssignee).filter(Boolean)
     }))
   };
 }
@@ -227,9 +229,24 @@ function isPersonEligibleForEntry(activity = {}, entry = {}, personId, orgPerson
   return new Set(getEffectiveEntryAllowedIds(activity, entry, pool)).has(targetPersonId);
 }
 
+function normalizeActivityAssigneeRows(rows = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => {
+      const personId = normalizeId(row.personId || row.id);
+      if (!personId) return null;
+      return {
+        ...row,
+        personId,
+        personName: row.personName || row.displayName || row.name || personId
+      };
+    })
+    .filter(Boolean);
+}
+
 function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
-  const assignees = parseJsonArray(entry.assignees);
-  const fallbackAssignees = parseJsonArray(entry.attendees);
+  const assignees = normalizeActivityAssigneeRows(parseJsonArray(entry.assignees));
+  const fallbackAssignees = normalizeActivityAssigneeRows(parseJsonArray(entry.attendees));
   const startTime = normalizeId(entry.startTime || activity.startTime);
   const endTime = normalizeId(entry.endTime || activity.endTime);
   const durationHours = Number(entry.durationHours || calculateDurationHours(startTime, endTime) || 0);
@@ -246,7 +263,7 @@ function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
     excludedPersonIds: normalizePersonIdList(entry.excludedPersonIds || entry.excludedPersons || []),
     assignees: assignees.length
       ? assignees
-      : (fallbackAssignees.length ? fallbackAssignees : parseJsonArray(activity.attendees))
+      : (fallbackAssignees.length ? fallbackAssignees : normalizeActivityAssigneeRows(parseJsonArray(activity.attendees)))
   };
 }
 
@@ -273,6 +290,7 @@ function flattenActivityAssignees(entries = []) {
   const byPersonId = new Map();
   entries.forEach((entry) => {
     (Array.isArray(entry.assignees) ? entry.assignees : []).forEach((assignee) => {
+      if (!assignee || typeof assignee !== 'object') return;
       const personId = normalizeId(assignee.personId);
       if (!personId) return;
       const existing = byPersonId.get(personId);
@@ -298,7 +316,7 @@ function normalizeActivityRecord(activity = {}) {
   const parsedAttendees = parseJsonArray(activity.attendees);
   const entries = getActivityEntries(activity);
   const firstEntry = entries[0] || {};
-  const attendees = parsedAttendees.length ? parsedAttendees : flattenActivityAssignees(entries);
+  const attendees = parsedAttendees.length ? normalizeActivityAssigneeRows(parsedAttendees) : flattenActivityAssignees(entries);
   const visibilityScope = normalizeActivityVisibilityScope(activity.visibilityScope || activity.calendarScope || activity.scope);
   const excludedPersonIds = normalizePersonIdList(activity.excludedPersonIds || activity.excludedPersons || []);
   let allowedPersonIds = normalizePersonIdList(activity.allowedPersonIds || activity.allowedPersons || []);
@@ -393,9 +411,9 @@ function preserveActivityLockMetadata(existing = {}, nextData = {}) {
     (Array.isArray(existing.entries) ? existing.entries : []).map((entry) => [normalizeId(entry.entryId), entry])
   );
   const mergeAssigneeLocks = (nextAssignees = [], priorAssignees = []) => {
-    const priorByPerson = new Map((Array.isArray(priorAssignees) ? priorAssignees : [])
+    const priorByPerson = new Map(normalizeActivityAssigneeRows(priorAssignees)
       .map((row) => [normalizeId(row.personId), row]));
-    return (Array.isArray(nextAssignees) ? nextAssignees : []).map((assignee) => {
+    return normalizeActivityAssigneeRows(nextAssignees).map((assignee) => {
       const prior = priorByPerson.get(normalizeId(assignee.personId));
       if (!prior || !isAssigneeTimesheetLocked(prior)) return assignee;
       return {
@@ -474,8 +492,8 @@ function enforceActivityLockRules(existing = {}, nextData = {}) {
     if (!prior) return;
     const structuralFields = ['date', 'startTime', 'endTime', 'durationHours', 'status'];
     const structuralChanged = structuralFields.some((field) => String(prior[field] ?? '') !== String(entry[field] ?? ''));
-    const priorAssignees = Array.isArray(prior.assignees) ? prior.assignees : [];
-    const nextAssignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+    const priorAssignees = normalizeActivityAssigneeRows(prior.assignees);
+    const nextAssignees = normalizeActivityAssigneeRows(entry.assignees);
     const priorLockedByPerson = new Map(priorAssignees
       .filter(isAssigneeTimesheetLocked)
       .map((row) => [normalizeId(row.personId), row]));
@@ -670,7 +688,7 @@ async function getScheduleEventsForPerson({ orgId, personId, startDate, endDate,
       if (normalizeStatus(entry.status, 'posted') !== 'posted') return [];
       if (!entry.date || entry.date < startDate || entry.date > endDate) return [];
       if (!isPersonEligibleForEntry(activity, entry, targetPersonId)) return [];
-      const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+      const assignees = normalizeActivityAssigneeRows(entry.assignees);
       const entryTitle = entry.title && entry.title !== activity.title ? `${activity.title}: ${entry.title}` : activity.title;
       return assignees
         .filter((attendee) => idsEqual(attendee.personId, targetPersonId))
@@ -722,7 +740,7 @@ async function getIncompleteActivityWorkSessionsForPerson({ orgId, personId, per
       if (normalizeStatus(entry.status, 'posted') !== 'posted') return [];
       if (!entry.date || entry.date < periodStartDate || entry.date > periodEndDate) return [];
       if (!isPersonEligibleForEntry(activity, entry, targetPersonId)) return [];
-      const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+      const assignees = normalizeActivityAssigneeRows(entry.assignees);
       const entryTitle = entry.title && entry.title !== activity.title ? `${activity.title}: ${entry.title}` : activity.title;
       const evaluationType = normalizeEvaluationType(activity.evaluationType);
       return assignees
@@ -776,7 +794,7 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
       if (normalizeStatus(entry.status, 'posted') !== 'posted') return [];
       if (!entry.date || entry.date < periodStartDate || entry.date > periodEndDate) return [];
       if (!isPersonEligibleForEntry(activity, entry, targetPersonId)) return [];
-      const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+      const assignees = normalizeActivityAssigneeRows(entry.assignees);
       const entryTitle = entry.title && entry.title !== activity.title ? `${activity.title}: ${entry.title}` : activity.title;
       return assignees
         .filter((attendee) => idsEqual(attendee.personId, targetPersonId))
@@ -840,6 +858,7 @@ module.exports = {
   calculateDurationHours,
   enrichActivityAttendeeNames,
   flattenActivityAssignees,
+  normalizeActivityAssigneeRows,
   normalizeEvaluationType,
   normalizeCompletionStatus,
   isAssigneeTimesheetLocked,

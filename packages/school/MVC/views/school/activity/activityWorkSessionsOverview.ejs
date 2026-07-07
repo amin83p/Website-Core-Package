@@ -134,6 +134,32 @@
     if (!showMessageModalFn) return false;
     return showMessageModalFn(options || {});
   }
+
+  async function showUiConfirm(options) {
+    const opts = { ...(options || {}) };
+    const okText = String(opts.okText || 'Yes').trim() || 'Yes';
+    const cancelText = String(opts.cancelText || 'Cancel').trim() || 'Cancel';
+    const showMessageModalFn = resolveMessageModalFn();
+    if (showMessageModalFn) {
+      const modalResult = await showMessageModalFn({
+        title: opts.title || 'Confirm',
+        message: opts.message || 'Are you sure?',
+        type: 'confirm',
+        icon: opts.icon || 'warning',
+        okText,
+        cancelText,
+        buttons: [
+          { text: okText, class: opts.okClass || 'btn-warning' },
+          { text: cancelText, class: opts.cancelClass || 'btn-secondary' }
+        ]
+      });
+      const normalizedResult = typeof modalResult === 'string'
+        ? modalResult.trim().toLowerCase()
+        : modalResult;
+      return normalizedResult === true || normalizedResult === okText.toLowerCase();
+    }
+    return window.confirm(opts.message || 'Are you sure?');
+  }
   let modalInstance = null;
 
   function escapeHtml(value) {
@@ -142,6 +168,27 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function cssEscape(value) {
+    const text = String(value || '');
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(text);
+    return text.replace(/["\\]/g, '\\$&');
+  }
+
+  function normalizeAssigneeRows(rows) {
+    return (Array.isArray(rows) ? rows : [])
+      .filter((row) => row && typeof row === 'object')
+      .map((row) => {
+        const personId = String(row.personId || row.id || '').trim();
+        if (!personId) return null;
+        return {
+          ...row,
+          personId,
+          personName: row.personName || row.displayName || row.name || personId
+        };
+      })
+      .filter(Boolean);
   }
 
   function getModal() {
@@ -162,8 +209,12 @@
       ...(options && options.headers ? options.headers : {})
     };
     if (actionStateId) headers['x-action-state-id'] = actionStateId;
+    const requestOptions = { ...(options || {}) };
+    if (requestOptions.body instanceof FormData) {
+      requestOptions.body = new URLSearchParams(requestOptions.body);
+    }
     const response = await fetch(url, {
-      ...options,
+      ...requestOptions,
       headers
     });
     const payload = await response.json().catch(() => ({}));
@@ -176,7 +227,7 @@
   function patchSessionRow(summary) {
     if (!summary || !summary.entryId) return;
     sessionsById.set(String(summary.entryId), summary);
-    const row = document.querySelector('.js-work-session-row[data-entry-id="' + CSS.escape(summary.entryId) + '"]');
+    const row = document.querySelector('.js-work-session-row[data-entry-id="' + cssEscape(summary.entryId) + '"]');
     if (!row) return;
     const namesEl = row.querySelector('.js-row-assignee-names');
     const summaryEl = row.querySelector('.js-row-assignee-summary');
@@ -188,7 +239,7 @@
 
   function renderAssigneeTable(context) {
     const entry = context.entry || {};
-    const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+    const assignees = normalizeAssigneeRows(entry.assignees);
     const canManageAll = context.canManageAll === true;
     const paid = activityPaid;
     const rowIsCompletion = (context.evaluationType || pageData.evaluationType) === 'completion';
@@ -267,9 +318,10 @@
     const data = new FormData();
     data.append('actionStateId', actionStateId);
     data.append('personId', personId);
-    const statusEl = document.querySelector('.ws-field-status[data-person-id="' + CSS.escape(personId) + '"]');
-    const paidHoursEl = document.querySelector('.ws-field-paid-hours[data-person-id="' + CSS.escape(personId) + '"]');
-    const notesEl = document.querySelector('.ws-field-notes[data-person-id="' + CSS.escape(personId) + '"]');
+    const safePersonId = cssEscape(personId);
+    const statusEl = document.querySelector('.ws-field-status[data-person-id="' + safePersonId + '"]');
+    const paidHoursEl = document.querySelector('.ws-field-paid-hours[data-person-id="' + safePersonId + '"]');
+    const notesEl = document.querySelector('.ws-field-notes[data-person-id="' + safePersonId + '"]');
     if (statusEl) data.append('status', statusEl.value);
     if (paidHoursEl) data.append('paidHours', paidHoursEl.value);
     if (notesEl) data.append('notes', notesEl.value);
@@ -310,10 +362,14 @@
   async function postAssigneeAction(action, personId) {
     if (!activeEntryId || !personId) return;
     if (action === 'complete') {
-      const modalFn = resolveMessageModalFn();
-      const confirmed = modalFn
-        ? await modalFn({ title: 'Mark complete', message: 'Mark this assignment complete?', icon: 'question', showCancel: true })
-        : true;
+      const confirmed = await showUiConfirm({
+        title: 'Mark Complete',
+        message: 'Mark this assignment complete?',
+        icon: 'warning',
+        okText: 'Complete',
+        cancelText: 'Cancel',
+        okClass: 'btn-warning'
+      });
       if (!confirmed) return;
     }
     if (typeof window.showLoading === 'function') window.showLoading('Saving…');

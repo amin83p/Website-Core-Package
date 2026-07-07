@@ -293,8 +293,9 @@ function buildLegacyActivityEntry(input = {}, context = {}) {
 function flattenActivityAssignees(entries = []) {
   const byPersonId = new Map();
   entries.forEach((entry) => {
-    (Array.isArray(entry.assignees) ? entry.assignees : []).forEach((assignee) => {
-      const personId = cleanString(assignee.personId, { max: 80, allowEmpty: true });
+    (Array.isArray(entry?.assignees) ? entry.assignees : []).forEach((assignee) => {
+      if (!assignee || typeof assignee !== 'object') return;
+      const personId = cleanString(assignee.personId || assignee.id, { max: 80, allowEmpty: true });
       if (!personId) return;
       const existing = byPersonId.get(personId);
       if (!existing) {
@@ -415,12 +416,17 @@ async function updateActivity(id, payload) {
     if (index < 0) throw new Error('School activity not found.');
     const existing = rows[index];
     const sanitized = sanitizeActivityPayload({ ...payload, orgId: existing.orgId || payload.orgId });
-    const existingEntries = new Map((Array.isArray(existing.entries) ? existing.entries : []).map((entry) => [String(entry.entryId), entry]));
+    const existingEntries = new Map((Array.isArray(existing.entries) ? existing.entries : [])
+      .filter((entry) => entry && typeof entry === 'object')
+      .map((entry) => [String(entry.entryId), entry]));
     const mergeAssigneeLocks = (nextAssignees = [], priorAssignees = []) => {
       const priorByPerson = new Map((Array.isArray(priorAssignees) ? priorAssignees : [])
+        .filter((row) => row && typeof row === 'object' && row.personId)
         .map((row) => [String(row.personId), row]));
-      return (Array.isArray(nextAssignees) ? nextAssignees : []).map((assignee) => {
-        const prior = priorByPerson.get(String(assignee.personId));
+      return (Array.isArray(nextAssignees) ? nextAssignees : [])
+        .filter((assignee) => assignee && typeof assignee === 'object' && (assignee.personId || assignee.id))
+        .map((assignee) => {
+        const prior = priorByPerson.get(String(assignee.personId || assignee.id));
         if (!prior || prior.locked !== true) return assignee;
         return {
           ...assignee,

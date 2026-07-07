@@ -19,6 +19,19 @@ function assertOrgAccess(row, orgId) {
   }
 }
 
+function logWorkSessionMutationError(action, error, req = {}) {
+  const activityId = req.params?.activityId || '';
+  const entryId = req.params?.entryId || '';
+  const personId = (req.body && req.body.personId) || '';
+  console.error(`[school-activity-work-session] ${action} failed`, {
+    activityId,
+    entryId,
+    personId,
+    message: error?.message,
+    stack: error?.stack
+  });
+}
+
 function hasPersonControlRules(row = {}) {
   const allowedCount = Array.isArray(row.allowedPersonIds) ? row.allowedPersonIds.length : 0;
   const excludedCount = Array.isArray(row.excludedPersonIds) ? row.excludedPersonIds.length : 0;
@@ -333,12 +346,13 @@ exports.saveWorkSessionAssignee = async (req, res) => {
     const orgId = getActiveOrgIdOrThrow(req.user);
     const { activityId, entryId } = req.params;
     const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const body = req.body || {};
     const result = await activityWorkSessionService.saveAssigneeRow({
       activityId,
       entryId,
-      personId: req.body.personId,
+      personId: body.personId,
       reqUser: req.user,
-      input: req.body,
+      input: body,
       accessContext
     });
     assertOrgAccess(result.context.activity, orgId);
@@ -352,6 +366,7 @@ exports.saveWorkSessionAssignee = async (req, res) => {
     });
     res.redirect(target.url);
   } catch (error) {
+    logWorkSessionMutationError('save', error, req);
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
   }
@@ -362,12 +377,13 @@ exports.completeWorkSessionAssignee = async (req, res) => {
     const orgId = getActiveOrgIdOrThrow(req.user);
     const { activityId, entryId } = req.params;
     const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const body = req.body || {};
     const result = await activityWorkSessionService.completeAssignee({
       activityId,
       entryId,
-      personId: req.body.personId,
+      personId: body.personId,
       reqUser: req.user,
-      input: req.body,
+      input: body,
       accessContext
     });
     assertOrgAccess(result.context.activity, orgId);
@@ -381,6 +397,38 @@ exports.completeWorkSessionAssignee = async (req, res) => {
     });
     res.redirect(target.url);
   } catch (error) {
+    logWorkSessionMutationError('complete', error, req);
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+};
+
+exports.resetWorkSessionAssigneeCompletion = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const { activityId, entryId } = req.params;
+    const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const body = req.body || {};
+    const result = await activityWorkSessionService.resetAssigneeCompletion({
+      activityId,
+      entryId,
+      personId: body.personId,
+      reqUser: req.user,
+      input: body,
+      accessContext
+    });
+    assertOrgAccess(result.context.activity, orgId);
+    const payload = { status: 'success', message: 'Assignment moved back to pending completion.', actionStateId: req.actionStateId, ...result };
+    if (isAjax(req)) return res.json(payload);
+    const target = await activityWorkSessionService.resolveWorkSessionManageTargetForRequest({
+      activityId,
+      entryId,
+      reqUser: req.user,
+      accessContext
+    });
+    res.redirect(target.url);
+  } catch (error) {
+    logWorkSessionMutationError('pending', error, req);
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
   }

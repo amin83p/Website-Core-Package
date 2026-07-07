@@ -12,6 +12,19 @@ function normalizeStatus(value, fallback = '') {
   return String(value || fallback || '').trim().toLowerCase();
 }
 
+function normalizeAssigneeRows(rows = []) {
+  if (typeof activityService.normalizeActivityAssigneeRows === 'function') {
+    return activityService.normalizeActivityAssigneeRows(rows);
+  }
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => {
+      const personId = normalizeId(row.personId || row.id);
+      return personId ? { ...row, personId } : null;
+    })
+    .filter(Boolean);
+}
+
 function isOrgWideAccess(access = {}) {
   return schoolRecordAccessService.isOrgWideScope(access);
 }
@@ -30,7 +43,7 @@ function findEntry(activity = {}, entryId = '') {
 
 function findAssignee(entry = {}, personId = '') {
   const token = normalizeId(personId);
-  return (Array.isArray(entry.assignees) ? entry.assignees : [])
+  return normalizeAssigneeRows(entry.assignees)
     .find((row) => idsEqual(row.personId, token)) || null;
 }
 
@@ -105,7 +118,7 @@ function buildOverviewManageUrl(activityId) {
 
 function mapEntryToSessionSummary(activity, entry, index, { access, currentEntryId } = {}) {
   const entryId = normalizeId(entry.entryId);
-  const assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).map((assignee) => ({
+  const assignees = normalizeAssigneeRows(entry.assignees).map((assignee) => ({
     personId: normalizeId(assignee.personId),
     personName: assignee.personName || assignee.personId || 'Unknown',
     role: assignee.role || 'participant',
@@ -206,7 +219,7 @@ async function getWorkSessionContext(activityId, entryId, reqUser, accessContext
   const evaluationType = activityService.normalizeEvaluationType(activity.evaluationType);
   const scopedPersonId = normalizeId(access.personId || reqUser?.personId);
   const canManageAll = isOrgWideAccess(access);
-  const assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).map((assignee) =>
+  const assignees = normalizeAssigneeRows(entry.assignees).map((assignee) =>
     enrichAssigneeRow(activity, assignee, { reqUser, access, scopedPersonId })
   );
   const siblingSessions = buildSiblingSessions(activity, access, entryId);
@@ -228,10 +241,11 @@ async function persistAssigneeUpdate(activityId, entryId, personId, updater, req
   if (!activity) throw new Error('School activity not found.');
   const entries = activityService.getActivityEntries(activity).map((entry) => {
     if (!idsEqual(entry.entryId, entryId)) return entry;
-    const assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).map((assignee) => {
-      if (!idsEqual(assignee.personId, personId)) return assignee;
-      return updater(assignee);
-    });
+    const assignees = normalizeAssigneeRows(entry.assignees)
+      .map((assignee) => {
+        if (!idsEqual(assignee.personId, personId)) return assignee;
+        return updater(assignee);
+      });
     return { ...entry, assignees };
   });
   const attendees = activityService.flattenActivityAssignees(entries);
@@ -342,6 +356,46 @@ async function completeAssignee({
   return buildMutationPayload(nextContext, accessContext, reqUser);
 }
 
+async function resetAssigneeCompletion({
+  activityId,
+  entryId,
+  personId,
+  reqUser,
+  input = {},
+  accessContext = {}
+} = {}) {
+  const context = await getWorkSessionContext(activityId, entryId, reqUser, accessContext);
+  if (context.evaluationType !== 'completion') {
+    throw new Error('Pending completion is only available for completion-type activities.');
+  }
+  const targetPersonId = normalizeId(personId || input.personId || context.scopedPersonId);
+  const assignee = findAssignee(context.entry, targetPersonId);
+  if (!assignee) throw new Error('Assignee not found on this work session.');
+  if (!isAssigneeRowEditable({
+    assignee,
+    reqUser,
+    access: schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext),
+    targetPersonId
+  })) {
+    throw new Error('You cannot update this assignee row.');
+  }
+  const durationHours = Number(context.entry.durationHours || 0);
+  const paidHours = input.paidHours === undefined || input.paidHours === ''
+    ? Number(assignee.paidHours || durationHours || 0)
+    : Number(input.paidHours);
+  const notes = input.notes === undefined ? (assignee.notes || '') : String(input.notes || '').trim();
+  await persistAssigneeUpdate(activityId, entryId, targetPersonId, (row) => ({
+    ...row,
+    paidHours: Number.isFinite(paidHours) ? Number(paidHours.toFixed(2)) : row.paidHours,
+    notes: notes.slice(0, 500),
+    completionStatus: 'pending',
+    completedAt: '',
+    completedBy: ''
+  }), reqUser);
+  const nextContext = await getWorkSessionContext(activityId, entryId, reqUser, accessContext);
+  return buildMutationPayload(nextContext, accessContext, reqUser);
+}
+
 function countAccessiblePostedSessions(activity = {}, access = {}) {
   return listAccessiblePostedEntries(activity, access).length;
 }
@@ -393,6 +447,7 @@ module.exports = {
   getWorkSessionContext,
   saveAssigneeRow,
   completeAssignee,
+  resetAssigneeCompletion,
   isAssigneeRowEditable,
   buildOverviewManageUrl,
   buildSessionManageUrl,

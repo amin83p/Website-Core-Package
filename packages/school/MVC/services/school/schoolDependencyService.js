@@ -281,8 +281,10 @@ async function lockActivityAssignees({ activityId, locks = [], timesheetId, reqU
   const summary = { locked: 0, alreadyLocked: 0, missing: [] };
   const entries = (Array.isArray(activity.entries) ? activity.entries : []).map((entry) => {
     const entryId = normalizeId(entry?.entryId || entry?.id);
-    const assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).map((assignee) => {
-      const personId = normalizeId(assignee.personId);
+    const assignees = (Array.isArray(entry?.assignees) ? entry.assignees : [])
+      .filter((assignee) => assignee && typeof assignee === 'object')
+      .map((assignee) => {
+      const personId = normalizeId(assignee.personId || assignee.id);
       const key = `${entryId}::${personId}`;
       if (!targetSet.has(key)) return assignee;
       if (isAssigneeTimesheetLocked(assignee)) {
@@ -319,14 +321,17 @@ async function lockActivityAssignees({ activityId, locks = [], timesheetId, reqU
       return;
     }
     const assignee = (Array.isArray(entry.assignees) ? entry.assignees : [])
-      .find((row) => idsEqual(row.personId, target.personId));
+      .filter((row) => row && typeof row === 'object')
+      .find((row) => idsEqual(row.personId || row.id, target.personId));
     if (!assignee) summary.missing.push(target);
   });
   const nextActivity = {
     ...activity,
     entries,
     locked: entries.some((entry) => isActivityEntryTimesheetLocked(entry))
-      || entries.some((entry) => (Array.isArray(entry.assignees) ? entry.assignees : []).some(isAssigneeTimesheetLocked))
+      || entries.some((entry) => (Array.isArray(entry?.assignees) ? entry.assignees : [])
+        .filter((assignee) => assignee && typeof assignee === 'object')
+        .some(isAssigneeTimesheetLocked))
   };
   if (changed) {
     await schoolDataService.updateData('activities', normalizedActivityId, nextActivity, reqUser);

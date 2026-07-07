@@ -24,6 +24,7 @@
   const workSessionStatusActionRequired = isCompletion ? !allAssigneesCompleted : !allAttendanceRecorded;
   const workSessionLocationLabel = String(entryRow.location || activityRow.location || '').trim();
   const editableAssigneeRows = visibleRows.filter((row) => row.editable && !row.locked);
+  const pendingCompletionRows = editableAssigneeRows.filter((row) => String(row.completionStatus || '').toLowerCase() !== 'completed');
   const currentSessionIndex = sessionSwitcher.findIndex((row) => row && row.isCurrent === true);
   const prevSession = currentSessionIndex > 0 ? sessionSwitcher[currentSessionIndex - 1] : null;
   const nextSession = currentSessionIndex >= 0 && currentSessionIndex < (sessionSwitcher.length - 1)
@@ -629,7 +630,7 @@
           type="button"
           id="workSessionStatusButton"
           class="btn session-status-button<%= workSessionStatusActionRequired ? ' session-status-button--action-required' : '' %>"
-          <%= (isCompletion && workSessionStatusActionRequired && editableAssigneeRows.length) ? '' : 'disabled' %>
+          <%= (isCompletion && workSessionStatusActionRequired && pendingCompletionRows.length) ? '' : 'disabled' %>
           style="<%= !workSessionStatusActionRequired ? 'background-color:#d1e7dd;color:#0f5132;border-color:#badbcc;' : '' %>">
           <span id="workSessionStatusButtonLabel"><%= workSessionStatusLabel %></span>
           <i class="bi bi-pencil-square" aria-hidden="true"></i>
@@ -756,7 +757,7 @@
         <% if (isCompletion) { %>
           <div class="alert alert-info border-info shadow-sm mb-3">
             <div class="fw-semibold"><i class="bi bi-check2-circle me-2"></i>Completion workflow</div>
-            <div class="small mt-1">Use <strong>Session status</strong> in the header to mark completion, then <strong>Save session</strong> for assignee details.</div>
+            <div class="small mt-1">Use <strong>Pending completion</strong> in the session status area when the work is done. Use <strong>Save session</strong> for hour and note changes.</div>
           </div>
         <% } else { %>
           <div class="alert alert-info border-info shadow-sm mb-3">
@@ -771,9 +772,14 @@
             if (!rowVisible && !canManageAll) return;
             const rowEditable = assignee.editable && (canManageAll || assignee.isSelf);
             const statusClass = assignee.locked ? 'secondary' : (assignee.readyForTimesheet ? 'success' : 'warning');
+            const isAssigneeCompleted = String(assignee.completionStatus || '').toLowerCase() === 'completed';
             const rowKey = String(assignee.personId || ('row_' + idx)).replace(/[^A-Za-z0-9_-]/g, '_') + '_' + String(idx);
           %>
-            <div class="card border-0 shadow-sm work-session-assignee-form<%= assignee.locked ? ' is-locked' : '' %>" data-person-id="<%= assignee.personId %>">
+            <div
+              class="card border-0 shadow-sm work-session-assignee-form<%= assignee.locked ? ' is-locked' : '' %>"
+              data-person-id="<%= assignee.personId %>"
+              data-person-name="<%= assignee.personName || assignee.personId %>"
+              data-completion-status="<%= String(assignee.completionStatus || 'pending').toLowerCase() %>">
               <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                   <div>
@@ -783,7 +789,7 @@
                   </div>
                   <div class="text-end">
                     <span class="badge bg-<%= statusClass %>"><%= assignee.completionLabel %></span>
-                    <% if (isCompletion && String(assignee.completionStatus || '').toLowerCase() === 'completed' && assignee.completedAt) { %>
+                    <% if (isCompletion && isAssigneeCompleted && assignee.completedAt) { %>
                       <div class="small text-muted mt-1"><%= assignee.completedAt.slice(0, 10) %></div>
                     <% } %>
                   </div>
@@ -828,19 +834,29 @@
                 </div>
 
                 <% if (isCompletion && rowEditable) { %>
-                  <div class="form-check">
-                    <input type="radio" class="form-check-input ws-complete-target" name="ws_complete_target" id="completeTarget_<%= rowKey %>" value="<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
-                    <label class="form-check-label" for="completeTarget_<%= rowKey %>">Use this assignee when marking session completed</label>
-                  </div>
+                  <% if (isAssigneeCompleted) { %>
+                    <form method="POST" action="<%= manageUrl %>/pending" class="mt-3 ws-assignee-pending-form" data-person-id="<%= assignee.personId %>">
+                      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+                      <input type="hidden" name="personId" value="<%= assignee.personId %>">
+                      <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                      <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                      <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                      <button type="submit" class="btn btn-outline-warning btn-sm btn-ws-pending" data-person-id="<%= assignee.personId %>" data-person-name="<%= assignee.personName || assignee.personId %>">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Set back to pending
+                      </button>
+                    </form>
+                  <% } else { %>
+                    <div class="form-text small text-muted">Use the session status button to complete this assignee.</div>
+                  <% } %>
                 <% } %>
 
                 <% if (rowEditable) { %>
                   <form method="POST" action="<%= manageUrl %>/save" class="d-none ws-assignee-save-form" data-person-id="<%= assignee.personId %>">
                     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
                     <input type="hidden" name="personId" value="<%= assignee.personId %>">
-                    <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>">
-                    <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>">
-                    <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>">
+                    <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                    <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                    <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
                   </form>
                 <% } %>
               </div>
@@ -892,6 +908,12 @@
       return false;
     }
 
+    function escapeSelectorValue(value) {
+      const text = String(value || '');
+      if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(text);
+      return text.replace(/["\\]/g, '\\$&');
+    }
+
     async function showUiConfirm(options) {
       const opts = { showCancel: true, ...(options || {}) };
       try {
@@ -907,8 +929,8 @@
             cancelText: cancelText,
             icon: opts.icon || 'warning',
             buttons: [
-              { text: okText, class: 'btn-primary' },
-              { text: cancelText, class: 'btn-secondary' }
+              { text: okText, class: opts.okClass || 'btn-primary' },
+              { text: cancelText, class: opts.cancelClass || 'btn-secondary' }
             ]
           };
           const modalResult = await showMessageModalFn(modalPayload);
@@ -924,26 +946,30 @@
     }
 
     function syncRowFields(personId) {
-      const status = document.querySelector('input.ws-att-radio[data-person-id="' + personId + '"]:checked');
-      const paidHours = document.querySelector('.ws-paid-hours-input[data-person-id="' + personId + '"]');
-      const notes = document.querySelector('.ws-notes-input[data-person-id="' + personId + '"]');
-      document.querySelectorAll('.ws-status-' + personId).forEach((input) => {
+      const safePersonId = escapeSelectorValue(personId);
+      const personSelector = '[data-person-id="' + safePersonId + '"]';
+      const status = document.querySelector('input.ws-att-radio' + personSelector + ':checked');
+      const paidHours = document.querySelector('.ws-paid-hours-input' + personSelector);
+      const notes = document.querySelector('.ws-notes-input' + personSelector);
+      document.querySelectorAll('input[name="status"]' + personSelector).forEach((input) => {
         if (status) input.value = status.value;
         else if (isCompletionMode) input.value = input.value || 'attended';
       });
-      document.querySelectorAll('.ws-paid-hours-' + personId).forEach((input) => {
+      document.querySelectorAll('input[name="paidHours"]' + personSelector).forEach((input) => {
         if (paidHours) input.value = paidHours.value;
       });
-      document.querySelectorAll('.ws-notes-' + personId).forEach((input) => {
+      document.querySelectorAll('input[name="notes"]' + personSelector).forEach((input) => {
         if (notes) input.value = notes.value;
       });
     }
 
     function syncCompleteWorkSessionForm(personId) {
       syncRowFields(personId);
-      const statusSource = document.querySelector('.ws-status-' + personId);
-      const paidSource = document.querySelector('.ws-paid-hours-' + personId);
-      const notesSource = document.querySelector('.ws-notes-' + personId);
+      const safePersonId = escapeSelectorValue(personId);
+      const personSelector = '[data-person-id="' + safePersonId + '"]';
+      const statusSource = document.querySelector('input[name="status"]' + personSelector);
+      const paidSource = document.querySelector('input[name="paidHours"]' + personSelector);
+      const notesSource = document.querySelector('input[name="notes"]' + personSelector);
       const personInput = document.getElementById('completeWorkSessionPersonId');
       const statusInput = document.getElementById('completeWorkSessionStatus');
       const paidInput = document.getElementById('completeWorkSessionPaidHours');
@@ -954,22 +980,12 @@
       if (notesInput) notesInput.value = notesSource ? notesSource.value : '';
     }
 
-    function resolveCompletionTargetPersonId() {
-      const selected = document.querySelector('input.ws-complete-target:checked');
-      if (selected) return selected.getAttribute('data-person-id') || selected.value || '';
-      const editableTargets = Array.from(document.querySelectorAll('input.ws-complete-target'));
-      if (editableTargets.length === 1) {
-        return editableTargets[0].getAttribute('data-person-id') || editableTargets[0].value || '';
-      }
-      const saveForms = Array.from(document.querySelectorAll('.ws-assignee-save-form[data-person-id]'));
-      if (saveForms.length === 1) return saveForms[0].getAttribute('data-person-id') || '';
-      return '';
-    }
 
     const saveSessionBtn = document.getElementById('btnSaveWorkSession');
     if (saveSessionBtn) {
       saveSessionBtn.addEventListener('click', async function () {
-        const saveForms = Array.from(document.querySelectorAll('.ws-assignee-save-form[data-person-id]'));
+        const saveForms = Array.from(document.querySelectorAll('.ws-assignee-save-form[data-person-id]'))
+          .filter((form) => String(form.getAttribute('data-person-id') || '').trim());
         if (!saveForms.length) return;
         if (typeof window.showLoading === 'function') window.showLoading('Saving session…');
         try {
@@ -978,7 +994,7 @@
             if (personId) syncRowFields(personId);
             const response = await fetch(form.action, {
               method: 'POST',
-              body: new FormData(form),
+              body: new URLSearchParams(new FormData(form)),
               headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
             const payload = await response.json().catch(() => ({}));
@@ -996,26 +1012,89 @@
     }
     const completeForm = document.getElementById('frmCompleteWorkSessionStatus');
     const statusButton = document.getElementById('workSessionStatusButton');
+
+    function getPendingCompletionTargets() {
+      return Array.from(document.querySelectorAll('.work-session-assignee-form[data-person-id]'))
+        .filter((row) => String(row.getAttribute('data-person-id') || '').trim())
+        .filter((row) => String(row.getAttribute('data-completion-status') || '').toLowerCase() !== 'completed')
+        .map((row) => ({
+          personId: String(row.getAttribute('data-person-id') || '').trim(),
+          personName: row.getAttribute('data-person-name') || 'this assignee'
+        }));
+    }
+
+    async function postCompleteWorkSessionTarget(personId) {
+      syncCompleteWorkSessionForm(personId);
+      const response = await fetch(completeForm.action, {
+        method: 'POST',
+        body: new URLSearchParams(new FormData(completeForm)),
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status === 'error') {
+        throw new Error(payload.message || 'Complete failed.');
+      }
+      if (payload.actionStateId) {
+        document.querySelectorAll('input[name="actionStateId"]').forEach((input) => {
+          input.value = String(payload.actionStateId || '');
+        });
+      }
+      return payload;
+    }
+
     if (statusButton && completeForm && isCompletionMode) {
-      statusButton.addEventListener('click', async function () {
+      statusButton.addEventListener('click', async function (event) {
+        event.preventDefault();
         if (statusButton.disabled) return;
-        const personId = resolveCompletionTargetPersonId();
-        if (!personId) {
-          const message = 'Select an assignee below before marking this work session completed.';
-          await showUiMessage({ title: 'Select assignee', icon: 'warning', message: message });
+        const targets = getPendingCompletionTargets();
+        if (!targets.length) {
+          await showUiMessage({ title: 'Already Complete', icon: 'success', message: 'This work session is already complete.' });
           return;
         }
+        const message = targets.length === 1
+          ? 'Mark ' + targets[0].personName + ' complete for this work session?'
+          : 'Mark ' + targets.length + ' assignees complete for this work session?';
         const confirmed = await showUiConfirm({
-          title: 'Mark completed',
+          title: 'Mark Complete',
           icon: 'warning',
-          message: 'Mark this work session as completed for the selected assignee?'
+          okText: 'Complete',
+          cancelText: 'Cancel',
+          okClass: 'btn-warning',
+          message: message
         });
         if (!confirmed) return;
-        syncCompleteWorkSessionForm(personId);
-        if (typeof window.showLoading === 'function') window.showLoading('Completing…');
-        completeForm.submit();
+        if (typeof window.showLoading === 'function') window.showLoading('Completing...');
+        try {
+          for (const target of targets) {
+            await postCompleteWorkSessionTarget(target.personId);
+          }
+          window.location.reload();
+        } catch (error) {
+          if (typeof window.hideLoading === 'function') window.hideLoading();
+          const errorMessage = error && error.message ? error.message : 'Complete failed.';
+          await showUiMessage({ title: 'Complete failed', icon: 'error', message: errorMessage });
+        }
       });
     }
+
+    document.querySelectorAll('.btn-ws-pending').forEach((button) => {
+      button.addEventListener('click', async function (event) {
+        event.preventDefault();
+        const personId = button.getAttribute('data-person-id');
+        const personName = button.getAttribute('data-person-name') || 'this assignee';
+        const confirmed = await showUiConfirm({
+          title: 'Set Back to Pending',
+          icon: 'warning',
+          okText: 'Set Pending',
+          cancelText: 'Cancel',
+          message: 'Move ' + personName + ' back to pending completion? This is useful when the assignment was completed by mistake.'
+        });
+        if (!confirmed) return;
+        if (personId) syncRowFields(personId);
+        if (typeof window.showLoading === 'function') window.showLoading('Updating...');
+        button.closest('form')?.submit();
+      });
+    });
 
     function setActiveWorkPanel(panelId) {
       document.querySelectorAll('.session-manager-nav-item[data-work-panel]').forEach((btn) => {

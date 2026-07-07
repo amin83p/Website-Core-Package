@@ -110,6 +110,16 @@ router.post('/:activityId/work-sessions/:entryId/complete',
     allowSectionTokenFallback: true
   }),
   ctrl.completeWorkSessionAssignee);
+router.post('/:activityId/work-sessions/:entryId/pending',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true,
+    allowSectionTokenFallback: true
+  }),
+  ctrl.resetWorkSessionAssigneeCompletion);
 
 module.exports = router;
 

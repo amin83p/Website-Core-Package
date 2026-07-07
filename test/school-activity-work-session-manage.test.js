@@ -26,6 +26,7 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(activityRoute, /work-sessions\/:entryId\/manage/);
   assert.match(activityRoute, /work-sessions\/:entryId\/save/);
   assert.match(activityRoute, /work-sessions\/:entryId\/complete/);
+  assert.match(activityRoute, /work-sessions\/:entryId\/pending/);
   assert.match(activityRoute, /ctrl\.manageWorkSession/);
   assert.match(activityRoute, /ctrl\.saveWorkSessionAssignee/);
   assert.match(activityRoute, /ctrl\.completeWorkSessionAssignee/);
@@ -33,6 +34,7 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(activityRoute, /work-sessions\/:entryId\/api\/context[\s\S]*OPERATIONS\.UPDATE/);
   assert.match(activityRoute, /work-sessions\/:entryId\/manage[\s\S]*OPERATIONS\.UPDATE/);
   assert.match(activityRoute, /work-sessions\/:entryId\/complete[\s\S]*allowOperationTokenFallback:\s*true/);
+  assert.match(activityRoute, /work-sessions\/:entryId\/pending[\s\S]*allowOperationTokenFallback:\s*true/);
 
   const controller = readText('packages/school/MVC/controllers/school/activityController.js');
   assert.match(controller, /activityWorkSessionService/);
@@ -45,6 +47,10 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(controller, /resolveWorkSessionManageTargetForRequest/);
   assert.doesNotMatch(controller, /siblingSessions\.length > 1/);
   assert.match(controller, /completeWorkSessionAssignee/);
+  assert.match(controller, /resetWorkSessionAssigneeCompletion/);
+  assert.match(controller, /const body = req\.body \|\| \{\};/);
+  assert.match(controller, /personId: body\.personId/);
+  assert.match(controller, /input: body/);
 
   assert.ok(fs.existsSync(path.join(ROOT, 'packages/school/MVC/services/school/activityWorkSessionService.js')));
   assert.ok(fs.existsSync(path.join(ROOT, 'packages/school/MVC/views/school/activity/activityWorkSessionManager.ejs')));
@@ -63,6 +69,16 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(manager, /Session status/);
   assert.match(manager, /Complete/);
   assert.match(manager, /Manage Work Session/);
+  assert.match(manager, /pendingCompletionRows/);
+  assert.match(manager, /getPendingCompletionTargets/);
+  assert.match(manager, /postCompleteWorkSessionTarget/);
+  assert.match(manager, /okClass: 'btn-warning'/);
+  assert.doesNotMatch(manager, /btn-ws-complete/);
+  assert.doesNotMatch(manager, /Completes this assignee only/);
+  assert.match(manager, /Set back to pending/);
+  assert.doesNotMatch(manager, /Use this assignee when marking session completed/);
+  assert.doesNotMatch(manager, /Select this assignee for completion/);
+  assert.doesNotMatch(manager, /ws-complete-target/);
   assert.match(manager, /All Activities/);
   assert.match(manager, /All work sessions/);
   assert.match(manager, /session-manager-toolbar-row/);
@@ -80,6 +96,7 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(manager, /att-label/);
   assert.match(manager, /btn-check ws-att-radio/);
   assert.match(manager, /btnCloseWorkSessionManager/);
+  assert.match(manager, /new URLSearchParams\(new FormData\(form\)\)/);
   assert.match(manager, /POST" action="<%= manageUrl %>\/save/);
   assert.match(manager, /POST" action="<%= manageUrl %>\/complete/);
   assert.match(manager, /evaluationTypeLocked/);
@@ -92,9 +109,16 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(overview, /js-open-work-session/);
   assert.match(overview, /openWorkSessionModal/);
   assert.match(overview, /renderAssigneeTable/);
+  assert.match(overview, /normalizeAssigneeRows/);
+  assert.match(overview, /cssEscape/);
+  assert.match(overview, /requestOptions\.body instanceof FormData/);
+  assert.match(overview, /new URLSearchParams\(requestOptions\.body\)/);
   assert.match(overview, /context\.evaluationType/);
   assert.match(overview, /rowIsCompletion/);
   assert.match(overview, /!rowIsCompletion\) html \+= '<th>Attendance<\/th>'/);
+  assert.match(overview, /showUiConfirm/);
+  assert.match(overview, /okClass: 'btn-warning'/);
+  assert.match(overview, /cancelText: 'Cancel'/);
   assert.match(overview, /payload\.actionStateId/);
   assert.match(controller, /actionStateId: req\.actionStateId/);
   assert.match(controller, /getWorkSessionContextJson[\s\S]*actionStateId: req\.actionStateId/);
@@ -609,6 +633,83 @@ test('Completion save rejects attendance status changes and complete auto-attend
     assert.equal(savedAssignee.status, 'attended');
     assert.ok(result.sessionSummary);
     assert.equal(result.sessionSummary.readyCount, 1);
+
+    const resetResult = await activityWorkSessionService.resetAssigneeCompletion({
+      activityId: activity.id,
+      entryId: 'ENTRY-1',
+      personId: 'P1',
+      reqUser,
+      input: { notes: 'Completed by mistake' },
+      accessContext: { scopeId: 'SCP_ORG' }
+    });
+    assert.equal(resetResult.context.entry.assignees[0].completionStatus, 'pending');
+    assert.equal(resetResult.context.entry.assignees[0].completedAt, '');
+    assert.equal(resetResult.context.entry.assignees[0].completedBy, '');
+    assert.equal(savedAssignee.completionStatus, 'pending');
+    assert.equal(savedAssignee.notes, 'Completed by mistake');
+    assert.equal(resetResult.sessionSummary.readyCount, 0);
+  } finally {
+    activityService.getActivity = originalGetActivity;
+    schoolDataService.getDataById = originalGet;
+    schoolDataService.updateData = originalUpdate;
+  }
+});
+
+test('Activity work session paid-hour save skips malformed blank assignee rows', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+  const originalGetActivity = activityService.getActivity;
+  const originalGet = schoolDataService.getDataById;
+  const originalUpdate = schoolDataService.updateData;
+
+  const activity = {
+    id: 'ACT-HOURS-1',
+    orgId: '900000',
+    title: 'Paid hour save',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    entries: [{
+      entryId: 'ENTRY-1',
+      date: '2026-07-01',
+      startTime: '09:00',
+      endTime: '11:00',
+      durationHours: 2,
+      status: 'posted',
+      assignees: [
+        undefined,
+        { id: 'P.HOURS:1', displayName: 'Hour Person', status: 'attended', paid: true, paidHours: 2, completionStatus: 'pending' }
+      ]
+    }]
+  };
+
+  let savedPayload = null;
+  activityService.getActivity = async () => activity;
+  schoolDataService.getDataById = async () => activity;
+  schoolDataService.updateData = async (_type, _id, payload) => {
+    savedPayload = payload;
+    Object.assign(activity, payload);
+    return payload;
+  };
+
+  const reqUser = { id: 'U1', personId: 'P.HOURS:1', activeOrgId: '900000', orgId: '900000' };
+
+  try {
+    const result = await activityWorkSessionService.saveAssigneeRow({
+      activityId: activity.id,
+      entryId: 'ENTRY-1',
+      personId: 'P.HOURS:1',
+      reqUser,
+      input: { status: 'attended', paidHours: '3.25', notes: 'Adjusted hours' },
+      accessContext: { scopeId: 'SCP_ORG' }
+    });
+    assert.equal(result.context.entry.assignees[0].personId, 'P.HOURS:1');
+    assert.equal(result.context.entry.assignees[0].paidHours, 3.25);
+    assert.equal(savedPayload.entries[0].assignees.length, 1);
+    assert.equal(savedPayload.entries[0].assignees[0].personId, 'P.HOURS:1');
+    assert.equal(savedPayload.entries[0].assignees[0].paidHours, 3.25);
+    assert.equal(savedPayload.attendees.length, 1);
   } finally {
     activityService.getActivity = originalGetActivity;
     schoolDataService.getDataById = originalGet;
