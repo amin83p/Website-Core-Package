@@ -61,6 +61,9 @@ test('Activity work session routes, controller, service, and view are wired', ()
   const form = readText('packages/school/MVC/views/school/activity/activityForm.ejs');
   assert.match(form, /name="evaluationType"/);
   assert.match(form, /activityEvaluationType/);
+  assert.match(form, /isCompletionEvaluation/);
+  assert.match(form, /js-assignee-completion-status/);
+  assert.match(form, /renderAssigneeStatusControl/);
 
   const manager = readText('packages/school/MVC/views/school/activity/activityWorkSessionManager.ejs');
   assert.match(manager, /evaluationTypeLabel/);

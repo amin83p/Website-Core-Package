@@ -385,6 +385,23 @@ document.addEventListener('DOMContentLoaded', function () {
   const legacyStartInput = document.getElementById('activityLegacyStartTime');
   const legacyEndInput = document.getElementById('activityLegacyEndTime');
   const legacyDurationInput = document.getElementById('activityLegacyDurationHours');
+  const evaluationTypeSelect = document.getElementById('activityEvaluationType');
+  const initialEvaluationType = '<%= evaluationType %>';
+
+  function isCompletionEvaluation() {
+    if (evaluationTypeSelect && !evaluationTypeSelect.disabled) {
+      return String(evaluationTypeSelect.value || '').toLowerCase() === 'completion';
+    }
+    const hiddenEvaluationType = form?.querySelector('input[name="evaluationType"]');
+    if (hiddenEvaluationType) {
+      return String(hiddenEvaluationType.value || '').toLowerCase() === 'completion';
+    }
+    return String(initialEvaluationType || 'attendance').toLowerCase() === 'completion';
+  }
+
+  function normalizeCompletionStatus(value) {
+    return String(value || 'pending').toLowerCase() === 'completed' ? 'completed' : 'pending';
+  }
 
   function parseInitialJson(id, fallback) {
     try {
@@ -727,6 +744,7 @@ document.addEventListener('DOMContentLoaded', function () {
       roles: roles.length ? roles : [selectedRole],
       role: selectedRole,
       status: item?.status || 'attended',
+      completionStatus: normalizeCompletionStatus(item?.completionStatus),
       paid: item?.paid === undefined ? paidInput.checked : normalizeBoolean(item.paid, paidInput.checked),
       paidHours: item?.paidHours ?? entryDuration ?? '',
       notes: item?.notes || ''
@@ -826,20 +844,28 @@ document.addEventListener('DOMContentLoaded', function () {
     return '<select class="form-select form-select-sm js-assignee-role">' + options + '</select>';
   }
 
+  function renderAssigneeStatusControl(assignee) {
+    if (isCompletionEvaluation()) {
+      const completionStatus = normalizeCompletionStatus(assignee.completionStatus);
+      return '<select class="form-select form-select-sm js-assignee-completion-status"><option value="pending" ' + (completionStatus === 'pending' ? 'selected' : '') + '>Pending</option><option value="completed" ' + (completionStatus === 'completed' ? 'selected' : '') + '>Completed</option></select>';
+    }
+    const status = assignee.status || 'attended';
+    return '<select class="form-select form-select-sm js-assignee-status"><option value="attended" ' + (status === 'attended' ? 'selected' : '') + '>Attended</option><option value="absent" ' + (status === 'absent' ? 'selected' : '') + '>Absent</option><option value="excused" ' + (status === 'excused' ? 'selected' : '') + '>Excused</option></select>';
+  }
+
   function renderAssigneeRows(entry, entryIndex) {
     const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
     if (!assignees.length) {
       return '<div class="text-muted small border rounded p-3 bg-light">No people assigned to this work session yet.</div>';
     }
     return assignees.map(function (assignee, assigneeIndex) {
-      const status = assignee.status || 'attended';
       const paid = assignee.paid !== false;
       return [
         '<div class="border rounded p-3 mb-2 bg-white" data-assignee-index="' + assigneeIndex + '">',
         '<div class="row g-2 align-items-end">',
         '<div class="col-md-3"><div class="fw-bold">' + escapeHtml(assignee.personName || assignee.personId) + '</div><div class="small text-muted">' + escapeHtml(assignee.personId || '') + '</div></div>',
         '<div class="col-md-2"><label class="form-label fw-bold small">Role</label>' + renderRoleSelect(assignee, entryIndex, assigneeIndex) + '</div>',
-        '<div class="col-md-2"><label class="form-label fw-bold small">Status</label><select class="form-select form-select-sm js-assignee-status"><option value="attended" ' + (status === 'attended' ? 'selected' : '') + '>Attended</option><option value="absent" ' + (status === 'absent' ? 'selected' : '') + '>Absent</option><option value="excused" ' + (status === 'excused' ? 'selected' : '') + '>Excused</option></select></div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Status</label>' + renderAssigneeStatusControl(assignee) + '</div>',
         '<div class="col-md-2"><label class="form-label fw-bold small">Paid Hours</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-assignee-hours" value="' + escapeHtml(assignee.paidHours ?? entry.durationHours ?? '') + '"></div>',
         '<div class="col-md-2"><div class="form-check form-switch"><input class="form-check-input js-assignee-paid" type="checkbox" ' + (paid ? 'checked' : '') + '><label class="form-check-label small fw-bold">Payable</label></div></div>',
         '<div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm js-assignee-remove"><i class="bi bi-trash"></i></button></div>',
@@ -1025,6 +1051,10 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       assigneeRow.querySelector('.js-assignee-status')?.addEventListener('change', function (event) {
         entries[entryIndex].assignees[assigneeIndex].status = event.target.value;
+        syncEntries();
+      });
+      assigneeRow.querySelector('.js-assignee-completion-status')?.addEventListener('change', function (event) {
+        entries[entryIndex].assignees[assigneeIndex].completionStatus = normalizeCompletionStatus(event.target.value);
         syncEntries();
       });
       assigneeRow.querySelector('.js-assignee-hours')?.addEventListener('input', function (event) {
@@ -1626,6 +1656,10 @@ document.addEventListener('DOMContentLoaded', function () {
         submitBtn.innerHTML = originalText;
       }
     }
+  });
+
+  evaluationTypeSelect?.addEventListener('change', function () {
+    if (selectedEntryIndex !== null) renderEntryModal();
   });
 
   entries = entries.length
