@@ -41,6 +41,15 @@ test('master academia hub client wiring includes report workspace config and ren
   assert.match(viewSource, /function renderReportInstanceWorkspace\(payload\)/);
   assert.match(viewSource, /function appendReportAssignmentWorkspaceQuery\(requestQuery\)/);
   assert.match(viewSource, /function bindReportAssignmentWorkspaceControls\(\)/);
+  assert.match(viewSource, /function appendReportInstanceWorkspaceQuery\(requestQuery\)/);
+  assert.match(viewSource, /function bindReportInstanceWorkspaceControls\(\)/);
+  assert.match(viewSource, /hubReportInstanceStartDate/);
+  assert.match(viewSource, /hubReportInstanceTemplate/);
+  assert.match(viewSource, /hubReportInstanceStatus/);
+  assert.match(viewSource, /hubReportInstanceClassId/);
+  assert.match(viewSource, /hubReportInstanceTeacherId/);
+  assert.match(viewSource, /hubReportInstanceStudentId/);
+  assert.match(viewSource, /appendReportInstanceWorkspaceQuery\(requestQuery\)/);
   assert.match(viewSource, /hubReportAssignmentTeacherPersonId/);
   assert.match(viewSource, /hubReportAssignmentClassIds/);
   assert.match(viewSource, /hubReportAssignmentScope/);
@@ -72,6 +81,11 @@ test('master academia hub service and routes expose report workspace branches wi
   assert.match(serviceSource, /key === 'report-instances'/);
   assert.match(serviceSource, /sectionId:\s*SECTIONS\.SCHOOL_REPORTS_INSTANCES/);
   assert.match(serviceSource, /buildInstanceListRows/);
+  assert.match(serviceSource, /templateId/);
+  assert.match(serviceSource, /dueDateStart/);
+  assert.match(serviceSource, /dueDateEnd/);
+  assert.match(serviceSource, /templateOptions/);
+  assert.match(serviceSource, /statusOptions/);
   assert.match(serviceSource, /normalizeReportInstanceRows/);
   assert.match(serviceSource, /params\.set\('rowId', normalizeText\(row\.assignmentRowId\)\)/);
   assert.match(serviceSource, /sourceUrl:\s*'\/school\/reports\/instances'/);

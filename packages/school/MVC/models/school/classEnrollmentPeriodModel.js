@@ -161,6 +161,18 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
     completionDate: sessionCap.completionDate,
     completionSessionId: sessionCap.completionSessionId,
     completionReason: sessionCap.completionReason,
+    plannedNotApplicableSessionIds: (() => {
+      const raw = Array.isArray(input.plannedNotApplicableSessionIds) ? input.plannedNotApplicableSessionIds : [];
+      const out = [];
+      const seen = new Set();
+      raw.forEach((row) => {
+        const id = cleanId(row, { max: 120, allowEmpty: true });
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        out.push(id);
+      });
+      return out.slice(0, 200);
+    })(),
     transactionSummary: sanitizeTransactionSummary(input.transactionSummary),
     sequenceNo,
     createdBy: createdBy || '',

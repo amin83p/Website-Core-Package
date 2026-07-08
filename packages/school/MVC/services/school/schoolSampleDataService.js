@@ -648,6 +648,18 @@ function looksLikeSampleNote(value = '', roleToken = '') {
   return note.includes('sample') && note.includes(roleToken);
 }
 
+function personHasSampleDataTag(person = {}) {
+  const tags = Array.isArray(person?.tags) ? person.tags : [];
+  return tags.some((tag) => String(tag || '').trim().toLowerCase() === 'sample-data');
+}
+
+function isPersonLinkedToOrg(person = {}, orgId = '') {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) return false;
+  return (Array.isArray(person?.organizations) ? person.organizations : [])
+    .some((row) => idsEqual(row?.orgId, targetOrgId));
+}
+
 function isSampleStudentRow(row) {
   const marker = String(row?.localId || '').trim().toUpperCase();
   return /^SMP-STU-/.test(marker) || looksLikeSampleNote(row?.notes, 'student');
@@ -661,6 +673,526 @@ function isSampleTeacherRow(row) {
 function isSampleStaffRow(row) {
   const marker = String(row?.employeeNumber || '').trim().toUpperCase();
   return /^SMP-STF-/.test(marker) || looksLikeSampleNote(row?.notes, 'staff');
+}
+
+function isSampleRoleRowForPreview(group, row, person, orgId) {
+  if (group === 'students' && isSampleStudentRow(row)) return true;
+  if (group === 'teachers' && isSampleTeacherRow(row)) return true;
+  if (group === 'staff' && isSampleStaffRow(row)) return true;
+  return personHasSampleDataTag(person) && isPersonLinkedToOrg(person, orgId);
+}
+
+const DEFAULT_MASTER_DEFINITIONS = Object.freeze({
+  classes: false,
+  programs: false,
+  terms: false,
+  subjects: false,
+  departments: false,
+  reportTemplates: false,
+  timesheetPeriods: false,
+  activityCategories: false,
+  examDefinitions: false,
+  schoolAccounts: false
+});
+
+function normalizeMasterDefinitions(input = {}) {
+  const out = { ...DEFAULT_MASTER_DEFINITIONS };
+  Object.keys(DEFAULT_MASTER_DEFINITIONS).forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(input, key)) {
+      out[key] = input[key] === true || input[key] === 'true' || input[key] === 'on';
+    }
+  });
+  return out;
+}
+
+function normalizeClearCount(result) {
+  return Number(result?.removed ?? result?.deletedCount ?? 0);
+}
+
+function normalizeRemainingCount(result) {
+  return Number(result?.remaining ?? 0);
+}
+
+function mergePurgeWarnings(warnings, label, result) {
+  if (!Array.isArray(result?.errors) || !result.errors.length) return;
+  warnings.push(`${label}: ${result.errors.join('; ')}`);
+}
+
+async function listOrgScopedRows(repository, orgId) {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId || !repository || typeof repository.list !== 'function') return [];
+  const rows = await repository.list({
+    query: { orgId__eq: targetOrgId },
+    scope: { canViewAll: true }
+  });
+  return Array.isArray(rows) ? rows : [];
+}
+
+function toPreviewRow(row = {}) {
+  const id = toPublicId(row?.id) || String(row?.id || '').trim();
+  const presetLabel = String(row?.label || '').trim();
+  if (presetLabel) return { id, label: presetLabel };
+  const labelFields = ['name', 'title', 'code', 'localId', 'employeeNumber', 'summary', 'classTitle'];
+  let label = '';
+  for (const field of labelFields) {
+    const value = String(row?.[field] || '').trim();
+    if (value) {
+      label = value;
+      break;
+    }
+  }
+  return { id, label: label || id || '(Unnamed)' };
+}
+
+function buildPreviewGroup(key, label, rows = [], options = {}) {
+  const sampleLimit = Number(options?.sampleLimit) > 0 ? Number(options.sampleLimit) : 25;
+  const normalizedRows = (Array.isArray(rows) ? rows : []).map(toPreviewRow).filter((row) => row.id);
+  const count = normalizedRows.length;
+  const truncated = count > sampleLimit;
+  return {
+    key,
+    label,
+    count,
+    rows: truncated ? normalizedRows.slice(0, sampleLimit) : normalizedRows,
+    truncated,
+    hiddenCount: truncated ? count - sampleLimit : 0,
+    skipped: options?.skipped === true,
+    note: String(options?.note || '').trim()
+  };
+}
+
+async function countExistingMigrationLogFiles() {
+  const base = path.join(resolveCoreRoot(), 'data/school');
+  let count = 0;
+  for (const name of MIGRATION_LOG_FILES) {
+    const fp = path.join(base, name);
+    try {
+      await fs.access(fp);
+      count += 1;
+    } catch (_) {
+      // file absent
+    }
+  }
+  return count;
+}
+
+function countClassEnrollments(classRows = []) {
+  return (Array.isArray(classRows) ? classRows : []).reduce((sum, row) => {
+    const students = Array.isArray(row?.enrollment?.students) ? row.enrollment.students : [];
+    return sum + students.length;
+  }, 0);
+}
+
+function countClassesWithEmbeddedSessions(classRows = []) {
+  return (Array.isArray(classRows) ? classRows : []).filter((row) => {
+    const sessions = Array.isArray(row?.sessions) ? row.sessions : [];
+    return sessions.length > 0;
+  }).length;
+}
+
+function countClassesWithOfficialFinalGrades(classRows = []) {
+  return (Array.isArray(classRows) ? classRows : []).filter((row) => {
+    const raw = row?.officialFinalGrades;
+    return raw
+      && typeof raw === 'object'
+      && !Array.isArray(raw)
+      && Object.keys(raw).length > 0;
+  }).length;
+}
+
+function isPurgeEligibleSchoolAccount(row = {}) {
+  const headCategory = String(row?.headCategory || 'none').trim().toLowerCase();
+  return headCategory === 'none';
+}
+
+function sumPreviewGroupCounts(groups = []) {
+  return (Array.isArray(groups) ? groups : []).reduce((sum, group) => {
+    if (group?.skipped === true) return sum;
+    return sum + Number(group?.count || 0);
+  }, 0);
+}
+
+async function buildOrgWorkspaceResetPreview({
+  orgId,
+  includeAcademicSnapshots = true,
+  masterDefinitions = {}
+}) {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('Active organization is required.');
+  const flags = normalizeMasterDefinitions(masterDefinitions);
+
+  const [
+    ledgerRows,
+    transactionRows,
+    journalRows,
+    programRegistrationRows,
+    priorSubjectCreditRows,
+    termRegistrationRows,
+    classEnrollmentPeriodRows,
+    withdrawalRows,
+    reportInstanceRows,
+    reportAssignmentRows,
+    timesheetRows,
+    activityRows,
+    activityCategoryRows,
+    leaveRequestRows,
+    taskRows,
+    taskRoutingRuleRows,
+    sessionStudentCaseRows,
+    examAnswerRows,
+    examAttemptRows,
+    examAssignmentRows,
+    examAllocationRows,
+    classRows,
+    subjectRows,
+    migrationLogFiles,
+    attendancePolicy,
+    snapshotRows
+  ] = await Promise.all([
+    listOrgScopedRows(schoolRepositories.academicLedger, targetOrgId),
+    listOrgScopedRows(schoolRepositories.globalTransactions, targetOrgId),
+    listOrgScopedRows(schoolRepositories.transactionJournals, targetOrgId),
+    listOrgScopedRows(schoolRepositories.studentProgramRegistrations, targetOrgId),
+    listOrgScopedRows(schoolRepositories.studentProgramPriorSubjects, targetOrgId),
+    listOrgScopedRows(schoolRepositories.studentTermRegistrations, targetOrgId),
+    listOrgScopedRows(schoolRepositories.classEnrollmentPeriods, targetOrgId),
+    withdrawalRepository.list({
+      query: { orgId__eq: targetOrgId },
+      scope: { canViewAll: true }
+    }),
+    listOrgScopedRows(schoolRepositories.reportInstances, targetOrgId),
+    listOrgScopedRows(schoolRepositories.reportAssignments, targetOrgId),
+    listOrgScopedRows(schoolRepositories.timesheets, targetOrgId),
+    listOrgScopedRows(schoolRepositories.activities, targetOrgId),
+    listOrgScopedRows(schoolRepositories.activityCategories, targetOrgId),
+    listOrgScopedRows(schoolRepositories.leaveRequests, targetOrgId),
+    listOrgScopedRows(schoolRepositories.tasks, targetOrgId),
+    listOrgScopedRows(schoolRepositories.taskRoutingRules, targetOrgId),
+    listOrgScopedRows(schoolRepositories.sessionStudentCases, targetOrgId),
+    listOrgScopedRows(schoolRepositories.examAnswers, targetOrgId),
+    listOrgScopedRows(schoolRepositories.examAttempts, targetOrgId),
+    listOrgScopedRows(schoolRepositories.examAssignments, targetOrgId),
+    listOrgScopedRows(schoolRepositories.examAllocations, targetOrgId),
+    listOrgScopedRows(schoolRepositories.classes, targetOrgId),
+    listOrgScopedRows(schoolRepositories.subjects, targetOrgId),
+    countExistingMigrationLogFiles(),
+    attendanceMatrixPolicyModel.getPolicyForOrg(targetOrgId),
+    schoolRepositories.academicSnapshots.list({
+      scope: { canViewAll: false, activeOrgId: targetOrgId }
+    })
+  ]);
+
+  const normalizedClassRows = Array.isArray(classRows) ? classRows : [];
+  const normalizedSnapshotRows = Array.isArray(snapshotRows) ? snapshotRows : [];
+  const classEnrollmentCount = countClassEnrollments(normalizedClassRows);
+  const embeddedSessionsClassCount = countClassesWithEmbeddedSessions(normalizedClassRows);
+  const officialFinalGradesClassCount = countClassesWithOfficialFinalGrades(normalizedClassRows);
+  const attendancePolicyCount = attendancePolicy ? 1 : 0;
+
+  const transactionalGroups = [
+    buildPreviewGroup('academicLedger', 'Academic ledger entries', ledgerRows),
+    buildPreviewGroup('globalTransactions', 'Global transactions', transactionRows),
+    buildPreviewGroup('transactionJournals', 'Transaction journals', journalRows),
+    buildPreviewGroup('programRegistrations', 'Program registrations', programRegistrationRows),
+    buildPreviewGroup('priorSubjectCredits', 'Prior subject credits', priorSubjectCreditRows),
+    buildPreviewGroup('termRegistrations', 'Term registrations', termRegistrationRows),
+    buildPreviewGroup('classEnrollmentPeriods', 'Class enrollment periods', classEnrollmentPeriodRows),
+    buildPreviewGroup('withdrawals', 'Withdrawals', withdrawalRows),
+    buildPreviewGroup('classEnrollments', 'Legacy class roster enrollments', [], { note: `${classEnrollmentCount} enrollment row(s) across org classes` }),
+    buildPreviewGroup('reportInstances', 'Report instances', reportInstanceRows),
+    buildPreviewGroup('reportAssignments', 'Report assignments', reportAssignmentRows),
+    buildPreviewGroup('timesheets', 'Timesheet entries', timesheetRows),
+    buildPreviewGroup('activities', 'Activities', activityRows),
+    buildPreviewGroup('activityCategories', 'Activity categories', activityCategoryRows),
+    buildPreviewGroup('leaveRequests', 'Leave requests', leaveRequestRows),
+    buildPreviewGroup('tasks', 'Tasks', taskRows),
+    buildPreviewGroup('taskRoutingRules', 'Task routing rules', taskRoutingRuleRows),
+    buildPreviewGroup('sessionStudentCases', 'Session issues / cases', sessionStudentCaseRows),
+    buildPreviewGroup('examAnswers', 'Exam answers', examAnswerRows),
+    buildPreviewGroup('examAttempts', 'Exam attempts', examAttemptRows),
+    buildPreviewGroup('examAssignments', 'Exam assignments', examAssignmentRows),
+    buildPreviewGroup('examAllocations', 'Exam allocations', examAllocationRows),
+    includeAcademicSnapshots
+      ? buildPreviewGroup('academicSnapshots', 'Academic snapshots', normalizedSnapshotRows)
+      : buildPreviewGroup('academicSnapshots', 'Academic snapshots', normalizedSnapshotRows, {
+        skipped: true,
+        note: 'Snapshots will be preserved for this reset.'
+      }),
+    buildPreviewGroup('classRuntimeDirs', 'Class workspace folders', normalizedClassRows, {
+      note: `${normalizedClassRows.length} class workspace folder(s)`
+    }),
+    buildPreviewGroup('embeddedSessions', 'Embedded sessions on class rows', [], {
+      note: `${embeddedSessionsClassCount} class row(s) with embedded sessions`
+    }),
+    buildPreviewGroup('subjectStorageDirs', 'Subject storage folders', subjectRows, {
+      note: `${(Array.isArray(subjectRows) ? subjectRows : []).length} subject storage folder(s)`
+    }),
+    buildPreviewGroup('migrationLogFiles', 'Migration log files', [], {
+      note: `${migrationLogFiles} optional migration log file(s) present`
+    }),
+    buildPreviewGroup('attendanceMatrixPolicy', 'Attendance matrix policy override', [], {
+      note: attendancePolicyCount ? 'Org attendance matrix policy override is set' : 'No org attendance matrix policy override'
+    }),
+    buildPreviewGroup('officialFinalGradesClasses', 'Official final grades workflow state', [], {
+      note: `${officialFinalGradesClassCount} class(es) with official final grade workflow state`
+    }),
+    buildPreviewGroup('classIndexesRebuilt', 'Class schedule indexes rebuilt', normalizedClassRows, {
+      note: `${normalizedClassRows.length} class index rebuild(s)`
+    })
+  ];
+
+  transactionalGroups.find((g) => g.key === 'classEnrollments').count = classEnrollmentCount;
+  transactionalGroups.find((g) => g.key === 'embeddedSessions').count = embeddedSessionsClassCount;
+  transactionalGroups.find((g) => g.key === 'migrationLogFiles').count = migrationLogFiles;
+  transactionalGroups.find((g) => g.key === 'attendanceMatrixPolicy').count = attendancePolicyCount;
+  transactionalGroups.find((g) => g.key === 'officialFinalGradesClasses').count = officialFinalGradesClassCount;
+
+  const masterGroups = [];
+  const protectedGroups = [];
+
+  if (flags.examDefinitions) {
+    const [examQuestionRows, examRevisionRows, examTemplateRows] = await Promise.all([
+      listOrgScopedRows(schoolRepositories.examQuestions, targetOrgId),
+      listOrgScopedRows(schoolRepositories.examRevisions, targetOrgId),
+      listOrgScopedRows(schoolRepositories.examTemplates, targetOrgId)
+    ]);
+    masterGroups.push(
+      buildPreviewGroup('examQuestions', 'Exam questions', examQuestionRows),
+      buildPreviewGroup('examRevisions', 'Exam revisions', examRevisionRows),
+      buildPreviewGroup('examTemplates', 'Exam templates', examTemplateRows)
+    );
+  }
+
+  if (flags.reportTemplates) {
+    masterGroups.push(buildPreviewGroup(
+      'reportTemplates',
+      'Report templates',
+      await listOrgScopedRows(schoolRepositories.reportTemplates, targetOrgId)
+    ));
+  }
+
+  if (flags.timesheetPeriods) {
+    masterGroups.push(buildPreviewGroup(
+      'timesheetPeriods',
+      'Timesheet periods',
+      await listOrgScopedRows(schoolRepositories.timesheetPeriods, targetOrgId)
+    ));
+  }
+
+  if (flags.activityCategories) {
+    masterGroups.push(buildPreviewGroup(
+      'activityCategories',
+      'Activity categories (remaining after transactional clear)',
+      activityCategoryRows,
+      { note: 'Transactional reset already clears activity categories; this shows any rows that would be targeted again.' }
+    ));
+  }
+
+  if (flags.classes) {
+    masterGroups.push(buildPreviewGroup('classes', 'Classes (master rows)', normalizedClassRows));
+  }
+
+  if (flags.subjects) {
+    masterGroups.push(buildPreviewGroup(
+      'subjects',
+      'Subjects',
+      await listOrgScopedRows(schoolRepositories.subjects, targetOrgId)
+    ));
+  }
+
+  if (flags.programs) {
+    masterGroups.push(buildPreviewGroup(
+      'programs',
+      'Programs',
+      await listOrgScopedRows(schoolRepositories.programs, targetOrgId)
+    ));
+  }
+
+  if (flags.terms) {
+    masterGroups.push(buildPreviewGroup(
+      'terms',
+      'Terms',
+      await listOrgScopedRows(schoolRepositories.terms, targetOrgId)
+    ));
+  }
+
+  if (flags.departments) {
+    masterGroups.push(buildPreviewGroup(
+      'departments',
+      'Departments',
+      await listOrgScopedRows(schoolRepositories.departments, targetOrgId)
+    ));
+  }
+
+  if (flags.schoolAccounts) {
+    const accountRows = await listOrgScopedRows(schoolRepositories.schoolAccounts, targetOrgId);
+    const eligibleAccounts = accountRows.filter(isPurgeEligibleSchoolAccount);
+    const protectedAccounts = accountRows.filter((row) => !isPurgeEligibleSchoolAccount(row));
+    masterGroups.push(buildPreviewGroup('schoolAccounts', 'School accounts (purge eligible)', eligibleAccounts));
+    protectedGroups.push(buildPreviewGroup(
+      'schoolAccountsHead',
+      'Protected head school accounts',
+      protectedAccounts.map((row) => ({
+        ...toPreviewRow(row),
+        label: `${toPreviewRow(row).label} [${String(row?.headCategory || 'none')}]`
+      }))
+    ));
+  }
+
+  const selectedKeys = Object.keys(flags).filter((key) => flags[key] === true);
+  const transactionalRecords = sumPreviewGroupCounts(transactionalGroups.filter((g) => g.key !== 'classIndexesRebuilt'))
+    + classEnrollmentCount
+    + embeddedSessionsClassCount
+    + migrationLogFiles
+    + attendancePolicyCount
+    + officialFinalGradesClassCount
+    + normalizedClassRows.length;
+  const masterRecords = sumPreviewGroupCounts(masterGroups);
+  const protectedRecords = sumPreviewGroupCounts(protectedGroups);
+
+  return {
+    orgId: targetOrgId,
+    generatedAt: new Date().toISOString(),
+    includeAcademicSnapshots: includeAcademicSnapshots === true,
+    masterDefinitions: flags,
+    transactional: {
+      groups: transactionalGroups,
+      summary: { totalRecords: transactionalRecords }
+    },
+    masters: {
+      selectedKeys,
+      groups: masterGroups,
+      protected: protectedGroups
+    },
+    summary: {
+      transactionalRecords,
+      masterRecords,
+      protectedRecords
+    }
+  };
+}
+
+async function clearOptionalMasterDefinitions({
+  orgId,
+  masterDefinitions = {},
+  activityCategoriesAlreadyCleared = false
+}) {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('Active organization is required.');
+
+  const flags = normalizeMasterDefinitions(masterDefinitions);
+  const cleared = {};
+  const remaining = {};
+  const warnings = [];
+  const anySelected = Object.values(flags).some(Boolean);
+  if (!anySelected) {
+    return { cleared, remaining, warnings };
+  }
+
+  if (flags.examDefinitions) {
+    const examQuestionsResult = await schoolRepositories.examQuestions.clearByOrg(targetOrgId);
+    const examRevisionsResult = await schoolRepositories.examRevisions.clearByOrg(targetOrgId);
+    const examTemplatesResult = await schoolRepositories.examTemplates.clearByOrg(targetOrgId);
+    cleared.examQuestions = normalizeClearCount(examQuestionsResult);
+    cleared.examRevisions = normalizeClearCount(examRevisionsResult);
+    cleared.examTemplates = normalizeClearCount(examTemplatesResult);
+    remaining.examQuestions = normalizeRemainingCount(examQuestionsResult);
+    remaining.examRevisions = normalizeRemainingCount(examRevisionsResult);
+    remaining.examTemplates = normalizeRemainingCount(examTemplatesResult);
+  }
+
+  if (flags.reportTemplates) {
+    const result = await schoolRepositories.purgeOrgScopedRepositoryRows(
+      schoolRepositories.reportTemplates,
+      targetOrgId
+    );
+    cleared.reportTemplates = Number(result?.removed || 0);
+    remaining.reportTemplates = Number(result?.remaining || 0);
+    mergePurgeWarnings(warnings, 'Report templates', result);
+  }
+
+  if (flags.timesheetPeriods) {
+    const result = await schoolRepositories.purgeOrgScopedRepositoryRows(
+      schoolRepositories.timesheetPeriods,
+      targetOrgId
+    );
+    cleared.timesheetPeriods = Number(result?.removed || 0);
+    remaining.timesheetPeriods = Number(result?.remaining || 0);
+    mergePurgeWarnings(warnings, 'Timesheet periods', result);
+  }
+
+  if (flags.activityCategories && !activityCategoriesAlreadyCleared) {
+    const result = await schoolRepositories.activityCategories.clearByOrg(targetOrgId);
+    cleared.activityCategories = normalizeClearCount(result);
+    remaining.activityCategories = normalizeRemainingCount(result);
+  } else if (flags.activityCategories) {
+    const scopedRows = await schoolRepositories.activityCategories.list({
+      query: { orgId__eq: targetOrgId },
+      scope: { canViewAll: true }
+    });
+    cleared.activityCategories = 0;
+    remaining.activityCategories = Array.isArray(scopedRows) ? scopedRows.length : 0;
+  }
+
+  if (flags.classes) {
+    const result = await schoolRepositories.purgeOrgScopedRepositoryRows(
+      schoolRepositories.classes,
+      targetOrgId
+    );
+    cleared.classes = Number(result?.removed || 0);
+    remaining.classes = Number(result?.remaining || 0);
+    mergePurgeWarnings(warnings, 'Classes', result);
+  }
+
+  if (flags.subjects) {
+    const result = await schoolRepositories.purgeOrgScopedRepositoryRows(
+      schoolRepositories.subjects,
+      targetOrgId
+    );
+    cleared.subjects = Number(result?.removed || 0);
+    remaining.subjects = Number(result?.remaining || 0);
+    mergePurgeWarnings(warnings, 'Subjects', result);
+  }
+
+  if (flags.programs) {
+    const result = await schoolRepositories.purgeOrgScopedRepositoryRows(
+      schoolRepositories.programs,
+      targetOrgId
+    );
+    cleared.programs = Number(result?.removed || 0);
+    remaining.programs = Number(result?.remaining || 0);
+    mergePurgeWarnings(warnings, 'Programs', result);
+  }
+
+  if (flags.terms) {
+    const result = await schoolRepositories.purgeOrgScopedRepositoryRows(
+      schoolRepositories.terms,
+      targetOrgId
+    );
+    cleared.terms = Number(result?.removed || 0);
+    remaining.terms = Number(result?.remaining || 0);
+    mergePurgeWarnings(warnings, 'Terms', result);
+  }
+
+  if (flags.departments) {
+    const result = await schoolRepositories.purgeOrgScopedRepositoryRows(
+      schoolRepositories.departments,
+      targetOrgId
+    );
+    cleared.departments = Number(result?.removed || 0);
+    remaining.departments = Number(result?.remaining || 0);
+    mergePurgeWarnings(warnings, 'Departments', result);
+  }
+
+  if (flags.schoolAccounts) {
+    const result = await schoolRepositories.purgeOrgScopedSchoolAccounts(targetOrgId);
+    cleared.schoolAccounts = Number(result?.removed || 0);
+    cleared.schoolAccountsSkippedHead = Number(result?.skippedHeadAccounts || 0);
+    remaining.schoolAccounts = Number(result?.remaining || 0);
+    mergePurgeWarnings(warnings, 'School accounts', result);
+  }
+
+  return { cleared, remaining, warnings };
 }
 
 function resolvePersonDisplayName(person = {}) {
@@ -789,18 +1321,14 @@ async function buildSamplePeopleDeletePreview({
     })
   ]);
 
-  const sampleStudents = (Array.isArray(studentsAll) ? studentsAll : []).filter(isSampleStudentRow);
-  const sampleTeachers = (Array.isArray(teachersAll) ? teachersAll : []).filter(isSampleTeacherRow);
-  const sampleStaff = (Array.isArray(staffAll) ? staffAll : []).filter(isSampleStaffRow);
-
-  const associatedPersonIds = normalizeIdList([
-    ...sampleStudents.map((row) => row?.personId),
-    ...sampleTeachers.map((row) => row?.personId),
-    ...sampleStaff.map((row) => row?.personId)
+  const candidatePersonIds = normalizeIdList([
+    ...(Array.isArray(studentsAll) ? studentsAll : []).map((row) => row?.personId),
+    ...(Array.isArray(teachersAll) ? teachersAll : []).map((row) => row?.personId),
+    ...(Array.isArray(staffAll) ? staffAll : []).map((row) => row?.personId)
   ]);
 
   const peopleRows = await Promise.all(
-    associatedPersonIds.map(async (personId) => {
+    candidatePersonIds.map(async (personId) => {
       try {
         return await dataServiceGlobal.getDataById('persons', personId, reqUser, {
           enrichment: { includeSchoolRoles: false }
@@ -816,6 +1344,25 @@ async function buildSamplePeopleDeletePreview({
     if (!personId) return;
     personMap.set(personId, person);
   });
+
+  const sampleStudents = (Array.isArray(studentsAll) ? studentsAll : []).filter((row) => {
+    const person = personMap.get(toPublicId(row?.personId));
+    return isSampleRoleRowForPreview('students', row, person, targetOrgId);
+  });
+  const sampleTeachers = (Array.isArray(teachersAll) ? teachersAll : []).filter((row) => {
+    const person = personMap.get(toPublicId(row?.personId));
+    return isSampleRoleRowForPreview('teachers', row, person, targetOrgId);
+  });
+  const sampleStaff = (Array.isArray(staffAll) ? staffAll : []).filter((row) => {
+    const person = personMap.get(toPublicId(row?.personId));
+    return isSampleRoleRowForPreview('staff', row, person, targetOrgId);
+  });
+
+  const associatedPersonIds = normalizeIdList([
+    ...sampleStudents.map((row) => row?.personId),
+    ...sampleTeachers.map((row) => row?.personId),
+    ...sampleStaff.map((row) => row?.personId)
+  ]);
 
   const accountMap = new Map();
   (Array.isArray(accountsAll) ? accountsAll : []).forEach((account) => {
@@ -1383,10 +1930,12 @@ async function clearOfficialFinalGradesForOrg(orgId) {
 
 async function clearSampleTransactionalData({
   orgId,
-  includeAcademicSnapshots = true
+  includeAcademicSnapshots = true,
+  masterDefinitions = {}
 }) {
   const targetOrgId = String(orgId || '').trim();
   if (!targetOrgId) throw new Error('Active organization is required.');
+  const normalizedMasterDefinitions = normalizeMasterDefinitions(masterDefinitions);
 
   const [
     ledgerResult,
@@ -1402,7 +1951,13 @@ async function clearSampleTransactionalData({
     reportAssignmentsResult,
     timesheetsResult,
     classRuntimeResult,
-    subjectStorageResult
+    subjectStorageResult,
+    activitiesResult,
+    activityCategoriesResult,
+    leaveRequestsResult,
+    tasksResult,
+    taskRoutingRulesResult,
+    sessionStudentCasesResult
   ] = await Promise.all([
     schoolRepositories.academicLedger.clearByOrg(targetOrgId),
     schoolRepositories.globalTransactions.clearByOrg(targetOrgId),
@@ -1417,8 +1972,19 @@ async function clearSampleTransactionalData({
     schoolRepositories.reportAssignments.clearByOrg(targetOrgId),
     schoolRepositories.timesheets.clearByOrg(targetOrgId),
     schoolRepositories.classes.clearRuntimeStorageByOrg(targetOrgId),
-    schoolRepositories.subjects.clearStorageByOrg(targetOrgId)
+    schoolRepositories.subjects.clearStorageByOrg(targetOrgId),
+    schoolRepositories.activities.clearByOrg(targetOrgId),
+    schoolRepositories.activityCategories.clearByOrg(targetOrgId),
+    schoolRepositories.leaveRequests.clearByOrg(targetOrgId),
+    schoolRepositories.tasks.clearByOrg(targetOrgId),
+    schoolRepositories.taskRoutingRules.clearByOrg(targetOrgId),
+    schoolRepositories.sessionStudentCases.clearByOrg(targetOrgId)
   ]);
+
+  const examAnswersResult = await schoolRepositories.examAnswers.clearByOrg(targetOrgId);
+  const examAttemptsResult = await schoolRepositories.examAttempts.clearByOrg(targetOrgId);
+  const examAssignmentsResult = await schoolRepositories.examAssignments.clearByOrg(targetOrgId);
+  const examAllocationsResult = await schoolRepositories.examAllocations.clearByOrg(targetOrgId);
 
   let snapshotResult = { removed: 0, remaining: 0 };
   if (includeAcademicSnapshots) {
@@ -1456,6 +2022,12 @@ async function clearSampleTransactionalData({
     }
   }
 
+  const masterPurgeResult = await clearOptionalMasterDefinitions({
+    orgId: targetOrgId,
+    masterDefinitions: normalizedMasterDefinitions,
+    activityCategoriesAlreadyCleared: true
+  });
+
   const warnings = [];
   if (Array.isArray(classRuntimeResult?.errors) && classRuntimeResult.errors.length) {
     warnings.push(`Class workspace cleanup: ${classRuntimeResult.errors.join('; ')}`);
@@ -1472,49 +2044,83 @@ async function clearSampleTransactionalData({
       `Class index rebuild: ${slice}${indexRebuildErrors.length > 5 ? '…' : ''}`
     );
   }
+  if (Array.isArray(masterPurgeResult?.warnings) && masterPurgeResult.warnings.length) {
+    warnings.push(...masterPurgeResult.warnings);
+  }
+
+  const transactionalCleared = {
+    academicLedgerEntries: Number(ledgerResult?.removed || 0),
+    globalTransactions: Number(transactionResult?.removed || 0),
+    transactionJournals: Number(journalResult?.removed || 0),
+    programRegistrations: Number(programRegistrationResult?.removed || 0),
+    priorSubjectCredits: Number(priorSubjectCreditsResult?.removed || 0),
+    termRegistrations: Number(termRegistrationResult?.removed || 0),
+    classEnrollmentPeriods: Number(classEnrollmentPeriodResult?.removed || 0),
+    withdrawals: Number(withdrawalResult?.removed || 0),
+    classEnrollments: Number(classEnrollmentResult?.removedEnrollments || 0),
+    academicSnapshots: Number(snapshotResult?.removed || 0),
+    reportInstances: Number(reportInstancesResult?.removed || 0),
+    reportAssignments: Number(reportAssignmentsResult?.removed || 0),
+    timesheets: Number(timesheetsResult?.removed || 0),
+    activities: normalizeClearCount(activitiesResult),
+    activityCategories: normalizeClearCount(activityCategoriesResult),
+    leaveRequests: normalizeClearCount(leaveRequestsResult),
+    tasks: normalizeClearCount(tasksResult),
+    taskRoutingRules: normalizeClearCount(taskRoutingRulesResult),
+    sessionStudentCases: normalizeClearCount(sessionStudentCasesResult),
+    examAnswers: normalizeClearCount(examAnswersResult),
+    examAttempts: normalizeClearCount(examAttemptsResult),
+    examAssignments: normalizeClearCount(examAssignmentsResult),
+    examAllocations: normalizeClearCount(examAllocationsResult),
+    classRuntimeDirs: Number(classRuntimeResult?.removedDirs || 0),
+    embeddedSessionsClearedClasses:
+      Number(classRuntimeResult?.mongoSessionsClearedClasses || 0)
+      + Number(classRuntimeResult?.jsonSessionsClearedClasses || 0),
+    subjectStorageDirs: Number(subjectStorageResult?.removedDirs || 0),
+    migrationLogFiles: Number(migrationLogResult?.removed || 0),
+    attendanceMatrixPolicyOrgs: Number(attendancePolicyResult?.removed || 0),
+    officialFinalGradesClasses: Number(officialGradesResult?.classesUpdated || 0),
+    classIndexesRebuilt
+  };
+
+  const transactionalRemaining = {
+    academicLedgerEntries: Number(ledgerResult?.remaining || 0),
+    globalTransactions: Number(transactionResult?.remaining || 0),
+    transactionJournals: Number(journalResult?.remaining || 0),
+    programRegistrations: Number(programRegistrationResult?.remaining || 0),
+    priorSubjectCredits: Number(priorSubjectCreditsResult?.remaining || 0),
+    termRegistrations: Number(termRegistrationResult?.remaining || 0),
+    classEnrollmentPeriods: Number(classEnrollmentPeriodResult?.remaining || 0),
+    withdrawals: Number(withdrawalResult?.remaining || 0),
+    classEnrollments: Number(classEnrollmentResult?.remainingEnrollmentsInOrg || 0),
+    academicSnapshots: Number(snapshotResult?.remaining || 0),
+    reportInstances: Number(reportInstancesResult?.remaining || 0),
+    reportAssignments: Number(reportAssignmentsResult?.remaining || 0),
+    timesheets: Number(timesheetsResult?.remaining || 0),
+    activities: normalizeRemainingCount(activitiesResult),
+    activityCategories: normalizeRemainingCount(activityCategoriesResult),
+    leaveRequests: normalizeRemainingCount(leaveRequestsResult),
+    tasks: normalizeRemainingCount(tasksResult),
+    taskRoutingRules: normalizeRemainingCount(taskRoutingRulesResult),
+    sessionStudentCases: normalizeRemainingCount(sessionStudentCasesResult),
+    examAnswers: normalizeRemainingCount(examAnswersResult),
+    examAttempts: normalizeRemainingCount(examAttemptsResult),
+    examAssignments: normalizeRemainingCount(examAssignmentsResult),
+    examAllocations: normalizeRemainingCount(examAllocationsResult)
+  };
 
   return {
     orgId: targetOrgId,
     warnings,
+    masterDefinitions: normalizedMasterDefinitions,
     summary: {
       cleared: {
-        academicLedgerEntries: Number(ledgerResult?.removed || 0),
-        globalTransactions: Number(transactionResult?.removed || 0),
-        transactionJournals: Number(journalResult?.removed || 0),
-        programRegistrations: Number(programRegistrationResult?.removed || 0),
-        priorSubjectCredits: Number(priorSubjectCreditsResult?.removed || 0),
-        termRegistrations: Number(termRegistrationResult?.removed || 0),
-        classEnrollmentPeriods: Number(classEnrollmentPeriodResult?.removed || 0),
-        withdrawals: Number(withdrawalResult?.removed || 0),
-        classEnrollments: Number(classEnrollmentResult?.removedEnrollments || 0),
-        academicSnapshots: Number(snapshotResult?.removed || 0),
-        reportInstances: Number(reportInstancesResult?.removed || 0),
-        reportAssignments: Number(reportAssignmentsResult?.removed || 0),
-        timesheets: Number(timesheetsResult?.removed || 0),
-        classRuntimeDirs: Number(classRuntimeResult?.removedDirs || 0),
-        embeddedSessionsClearedClasses:
-          Number(classRuntimeResult?.mongoSessionsClearedClasses || 0)
-          + Number(classRuntimeResult?.jsonSessionsClearedClasses || 0),
-        subjectStorageDirs: Number(subjectStorageResult?.removedDirs || 0),
-        migrationLogFiles: Number(migrationLogResult?.removed || 0),
-        attendanceMatrixPolicyOrgs: Number(attendancePolicyResult?.removed || 0),
-        officialFinalGradesClasses: Number(officialGradesResult?.classesUpdated || 0),
-        classIndexesRebuilt
+        ...transactionalCleared,
+        ...(masterPurgeResult?.cleared || {})
       },
       remaining: {
-        academicLedgerEntries: Number(ledgerResult?.remaining || 0),
-        globalTransactions: Number(transactionResult?.remaining || 0),
-        transactionJournals: Number(journalResult?.remaining || 0),
-        programRegistrations: Number(programRegistrationResult?.remaining || 0),
-        priorSubjectCredits: Number(priorSubjectCreditsResult?.remaining || 0),
-        termRegistrations: Number(termRegistrationResult?.remaining || 0),
-        classEnrollmentPeriods: Number(classEnrollmentPeriodResult?.remaining || 0),
-        withdrawals: Number(withdrawalResult?.remaining || 0),
-        classEnrollments: Number(classEnrollmentResult?.remainingEnrollmentsInOrg || 0),
-        academicSnapshots: Number(snapshotResult?.remaining || 0),
-        reportInstances: Number(reportInstancesResult?.remaining || 0),
-        reportAssignments: Number(reportAssignmentsResult?.remaining || 0),
-        timesheets: Number(timesheetsResult?.remaining || 0)
+        ...transactionalRemaining,
+        ...(masterPurgeResult?.remaining || {})
       }
     }
   };
@@ -1523,6 +2129,10 @@ async function clearSampleTransactionalData({
 module.exports = {
   generateSampleSchoolPeople,
   clearSampleTransactionalData,
+  clearOptionalMasterDefinitions,
+  buildOrgWorkspaceResetPreview,
   buildSamplePeopleDeletePreview,
-  deleteSelectedSamplePeople
+  deleteSelectedSamplePeople,
+  normalizeMasterDefinitions,
+  DEFAULT_MASTER_DEFINITIONS
 };

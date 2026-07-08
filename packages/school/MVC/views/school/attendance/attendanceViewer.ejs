@@ -189,6 +189,7 @@
                     <h5 class="fw-bold mb-1" id="det_studentName">Student Name</h5>
                     <div class="text-muted small" id="det_date">Date</div>
                     <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_lock_notice">This session is locked. Attendance cannot be changed unless an administrator unlocks it or overrides the lock.</p>
+                    <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_makeup_notice">This session requires a make-up session. Attendance and roster notes cannot be changed here. Create or open the make-up session instead.</p>
                 </div>
 
                 <fieldset id="fieldset_cell_attendance" class="border-0 p-0 m-0 mb-4">
@@ -634,7 +635,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div><span class="text-success fw-semibold">${p}</span><span class="text-muted"> / </span><span class="text-danger fw-semibold">${a}</span>${na ? `<span class="text-muted"> / </span><span class="text-secondary fw-semibold">${na}</span>` : ''}</div>
                     <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${pctStr}</div>
                   </td>
-                  <td class="ps-3 matrix-sticky-name">${stu.name}</td>`;
+                  <td class="ps-3 matrix-sticky-name">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(stu.name, stu.studentRecordId, { className: 'text-decoration-none fw-bold' }) : stu.name}</td>`;
                 
                 stu.records.forEach(rec => {
                     let icon = '<i class="bi bi-dash status-na"></i>';
@@ -644,7 +645,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (rec.status === 'late') { icon = `<i class="bi bi-clock-fill status-late"></i>`; tooltip = `Late`; }
                     else if (rec.status === 'excused') { icon = '<i class="bi bi-envelope-paper-fill status-excused"></i>'; tooltip = 'Excused'; }
                     else if (rec.status === 'absent') { icon = '<i class="bi bi-x-circle-fill status-absent"></i>'; tooltip = 'Absent'; }
-                    else if (rec.status === 'not_applicable') { icon = '<i class="bi bi-dash-circle-fill status-na"></i>'; tooltip = rec.applicability === 'approved_leave' ? 'N/A - approved leave' : 'N/A'; }
+                    else if (rec.status === 'not_applicable') {
+                        icon = '<i class="bi bi-dash-circle-fill status-na"></i>';
+                        tooltip = rec.applicability === 'approved_leave'
+                            ? 'N/A - approved leave'
+                            : (rec.applicability === 'makeup_required' ? 'N/A - make-up session required' : 'N/A');
+                    }
 
                     // UPDATED: Badge now strictly checks the comments array (ignores general teacherNotes)
                     const hasComments = (rec.comments && rec.comments.length > 0);
@@ -915,7 +921,14 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     document.getElementById('modal_classId').value = window.currentMatrixData.classId;
     document.getElementById('modal_sessionId').value = sessionId;
     document.getElementById('modal_personId').value = studentPersonId;
-    document.getElementById('det_studentName').innerText = student.name;
+    const studentNameEl = document.getElementById('det_studentName');
+    if (studentNameEl) {
+        if (typeof schoolRenderStudentNameHtml === 'function') {
+            studentNameEl.innerHTML = schoolRenderStudentNameHtml(student.name, record.studentRecordId || student.studentRecordId, { className: 'text-decoration-none fw-bold' });
+        } else {
+            studentNameEl.innerText = student.name;
+        }
+    }
     document.getElementById('det_date').innerText = `Session Date: ${record.date}`;
 
     const allowed = ['present', 'late', 'excused', 'absent', 'not_applicable'];
@@ -943,18 +956,28 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     }
 
     const locked = record.sessionLocked === true;
+    const makeupRequired = record.applicability === 'makeup_required';
     const canEdit = window.CAN_EDIT_ATTENDANCE_ROSTER === true;
     const canOverride = window.CAN_OVERRIDE_SESSION_LOCK === true;
-    const allowEdit = canEdit && (!locked || canOverride);
+    const allowEdit = canEdit && !makeupRequired && (!locked || canOverride);
     const fs = document.getElementById('fieldset_cell_attendance');
     if (fs) fs.disabled = !allowEdit;
     const lockNotice = document.getElementById('cell_modal_lock_notice');
-    if (locked && !canOverride && canEdit) lockNotice.classList.remove('d-none');
+    const makeupNotice = document.getElementById('cell_modal_makeup_notice');
+    if (makeupNotice) {
+        if (makeupRequired && canEdit) makeupNotice.classList.remove('d-none');
+        else makeupNotice.classList.add('d-none');
+    }
+    if (locked && !canOverride && canEdit && !makeupRequired) lockNotice.classList.remove('d-none');
     else lockNotice.classList.add('d-none');
     const saveAttBtn = document.getElementById('btn_saveAttendance');
     if (saveAttBtn) {
         saveAttBtn.disabled = !allowEdit;
     }
+    ['inp_newComment', 'inp_newCommentFile', 'btn_saveComment', 'btn_mentionUser'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !allowEdit;
+    });
 
     const thread = document.getElementById('det_commentsThread');
     thread.innerHTML = '';

@@ -1820,6 +1820,7 @@ async function viewAllocation(req, res) {
         return {
           ...row,
           studentName: fullName || studentId || '-',
+          studentRecordId: studentId,
           studentNo: String(student?.studentNo || '').trim()
         };
       });
@@ -2143,6 +2144,7 @@ async function viewTeacherAssignment(req, res) {
       return {
         ...row,
         studentName: fullName || String(student?.studentNo || row?.studentId || '').trim(),
+        studentRecordId: String(row?.studentId || '').trim(),
         studentNo: String(student?.studentNo || '').trim(),
         reviewAttemptId: String(reviewAttempt?.id || row?.submittedAttemptId || row?.startedAttemptId || '').trim(),
         reviewAttemptStatus: String(reviewAttempt?.status || '').trim().toLowerCase()
@@ -2799,6 +2801,7 @@ async function listTakeAssignments(req, res) {
           revisionLabel: `R${Number(revision?.revisionNo || row?.revisionNo || 0)}`,
           classTitle: String(classRow?.title || classRow?.name || row?.classId || '').trim(),
           studentName: fullName || String(student?.studentNo || row?.studentId || '').trim(),
+          studentRecordId: String(row?.studentId || '').trim(),
           studentNo: String(student?.studentNo || '').trim(),
           canTake: canStartByStatus || canContinueByStatus,
           canViewResult: (

@@ -381,7 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const tr = document.createElement('tr');
           const fp = formatGmPercent(row.finalPercent);
           const att = formatGmPercent(row.attendancePct);
-          tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${row.name}</td><td class="gm-sticky-att small">${att}</td><td class="text-muted">—</td>`;
+          tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-att small">${att}</td><td class="text-muted">—</td>`;
           tbody.appendChild(tr);
         });
         document.getElementById('gm_results').classList.remove('d-none');
@@ -426,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const attCell = attStr === '—'
           ? '<span class="text-muted">—</span>'
           : `<span class="fw-semibold text-primary">${attStr}</span>`;
-        let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${row.name}</td><td class="gm-sticky-att small">${attCell}</td>`;
+        let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-att small">${attCell}</td>`;
         row.cells.forEach((cell, idx) => {
           const col = columns[idx];
           html += `<td class="text-center small ${bandClass(col.dateBand)}">${renderCellHtml(cell)}</td>`;

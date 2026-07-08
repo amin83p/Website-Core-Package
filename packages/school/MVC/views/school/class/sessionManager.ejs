@@ -970,8 +970,8 @@
             <div>
                 <h6 class="fw-bold mb-1">Original session requires a make-up</h6>
                 <div class="small">
-                    This session is inactive for attendance, class conduct, gradebook, content, student cases, and file work because its current status requires a make-up session.
-                    Create or open the make-up session to complete instructional work.
+                    This original session requires a make-up session. Attendance remains visible as N/A for tracking and is excluded from attendance calculations.
+                    Create or open the make-up session to complete instructional work, gradebook, content, student cases, and file work.
                 </div>
                 <% if (existingMakeupHistory.length) { %>
                     <div class="small mt-2">
@@ -992,7 +992,7 @@
                 </button>
             </div>
             <nav class="session-manager-sidebar-nav" role="tablist">
-                <button type="button" class="session-manager-nav-item active" data-session-panel="attendance" role="tab" aria-selected="true" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
+                <button type="button" class="session-manager-nav-item active" data-session-panel="attendance" role="tab" aria-selected="true">
                     <i class="bi bi-people-fill fs-5"></i><span class="session-manager-nav-label">Attendance</span>
                 </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="conduct" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
@@ -1097,7 +1097,7 @@
                                         <% session.roster.forEach((student, i) => { %>
                                             <tr class="roster-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
                                                 <td class="ps-4 fw-bold align-middle">
-                                                    <%= student.name %>
+                                                    <%- include('../partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
                                                     <% if (student.comments && student.comments.length > 0) { %>
                                                         <i class="bi bi-chat-dots-fill text-primary ms-1" style="font-size: 0.75rem;" title="Notes Exist"></i>
                                                     <% } %>
@@ -1173,7 +1173,7 @@
                                         <% session.roster.forEach((student) => { %>
                                             <tr class="conduct-row" data-personid="<%= student.personId %>">
                                                 <td class="ps-4 fw-bold align-middle">
-                                                    <%= student.name %>
+                                                    <%- include('../partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
                                                     <div class="small text-muted font-monospace"><%= student.personId %></div>
                                                 </td>
                                                 <td class="text-center">
@@ -1275,9 +1275,14 @@
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
                         <div>
                             <h5 class="m-0 fw-bold text-primary"><i class="bi bi-clipboard-check me-2"></i>Report instances</h5>
-                            <div class="small text-muted mt-1">Concrete report instances for this session (one row per student or class target). Use <strong>Open V2</strong> or <strong>Start</strong> to fill out reports. To change assignment settings (teachers, dates, scope), use <strong>Reports → Assignments</strong>.</div>
+                            <div class="small text-muted mt-1">Concrete report instances for this session (one row per student or class target). Use <strong>Open V2</strong> or <strong>Start</strong> to fill out reports. Admin users can assign a new report directly from this panel.</div>
                         </div>
-                        <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                        <div class="d-flex flex-wrap gap-2 flex-shrink-0">
+                            <% if (canAssignSessionReports) { %>
+                                <button type="button" class="btn btn-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
+                            <% } %>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -1518,6 +1523,88 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="sessionReportAssignmentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-plus me-2"></i>Assign Report To Session</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="sessionReportTemplateId" value="">
+                <div class="alert alert-light border small mb-3" id="sessionReportAssignmentContext"></div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold" for="sessionReportTemplateLabel">Template</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control bg-white" id="sessionReportTemplateLabel" placeholder="Pick template..." readonly>
+                            <button type="button" class="btn btn-outline-primary" id="btnPickSessionReportTemplate"><i class="bi bi-search"></i></button>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold" for="sessionReportScope">Report Scope</label>
+                        <select class="form-select" id="sessionReportScope">
+                            <option value="class">Whole Class</option>
+                            <option value="each_student">Each Student</option>
+                            <option value="selected_students">Specific Students</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold" for="sessionReportTargetMode">Target Mode</label>
+                        <input type="text" class="form-control bg-light" id="sessionReportTargetMode" value="Session" readonly>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold" for="sessionReportStartDate">Start Date</label>
+                        <input type="date" class="form-control" id="sessionReportStartDate" max="<%= session.date || '' %>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold" for="sessionReportDueDate">Due Date</label>
+                        <input type="date" class="form-control bg-light" id="sessionReportDueDate" value="<%= session.date || '' %>" readonly>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold" for="sessionReportTaskStart">Task Start</label>
+                        <input type="time" class="form-control" id="sessionReportTaskStart" min="<%= session.startTime || '' %>" max="<%= session.endTime || '' %>">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold" for="sessionReportTaskEnd">Task End</label>
+                        <input type="time" class="form-control" id="sessionReportTaskEnd" min="<%= session.startTime || '' %>" max="<%= session.endTime || '' %>">
+                    </div>
+                    <div class="col-12 d-none" id="sessionReportSpecificStudentsWrap">
+                        <label class="form-label fw-bold" for="sessionReportStudentSummary">Specific Students</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control bg-white" id="sessionReportStudentSummary" placeholder="No students selected" readonly>
+                            <button type="button" class="btn btn-outline-primary" id="btnPickSessionReportStudents"><i class="bi bi-people"></i></button>
+                        </div>
+                        <div id="sessionReportSelectedStudents" class="d-flex flex-wrap gap-1 mt-2"></div>
+                        <div class="form-text">Only students shown on this session roster are accepted.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold" for="sessionReportAllocatedHours">Allocated Hours</label>
+                        <input type="number" class="form-control" id="sessionReportAllocatedHours" min="0" step="0.25" value="0">
+                    </div>
+                    <div class="col-md-8 d-flex align-items-end flex-wrap gap-4">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="sessionReportTimesheetReflection">
+                            <label class="form-check-label" for="sessionReportTimesheetReflection">Reflect on timesheet</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="sessionReportConflictPermitted">
+                            <label class="form-check-label" for="sessionReportConflictPermitted">Permit schedule conflict</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold" for="sessionReportNotes">Notes</label>
+                        <textarea class="form-control" id="sessionReportNotes" rows="3" maxlength="1500" placeholder="Optional assignment notes"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary fw-bold" id="btnSaveSessionReportAssignment"><i class="bi bi-save me-1"></i>Save Assignment</button>
+            </div>
+        </div>
+    </div>
+</div>
 <%- include('partials/modal_GenericPicker') %>
 
 <script>
@@ -1540,6 +1627,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionDefaultDate = <%- jsonForScript(session.date || '') %>;
     const sessionDefaultStartTime = <%- jsonForScript(session.startTime || '') %>;
     const sessionDefaultEndTime = <%- jsonForScript(session.endTime || '') %>;
+    const sessionCanAssignReports = <%- jsonForScript(Boolean(canAssignSessionReports)) %>;
+    const sessionReportRosterRows = <%- jsonForScript(Array.isArray(session.roster) ? session.roster : []) %>;
+    const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
     const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag)) %>;
     const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     const sessionStatusMap = new Map((sessionStatusMeta || []).map((row) => [normalizeStatusCode(row.code), row]));
@@ -1836,7 +1926,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const canResolve = !['resolved', 'cancelled'].includes(status);
             return `
                 <tr data-case-id="${scEscapeHtml(row.id)}">
-                    <td class="ps-4 fw-semibold">${scEscapeHtml(row.studentName || row.studentPersonId)}<div class="small text-muted font-monospace">${scEscapeHtml(row.studentPersonId)}</div></td>
+                    <td class="ps-4 fw-semibold">${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.studentName || row.studentPersonId, row.studentRecordId, { className: 'text-decoration-none fw-semibold' }) : scEscapeHtml(row.studentName || row.studentPersonId))}<div class="small text-muted font-monospace">${scEscapeHtml(row.studentPersonId)}</div></td>
                     <td class="text-capitalize">${scEscapeHtml(String(row.category || 'other').replace(/_/g, ' '))}</td>
                     <td><span class="badge ${studentCaseBadgeClass(severity, 'severity')}">${scEscapeHtml(severity.toUpperCase())}</span></td>
                     <td><span class="badge ${studentCaseBadgeClass(status, 'status')}">${scEscapeHtml(status.replace(/_/g, ' ').toUpperCase())}</span></td>
@@ -1902,6 +1992,258 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    let sessionReportAssignmentModalInstance = null;
+    let selectedSessionReportStudents = new Map();
+    let savingSessionReportAssignment = false;
+
+    function getSessionReportAssignmentModal() {
+        const modal = document.getElementById('sessionReportAssignmentModal');
+        if (modal && window.bootstrap && !sessionReportAssignmentModalInstance) {
+            sessionReportAssignmentModalInstance = window.bootstrap.Modal.getOrCreateInstance(modal);
+        }
+        return modal;
+    }
+
+    function parseSessionTimeToMinutes(value) {
+        const token = String(value || '').trim();
+        if (!/^\d{2}:\d{2}$/.test(token)) return null;
+        const parts = token.split(':').map(Number);
+        if (!Number.isInteger(parts[0]) || !Number.isInteger(parts[1])) return null;
+        return (parts[0] * 60) + parts[1];
+    }
+
+    function calculateSessionReportAllocatedHours() {
+        const modal = getSessionReportAssignmentModal();
+        if (!modal) return 0;
+        const start = parseSessionTimeToMinutes(modal.querySelector('#sessionReportTaskStart')?.value || '');
+        const end = parseSessionTimeToMinutes(modal.querySelector('#sessionReportTaskEnd')?.value || '');
+        if (start === null || end === null || end <= start) return 0;
+        return Math.round(((end - start) / 60) * 100) / 100;
+    }
+
+    function syncSessionReportAllocatedHours(force = false) {
+        const modal = getSessionReportAssignmentModal();
+        if (!modal) return;
+        const reflect = modal.querySelector('#sessionReportTimesheetReflection')?.checked === true;
+        const input = modal.querySelector('#sessionReportAllocatedHours');
+        if (!input) return;
+        input.disabled = !reflect;
+        if (reflect && (force || !Number(input.value || 0))) {
+            input.value = String(calculateSessionReportAllocatedHours() || 0);
+        }
+        if (!reflect) input.value = '0';
+    }
+
+    function getSessionReportRosterItems() {
+        const seen = new Set();
+        return (Array.isArray(sessionReportRosterRows) ? sessionReportRosterRows : [])
+            .map((row) => {
+                const id = String(row?.personId || row?.studentPersonId || row?.id || '').trim();
+                const name = String(row?.name || row?.studentName || row?.displayName || row?.preferredName || [row?.firstName, row?.lastName].filter(Boolean).join(' ') || id).trim();
+                if (!id || seen.has(id)) return null;
+                seen.add(id);
+                return { id, personId: id, name, title: name ? `${name} (${id})` : id };
+            })
+            .filter(Boolean);
+    }
+
+    function renderSessionReportSelectedStudents() {
+        const modal = getSessionReportAssignmentModal();
+        if (!modal) return;
+        const rows = Array.from(selectedSessionReportStudents.values());
+        const summary = modal.querySelector('#sessionReportStudentSummary');
+        const chips = modal.querySelector('#sessionReportSelectedStudents');
+        if (summary) {
+            summary.value = rows.length
+                ? `${rows.length} ${rows.length === 1 ? 'student' : 'students'} selected`
+                : '';
+        }
+        if (chips) {
+            chips.innerHTML = rows.length
+                ? rows.map((row) => `<span class="badge bg-light text-dark border">${scEscapeHtml(row.name || row.id)}</span>`).join('')
+                : '<span class="small text-muted">No specific students selected.</span>';
+        }
+    }
+
+    function syncSessionReportScope() {
+        const modal = getSessionReportAssignmentModal();
+        if (!modal) return;
+        const scope = String(modal.querySelector('#sessionReportScope')?.value || 'class').trim();
+        const wrap = modal.querySelector('#sessionReportSpecificStudentsWrap');
+        if (wrap) wrap.classList.toggle('d-none', scope !== 'selected_students');
+    }
+
+    function resetSessionReportAssignmentModal() {
+        const modal = getSessionReportAssignmentModal();
+        if (!modal) return;
+        selectedSessionReportStudents = new Map();
+        modal.querySelector('#sessionReportTemplateId').value = '';
+        modal.querySelector('#sessionReportTemplateLabel').value = '';
+        modal.querySelector('#sessionReportScope').value = 'class';
+        modal.querySelector('#sessionReportStartDate').value = sessionDefaultDate || '';
+        modal.querySelector('#sessionReportDueDate').value = sessionDefaultDate || '';
+        modal.querySelector('#sessionReportTaskStart').value = sessionDefaultStartTime || '';
+        modal.querySelector('#sessionReportTaskEnd').value = sessionDefaultEndTime || '';
+        modal.querySelector('#sessionReportConflictPermitted').checked = false;
+        modal.querySelector('#sessionReportTimesheetReflection').checked = false;
+        modal.querySelector('#sessionReportAllocatedHours').value = '0';
+        modal.querySelector('#sessionReportNotes').value = '';
+        const teacherLabel = sessionDefaultTeacherName || sessionDefaultTeacherId || 'No teacher assigned';
+        modal.querySelector('#sessionReportAssignmentContext').innerHTML = [
+            `<strong>Class:</strong> ${scEscapeHtml(sessionManagerClassTitle || sessionManagerClassId)}`,
+            `<strong>Session:</strong> ${scEscapeHtml(sessionDefaultDate || sessionManagerSessionId)} ${scEscapeHtml(sessionDefaultStartTime || '')}-${scEscapeHtml(sessionDefaultEndTime || '')}`,
+            `<strong>Teacher:</strong> ${scEscapeHtml(teacherLabel)}`,
+            '<strong>Target Mode:</strong> Session'
+        ].join('<br>');
+        renderSessionReportSelectedStudents();
+        syncSessionReportScope();
+        syncSessionReportAllocatedHours(true);
+    }
+
+    function openSessionReportAssignmentModal() {
+        if (!sessionCanAssignReports) return;
+        const modal = getSessionReportAssignmentModal();
+        if (!modal) return;
+        resetSessionReportAssignmentModal();
+        if (sessionReportAssignmentModalInstance) sessionReportAssignmentModalInstance.show();
+        else modal.classList.add('show');
+    }
+
+    function openSessionReportTemplatePicker() {
+        if (!window.GenericPicker || !window.GenericPickerPresets) {
+            showStudentCaseMessage('Template Picker', 'Template picker is not available on this page.', 'warning');
+            return;
+        }
+        window.GenericPicker.open(window.GenericPickerPresets.normalizeConfig({
+            title: 'Select Report Template',
+            icon: 'bi-journal-text',
+            apiEndpoint: '/school/reports/templates',
+            placeholder: 'Search report templates...',
+            searchFields: 'id,title,type,description,status,version',
+            onSelect: function (item) {
+                const id = String(item?.id || '').trim();
+                if (!id) return;
+                const modal = getSessionReportAssignmentModal();
+                const version = Number(item?.version || 1);
+                modal.querySelector('#sessionReportTemplateId').value = id;
+                modal.querySelector('#sessionReportTemplateLabel').value = `${item?.title || id} | ${item?.type || '-'} v${version}`;
+            }
+        }));
+    }
+
+    function openSessionReportStudentPicker() {
+        if (!window.GenericPicker || !window.GenericPickerPresets) {
+            showStudentCaseMessage('Student Picker', 'Student picker is not available on this page.', 'warning');
+            return;
+        }
+        const items = getSessionReportRosterItems();
+        if (!items.length) {
+            showStudentCaseMessage('No Session Students', 'No students are available in this session roster.', 'info');
+            return;
+        }
+        const itemMap = new Map(items.map((row) => [row.id, row]));
+        window.GenericPicker.open(window.GenericPickerPresets.person({
+            title: 'Select Session Students',
+            icon: 'bi-people',
+            placeholder: 'Search session students...',
+            sourceMode: 'local',
+            localItems: items,
+            searchFields: 'id,personId,name,title',
+            limit: 5000,
+            multiselect: true,
+            selectedItems: Array.from(selectedSessionReportStudents.keys()).map((id) => itemMap.get(id)).filter(Boolean),
+            itemFilter: function (item) {
+                return itemMap.has(String(item?.id || item?.personId || '').trim());
+            },
+            onSelect: function (rows) {
+                selectedSessionReportStudents = new Map();
+                (Array.isArray(rows) ? rows : [rows]).forEach((row) => {
+                    const id = String(row?.id || row?.personId || '').trim();
+                    if (id && itemMap.has(id)) selectedSessionReportStudents.set(id, itemMap.get(id));
+                });
+                renderSessionReportSelectedStudents();
+            }
+        }));
+    }
+
+    function validateSessionReportAssignmentPayload(payload) {
+        if (!payload.templateId) return 'Select a report template.';
+        if (!payload.reportStartDate) return 'Select the report start date.';
+        if (sessionDefaultDate && payload.reportStartDate > sessionDefaultDate) return 'Report Start Date cannot be after the session date.';
+        if (!payload.taskStartTime || !payload.taskEndTime) return 'Task Start and Task End are required.';
+        if (payload.taskStartTime >= payload.taskEndTime) return 'Task End must be later than Task Start.';
+        if (sessionDefaultStartTime && payload.taskStartTime < sessionDefaultStartTime) return `Task Start cannot be before the session start time (${sessionDefaultStartTime}).`;
+        if (sessionDefaultEndTime && payload.taskEndTime > sessionDefaultEndTime) return `Task End cannot be after the session end time (${sessionDefaultEndTime}).`;
+        if (payload.reportScope === 'selected_students' && !payload.targetStudentIds.length) return 'Select at least one student for Specific Students scope.';
+        if (payload.timesheetReflection && Number(payload.allocatedHours || 0) <= 0) return 'Allocated Hours must be greater than zero when timesheet reflection is enabled.';
+        return '';
+    }
+
+    async function saveSessionReportAssignment() {
+        if (savingSessionReportAssignment) return;
+        const modal = getSessionReportAssignmentModal();
+        if (!modal) return;
+        const button = modal.querySelector('#btnSaveSessionReportAssignment');
+        const oldHtml = button ? button.innerHTML : '';
+        const payload = {
+            templateId: String(modal.querySelector('#sessionReportTemplateId')?.value || '').trim(),
+            reportScope: String(modal.querySelector('#sessionReportScope')?.value || 'class').trim(),
+            reportStartDate: String(modal.querySelector('#sessionReportStartDate')?.value || '').trim(),
+            taskStartTime: String(modal.querySelector('#sessionReportTaskStart')?.value || '').trim(),
+            taskEndTime: String(modal.querySelector('#sessionReportTaskEnd')?.value || '').trim(),
+            conflictPermitted: modal.querySelector('#sessionReportConflictPermitted')?.checked === true,
+            timesheetReflection: modal.querySelector('#sessionReportTimesheetReflection')?.checked === true,
+            allocatedHours: String(modal.querySelector('#sessionReportAllocatedHours')?.value || '0').trim(),
+            notes: String(modal.querySelector('#sessionReportNotes')?.value || '').trim(),
+            targetStudentIds: Array.from(selectedSessionReportStudents.keys())
+        };
+        const issue = validateSessionReportAssignmentPayload(payload);
+        if (issue) {
+            await showStudentCaseMessage('Assignment Incomplete', issue, 'warning');
+            return;
+        }
+        const body = new URLSearchParams();
+        body.set('actionStateId', actionStateId || '');
+        Object.entries(payload).forEach(([key, value]) => {
+            if (Array.isArray(value)) body.set(key, value.join(','));
+            else body.set(key, String(value));
+        });
+        try {
+            savingSessionReportAssignment = true;
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+            }
+            if (typeof window.showLoading === 'function') window.showLoading('Assigning report to session...');
+            const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/report-assignments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                    'x-ajax-request': 'true',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin',
+                body
+            });
+            const result = await res.json().catch(() => ({ status: 'error', message: 'Unable to read server response.' }));
+            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Could not assign report to this session.');
+            sessionReportInstancesState = Array.isArray(result.rows) ? result.rows : [];
+            renderSessionReportInstances();
+            renderSessionStatusButtons();
+            if (sessionReportAssignmentModalInstance) sessionReportAssignmentModalInstance.hide();
+            await showStudentCaseMessage('Report Assigned', result.message || 'Report assigned to this session.', 'success');
+        } catch (error) {
+            await showStudentCaseMessage('Assignment Failed', error.message || 'Could not assign report to this session.', 'error');
+        } finally {
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+            savingSessionReportAssignment = false;
+        }
+    }
     function getStudentCaseById(id) {
         return (Array.isArray(studentCasesState) ? studentCasesState : []).find((row) => String(row.id) === String(id)) || null;
     }
@@ -2039,7 +2381,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnRefreshSessionReportInstances')?.addEventListener('click', () => {
         refreshSessionReportInstances().catch((error) => showStudentCaseMessage('Refresh Failed', error.message, 'error'));
     });
-
+    if (sessionCanAssignReports) {
+        document.getElementById('btnOpenSessionReportAssignmentModal')?.addEventListener('click', openSessionReportAssignmentModal);
+        document.getElementById('btnPickSessionReportTemplate')?.addEventListener('click', openSessionReportTemplatePicker);
+        document.getElementById('btnPickSessionReportStudents')?.addEventListener('click', openSessionReportStudentPicker);
+        document.getElementById('sessionReportScope')?.addEventListener('change', syncSessionReportScope);
+        document.getElementById('sessionReportTaskStart')?.addEventListener('change', () => syncSessionReportAllocatedHours(true));
+        document.getElementById('sessionReportTaskEnd')?.addEventListener('change', () => syncSessionReportAllocatedHours(true));
+        document.getElementById('sessionReportTimesheetReflection')?.addEventListener('change', () => syncSessionReportAllocatedHours(true));
+        document.getElementById('btnSaveSessionReportAssignment')?.addEventListener('click', () => {
+            saveSessionReportAssignment().catch((error) => showStudentCaseMessage('Assignment Failed', error.message, 'error'));
+        });
+    }
 
     function parseNonNegAttendanceMins(v) {
         const n = Number(String(v ?? '').trim());
@@ -3925,3 +4278,4 @@ function openDetailsModal(personId, name) {
     if (detailsModalInstance) detailsModalInstance.show();
 }
 </script>
+<%- include('../partials/studentProfileLinkBootstrap') %>

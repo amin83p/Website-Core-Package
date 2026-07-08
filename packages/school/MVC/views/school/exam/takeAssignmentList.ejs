@@ -119,7 +119,7 @@
         <% const lifecycle = String(row?.lifecycleBucket || '').toLowerCase(); %>
         <tr>
           <td class="ps-4">
-            <div class="fw-semibold"><%= row.studentName || row.studentId || '-' %></div>
+            <div class="fw-semibold"><%- include('../partials/studentNameLink', { name: row.studentName || row.studentId || '-', studentRecordId: row.studentRecordId || row.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
             <div class="x-small text-muted font-monospace"><%= row.studentId || '-' %></div>
             <% if (row.studentNo) { %><div class="x-small text-muted">No: <%= row.studentNo %></div><% } %>
           </td>

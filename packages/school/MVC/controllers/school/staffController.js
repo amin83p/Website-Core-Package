@@ -10,6 +10,7 @@ const {
   enrichPersonPickerRowsWithAccountState
 } = require('../../services/school/schoolPeopleDuplicateGuardService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
+const schoolLinkedPersonProfileService = require('../../services/school/schoolLinkedPersonProfileService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
@@ -683,6 +684,11 @@ exports.showForm = async (req, res) => {
 
     const editFormDisplayName = String(personName || '').trim() || 'Staff member';
     const editFormRecordId = String(staff.id || staff.personId || '').trim();
+    const canEditLinkedPerson = await schoolLinkedPersonProfileService.evaluateCanEditLinkedPerson({
+      reqUser: req.user,
+      linkType: 'staff',
+      isEdit
+    });
 
     res.render('school/staff/staffForm', {
       title: isEdit ? `Edit Staff: ${editFormDisplayName} (${editFormRecordId})` : 'New Staff',
@@ -696,7 +702,10 @@ exports.showForm = async (req, res) => {
       compensationMethods: COMPENSATION_METHODS,
       user: req.user,
       includeModal: true,
-      actionStateId: req.actionStateId
+      actionStateId: req.actionStateId,
+      canEditLinkedPerson,
+      linkedPersonLinkType: 'staff',
+      linkedPersonLinkId: isEdit ? editFormRecordId : ''
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });

@@ -11,6 +11,7 @@ const classEnrollmentSessionApplicabilityService = require('../../services/schoo
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
+const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
 const accessService = requireCoreModule('MVC/services/security/index');
@@ -24,6 +25,30 @@ function normalizeDateOnly(value) {
     const parsed = new Date(token);
     if (Number.isNaN(parsed.getTime())) return '';
     return parsed.toISOString().slice(0, 10);
+}
+
+async function assertAttendanceMatrixSessionEditable(req, classData, session) {
+    const isSessionLocked = session.locked === true || String(session.locked) === 'true';
+    const canOverride = await adminChekersService.isAdminForRequestAsync(
+        req.user,
+        SECTIONS.SCHOOL_ATTENDANCES,
+        OPERATIONS.UPDATE,
+        { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
+    );
+    if (isSessionLocked && !canOverride) {
+        throw new Error('This session is locked and cannot be edited. Please contact an administrator.');
+    }
+
+    const statusMap = await sessionStatusPolicyService.getStatusMap(
+        String(classData?.orgId || req.user?.activeOrgId || '').trim(),
+        { includeInactive: true }
+    );
+    if (sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap(statusMap, {
+        status: session?.status,
+        notes: session?.notes
+    })) {
+        throw new Error('This original session is inactive because its status requires a make-up session. Attendance cannot be changed from the matrix. Create or open the make-up session instead.');
+    }
 }
 
 function resolveDateWindow({ sessions = [], startDate = '', endDate = '' } = {}) {
@@ -237,6 +262,7 @@ async function getAttendanceData(req, res) {
         );
 
         const activeOrgId = String(req.user?.activeOrgId || classData?.orgId || '').trim();
+        const forceNotApplicableSessionKeys = sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, filteredSessions);
         const sessionDates = filteredSessions.map((row) => String(row?.date || '').trim()).filter(Boolean);
         const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
             classId: classData.id,
@@ -263,7 +289,8 @@ async function getAttendanceData(req, res) {
                 activeOrgId,
                 orgId: classData?.orgId || activeOrgId,
                 reqUser: req.user,
-                allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+                allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+                forceNotApplicableSessionKeys
             });
             rollingApplicability.personIds.forEach((personId) => activePersonIds.add(String(personId || '').trim()));
         } else {
@@ -277,10 +304,19 @@ async function getAttendanceData(req, res) {
             });
         }
 
+        const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(students, activeOrgId);
+
         let studentList = Array.from(activePersonIds).map(uid => {
             const person = persons.find(p => String(p.id) === uid);
             const name = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : `Person ${uid}`;
-            return { personId: uid, name };
+            return {
+                personId: uid,
+                name,
+                studentRecordId: schoolStudentProfileLinkService.resolveStudentRecordId({
+                    personId: uid,
+                    personToStudentMap
+                })
+            };
         });
         studentList.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -303,16 +339,20 @@ async function getAttendanceData(req, res) {
                 const rosterRecord = ses.roster?.find(r => String(r.personId) === stu.personId);
                 const sessionLocked = ses.locked === true || String(ses.locked) === 'true';
                 const applicabilityState = getApplicabilityForSession(stu, ses);
-                const expectedForSession = Boolean(applicabilityState.expected);
+                const forceNotApplicable = forceNotApplicableSessionKeys.has(String(ses?.sessionId || ses?.id || '').trim())
+                    || forceNotApplicableSessionKeys.has(String(ses?.date || '').trim());
+                const expectedForSession = !forceNotApplicable && Boolean(applicabilityState.expected);
                 const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
-                let status = rosterRecord
-                    ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
-                    : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE);
-                let applicability = rosterRecord ? 'manual' : (expectedForSession ? 'expected_missing' : (applicabilityState.reason || 'not_enrolled'));
-                if (hasApprovedLeave && (!rosterRecord || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
+                let status = forceNotApplicable
+                    ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+                    : (rosterRecord
+                        ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
+                        : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
+                let applicability = forceNotApplicable ? 'makeup_required' : (rosterRecord ? 'manual' : (expectedForSession ? 'expected_missing' : (applicabilityState.reason || 'not_enrolled')));
+                if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
                     status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
                     applicability = 'approved_leave';
-                } else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE && rosterRecord) {
+                } else if (!forceNotApplicable && status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE && rosterRecord) {
                     applicability = 'manual_not_applicable';
                 }
                 return {
@@ -371,6 +411,8 @@ async function addAttendanceComment(req, res) {
         if (sessionIndex === -1) throw new Error('Session not found.');
 
         const session = sessions[sessionIndex];
+        await assertAttendanceMatrixSessionEditable(req, classData, session);
+
         if (!session.roster) session.roster = [];
         
         let rosterRecord = session.roster.find(r => idsEqual(r.personId, studentPersonId));
@@ -497,16 +539,7 @@ async function updateAttendanceRosterCell(req, res) {
         if (sessionIndex === -1) throw new Error('Session not found.');
 
         const session = sessions[sessionIndex];
-        const isSessionLocked = session.locked === true || String(session.locked) === 'true';
-        let canOverride = await adminChekersService.isAdminForRequestAsync(
-            req.user,
-            SECTIONS.SCHOOL_ATTENDANCES,
-            OPERATIONS.UPDATE,
-            { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
-        );
-        if (isSessionLocked && !canOverride) {
-            throw new Error('This session is locked and cannot be edited. Please contact an administrator.');
-        }
+        await assertAttendanceMatrixSessionEditable(req, classData, session);
 
         const normalizedAttendance = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(req.body?.attendance, '');
         if (!normalizedAttendance) {

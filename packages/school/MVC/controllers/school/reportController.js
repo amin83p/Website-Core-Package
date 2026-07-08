@@ -1,6 +1,6 @@
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
-const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const accessService = requireCoreModule('MVC/services/security');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
@@ -103,6 +103,7 @@ function buildReportInstanceDetailsForView(inst, {
     sessionSummary,
     assignmentSummary,
     studentName,
+    studentRecordId: toPublicId(studentRegistry?.id),
     studentLocalId: studentExtra,
     targetLabel
   };

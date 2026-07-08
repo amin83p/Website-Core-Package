@@ -1503,6 +1503,105 @@ schoolRepositories.taskRoutingRules.clearByOrg = async (orgId, options = {}) => 
   }, 'school.taskRoutingRules.clearByOrg');
 };
 
+schoolRepositories.sessionStudentCases.clearByOrg = async (orgId, options = {}) => {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('orgId is required to clear session student cases.');
+  return runByRepositoryBackend(options, {
+    json: async () => {
+      const removed = Number(await sessionStudentCaseModel.clearSessionStudentCasesByOrg(targetOrgId) || 0);
+      const remainingRows = await schoolRepositories.sessionStudentCases.list({
+        query: { orgId__eq: targetOrgId },
+        scope: { canViewAll: true }
+      }, options);
+      return {
+        removed,
+        remaining: Array.isArray(remainingRows) ? remainingRows.length : 0
+      };
+    },
+    mongo: async () => {
+      const collection = getMongoCollection('schoolSessionStudentCases');
+      const result = await collection.deleteMany({ orgId: targetOrgId });
+      return {
+        removed: Number(result?.deletedCount || 0),
+        remaining: await collection.countDocuments({ orgId: targetOrgId })
+      };
+    }
+  }, 'school.sessionStudentCases.clearByOrg');
+};
+
+schoolRepositories.purgeOrgScopedRepositoryRows = async (repository, orgId, options = {}) => {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('orgId is required to purge org-scoped repository rows.');
+  if (!repository || typeof repository.list !== 'function' || typeof repository.remove !== 'function') {
+    throw new Error('Repository must expose list and remove.');
+  }
+  const rows = await repository.list({
+    query: { orgId__eq: targetOrgId },
+    scope: { canViewAll: true }
+  }, options);
+  const matches = Array.isArray(rows) ? rows : [];
+  let removed = 0;
+  const errors = [];
+  for (const row of matches) {
+    const rowId = toPublicId(row?.id);
+    if (!rowId) continue;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await repository.remove(rowId, options);
+      removed += 1;
+    } catch (err) {
+      errors.push(`${rowId}: ${String(err?.message || err)}`);
+    }
+  }
+  const remainingRows = await repository.list({
+    query: { orgId__eq: targetOrgId },
+    scope: { canViewAll: true }
+  }, options);
+  return {
+    removed,
+    remaining: Array.isArray(remainingRows) ? remainingRows.length : 0,
+    errors
+  };
+};
+
+schoolRepositories.purgeOrgScopedSchoolAccounts = async (orgId, options = {}) => {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('orgId is required to purge school accounts.');
+  const rows = await schoolRepositories.schoolAccounts.list({
+    query: { orgId__eq: targetOrgId },
+    scope: { canViewAll: true }
+  }, options);
+  const matches = (Array.isArray(rows) ? rows : []).filter((row) => {
+    const headCategory = String(row?.headCategory || 'none').trim().toLowerCase();
+    return headCategory === 'none';
+  });
+  let removed = 0;
+  let skippedHeadAccounts = 0;
+  const errors = [];
+  for (const row of matches) {
+    const rowId = toPublicId(row?.id);
+    if (!rowId) continue;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await schoolRepositories.schoolAccounts.purgeById(rowId, options);
+      removed += 1;
+    } catch (err) {
+      errors.push(`${rowId}: ${String(err?.message || err)}`);
+    }
+  }
+  skippedHeadAccounts = (Array.isArray(rows) ? rows.length : 0) - matches.length;
+  const remainingRows = await schoolRepositories.schoolAccounts.list({
+    query: { orgId__eq: targetOrgId },
+    scope: { canViewAll: true }
+  }, options);
+  return {
+    removed,
+    skippedHeadAccounts,
+    remaining: Array.isArray(remainingRows) ? remainingRows.length : 0,
+    errors
+  };
+};
+
 schoolRepositories.reportInstances.clearByOrg = async (orgId, options = {}) => {
   const targetOrgId = toPublicId(orgId);
   if (!targetOrgId) throw new Error('orgId is required to clear report instances.');

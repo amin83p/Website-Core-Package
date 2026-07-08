@@ -1,0 +1,507 @@
+const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
+const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+
+function resolveSchoolDataService() {
+  return require('./schoolDataService');
+}
+
+const DAY_NAME_TO_INDEX = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6
+};
+
+function cleanText(value) {
+  return String(value || '').trim();
+}
+
+function normalizeDateOnly(value) {
+  const token = cleanText(value);
+  if (!token) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(token)) return token;
+  const parsed = new Date(token);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+}
+
+function getSessionId(session = {}, fallback = '') {
+  return toPublicId(session.sessionId || session.id || fallback);
+}
+
+function getSessionDate(session = {}) {
+  return normalizeDateOnly(session.date || session.sessionDate || session.startDate);
+}
+
+function getSessionSortKey(session = {}, index = 0) {
+  return [
+    getSessionDate(session) || '9999-12-31',
+    cleanText(session.startTime || session.start || ''),
+    String(index).padStart(6, '0')
+  ].join('|');
+}
+
+function dateInWindow(date, startDate, endDate) {
+  const d = normalizeDateOnly(date);
+  const start = normalizeDateOnly(startDate);
+  const end = normalizeDateOnly(endDate) || '9999-12-31';
+  if (!d || !start) return false;
+  return start <= d && d <= end;
+}
+
+function normalizeDaysOfWeek(input) {
+  if (Array.isArray(input)) {
+    return input
+      .map((row) => {
+        if (typeof row === 'number' && row >= 0 && row <= 6) return row;
+        const name = cleanText(row);
+        if (Object.prototype.hasOwnProperty.call(DAY_NAME_TO_INDEX, name)) return DAY_NAME_TO_INDEX[name];
+        const parsed = Number.parseInt(name, 10);
+        return Number.isFinite(parsed) && parsed >= 0 && parsed <= 6 ? parsed : null;
+      })
+      .filter((row) => row !== null);
+  }
+  return [];
+}
+
+function sanitizePlannedNaSessionIds(input) {
+  const rows = Array.isArray(input) ? input : [];
+  const out = [];
+  const seen = new Set();
+  rows.forEach((row) => {
+    const id = toPublicId(row);
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= 200) return;
+  });
+  return out;
+}
+
+function classifySessionForWindow(session = {}, { startDate, endDate, statusMap, forceNaKeys } = {}) {
+  const sessionId = getSessionId(session);
+  const date = getSessionDate(session);
+  const inWindow = dateInWindow(date, startDate, endDate);
+  const excluded = sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(statusMap, {
+    status: session?.status,
+    notes: session?.notes
+  });
+  const forceNa = forceNaKeys instanceof Set
+    && (forceNaKeys.has(sessionId) || forceNaKeys.has(date));
+  const countable = inWindow && !excluded && !forceNa;
+  let excludeReason = '';
+  if (!inWindow) excludeReason = 'out_of_window';
+  else if (forceNa) excludeReason = 'makeup_required';
+  else if (excluded) excludeReason = 'excluded_from_attendance';
+
+  return {
+    sessionId,
+    date,
+    startTime: cleanText(session.startTime || session.start || ''),
+    endTime: cleanText(session.endTime || session.end || ''),
+    status: cleanText(session.status || 'scheduled'),
+    room: cleanText(session.room || ''),
+    inWindow,
+    countable,
+    excludeReason
+  };
+}
+
+function listSessionsInWindow({ sessions = [], startDate = '', endDate = '', statusMap = {} } = {}) {
+  const forceNaKeys = sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, sessions);
+  const rows = (Array.isArray(sessions) ? sessions : [])
+    .map((session, index) => ({
+      session,
+      index,
+      sortKey: getSessionSortKey(session, index)
+    }))
+    .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    .map(({ session }) => classifySessionForWindow(session, { startDate, endDate, statusMap, forceNaKeys }))
+    .filter((row) => row.inWindow);
+
+  const countableSessions = rows.filter((row) => row.countable);
+  return {
+    sessions: rows,
+    countableSessions,
+    availableCount: countableSessions.length
+  };
+}
+
+function evaluateAlignment({
+  sessions = [],
+  startDate = '',
+  endDate = '',
+  targetSessionCount = 0,
+  statusMap = {}
+} = {}) {
+  const normalizedStart = normalizeDateOnly(startDate);
+  const normalizedEnd = normalizeDateOnly(endDate);
+  const target = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(targetSessionCount);
+
+  if (!normalizedEnd) {
+    return {
+      availableCount: 0,
+      sessions: [],
+      countableSessions: [],
+      alignmentStatus: 'no_end_date',
+      requiredNaCount: 0,
+      gapCount: 0,
+      effectiveTarget: target
+    };
+  }
+
+  const listed = listSessionsInWindow({
+    sessions,
+    startDate: normalizedStart,
+    endDate: normalizedEnd,
+    statusMap
+  });
+  const availableCount = listed.availableCount;
+  const effectiveTarget = target > 0 ? target : availableCount;
+
+  let alignmentStatus = 'ok';
+  let requiredNaCount = 0;
+  let gapCount = 0;
+
+  if (availableCount === 0 || effectiveTarget > availableCount) {
+    alignmentStatus = 'insufficient_sessions';
+    gapCount = Math.max(0, effectiveTarget - availableCount);
+  } else if (effectiveTarget > 0 && effectiveTarget < availableCount) {
+    alignmentStatus = 'overage_requires_na';
+    requiredNaCount = availableCount - effectiveTarget;
+  }
+
+  return {
+    availableCount,
+    sessions: listed.sessions,
+    countableSessions: listed.countableSessions,
+    alignmentStatus,
+    requiredNaCount,
+    gapCount,
+    effectiveTarget
+  };
+}
+
+function validatePlannedNaSelection({
+  countableSessions = [],
+  targetSessionCount = 0,
+  plannedNaSessionIds = []
+} = {}) {
+  const target = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(targetSessionCount);
+  const availableCount = (Array.isArray(countableSessions) ? countableSessions : []).length;
+  const requiredNaCount = target > 0 && availableCount > target ? availableCount - target : 0;
+  const ids = sanitizePlannedNaSessionIds(plannedNaSessionIds);
+
+  if (requiredNaCount === 0) {
+    if (ids.length) {
+      return { valid: false, message: 'No N/A session selection is required for this enrollment.' };
+    }
+    return { valid: true, plannedNaSessionIds: [] };
+  }
+
+  if (ids.length !== requiredNaCount) {
+    return {
+      valid: false,
+      message: `Select exactly ${requiredNaCount} session(s) to mark N/A.`
+    };
+  }
+
+  const allowed = new Set(
+    (Array.isArray(countableSessions) ? countableSessions : []).map((row) => toPublicId(row.sessionId)).filter(Boolean)
+  );
+  const invalid = ids.filter((id) => !allowed.has(id));
+  if (invalid.length) {
+    return { valid: false, message: 'One or more selected sessions are not countable sessions in this enrollment window.' };
+  }
+
+  return { valid: true, plannedNaSessionIds: ids };
+}
+
+function extractScheduleDefaults(classData = {}) {
+  const schedule = classData?.schedule?.current && typeof classData.schedule.current === 'object'
+    ? classData.schedule.current
+    : {};
+  const daysOfWeek = normalizeDaysOfWeek(schedule.daysOfWeek);
+  return {
+    daysOfWeek,
+    dayNames: daysOfWeek.map((idx) => Object.keys(DAY_NAME_TO_INDEX).find((name) => DAY_NAME_TO_INDEX[name] === idx)).filter(Boolean),
+    startTime: cleanText(schedule.startTime || ''),
+    endTime: cleanText(schedule.endTime || ''),
+    room: cleanText(schedule.room || classData?.room || ''),
+    exceptionDates: Array.isArray(schedule.exceptionDates)
+      ? schedule.exceptionDates.map((row) => normalizeDateOnly(row)).filter(Boolean)
+      : []
+  };
+}
+
+function computeDurationHours(startTime, endTime) {
+  const start = cleanText(startTime);
+  const end = cleanText(endTime);
+  if (!start || !end) return 0;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  if (![sh, sm, eh, em].every((n) => Number.isFinite(n))) return 0;
+  const hours = (eh + em / 60) - (sh + sm / 60);
+  return hours > 0 ? Number(hours.toFixed(2)) : 0;
+}
+
+function buildNextSessionId(existingSessions = []) {
+  const used = new Set(
+    (Array.isArray(existingSessions) ? existingSessions : [])
+      .map((row) => getSessionId(row))
+      .filter(Boolean)
+  );
+  for (let i = 0; i < 50; i += 1) {
+    const candidate = `SES_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return `SES_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
+
+function collectRollingSessionDateViolations({
+  registrationMode = 'term_based',
+  cycleStartDate = '',
+  cycleEndDate = '',
+  sessions = []
+} = {}) {
+  const mode = String(registrationMode || '').trim().toLowerCase();
+  if (mode !== 'rolling') return [];
+
+  const normalizedStart = normalizeDateOnly(cycleStartDate);
+  const normalizedEnd = normalizeDateOnly(cycleEndDate);
+  const rows = Array.isArray(sessions) ? sessions : [];
+  const violations = [];
+
+  if (!normalizedStart) {
+    violations.push({
+      type: 'missing_cycle_start',
+      message: 'Cycle Start Date is required for rolling classes before generating/saving sessions.'
+    });
+    return violations;
+  }
+
+  rows.forEach((row, index) => {
+    const dateToken = String(row?.date || '').trim();
+    if (!dateToken) return;
+    const normalizedDate = normalizeDateOnly(dateToken);
+    if (!normalizedDate) {
+      violations.push({ type: 'invalid_session_date', index, date: dateToken, sessionId: getSessionId(row) });
+      return;
+    }
+    if (normalizedDate < normalizedStart || (normalizedEnd && normalizedDate > normalizedEnd)) {
+      violations.push({ type: 'out_of_cycle_window', index, date: normalizedDate, sessionId: getSessionId(row) });
+    }
+  });
+
+  return violations;
+}
+
+function assertRollingSessionsWithinCycleWindowOrThrow(input = {}) {
+  const violations = collectRollingSessionDateViolations(input);
+  if (!violations.length) return;
+  const missingCycleStart = violations.find((row) => row.type === 'missing_cycle_start');
+  if (missingCycleStart) {
+    throw new Error(String(missingCycleStart.message || 'Cycle Start Date is required for rolling classes.'));
+  }
+  const outsideRows = violations.filter((row) => row.type === 'out_of_cycle_window');
+  const outsideSample = outsideRows.slice(0, 5).map((row) => {
+    const sid = String(row?.sessionId || '').trim();
+    return sid ? `${row.date} (${sid})` : row.date;
+  }).join(', ');
+  const outsideSuffix = outsideRows.length > 5 ? ` (+${outsideRows.length - 5} more)` : '';
+  throw new Error(`Rolling class sessions must stay within cycle dates. Out-of-window session date(s): ${outsideSample}${outsideSuffix}.`);
+}
+
+function generateBatchSessionRows({
+  classData = {},
+  existingSessions = [],
+  batchSpec = {}
+} = {}) {
+  const startDate = normalizeDateOnly(batchSpec.startDate);
+  const endDate = normalizeDateOnly(batchSpec.endDate);
+  if (!startDate || !endDate) throw new Error('startDate and endDate are required for batch session generation.');
+  if (startDate > endDate) throw new Error('startDate must be on or before endDate.');
+
+  const defaults = extractScheduleDefaults(classData);
+  const daysOfWeek = normalizeDaysOfWeek(batchSpec.daysOfWeek).length
+    ? normalizeDaysOfWeek(batchSpec.daysOfWeek)
+    : defaults.daysOfWeek;
+  if (!daysOfWeek.length) throw new Error('At least one weekday must be selected.');
+
+  const startTime = cleanText(batchSpec.startTime || defaults.startTime);
+  const endTime = cleanText(batchSpec.endTime || defaults.endTime);
+  if (!startTime || !endTime) throw new Error('Start time and end time are required.');
+
+  const exceptions = new Set(
+    [
+      ...(Array.isArray(defaults.exceptionDates) ? defaults.exceptionDates : []),
+      ...(Array.isArray(batchSpec.exceptionDates) ? batchSpec.exceptionDates : [])
+    ].map((row) => normalizeDateOnly(row)).filter(Boolean)
+  );
+
+  const existingDates = new Set(
+    (Array.isArray(existingSessions) ? existingSessions : [])
+      .map((row) => getSessionDate(row))
+      .filter(Boolean)
+  );
+
+  const skipExistingDates = batchSpec.skipExistingDates !== false;
+  const durationHours = computeDurationHours(startTime, endTime);
+  const room = cleanText(batchSpec.room || defaults.room);
+  const defaultStatus = cleanText(batchSpec.status || 'scheduled') || 'scheduled';
+  const teacherId = toPublicId(batchSpec.teacherId || classData?.primaryTeacherId || '');
+  const teacherName = cleanText(batchSpec.teacherName || '');
+
+  const created = [];
+  const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+  const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+  const current = new Date(startYear, startMonth - 1, startDay);
+  const end = new Date(endYear, endMonth - 1, endDay);
+
+  while (current <= end) {
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, '0');
+    const d = String(current.getDate()).padStart(2, '0');
+    const dateString = `${y}-${m}-${d}`;
+    if (daysOfWeek.includes(current.getDay()) && !exceptions.has(dateString)) {
+      if (!skipExistingDates || !existingDates.has(dateString)) {
+        created.push({
+          sessionId: buildNextSessionId([...(Array.isArray(existingSessions) ? existingSessions : []), ...created]),
+          date: dateString,
+          originalDate: dateString,
+          startTime,
+          endTime,
+          durationHours,
+          room,
+          status: defaultStatus,
+          notes: '',
+          locked: false,
+          delivery: {
+            deliveredBy: teacherId || null,
+            deliveredByName: teacherName || '',
+            substitute: false
+          },
+          roster: []
+        });
+        existingDates.add(dateString);
+      }
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return created;
+}
+
+async function appendBatchSessions({ classData, batchSpec = {}, reqUser } = {}) {
+  if (!classData?.id) throw new Error('classData.id is required.');
+  const schoolDataService = resolveSchoolDataService();
+  const existingSessions = await schoolDataService.getClassSessions(classData.id, reqUser);
+  const created = generateBatchSessionRows({ classData, existingSessions, batchSpec });
+  if (!created.length) {
+    return {
+      createdCount: 0,
+      sessions: existingSessions,
+      createdSessions: []
+    };
+  }
+
+  const nextSessions = [...(Array.isArray(existingSessions) ? existingSessions : []), ...created];
+  assertRollingSessionsWithinCycleWindowOrThrow({
+    registrationMode: classData?.registrationMode,
+    cycleStartDate: classData?.cycleStartDate,
+    cycleEndDate: classData?.cycleEndDate,
+    sessions: nextSessions
+  });
+
+  const saved = await schoolDataService.saveClassSessions(classData.id, nextSessions, reqUser);
+  return {
+    createdCount: created.length,
+    sessions: saved,
+    createdSessions: created
+  };
+}
+
+async function materializePlannedNaAttendance({ classId, personId, sessionIds = [], reqUser } = {}) {
+  const classToken = toPublicId(classId);
+  const personToken = toPublicId(personId);
+  const targetIds = sanitizePlannedNaSessionIds(sessionIds);
+  if (!classToken || !personToken || !targetIds.length) {
+    return { updatedCount: 0, sessionIds: [] };
+  }
+
+  const schoolDataService = resolveSchoolDataService();
+  const sessions = await schoolDataService.getClassSessions(classToken, reqUser);
+  const idSet = new Set(targetIds);
+  let updatedCount = 0;
+
+  const nextSessions = (Array.isArray(sessions) ? sessions : []).map((session) => {
+    const sessionId = getSessionId(session);
+    if (!idSet.has(sessionId)) return session;
+    const roster = Array.isArray(session.roster) ? [...session.roster] : [];
+    const index = roster.findIndex((row) => idsEqual(row?.personId, personToken));
+    const naStatus = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+    if (index >= 0) {
+      if (roster[index].attendance !== naStatus) {
+        roster[index] = { ...roster[index], personId: personToken, attendance: naStatus };
+        updatedCount += 1;
+      }
+    } else {
+      roster.push({
+        personId: personToken,
+        attendance: naStatus,
+        notes: '',
+        comments: []
+      });
+      updatedCount += 1;
+    }
+    return { ...session, roster };
+  });
+
+  if (updatedCount > 0) {
+    await schoolDataService.saveClassSessions(classToken, nextSessions, reqUser);
+    const classData = await schoolDataService.getDataById('classes', classToken, reqUser);
+    if (classData) {
+      await classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass({
+        classData,
+        sessions: nextSessions,
+        reqUser,
+        activeOrgId: classData?.orgId || reqUser?.activeOrgId || ''
+      });
+    }
+  }
+
+  return { updatedCount, sessionIds: targetIds };
+}
+
+function parsePlannedNaSessionIdsFromBody(body = {}) {
+  const raw = body?.plannedNotApplicableSessionIds ?? body?.plannedNaSessionIds ?? [];
+  if (Array.isArray(raw)) return sanitizePlannedNaSessionIds(raw);
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return sanitizePlannedNaSessionIds(parsed);
+    } catch (_) {
+      return sanitizePlannedNaSessionIds(raw.split(','));
+    }
+  }
+  return [];
+}
+
+module.exports = {
+  listSessionsInWindow,
+  evaluateAlignment,
+  validatePlannedNaSelection,
+  extractScheduleDefaults,
+  generateBatchSessionRows,
+  appendBatchSessions,
+  materializePlannedNaAttendance,
+  sanitizePlannedNaSessionIds,
+  parsePlannedNaSessionIdsFromBody,
+  assertRollingSessionsWithinCycleWindowOrThrow
+};

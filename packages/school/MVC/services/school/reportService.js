@@ -147,7 +147,15 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_session_rating_span_class_effort_percent', label: 'Student Session Rating Span Class Effort %', description: 'Average class effort rating across attended sessions within report period.' }),
     Object.freeze({ key: 'student_session_rating_span_class_participation_percent', label: 'Student Session Rating Span Class Participation %', description: 'Average class participation rating across attended sessions within report period.' }),
     Object.freeze({ key: 'student_session_rating_span_respects_teachers_percent', label: 'Student Session Rating Span Respects The Teachers %', description: 'Average respects-the-teachers rating across attended sessions within report period.' }),
-    Object.freeze({ key: 'student_session_rating_span_respects_students_percent', label: 'Student Session Rating Span Treats Other Students With Respect %', description: 'Average treats-other-students-with-respect rating across attended sessions within report period.' })
+    Object.freeze({ key: 'student_session_rating_span_respects_students_percent', label: 'Student Session Rating Span Treats Other Students With Respect %', description: 'Average treats-other-students-with-respect rating across attended sessions within report period.' }),
+    Object.freeze({ key: 'CLB_goal_listening', label: 'CLB Goal Listening', description: 'Latest CLB goal for listening from student profile history.' }),
+    Object.freeze({ key: 'CLB_goal_speaking', label: 'CLB Goal Speaking', description: 'Latest CLB goal for speaking from student profile history.' }),
+    Object.freeze({ key: 'CLB_goal_reading', label: 'CLB Goal Reading', description: 'Latest CLB goal for reading from student profile history.' }),
+    Object.freeze({ key: 'CLB_goal_writing', label: 'CLB Goal Writing', description: 'Latest CLB goal for writing from student profile history.' }),
+    Object.freeze({ key: 'CLB_current_listening', label: 'CLB Current Listening', description: 'Latest current CLB level for listening from student profile history.' }),
+    Object.freeze({ key: 'CLB_current_speaking', label: 'CLB Current Speaking', description: 'Latest current CLB level for speaking from student profile history.' }),
+    Object.freeze({ key: 'CLB_current_reading', label: 'CLB Current Reading', description: 'Latest current CLB level for reading from student profile history.' }),
+    Object.freeze({ key: 'CLB_current_writing', label: 'CLB Current Writing', description: 'Latest current CLB level for writing from student profile history.' })
   ]),
   gradebookPeriodStudent: Object.freeze([
     Object.freeze({ key: 'student_gradebook_period_activity_count', label: 'Student Gradebook Period Activities', description: 'Include-in-grade activities in period where student not absent and has a score.' }),
@@ -238,6 +246,10 @@ async function buildStudentAttendanceApplicabilityContext({ classData, sessions,
   const expectedSessionIds = new Set(sessionRows.map(buildSessionMetricKey).filter(Boolean));
   if (!targetPersonId || !sessionRows.length) return { notApplicableSessionIds, expectedSessionIds };
 
+  const statusMapForApplicability = await sessionStatusPolicyService.getStatusMap(orgId || classData?.orgId || reqUser?.activeOrgId || '', { includeInactive: true });
+  const forceNotApplicableSessionIds = sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMapForApplicability, sessionRows);
+  forceNotApplicableSessionIds.forEach((key) => notApplicableSessionIds.add(key));
+
   const registrationMode = String(classData?.registrationMode || '').trim().toLowerCase();
   if (registrationMode === 'rolling') {
     expectedSessionIds.clear();
@@ -250,7 +262,8 @@ async function buildStudentAttendanceApplicabilityContext({ classData, sessions,
       activeOrgId: orgId || classData?.orgId || reqUser?.activeOrgId || '',
       orgId: orgId || classData?.orgId || reqUser?.activeOrgId || '',
       reqUser,
-      allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+      allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+      forceNotApplicableSessionKeys: forceNotApplicableSessionIds
     });
     sessionRows.forEach((session) => {
       const key = buildSessionMetricKey(session);
@@ -286,7 +299,7 @@ async function buildStudentAttendanceApplicabilityContext({ classData, sessions,
   return { notApplicableSessionIds, expectedSessionIds };
 }
 
-function buildClassAttendanceSummary(session) {
+function buildClassAttendanceSummary(session, statusMap = null) {
   const roster = Array.isArray(session?.roster) ? session.roster : [];
   const summary = {
     total: 0,
@@ -297,8 +310,11 @@ function buildClassAttendanceSummary(session) {
     notApplicable: 0
   };
 
+  const forceNotApplicable = sessionForcesNotApplicableAttendance(session, statusMap);
   roster.forEach((row) => {
-    const status = attendanceMatrixMetricsService.normalizeStatus(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
+    const status = forceNotApplicable
+      ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+      : attendanceMatrixMetricsService.normalizeStatus(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
     if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
       summary.notApplicable += 1;
       return;
@@ -346,28 +362,14 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
     const derivedNotApplicable = sessionKey && notApplicableSessionIds.has(sessionKey);
     const expectedForSession = !expectedSessionIds || !sessionKey || expectedSessionIds.has(sessionKey);
     const row = roster.find((item) => idsEqual(item?.personId, target));
-    if (!row) {
-      if (derivedNotApplicable || !expectedForSession) {
-        out.notApplicable += 1;
-        matrixRecords.push({
-          status: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE,
-          lateMinutes: 0,
-          earlyLeaveMinutes: 0,
-          scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(session, matrixPolicy.scheduledMinutes)
-        });
-      } else if (countMissingAsAbsent) {
-        out.totalSessions += 1;
-        out.absent += 1;
-        matrixRecords.push({
-          status: 'absent',
-          lateMinutes: 0,
-          earlyLeaveMinutes: 0,
-          scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(session, matrixPolicy.scheduledMinutes)
-        });
-      }
-      return;
-    }
-    const status = attendanceMatrixMetricsService.normalizeStatus(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
+    const status = resolveEffectiveAttendanceStatus({
+      session,
+      rosterRow: row,
+      statusMap: effectiveStatusMap,
+      derivedNotApplicable,
+      expectedForSession
+    });
+    if (!row && status !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE && !countMissingAsAbsent) return;
     if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
       out.notApplicable += 1;
       matrixRecords.push({
@@ -441,6 +443,7 @@ function buildStudentPunctualitySummary(sessions, studentId, statusMap = null, o
       status: session?.status,
       notes: session?.notes
     })) return;
+    if (sessionForcesNotApplicableAttendance(session, effectiveStatusMap)) return;
     const roster = Array.isArray(session?.roster) ? session.roster : [];
     const row = roster.find((item) => idsEqual(item?.personId, target));
     if (!row) return;
@@ -512,6 +515,7 @@ function buildStudentSessionRatingSummary(sessions, studentId, statusMap = null,
       status: session?.status,
       notes: session?.notes
     })) return;
+    if (sessionForcesNotApplicableAttendance(session, effectiveStatusMap)) return;
     const roster = Array.isArray(session?.roster) ? session.roster : [];
     const row = roster.find((item) => idsEqual(item?.personId, target));
     if (!row) return;
@@ -578,7 +582,10 @@ async function buildClassAttendanceSpanSummary(sessions, statusMap = null) {
     roster.forEach((row) => {
       const personId = String(row?.personId || '').trim();
       if (personId) uniqueStudents.add(personId);
-      const status = attendanceMatrixMetricsService.normalizeStatus(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
+      const forceNotApplicable = sessionForcesNotApplicableAttendance(session, effectiveStatusMap);
+      const status = forceNotApplicable
+        ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+        : attendanceMatrixMetricsService.normalizeStatus(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
       if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
         out.notApplicable += 1;
         return;
@@ -673,7 +680,7 @@ function averageRounded(arr) {
   return Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 100) / 100;
 }
 
-function computeReportPeriodGradebookStats(periodSessions, studentPersonId) {
+function computeReportPeriodGradebookStats(periodSessions, studentPersonId, statusMap = null) {
   const cols = collectPeriodGradeColumns(periodSessions);
   const classPercents = [];
   let classEarned = 0;
@@ -683,6 +690,7 @@ function computeReportPeriodGradebookStats(periodSessions, studentPersonId) {
   let studentPossible = 0;
   let studentActivitySlots = 0;
   const targetStudent = toPublicId(studentPersonId);
+  const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
 
   cols.forEach((col) => {
     const ses = col.session;
@@ -690,7 +698,8 @@ function computeReportPeriodGradebookStats(periodSessions, studentPersonId) {
     roster.forEach((r) => {
       const pid = toPublicId(r?.personId);
       if (!pid) return;
-      const att = rosterAttendanceLower(ses, pid);
+      const forceNotApplicable = sessionForcesNotApplicableAttendance(ses, effectiveStatusMap);
+      const att = forceNotApplicable ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : rosterAttendanceLower(ses, pid);
       const absent = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       const raw = absent ? null : getScoreFromScoresMap(col.scores, pid);
       const total = col.totalScore > 0 ? col.totalScore : 0;
@@ -892,6 +901,26 @@ function buildStudentRecordMaps(students = []) {
   return { byPersonId, personByStudentRecordId };
 }
 
+function sessionForcesNotApplicableAttendance(session, statusMap) {
+  const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
+  return sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap(effectiveStatusMap, {
+    status: session?.status,
+    notes: session?.notes
+  });
+}
+
+function resolveEffectiveAttendanceStatus({ session, rosterRow, statusMap, derivedNotApplicable = false, expectedForSession = true } = {}) {
+  if (sessionForcesNotApplicableAttendance(session, statusMap) || derivedNotApplicable || !expectedForSession) {
+    return attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+  }
+  if (rosterRow) {
+    return attendanceMatrixMetricsService.normalizeStatus(
+      rosterRow?.attendance,
+      attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+    );
+  }
+  return attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT;
+}
 function attendanceStatusDetails(statusValue) {
   const status = attendanceMatrixMetricsService.normalizeStatus(
     statusValue,
@@ -943,8 +972,8 @@ function buildStudentCollectionRow({ personId, person, studentRecord, rosterName
   };
 }
 
-function buildSessionCollectionRow(session, index) {
-  const summary = buildClassAttendanceSummary(session);
+function buildSessionCollectionRow(session, index, statusMap = null) {
+  const summary = buildClassAttendanceSummary(session, statusMap);
   const percent = summary.total > 0
     ? Number((((summary.present + summary.late + summary.excused) / summary.total) * 100).toFixed(2))
     : 0;
@@ -1081,7 +1110,7 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
     rosterNameMap,
     index
   }));
-  const sessionRows = periodSessions.map((session, index) => buildSessionCollectionRow(session, index));
+  const sessionRows = periodSessions.map((session, index) => buildSessionCollectionRow(session, index, statusMap));
   const attendanceRows = [];
   studentContexts.forEach((context, studentIndex) => {
     periodSessions.forEach((session, sessionIndex) => {
@@ -1091,11 +1120,13 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
       const derivedNotApplicable = sessionKey && context.applicability?.notApplicableSessionIds instanceof Set && context.applicability.notApplicableSessionIds.has(sessionKey);
       const expectedSessionIds = context.applicability?.expectedSessionIds instanceof Set ? context.applicability.expectedSessionIds : null;
       const expectedForSession = !expectedSessionIds || !sessionKey || expectedSessionIds.has(sessionKey);
-      const statusSource = rosterRow
-        ? rosterRow.attendance
-        : (derivedNotApplicable || !expectedForSession
-          ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
-          : attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
+      const statusSource = resolveEffectiveAttendanceStatus({
+        session,
+        rosterRow,
+        statusMap,
+        derivedNotApplicable,
+        expectedForSession
+      });
       const statusDetails = attendanceStatusDetails(statusSource);
       const studentRow = studentRows[studentIndex] || {};
       attendanceRows.push({
@@ -1112,8 +1143,8 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
         session_end_time: String(session?.endTime || ''),
         attendance_status: statusDetails.status,
         attendance_status_label: statusDetails.label,
-        attendance_late_minutes: rosterRow ? normalizeNumber(rosterRow?.lateMinutes) : 0,
-        attendance_early_leave_minutes: rosterRow ? normalizeNumber(rosterRow?.earlyLeaveMinutes) : 0
+        attendance_late_minutes: statusDetails.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRow ? normalizeNumber(rosterRow?.lateMinutes) : 0),
+        attendance_early_leave_minutes: statusDetails.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRow ? normalizeNumber(rosterRow?.earlyLeaveMinutes) : 0)
       });
     });
   });
@@ -1124,6 +1155,18 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
     student_attendance_rows: attendanceRows
   };
 }
+
+function getLatestClbLevelEntry(studentRecord = {}) {
+  const history = Array.isArray(studentRecord?.clbLevelHistory) ? studentRecord.clbLevelHistory : [];
+  if (!history.length) return null;
+  const sorted = [...history].sort((a, b) => {
+    const dateCmp = String(b?.recordedAt || '').localeCompare(String(a?.recordedAt || ''));
+    if (dateCmp !== 0) return dateCmp;
+    return String(b?.id || '').localeCompare(String(a?.id || ''));
+  });
+  return sorted[0] || null;
+}
+
 async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = '', reqUser }) {
   const classIdForQuery = toPublicId(assignment.classId);
   const [classData, sessions, students, persons, organizations, examAssignmentsForClass] = await Promise.all([
@@ -1160,7 +1203,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
   const reportOrgId = toPublicId(classData?.orgId || assignment?.orgId || studentRecord?.orgId);
   const statusMap = await sessionStatusPolicyService.getStatusMap(reportOrgId || reqUser?.activeOrgId || '', { includeInactive: true });
   const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(reportOrgId || reqUser?.activeOrgId || '');
-  const classAttendance = buildClassAttendanceSummary(session);
+  const classAttendance = buildClassAttendanceSummary(session, statusMap);
   const allAttendanceApplicabilityContext = await buildStudentAttendanceApplicabilityContext({
     classData,
     sessions,
@@ -1176,7 +1219,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
   });
   const periodSessions = filterSessionsByDateRange(sessions, reportPeriod.startDate, reportPeriod.dueDate);
   const periodSessionsGrade = filterPeriodSessionsForGradeMetrics(sessions, reportPeriod.startDate, reportPeriod.dueDate, statusMap);
-  const gradebookPeriodStats = computeReportPeriodGradebookStats(periodSessionsGrade, studentPersonId);
+  const gradebookPeriodStats = computeReportPeriodGradebookStats(periodSessionsGrade, studentPersonId, statusMap);
   const examRows = Array.isArray(examAssignmentsForClass) ? examAssignmentsForClass : [];
   const examPeriodStats = computeReportPeriodExamStats(
     examRows,
@@ -1224,6 +1267,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
   const studentOrgMembership = findOrgMembership(studentPerson, studentOrgId);
   const studentAddress = getAddressFromPerson(studentPerson);
   const studentNameParts = getPersonNameParts(studentPerson);
+  const latestClbLevelEntry = getLatestClbLevelEntry(studentRecord);
 
   const snapshot = {
     teacher_id: resolvedTeacherId,
@@ -1275,6 +1319,14 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_self_fund: studentRecord ? studentRecord?.selfFund === true : '',
     student_funder_note: String(studentRecord?.funderNote || ''),
     student_record_notes: String(studentRecord?.notes || ''),
+    CLB_goal_listening: String(latestClbLevelEntry?.goal?.listening || ''),
+    CLB_goal_speaking: String(latestClbLevelEntry?.goal?.speaking || ''),
+    CLB_goal_reading: String(latestClbLevelEntry?.goal?.reading || ''),
+    CLB_goal_writing: String(latestClbLevelEntry?.goal?.writing || ''),
+    CLB_current_listening: String(latestClbLevelEntry?.current?.listening || ''),
+    CLB_current_speaking: String(latestClbLevelEntry?.current?.speaking || ''),
+    CLB_current_reading: String(latestClbLevelEntry?.current?.reading || ''),
+    CLB_current_writing: String(latestClbLevelEntry?.current?.writing || ''),
     class_attendance_total: primaryAttendance.total,
     class_attendance_present: primaryAttendance.present,
     class_attendance_late: primaryAttendance.late,
@@ -1503,6 +1555,7 @@ function validateTemplatePrefillKeys(templateOrSchema) {
 
 module.exports = {
   buildPrefillSnapshot,
+  getLatestClbLevelEntry,
   // Runs dependency-aware calculated fields on merged answers.
   recomputeCalculatedAnswers: reportRuleEngineService.recomputeCalculatedAnswers,
   mergeTemplateData,

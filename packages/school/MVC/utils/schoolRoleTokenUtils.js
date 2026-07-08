@@ -207,11 +207,17 @@ function buildCanonicalOrgRole(orgMembership = {}) {
     return Array.isArray(roles) && roles.length > 0 ? roles[0] : 'member';
 }
 
+function filterSchoolPackageOrgRoles(orgMembership = {}) {
+    return normalizeOrgRoleTokens(orgMembership).filter(isSchoolToken);
+}
+
 module.exports = {
     SCHOOL_SUFFIX_TO_TOKEN,
     SCHOOL_TOKEN_SET,
     canonicalizeRoleAtom,
+    isSchoolToken,
     normalizeRoleTokenValues,
     normalizeOrgRoleTokens,
-    buildCanonicalOrgRole
+    buildCanonicalOrgRole,
+    filterSchoolPackageOrgRoles
 };

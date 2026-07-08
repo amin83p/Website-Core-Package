@@ -7,6 +7,7 @@ const reportViewService = require('./reportViewService');
 const personDisplayNameService = require('./personDisplayNameService');
 const sessionExplorerService = require('./sessionExplorerService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
+const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
 const schoolIndexService = require('./schoolIndexService');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -703,12 +704,14 @@ function normalizeReportInstanceRows(rows) {
     classLifecycle: row?.classLifecycle && typeof row.classLifecycle === 'object' ? row.classLifecycle : {},
     sessionId: normalizeText(row?.sessionId || ''),
     sessionDate: normalizeText(row?.sessionDate || ''),
+    reportDueDate: normalizeText(row?.reportDueDate || ''),
     templateId: normalizeText(row?.templateId),
     templateTitle: normalizeText(row?.templateTitle || row?.templateId || '-'),
     templateVersion: Number(row?.templateVersion || 1) || 1,
     teacherId: normalizeText(row?.teacherId),
     teacherName: normalizeText(row?.teacherName || row?.teacherId || '-'),
     studentId: normalizeText(row?.studentId),
+    studentRecordId: normalizeText(row?.studentRecordId || ''),
     studentName: normalizeText(row?.studentName || (row?.studentId ? row.studentId : 'Whole class')),
     status: lower(row?.status || 'draft'),
     hasDocxTemplate: row?.hasDocxTemplate === true,
@@ -892,6 +895,7 @@ function normalizeSessionIssueRows(rows) {
       sessionStartTime: normalizeText(row?.sessionStartTime),
       sessionEndTime: normalizeText(row?.sessionEndTime),
       studentPersonId: normalizeText(row?.studentPersonId),
+      studentRecordId: normalizeText(row?.studentRecordId || ''),
       studentName: normalizeText(row?.studentName || row?.studentPersonId || '-'),
       teacherPersonId: normalizeText(row?.teacherPersonId),
       teacherName: normalizeText(row?.teacherName || row?.teacherPersonId || 'Unassigned'),
@@ -1102,7 +1106,19 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       query: {},
       scope: { activeOrgId: getHubActiveOrgId(req.user) }
     });
+    const students = await dataService.fetchData('students', {}, req.user);
+    const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(
+      students,
+      getHubActiveOrgId(req.user)
+    );
     const rows = sortSessionIssueRows(normalizeSessionIssueRows(rawRows)
+      .map((row) => ({
+        ...row,
+        studentRecordId: schoolStudentProfileLinkService.resolveStudentRecordId({
+          personId: row.studentPersonId,
+          personToStudentMap
+        })
+      }))
       .filter((row) => sessionIssueMatchesFilters(row, queryInput || {}, query.q || '')));
     return {
       section: {
@@ -1402,19 +1418,55 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     const assignmentRowFilter = normalizeText(queryInput?.assignmentRowId || queryInput?.rowId || '');
     const sessionFilter = normalizeText(queryInput?.sessionId || '');
     const sessionDateFilter = normalizeText(queryInput?.sessionDate || '');
-    const teacherFilter = normalizeText(queryInput?.teacherId || '');
-    const studentFilter = normalizeText(queryInput?.studentId || '');
+    const templateId = normalizeText(queryInput?.templateId || '');
+    const classIds = splitFilterIds(queryInput?.classIds || queryInput?.classId || '');
+    const teacherIds = splitFilterIds(queryInput?.teacherIds || queryInput?.teacherPersonId || queryInput?.teacherId || '');
+    const studentIds = splitFilterIds(queryInput?.studentIds || queryInput?.studentPersonId || queryInput?.studentId || '');
+    const dueDateStart = normalizeText(queryInput?.dueDateStart || queryInput?.startDate || '');
+    const dueDateEnd = normalizeText(queryInput?.dueDateEnd || queryInput?.endDate || '');
+    const status = lower(queryInput?.status || '');
     const searchTerm = lower(query.q || '');
-    const rows = normalizeReportInstanceRows(await reportViewService.buildInstanceListRows({
-      reqUser: req.user,
-      assignmentFilter,
-      assignmentRowFilter,
-      sessionFilter,
-      sessionDateFilter,
-      teacherFilter,
-      studentFilter,
-      q: searchTerm
-    }));
+    const [instanceRows, allTemplates, classes] = await Promise.all([
+      reportViewService.buildInstanceListRows({
+        reqUser: req.user,
+        assignmentFilter,
+        assignmentRowFilter,
+        sessionFilter,
+        sessionDateFilter,
+        teacherFilter: teacherIds[0] || '',
+        studentFilter: studentIds[0] || '',
+        templateId,
+        classIds,
+        teacherIds,
+        studentIds,
+        dueDateStart,
+        dueDateEnd,
+        status,
+        q: searchTerm
+      }),
+      dataService.fetchData('reportTemplates', {}, req.user),
+      dataService.fetchData('classes', {}, req.user)
+    ]);
+    const rows = normalizeReportInstanceRows(instanceRows);
+    const classMap = new Map(
+      (Array.isArray(classes) ? classes : [])
+        .map((row) => [toPublicId(row?.id), row])
+        .filter(([id]) => Boolean(id))
+    );
+    const selectedClasses = classIds.map((id) => {
+      const classItem = classMap.get(toPublicId(id));
+      return {
+        id,
+        title: normalizeText(classItem?.title || id)
+      };
+    });
+    const templateOptions = (Array.isArray(allTemplates) ? allTemplates : [])
+      .map((row) => ({
+        id: normalizeText(row?.id),
+        title: normalizeText(row?.title || row?.id || '-')
+      }))
+      .filter((row) => Boolean(row.id))
+      .sort((a, b) => a.title.localeCompare(b.title));
     return {
       section: {
         key: 'report-instances',
@@ -1429,9 +1481,30 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
         assignmentRowId: assignmentRowFilter,
         sessionId: sessionFilter,
         sessionDate: sessionDateFilter,
-        teacherId: teacherFilter,
-        studentId: studentFilter
+        templateId,
+        classIds: normalizeText(classIds.join(',')),
+        classId: normalizeText(classIds[0] || ''),
+        teacherIds: normalizeText(teacherIds.join(',')),
+        teacherPersonId: normalizeText(teacherIds.join(',')),
+        teacherId: normalizeText(teacherIds[0] || ''),
+        studentIds: normalizeText(studentIds.join(',')),
+        studentPersonId: normalizeText(studentIds.join(',')),
+        studentId: normalizeText(studentIds[0] || ''),
+        dueDateStart,
+        dueDateEnd,
+        startDate: dueDateStart,
+        endDate: dueDateEnd,
+        status
       },
+      templateOptions,
+      selectedClasses,
+      statusOptions: [
+        { value: '', label: 'All Statuses' },
+        { value: 'pending', label: 'Pending' },
+        { value: 'draft', label: 'Draft' },
+        { value: 'submitted', label: 'Submitted' },
+        { value: 'locked', label: 'Locked' }
+      ],
       searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()
     };

@@ -127,3 +127,12 @@ test('session manager handles metadata conflict warning with force resubmit', ()
   assert.match(source, /Save Anyway/);
   assert.match(source, /submitSessionSave\(\{ \.\.\.payload,\s*force:\s*true \}\)/);
 });
+test('session manager keeps make-up-required attendance visible as derived N/A', () => {
+  const viewSource = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  const controllerSource = read('packages/school/MVC/controllers/school/classController.js');
+  assert.match(viewSource, /Attendance remains visible as N\/A for tracking/);
+  assert.doesNotMatch(viewSource, /data-session-panel="attendance" role="tab" aria-selected="true" <%= isMakeupRequiredInactive/);
+  assert.match(controllerSource, /const forceSessionNotApplicable = sessionStatusPolicyService\.shouldForceNotApplicableAttendanceByMap/);
+  assert.match(controllerSource, /state\.reason === 'makeup_required'/);
+  assert.match(controllerSource, /attendanceMatrixMetricsService\.ATTENDANCE_STATUS\.NOT_APPLICABLE/);
+});

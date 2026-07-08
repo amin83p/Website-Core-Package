@@ -36,6 +36,11 @@ router.get('/people-delete-preview',
   trackActionState(SECTIONS.SCHOOL_SAMPLE_DATA, OPERATIONS.CREATE),
   ctrl.listPeopleDeletePreview);
 
+router.get('/clear-transactional-preview',
+  requireAccess(SECTIONS.SCHOOL_SAMPLE_DATA, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_SAMPLE_DATA, OPERATIONS.CREATE),
+  ctrl.listClearTransactionalPreview);
+
 router.post('/people-delete',
   requireAccess(SECTIONS.SCHOOL_SAMPLE_DATA, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_SAMPLE_DATA, OPERATIONS.CREATE, { requireToken: true }),

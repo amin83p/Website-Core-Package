@@ -149,12 +149,16 @@
             <div class="x-small text-muted">v<%= Number(row.templateVersion || 1) %></div>
           </td>
           <td>
-            <div><%= row.teacherName || '-' %></div>
-            <div class="x-small text-muted font-monospace"><%= row.teacherId || '-' %></div>
+            <div class="fw-semibold"><%= row.teacherName || '-' %></div>
+            <% if (row.teacherId && row.teacherName && row.teacherName !== row.teacherId) { %>
+              <div class="x-small text-muted font-monospace"><%= row.teacherId %></div>
+            <% } %>
           </td>
           <td>
-            <div><%= row.studentName || '-' %></div>
-            <div class="x-small text-muted font-monospace"><%= row.studentId || '-' %></div>
+            <div><%- include('../partials/studentNameLink', { name: row.studentName || '-', studentRecordId: row.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
+            <% if (row.studentId && row.studentName && row.studentName !== row.studentId) { %>
+              <div class="x-small text-muted font-monospace"><%= row.studentId %></div>
+            <% } %>
           </td>
           <td>
             <% const status = String(row.status || '').toLowerCase(); %>

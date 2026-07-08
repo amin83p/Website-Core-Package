@@ -10,7 +10,7 @@ const {
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
 
 /** Bump when `clearSampleTransactionalData` behavior or response shape changes so replay cache is not reused. */
-const CLEAR_TRANSACTIONAL_IDEMPOTENCY_VERSION = 'v5';
+const CLEAR_TRANSACTIONAL_IDEMPOTENCY_VERSION = 'v6';
 /** Bump when sample people cleanup behavior or response shape changes so replay cache is not reused. */
 const PEOPLE_DELETE_IDEMPOTENCY_VERSION = 'v2';
 
@@ -73,6 +73,40 @@ function parseIdList(input) {
     out.push(id);
   });
   return out;
+}
+
+function parseMasterDefinitions(body = {}) {
+  return schoolSampleDataService.normalizeMasterDefinitions({
+    classes: body.masterDefinitions_classes,
+    programs: body.masterDefinitions_programs,
+    terms: body.masterDefinitions_terms,
+    subjects: body.masterDefinitions_subjects,
+    departments: body.masterDefinitions_departments,
+    reportTemplates: body.masterDefinitions_reportTemplates,
+    timesheetPeriods: body.masterDefinitions_timesheetPeriods,
+    activityCategories: body.masterDefinitions_activityCategories,
+    examDefinitions: body.masterDefinitions_examDefinitions,
+    schoolAccounts: body.masterDefinitions_schoolAccounts
+  });
+}
+
+function parseBooleanFlag(value) {
+  return value === true || value === 'true' || value === 'on';
+}
+
+function parseMasterDefinitionsFromQuery(query = {}) {
+  return parseMasterDefinitions(query);
+}
+
+function buildClearTransactionalMessage(result = {}) {
+  const masterDefinitions = result?.masterDefinitions || {};
+  const selectedMasters = Object.entries(masterDefinitions)
+    .filter(([, enabled]) => enabled === true)
+    .map(([key]) => key);
+  const masterNote = selectedMasters.length
+    ? ` Selected master definitions were also purged: ${selectedMasters.join(', ')}.`
+    : ' Master definitions were preserved unless explicitly selected.';
+  return `Org workspace reset completed: transactional/runtime school data was cleared or rebuilt (activities, leave requests, tasks, session issues, exam runtime data, ledgers, registrations, workspaces, reports, timesheets, and related indexes).${masterNote}`;
 }
 
 exports.showForm = async (req, res) => {
@@ -169,11 +203,13 @@ exports.clearTransactionalData = async (req, res) => {
     const includeAcademicSnapshots = req.body.includeAcademicSnapshots === 'true'
       || req.body.includeAcademicSnapshots === 'on'
       || req.body.includeAcademicSnapshots === true;
+    const masterDefinitions = parseMasterDefinitions(req.body || {});
     guardKey = idempotencyGuardService.createGuardKey([
       'sample_data_clear_transactional',
       CLEAR_TRANSACTIONAL_IDEMPOTENCY_VERSION,
       activeOrgId,
-      includeAcademicSnapshots
+      includeAcademicSnapshots,
+      masterDefinitions
     ]);
     const guardResult = idempotencyGuardService.beginGuard({
       key: guardKey,
@@ -184,11 +220,12 @@ exports.clearTransactionalData = async (req, res) => {
 
     const result = await schoolSampleDataService.clearSampleTransactionalData({
       orgId: activeOrgId,
-      includeAcademicSnapshots
+      includeAcademicSnapshots,
+      masterDefinitions
     });
     const payloadOut = {
       status: 'success',
-      message: 'Academic and accounting transactions, registrations, prior subject credits (transfer/placement), withdrawals, class enrollments and enrollment periods, class workspaces (sessions, gradebooks, materials), report runs, timesheets, attendance matrix policy for this org, official final grades on classes, and related indexes were cleared or rebuilt. Master definitions (including report templates and timesheet periods) were preserved.',
+      message: buildClearTransactionalMessage(result),
       result
     };
     idempotencyGuardService.completeGuard(guardKey, payloadOut);
@@ -228,6 +265,26 @@ exports.listPeopleDeletePreview = async (req, res) => {
     return res.json({
       status: 'success',
       message: 'Preview loaded.',
+      preview
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message, error });
+  }
+};
+
+exports.listClearTransactionalPreview = async (req, res) => {
+  try {
+    const activeOrgId = await assertCreateOrgContextOrThrow(req.user);
+    const includeAcademicSnapshots = parseBooleanFlag(req.query?.includeAcademicSnapshots);
+    const masterDefinitions = parseMasterDefinitionsFromQuery(req.query || {});
+    const preview = await schoolSampleDataService.buildOrgWorkspaceResetPreview({
+      orgId: activeOrgId,
+      includeAcademicSnapshots,
+      masterDefinitions
+    });
+    return res.json({
+      status: 'success',
+      message: 'Org workspace reset preview loaded.',
       preview
     });
   } catch (error) {

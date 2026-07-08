@@ -163,12 +163,14 @@
             <div class="x-small text-muted">v<%= Number(row.templateVersion || 1) %></div>
           </td>
           <td>
-            <div><%= row.teacherName || row.teacherId || '-' %></div>
-            <div class="x-small text-muted font-monospace"><%= row.teacherId || '-' %></div>
+            <div class="fw-semibold"><%= row.teacherName || '-' %></div>
+            <% if (row.teacherId && row.teacherName && row.teacherName !== row.teacherId) { %>
+              <div class="x-small text-muted font-monospace"><%= row.teacherId %></div>
+            <% } %>
           </td>
           <td>
-            <div><%= row.studentName || (row.studentId ? row.studentId : 'Whole class') %></div>
-            <% if (row.studentId) { %>
+            <div><%- include('../partials/studentNameLink', { name: row.studentName || 'Whole class', studentRecordId: row.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
+            <% if (row.studentId && row.studentName && row.studentName !== row.studentId && row.studentName !== 'Whole class') { %>
               <div class="x-small text-muted font-monospace"><%= row.studentId %></div>
             <% } %>
           </td>

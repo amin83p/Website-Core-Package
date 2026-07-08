@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { SECTIONS } = require('./schoolRouteDependencies');
 const { registerSchoolUploadCategoryResolvers } = require('../services/school/schoolUploadCategoryRegistration');
+const schoolStudentProfileLinkService = require('../services/school/schoolStudentProfileLinkService');
 
 const SCHOOL_MOUNT_GUARD_KEY = '__schoolMainRouteMounted';
 
@@ -16,6 +17,15 @@ router.use((req, _res, next) => {
 
 router.use((req, res, next) => {
   res.locals.schoolSectionDashboardHref = `/dashboard/section-nav/${encodeURIComponent(SECTIONS.SCHOOL || 'SCHOOL')}`;
+  next();
+});
+
+router.use(async (req, res, next) => {
+  try {
+    res.locals.canOpenStudentProfile = await schoolStudentProfileLinkService.evaluateCanOpenStudentProfile(req.user, req.ip);
+  } catch (_err) {
+    res.locals.canOpenStudentProfile = false;
+  }
   next();
 });
 

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const express = require('express');
 
-const { SECTIONS, OPERATIONS } = require('../config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../packages/school/config/accessConstants');
 
 function createHandler(name) {
   return (req, res) => {
@@ -28,30 +28,28 @@ function setRequireStub(modulePath, exportsValue, originals) {
 }
 
 async function withStubbedSampleDataRoutes(callback) {
-  const routePath = require.resolve('../MVC/routes/school/sampleDataRoutes');
+  const routePath = require.resolve('../packages/school/MVC/routes/sampleDataRoutes');
   const originals = new Map();
   if (!originals.has(routePath)) originals.set(routePath, require.cache[routePath]);
   delete require.cache[routePath];
 
-  setRequireStub('../MVC/controllers/school/schoolSampleDataController', {
+  setRequireStub('../packages/school/MVC/controllers/school/schoolSampleDataController', {
     showForm: createHandler('show-form'),
     generate: createHandler('generate'),
     clearTransactionalData: createHandler('clear-transactional'),
+    listClearTransactionalPreview: createHandler('clear-transactional-preview'),
     listPeopleDeletePreview: createHandler('people-delete-preview'),
     deleteSelectedSamplePeople: createHandler('people-delete')
   }, originals);
 
-  setRequireStub('../MVC/middleware/authMiddleware', {
+  setRequireStub('../packages/school/MVC/routes/schoolRouteDependencies', {
     requireAuth(req, res, next) {
       if (req.headers.authorization === 'Bearer allowed') {
         req.user = { id: 'user-1', activeOrgId: 'ORG-1' };
         return next();
       }
       return res.status(401).json({ status: 'error', message: 'Authentication required.' });
-    }
-  }, originals);
-
-  setRequireStub('../MVC/middleware/accessMiddleware', {
+    },
     requireAccess(sectionId, operationId) {
       return (req, res, next) => {
         req.accessCheck = { sectionId, operationId };
@@ -62,10 +60,7 @@ async function withStubbedSampleDataRoutes(callback) {
           operationId
         });
       };
-    }
-  }, originals);
-
-  setRequireStub('../MVC/middleware/actionStateMiddleware', {
+    },
     trackActionState: (sectionId, operationId, options = {}) => (req, _res, next) => {
       req.actionState = {
         sectionId,
@@ -73,19 +68,28 @@ async function withStubbedSampleDataRoutes(callback) {
         requireToken: options.requireToken === true
       };
       next();
+    },
+    SECTIONS,
+    OPERATIONS
+  }, originals);
+
+  setRequireStub('../packages/school/MVC/services/school/schoolCoreContracts', {
+    requireCoreModule(modulePath) {
+      if (modulePath === 'MVC/middleware/adminApproval') {
+        return (req, res, next) => {
+          if (req.headers['x-admin-verified'] === 'yes') return next();
+          return res.status(403).json({
+            status: 'admin_required',
+            message: 'Admin approval required or session expired.'
+          });
+        };
+      }
+      throw new Error(`Unexpected core module stub request: ${modulePath}`);
     }
   }, originals);
 
-  setRequireStub('../MVC/middleware/adminApproval', (req, res, next) => {
-    if (req.headers['x-admin-verified'] === 'yes') return next();
-    return res.status(403).json({
-      status: 'admin_required',
-      message: 'Admin approval required or session expired.'
-    });
-  }, originals);
-
   try {
-    const router = require('../MVC/routes/school/sampleDataRoutes');
+    const router = require('../packages/school/MVC/routes/sampleDataRoutes');
     return await callback(router);
   } finally {
     delete require.cache[routePath];
@@ -194,5 +198,56 @@ test('sample people delete preview remains authenticated and access-checked only
       });
       assert.equal(body.actionState.requireToken, false);
     });
+  });
+});
+
+test('org workspace reset preview remains authenticated and access-checked only', async () => {
+  await withStubbedSampleDataRoutes(async (router) => {
+    const app = express();
+    app.use('/school/sample-data', router);
+
+    await withServer(app, async (baseUrl) => {
+      const unauthenticated = await fetch(`${baseUrl}/school/sample-data/clear-transactional-preview`, {
+        method: 'GET',
+        redirect: 'manual'
+      });
+      assert.equal(unauthenticated.status, 401);
+
+      const allowed = await fetch(`${baseUrl}/school/sample-data/clear-transactional-preview`, {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes'
+        },
+        redirect: 'manual'
+      });
+      assert.equal(allowed.status, 200);
+      const body = await allowed.json();
+      assert.equal(body.handler, 'clear-transactional-preview');
+      assert.equal(body.userId, 'user-1');
+      assert.deepEqual(body.accessCheck, {
+        sectionId: SECTIONS.SCHOOL_SAMPLE_DATA,
+        operationId: OPERATIONS.CREATE
+      });
+      assert.equal(body.actionState.requireToken, false);
+    });
+  });
+});
+
+test('sample data generator form includes org workspace reset master checkbox fields', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const formPath = path.join(__dirname, '../packages/school/MVC/views/school/sampleData/generatorForm.ejs');
+  const html = fs.readFileSync(formPath, 'utf8');
+  [
+    'masterDefinitions_classes',
+    'masterDefinitions_examDefinitions',
+    'masterDefinitions_schoolAccounts',
+    'appendMasterDefinitionParams',
+    'btnPreviewOrgWorkspaceReset',
+    'clear-transactional-preview',
+    'Reset Org Workspace'
+  ].forEach((needle) => {
+    assert.ok(html.includes(needle), `expected sample data form to include ${needle}`);
   });
 });

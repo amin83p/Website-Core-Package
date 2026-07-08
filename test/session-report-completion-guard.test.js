@@ -61,6 +61,24 @@ test('isSessionCompletionStatusByMap uses status definitions', () => {
   assert.equal(sessionStatusPolicyService.isSessionCompletionStatusByMap(statusMap, { status: 'scheduled' }), false);
 });
 
+test('make-up-required sessions stay attendance-visible and force N/A policy', () => {
+  const statusMap = new Map([
+    ['completed', { code: 'completed', isFinal: true, makeUpRequired: false, excludeFromAttendance: false }],
+    ['cancelled', { code: 'cancelled', isFinal: true, makeUpRequired: false, excludeFromAttendance: true }],
+    ['missed_informed24', { code: 'missed_informed24', isFinal: true, makeUpRequired: true, excludeFromAttendance: true }]
+  ]);
+
+  assert.equal(sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(statusMap, { status: 'missed_informed24' }), false);
+  assert.equal(sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap(statusMap, { status: 'missed_informed24' }), true);
+  assert.equal(sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(statusMap, { status: 'cancelled' }), true);
+  assert.equal(sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap(statusMap, { status: 'cancelled' }), false);
+
+  const keys = sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, [
+    { sessionId: 'SES-MAKEUP', date: '2026-06-20', status: 'missed_informed24' }
+  ]);
+  assert.equal(keys.has('SES-MAKEUP'), true);
+  assert.equal(keys.has('2026-06-20'), true);
+});
 test('mapPendingReportDto returns compact pending report shape', () => {
   const dto = sessionReportInstanceService.mapPendingReportDto({
     templateTitle: 'Daily Report',

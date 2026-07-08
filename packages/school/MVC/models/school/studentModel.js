@@ -17,6 +17,8 @@ if (!fsSync.existsSync(dataPath)) {
 // -----------------------------
 
 const ACADEMIC_STATUSES = new Set(['Active', 'Probation', 'Graduated', 'Withdrawn', 'Archived']);
+const CLB_SKILLS = Object.freeze(['listening', 'speaking', 'reading', 'writing']);
+const CLB_LEVEL_HISTORY_MAX = 100;
 
 function isPlainObject(v) {
     return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -81,6 +83,42 @@ function cleanAttachments(v) {
     });
 }
 
+function cleanClbSkillLevels(value) {
+    const src = isPlainObject(value) ? value : {};
+    const out = {};
+    CLB_SKILLS.forEach((skill) => {
+        out[skill] = cleanString(src[skill], { max: 20, allowEmpty: true });
+    });
+    return out;
+}
+
+function cleanClbLevelHistory(value) {
+    if (value === undefined || value === null || value === '') return [];
+    if (!Array.isArray(value)) throw new Error('clbLevelHistory must be an array.');
+    if (value.length > CLB_LEVEL_HISTORY_MAX) throw new Error('Too many CLB level history entries.');
+
+    const cleaned = value.map((entry, index) => {
+        if (!isPlainObject(entry)) throw new Error('Invalid CLB level history entry.');
+        const recordedAt = cleanDateISO(entry.recordedAt, { allowEmpty: false });
+        if (!recordedAt) throw new Error(`CLB level history entry ${index + 1} requires a valid recordedAt date.`);
+        const id = cleanId(entry.id, { max: 64, allowEmpty: true }) || `clb_${Date.now()}_${index}`;
+        return {
+            id,
+            recordedAt,
+            goal: cleanClbSkillLevels(entry.goal),
+            current: cleanClbSkillLevels(entry.current)
+        };
+    });
+
+    cleaned.sort((a, b) => {
+        const dateCmp = String(b.recordedAt).localeCompare(String(a.recordedAt));
+        if (dateCmp !== 0) return dateCmp;
+        return String(b.id).localeCompare(String(a.id));
+    });
+
+    return cleaned;
+}
+
 function sanitizeStudentInput(input, { isUpdate = false } = {}) {
     if (!isPlainObject(input)) throw new Error('Invalid student payload.');
 
@@ -122,7 +160,8 @@ function sanitizeStudentInput(input, { isUpdate = false } = {}) {
         enrollmentDate,
         academicStatus,
         notes: cleanString(input.notes, { max: 5000, allowEmpty: true }),
-        attachments: cleanAttachments(input.attachments)
+        attachments: cleanAttachments(input.attachments),
+        clbLevelHistory: cleanClbLevelHistory(input.clbLevelHistory)
     };
 
     if (!out.funderAccountId) {
@@ -276,6 +315,9 @@ module.exports = {
     updateStudent,
     deleteStudent,
     purgeStudent,
+    sanitizeStudentInput,
+    cleanClbLevelHistory,
+    CLB_SKILLS,
     ACADEMIC_STATUSES: Object.freeze([...ACADEMIC_STATUSES]),
     FEE_CATEGORIES
 };

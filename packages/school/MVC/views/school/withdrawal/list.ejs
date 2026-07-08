@@ -58,7 +58,7 @@
             <% } %>
           </td>
           <td>
-            <div class="fw-bold"><%= w.studentName || w.studentId %></div>
+            <div class="fw-bold"><%- include('../partials/studentNameLink', { name: w.studentName || w.studentId, studentRecordId: w.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
             <div class="small text-muted font-monospace"><%= w.studentId || '-' %></div>
           </td>
           <td class="small"><%= reasons[w.reason] || w.reason || '-' %></td>

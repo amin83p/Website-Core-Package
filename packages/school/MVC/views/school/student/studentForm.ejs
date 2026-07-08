@@ -8,6 +8,7 @@
 
   // safe JSON for embedding into <script>
   const initAttachmentsJson = JSON.stringify(s.attachments || []).replace(/</g, '\\u003c');
+  const initClbLevelHistoryJson = JSON.stringify(s.clbLevelHistory || []).replace(/</g, '\\u003c');
   const routeIdJson = JSON.stringify(routeId).replace(/</g, '\\u003c');
   const initPersonOrganizationsJson = JSON.stringify(typeof personOrganizations !== 'undefined' ? (personOrganizations || []) : []).replace(/</g, '\\u003c');
   const initOrganizationLookupJson = JSON.stringify(typeof organizationLookup !== 'undefined' ? (organizationLookup || {}) : {}).replace(/</g, '\\u003c');
@@ -31,6 +32,7 @@
 
       <!-- Existing attachments JSON (updated live when comments or deletions happen) -->
       <input type="hidden" name="attachments" id="hid_attachments" value="[]">
+      <input type="hidden" name="clbLevelHistory" id="hid_clbLevelHistory" value="[]">
 
       <!-- ActionState anti-tamper token (required for edit/update when middleware is enabled) -->
       <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
@@ -76,6 +78,9 @@
                         <input type="hidden" name="personId" id="inp_personId" value="<%= s.personId || '' %>" required>
                         <input type="text" id="inp_personName" class="form-control size-md bg-white border-primary fw-bold" placeholder="Search Person Directory..." value="<%= personName || '' %>" readonly required>
                         <button type="button" class="btn btn-primary" id="btnPickPerson" <%= isEdit ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
+                        <% if (canEditLinkedPerson) { %>
+                        <button type="button" class="btn btn-outline-primary" id="btnEditPersonProfile" data-link-type="<%= linkedPersonLinkType || 'student' %>" data-link-id="<%= linkedPersonLinkId || '' %>" title="Edit person profile"><i class="bi bi-pencil-square"></i></button>
+                        <% } %>
                      </div>
                      <div class="form-text small">Links this student profile to a global user identity.</div>
                   </div>
@@ -236,6 +241,80 @@
                      <textarea name="notes" class="form-control size-md" rows="2" placeholder="Internal notes..."><%= s.notes || '' %></textarea>
                   </div>
                </div>
+
+               <div class="card border-secondary shadow-sm mb-3">
+                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                   <span class="fw-bold"><i class="bi bi-bar-chart-steps me-2"></i>CLB Levels</span>
+                   <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="btnAddClbEntry">
+                     <i class="bi bi-plus-lg me-1"></i>Add CLB Entry
+                   </button>
+                 </div>
+                 <div class="card-body">
+                   <p class="small text-muted mb-3">Track CLB goals and current levels over time. Each entry includes a goal row and a current-level row across Listening, Speaking, Reading, and Writing.</p>
+                   <div id="clbHistoryEmpty" class="text-muted small text-center py-3 border rounded bg-light">No CLB entries yet. Click <strong>Add CLB Entry</strong> to record the first assessment.</div>
+                   <div id="clbHistoryWrap" class="d-none">
+                     <div class="table-responsive">
+                       <table class="table table-sm table-bordered align-middle mb-0" id="clbHistoryTable">
+                         <thead class="table-light">
+                           <tr>
+                             <th style="width: 12%;">Date</th>
+                             <th style="width: 14%;">Row</th>
+                             <th>Listening</th>
+                             <th>Speaking</th>
+                             <th>Reading</th>
+                             <th>Writing</th>
+                             <th style="width: 8%;" class="text-end">Actions</th>
+                           </tr>
+                         </thead>
+                         <tbody id="clbHistoryTbody"></tbody>
+                       </table>
+                     </div>
+                   </div>
+
+                   <div id="clbEntryEditor" class="border rounded p-3 mt-3 bg-light d-none">
+                     <div class="d-flex justify-content-between align-items-center mb-3">
+                       <h6 class="fw-bold mb-0">New CLB Entry</h6>
+                       <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCancelClbEntry">Cancel</button>
+                     </div>
+                     <div class="row g-3 mb-3">
+                       <div class="col-md-4">
+                         <label class="form-label fw-bold small" for="inp_clbRecordedAt">Recorded Date *</label>
+                         <input type="date" class="form-control form-control-sm" id="inp_clbRecordedAt">
+                       </div>
+                     </div>
+                     <div class="table-responsive">
+                       <table class="table table-sm table-bordered align-middle mb-3">
+                         <thead class="table-light">
+                           <tr>
+                             <th style="width: 18%;">Row</th>
+                             <th>Listening</th>
+                             <th>Speaking</th>
+                             <th>Reading</th>
+                             <th>Writing</th>
+                           </tr>
+                         </thead>
+                         <tbody>
+                           <tr>
+                             <td class="fw-bold small">CLB Goal</td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_goal_listening" placeholder="e.g. 7-8" maxlength="20"></td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_goal_speaking" placeholder="e.g. 7-8" maxlength="20"></td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_goal_reading" placeholder="e.g. 6" maxlength="20"></td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_goal_writing" placeholder="e.g. 6" maxlength="20"></td>
+                           </tr>
+                           <tr>
+                             <td class="fw-bold small">Current CLB Level</td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_current_listening" placeholder="e.g. 7+" maxlength="20"></td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_current_speaking" placeholder="e.g. 7+" maxlength="20"></td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_current_reading" placeholder="e.g. 6-" maxlength="20"></td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_current_writing" placeholder="e.g. 5+" maxlength="20"></td>
+                           </tr>
+                         </tbody>
+                       </table>
+                     </div>
+                     <button type="button" class="btn btn-sm btn-primary fw-bold" id="btnSaveClbEntry">Save CLB Entry</button>
+                   </div>
+                 </div>
+               </div>
            </div>
 
            <div class="tab-pane fade" id="tab-financial">
@@ -374,9 +453,11 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
+<%- include('../partials/personProfileEditModal') %>
 
 <script>
   window.__INIT_STUDENT_ATTACHMENTS__ = <%- initAttachmentsJson %>;
+  window.__INIT_CLB_LEVEL_HISTORY__ = <%- initClbLevelHistoryJson %>;
   window.__STUDENT_ROUTE_ID__ = <%- routeIdJson %>;
 </script>
 
@@ -415,6 +496,17 @@
 
   const studentRouteId = window.__STUDENT_ROUTE_ID__ || '';
   let existingAttachments = Array.isArray(window.__INIT_STUDENT_ATTACHMENTS__) ? window.__INIT_STUDENT_ATTACHMENTS__ : [];
+  const CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
+  let clbLevelHistory = Array.isArray(window.__INIT_CLB_LEVEL_HISTORY__) ? window.__INIT_CLB_LEVEL_HISTORY__ : [];
+  const hidClbLevelHistory = document.getElementById('hid_clbLevelHistory');
+  const clbHistoryEmpty = document.getElementById('clbHistoryEmpty');
+  const clbHistoryWrap = document.getElementById('clbHistoryWrap');
+  const clbHistoryTbody = document.getElementById('clbHistoryTbody');
+  const clbEntryEditor = document.getElementById('clbEntryEditor');
+  const btnAddClbEntry = document.getElementById('btnAddClbEntry');
+  const btnCancelClbEntry = document.getElementById('btnCancelClbEntry');
+  const btnSaveClbEntry = document.getElementById('btnSaveClbEntry');
+  const inpClbRecordedAt = document.getElementById('inp_clbRecordedAt');
   let newFileObjectUrls = [];
   let currentWizardStep = 0;
   let newPersonEmails = [{ type: 'primary', email: '', isPrimary: true }];
@@ -505,10 +597,14 @@
   }
 
   function normalizePersonRoles(org) {
+    if (window.SchoolRoleDisplay && typeof window.SchoolRoleDisplay.filterSchoolPackageOrgRoles === 'function') {
+      return window.SchoolRoleDisplay.filterSchoolPackageOrgRoles(org);
+    }
     const rawRoles = Array.isArray(org?.roles) && org.roles.length
       ? org.roles
       : (org?.role ? [org.role] : []);
-    return Array.from(new Set(rawRoles.map((role) => String(role || '').trim()).filter(Boolean)));
+    return Array.from(new Set(rawRoles.map((role) => String(role || '').trim()).filter(Boolean)))
+      .filter((role) => /^school_(student|teacher|staff)$/i.test(String(role || '').trim()));
   }
 
   function getOrganizationDisplayName(org) {
@@ -535,7 +631,7 @@
       const roles = normalizePersonRoles(org);
       const roleBadges = roles.length
         ? roles.map((role) => `<span class="badge text-bg-primary-subtle text-primary-emphasis border me-1 mb-1">${safeHtml(formatRoleLabel(role))}</span>`).join('')
-        : '<span class="text-muted small">No roles assigned</span>';
+        : '<span class="text-muted small">No school roles assigned</span>';
 
       return (
         '<div class="border rounded p-3 mb-2 bg-white">' +
@@ -807,6 +903,141 @@
 
   function syncHiddenAttachments() {
     hidAttachments.value = JSON.stringify(existingAttachments || []);
+  }
+
+  function sortClbHistory(entries) {
+    return [...(Array.isArray(entries) ? entries : [])].sort((a, b) => {
+      const dateCmp = String(b?.recordedAt || '').localeCompare(String(a?.recordedAt || ''));
+      if (dateCmp !== 0) return dateCmp;
+      return String(b?.id || '').localeCompare(String(a?.id || ''));
+    });
+  }
+
+  function syncClbHiddenField() {
+    if (hidClbLevelHistory) {
+      hidClbLevelHistory.value = JSON.stringify(sortClbHistory(clbLevelHistory));
+    }
+  }
+
+  function renderClbCell(value) {
+    const text = String(value || '').trim();
+    return text ? safeHtml(text) : '<span class="text-muted">—</span>';
+  }
+
+  function renderClbHistoryTable() {
+    clbLevelHistory = sortClbHistory(clbLevelHistory);
+    if (!clbHistoryTbody || !clbHistoryEmpty || !clbHistoryWrap) return;
+
+    if (!clbLevelHistory.length) {
+      clbHistoryEmpty.classList.remove('d-none');
+      clbHistoryWrap.classList.add('d-none');
+      clbHistoryTbody.innerHTML = '';
+      syncClbHiddenField();
+      return;
+    }
+
+    clbHistoryEmpty.classList.add('d-none');
+    clbHistoryWrap.classList.remove('d-none');
+    clbHistoryTbody.innerHTML = '';
+
+    clbLevelHistory.forEach((entry) => {
+      const entryId = String(entry?.id || '');
+      const goalCells = CLB_SKILLS.map((skill) => `<td>${renderClbCell(entry?.goal?.[skill])}</td>`).join('');
+      const currentCells = CLB_SKILLS.map((skill) => `<td>${renderClbCell(entry?.current?.[skill])}</td>`).join('');
+      clbHistoryTbody.innerHTML += `
+        <tr>
+          <td rowspan="2" class="align-middle fw-semibold">${safeHtml(entry?.recordedAt || '')}</td>
+          <td class="fw-bold small">CLB Goal</td>
+          ${goalCells}
+          <td rowspan="2" class="text-end align-middle">
+            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-clb-entry" data-entry-id="${safeHtml(entryId)}" title="Remove entry">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        <tr>
+          <td class="fw-bold small">Current CLB Level</td>
+          ${currentCells}
+        </tr>
+      `;
+    });
+
+    clbHistoryTbody.querySelectorAll('.btn-remove-clb-entry').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const entryId = btn.getAttribute('data-entry-id') || '';
+        const confirmed = await confirmDelete('Remove this CLB entry from the student profile?');
+        if (!confirmed) return;
+        clbLevelHistory = clbLevelHistory.filter((row) => String(row?.id || '') !== entryId);
+        renderClbHistoryTable();
+      });
+    });
+
+    syncClbHiddenField();
+  }
+
+  function clearClbEditor() {
+    if (inpClbRecordedAt) inpClbRecordedAt.value = new Date().toISOString().slice(0, 10);
+    CLB_SKILLS.forEach((skill) => {
+      const goalInput = document.getElementById(`inp_clb_goal_${skill}`);
+      const currentInput = document.getElementById(`inp_clb_current_${skill}`);
+      if (goalInput) goalInput.value = '';
+      if (currentInput) currentInput.value = '';
+    });
+  }
+
+  function showClbEditor() {
+    clearClbEditor();
+    if (clbEntryEditor) clbEntryEditor.classList.remove('d-none');
+  }
+
+  function hideClbEditor() {
+    if (clbEntryEditor) clbEntryEditor.classList.add('d-none');
+  }
+
+  function collectClbEditorEntry() {
+    const recordedAt = String(inpClbRecordedAt?.value || '').trim();
+    if (!recordedAt) throw new Error('Recorded date is required for a CLB entry.');
+    const goal = {};
+    const current = {};
+    CLB_SKILLS.forEach((skill) => {
+      goal[skill] = String(document.getElementById(`inp_clb_goal_${skill}`)?.value || '').trim();
+      current[skill] = String(document.getElementById(`inp_clb_current_${skill}`)?.value || '').trim();
+    });
+    const hasAnyValue = CLB_SKILLS.some((skill) => goal[skill] || current[skill]);
+    if (!hasAnyValue) throw new Error('Enter at least one CLB goal or current level value.');
+    return {
+      id: `clb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      recordedAt,
+      goal,
+      current
+    };
+  }
+
+  function saveClbEntryFromEditor() {
+    const entry = collectClbEditorEntry();
+    clbLevelHistory.push(entry);
+    renderClbHistoryTable();
+    hideClbEditor();
+  }
+
+  function wireClbLevelHistoryUi() {
+    if (btnAddClbEntry) btnAddClbEntry.addEventListener('click', showClbEditor);
+    if (btnCancelClbEntry) btnCancelClbEntry.addEventListener('click', hideClbEditor);
+    if (btnSaveClbEntry) {
+      btnSaveClbEntry.addEventListener('click', () => {
+        try {
+          saveClbEntryFromEditor();
+        } catch (err) {
+          showMsg({
+            title: 'CLB Entry',
+            icon: 'warning',
+            message: err.message || 'Unable to save CLB entry.',
+            buttons: [{ text: 'OK', class: 'btn-primary' }]
+          });
+        }
+      });
+    }
+    renderClbHistoryTable();
   }
 
   // Robust confirm helper that works with showMessageModal if present.
@@ -1093,6 +1324,7 @@
             document.getElementById('inp_personName').value = `${item.name?.first || ''} ${item.name?.last || ''}`.trim() || item.id;
             selectedPersonOrganizations = Array.isArray(item.organizations) ? item.organizations : [];
             renderPersonRoleSummary();
+            refreshEditPersonButton();
             const modeExisting = document.getElementById('personModeExisting');
             if (modeExisting) {
               modeExisting.checked = true;
@@ -1105,8 +1337,35 @@
 
     const modeExisting = document.getElementById('personModeExisting');
     const modeNew = document.getElementById('personModeNew');
-    if (modeExisting) modeExisting.addEventListener('change', syncPersonModeUI);
-    if (modeNew) modeNew.addEventListener('change', syncPersonModeUI);
+    if (modeExisting) modeExisting.addEventListener('change', () => { syncPersonModeUI(); refreshEditPersonButton(); });
+    if (modeNew) modeNew.addEventListener('change', () => { syncPersonModeUI(); refreshEditPersonButton(); });
+
+    function refreshEditPersonButton() {
+      const btnEditPerson = document.getElementById('btnEditPersonProfile');
+      if (!btnEditPerson || !window.SchoolPersonProfileModal) return;
+      const personId = document.getElementById('inp_personId')?.value?.trim();
+      const personModeExisting = !modeExisting || modeExisting.checked;
+      window.SchoolPersonProfileModal.updateEditButtonState(btnEditPerson, { personId, personModeExisting });
+    }
+
+    const btnEditPerson = document.getElementById('btnEditPersonProfile');
+    if (btnEditPerson && window.SchoolPersonProfileModal) {
+      btnEditPerson.addEventListener('click', () => {
+        const personId = document.getElementById('inp_personId')?.value?.trim();
+        if (!personId) return;
+        window.SchoolPersonProfileModal.open({
+          personId,
+          linkType: btnEditPerson.dataset.linkType || 'student',
+          linkId: btnEditPerson.dataset.linkId || '',
+          organizationLookup,
+          onSaved: ({ displayName, organizations: nextOrganizations }) => {
+            if (displayName) document.getElementById('inp_personName').value = displayName;
+            selectedPersonOrganizations = Array.isArray(nextOrganizations) ? nextOrganizations : [];
+            renderPersonRoleSummary();
+          }
+        });
+      });
+    }
 
     const selfFundToggle = document.getElementById('chk_selfFund');
     if (selfFundToggle) selfFundToggle.addEventListener('change', syncFunderDependentFields);
@@ -1301,6 +1560,7 @@
         }
 
         syncHiddenAttachments();
+        syncClbHiddenField();
         syncNewPersonHiddenState();
 
         // Build FormData manually so fields go first, files last
@@ -1419,6 +1679,8 @@
     syncFunderDependentFields();
     syncPersonModeUI();
     syncNewPersonHiddenState();
+    wireClbLevelHistoryUi();
+    refreshEditPersonButton();
   });
 })();
 </script>

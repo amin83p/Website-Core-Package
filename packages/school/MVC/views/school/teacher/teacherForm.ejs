@@ -61,6 +61,9 @@
                     <input type="hidden" name="personId" id="inp_personId" value="<%= t.personId || '' %>" required>
                     <input type="text" id="inp_personName" class="form-control size-md bg-white border-primary fw-bold" placeholder="Search Person Directory..." value="<%= personName || '' %>" readonly required>
                     <button type="button" class="btn btn-primary" id="btnPickPerson" <%= isEdit ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
+                    <% if (canEditLinkedPerson) { %>
+                    <button type="button" class="btn btn-outline-primary" id="btnEditPersonProfile" data-link-type="<%= linkedPersonLinkType || 'teacher' %>" data-link-id="<%= linkedPersonLinkId || '' %>" title="Edit person profile"><i class="bi bi-pencil-square"></i></button>
+                    <% } %>
                   </div>
                 </div>
                 <div class="col-md-4 mb-3">
@@ -273,6 +276,7 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
+<%- include('../partials/personProfileEditModal') %>
 
 <script>
 (function () {
@@ -367,10 +371,14 @@
   }
 
   function normalizePersonRoles(org) {
+    if (window.SchoolRoleDisplay && typeof window.SchoolRoleDisplay.filterSchoolPackageOrgRoles === 'function') {
+      return window.SchoolRoleDisplay.filterSchoolPackageOrgRoles(org);
+    }
     const rawRoles = Array.isArray(org?.roles) && org.roles.length
       ? org.roles
       : (org?.role ? [org.role] : []);
-    return Array.from(new Set(rawRoles.map((role) => String(role || '').trim()).filter(Boolean)));
+    return Array.from(new Set(rawRoles.map((role) => String(role || '').trim()).filter(Boolean)))
+      .filter((role) => /^school_(student|teacher|staff)$/i.test(String(role || '').trim()));
   }
 
   function getOrganizationDisplayName(org) {
@@ -396,7 +404,7 @@
       const roles = normalizePersonRoles(org);
       const roleBadges = roles.length
         ? roles.map((role) => `<span class="badge text-bg-primary-subtle text-primary-emphasis border me-1 mb-1">${safeHtml(toLabelCase(role))}</span>`).join('')
-        : '<span class="text-muted small">No roles assigned</span>';
+        : '<span class="text-muted small">No school roles assigned</span>';
 
       return (
         '<div class="border rounded p-3 mb-2 bg-white">' +
@@ -671,6 +679,7 @@
             document.getElementById('inp_personName').value = `${item.name?.first || ''} ${item.name?.last || ''}`.trim() || item.id;
             selectedPersonOrganizations = Array.isArray(item.organizations) ? item.organizations : [];
             renderPersonRoleSummary();
+            refreshEditPersonButton();
             const modeExisting = document.getElementById('personModeExisting');
             if (modeExisting) {
               modeExisting.checked = true;
@@ -683,8 +692,35 @@
 
     const modeExisting = document.getElementById('personModeExisting');
     const modeNew = document.getElementById('personModeNew');
-    if (modeExisting) modeExisting.addEventListener('change', syncPersonModeUI);
-    if (modeNew) modeNew.addEventListener('change', syncPersonModeUI);
+    if (modeExisting) modeExisting.addEventListener('change', () => { syncPersonModeUI(); refreshEditPersonButton(); });
+    if (modeNew) modeNew.addEventListener('change', () => { syncPersonModeUI(); refreshEditPersonButton(); });
+
+    function refreshEditPersonButton() {
+      const btnEditPerson = document.getElementById('btnEditPersonProfile');
+      if (!btnEditPerson || !window.SchoolPersonProfileModal) return;
+      const personId = document.getElementById('inp_personId')?.value?.trim();
+      const personModeExisting = !modeExisting || modeExisting.checked;
+      window.SchoolPersonProfileModal.updateEditButtonState(btnEditPerson, { personId, personModeExisting });
+    }
+
+    const btnEditPerson = document.getElementById('btnEditPersonProfile');
+    if (btnEditPerson && window.SchoolPersonProfileModal) {
+      btnEditPerson.addEventListener('click', () => {
+        const personId = document.getElementById('inp_personId')?.value?.trim();
+        if (!personId) return;
+        window.SchoolPersonProfileModal.open({
+          personId,
+          linkType: btnEditPerson.dataset.linkType || 'teacher',
+          linkId: btnEditPerson.dataset.linkId || '',
+          organizationLookup,
+          onSaved: ({ displayName, organizations: nextOrganizations }) => {
+            if (displayName) document.getElementById('inp_personName').value = displayName;
+            selectedPersonOrganizations = Array.isArray(nextOrganizations) ? nextOrganizations : [];
+            renderPersonRoleSummary();
+          }
+        });
+      });
+    }
 
     if (btnAddNewPersonEmail) {
       btnAddNewPersonEmail.addEventListener('click', () => {
@@ -843,6 +879,7 @@
     syncPersonModeUI();
     syncNewPersonHiddenState();
     syncCompensationHiddenState();
+    refreshEditPersonButton();
   });
 })();
 </script>

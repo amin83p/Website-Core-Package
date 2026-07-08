@@ -29,6 +29,7 @@ const {
     enrichPersonPickerRowsWithAccountState
 } = require('../../services/school/schoolPeopleDuplicateGuardService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
+const schoolLinkedPersonProfileService = require('../../services/school/schoolLinkedPersonProfileService');
 const { ACADEMIC_STATUSES } = require('../../models/school/studentModel');
 const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
 const STUDENT_DELETE_FOOTPRINT_RULES = Object.freeze([
@@ -771,6 +772,11 @@ exports.showForm = async (req, res) => {
 
         const editFormDisplayName = String(personName || '').trim() || 'Student';
         const editFormRecordId = String(student.id || student.personId || '').trim();
+        const canEditLinkedPerson = await schoolLinkedPersonProfileService.evaluateCanEditLinkedPerson({
+            reqUser: req.user,
+            linkType: 'student',
+            isEdit
+        });
 
         res.render('school/student/studentForm', {
             title: isEdit ? `Edit Student: ${editFormDisplayName} (${editFormRecordId})` : 'Admit New Student',
@@ -784,7 +790,10 @@ exports.showForm = async (req, res) => {
             countries,    
             user: req.user,
             includeModal: true,
-            actionStateId: req.actionStateId
+            actionStateId: req.actionStateId,
+            canEditLinkedPerson,
+            linkedPersonLinkType: 'student',
+            linkedPersonLinkId: isEdit ? editFormRecordId : ''
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -897,6 +906,11 @@ exports.saveStudent = async (req, res) => {
             try { parsedAttachments = JSON.parse(req.body.attachments); } catch (e) { parsedAttachments = []; }
         }
 
+        let parsedClbLevelHistory = [];
+        if (req.body.clbLevelHistory) {
+            try { parsedClbLevelHistory = JSON.parse(req.body.clbLevelHistory); } catch (e) { parsedClbLevelHistory = []; }
+        }
+
         const commentsRaw = req.body.newFileComments;
         const newFileComments = Array.isArray(commentsRaw) ? commentsRaw : (commentsRaw ? [commentsRaw] : []);
 
@@ -953,7 +967,8 @@ exports.saveStudent = async (req, res) => {
             enrollmentDate: req.body.enrollmentDate,
             academicStatus: req.body.academicStatus || 'Active',
             notes: (req.body.notes || '').trim(),
-            attachments: parsedAttachments
+            attachments: parsedAttachments,
+            clbLevelHistory: parsedClbLevelHistory
         };
 
         if (payload.selfFund) {

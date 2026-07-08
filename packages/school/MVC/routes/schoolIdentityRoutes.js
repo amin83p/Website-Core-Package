@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/school/schoolIdentityController');
+const linkedPersonCtrl = require('../controllers/school/schoolLinkedPersonProfileController');
 const {
   requireAuth,
   requireAccess,
@@ -41,6 +42,32 @@ const SCHOOL_IDENTITY_READ_SECTIONS = [
   SECTIONS.SCHOOL_STAFF
 ].filter(Boolean);
 
+const LINK_TYPE_SECTION_MAP = Object.freeze({
+  student: SECTIONS.SCHOOL_STUDENTS,
+  teacher: SECTIONS.SCHOOL_TEACHERS,
+  staff: SECTIONS.SCHOOL_STAFF
+});
+
+const linkedPersonProfileMutationActionState = Object.freeze({
+  requireToken: false,
+  keepActive: true
+});
+
+function resolveLinkedPersonSectionId(req) {
+  const linkType = String(req.query?.linkType || req.body?.linkType || '').trim().toLowerCase();
+  return LINK_TYPE_SECTION_MAP[linkType] || SECTIONS.SCHOOL_STUDENTS;
+}
+
+function trackLinkedPersonProfileRead(req, res, next) {
+  const sectionId = resolveLinkedPersonSectionId(req);
+  return trackActionState(sectionId, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true })(req, res, next);
+}
+
+function trackLinkedPersonProfilePatch(req, res, next) {
+  const sectionId = resolveLinkedPersonSectionId(req);
+  return trackActionState(sectionId, OPERATIONS.UPDATE, linkedPersonProfileMutationActionState)(req, res, next);
+}
+
 router.use(requireAuth);
 
 router.get('/api/persons',
@@ -62,5 +89,15 @@ router.get('/api/taggable-users',
   ].filter(Boolean), OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.listTaggableUsers);
+
+router.get('/api/linked-person/:personId',
+  requireAccessAny(SCHOOL_IDENTITY_READ_SECTIONS, OPERATIONS.READ_ALL),
+  trackLinkedPersonProfileRead,
+  linkedPersonCtrl.getLinkedPersonProfile);
+
+router.patch('/api/linked-person/:personId',
+  requireAccessAny(SCHOOL_IDENTITY_READ_SECTIONS, OPERATIONS.READ_ALL),
+  trackLinkedPersonProfilePatch,
+  linkedPersonCtrl.patchLinkedPersonProfile);
 
 module.exports = router;

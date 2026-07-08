@@ -75,10 +75,13 @@ function sortStatusRows(a, b) {
 }
 
 async function buildStatusBundle(orgId, { includeInactive = false } = {}) {
-  const all = await schoolRepositories.sessionStatuses.list({
-    query: {},
-    scope: { canViewAll: true }
-  });
+  const repository = Object.prototype.hasOwnProperty.call(schoolRepositories, 'sessionStatuses') ? schoolRepositories.sessionStatuses : null;
+  const all = repository && typeof repository.list === 'function'
+    ? await repository.list({
+      query: {},
+      scope: { canViewAll: true }
+    })
+    : [];
   const targetOrgId = toPublicId(orgId) || '';
   const fallbackByCode = buildDefaultFallbackByCode();
 
@@ -235,12 +238,34 @@ function isSessionCompletionStatusByMap(statusMap, { status, notes = '' } = {}) 
     && definition.excludeFromAttendance !== true;
 }
 
+function shouldForceNotApplicableAttendanceByMap(statusMap, { status, notes = '' } = {}) {
+  const { definition } = resolveStatusDefinition(statusMap, { status, notes });
+  return definition?.makeUpRequired === true;
+}
+
 function shouldExcludeFromAttendanceByMap(statusMap, { status, notes = '' } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
   if (normalized === 'holiday') return true;
   if (!definition) return normalized === 'cancelled';
-  return definition.excludeFromAttendance === true || definition.makeUpRequired === true;
+  if (definition.makeUpRequired === true) return false;
+  return definition.excludeFromAttendance === true;
 }
+
+function buildForceNotApplicableAttendanceSessionKeys(statusMap, sessions = []) {
+  const out = new Set();
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    if (!shouldForceNotApplicableAttendanceByMap(statusMap, {
+      status: session?.status,
+      notes: session?.notes
+    })) return;
+    const sessionId = toPublicId(session?.sessionId || session?.id || '');
+    const date = String(session?.date || session?.sessionDate || '').trim();
+    if (sessionId) out.add(sessionId);
+    if (date) out.add(date);
+  });
+  return out;
+}
+
 
 function shouldExcludeFromTeacherIndexByMap(statusMap, { status, notes = '' } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
@@ -352,6 +377,8 @@ module.exports = {
   resolveStatusDefinition,
   isFinalStatusByMap,
   isSessionCompletionStatusByMap,
+  shouldForceNotApplicableAttendanceByMap,
+  buildForceNotApplicableAttendanceSessionKeys,
   shouldExcludeFromAttendanceByMap,
   shouldExcludeFromTeacherIndexByMap,
   shouldExcludeFromStudentIndexByMap,

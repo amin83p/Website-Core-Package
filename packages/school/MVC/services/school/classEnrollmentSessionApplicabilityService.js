@@ -1,4 +1,5 @@
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
+const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -147,7 +148,8 @@ function resolveRollingEnrollmentApplicability({
   studentToPersonMap = new Map(),
   activeOrgId = '',
   allowedStatuses = OPEN_OR_HISTORICAL_STATUSES,
-  approvedLeaveKeys = new Set()
+  approvedLeaveKeys = new Set(),
+  forceNotApplicableSessionKeys = new Set()
 } = {}) {
   const sessionRows = normalizeSessionRows(sessions);
   const personMap = normalizeStudentToPersonMap(studentToPersonMap);
@@ -186,12 +188,13 @@ function resolveRollingEnrollmentApplicability({
           ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
           : '';
         const hasApprovedLeave = approvedLeaveKeys.has(key);
-        const notApplicable = hasApprovedLeave || attendance === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+        const forceNotApplicable = forceNotApplicableSessionKeys.has(sessionId) || forceNotApplicableSessionKeys.has(date);
+        const notApplicable = forceNotApplicable || hasApprovedLeave || attendance === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
 
         if (notApplicable) {
           const next = {
             expected: false,
-            reason: hasApprovedLeave ? 'approved_leave' : 'manual_not_applicable',
+            reason: forceNotApplicable ? 'makeup_required' : (hasApprovedLeave ? 'approved_leave' : 'manual_not_applicable'),
             periodId,
             targetSessionCount,
             consumedCount,
@@ -282,7 +285,8 @@ async function resolveRollingEnrollmentApplicabilityWithLeaves({
   activeOrgId = '',
   orgId = '',
   reqUser,
-  allowedStatuses = OPEN_OR_HISTORICAL_STATUSES
+  allowedStatuses = OPEN_OR_HISTORICAL_STATUSES,
+  forceNotApplicableSessionKeys = new Set()
 } = {}) {
   const personMap = normalizeStudentToPersonMap(studentToPersonMap);
   const candidatePersonIds = new Set();
@@ -302,7 +306,8 @@ async function resolveRollingEnrollmentApplicabilityWithLeaves({
     studentToPersonMap: personMap,
     activeOrgId,
     allowedStatuses,
-    approvedLeaveKeys
+    approvedLeaveKeys,
+    forceNotApplicableSessionKeys
   });
 }
 
@@ -331,6 +336,7 @@ async function recomputeSessionCappedEnrollmentCompletionsForClass({
       : schoolDataService.fetchData('students', {}, reqUser)
   ]);
   const studentToPersonMap = normalizeStudentToPersonMap(effectiveStudents);
+  const statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
   const applicability = await resolveRollingEnrollmentApplicabilityWithLeaves({
     sessions,
     periodRows: effectivePeriods,
@@ -338,7 +344,8 @@ async function recomputeSessionCappedEnrollmentCompletionsForClass({
     activeOrgId: orgId,
     orgId,
     reqUser,
-    allowedStatuses: OPEN_STATUSES
+    allowedStatuses: OPEN_STATUSES,
+    forceNotApplicableSessionKeys: sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, sessions)
   });
   const updates = [];
   for (const [periodId, summary] of applicability.summariesByPeriodId.entries()) {

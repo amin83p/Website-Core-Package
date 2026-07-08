@@ -2,6 +2,7 @@ const schoolRepositories = require('../../repositories/school');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const classEnrollmentPolicyService = require('./classEnrollmentPolicyService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
+const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const TERMINAL_STATUSES = new Set(['cancelled', 'archived', 'error']);
@@ -278,6 +279,7 @@ async function createPeriod(input = {}, requestingUser = null, options = {}) {
     completionDate: sessionCap.completionDate,
     completionSessionId: sessionCap.completionSessionId,
     completionReason: sessionCap.completionReason,
+    plannedNotApplicableSessionIds: rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(input.plannedNotApplicableSessionIds),
     funderType: String(input.funderType || '').trim(),
     funderId: String(input.funderId || '').trim(),
     authorizationRef: String(input.authorizationRef || '').trim(),

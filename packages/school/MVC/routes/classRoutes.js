@@ -22,6 +22,14 @@ const sessionManagerMutationActionState = {
   allowInactiveTokenFallback: true
 };
 
+const sessionReportAssignmentActionState = {
+  requireToken: true,
+  keepActive: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true,
+  allowSectionTokenFallback: true
+};
+
 const rollingEnrollmentMutationActionState = {
   requireToken: true,
   keepActive: true,
@@ -223,6 +231,17 @@ router.get('/api/:classId/rolling-eligibility',
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL, { keepActive: true }),
   rollingCtrl.previewRollingEnrollmentEligibility);
 
+router.post('/api/:classId/enrollment-session-alignment',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL, { keepActive: true }),
+  rollingCtrl.postEnrollmentSessionAlignment);
+
+router.post('/api/:classId/sessions/append-batch',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.postAppendBatchSessions);
+
 router.post('/api/:classId/rolling-program-registration/preview',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
   requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE),
@@ -348,6 +367,10 @@ router.get('/:id/sessions/:sessionId/cases',
 router.get('/:id/sessions/:sessionId/report-instances',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
   classCtrl.listSessionReportInstances);
+router.post('/:id/sessions/:sessionId/report-assignments',
+  requireAccess(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE, sessionReportAssignmentActionState),
+  classCtrl.assignReportToSession);
 router.post('/:id/sessions/:sessionId/files/upload',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   upload('school-class-workspace', true).single('file'),

@@ -403,6 +403,80 @@ test('buildPrefillSnapshot excludes N/A attendance from percentage denominators'
   });
 });
 
+test('buildPrefillSnapshot derives make-up-required sessions as N/A without counting saved marks', async () => {
+  const assignment = {
+    id: 'ASN-MAKEUP-NA',
+    orgId: '900000',
+    classId: 'CLASS-MAKEUP-NA',
+    sessionId: 'SES-MAKEUP',
+    sessionDate: '2026-06-17',
+    reportStartDate: '2026-06-16',
+    reportDueDate: '2026-06-17',
+    teacherIds: ['TEACHER-1']
+  };
+  const sessions = [
+    { sessionId: 'SES-1', date: '2026-06-16', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'present' }] },
+    { sessionId: 'SES-MAKEUP', date: '2026-06-17', status: 'missed_informed24', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'present' }] }
+  ];
+  const statusMap = new Map([
+    ['completed', { code: 'completed', isFinal: true, makeUpRequired: false, excludeFromAttendance: false }],
+    ['missed_informed24', { code: 'missed_informed24', isFinal: true, makeUpRequired: true, excludeFromAttendance: true }]
+  ]);
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-MAKEUP-NA') return { id: 'CLASS-MAKEUP-NA', orgId: '900000', title: 'Make-up N/A Class' };
+      return null;
+    },
+    getClassSessions: async () => sessions,
+    fetchData: async (entityType) => {
+      if (entityType === 'students') return [{ id: 'STU-1', orgId: '900000', personId: 'STUDENT-PERSON-1' }];
+      if (entityType === 'examAssignments') return [];
+      return [];
+    }
+  }, async () => {
+    await withPatched(dataServiceGlobal, {
+      fetchData: async (entityType) => {
+        if (entityType === 'persons') {
+          return [
+            { id: 'TEACHER-1', name: { preferred: 'Teacher One' } },
+            { id: 'STUDENT-PERSON-1', name: { first: 'Student', last: 'One' } }
+          ];
+        }
+        if (entityType === 'organizations') return [{ id: '900000', name: 'Org One' }];
+        return [];
+      }
+    }, async () => {
+      await withPatched(sessionStatusPolicyService, {
+        getStatusMap: async () => statusMap
+      }, async () => {
+        await withPatched(attendanceMatrixPolicyModel, {
+          getPolicyForOrg: async () => ({
+            scheduledMinutes: 60,
+            disqualifyLateMinutes: 30,
+            disqualifyEarlyLeaveMinutes: 30,
+            disqualifyCombinedMissedMinutes: null
+          })
+        }, async () => {
+          const snapshot = await reportService.buildPrefillSnapshot({
+            assignment,
+            teacherId: 'TEACHER-1',
+            studentId: 'STUDENT-PERSON-1',
+            reqUser: { id: 'USER-1', activeOrgId: '900000' }
+          });
+
+          assert.equal(snapshot.student_attendance_span_total_sessions, 1);
+          assert.equal(snapshot.student_attendance_span_present, 1);
+          assert.equal(snapshot.student_attendance_span_na, 1);
+          assert.equal(snapshot.student_attendance_span_percent, 100);
+          assert.equal(snapshot.class_attendance_span_total, 1);
+          assert.equal(snapshot.class_attendance_span_na, 1);
+          assert.equal(snapshot.class_attendance_span_percent, 100);
+        });
+      });
+    });
+  });
+});
 test('buildReportDocxCollections builds students, sessions, and N/A-aware attendance rows', async () => {
   const assignment = {
     id: 'ASN-COLLECTIONS',

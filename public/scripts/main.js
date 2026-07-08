@@ -62,12 +62,21 @@
                 return nativeFetch(input, init);
             }
 
+            // Auxiliary school person-profile saves must not consume the parent form token.
+            if (/\/school\/identity\/api\/linked-person\//i.test(requestUrl)) {
+                return nativeFetch(input, init);
+            }
+
+            const headers = mergeHeaders(input, init);
+            if (headers.has('x-skip-action-state-token') || headers.has('x-skip-action-state-bridge')) {
+                return nativeFetch(input, init);
+            }
+
             const token = resolveActionStateToken();
             if (!token) {
                 return nativeFetch(input, init);
             }
 
-            const headers = mergeHeaders(input, init);
             if (!headers.has('x-action-state-id')) {
                 headers.set('X-Action-State-Id', token);
             }

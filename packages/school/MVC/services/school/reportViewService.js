@@ -7,6 +7,8 @@ const adminChekersService = requireCoreModule('MVC/services/adminChekersService'
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
+const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function isSchoolReportAdminViewer(reqUser) {
@@ -124,6 +126,28 @@ function applyAssignmentRow(assignment = {}, row = null) {
     return reportAssignmentModel.applyTargetRowToAssignment(assignment, row);
   }
   return assignment;
+}
+
+function resolveInstanceReportDueDate(instance = {}, assignment = {}) {
+  const targetRow = findAssignmentRow(assignment, instance.assignmentRowId || '');
+  return parseDateOnlyValue(
+    targetRow?.reportDueDate ||
+    targetRow?.dueDate ||
+    assignment?.reportDueDate ||
+    assignment?.dueDate ||
+    instance?.sessionDate ||
+    ''
+  );
+}
+
+function parseFilterIdList(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => toPublicId(item)).filter(Boolean);
+  }
+  return String(value || '')
+    .split(',')
+    .map((item) => toPublicId(item.trim()))
+    .filter(Boolean);
 }
 
 function findAssignmentRow(assignment = {}, rowId = '') {
@@ -366,6 +390,176 @@ async function buildPersonNameMap(reqUser) {
     map.set(id, preferred || fullName || id);
   });
   return map;
+}
+
+function formatPersonDisplayName(person = {}, fallback = '') {
+  const preferred = String(person?.name?.preferred || person?.preferredName || '').trim();
+  if (preferred) return preferred;
+  const first = String(person?.name?.first || person?.firstName || '').trim();
+  const last = String(person?.name?.last || person?.lastName || '').trim();
+  const combined = `${first} ${last}`.trim();
+  if (combined) return combined;
+  return String(person?.displayName || person?.fullName || fallback || '').trim();
+}
+
+function buildRecordIdToPersonIdMaps({ students = [], teachers = [], orgId = '' } = {}) {
+  const orgToken = String(orgId || '').trim();
+  const studentRecordToPersonId = new Map();
+  const teacherRecordToPersonId = new Map();
+  (Array.isArray(students) ? students : []).forEach((row) => {
+    const recordId = toPublicId(row?.id);
+    const personId = toPublicId(row?.personId);
+    if (!recordId || !personId) return;
+    if (orgToken && toPublicId(row?.orgId) && toPublicId(row.orgId) !== orgToken) return;
+    studentRecordToPersonId.set(recordId, personId);
+  });
+  (Array.isArray(teachers) ? teachers : []).forEach((row) => {
+    const recordId = toPublicId(row?.id);
+    const personId = toPublicId(row?.personId);
+    if (!recordId || !personId) return;
+    if (orgToken && toPublicId(row?.orgId) && toPublicId(row.orgId) !== orgToken) return;
+    teacherRecordToPersonId.set(recordId, personId);
+  });
+  return { studentRecordToPersonId, teacherRecordToPersonId };
+}
+
+function resolvePersonIdFromParticipantToken(rawId = '', maps = {}) {
+  const token = toPublicId(rawId);
+  if (!token) return '';
+  return maps.studentRecordToPersonId?.get(token)
+    || maps.teacherRecordToPersonId?.get(token)
+    || token;
+}
+
+function readReportPrefillName(snapshot = {}, keys = []) {
+  const source = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  for (const key of keys) {
+    const value = String(source?.[key] || '').trim();
+    if (value) return value;
+  }
+  return '';
+}
+
+function resolveReportParticipantDisplay({
+  rawId = '',
+  nameByPersonId = new Map(),
+  studentRecordToPersonId = new Map(),
+  teacherRecordToPersonId = new Map(),
+  prefillName = ''
+} = {}) {
+  const token = toPublicId(rawId);
+  if (!token) return { personId: '', displayName: '-' };
+  const personId = resolvePersonIdFromParticipantToken(token, { studentRecordToPersonId, teacherRecordToPersonId });
+  const mappedName = String(nameByPersonId.get(personId) || '').trim();
+  const cleanPrefill = String(prefillName || '').trim();
+  const displayName = mappedName
+    || (cleanPrefill && cleanPrefill !== token && cleanPrefill !== personId ? cleanPrefill : '')
+    || personId
+    || token;
+  return { personId, displayName };
+}
+
+async function buildReportParticipantNameContext({
+  reqUser,
+  students = [],
+  teachers = [],
+  participantTokens = []
+} = {}) {
+  const { studentRecordToPersonId, teacherRecordToPersonId } = buildRecordIdToPersonIdMaps({
+    students,
+    teachers,
+    orgId: reqUser?.activeOrgId || ''
+  });
+  const personIds = new Set();
+  (Array.isArray(students) ? students : []).forEach((row) => {
+    const personId = toPublicId(row?.personId);
+    if (personId) personIds.add(personId);
+  });
+  (Array.isArray(teachers) ? teachers : []).forEach((row) => {
+    const personId = toPublicId(row?.personId);
+    if (personId) personIds.add(personId);
+  });
+  (Array.isArray(participantTokens) ? participantTokens : []).forEach((token) => {
+    const personId = resolvePersonIdFromParticipantToken(token, { studentRecordToPersonId, teacherRecordToPersonId });
+    if (personId) personIds.add(personId);
+  });
+
+  const [personRowMap, legacyNameMap] = await Promise.all([
+    schoolPersonAccessService.buildPersonByIdMap({
+      reqUser,
+      personIds: [...personIds],
+      requireSchoolRole: false
+    }),
+    buildPersonNameMap(reqUser)
+  ]);
+
+  const nameByPersonId = new Map();
+  personIds.forEach((personId) => {
+    const person = personRowMap.get(personId);
+    const directName = person ? formatPersonDisplayName(person, '') : '';
+    const legacyName = String(legacyNameMap.get(personId) || '').trim();
+    const name = directName || legacyName;
+    if (name && name !== personId) nameByPersonId.set(personId, name);
+  });
+  legacyNameMap.forEach((name, personId) => {
+    const cleanName = String(name || '').trim();
+    if (!nameByPersonId.has(personId) && cleanName && cleanName !== personId) {
+      nameByPersonId.set(personId, cleanName);
+    }
+  });
+
+  return {
+    nameByPersonId,
+    studentRecordToPersonId,
+    teacherRecordToPersonId,
+    resolveTeacher(rawId, prefillName = '') {
+      return resolveReportParticipantDisplay({
+        rawId,
+        nameByPersonId,
+        studentRecordToPersonId,
+        teacherRecordToPersonId,
+        prefillName
+      });
+    },
+    resolveStudent(rawId, prefillName = '') {
+      return resolveReportParticipantDisplay({
+        rawId,
+        nameByPersonId,
+        studentRecordToPersonId,
+        teacherRecordToPersonId,
+        prefillName
+      });
+    }
+  };
+}
+
+function mapReportInstanceParticipantFields({
+  row = {},
+  participantNames,
+  personToStudentMap = new Map()
+} = {}) {
+  const teacherId = toPublicId(row?.teacherId);
+  const studentId = toPublicId(row?.studentId);
+  const teacherPrefill = readReportPrefillName(row?.prefillSnapshot, ['teacher_name'])
+    || readReportPrefillName(row?.answers, ['teacher_name']);
+  const studentPrefill = readReportPrefillName(row?.prefillSnapshot, ['student_full_name', 'student_name'])
+    || readReportPrefillName(row?.answers, ['student_full_name', 'student_name']);
+  const teacherResolved = participantNames.resolveTeacher(teacherId, teacherPrefill);
+  const studentResolved = studentId
+    ? participantNames.resolveStudent(studentId, studentPrefill)
+    : { personId: '', displayName: 'Whole class' };
+  return {
+    teacherId: teacherResolved.personId || teacherId,
+    teacherName: teacherResolved.displayName || '-',
+    studentId: studentResolved.personId || studentId,
+    studentName: studentResolved.displayName || 'Whole class',
+    studentRecordId: studentResolved.personId
+      ? schoolStudentProfileLinkService.resolveStudentRecordId({
+        personId: studentResolved.personId,
+        personToStudentMap
+      })
+      : ''
+  };
 }
 
 async function listAllReportTemplates(reqUser) {
@@ -797,13 +991,27 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
 }
 
 function buildInstanceScheduleFilters(input = {}) {
+  const teacherIds = parseFilterIdList(
+    input.teacherIds || input.teacherPersonId || input.teacherFilter || input.teacherId || ''
+  );
+  const studentIds = parseFilterIdList(
+    input.studentIds || input.studentPersonId || input.studentFilter || input.studentId || ''
+  );
+  const classIds = parseFilterIdList(input.classIds || input.classId || '');
   return {
     assignmentId: toPublicId(input.assignmentFilter || input.assignmentId || ''),
     assignmentRowId: toPublicId(input.assignmentRowFilter || input.assignmentRowId || input.rowId || ''),
     sessionId: toPublicId(input.sessionFilter || input.sessionId || ''),
     sessionDate: parseDateOnlyValue(input.sessionDateFilter || input.sessionDate || ''),
-    teacherId: toPublicId(input.teacherFilter || input.teacherId || ''),
-    studentId: toPublicId(input.studentFilter || input.studentId || '')
+    teacherId: teacherIds[0] || toPublicId(input.teacherFilter || input.teacherId || ''),
+    studentId: studentIds[0] || toPublicId(input.studentFilter || input.studentId || ''),
+    templateId: toPublicId(input.templateId || input.templateFilter || ''),
+    classIds,
+    teacherIds,
+    studentIds,
+    dueDateStart: parseDateOnlyValue(input.dueDateStart || input.startDate || ''),
+    dueDateEnd: parseDateOnlyValue(input.dueDateEnd || input.endDate || ''),
+    status: String(input.status || '').trim().toLowerCase()
   };
 }
 
@@ -815,8 +1023,33 @@ function rowMatchesInstanceFilters(row = {}, filters = {}) {
   }
   if (filters.sessionId && !idsEqual(row.sessionId || '', filters.sessionId)) return false;
   if (filters.sessionDate && parseDateOnlyValue(row.sessionDate || '') !== filters.sessionDate) return false;
-  if (filters.teacherId && !idsEqual(row.teacherId || '', filters.teacherId)) return false;
-  if (filters.studentId && !idsEqual(row.studentId || '', filters.studentId)) return false;
+  if (filters.templateId && !idsEqual(row.templateId || '', filters.templateId)) return false;
+  if (filters.classIds?.length && !filters.classIds.some((id) => idsEqual(row.classId || '', id))) return false;
+  if (filters.teacherIds?.length) {
+    if (!filters.teacherIds.some((id) => idsEqual(row.teacherId || '', id))) return false;
+  } else if (filters.teacherId && !idsEqual(row.teacherId || '', filters.teacherId)) {
+    return false;
+  }
+  if (filters.studentIds?.length) {
+    if (!row.studentId) return false;
+    if (!filters.studentIds.some((id) => idsEqual(row.studentId || '', id))) return false;
+  } else if (filters.studentId && !idsEqual(row.studentId || '', filters.studentId)) {
+    return false;
+  }
+  if (filters.status) {
+    if (filters.status === 'pending') {
+      if (!row.isPendingAssignment) return false;
+    } else {
+      if (row.isPendingAssignment) return false;
+      if (String(row.status || '').toLowerCase() !== filters.status) return false;
+    }
+  }
+  if (filters.dueDateStart || filters.dueDateEnd) {
+    const dueDate = parseDateOnlyValue(row.reportDueDate || '');
+    if (!dueDate) return false;
+    if (filters.dueDateStart && dueDate < filters.dueDateStart) return false;
+    if (filters.dueDateEnd && dueDate > filters.dueDateEnd) return false;
+  }
   return true;
 }
 
@@ -828,6 +1061,13 @@ async function buildInstanceListRows({
   sessionDateFilter = '',
   teacherFilter = '',
   studentFilter = '',
+  templateId = '',
+  classIds = [],
+  teacherIds = [],
+  studentIds = [],
+  dueDateStart = '',
+  dueDateEnd = '',
+  status = '',
   q = ''
 }) {
   const instanceFilters = buildInstanceScheduleFilters({
@@ -836,16 +1076,36 @@ async function buildInstanceListRows({
     sessionFilter,
     sessionDateFilter,
     teacherFilter,
-    studentFilter
+    studentFilter,
+    templateId,
+    classIds,
+    teacherIds,
+    studentIds,
+    dueDateStart,
+    dueDateEnd,
+    status
   });
-  const [allInstances, allAssignments, allTemplates, classes, students, personMap] = await Promise.all([
+  const [allInstances, allAssignments, allTemplates, classes, students, teachers] = await Promise.all([
     listAllReportInstances(reqUser),
     listAllReportAssignments(reqUser),
     listAllReportTemplates(reqUser),
     schoolDataService.fetchData('classes', {}, reqUser),
     schoolDataService.fetchData('students', {}, reqUser),
-    buildPersonNameMap(reqUser)
+    schoolDataService.fetchData('teachers', {}, reqUser)
   ]);
+  const participantTokens = [];
+  filterRecordsByOrg(allInstances, reqUser).forEach((row) => {
+    const teacherId = toPublicId(row?.teacherId);
+    const studentId = toPublicId(row?.studentId);
+    if (teacherId) participantTokens.push(teacherId);
+    if (studentId) participantTokens.push(studentId);
+  });
+  const participantNames = await buildReportParticipantNameContext({
+    reqUser,
+    students,
+    teachers,
+    participantTokens
+  });
   const assignmentMap = new Map(
     (Array.isArray(allAssignments) ? allAssignments : [])
       .map((row) => [toPublicId(row?.id), row])
@@ -861,6 +1121,10 @@ async function buildInstanceListRows({
       .map((row) => [toPublicId(row?.id), row])
       .filter(([id]) => Boolean(id))
   );
+  const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(
+    students,
+    reqUser?.activeOrgId || ''
+  );
 
   const activeInstanceRows = filterRecordsByOrg(allInstances, reqUser)
     .filter(isActiveReportInstance)
@@ -869,8 +1133,11 @@ async function buildInstanceListRows({
       const assignment = assignmentMap.get(toPublicId(row?.assignmentId)) || null;
       const template = templateMap.get(toPublicId(row?.templateId)) || null;
       const classItem = classMap.get(toPublicId(row?.classId)) || null;
-      const teacherId = toPublicId(row?.teacherId);
-      const studentId = toPublicId(row?.studentId);
+      const participants = mapReportInstanceParticipantFields({
+        row,
+        participantNames,
+        personToStudentMap
+      });
       return {
         ...row,
         isPendingAssignment: false,
@@ -879,8 +1146,12 @@ async function buildInstanceListRows({
         templateTitle: template?.title || row.templateId,
         hasDocxTemplate: Boolean(template?.docxTemplate?.path),
         assignmentStatus: assignment?.status || '',
-        teacherName: personMap.get(teacherId) || teacherId || '-',
-        studentName: studentId ? (personMap.get(studentId) || studentId) : 'Whole class'
+        reportDueDate: resolveInstanceReportDueDate(row, assignment),
+        teacherId: participants.teacherId,
+        teacherName: participants.teacherName,
+        studentId: participants.studentId,
+        studentName: participants.studentName,
+        studentRecordId: participants.studentRecordId
       };
     });
 
@@ -924,6 +1195,15 @@ async function buildInstanceListRows({
           const assignmentRowId = String(targetRow?.rowId || '').trim();
           const identityKey = buildInstanceIdentityKeyForRow(assignmentId, assignmentRowId, teacherId, targetKey);
           if (existingInstanceKeys.has(identityKey)) return;
+          const participants = mapReportInstanceParticipantFields({
+            row: {
+              teacherId,
+              studentId,
+              prefillSnapshot: {}
+            },
+            participantNames,
+            personToStudentMap
+          });
           pendingRows.push({
             id: `pending-${assignmentId}-${assignmentRowId || 'legacy'}-${teacherId}-${targetKey}`.replace(/[^A-Za-z0-9_-]/g, '-'),
             isPendingAssignment: true,
@@ -933,12 +1213,17 @@ async function buildInstanceListRows({
             classId: assignment.classId,
             sessionId: targetRow.sessionId,
             sessionDate: String(targetRow.sessionDate || targetRow.reportDueDate || targetRow.dueDate || '').trim(),
+            reportDueDate: resolveInstanceReportDueDate(
+              { assignmentRowId, sessionDate: targetRow.sessionDate || targetRow.reportDueDate || targetRow.dueDate || '' },
+              rowAssignment
+            ),
             templateId: assignment.templateId,
             templateVersion: assignment.templateVersion || template?.version || 1,
-            teacherId,
-            teacherName: personMap.get(teacherId) || teacherId || '-',
-            studentId,
-            studentName: studentId ? (personMap.get(studentId) || studentId) : 'Whole class',
+            teacherId: participants.teacherId,
+            teacherName: participants.teacherName,
+            studentId: participants.studentId,
+            studentName: participants.studentName,
+            studentRecordId: participants.studentRecordId,
             targetKey,
             status: 'pending',
             classTitle: classItem?.title || assignment.classId,
@@ -964,6 +1249,7 @@ async function buildInstanceListRows({
         row.templateTitle,
         row.status,
         row.sessionDate,
+        row.reportDueDate,
         row.teacherId,
         row.teacherName,
         row.studentId,
@@ -1062,8 +1348,7 @@ async function buildPersonReportListContext({ reqUser, requestedScope = '', requ
     classes,
     teachers,
     staffRows,
-    students,
-    personMap
+    students
   ] = await Promise.all([
     listAllReportInstances(reqUser),
     listAllReportAssignments(reqUser),
@@ -1071,9 +1356,21 @@ async function buildPersonReportListContext({ reqUser, requestedScope = '', requ
     schoolDataService.fetchData('classes', {}, reqUser),
     schoolDataService.fetchData('teachers', {}, reqUser),
     schoolDataService.fetchData('staff', {}, reqUser),
-    schoolDataService.fetchData('students', {}, reqUser),
-    buildPersonNameMap(reqUser)
+    schoolDataService.fetchData('students', {}, reqUser)
   ]);
+  const participantTokens = [];
+  filterRecordsByOrg(allInstances, reqUser).forEach((row) => {
+    const teacherId = toPublicId(row?.teacherId);
+    const studentId = toPublicId(row?.studentId);
+    if (teacherId) participantTokens.push(teacherId);
+    if (studentId) participantTokens.push(studentId);
+  });
+  const participantNames = await buildReportParticipantNameContext({
+    reqUser,
+    students,
+    teachers,
+    participantTokens
+  });
   const assignmentMap = new Map(
     (Array.isArray(allAssignments) ? allAssignments : [])
       .map((row) => [toPublicId(row?.id), row])
@@ -1093,6 +1390,10 @@ async function buildPersonReportListContext({ reqUser, requestedScope = '', requ
   const teacherPersonSet = new Set((teachers || []).map((row) => toPublicId(row?.personId)).filter(Boolean));
   const staffPersonSet = new Set((staffRows || []).map((row) => toPublicId(row?.personId)).filter(Boolean));
   const studentPersonSet = new Set((students || []).map((row) => toPublicId(row?.personId)).filter(Boolean));
+  const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(
+    students,
+    reqUser?.activeOrgId || ''
+  );
   const activeOrgRoles = getActiveOrgRoleSet(reqUser);
 
   const viewerRoles = [];
@@ -1129,16 +1430,22 @@ async function buildPersonReportListContext({ reqUser, requestedScope = '', requ
       const assignment = assignmentMap.get(toPublicId(row?.assignmentId)) || null;
       const template = templateMap.get(toPublicId(row?.templateId)) || null;
       const classItem = classMap.get(toPublicId(row?.classId)) || null;
-      const teacherId = toPublicId(row.teacherId);
-      const studentId = toPublicId(row.studentId);
+      const participants = mapReportInstanceParticipantFields({
+        row,
+        participantNames,
+        personToStudentMap
+      });
       return {
         ...row,
         classTitle: classItem?.title || row.classId,
         classLifecycle: buildClassLifecycleSnapshot(classItem || {}),
         templateTitle: template?.title || row.templateId,
         assignmentStatus: assignment?.status || '',
-        teacherName: personMap.get(teacherId) || teacherId || '-',
-        studentName: personMap.get(studentId) || studentId || '-'
+        teacherId: participants.teacherId,
+        teacherName: participants.teacherName,
+        studentId: participants.studentId,
+        studentName: participants.studentName,
+        studentRecordId: participants.studentRecordId
       };
     })
     .filter((row) => {
@@ -1166,7 +1473,9 @@ async function buildPersonReportListContext({ reqUser, requestedScope = '', requ
     viewerRoles,
     selectedScope: effectiveScope,
     selectedPersonId: effectivePersonId,
-    selectedPersonLabel: effectivePersonId ? (personMap.get(effectivePersonId) || effectivePersonId) : ''
+    selectedPersonLabel: effectivePersonId
+      ? (participantNames.resolveTeacher(effectivePersonId).displayName || effectivePersonId)
+      : ''
   };
 }
 
@@ -1257,6 +1566,9 @@ module.exports = {
   buildAssignmentListContext,
   buildAssignmentFormContext,
   buildInstanceListRows,
+  buildInstanceScheduleFilters,
+  rowMatchesInstanceFilters,
+  resolveInstanceReportDueDate,
   buildReportReviewNavigator,
   buildPersonReportListContext,
   buildInstanceAnswers,

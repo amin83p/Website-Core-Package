@@ -1,0 +1,9 @@
+<%
+  const _name = typeof name !== 'undefined' ? String(name || '') : '';
+  const _studentRecordId = typeof studentRecordId !== 'undefined' ? String(studentRecordId || '').trim() : '';
+  const _canOpen = typeof canOpenStudentProfile !== 'undefined' && canOpenStudentProfile;
+  const _linkClass = typeof linkClass !== 'undefined' ? String(linkClass || 'text-decoration-none') : 'text-decoration-none';
+%>
+<% if (_canOpen && _studentRecordId) { %>
+<a href="/school/students/edit/<%= encodeURIComponent(_studentRecordId) %>" target="_blank" rel="noopener noreferrer" class="<%= _linkClass %>"><%= _name %></a>
+<% } else { %><%= _name %><% } %>

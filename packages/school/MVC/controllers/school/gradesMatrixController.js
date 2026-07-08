@@ -13,6 +13,7 @@ const leaveRequestService = require('../../services/school/leaveRequestService')
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
+const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -287,6 +288,7 @@ async function buildGradesMatrixPayload(req, query) {
   );
 
   const activeOrgId = String(req.user?.activeOrgId || classData?.orgId || '').trim();
+  const forceNotApplicableSessionKeys = sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, filteredSessions);
   const sessionDates = filteredSessions.map((row) => String(row?.date || '').trim()).filter(Boolean);
   const isRollingClass = String(classData?.registrationMode || '').trim().toLowerCase() === 'rolling';
   const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
@@ -312,7 +314,8 @@ async function buildGradesMatrixPayload(req, query) {
       activeOrgId,
       orgId: classData?.orgId || activeOrgId,
       reqUser: req.user,
-      allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+      allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+      forceNotApplicableSessionKeys
     });
     rollingApplicability.personIds.forEach((personId) => activePersonIds.add(String(personId || '').trim()));
   } else {
@@ -328,10 +331,19 @@ async function buildGradesMatrixPayload(req, query) {
     personIds: Array.from(activePersonIds)
   });
 
+  const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(students, activeOrgId);
+
   let studentList = Array.from(activePersonIds).map((uid) => {
     const person = personById.get(String(uid || '').trim());
     const name = person ? schoolPersonAccessService.formatPersonName(person, `Person ${uid}`) : `Person ${uid}`;
-    return { personId: uid, name };
+    return {
+      personId: uid,
+      name,
+      studentRecordId: schoolStudentProfileLinkService.resolveStudentRecordId({
+        personId: uid,
+        personToStudentMap
+      })
+    };
   });
   studentList.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -361,12 +373,16 @@ async function buildGradesMatrixPayload(req, query) {
     const attendanceRecords = filteredSessions.map((ses) => {
       const rosterRecord = ses.roster?.find((r) => idsEqual(r.personId, stu.personId));
       const applicabilityState = getApplicabilityForSession(stu, ses);
-      const expectedForSession = Boolean(applicabilityState.expected);
+      const forceNotApplicable = forceNotApplicableSessionKeys.has(String(ses?.sessionId || ses?.id || '').trim())
+        || forceNotApplicableSessionKeys.has(String(ses?.date || '').trim());
+      const expectedForSession = !forceNotApplicable && Boolean(applicabilityState.expected);
       const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
-      let status = rosterRecord
-        ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
-        : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE);
-      if (hasApprovedLeave && (!rosterRecord || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
+      let status = forceNotApplicable
+        ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+        : (rosterRecord
+          ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
+          : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
+      if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
         status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       }
       return {
@@ -388,12 +404,16 @@ async function buildGradesMatrixPayload(req, query) {
       }
       const rosterRecord = ses.roster?.find((r) => idsEqual(r.personId, stu.personId));
       const applicabilityState = getApplicabilityForSession(stu, ses);
-      const expectedForSession = Boolean(applicabilityState.expected);
+      const forceNotApplicable = forceNotApplicableSessionKeys.has(String(ses?.sessionId || ses?.id || '').trim())
+        || forceNotApplicableSessionKeys.has(String(ses?.date || '').trim());
+      const expectedForSession = !forceNotApplicable && Boolean(applicabilityState.expected);
       const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
-      let att = rosterRecord
-        ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
-        : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE);
-      if (hasApprovedLeave && (!rosterRecord || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
+      let att = forceNotApplicable
+        ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+        : (rosterRecord
+          ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
+          : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
+      if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
         att = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       }
       const absent = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;

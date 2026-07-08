@@ -40,6 +40,7 @@ const finalGradesWorkflowService = require('../../services/school/finalGradesWor
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const activityService = require('../../services/school/activityService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
+const sessionReportAssignmentService = require('../../services/school/sessionReportAssignmentService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const schoolRepositories = require('../../repositories/school');
@@ -57,6 +58,7 @@ const sessionReportInstanceService = require('../../services/school/sessionRepor
 const schoolRecordAccessService = require('../../services/school/schoolRecordAccessService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
+const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 
 function isSafeChildPath(basePath, targetPath) {
     const normalizedBase = path.resolve(basePath);
@@ -1031,7 +1033,11 @@ function mergeGradebookScorePersonsIntoEnrichedRoster(enrichedRoster, session, p
             attendance: 'absent',
             notes: '',
             comments: [],
-            name: displayName
+            name: displayName,
+            studentRecordId: schoolStudentProfileLinkService.resolveStudentRecordId({
+                personId: pid,
+                personToStudentMap: options?.personToStudentMap
+            })
         });
     });
 }
@@ -1206,14 +1212,17 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
             schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, reqUser),
             schoolDataService.getClassSessions(classData?.id, reqUser)
         ]);
+        const effectiveSessions = Array.isArray(allSessions) && allSessions.length ? allSessions : [session];
+        const statusMapForApplicability = await sessionStatusPolicyService.getStatusMap(classData?.orgId || activeOrgId, { includeInactive: true });
         const applicability = await classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicabilityWithLeaves({
-            sessions: Array.isArray(allSessions) && allSessions.length ? allSessions : [session],
+            sessions: effectiveSessions,
             periodRows,
             studentToPersonMap,
             activeOrgId,
             orgId: classData?.orgId || activeOrgId,
             reqUser,
-            allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+            allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+            forceNotApplicableSessionKeys: sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMapForApplicability, effectiveSessions)
         });
         const personIds = new Set();
         const applicabilityByPersonId = new Map();
@@ -1225,7 +1234,7 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
                 session?.sessionId || session?.id
             );
             if (!state) return;
-            if (state.expected || state.reason === 'approved_leave' || state.reason === 'manual_not_applicable') {
+            if (state.expected || state.reason === 'approved_leave' || state.reason === 'manual_not_applicable' || state.reason === 'makeup_required') {
                 const normalizedPersonId = cleanPersonId(personId);
                 personIds.add(normalizedPersonId);
                 applicabilityByPersonId.set(normalizedPersonId, state);
@@ -1306,6 +1315,11 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
             return pid && activePersonIds.has(pid);
         });
     }
+    const statusMapForSession = await sessionStatusPolicyService.getStatusMap(classData?.orgId || reqUser?.activeOrgId || '', { includeInactive: true });
+    const forceSessionNotApplicable = sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap(statusMapForSession, {
+        status: workingSession?.status,
+        notes: workingSession?.notes
+    });
     const getApplicabilityForPerson = (pid) => activeApplicabilityByPersonId.get(cleanPersonId(pid)) || null;
     const hasApprovedLeaveFor = (pid) => getApplicabilityForPerson(pid)?.reason === 'approved_leave';
 
@@ -1313,7 +1327,7 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
         if (!workingSession.roster.find((r) => idsEqual(r.personId, pid))) {
             workingSession.roster.push({
                 personId: pid,
-                attendance: hasApprovedLeaveFor(pid) ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : 'present',
+                attendance: (forceSessionNotApplicable || hasApprovedLeaveFor(pid)) ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : 'present',
                 notes: '',
                 comments: [],
                 classEffortPercent: 100,
@@ -1326,7 +1340,11 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
 
     workingSession.roster = workingSession.roster.map((row) => {
         const pid = cleanPersonId(row?.personId);
-        if (!pid || !hasApprovedLeaveFor(pid)) return row;
+        if (!pid) return row;
+        if (forceSessionNotApplicable) {
+            return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0 };
+        }
+        if (!hasApprovedLeaveFor(pid)) return row;
         const normalized = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
         if (normalized !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
             && normalized !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
@@ -1334,6 +1352,11 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
         }
         return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0 };
     });
+
+    const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(
+        students,
+        classData?.orgId || reqUser?.activeOrgId || ''
+    );
 
     const enrichedRoster = workingSession.roster.map((r) => {
         const pid = cleanPersonId(r.personId);
@@ -1343,6 +1366,10 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
             ...r,
             personId: pid,
             name: displayName,
+            studentRecordId: schoolStudentProfileLinkService.resolveStudentRecordId({
+                personId: pid,
+                personToStudentMap
+            }),
             classEffortPercent: normalizeSessionRatingPercent(r.classEffortPercent),
             classParticipationPercent: normalizeSessionRatingPercent(r.classParticipationPercent),
             respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent),
@@ -1353,7 +1380,8 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
     mergeGradebookScorePersonsIntoEnrichedRoster(enrichedRoster, workingSession, persons, {
         allowedPersonIds: getClassRegistrationModeKey(classData) === 'rolling'
             ? new Set(Array.from(activePersonIds).map((id) => String(id)))
-            : null
+            : null,
+        personToStudentMap
     });
 
     enrichedRoster.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -3317,6 +3345,11 @@ async function manageSession1(req, res) {
             }
         });
 
+        const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(
+            students,
+            classData?.orgId || getActiveOrgIdOrThrow(req.user)
+        );
+
         const enrichedRoster = session.roster.map(r => {
             const pid = cleanPersonId(r.personId);
             const person = persons.find((p) => idsEqual(p.id, pid));
@@ -3325,6 +3358,10 @@ async function manageSession1(req, res) {
                 ...r,
                 personId: pid,
                 name: displayName,
+                studentRecordId: schoolStudentProfileLinkService.resolveStudentRecordId({
+                    personId: pid,
+                    personToStudentMap
+                }),
                 classEffortPercent: normalizeSessionRatingPercent(r.classEffortPercent),
                 classParticipationPercent: normalizeSessionRatingPercent(r.classParticipationPercent),
                 respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent),
@@ -3335,7 +3372,8 @@ async function manageSession1(req, res) {
         mergeGradebookScorePersonsIntoEnrichedRoster(enrichedRoster, session, persons, {
             allowedPersonIds: getClassRegistrationModeKey(classData) === 'rolling'
                 ? new Set(Array.from(activePersonIds).map((id) => String(id)))
-                : null
+                : null,
+            personToStudentMap
         });
 
         enrichedRoster.sort((a, b) => a.name.localeCompare(b.name));
@@ -3644,6 +3682,13 @@ async function manageSession(req, res) {
             viewerContext: sessionReportViewerContext,
             sessionRoster: session.roster
         });
+        const reportAssignmentCreateAccess = await accessService.evaluateAccess({
+            user: req.user,
+            sectionId: SECTIONS.SCHOOL_REPORTS_ASSIGNMENT,
+            operationId: OPERATIONS.CREATE,
+            ipAddress: req.ip
+        }).catch(() => null);
+
 
         const orgPolicyLayerMs = await attendanceMatrixPolicyModel.getPolicyForOrg(
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
@@ -3665,6 +3710,7 @@ async function manageSession(req, res) {
             sessionExamContentItems,
             combinedSessionContent,
             sessionReportInstanceRows,
+            canAssignSessionReports: Boolean(reportAssignmentCreateAccess?.allowed),
             sessionStatusMeta: getActiveSessionStatusMeta(sessionStatusMeta),
             defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
             prevSessionId,    
@@ -3683,6 +3729,55 @@ async function manageSession(req, res) {
     }
 }
 
+async function assignReportToSession(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { session } = findSessionInList(sessions, sessionId);
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session);
+
+        const enrichedRoster = await buildEnrichedSessionRosterForMutation({
+            classData,
+            session,
+            reqUser: req.user
+        });
+
+        const result = await sessionReportAssignmentService.createAssignmentForSession({
+            classData,
+            session,
+            sessionRoster: enrichedRoster,
+            input: req.body || {},
+            reqUser: req.user
+        });
+
+        const viewerContext = await sessionReportInstanceService.buildSessionReportViewerContext({
+            classId,
+            sessionRoster: enrichedRoster,
+            reqUser: req.user,
+            isReportAdminViewer: true
+        });
+        const rows = await sessionReportInstanceService.buildSessionReportInstanceRows({
+            classId,
+            sessionId,
+            sessionDate: session?.date,
+            reqUser: req.user,
+            viewerContext,
+            sessionRoster: enrichedRoster
+        });
+
+        return res.json({
+            status: 'success',
+            message: result.message || 'Report assigned to this session.',
+            assignmentId: result.assignment?.id || '',
+            rows,
+            actionStateId: req.actionStateId
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
 async function listSessionReportInstances(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -4381,7 +4476,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus,
+  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus,
   showFinalGradesPage,
   postOfficialFinalGradesWorkflow
 };

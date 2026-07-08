@@ -52,9 +52,11 @@
 
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-body p-4">
+          <h5 class="fw-bold mb-3"><i class="bi bi-arrow-counterclockwise me-2"></i>Org Workspace Reset</h5>
+
           <div class="alert alert-warning border-warning shadow-sm mb-4">
             <i class="bi bi-exclamation-triangle me-2"></i>
-            This action clears <b>Academic Ledger</b>, <b>Transaction Book</b>, <b>Journals</b>, <b>Program/Term Registrations</b>, <b>Prior Subject Credits</b>, <b>Withdrawals</b>, <b>Class Enrollments</b> (including enrollment period rows and completion-decision fields), per-class folders under <code>classes_storage</code> <em>and</em> embedded <code>sessions</code> on class rows in <code>classes.json</code> (JSON) or <code>schoolClasses</code> (Mongo), <b>Report Instances &amp; Assignments</b> (templates stay), <b>Timesheets</b> (period definitions stay), per-subject folders under <code>subjects_storage</code>, <b>Attendance Matrix Policy</b> overrides for this org (JSON or Mongo), <b>Official Final Grades</b> workflow state on classes in this org, and optional migration log files. It then rebuilds teacher/student schedule indexes for classes in this org. Master row definitions remain (accounts, people, programs, terms, classes, subjects, report templates, timesheet periods).
+            <b>Transactional/runtime clear (always runs):</b> Academic Ledger, Transaction Book, Journals, Program/Term Registrations, Prior Subject Credits, Withdrawals, Class Enrollments (including enrollment period rows), class workspaces under <code>classes_storage</code> and embedded <code>sessions</code>, Report Instances &amp; Assignments, Timesheets (entries only), Activities, Leave Requests, Tasks, Session Issues/Cases, Exam runtime data (answers, attempts, assignments, allocations), per-subject folders under <code>subjects_storage</code>, Attendance Matrix Policy overrides, Official Final Grades workflow state, optional academic snapshots, migration log files, and class schedule index rebuilds.
           </div>
 
           <div class="form-check mb-3">
@@ -64,9 +66,90 @@
             </label>
           </div>
 
-          <button type="button" class="btn btn-outline-danger btn-md fw-bold px-4" id="btnClearTransactionalData">
-            Clear Transactions, Registrations & Withdrawals
-          </button>
+          <div class="border rounded-3 p-3 mb-4">
+            <div class="fw-bold mb-2">Optional master definition purge</div>
+            <div class="small text-muted mb-3">Unchecked by default. Only selected groups are deleted after the transactional reset completes.</div>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input js-master-definition-toggle" type="checkbox" id="masterDefinitions_programs" data-master-key="programs">
+                  <label class="form-check-label" for="masterDefinitions_programs">Programs</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input js-master-definition-toggle" type="checkbox" id="masterDefinitions_terms" data-master-key="terms">
+                  <label class="form-check-label" for="masterDefinitions_terms">Terms</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input js-master-definition-toggle" type="checkbox" id="masterDefinitions_departments" data-master-key="departments">
+                  <label class="form-check-label" for="masterDefinitions_departments">Departments</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input js-master-definition-toggle" type="checkbox" id="masterDefinitions_subjects" data-master-key="subjects">
+                  <label class="form-check-label" for="masterDefinitions_subjects">Subjects</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input js-master-definition-toggle" type="checkbox" id="masterDefinitions_reportTemplates" data-master-key="reportTemplates">
+                  <label class="form-check-label" for="masterDefinitions_reportTemplates">Report templates</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input js-master-definition-toggle" type="checkbox" id="masterDefinitions_timesheetPeriods" data-master-key="timesheetPeriods">
+                  <label class="form-check-label" for="masterDefinitions_timesheetPeriods">Timesheet periods</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input js-master-definition-toggle" type="checkbox" id="masterDefinitions_activityCategories" data-master-key="activityCategories">
+                  <label class="form-check-label" for="masterDefinitions_activityCategories">Activity categories (if any remain)</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input js-master-definition-toggle" type="checkbox" id="masterDefinitions_examDefinitions" data-master-key="examDefinitions">
+                  <label class="form-check-label" for="masterDefinitions_examDefinitions">Exam definitions (templates, revisions, questions)</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check border border-danger-subtle rounded-2 p-2 bg-danger-subtle">
+                  <input class="form-check-input js-master-definition-toggle" type="checkbox" id="masterDefinitions_classes" data-master-key="classes">
+                  <label class="form-check-label fw-bold text-danger" for="masterDefinitions_classes">Classes (master rows)</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check border border-danger-subtle rounded-2 p-2 bg-danger-subtle">
+                  <input class="form-check-input js-master-definition-toggle" type="checkbox" id="masterDefinitions_schoolAccounts" data-master-key="schoolAccounts">
+                  <label class="form-check-label fw-bold text-danger" for="masterDefinitions_schoolAccounts">School accounts (non-head only)</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-info border-info shadow-sm mb-4">
+            <div class="fw-bold mb-2">Recommended workflow</div>
+            <ol class="mb-0 small ps-3">
+              <li>Preview the org workspace reset to review impacted records.</li>
+              <li>Run org workspace reset (transactional clear + any optional master groups above).</li>
+              <li>Open <b>Delete Sample People (Selectable)</b> and confirm the rows you want removed.</li>
+            </ol>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-md fw-bold px-4" id="btnPreviewOrgWorkspaceReset">
+              Preview Reset
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-md fw-bold px-4" id="btnClearTransactionalData">
+              Reset Org Workspace
+            </button>
+          </div>
         </div>
       </div>
 
@@ -80,7 +163,7 @@
             Delete Sample People (Selectable)
           </button>
           <div class="small text-muted mt-2">
-            Recommended order: first run transactional clear, then run this people cleanup for a fully clean school workspace.
+            Recommended order: first run <b>Org Workspace Reset</b>, then run this people cleanup for a fully clean school workspace.
           </div>
         </div>
       </div>
@@ -151,6 +234,35 @@
   </div>
 </div>
 
+<div class="modal fade" id="sampleWorkspaceResetPreviewModal" tabindex="-1" aria-labelledby="sampleWorkspaceResetPreviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="sampleWorkspaceResetPreviewModalLabel">
+          <i class="bi bi-eye me-2"></i>Org Workspace Reset Preview
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info border-info mb-3">
+          <i class="bi bi-info-circle me-2"></i>
+          This preview is read-only. No data is deleted until you run <b>Reset Org Workspace</b>.
+        </div>
+        <div id="sampleWorkspaceResetPreviewModalContent"></div>
+      </div>
+      <div class="modal-footer d-flex justify-content-between align-items-center">
+        <div class="small text-muted" id="sampleWorkspaceResetPreviewSummaryText"></div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-danger" id="btnProceedOrgWorkspaceReset">
+            Proceed to Reset
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <% if (lastResult) { %>
 <script>
   window.__LAST_SAMPLE_GENERATOR_RESULT__ = <%- JSON.stringify(lastResult).replace(/</g, '\\u003c') %>;
@@ -174,6 +286,11 @@
   const resetResultEl = document.getElementById('sampleResetResult');
   const submitBtn = document.getElementById('btnGenerateSamples');
   const clearBtn = document.getElementById('btnClearTransactionalData');
+  const previewResetBtn = document.getElementById('btnPreviewOrgWorkspaceReset');
+  const proceedResetBtn = document.getElementById('btnProceedOrgWorkspaceReset');
+  const workspaceResetPreviewModalEl = document.getElementById('sampleWorkspaceResetPreviewModal');
+  const workspaceResetPreviewModalContentEl = document.getElementById('sampleWorkspaceResetPreviewModalContent');
+  const workspaceResetPreviewSummaryTextEl = document.getElementById('sampleWorkspaceResetPreviewSummaryText');
   const openPeopleDeleteBtn = document.getElementById('btnOpenSamplePeopleDeleteModal');
   const selectAllPeopleBtn = document.getElementById('btnSelectAllSamplePeople');
   const unselectAllPeopleBtn = document.getElementById('btnUnselectAllSamplePeople');
@@ -192,7 +309,9 @@
   const operationProgressWrapEl = operationProgressBarEl ? operationProgressBarEl.closest('.progress') : null;
 
   let samplePeoplePreview = null;
+  let sampleWorkspaceResetPreview = null;
   let peopleDeleteModalApi = null;
+  let workspaceResetPreviewModalApi = null;
   let operationModalApi = null;
   let operationProgressTimer = null;
   let operationStageTimer = null;
@@ -342,6 +461,199 @@
       .replace(/'/g, '&#39;');
   }
 
+  const MASTER_DEFINITION_KEYS = [
+    'classes',
+    'programs',
+    'terms',
+    'subjects',
+    'departments',
+    'reportTemplates',
+    'timesheetPeriods',
+    'activityCategories',
+    'examDefinitions',
+    'schoolAccounts'
+  ];
+
+  function collectMasterDefinitionSelections() {
+    const out = {};
+    MASTER_DEFINITION_KEYS.forEach((key) => {
+      const el = document.getElementById(`masterDefinitions_${key}`);
+      out[key] = !!(el && el.checked);
+    });
+    return out;
+  }
+
+  function buildSelectedMasterDefinitionSummary() {
+    const selections = collectMasterDefinitionSelections();
+    const selected = MASTER_DEFINITION_KEYS.filter((key) => selections[key]);
+    if (!selected.length) return 'No optional master definitions selected.';
+    return `Optional master purge: ${selected.join(', ')}.`;
+  }
+
+  function appendMasterDefinitionParams(params) {
+    const selections = collectMasterDefinitionSelections();
+    MASTER_DEFINITION_KEYS.forEach((key) => {
+      params.set(`masterDefinitions_${key}`, selections[key] ? 'true' : 'false');
+    });
+  }
+
+  function appendWorkspaceResetPreviewParams(params) {
+    params.set('includeAcademicSnapshots', includeSnapshotsCheckbox?.checked ? 'true' : 'false');
+    appendMasterDefinitionParams(params);
+  }
+
+  function getWorkspaceResetPreviewModalApi() {
+    if (workspaceResetPreviewModalApi) return workspaceResetPreviewModalApi;
+    if (workspaceResetPreviewModalEl && window.bootstrap && window.bootstrap.Modal) {
+      workspaceResetPreviewModalApi = window.bootstrap.Modal.getOrCreateInstance(workspaceResetPreviewModalEl);
+      return workspaceResetPreviewModalApi;
+    }
+    return null;
+  }
+
+  function showWorkspaceResetPreviewModal() {
+    const api = getWorkspaceResetPreviewModalApi();
+    if (api) {
+      api.show();
+      return;
+    }
+    if (!workspaceResetPreviewModalEl) return;
+    workspaceResetPreviewModalEl.style.display = 'block';
+    workspaceResetPreviewModalEl.classList.add('show');
+    workspaceResetPreviewModalEl.removeAttribute('aria-hidden');
+    workspaceResetPreviewModalEl.setAttribute('aria-modal', 'true');
+    workspaceResetPreviewModalEl.setAttribute('role', 'dialog');
+    document.body.classList.add('modal-open');
+  }
+
+  function hideWorkspaceResetPreviewModal() {
+    const api = getWorkspaceResetPreviewModalApi();
+    if (api) {
+      api.hide();
+      return;
+    }
+    if (!workspaceResetPreviewModalEl) return;
+    workspaceResetPreviewModalEl.classList.remove('show');
+    workspaceResetPreviewModalEl.style.display = 'none';
+    workspaceResetPreviewModalEl.setAttribute('aria-hidden', 'true');
+    workspaceResetPreviewModalEl.removeAttribute('aria-modal');
+    document.body.classList.remove('modal-open');
+  }
+
+  function buildPreviewGroupTableHtml(groups, emptyMessage) {
+    const rows = Array.isArray(groups) ? groups : [];
+    if (!rows.length) {
+      return `<div class="small text-muted">${safeHtml(emptyMessage || 'Nothing to show.')}</div>`;
+    }
+    return rows.map((group) => {
+      const count = Number(group?.count || 0);
+      const skipped = group?.skipped === true;
+      const note = String(group?.note || '').trim();
+      const sampleRows = Array.isArray(group?.rows) ? group.rows : [];
+      const hiddenCount = Number(group?.hiddenCount || 0);
+      return `
+        <div class="border rounded-3 p-3 mb-3">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+            <div>
+              <div class="fw-bold">${safeHtml(group?.label || group?.key || 'Group')}</div>
+              ${note ? `<div class="small text-muted">${safeHtml(note)}</div>` : ''}
+            </div>
+            <div>
+              ${skipped
+                ? '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Preserved</span>'
+                : `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">${count} affected</span>`}
+            </div>
+          </div>
+          ${sampleRows.length ? `
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Label</th>
+                    <th>ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${sampleRows.map((row) => `
+                    <tr>
+                      <td>${safeHtml(row?.label || '(Unnamed)')}</td>
+                      <td class="font-monospace small">${safeHtml(row?.id || '')}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+            ${hiddenCount > 0 ? `<div class="small text-muted mt-2">... and ${hiddenCount} more not shown.</div>` : ''}
+          ` : (count > 0 && !note ? '<div class="small text-muted">No row details available; count only.</div>' : '')}
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderOrgWorkspaceResetPreview(preview) {
+    sampleWorkspaceResetPreview = preview || null;
+    if (!workspaceResetPreviewModalContentEl) return;
+    if (!preview) {
+      workspaceResetPreviewModalContentEl.innerHTML = '';
+      if (workspaceResetPreviewSummaryTextEl) workspaceResetPreviewSummaryTextEl.textContent = '';
+      return;
+    }
+
+    const transactionalGroups = preview?.transactional?.groups || [];
+    const masterGroups = preview?.masters?.groups || [];
+    const protectedGroups = preview?.masters?.protected || [];
+    const summary = preview?.summary || {};
+
+    workspaceResetPreviewModalContentEl.innerHTML = `
+      <div class="mb-4">
+        <h6 class="fw-bold mb-3">Transactional / runtime impact (always cleared)</h6>
+        ${buildPreviewGroupTableHtml(transactionalGroups, 'No transactional records found for this organization.')}
+      </div>
+      ${masterGroups.length ? `
+        <div class="mb-4">
+          <h6 class="fw-bold mb-3">Optional master definition purge</h6>
+          ${buildPreviewGroupTableHtml(masterGroups, 'No master definitions selected.')}
+        </div>
+      ` : `
+        <div class="alert alert-secondary border-secondary mb-4">
+          No optional master definitions are selected. Master rows will be preserved.
+        </div>
+      `}
+      ${protectedGroups.length ? `
+        <div class="mb-2">
+          <h6 class="fw-bold mb-3">Protected items</h6>
+          ${buildPreviewGroupTableHtml(protectedGroups, 'No protected items.')}
+        </div>
+      ` : ''}
+    `;
+
+    if (workspaceResetPreviewSummaryTextEl) {
+      workspaceResetPreviewSummaryTextEl.innerHTML = `
+        Transactional records: <b>${Number(summary.transactionalRecords || 0)}</b>
+        | Master records: <b>${Number(summary.masterRecords || 0)}</b>
+        | Protected: <b>${Number(summary.protectedRecords || 0)}</b>
+      `;
+    }
+  }
+
+  async function loadOrgWorkspaceResetPreview() {
+    if (!workspaceResetPreviewModalContentEl) return null;
+    workspaceResetPreviewModalContentEl.innerHTML = '<div class="py-4 text-center text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading preview...</div>';
+    const params = new URLSearchParams();
+    params.set('actionStateId', String(actionStateInput?.value || '').trim());
+    appendWorkspaceResetPreviewParams(params);
+    const response = await fetch(`/school/sample-data/clear-transactional-preview?${params.toString()}`, {
+      method: 'GET',
+      headers: { 'X-AJAX-Request': 'true' }
+    });
+    const result = await response.json();
+    if (result.status !== 'success') {
+      throw new Error(result.message || 'Failed to load org workspace reset preview.');
+    }
+    renderOrgWorkspaceResetPreview(result.preview || null);
+    return result.preview || null;
+  }
+
   function getPeopleDeleteModalApi() {
     if (peopleDeleteModalApi) return peopleDeleteModalApi;
     if (peopleDeleteModalEl && window.bootstrap && window.bootstrap.Modal) {
@@ -457,7 +769,7 @@
     resetResultEl.innerHTML = `
       <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3">
-          <h5 class="m-0 fw-bold"><i class="bi bi-eraser me-2"></i>Transactional Reset Result</h5>
+          <h5 class="m-0 fw-bold"><i class="bi bi-eraser me-2"></i>Org Workspace Reset Result</h5>
         </div>
         <div class="card-body p-4">
           ${resetWarnings.length ? `
@@ -549,6 +861,42 @@
             </div>
             <div class="col-lg-3 col-md-4">
               <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Activities Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.activities || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Leave Requests Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.leaveRequests || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Tasks Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.tasks || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Session Issues Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.sessionStudentCases || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Exam Answers Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.examAnswers || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Exam Attempts Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.examAttempts || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
                 <div class="small text-muted">Class Workspaces Removed</div>
                 <div class="fs-4 fw-bold text-danger">${Number(cleared.classRuntimeDirs || 0)}</div>
               </div>
@@ -589,6 +937,20 @@
                 <div class="fs-4 fw-bold text-primary">${Number(cleared.classIndexesRebuilt || 0)}</div>
               </div>
             </div>
+            ${Number(cleared.classes || 0) > 0 ? `
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Classes Purged (master)</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.classes || 0)}</div>
+              </div>
+            </div>` : ''}
+            ${Number(cleared.schoolAccounts || 0) > 0 ? `
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">School Accounts Purged</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.schoolAccounts || 0)}</div>
+              </div>
+            </div>` : ''}
           </div>
 
           <div class="alert alert-secondary border-secondary mb-0">
@@ -606,7 +968,11 @@
               Snapshots: <b>${Number(remaining.academicSnapshots || 0)}</b> |
               Report Instances: <b>${Number(remaining.reportInstances || 0)}</b> |
               Report Assignments: <b>${Number(remaining.reportAssignments || 0)}</b> |
-              Timesheets: <b>${Number(remaining.timesheets || 0)}</b>
+              Timesheets: <b>${Number(remaining.timesheets || 0)}</b> |
+              Activities: <b>${Number(remaining.activities || 0)}</b> |
+              Session Issues: <b>${Number(remaining.sessionStudentCases || 0)}</b> |
+              Classes (master): <b>${Number(remaining.classes || 0)}</b> |
+              Programs: <b>${Number(remaining.programs || 0)}</b>
             </div>
           </div>
         </div>
@@ -1025,46 +1391,48 @@
     }
   });
 
-  if (clearBtn) {
-    clearBtn.addEventListener('click', async function () {
+  async function runOrgWorkspaceReset() {
+    if (!clearBtn) return;
     const originalText = clearBtn.innerHTML;
     try {
+      const masterSummary = buildSelectedMasterDefinitionSummary();
       let confirmed = false;
       if (typeof window.showMessageModal === 'function') {
         const result = await window.showMessageModal({
-          title: 'Clear Transactions, Registrations & Withdrawals?',
+          title: 'Reset Org Workspace?',
           icon: 'warning',
-          message: 'This will clear academic/accounting transactions, program & term registrations, prior subject credits, withdrawals, class enrollments, enrollment periods, class workspace files, report runs (not templates), timesheets (not periods), subject storage folders, attendance matrix policy for this org, official final grades on classes, optional snapshots, and rebuild class-related schedule indexes. Master definitions will remain unchanged.',
+          message: `This will clear transactional/runtime school data for the active organization (activities, leave requests, tasks, session issues, exam runtime data, ledgers, registrations, workspaces, report runs, timesheets, attendance policy, official final grades, optional snapshots, and rebuild class indexes). ${masterSummary}`,
           buttons: [
             { text: 'Cancel', class: 'btn-secondary' },
-            { text: 'Clear Data', class: 'btn-danger' }
+            { text: 'Reset Workspace', class: 'btn-danger' }
           ]
         });
-        confirmed = result === 'Clear Data';
+        confirmed = result === 'Reset Workspace';
       } else {
-        confirmed = window.confirm('Clear transactions, registrations, prior credits, withdrawals, enrollments, workspaces, report runs, timesheets, attendance policy, official final grades, snapshots (if enabled), and rebuild indexes? Master definitions will remain unchanged.');
+        confirmed = window.confirm(`Reset org workspace? ${masterSummary}`);
       }
       if (!confirmed) return;
 
       await ensureAdminVerification();
 
       clearBtn.disabled = true;
-      clearBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Clearing...';
+      clearBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Resetting...';
       showOperationModal({
-        title: 'Clearing sample transactional data',
-        subtitle: 'Removing generated transactional records and rebuilding related school indexes.',
+        title: 'Resetting org workspace',
+        subtitle: 'Clearing transactional/runtime records and rebuilding related school indexes.',
         stages: [
           'Checking the active organization and cleanup options...',
-          'Clearing ledgers, journals, registrations, and withdrawals...',
-          'Removing class workspace data and report runs...',
+          'Clearing ledgers, journals, registrations, activities, and withdrawals...',
+          'Removing class workspace data, session issues, tasks, and exam runtime data...',
           'Resetting attendance and final grade workflow state...',
-          'Rebuilding indexes and preparing the cleanup summary...'
+          'Purging selected master definitions and rebuilding indexes...'
         ]
       });
 
       const params = new URLSearchParams();
       params.set('actionStateId', String(actionStateInput?.value || '').trim());
       params.set('includeAcademicSnapshots', includeSnapshotsCheckbox?.checked ? 'true' : 'false');
+      appendMasterDefinitionParams(params);
 
       const response = await fetch('/school/sample-data/clear-transactional', {
         method: 'POST',
@@ -1075,24 +1443,31 @@
         body: params.toString()
       });
 
-      const result = await readJsonResponse(response, 'Admin approval is required before clearing sample transactional data.');
+      const result = await readJsonResponse(response, 'Admin approval is required before resetting the org workspace.');
       if (result?.idempotency?.state) hideOperationModal();
       const guarded = typeof window.applyGuardedApiResult === 'function'
-        ? await window.applyGuardedApiResult(result, { busyTitle: 'Clear In Progress', replayTitle: 'Clear Already Processed' })
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Reset In Progress', replayTitle: 'Reset Already Processed' })
         : { stop: false };
       if (guarded.stop) return;
       if (result.status !== 'success') {
-        throw new Error(result.message || 'Failed to clear transactional data.');
+        throw new Error(result.message || 'Failed to reset org workspace.');
       }
       if (!result?.idempotency?.state) {
-        await completeOperationModal('Cleanup completed. Preparing the result...');
+        await completeOperationModal('Reset completed. Preparing the result...');
       }
 
       renderResetResult(result.result);
+      try {
+        await loadPeopleDeletePreview();
+        setAllPeopleSelection(true);
+        showPeopleDeleteModal();
+      } catch (_) {
+        // People preview is optional after reset; reset result is still shown.
+      }
       await showMsg({
         title: 'Completed',
         icon: 'success',
-        message: result.message || 'Transactional data cleared successfully.',
+        message: result.message || 'Org workspace reset completed successfully.',
         buttons: [{ text: 'OK', class: 'btn-success' }]
       });
     } catch (error) {
@@ -1101,13 +1476,60 @@
       await showMsg({
         title: isAdminRequiredError(error) ? 'Admin Verification Required' : 'System Error',
         icon: isAdminRequiredError(error) ? 'warning' : 'error',
-        message: error.message || 'Failed to clear transactional data.',
+        message: error.message || 'Failed to reset org workspace.',
         buttons: [{ text: 'Close', class: 'btn-secondary' }]
       });
     } finally {
       clearBtn.disabled = false;
       clearBtn.innerHTML = originalText;
     }
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async function () {
+      await runOrgWorkspaceReset();
+    });
+  }
+
+  if (previewResetBtn) {
+    previewResetBtn.addEventListener('click', async function () {
+      const originalText = previewResetBtn.innerHTML;
+      try {
+        previewResetBtn.disabled = true;
+        previewResetBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Loading...';
+        await loadOrgWorkspaceResetPreview();
+        showWorkspaceResetPreviewModal();
+      } catch (error) {
+        await showMsg({
+          title: 'Preview Error',
+          icon: 'error',
+          message: error.message || 'Failed to load org workspace reset preview.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } finally {
+        previewResetBtn.disabled = false;
+        previewResetBtn.innerHTML = originalText;
+      }
+    });
+  }
+
+  if (proceedResetBtn) {
+    proceedResetBtn.addEventListener('click', async function () {
+      hideWorkspaceResetPreviewModal();
+      await runOrgWorkspaceReset();
+    });
+  }
+
+  if (workspaceResetPreviewModalEl) {
+    workspaceResetPreviewModalEl.addEventListener('click', function (event) {
+      const dismissBtn = event.target.closest('[data-bs-dismiss="modal"]');
+      if (dismissBtn) {
+        hideWorkspaceResetPreviewModal();
+        return;
+      }
+      if (event.target === workspaceResetPreviewModalEl) {
+        hideWorkspaceResetPreviewModal();
+      }
     });
   }
 

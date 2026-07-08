@@ -1023,6 +1023,13 @@
       .replace(/'/g, '&#39;');
   }
 
+  function hubStudentNameHtml(name, studentRecordId, className) {
+    if (typeof schoolRenderStudentNameHtml === 'function') {
+      return schoolRenderStudentNameHtml(name, studentRecordId, { className: className || 'text-decoration-none fw-semibold' });
+    }
+    return escapeHtml(name || '-');
+  }
+
   async function showHubMessage(options) {
     if (typeof window.showMessageModal === 'function') {
       return window.showMessageModal(options || {});
@@ -2009,6 +2016,9 @@
   let hubSessionIssueStudentSelections = [];
   let hubSessionIssueClassSelections = [];
   let hubReportAssignmentClassSelections = [];
+  let hubReportInstanceClassSelections = [];
+  let hubReportInstanceTeacherSelections = [];
+  let hubReportInstanceStudentSelections = [];
   let hubSessionRowsByKey = new Map();
   let hubSessionStatusMeta = [];
   let hubSessionCanUpdateSessions = false;
@@ -3187,7 +3197,7 @@
           '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
           '<td class="ps-4"><div class="fw-bold">' + escapeHtml(formatHubSessionIssueDate(row.sessionDate)) + '</div><div class="small text-muted">' + escapeHtml(row.sessionStartTime || '--:--') + ' - ' + escapeHtml(row.sessionEndTime || '--:--') + '</div></td>',
           '<td><div class="fw-semibold text-primary">' + escapeHtml(row.classTitle || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.classId || '') + '</div></td>',
-          '<td><div class="fw-semibold">' + escapeHtml(row.studentName || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.studentPersonId || '') + '</div></td>',
+          '<td><div class="fw-semibold">' + hubStudentNameHtml(row.studentName || '-', row.studentRecordId) + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.studentPersonId || '') + '</div></td>',
           '<td><div>' + escapeHtml(row.teacherName || 'Unassigned') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.teacherPersonId || '') + '</div></td>',
           '<td class="text-capitalize">' + escapeHtml(toHubTitleCase(row.category || 'other')) + '</td>',
           '<td><span class="badge ' + sessionIssueBadgeClass(row.severity, 'severity') + '">' + escapeHtml(String(row.severity || 'info').toUpperCase()) + '</span></td>',
@@ -4358,7 +4368,7 @@
       return [
         '<tr>',
         '<td class="hub-attendance-rollup text-center small"><div><span class="text-success fw-bold">' + escapeHtml(String(present)) + '</span><span class="text-muted"> / </span><span class="text-danger fw-bold">' + escapeHtml(String(absent)) + '</span></div><div class="text-primary fw-bold">' + escapeHtml(percent) + '</div></td>',
-        '<td class="hub-attendance-student"><div class="fw-semibold">' + escapeHtml(student.name || 'Student') + '</div><div class="text-muted small font-monospace">' + escapeHtml(student.personId || '') + '</div></td>',
+        '<td class="hub-attendance-student"><div class="fw-semibold">' + hubStudentNameHtml(student.name || 'Student', student.studentRecordId) + '</div><div class="text-muted small font-monospace">' + escapeHtml(student.personId || '') + '</div></td>',
         cells,
         '</tr>'
       ].join('');
@@ -4445,7 +4455,7 @@
           const notesExist = Array.isArray(record.comments) && record.comments.length > 0;
           return '<td class="hub-attendance-cell" data-hub-attendance-cell data-class-id="' + escapeHtml(row.classId || '') + '" data-person-id="' + escapeHtml(student.personId || '') + '" data-session-id="' + escapeHtml(sessionId) + '" title="Open this attendance record in the full Attendance page">' + hubAttendanceStatusIcon(record.status) + (notesExist ? '<div class="small mt-1"><i class="bi bi-chat-dots-fill text-primary"></i></div>' : '') + '</td>';
         }).join('');
-        return '<tr><td class="hub-attendance-rollup text-center small"><div><span class="text-success fw-bold">' + escapeHtml(String(present)) + '</span><span class="text-muted"> / </span><span class="text-danger fw-bold">' + escapeHtml(String(absent)) + '</span></div><div class="text-primary fw-bold">' + escapeHtml(percent) + '</div></td><td class="hub-attendance-student"><div class="fw-semibold">' + escapeHtml(student.name || 'Student') + '</div><div class="text-muted small font-monospace">' + escapeHtml(student.personId || '') + '</div></td>' + cells + '</tr>';
+        return '<tr><td class="hub-attendance-rollup text-center small"><div><span class="text-success fw-bold">' + escapeHtml(String(present)) + '</span><span class="text-muted"> / </span><span class="text-danger fw-bold">' + escapeHtml(String(absent)) + '</span></div><div class="text-primary fw-bold">' + escapeHtml(percent) + '</div></td><td class="hub-attendance-student"><div class="fw-semibold">' + hubStudentNameHtml(student.name || 'Student', student.studentRecordId) + '</div><div class="text-muted small font-monospace">' + escapeHtml(student.personId || '') + '</div></td>' + cells + '</tr>';
       }).join('') : '<tr><td colspan="' + escapeHtml(String(sessions.length + 2)) + '" class="text-center text-muted py-5">No matching students in this class matrix.</td></tr>';
       return '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2"><div><div class="fw-bold">' + escapeHtml(row.className || row.classId || 'Class') + '</div><div class="text-muted small">' + escapeHtml(String(matrix.length)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions</div></div><a class="btn btn-outline-primary btn-sm" href="/school/attendances?classId=' + encodeURIComponent(row.classId || '') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a></div><div class="card-body p-0"><div class="hub-attendance-matrix-wrap border-0"><table class="table table-hover align-middle hub-attendance-table mb-0"><thead><tr><th class="hub-attendance-rollup text-center small">Rollup<br><span class="text-muted fw-normal">P / A / %</span></th><th class="hub-attendance-student">Student</th>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div></div></div>';
     }
@@ -4854,6 +4864,263 @@
     bindReportAssignmentWorkspaceControls();
   }
 
+  function renderReportInstanceClassChips() {
+    const container = document.getElementById('hubReportInstanceClassChips');
+    if (!container) return;
+    if (!hubReportInstanceClassSelections.length) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = hubReportInstanceClassSelections.map(function (item) {
+      return '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1"><span>' + escapeHtml(item.name || item.id) + '</span><button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove class" data-hub-report-instance-remove-class="' + escapeHtml(item.id) + '"></button></span>';
+    }).join('');
+  }
+
+  function renderReportInstanceTeacherChips() {
+    const container = document.getElementById('hubReportInstanceTeacherChips');
+    if (!container) return;
+    if (!hubReportInstanceTeacherSelections.length) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = hubReportInstanceTeacherSelections.map(function (item) {
+      return '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1"><span>' + escapeHtml(item.name || item.id) + '</span><button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove teacher" data-hub-report-instance-remove-teacher="' + escapeHtml(item.id) + '"></button></span>';
+    }).join('');
+  }
+
+  function renderReportInstanceStudentChips() {
+    const container = document.getElementById('hubReportInstanceStudentChips');
+    if (!container) return;
+    if (!hubReportInstanceStudentSelections.length) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = hubReportInstanceStudentSelections.map(function (item) {
+      return '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1"><span>' + escapeHtml(item.name || item.id) + '</span><button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove student" data-hub-report-instance-remove-student="' + escapeHtml(item.id) + '"></button></span>';
+    }).join('');
+  }
+
+  function syncReportInstanceInputs() {
+    const classIdEl = document.getElementById('hubReportInstanceClassId');
+    const classNameEl = document.getElementById('hubReportInstanceClassName');
+    const teacherIdEl = document.getElementById('hubReportInstanceTeacherId');
+    const teacherNameEl = document.getElementById('hubReportInstanceTeacherName');
+    const studentIdEl = document.getElementById('hubReportInstanceStudentId');
+    const studentNameEl = document.getElementById('hubReportInstanceStudentName');
+    if (classIdEl) classIdEl.value = hubReportInstanceClassSelections.map(function (item) { return item.id; }).filter(Boolean).join(',');
+    if (classNameEl) classNameEl.value = hubReportInstanceClassSelections.map(function (item) { return item.name || item.id; }).join(', ');
+    if (teacherIdEl) teacherIdEl.value = hubReportInstanceTeacherSelections.map(function (item) { return item.id; }).filter(Boolean).join(',');
+    if (teacherNameEl) teacherNameEl.value = hubReportInstanceTeacherSelections.map(function (item) { return item.name || item.id; }).join(', ');
+    if (studentIdEl) studentIdEl.value = hubReportInstanceStudentSelections.map(function (item) { return item.id; }).filter(Boolean).join(',');
+    if (studentNameEl) studentNameEl.value = hubReportInstanceStudentSelections.map(function (item) { return item.name || item.id; }).join(', ');
+    renderReportInstanceClassChips();
+    renderReportInstanceTeacherChips();
+    renderReportInstanceStudentChips();
+  }
+
+  function appendReportInstanceWorkspaceQuery(requestQuery) {
+    const values = {
+      dueDateStart: hubInputValue('hubReportInstanceStartDate'),
+      dueDateEnd: hubInputValue('hubReportInstanceEndDate'),
+      templateId: hubInputValue('hubReportInstanceTemplate'),
+      status: hubInputValue('hubReportInstanceStatus'),
+      classId: hubInputValue('hubReportInstanceClassId'),
+      teacherPersonId: hubInputValue('hubReportInstanceTeacherId'),
+      studentPersonId: hubInputValue('hubReportInstanceStudentId')
+    };
+    Object.keys(values).forEach(function (key) {
+      if (values[key]) requestQuery.set(key, values[key]);
+    });
+  }
+
+  function setHubReportInstanceDateRange(range) {
+    const startEl = document.getElementById('hubReportInstanceStartDate');
+    const endEl = document.getElementById('hubReportInstanceEndDate');
+    if (!startEl || !endEl) return;
+    const today = new Date();
+    let start = new Date(today);
+    let end = new Date(today);
+
+    if (range === 'allTime') {
+      startEl.value = '';
+      endEl.value = '';
+      loadWorkspaceSection('report-instances');
+      return;
+    }
+    if (range === 'thisWeek') {
+      const day = today.getDay() || 7;
+      start.setDate(today.getDate() - (day - 1));
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (range === 'last7') {
+      start.setDate(today.getDate() - 6);
+    } else if (range === 'thisMonth') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    }
+    startEl.value = hubDateToIso(start);
+    endEl.value = hubDateToIso(end);
+    loadWorkspaceSection('report-instances');
+  }
+
+  function openHubReportInstanceTeacherPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.teacher({
+      title: 'Filter Report Instances by Teachers',
+      placeholder: 'Search teachers, select one or more...',
+      multiselect: true,
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubTeacherId(item);
+          const name = formatHubTeacherName(item, id);
+          if (id && !hubReportInstanceTeacherSelections.some(function (row) { return row.id === id; })) {
+            hubReportInstanceTeacherSelections.push({ id, name });
+          }
+        });
+        syncReportInstanceInputs();
+        loadWorkspaceSection('report-instances');
+      }
+    }));
+  }
+
+  function openHubReportInstanceStudentPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Student Picker', icon: 'warning', message: 'Student picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.student({
+      title: 'Filter Report Instances by Students',
+      placeholder: 'Search students, select one or more...',
+      multiselect: true,
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubSchedulePersonId(item);
+          const name = formatHubSchedulePersonName(item, id);
+          if (id && !hubReportInstanceStudentSelections.some(function (row) { return row.id === id; })) {
+            hubReportInstanceStudentSelections.push({ id, name });
+          }
+        });
+        syncReportInstanceInputs();
+        loadWorkspaceSection('report-instances');
+      }
+    }));
+  }
+
+  function openHubReportInstanceClassPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Class Picker', icon: 'warning', message: 'Class picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.class({
+      title: 'Filter Report Instances by Classes',
+      icon: 'bi-book',
+      multiselect: true,
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubClassId(item);
+          const name = formatHubClassName(item, id);
+          if (id && !hubReportInstanceClassSelections.some(function (row) { return row.id === id; })) {
+            hubReportInstanceClassSelections.push({ id, name });
+          }
+        });
+        syncReportInstanceInputs();
+        loadWorkspaceSection('report-instances');
+      }
+    }));
+  }
+
+  function bindReportInstanceWorkspaceControls() {
+    const loadBtn = document.getElementById('hubReportInstanceFilterLoad');
+    if (loadBtn) loadBtn.addEventListener('click', function () { loadWorkspaceSection('report-instances'); });
+    const resetBtn = document.getElementById('hubReportInstanceReset');
+    if (resetBtn) resetBtn.addEventListener('click', function () {
+      ['hubReportInstanceStartDate', 'hubReportInstanceEndDate', 'hubReportInstanceTemplate', 'hubReportInstanceStatus'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      hubReportInstanceClassSelections = [];
+      hubReportInstanceTeacherSelections = [];
+      hubReportInstanceStudentSelections = [];
+      syncReportInstanceInputs();
+      workspaceState.serverSearch['report-instances'] = '';
+      const searchInput = document.getElementById('hubServerSearch_report-instances');
+      if (searchInput) searchInput.value = '';
+      loadWorkspaceSection('report-instances');
+    });
+    root.querySelectorAll('[data-hub-report-instance-range]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setHubReportInstanceDateRange(btn.getAttribute('data-hub-report-instance-range') || 'today');
+      });
+    });
+    ['hubReportInstanceTemplate', 'hubReportInstanceStatus'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', function () { loadWorkspaceSection('report-instances'); });
+    });
+    const openTeacher = document.getElementById('hubReportInstanceOpenTeacherPicker');
+    if (openTeacher) openTeacher.addEventListener('click', openHubReportInstanceTeacherPicker);
+    const openStudent = document.getElementById('hubReportInstanceOpenStudentPicker');
+    if (openStudent) openStudent.addEventListener('click', openHubReportInstanceStudentPicker);
+    const openClass = document.getElementById('hubReportInstanceOpenClassPicker');
+    if (openClass) openClass.addEventListener('click', openHubReportInstanceClassPicker);
+    const clearTeacher = document.getElementById('hubReportInstanceClearTeacher');
+    if (clearTeacher) clearTeacher.addEventListener('click', function () {
+      hubReportInstanceTeacherSelections = [];
+      syncReportInstanceInputs();
+      loadWorkspaceSection('report-instances');
+    });
+    const clearStudent = document.getElementById('hubReportInstanceClearStudent');
+    if (clearStudent) clearStudent.addEventListener('click', function () {
+      hubReportInstanceStudentSelections = [];
+      syncReportInstanceInputs();
+      loadWorkspaceSection('report-instances');
+    });
+    const clearClass = document.getElementById('hubReportInstanceClearClass');
+    if (clearClass) clearClass.addEventListener('click', function () {
+      hubReportInstanceClassSelections = [];
+      syncReportInstanceInputs();
+      loadWorkspaceSection('report-instances');
+    });
+    const teacherChips = document.getElementById('hubReportInstanceTeacherChips');
+    if (teacherChips) teacherChips.addEventListener('click', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-report-instance-remove-teacher]');
+      if (!btn) return;
+      const removeId = btn.getAttribute('data-hub-report-instance-remove-teacher') || '';
+      hubReportInstanceTeacherSelections = hubReportInstanceTeacherSelections.filter(function (item) { return item.id !== removeId; });
+      syncReportInstanceInputs();
+      loadWorkspaceSection('report-instances');
+    });
+    const studentChips = document.getElementById('hubReportInstanceStudentChips');
+    if (studentChips) studentChips.addEventListener('click', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-report-instance-remove-student]');
+      if (!btn) return;
+      const removeId = btn.getAttribute('data-hub-report-instance-remove-student') || '';
+      hubReportInstanceStudentSelections = hubReportInstanceStudentSelections.filter(function (item) { return item.id !== removeId; });
+      syncReportInstanceInputs();
+      loadWorkspaceSection('report-instances');
+    });
+    const classChips = document.getElementById('hubReportInstanceClassChips');
+    if (classChips) classChips.addEventListener('click', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-report-instance-remove-class]');
+      if (!btn) return;
+      const removeId = btn.getAttribute('data-hub-report-instance-remove-class') || '';
+      hubReportInstanceClassSelections = hubReportInstanceClassSelections.filter(function (item) { return item.id !== removeId; });
+      syncReportInstanceInputs();
+      loadWorkspaceSection('report-instances');
+    });
+    const loadButton = els.workspace.querySelector('[data-hub-load-workspace="report-instances"]');
+    if (loadButton) loadButton.addEventListener('click', function () { loadWorkspaceSection('report-instances'); });
+    bindWorkspaceSearchControls('report-instances');
+  }
+
   function reportInstanceStatusBadgeClass(status, isPendingAssignment) {
     if (isPendingAssignment === true) return 'text-bg-info';
     const value = String(status || '').trim().toLowerCase();
@@ -4888,8 +5155,8 @@
         '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
         '<td class="ps-3"><div class="fw-bold text-primary">' + escapeHtml(instanceLabel) + '</div><div class="x-small text-muted">Assignment: ' + escapeHtml(row.assignmentId || '-') + '</div><div class="x-small text-muted">' + escapeHtml(row.sessionDate || 'No session date') + '</div></td>',
         '<td><div class="fw-semibold">' + escapeHtml(row.classTitle || '-') + '</div><div class="x-small text-muted">Template: ' + escapeHtml(row.templateTitle || '-') + '</div></td>',
-        '<td><div>' + escapeHtml(row.teacherName || row.teacherId || '-') + '</div><div class="x-small text-muted font-monospace">' + escapeHtml(row.teacherId || '-') + '</div></td>',
-        '<td><div>' + escapeHtml(row.studentName || (row.studentId ? row.studentId : 'Whole class')) + '</div>' + (row.studentId ? '<div class="x-small text-muted font-monospace">' + escapeHtml(row.studentId) + '</div>' : '') + '</td>',
+        '<td><div class="fw-semibold">' + escapeHtml(row.teacherName || '-') + '</div>' + ((row.teacherId && row.teacherName && row.teacherName !== row.teacherId) ? '<div class="x-small text-muted font-monospace">' + escapeHtml(row.teacherId) + '</div>' : '') + '</td>',
+        '<td><div>' + hubStudentNameHtml(row.studentName || 'Whole class', row.studentRecordId) + '</div>' + ((row.studentId && row.studentName && row.studentName !== row.studentId && row.studentName !== 'Whole class') ? '<div class="x-small text-muted font-monospace">' + escapeHtml(row.studentId) + '</div>' : '') + '</td>',
         '<td><span class="badge ' + escapeHtml(reportInstanceStatusBadgeClass(row.status, row.isPendingAssignment)) + '">' + escapeHtml(statusLabel) + '</span></td>',
         '<td class="text-end pe-3"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
         '</tr>'
@@ -4915,8 +5182,44 @@
     };
     const rows = Array.isArray(payload.rows) ? payload.rows : [];
     const notLoaded = payload.notLoaded === true;
+    const filters = payload.filters || {};
     const refreshed = payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const templateOptions = Array.isArray(payload.templateOptions) ? payload.templateOptions : [];
+    const statusOptions = Array.isArray(payload.statusOptions) ? payload.statusOptions : [
+      { value: '', label: 'All Statuses' },
+      { value: 'pending', label: 'Pending' },
+      { value: 'draft', label: 'Draft' },
+      { value: 'submitted', label: 'Submitted' },
+      { value: 'locked', label: 'Locked' }
+    ];
     workspaceState.serverSearch['report-instances'] = workspaceState.serverSearch['report-instances'] || payload.searchQuery || '';
+
+    const teacherIds = splitHubIdList(filters.teacherPersonId || filters.teacherIds || '');
+    const studentIds = splitHubIdList(filters.studentPersonId || filters.studentIds || '');
+    const classIds = splitHubIdList(filters.classId || filters.classIds || '');
+    const selectedClasses = Array.isArray(payload.selectedClasses) ? payload.selectedClasses : [];
+    const selectedClassMap = new Map(selectedClasses.map(function (item) { return [String(item.id || '').trim(), item]; }));
+    const existingTeachers = new Map(hubReportInstanceTeacherSelections.map(function (item) { return [String(item.id || '').trim(), item]; }));
+    const existingStudents = new Map(hubReportInstanceStudentSelections.map(function (item) { return [String(item.id || '').trim(), item]; }));
+    const existingClasses = new Map(hubReportInstanceClassSelections.map(function (item) { return [String(item.id || '').trim(), item]; }));
+    hubReportInstanceTeacherSelections = teacherIds.map(function (id) { return existingTeachers.get(id) || { id: id, name: id }; });
+    hubReportInstanceStudentSelections = studentIds.map(function (id) { return existingStudents.get(id) || { id: id, name: id }; });
+    hubReportInstanceClassSelections = classIds.map(function (id) {
+      const existing = existingClasses.get(id);
+      if (existing) return existing;
+      const selected = selectedClassMap.get(id);
+      return { id: id, name: selected ? (selected.title || id) : id };
+    });
+
+    const templateSelect = ['<option value="">All Templates</option>'].concat(templateOptions.map(function (item) {
+      const value = String(item.id || '').trim();
+      return '<option value="' + escapeHtml(value) + '"' + (value === String(filters.templateId || '').trim() ? ' selected' : '') + '>' + escapeHtml(item.title || value) + '</option>';
+    })).join('');
+    const statusSelect = statusOptions.map(function (item) {
+      const value = String(item.value || '').toLowerCase();
+      return '<option value="' + escapeHtml(value) + '"' + (value === String(filters.status || '').toLowerCase() ? ' selected' : '') + '>' + escapeHtml(item.label || toHubTitleCase(value || 'all')) + '</option>';
+    }).join('');
+
     els.workspace.innerHTML = [
       '<section class="hub-workspace">',
       '<div class="hub-workspace-card">',
@@ -4931,23 +5234,37 @@
       '<a class="btn btn-outline-secondary btn-sm" href="' + escapeHtml(section.sourceUrl || '/school/reports/instances') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
       '</div>',
       '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubReportInstanceStartDate">Due Date Start</label><input type="date" id="hubReportInstanceStartDate" class="form-control form-control-sm" value="' + escapeHtml(filters.dueDateStart || filters.startDate || '') + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubReportInstanceEndDate">Due Date End</label><input type="date" id="hubReportInstanceEndDate" class="form-control form-control-sm" value="' + escapeHtml(filters.dueDateEnd || filters.endDate || '') + '"></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold small" for="hubReportInstanceTemplate">Template</label><select id="hubReportInstanceTemplate" class="form-select form-select-sm">' + templateSelect + '</select></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubReportInstanceStatus">Status</label><select id="hubReportInstanceStatus" class="form-select form-select-sm">' + statusSelect + '</select></div>',
+      '<div class="col-md-3 d-flex gap-2"><button type="button" id="hubReportInstanceFilterLoad" class="btn btn-primary btn-sm flex-fill fw-bold"><i class="bi bi-funnel-fill me-1"></i> Apply</button><button type="button" id="hubReportInstanceReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise"></i></button></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold small">Classes</label><div class="input-group input-group-sm"><input type="hidden" id="hubReportInstanceClassId" value="' + escapeHtml(filters.classId || filters.classIds || '') + '"><input type="text" id="hubReportInstanceClassName" class="form-control bg-white" placeholder="All Classes..." readonly><button type="button" class="btn btn-outline-danger" id="hubReportInstanceClearClass" title="Clear Classes"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubReportInstanceOpenClassPicker" title="Select Classes"><i class="bi bi-book"></i></button></div><div id="hubReportInstanceClassChips" class="mt-2"></div></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold small">Students</label><div class="input-group input-group-sm"><input type="hidden" id="hubReportInstanceStudentId" value="' + escapeHtml(filters.studentPersonId || filters.studentIds || '') + '"><input type="text" id="hubReportInstanceStudentName" class="form-control bg-white" placeholder="All Students..." readonly><button type="button" class="btn btn-outline-danger" id="hubReportInstanceClearStudent" title="Clear Students"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubReportInstanceOpenStudentPicker" title="Select Students"><i class="bi bi-mortarboard"></i></button></div><div id="hubReportInstanceStudentChips" class="mt-2"></div></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold small">Teachers</label><div class="input-group input-group-sm"><input type="hidden" id="hubReportInstanceTeacherId" value="' + escapeHtml(filters.teacherPersonId || filters.teacherIds || '') + '"><input type="text" id="hubReportInstanceTeacherName" class="form-control bg-white" placeholder="All Teachers..." readonly><button type="button" class="btn btn-outline-danger" id="hubReportInstanceClearTeacher" title="Clear Teachers"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubReportInstanceOpenTeacherPicker" title="Select Teachers"><i class="bi bi-people-fill"></i></button></div><div id="hubReportInstanceTeacherChips" class="mt-2"></div></div>',
+      '</div>',
+      '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-report-instance-range="today">Today</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-report-instance-range="thisWeek">This Week</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-report-instance-range="last7">Last 7 Days</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-report-instance-range="thisMonth">This Month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-report-instance-range="allTime">All Time</button>',
+      '</div>',
+      '</div>',
       workspaceToolbarHtml('report-instances', { label: 'report instances' }),
       '<div class="p-3 border-bottom bg-white">',
       '<div class="small text-muted">' + (notLoaded ? 'Report instances are not loaded automatically. Click Load Report Instances when ready.' : 'Showing ' + escapeHtml(String(rows.length)) + ' report instance(s). Last refreshed: ' + escapeHtml(refreshed) + '.') + '</div>',
       '</div>',
       '<div class="p-3">',
-      notLoaded ? '<div class="hub-empty"><div><i class="bi bi-file-earmark-text display-6 d-block mb-3"></i><div class="fw-semibold">Report instances are ready to load.</div><div class="text-muted small mt-1">Click the load button above to fetch report instance rows.</div></div></div>' : renderReportInstanceRows(rows),
+      notLoaded ? '<div class="hub-empty"><div><i class="bi bi-file-earmark-text display-6 d-block mb-3"></i><div class="fw-semibold">Report instances are ready to load.</div><div class="text-muted small mt-1">Set filters if needed, then click <strong>Apply</strong> or <strong>Load Report Instances</strong>.</div></div></div>' : renderReportInstanceRows(rows),
       '</div>',
       '</div>',
       '</section>'
     ].join('');
-    bindWorkspaceSearchControls('report-instances');
-    const loadButton = els.workspace.querySelector('[data-hub-load-workspace="report-instances"]');
-    if (loadButton) {
-      loadButton.addEventListener('click', function () {
-        loadWorkspaceSection('report-instances');
-      });
-    }
+    syncReportInstanceInputs();
+    bindReportInstanceWorkspaceControls();
   }
 
   function leaveRequestBadgeClass(status) {
@@ -6108,6 +6425,7 @@
     if (key === 'session-issues') appendSessionIssueWorkspaceQuery(requestQuery);
     if (key === 'timesheet-periods') appendTimesheetPeriodWorkspaceQuery(requestQuery);
     if (key === 'report-assignments') appendReportAssignmentWorkspaceQuery(requestQuery);
+    if (key === 'report-instances') appendReportInstanceWorkspaceQuery(requestQuery);
     if (key === 'holidays') requestQuery.set('year', workspaceState.holidaysYear || String(new Date().getFullYear()));
 
     workspaceState.currentSection = key;
@@ -6486,7 +6804,7 @@
         '<article class="hub-person-card" data-hub-card>',
         '<div class="d-flex justify-content-between align-items-start gap-2">',
         '<div class="min-w-0">',
-        '<div class="fw-semibold text-truncate">' + escapeHtml(row.name || '-') + '</div>',
+        '<div class="fw-semibold text-truncate">' + hubStudentNameHtml(row.name || '-', row.id) + '</div>',
         '<div class="text-muted small font-monospace">' + escapeHtml(row.id || '') + '</div>',
         '</div>',
         '<div class="d-flex align-items-center gap-2 flex-shrink-0">',
@@ -6725,3 +7043,4 @@
   renderSearchPrompt();
 }());
 </script>
+<%- include('partials/studentProfileLinkBootstrap') %>
