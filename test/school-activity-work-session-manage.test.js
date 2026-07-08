@@ -71,6 +71,11 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(manager, /frmWorkSessionMetadata/);
   assert.match(manager, /workSessionMetadataAssignees/);
   assert.match(manager, /btnAddWorkSessionAssignee/);
+  assert.match(manager, /workSessionPageData/);
+  assert.match(manager, /eligibleAssigneePersons/);
+  assert.match(manager, /sourceMode: 'local'/);
+  assert.match(manager, /localItems: pickerItems/);
+  assert.doesNotMatch(manager, /apiEndpoint: '\/school\/activities\/api\/eligible-persons'/);
   assert.match(manager, /include\('partials\/modal_GenericPicker'\)/);
   assert.match(manager, /GenericPickerPresets\.person/);
   assert.match(manager, /ws-role-input/);
@@ -786,6 +791,166 @@ test('Work session context scopes non-admin users to their own assignee row', as
     assert.deepEqual(context.entry.assignees.map((row) => row.personId), ['P1']);
   } finally {
     activityService.getActivity = originalGetActivity;
+  }
+});
+
+test('Work session context filters eligible assignee persons by activity scope and entry exclusions', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const originalGetActivity = activityService.getActivity;
+  const originalGetEligiblePersons = activityService.getEligiblePersons;
+
+  const activity = {
+    id: 'ACT-SCOPE-PICKER',
+    orgId: '900000',
+    title: 'Scoped Picker Activity',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    visibilityScope: 'individual',
+    allowedPersonIds: ['P1', 'P2', 'P3'],
+    excludedPersonIds: ['P3'],
+    entries: [{
+      entryId: 'ENTRY-1',
+      date: '2026-07-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      durationHours: 1,
+      status: 'posted',
+      excludedPersonIds: ['P2'],
+      assignees: []
+    }]
+  };
+
+  activityService.getActivity = async () => activity;
+  activityService.getEligiblePersons = async () => ([
+    { personId: 'P1', displayName: 'Person 1', roles: ['student'] },
+    { personId: 'P2', displayName: 'Person 2', roles: ['teacher'] },
+    { personId: 'P3', displayName: 'Person 3', roles: ['staff'] },
+    { personId: 'P4', displayName: 'Person 4', roles: ['student'] }
+  ]);
+
+  try {
+    const context = await activityWorkSessionService.getWorkSessionContext(
+      activity.id,
+      'ENTRY-1',
+      { id: 'ADMIN', personId: 'ADMIN-P', activeOrgId: '900000', orgId: '900000' },
+      { scopeId: 'SCP_ORG' }
+    );
+    assert.equal(context.visibilityScope, 'individual');
+    assert.deepEqual(context.eligibleAssigneePersons.map((row) => row.personId), ['P1']);
+    assert.equal(context.eligibleAssigneePersons[0].displayName, 'Person 1');
+  } finally {
+    activityService.getActivity = originalGetActivity;
+    activityService.getEligiblePersons = originalGetEligiblePersons;
+  }
+});
+
+test('Work session context eligible assignee persons honor school scope exclusions', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const originalGetActivity = activityService.getActivity;
+  const originalGetEligiblePersons = activityService.getEligiblePersons;
+
+  const activity = {
+    id: 'ACT-SCHOOL-SCOPE',
+    orgId: '900000',
+    title: 'School Scope Activity',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    visibilityScope: 'school',
+    excludedPersonIds: ['P3'],
+    entries: [{
+      entryId: 'ENTRY-1',
+      date: '2026-07-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      durationHours: 1,
+      status: 'posted',
+      excludedPersonIds: ['P2'],
+      assignees: []
+    }]
+  };
+
+  activityService.getActivity = async () => activity;
+  activityService.getEligiblePersons = async () => ([
+    { personId: 'P1', displayName: 'Person 1', roles: ['student'] },
+    { personId: 'P2', displayName: 'Person 2', roles: ['teacher'] },
+    { personId: 'P3', displayName: 'Person 3', roles: ['staff'] },
+    { personId: 'P4', displayName: 'Person 4', roles: ['student'] }
+  ]);
+
+  try {
+    const context = await activityWorkSessionService.getWorkSessionContext(
+      activity.id,
+      'ENTRY-1',
+      { id: 'ADMIN', personId: 'ADMIN-P', activeOrgId: '900000', orgId: '900000' },
+      { scopeId: 'SCP_ORG' }
+    );
+    assert.equal(context.visibilityScope, 'school');
+    assert.deepEqual(context.eligibleAssigneePersons.map((row) => row.personId), ['P1', 'P4']);
+  } finally {
+    activityService.getActivity = originalGetActivity;
+    activityService.getEligiblePersons = originalGetEligiblePersons;
+  }
+});
+
+test('Metadata save rejects out-of-scope assignees via activity save validation', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const originalGetActivity = activityService.getActivity;
+  const originalSaveActivity = activityService.saveActivity;
+
+  const activity = {
+    id: 'ACT-BLOCKED-ASSIGNEE',
+    orgId: '900000',
+    title: 'Blocked Assignee Activity',
+    categoryId: 'CAT-1',
+    departmentId: 'DEP-1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    visibilityScope: 'individual',
+    allowedPersonIds: ['P1'],
+    excludedPersonIds: [],
+    entries: [{
+      entryId: 'ENTRY-1',
+      date: '2026-07-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      durationHours: 1,
+      status: 'posted',
+      assignees: [
+        { personId: 'P1', personName: 'Person 1', role: 'participant', roles: ['participant'], status: 'attended', paid: true, paidHours: 1 }
+      ]
+    }]
+  };
+
+  activityService.getActivity = async () => activity;
+  activityService.saveActivity = async () => {
+    throw new Error('Assigned person "Person 9" is excluded from this activity scope/session.');
+  };
+
+  try {
+    await assert.rejects(
+      () => activityWorkSessionService.saveWorkSessionMetadata({
+        activityId: activity.id,
+        entryId: 'ENTRY-1',
+        reqUser: { id: 'ADMIN', personId: 'ADMIN-P', activeOrgId: '900000', orgId: '900000' },
+        accessContext: { scopeId: 'SCP_ORG' },
+        input: {
+          assignees: JSON.stringify([
+            { personId: 'P1', personName: 'Person 1', role: 'participant', roles: ['participant'], status: 'attended', paid: true },
+            { personId: 'P9', personName: 'Person 9', role: 'participant', roles: ['participant'], status: 'attended', paid: true }
+          ])
+        }
+      }),
+      /excluded from this activity scope\/session/i
+    );
+  } finally {
+    activityService.getActivity = originalGetActivity;
+    activityService.saveActivity = originalSaveActivity;
   }
 });
 

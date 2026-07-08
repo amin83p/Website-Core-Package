@@ -259,6 +259,40 @@ function buildSiblingSessions(activity, access, currentEntryId) {
     .map((entry, index) => mapEntryToSessionSummary(activity, entry, index, { access, currentEntryId }));
 }
 
+function mapEligibleAssigneePickerRow(row = {}) {
+  const personId = normalizeId(row.personId || row.id);
+  if (!personId) return null;
+  const displayName = cleanText(row.displayName || row.personName || personId, { max: 180 });
+  const roles = Array.isArray(row.roles) ? row.roles.map((role) => cleanText(role, { max: 40 }).toLowerCase()).filter(Boolean) : [];
+  const matchedRole = cleanText(row.matchedRole || roles[0] || '', { max: 40 }).toLowerCase();
+  return {
+    id: personId,
+    personId,
+    displayName,
+    firstName: cleanText(row.firstName || '', { max: 80 }),
+    lastName: cleanText(row.lastName || '', { max: 80 }),
+    preferredName: cleanText(row.preferredName || '', { max: 80 }),
+    roles,
+    matchedRole,
+    title: displayName
+  };
+}
+
+async function buildEligibleAssigneePersons(activity = {}, entry = {}, reqUser = {}) {
+  const orgId = normalizeId(activity.orgId || reqUser?.activeOrgId || reqUser?.orgId);
+  const eligiblePersons = await activityService.getEligiblePersons({ orgId, reqUser, q: '' });
+  const eligiblePersonIds = [...new Set((Array.isArray(eligiblePersons) ? eligiblePersons : [])
+    .map((row) => normalizeId(row?.personId || row?.id))
+    .filter(Boolean))];
+  const allowedIds = activityService.getEffectiveEntryAllowedIds(activity, entry, eligiblePersonIds);
+  const allowedSet = new Set(allowedIds);
+  return (Array.isArray(eligiblePersons) ? eligiblePersons : [])
+    .filter((row) => allowedSet.has(normalizeId(row?.personId || row?.id)))
+    .map((row) => mapEligibleAssigneePickerRow(row))
+    .filter(Boolean)
+    .sort((a, b) => String(a.displayName || a.personId).localeCompare(String(b.displayName || b.personId)));
+}
+
 async function getWorkSessionContext(activityId, entryId, reqUser, accessContext = {}) {
   const activity = await activityService.getActivity(activityId, reqUser, accessContext);
   if (!activity) throw new Error('School activity not found.');
@@ -273,6 +307,10 @@ async function getWorkSessionContext(activityId, entryId, reqUser, accessContext
     .map((assignee) => enrichAssigneeRow(activity, assignee, { reqUser, access, scopedPersonId }))
     .filter((assignee) => canManageAll || assignee.isSelf);
   const siblingSessions = buildSiblingSessions(activity, access, entryId);
+  const eligibleAssigneePersons = await buildEligibleAssigneePersons(activity, entry, reqUser);
+  const visibilityScope = activityService.normalizeActivityVisibilityScope(
+    activity.visibilityScope || activity.calendarScope || activity.scope
+  );
   return {
     activity,
     entry: { ...entry, assignees, title: buildEntryDisplayTitle(entry, siblingSessions.findIndex((row) => row.isCurrent)) },
@@ -282,7 +320,9 @@ async function getWorkSessionContext(activityId, entryId, reqUser, accessContext
     scopedPersonId,
     evaluationTypeLocked: activityService.activityHasLockedAssigneeRows(activity),
     siblingSessions,
-    overviewUrl: buildOverviewManageUrl(activity.id)
+    overviewUrl: buildOverviewManageUrl(activity.id),
+    eligibleAssigneePersons,
+    visibilityScope
   };
 }
 

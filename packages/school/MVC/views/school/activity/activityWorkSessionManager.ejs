@@ -996,8 +996,16 @@
 <%- include('partials/modal') %>
 <%- include('partials/modal_GenericPicker') %>
 
+<script type="application/json" id="workSessionPageData"><%- JSON.stringify({
+  eligibleAssigneePersons: Array.isArray(eligibleAssigneePersons) ? eligibleAssigneePersons : [],
+  visibilityScope: visibilityScope || 'school'
+}) %></script>
+
 <script>
   (function () {
+    const pageData = JSON.parse(document.getElementById('workSessionPageData').textContent || '{}');
+    const eligibleAssigneePersons = Array.isArray(pageData.eligibleAssigneePersons) ? pageData.eligibleAssigneePersons : [];
+    const visibilityScope = String(pageData.visibilityScope || 'school').trim().toLowerCase();
     const fallbackCloseHref = "<%= overviewManageUrl %>";
     const isCompletionMode = <%= isCompletion ? 'true' : 'false' %>;
     const canManageAllWorkSession = <%= canEditWorkSessionMetadata ? 'true' : 'false' %>;
@@ -1349,18 +1357,36 @@
           await showUiMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Person picker is not available on this page.' });
           return;
         }
-        const context = window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function'
-          ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization Scope' })
-          : null;
+        const container = document.getElementById('workSessionAssigneeForms');
+        const assignedIds = new Set(Array.from(container?.querySelectorAll('.work-session-assignee-form[data-person-id]') || [])
+          .map((row) => String(row.getAttribute('data-person-id') || '').trim())
+          .filter(Boolean));
+        const pickerItems = eligibleAssigneePersons.filter(function (person) {
+          const personId = String(person?.personId || person?.id || '').trim();
+          return personId && !assignedIds.has(personId);
+        });
+        if (!pickerItems.length) {
+          const emptyMessage = visibilityScope === 'individual'
+            ? 'Add allowed persons at the activity level before assigning people to this work session.'
+            : 'No eligible people remain for this work session based on activity scope and exclusions.';
+          await showUiMessage({
+            title: visibilityScope === 'individual' ? 'No Allowed Persons' : 'No Eligible People',
+            icon: 'warning',
+            message: emptyMessage,
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+          return;
+        }
         window.GenericPicker.open(window.GenericPickerPresets.person({
           title: 'Add Assigned People',
-          apiEndpoint: '/school/activities/api/eligible-persons',
           placeholder: 'Search students, teachers, or staff...',
           multiselect: true,
-          context,
+          sourceMode: 'local',
+          localItems: pickerItems,
+          searchFields: 'id,personId,displayName,firstName,lastName,preferredName,title',
+          limit: 5000,
           onSelect: function (items) {
             const selectedRows = Array.isArray(items) ? items : [items];
-            const container = document.getElementById('workSessionAssigneeForms');
             if (!container) return;
             selectedRows.forEach((item) => {
               const person = normalizePickerPerson(item);
