@@ -372,6 +372,29 @@ exports.saveWorkSessionAssignee = async (req, res) => {
   }
 };
 
+exports.saveWorkSessionMetadata = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const { activityId, entryId } = req.params;
+    const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const result = await activityWorkSessionService.saveWorkSessionMetadata({
+      activityId,
+      entryId,
+      reqUser: req.user,
+      input: req.body || {},
+      accessContext
+    });
+    assertOrgAccess(result.context.activity, orgId);
+    const payload = { status: 'success', message: 'Work session saved.', actionStateId: req.actionStateId, ...result };
+    if (isAjax(req)) return res.json(payload);
+    res.redirect(activityWorkSessionService.buildSessionManageUrl(activityId, entryId));
+  } catch (error) {
+    logWorkSessionMutationError('metadata', error, req);
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+};
+
 exports.completeWorkSessionAssignee = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);

@@ -24,6 +24,7 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(activityRoute, /ctrl\.manageWorkSessionsOverview/);
   assert.match(activityRoute, /ctrl\.getWorkSessionContextJson/);
   assert.match(activityRoute, /work-sessions\/:entryId\/manage/);
+  assert.match(activityRoute, /work-sessions\/:entryId\/metadata/);
   assert.match(activityRoute, /work-sessions\/:entryId\/save/);
   assert.match(activityRoute, /work-sessions\/:entryId\/complete/);
   assert.match(activityRoute, /work-sessions\/:entryId\/pending/);
@@ -42,6 +43,7 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(controller, /getWorkSessionContextJson/);
   assert.match(controller, /getWorkSessionsOverviewJson/);
   assert.match(controller, /manageWorkSession/);
+  assert.match(controller, /saveWorkSessionMetadata/);
   assert.match(controller, /sessions\.length === 1/);
   assert.match(controller, /activityWorkSessionManager/);
   assert.match(controller, /resolveWorkSessionManageTargetForRequest/);
@@ -66,6 +68,19 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(manager, /session-info-header/);
   assert.match(manager, /workSessionStatusButton/);
   assert.match(manager, /btnSaveWorkSession/);
+  assert.match(manager, /frmWorkSessionMetadata/);
+  assert.match(manager, /workSessionMetadataAssignees/);
+  assert.match(manager, /btnAddWorkSessionAssignee/);
+  assert.match(manager, /include\('partials\/modal_GenericPicker'\)/);
+  assert.match(manager, /GenericPickerPresets\.person/);
+  assert.match(manager, /ws-role-input/);
+  assert.match(manager, /<select class="form-select ws-role-input"/);
+  assert.doesNotMatch(manager, /<input type="text" class="form-control ws-role-input"/);
+  assert.match(manager, /ws-paid-input/);
+  assert.match(manager, /ws-completion-status-input/);
+  assert.match(manager, /ws-derived-hours/);
+  assert.doesNotMatch(manager, />Paid hours</);
+  assert.doesNotMatch(manager, /class="form-control ws-paid-hours-input"/);
   assert.match(manager, /Session status/);
   assert.match(manager, /Complete/);
   assert.match(manager, /Manage Work Session/);
@@ -100,7 +115,8 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.match(manager, /POST" action="<%= manageUrl %>\/save/);
   assert.match(manager, /POST" action="<%= manageUrl %>\/complete/);
   assert.match(manager, /evaluationTypeLocked/);
-  assert.match(manager, /if \(!isCompletion\)/);
+  assert.match(manager, /<label class="form-label">Status<\/label>/);
+  assert.match(manager, /isCompletionMode \?/);
   assert.doesNotMatch(manager, /Switch session:/);
 
   const overview = readText('packages/school/MVC/views/school/activity/activityWorkSessionsOverview.ejs');
@@ -652,6 +668,237 @@ test('Completion save rejects attendance status changes and complete auto-attend
     activityService.getActivity = originalGetActivity;
     schoolDataService.getDataById = originalGet;
     schoolDataService.updateData = originalUpdate;
+  }
+});
+
+test('Admin metadata save updates work session details and syncs assignee hours', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const originalGetActivity = activityService.getActivity;
+  const originalSaveActivity = activityService.saveActivity;
+
+  const activity = {
+    id: 'ACT-META-1',
+    orgId: '900000',
+    title: 'Metadata Activity',
+    categoryId: 'CAT-1',
+    departmentId: 'DEP-1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    entries: [{
+      entryId: 'ENTRY-1',
+      title: 'Original title',
+      date: '2026-07-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      durationHours: 1,
+      status: 'posted',
+      assignees: [
+        { personId: 'P1', personName: 'Person 1', role: 'participant', roles: ['participant'], status: 'attended', paid: true, paidHours: 1, completionStatus: 'pending' },
+        { personId: 'P2', personName: 'Person 2', role: 'observer', roles: ['observer'], status: 'attended', paid: true, paidHours: 1, completionStatus: 'pending' }
+      ]
+    }]
+  };
+
+  let savedPayload = null;
+  activityService.getActivity = async () => activity;
+  activityService.saveActivity = async (payload) => {
+    savedPayload = payload;
+    Object.assign(activity, payload);
+    return payload;
+  };
+
+  try {
+    const result = await activityWorkSessionService.saveWorkSessionMetadata({
+      activityId: activity.id,
+      entryId: 'ENTRY-1',
+      reqUser: { id: 'ADMIN', personId: 'ADMIN-P', activeOrgId: '900000', orgId: '900000' },
+      accessContext: { scopeId: 'SCP_ORG' },
+      input: {
+        title: 'Updated work',
+        status: 'posted',
+        location: 'Room 20',
+        date: '2026-07-03',
+        startTime: '09:00',
+        endTime: '11:30',
+        assignees: JSON.stringify([
+          { personId: 'P1', personName: 'Person 1', role: 'lead', roles: ['lead'], status: 'absent', paid: false, notes: 'Admin note', completionStatus: 'pending' },
+          { personId: 'P3', personName: 'Person 3', role: 'support', roles: ['support'], status: 'attended', paid: true, notes: '', completionStatus: 'pending' }
+        ])
+      }
+    });
+
+    assert.equal(savedPayload.entries[0].title, 'Updated work');
+    assert.equal(savedPayload.entries[0].location, 'Room 20');
+    assert.equal(savedPayload.entries[0].date, '2026-07-03');
+    assert.equal(savedPayload.entries[0].durationHours, 2.5);
+    assert.deepEqual(savedPayload.entries[0].assignees.map((row) => row.personId), ['P1', 'P3']);
+    assert.equal(savedPayload.entries[0].assignees[0].role, 'lead');
+    assert.equal(savedPayload.entries[0].assignees[0].status, 'absent');
+    assert.equal(savedPayload.entries[0].assignees[0].paid, false);
+    assert.equal(savedPayload.entries[0].assignees[0].paidHours, 2.5);
+    assert.equal(savedPayload.entries[0].assignees[1].paidHours, 2.5);
+    assert.equal(result.context.entry.assignees.length, 2);
+    assert.equal(result.sessionSummary.durationHours, 2.5);
+  } finally {
+    activityService.getActivity = originalGetActivity;
+    activityService.saveActivity = originalSaveActivity;
+  }
+});
+
+test('Work session context scopes non-admin users to their own assignee row', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const originalGetActivity = activityService.getActivity;
+
+  const activity = {
+    id: 'ACT-SCOPE-SELF',
+    orgId: '900000',
+    title: 'Scoped Self Activity',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    entries: [{
+      entryId: 'ENTRY-1',
+      date: '2026-07-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      durationHours: 1,
+      status: 'posted',
+      assignees: [
+        { personId: 'P1', personName: 'Person 1', status: 'attended', paid: true, paidHours: 1 },
+        { personId: 'P2', personName: 'Person 2', status: 'attended', paid: true, paidHours: 1 }
+      ]
+    }]
+  };
+
+  activityService.getActivity = async () => activity;
+
+  try {
+    const context = await activityWorkSessionService.getWorkSessionContext(
+      activity.id,
+      'ENTRY-1',
+      { id: 'U1', personId: 'P1', activeOrgId: '900000', orgId: '900000' },
+      { scopeId: 'SCP_DEPT' }
+    );
+    assert.equal(context.canManageAll, false);
+    assert.deepEqual(context.entry.assignees.map((row) => row.personId), ['P1']);
+  } finally {
+    activityService.getActivity = originalGetActivity;
+  }
+});
+
+test('Metadata save rejects non-admin scope and unsupported statuses', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const originalGetActivity = activityService.getActivity;
+
+  const activity = {
+    id: 'ACT-META-REJECT',
+    orgId: '900000',
+    title: 'Reject Activity',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    entries: [{
+      entryId: 'ENTRY-1',
+      date: '2026-07-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      durationHours: 1,
+      status: 'posted',
+      assignees: [{ personId: 'P1', personName: 'Person 1', status: 'attended', paid: true, paidHours: 1 }]
+    }]
+  };
+
+  activityService.getActivity = async () => activity;
+
+  try {
+    await assert.rejects(
+      () => activityWorkSessionService.saveWorkSessionMetadata({
+        activityId: activity.id,
+        entryId: 'ENTRY-1',
+        reqUser: { id: 'U1', personId: 'P1', activeOrgId: '900000', orgId: '900000' },
+        accessContext: { scopeId: 'SCP_DEPT' },
+        input: { title: 'Nope' }
+      }),
+      /cannot edit/i
+    );
+
+    await assert.rejects(
+      () => activityWorkSessionService.saveWorkSessionMetadata({
+        activityId: activity.id,
+        entryId: 'ENTRY-1',
+        reqUser: { id: 'ADMIN', activeOrgId: '900000', orgId: '900000' },
+        accessContext: { scopeId: 'SCP_ORG' },
+        input: { status: 'draft' }
+      }),
+      /posted or cancelled/i
+    );
+  } finally {
+    activityService.getActivity = originalGetActivity;
+  }
+});
+
+test('Metadata save propagates approved-timesheet lock rejection', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const originalGetActivity = activityService.getActivity;
+  const originalSaveActivity = activityService.saveActivity;
+
+  const activity = {
+    id: 'ACT-META-LOCK',
+    orgId: '900000',
+    title: 'Locked Activity',
+    categoryId: 'CAT-1',
+    departmentId: 'DEP-1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    entries: [{
+      entryId: 'ENTRY-1',
+      date: '2026-07-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      durationHours: 1,
+      status: 'posted',
+      assignees: [{
+        personId: 'P1',
+        personName: 'Person 1',
+        status: 'attended',
+        paid: true,
+        paidHours: 1,
+        locked: true,
+        lockReason: 'timesheet_approved'
+      }]
+    }]
+  };
+
+  activityService.getActivity = async () => activity;
+  activityService.saveActivity = async (payload) => {
+    activityService.enforceActivityLockRules(activity, payload);
+    return payload;
+  };
+
+  try {
+    await assert.rejects(
+      () => activityWorkSessionService.saveWorkSessionMetadata({
+        activityId: activity.id,
+        entryId: 'ENTRY-1',
+        reqUser: { id: 'ADMIN', activeOrgId: '900000', orgId: '900000' },
+        accessContext: { scopeId: 'SCP_ORG' },
+        input: {
+          startTime: '09:00',
+          endTime: '11:00',
+          assignees: JSON.stringify([{ personId: 'P1', personName: 'Person 1', status: 'attended', paid: true }])
+        }
+      }),
+      /locked by an approved timesheet/i
+    );
+  } finally {
+    activityService.getActivity = originalGetActivity;
+    activityService.saveActivity = originalSaveActivity;
   }
 });
 

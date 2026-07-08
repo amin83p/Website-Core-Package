@@ -7,6 +7,7 @@
   const isCompletion = evaluationType === 'completion';
   const manageUrl = `/school/activities/${encodeURIComponent(activityRow.id)}/work-sessions/${encodeURIComponent(entryRow.entryId)}`;
   const overviewManageUrl = overviewUrl || ('/school/activities/' + encodeURIComponent(activityRow.id) + '/work-sessions/manage');
+  const canEditWorkSessionMetadata = canManageAll === true;
   const dashboardHref = (typeof schoolSectionDashboardHref !== 'undefined' && schoolSectionDashboardHref)
     ? schoolSectionDashboardHref
     : '/school/activities';
@@ -30,6 +31,15 @@
   const nextSession = currentSessionIndex >= 0 && currentSessionIndex < (sessionSwitcher.length - 1)
     ? sessionSwitcher[currentSessionIndex + 1]
     : null;
+  const workSessionDurationLabel = Number(entryRow.durationHours || 0).toFixed(2);
+  const normalizeRoleForView = (value) => String(value || '').trim().toLowerCase().replace(/^school_/, '');
+  const roleLabelForView = (role) => {
+    const normalized = normalizeRoleForView(role);
+    if (normalized === 'teacher') return 'Teacher';
+    if (normalized === 'staff') return 'Staff';
+    if (normalized === 'student') return 'Student';
+    return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Participant';
+  };
 %>
 
 <style>
@@ -537,6 +547,22 @@
     display: grid;
     gap: 1rem;
   }
+  .activity-work-session-page .work-session-admin-metadata {
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    background: #fff;
+    padding: 0.85rem;
+    margin-bottom: 0.85rem;
+  }
+  .activity-work-session-page .work-session-admin-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .activity-work-session-page .ws-derived-hours {
+    font-weight: 700;
+  }
 </style>
 
 <div class="sections-page activity-work-session-page">
@@ -587,7 +613,7 @@
         <button type="button" class="btn btn-outline-secondary bg-light btn-md" disabled><i class="bi bi-chevron-right"></i></button>
       <% } %>
     </div>
-    <% if (editableAssigneeRows.length) { %>
+    <% if (canEditWorkSessionMetadata || editableAssigneeRows.length) { %>
       <button type="button" class="btn btn-primary btn-md btn-filled btn-save-session shadow-md" id="btnSaveWorkSession">
         <i class="bi bi-save me-1"></i>Save session
       </button>
@@ -639,6 +665,45 @@
     </div>
     <div class="collapse" id="workSessionInfoDetailsCollapse">
       <div class="session-info-details-body">
+        <% if (canEditWorkSessionMetadata) { %>
+          <form method="POST" action="<%= manageUrl %>/metadata" id="frmWorkSessionMetadata" class="work-session-admin-metadata">
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <input type="hidden" name="assignees" id="workSessionMetadataAssignees" value="">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-bold small" for="workSessionTitleInput">Title</label>
+                <input type="text" class="form-control" id="workSessionTitleInput" name="title" maxlength="180" value="<%= entryRow.title || '' %>">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold small" for="workSessionStatusInput">Status</label>
+                <select class="form-select" id="workSessionStatusInput" name="status">
+                  <option value="posted" <%= String(entryRow.status || 'posted').toLowerCase() === 'posted' ? 'selected' : '' %>>Posted</option>
+                  <option value="cancelled" <%= String(entryRow.status || '').toLowerCase() === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold small" for="workSessionLocationInput">Location</label>
+                <input type="text" class="form-control" id="workSessionLocationInput" name="location" maxlength="180" value="<%= entryRow.location || activityRow.location || '' %>">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold small" for="workSessionDateInput">Date</label>
+                <input type="date" class="form-control" id="workSessionDateInput" name="date" value="<%= entryRow.date || '' %>">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold small" for="workSessionStartInput">Start Time</label>
+                <input type="time" class="form-control js-work-session-time-input" id="workSessionStartInput" name="startTime" value="<%= entryRow.startTime || '' %>">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold small" for="workSessionEndInput">End Time</label>
+                <input type="time" class="form-control js-work-session-time-input" id="workSessionEndInput" name="endTime" value="<%= entryRow.endTime || '' %>">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold small">Hour</label>
+                <div class="form-control-plaintext ws-derived-hours" id="workSessionDerivedHours"><%= workSessionDurationLabel %> h</div>
+              </div>
+            </div>
+          </form>
+        <% } %>
         <div class="session-info-grid">
           <div class="session-info-tile session-info-tile--accent">
             <div class="session-info-tile-label">Activity</div>
@@ -766,25 +831,43 @@
           </div>
         <% } %>
 
-        <div class="work-session-assignee-forms">
+        <% if (canEditWorkSessionMetadata) { %>
+          <div class="work-session-admin-actions">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddWorkSessionAssignee">
+              <i class="bi bi-person-plus me-1"></i>Add person
+            </button>
+          </div>
+        <% } %>
+
+        <div class="work-session-assignee-forms" id="workSessionAssigneeForms">
           <% assigneeRows.forEach((assignee, idx) => {
             const rowVisible = canManageAll || assignee.isSelf;
             if (!rowVisible && !canManageAll) return;
             const rowEditable = assignee.editable && (canManageAll || assignee.isSelf);
             const statusClass = assignee.locked ? 'secondary' : (assignee.readyForTimesheet ? 'success' : 'warning');
             const isAssigneeCompleted = String(assignee.completionStatus || '').toLowerCase() === 'completed';
+            const assigneeRole = String(assignee.role || 'participant').toLowerCase();
+            const assigneeRoles = Array.from(new Set((Array.isArray(assignee.roles) && assignee.roles.length ? assignee.roles : [assigneeRole])
+              .map((role) => normalizeRoleForView(role))
+              .filter(Boolean)));
+            if (!assigneeRoles.includes(assigneeRole)) assigneeRoles.unshift(assigneeRole);
             const rowKey = String(assignee.personId || ('row_' + idx)).replace(/[^A-Za-z0-9_-]/g, '_') + '_' + String(idx);
           %>
             <div
               class="card border-0 shadow-sm work-session-assignee-form<%= assignee.locked ? ' is-locked' : '' %>"
               data-person-id="<%= assignee.personId %>"
               data-person-name="<%= assignee.personName || assignee.personId %>"
+              data-locked="<%= assignee.locked ? 'true' : 'false' %>"
+              data-role="<%= assigneeRole %>"
+              data-status="<%= String(assignee.status || 'attended').toLowerCase() %>"
+              data-paid="<%= assignee.paid !== false ? 'true' : 'false' %>"
+              data-notes="<%= assignee.notes || '' %>"
               data-completion-status="<%= String(assignee.completionStatus || 'pending').toLowerCase() %>">
               <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                   <div>
                     <h6 class="fw-bold mb-1"><%= assignee.personName || assignee.personId %></h6>
-                    <div class="small text-muted"><%= assignee.role || 'participant' %></div>
+                    <div class="small text-muted font-monospace"><%= assignee.personId %></div>
                     <% if (assignee.locked) { %><span class="badge bg-secondary mt-2">Timesheet locked</span><% } %>
                   </div>
                   <div class="text-end">
@@ -792,13 +875,47 @@
                     <% if (isCompletion && isAssigneeCompleted && assignee.completedAt) { %>
                       <div class="small text-muted mt-1"><%= assignee.completedAt.slice(0, 10) %></div>
                     <% } %>
+                    <% if (canEditWorkSessionMetadata && !assignee.locked) { %>
+                      <button type="button" class="btn btn-outline-danger btn-sm mt-2 js-remove-work-assignee" data-person-id="<%= assignee.personId %>" title="Remove person">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    <% } %>
                   </div>
                 </div>
 
-                <% if (!isCompletion) { %>
-                  <div class="mb-3">
-                    <label class="form-label">Attendance</label>
-                    <% if (rowEditable) { %>
+                <div class="row g-3 align-items-end">
+                  <div class="col-md-3">
+                    <label class="form-label" for="role_<%= rowKey %>">Role</label>
+                    <% if (canEditWorkSessionMetadata && rowEditable) { %>
+                      <select class="form-select ws-role-input" id="role_<%= rowKey %>" data-person-id="<%= assignee.personId %>" data-roles="<%= assigneeRoles.join(',') %>">
+                        <% assigneeRoles.forEach((role) => { %>
+                          <option value="<%= role %>" <%= role === assigneeRole ? 'selected' : '' %>><%= roleLabelForView(role) %></option>
+                        <% }) %>
+                      </select>
+                    <% } else { %>
+                      <div class="form-control-plaintext"><%= roleLabelForView(assignee.role || 'participant') %></div>
+                    <% } %>
+                  </div>
+                  <% if (canEditWorkSessionMetadata) { %>
+                    <div class="col-md-3">
+                      <label class="form-label" for="paid_<%= rowKey %>">Payable</label>
+                      <% if (rowEditable && !assignee.locked) { %>
+                        <div class="form-check form-switch mt-2">
+                          <input class="form-check-input ws-paid-input" type="checkbox" id="paid_<%= rowKey %>" data-person-id="<%= assignee.personId %>" <%= assignee.paid !== false ? 'checked' : '' %>>
+                          <label class="form-check-label" for="paid_<%= rowKey %>">Payable</label>
+                        </div>
+                      <% } else { %>
+                        <div class="form-control-plaintext"><%= assignee.paid !== false ? 'Yes' : 'No' %></div>
+                      <% } %>
+                    </div>
+                  <% } %>
+                  <div class="col-md-3">
+                    <label class="form-label">Hour</label>
+                    <div class="form-control-plaintext fw-semibold ws-derived-hours" data-person-id="<%= assignee.personId %>"><%= Number(entryRow.durationHours || 0).toFixed(2) %> h</div>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <% if (!isCompletion && rowEditable) { %>
                       <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Attendance status for <%= assignee.personName || assignee.personId %>">
                         <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="attended_<%= rowKey %>" value="attended" <%= String(assignee.status || 'attended') === 'attended' ? 'checked' : '' %>>
                         <label class="btn att-label" for="attended_<%= rowKey %>" title="Attended"><i class="bi bi-check-lg me-1"></i>Attended</label>
@@ -807,21 +924,19 @@
                         <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="absent_<%= rowKey %>" value="absent" <%= String(assignee.status || '') === 'absent' ? 'checked' : '' %>>
                         <label class="btn att-label" for="absent_<%= rowKey %>" title="Absent"><i class="bi bi-x-lg me-1"></i>Absent</label>
                       </div>
+                    <% } else if (isCompletion && canEditWorkSessionMetadata && rowEditable && !assignee.locked) { %>
+                      <select class="form-select ws-completion-status-input" id="completion_<%= rowKey %>" data-person-id="<%= assignee.personId %>">
+                        <option value="pending" <%= isAssigneeCompleted ? '' : 'selected' %>>Pending</option>
+                        <option value="completed" <%= isAssigneeCompleted ? 'selected' : '' %>>Completed</option>
+                      </select>
                     <% } else { %>
-                      <div class="form-control-plaintext"><span class="badge bg-light text-dark border"><%= assignee.status || 'pending' %></span></div>
+                      <div class="form-control-plaintext"><span class="badge bg-light text-dark border"><%= isCompletion ? (isAssigneeCompleted ? 'completed' : 'pending') : (assignee.status || 'pending') %></span></div>
                     <% } %>
                   </div>
-                <% } %>
+                </div>
 
                 <% if (activityRow.paid) { %>
-                  <div class="mb-3">
-                    <label class="form-label" for="paidHours_<%= rowKey %>">Paid hours</label>
-                    <% if (rowEditable) { %>
-                      <input type="number" step="0.25" min="0" max="24" class="form-control ws-paid-hours-input" id="paidHours_<%= rowKey %>" data-person-id="<%= assignee.personId %>" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>">
-                    <% } else { %>
-                      <div class="form-control-plaintext fw-semibold"><%= Number(assignee.paidHours || 0).toFixed(2) %></div>
-                    <% } %>
-                  </div>
+                  <input type="hidden" class="ws-paid-hours-input" id="paidHours_<%= rowKey %>" data-person-id="<%= assignee.personId %>" value="<%= Number(entryRow.durationHours || 0).toFixed(2) %>">
                 <% } %>
 
                 <div class="mb-3">
@@ -879,11 +994,15 @@
 </div>
 
 <%- include('partials/modal') %>
+<%- include('partials/modal_GenericPicker') %>
 
 <script>
   (function () {
     const fallbackCloseHref = "<%= overviewManageUrl %>";
     const isCompletionMode = <%= isCompletion ? 'true' : 'false' %>;
+    const canManageAllWorkSession = <%= canEditWorkSessionMetadata ? 'true' : 'false' %>;
+    const activityPaid = <%= activityRow.paid ? 'true' : 'false' %>;
+    let dynamicAssigneeIndex = 0;
 
     function resolveMessageModalFn() {
       if (typeof showMessageModal === 'function') return showMessageModal;
@@ -912,6 +1031,86 @@
       const text = String(value || '');
       if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(text);
       return text.replace(/["\\]/g, '\\$&');
+    }
+
+    function escapeHtml(value) {
+      return String(value === undefined || value === null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function calculateDurationHours(startTime, endTime) {
+      if (!startTime || !endTime) return 0;
+      const startParts = String(startTime).split(':').map(Number);
+      const endParts = String(endTime).split(':').map(Number);
+      if (startParts.length < 2 || endParts.length < 2) return 0;
+      const start = (startParts[0] * 60) + startParts[1];
+      const end = (endParts[0] * 60) + endParts[1];
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+      return Number(((end - start) / 60).toFixed(2));
+    }
+
+    function normalizeRole(value) {
+      return String(value || '').trim().toLowerCase().replace(/^school_/, '');
+    }
+
+    function normalizeRoleList(value) {
+      const source = Array.isArray(value) ? value : String(value || '').split(',');
+      const roles = [];
+      source.forEach(function (item) {
+        const role = normalizeRole(typeof item === 'string' ? item : (item?.key || item?.role || item?.name || item?.label));
+        if (role && !roles.includes(role)) roles.push(role);
+      });
+      return roles;
+    }
+
+    function roleLabel(role) {
+      const normalized = normalizeRole(role);
+      if (normalized === 'teacher') return 'Teacher';
+      if (normalized === 'staff') return 'Staff';
+      if (normalized === 'student') return 'Student';
+      return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Participant';
+    }
+
+    function pickDefaultRole(roles, preferred) {
+      const normalizedRoles = normalizeRoleList(roles);
+      const preferredRole = normalizeRole(preferred);
+      if (preferredRole && normalizedRoles.includes(preferredRole)) return preferredRole;
+      if (normalizedRoles.includes('teacher')) return 'teacher';
+      if (normalizedRoles.includes('staff')) return 'staff';
+      if (normalizedRoles.includes('student')) return 'student';
+      return normalizedRoles[0] || preferredRole || 'participant';
+    }
+
+    function buildRoleOptions(roles, selectedRole) {
+      const normalizedRoles = normalizeRoleList(roles);
+      const selected = pickDefaultRole(normalizedRoles, selectedRole);
+      const options = normalizedRoles.includes(selected) ? normalizedRoles : [selected].concat(normalizedRoles);
+      return options.map((role) => {
+        return '<option value="' + escapeHtml(role) + '"' + (role === selected ? ' selected' : '') + '>' + escapeHtml(roleLabel(role)) + '</option>';
+      }).join('');
+    }
+
+    function currentDerivedHours() {
+      const start = document.getElementById('workSessionStartInput')?.value || '<%= entryRow.startTime || '' %>';
+      const end = document.getElementById('workSessionEndInput')?.value || '<%= entryRow.endTime || '' %>';
+      return calculateDurationHours(start, end) || Number('<%= Number(entryRow.durationHours || 0).toFixed(2) %>') || 0;
+    }
+
+    function refreshDerivedHours() {
+      const hours = currentDerivedHours();
+      const label = hours.toFixed(2) + ' h';
+      const sessionHours = document.getElementById('workSessionDerivedHours');
+      if (sessionHours) sessionHours.textContent = label;
+      document.querySelectorAll('.ws-derived-hours').forEach((node) => {
+        node.textContent = label;
+      });
+      document.querySelectorAll('.ws-paid-hours-input').forEach((input) => {
+        input.value = hours.toFixed(2);
+      });
     }
 
     async function showUiConfirm(options) {
@@ -963,6 +1162,90 @@
       });
     }
 
+    function collectAdminAssignees() {
+      const hours = currentDerivedHours();
+      return Array.from(document.querySelectorAll('.work-session-assignee-form[data-person-id]'))
+        .map((row) => {
+          const personId = String(row.getAttribute('data-person-id') || '').trim();
+          if (!personId) return null;
+          const safePersonId = escapeSelectorValue(personId);
+          const personSelector = '[data-person-id="' + safePersonId + '"]';
+          const roleInput = row.querySelector('.ws-role-input' + personSelector);
+          const statusInput = row.querySelector('input.ws-att-radio' + personSelector + ':checked');
+          const completionInput = row.querySelector('.ws-completion-status-input' + personSelector);
+          const paidInput = row.querySelector('.ws-paid-input' + personSelector);
+          const notesInput = row.querySelector('.ws-notes-input' + personSelector);
+          const roleList = normalizeRoleList(roleInput?.getAttribute('data-roles') || row.getAttribute('data-roles') || row.getAttribute('data-role') || 'participant');
+          const role = pickDefaultRole(roleList, roleInput?.value || row.getAttribute('data-role') || 'participant');
+          const paidFallback = String(row.getAttribute('data-paid') || 'true').toLowerCase() !== 'false';
+          return {
+            personId,
+            personName: row.getAttribute('data-person-name') || personId,
+            role,
+            roles: roleList.includes(role) ? roleList : [role].concat(roleList),
+            status: statusInput ? statusInput.value : (row.getAttribute('data-status') || 'attended'),
+            paid: paidInput ? paidInput.checked : paidFallback,
+            paidHours: Number(hours.toFixed(2)),
+            notes: notesInput ? notesInput.value : (row.getAttribute('data-notes') || ''),
+            completionStatus: completionInput ? completionInput.value : row.getAttribute('data-completion-status') || 'pending'
+          };
+        })
+        .filter(Boolean);
+    }
+
+    function normalizePickerPerson(item) {
+      const personId = String(item?.personId || item?.id || item?.value || '').trim();
+      if (!personId) return null;
+      const personName = String(item?.displayName || item?.personName || item?.name || item?.label || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || personId).trim();
+      const roles = normalizeRoleList(item?.roles || item?.availableRoles || item?.matchedRole || item?.role);
+      const role = pickDefaultRole(roles, item?.matchedRole || item?.role);
+      return { personId, personName, role, roles: roles.length ? roles : [role] };
+    }
+
+    function buildAdminAssigneeCard(person) {
+      const safePersonId = escapeHtml(person.personId);
+      const safePersonName = escapeHtml(person.personName || person.personId);
+      const safeRole = escapeHtml(person.role || 'participant');
+      const roleList = normalizeRoleList(person.roles || person.role || 'participant');
+      const safeRoleList = escapeHtml(roleList.join(','));
+      const roleOptions = buildRoleOptions(roleList, person.role);
+      const rowKey = 'dynamic_' + (++dynamicAssigneeIndex);
+      const hours = currentDerivedHours().toFixed(2);
+      const attendanceControls = isCompletionMode ? [
+        '<select class="form-select ws-completion-status-input" id="completion_' + rowKey + '" data-person-id="' + safePersonId + '">',
+        '<option value="pending" selected>Pending</option>',
+        '<option value="completed">Completed</option>',
+        '</select>'
+      ].join('') : [
+        '<div class="btn-group btn-group-sm flex-wrap" role="group">',
+        '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="attended_' + rowKey + '" value="attended" checked>',
+        '<label class="btn att-label" for="attended_' + rowKey + '"><i class="bi bi-check-lg me-1"></i>Attended</label>',
+        '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="excused_' + rowKey + '" value="excused">',
+        '<label class="btn att-label" for="excused_' + rowKey + '"><i class="bi bi-envelope-paper me-1"></i>Excused</label>',
+        '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="absent_' + rowKey + '" value="absent">',
+        '<label class="btn att-label" for="absent_' + rowKey + '"><i class="bi bi-x-lg me-1"></i>Absent</label>',
+        '</div>'
+      ].join('');
+      return [
+        '<div class="card border-0 shadow-sm work-session-assignee-form" data-person-id="' + safePersonId + '" data-person-name="' + safePersonName + '" data-locked="false" data-role="' + safeRole + '" data-roles="' + safeRoleList + '" data-status="attended" data-paid="' + (activityPaid ? 'true' : 'false') + '" data-notes="" data-completion-status="pending">',
+        '<div class="card-body">',
+        '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">',
+        '<div><h6 class="fw-bold mb-1">' + safePersonName + '</h6><div class="small text-muted font-monospace">' + safePersonId + '</div></div>',
+        '<div class="text-end"><span class="badge bg-warning">Pending</span><button type="button" class="btn btn-outline-danger btn-sm mt-2 js-remove-work-assignee" data-person-id="' + safePersonId + '" title="Remove person"><i class="bi bi-trash"></i></button></div>',
+        '</div>',
+        '<div class="row g-3 align-items-end">',
+        '<div class="col-md-3"><label class="form-label" for="role_' + rowKey + '">Role</label><select class="form-select ws-role-input" id="role_' + rowKey + '" data-person-id="' + safePersonId + '" data-roles="' + safeRoleList + '">' + roleOptions + '</select></div>',
+        '<div class="col-md-3"><label class="form-label" for="paid_' + rowKey + '">Payable</label><div class="form-check form-switch mt-2"><input class="form-check-input ws-paid-input" type="checkbox" id="paid_' + rowKey + '" data-person-id="' + safePersonId + '"' + (activityPaid ? ' checked' : '') + '><label class="form-check-label" for="paid_' + rowKey + '">Payable</label></div></div>',
+        '<div class="col-md-3"><label class="form-label">Hour</label><div class="form-control-plaintext fw-semibold ws-derived-hours" data-person-id="' + safePersonId + '">' + hours + ' h</div></div>',
+        '<div class="col-md-3"><label class="form-label">Status</label>' + attendanceControls + '</div>',
+        '</div>',
+        activityPaid ? '<input type="hidden" class="ws-paid-hours-input" data-person-id="' + safePersonId + '" value="' + hours + '">' : '',
+        '<div class="mb-3"><label class="form-label" for="notes_' + rowKey + '">Notes</label><textarea class="form-control ws-notes-input" id="notes_' + rowKey + '" data-person-id="' + safePersonId + '" rows="3" maxlength="500" placeholder="Add notes for this assignee"></textarea></div>',
+        '</div>',
+        '</div>'
+      ].join('');
+    }
+
     function syncCompleteWorkSessionForm(personId) {
       syncRowFields(personId);
       const safePersonId = escapeSelectorValue(personId);
@@ -984,6 +1267,31 @@
     const saveSessionBtn = document.getElementById('btnSaveWorkSession');
     if (saveSessionBtn) {
       saveSessionBtn.addEventListener('click', async function () {
+        if (canManageAllWorkSession) {
+          const metadataForm = document.getElementById('frmWorkSessionMetadata');
+          if (!metadataForm) return;
+          refreshDerivedHours();
+          const assigneesInput = document.getElementById('workSessionMetadataAssignees');
+          if (assigneesInput) assigneesInput.value = JSON.stringify(collectAdminAssignees());
+          if (typeof window.showLoading === 'function') window.showLoading('Saving session...');
+          try {
+            const response = await fetch(metadataForm.action, {
+              method: 'POST',
+              body: new URLSearchParams(new FormData(metadataForm)),
+              headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.status === 'error') {
+              throw new Error(payload.message || 'Save failed.');
+            }
+            window.location.reload();
+          } catch (error) {
+            if (typeof window.hideLoading === 'function') window.hideLoading();
+            const message = error && error.message ? error.message : 'Save failed.';
+            await showUiMessage({ title: 'Save failed', icon: 'error', message: message });
+          }
+          return;
+        }
         const saveForms = Array.from(document.querySelectorAll('.ws-assignee-save-form[data-person-id]'))
           .filter((form) => String(form.getAttribute('data-person-id') || '').trim());
         if (!saveForms.length) return;
@@ -1010,6 +1318,63 @@
         }
       });
     }
+
+    document.querySelectorAll('.js-work-session-time-input').forEach((input) => {
+      input.addEventListener('change', refreshDerivedHours);
+      input.addEventListener('input', refreshDerivedHours);
+    });
+    refreshDerivedHours();
+
+    document.addEventListener('click', async function (event) {
+      const removeButton = event.target.closest('.js-remove-work-assignee');
+      if (!removeButton) return;
+      event.preventDefault();
+      const card = removeButton.closest('.work-session-assignee-form');
+      const personName = card?.getAttribute('data-person-name') || 'this person';
+      const confirmed = await showUiConfirm({
+        title: 'Remove Person',
+        icon: 'warning',
+        okText: 'Remove',
+        cancelText: 'Cancel',
+        okClass: 'btn-danger',
+        message: 'Remove ' + personName + ' from this work session?'
+      });
+      if (confirmed) card?.remove();
+    });
+
+    const addAssigneeButton = document.getElementById('btnAddWorkSessionAssignee');
+    if (addAssigneeButton) {
+      addAssigneeButton.addEventListener('click', async function () {
+        if (!window.GenericPicker || !window.GenericPickerPresets) {
+          await showUiMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Person picker is not available on this page.' });
+          return;
+        }
+        const context = window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function'
+          ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+          : null;
+        window.GenericPicker.open(window.GenericPickerPresets.person({
+          title: 'Add Assigned People',
+          apiEndpoint: '/school/activities/api/eligible-persons',
+          placeholder: 'Search students, teachers, or staff...',
+          multiselect: true,
+          context,
+          onSelect: function (items) {
+            const selectedRows = Array.isArray(items) ? items : [items];
+            const container = document.getElementById('workSessionAssigneeForms');
+            if (!container) return;
+            selectedRows.forEach((item) => {
+              const person = normalizePickerPerson(item);
+              if (!person) return;
+              const exists = container.querySelector('.work-session-assignee-form[data-person-id="' + escapeSelectorValue(person.personId) + '"]');
+              if (exists) return;
+              container.insertAdjacentHTML('beforeend', buildAdminAssigneeCard(person));
+            });
+            refreshDerivedHours();
+          }
+        }));
+      });
+    }
+
     const completeForm = document.getElementById('frmCompleteWorkSessionStatus');
     const statusButton = document.getElementById('workSessionStatusButton');
 

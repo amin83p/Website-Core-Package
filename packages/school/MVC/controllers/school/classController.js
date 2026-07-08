@@ -38,6 +38,7 @@ const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
+const activityService = require('../../services/school/activityService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
@@ -1465,9 +1466,215 @@ function resolveFallbackTeacherIdFromBody(body = {}) {
     return '';
 }
 
-async function detectSessionConflicts({ classId = '', sessions = [], activeOrgId = '', reqUser, fallbackTeacherId = '' }) {
+async function buildTeacherIdentityLookup({ activeOrgId = '', reqUser } = {}) {
+    const rows = await schoolDataService.fetchData('teachers', {}, reqUser).catch(() => []);
+    const teacherToPerson = new Map();
+    const personToTeacherIds = new Map();
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+        if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) return;
+        const teacherId = cleanPersonId(row?.id);
+        const personId = cleanPersonId(row?.personId);
+        if (!personId) return;
+        if (teacherId) teacherToPerson.set(teacherId, personId);
+        if (!personToTeacherIds.has(personId)) personToTeacherIds.set(personId, new Set());
+        if (teacherId) personToTeacherIds.get(personId).add(teacherId);
+    });
+    return { teacherToPerson, personToTeacherIds };
+}
+
+function resolveTeacherPersonId(value, teacherIdentityLookup = {}) {
+    const clean = cleanPersonId(value);
+    if (!clean) return '';
+    return teacherIdentityLookup?.teacherToPerson?.get(clean) || clean;
+}
+
+async function normalizeSessionMetadataTeacherInput(body = {}, { activeOrgId = '', reqUser } = {}) {
+    if (body?.teacherId === undefined) return body;
+    const teacherIdentityLookup = await buildTeacherIdentityLookup({ activeOrgId, reqUser });
+    return {
+        ...body,
+        teacherId: resolveTeacherPersonId(body.teacherId, teacherIdentityLookup) || cleanPersonId(body.teacherId)
+    };
+}
+
+function clockTimeToMinutes(value) {
+    const normalized = normalizeClockTime(value);
+    if (!normalized) return null;
+    const [hour, minute] = normalized.split(':').map(Number);
+    return (hour * 60) + minute;
+}
+
+function clockWindowsOverlap(aStart, aEnd, bStart, bEnd) {
+    const aStartMinutes = clockTimeToMinutes(aStart);
+    const aEndMinutes = clockTimeToMinutes(aEnd);
+    const bStartMinutes = clockTimeToMinutes(bStart);
+    const bEndMinutes = clockTimeToMinutes(bEnd);
+    if ([aStartMinutes, aEndMinutes, bStartMinutes, bEndMinutes].some((value) => !Number.isInteger(value))) return false;
+    if (aEndMinutes <= aStartMinutes || bEndMinutes <= bStartMinutes) return false;
+    return aStartMinutes < bEndMinutes && aEndMinutes > bStartMinutes;
+}
+
+function getSessionByIdFromMap(classSessionsById = new Map(), classId = '', sessionId = '') {
+    const normalizedClassId = toPublicId(classId);
+    const normalizedSessionId = toPublicId(sessionId);
+    if (!normalizedClassId || !normalizedSessionId) return null;
+    const sessions = classSessionsById.get(normalizedClassId) || [];
+    return (Array.isArray(sessions) ? sessions : [])
+        .find((row) => idsEqual(row?.sessionId || row?.id, normalizedSessionId)) || null;
+}
+
+function resolveReportAssignmentConflictDate(assignment = {}, classSessionsById = new Map()) {
+    const explicitDate = normalizeDateOnlyValue(reportAssignmentSessionUtils.resolveAssignmentTargetDate(assignment));
+    if (explicitDate) return explicitDate;
+    const sourceSession = getSessionByIdFromMap(classSessionsById, assignment?.classId, assignment?.sessionId);
+    return normalizeDateOnlyValue(sourceSession?.date);
+}
+
+function resolveReportAssignmentConflictWindow(assignment = {}, classSessionsById = new Map()) {
+    const start = normalizeClockTime(assignment?.taskStartTime);
+    const end = normalizeClockTime(assignment?.taskEndTime);
+    if (start && end) return { start, end };
+
+    const sourceSession = getSessionByIdFromMap(classSessionsById, assignment?.classId, assignment?.sessionId);
+    return {
+        start: normalizeClockTime(sourceSession?.startTime),
+        end: normalizeClockTime(sourceSession?.endTime)
+    };
+}
+
+function buildReportAssignmentLabel(assignment = {}, classIdTitleMap = new Map()) {
+    const classTitle = classIdTitleMap.get(toPublicId(assignment?.classId)) || toPublicId(assignment?.classId) || 'Class';
+    const assignmentId = toPublicId(assignment?.id);
+    const target = toPublicId(assignment?.assignmentRowId || assignment?.rowId || assignment?.sessionId || assignment?.dueDate);
+    return `Report: ${classTitle}${assignmentId ? ` ${assignmentId}` : ''}${target ? ` (${target})` : ''}`;
+}
+
+function dedupeSessionConflictRows(conflicts = []) {
+    const seen = new Set();
+    return (Array.isArray(conflicts) ? conflicts : []).filter((row) => {
+        const key = [
+            row?.sessionIndex,
+            row?.date,
+            row?.teacherName,
+            row?.conflictClass,
+            row?.existTime
+        ].join('|');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+async function appendActivitySessionConflicts({
+    conflicts,
+    session,
+    sessionIndex,
+    activeOrgId,
+    reqUser
+}) {
+    const teacherId = cleanPersonId(session?.resolvedPersonId);
+    const date = normalizeDateOnlyValue(session?.date);
+    const startTime = normalizeClockTime(session?.startTime);
+    const endTime = normalizeClockTime(session?.endTime);
+    if (!teacherId || !date || !startTime || !endTime) return;
+
+    const activityEvents = await activityService.getScheduleEventsForPerson({
+        orgId: activeOrgId,
+        personId: teacherId,
+        startDate: date,
+        endDate: date,
+        reqUser
+    });
+
+    (Array.isArray(activityEvents) ? activityEvents : []).forEach((event) => {
+        const eventDate = normalizeDateOnlyValue(event?.date);
+        const eventStart = normalizeClockTime(event?.start || event?.startTime);
+        const eventEnd = normalizeClockTime(event?.end || event?.endTime);
+        if (eventDate !== date || !clockWindowsOverlap(startTime, endTime, eventStart, eventEnd)) return;
+
+        const label = String(event?.title || event?.className || 'Work session').trim();
+        conflicts.push({
+            sessionIndex,
+            date,
+            teacherName: session?.delivery?.deliveredByName || teacherId,
+            conflictClass: `Activity: ${label}`,
+            existTime: `${eventStart} - ${eventEnd}`,
+            conflictType: 'activity_work_session',
+            activityId: toPublicId(event?.activityId),
+            activityEntryId: toPublicId(event?.activityEntryId)
+        });
+    });
+}
+
+async function appendReportAssignmentConflicts({
+    conflicts,
+    session,
+    sessionIndex,
+    activeOrgId,
+    classSessionsById,
+    classIdTitleMap,
+    teacherIdentityLookup
+}) {
+    const teacherId = cleanPersonId(session?.resolvedPersonId);
+    const date = normalizeDateOnlyValue(session?.date);
+    const startTime = normalizeClockTime(session?.startTime);
+    const endTime = normalizeClockTime(session?.endTime);
+    if (!teacherId || !date || !startTime || !endTime) return;
+
+    const assignments = await schoolRepositories.reportAssignments.list({
+        query: {},
+        scope: { canViewAll: true }
+    });
+
+    const expandedAssignments = [];
+    (Array.isArray(assignments) ? assignments : []).forEach((assignment) => {
+        if (activeOrgId && !idsEqual(assignment?.orgId, activeOrgId)) return;
+        if (String(assignment?.status || '').trim().toLowerCase() !== 'active') return;
+        const rows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment);
+        (rows.length ? rows : [{}]).forEach((row) => {
+            if (String(row?.status || 'active').trim().toLowerCase() !== 'active') return;
+            expandedAssignments.push(reportAssignmentSessionUtils.applyTargetRow(assignment, row));
+        });
+    });
+
+    expandedAssignments.forEach((assignment) => {
+        if (parseBoolean(assignment?.conflictPermitted, false)) return;
+        const teacherIds = Array.isArray(assignment?.teacherIds)
+            ? assignment.teacherIds.map((id) => resolveTeacherPersonId(id, teacherIdentityLookup)).filter(Boolean)
+            : [];
+        if (!teacherIds.includes(teacherId)) return;
+
+        const reportDate = resolveReportAssignmentConflictDate(assignment, classSessionsById);
+        if (reportDate !== date) return;
+
+        const window = resolveReportAssignmentConflictWindow(assignment, classSessionsById);
+        if (!clockWindowsOverlap(startTime, endTime, window.start, window.end)) return;
+
+        conflicts.push({
+            sessionIndex,
+            date,
+            teacherName: session?.delivery?.deliveredByName || teacherId,
+            conflictClass: buildReportAssignmentLabel(assignment, classIdTitleMap),
+            existTime: `${window.start} - ${window.end}`,
+            conflictType: 'report_assignment',
+            reportAssignmentId: toPublicId(assignment?.id),
+            reportAssignmentRowId: toPublicId(assignment?.assignmentRowId || assignment?.rowId)
+        });
+    });
+}
+
+async function detectSessionConflicts({
+    classId = '',
+    sessions = [],
+    activeOrgId = '',
+    reqUser,
+    fallbackTeacherId = '',
+    includeExternalScheduleConflicts = false,
+    externalFocusSessionIds = []
+}) {
     const parsedSessions = Array.isArray(sessions) ? sessions : [];
     const statusMap = await sessionStatusPolicyService.getStatusMap(activeOrgId, { includeInactive: true });
+    const teacherIdentityLookup = await buildTeacherIdentityLookup({ activeOrgId, reqUser });
     const allClasses = await schoolDataService.fetchData('classes', {}, reqUser);
     const scopedClasses = (Array.isArray(allClasses) ? allClasses : []).filter((row) => {
         if (!activeOrgId) return true;
@@ -1482,6 +1689,9 @@ async function detectSessionConflicts({ classId = '', sessions = [], activeOrgId
             sessions: await schoolDataService.getClassSessions(row?.id, reqUser)
         }))
     );
+    const classSessionsById = new Map(
+        classSessionsBundle.map((bundle) => [toPublicId(bundle?.classId), Array.isArray(bundle?.sessions) ? bundle.sessions : []])
+    );
     const teacherDayMap = new Map();
     classSessionsBundle.forEach((bundle) => {
         const sourceClassId = String(bundle?.classId || '').trim();
@@ -1493,7 +1703,7 @@ async function detectSessionConflicts({ classId = '', sessions = [], activeOrgId
                 status: sessionRow?.status,
                 notes: sessionRow?.notes
             })) return;
-            const tid = resolveSessionTeacherId(sessionRow, classFallbackTeacherId);
+            const tid = resolveTeacherPersonId(resolveSessionTeacherId(sessionRow, classFallbackTeacherId), teacherIdentityLookup);
             const date = String(sessionRow?.date || '').trim();
             const startTime = String(sessionRow?.startTime || '').trim();
             const endTime = String(sessionRow?.endTime || '').trim();
@@ -1512,7 +1722,7 @@ async function detectSessionConflicts({ classId = '', sessions = [], activeOrgId
     const normalizedSessions = parsedSessions.map((session, index) => ({
         ...session,
         _rowIndex: index,
-        resolvedPersonId: resolveSessionTeacherId(session, fallbackTeacherId)
+        resolvedPersonId: resolveTeacherPersonId(resolveSessionTeacherId(session, fallbackTeacherId), teacherIdentityLookup)
     }));
 
     const leaveConflictWindows = normalizedSessions
@@ -1673,7 +1883,43 @@ async function detectSessionConflicts({ classId = '', sessions = [], activeOrgId
         }
     });
 
-    return conflicts;
+    if (includeExternalScheduleConflicts) {
+        const focusedSessionIds = new Set(
+            (Array.isArray(externalFocusSessionIds) ? externalFocusSessionIds : [])
+                .map((id) => toPublicId(id))
+                .filter(Boolean)
+        );
+        for (let index = 0; index < normalizedSessions.length; index += 1) {
+            const ses = normalizedSessions[index];
+            const normalizedSessionId = toPublicId(ses?.sessionId || ses?.id);
+            if (focusedSessionIds.size && !focusedSessionIds.has(normalizedSessionId)) continue;
+            if (sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(statusMap, {
+                status: ses?.status,
+                notes: ses?.notes
+            })) continue;
+
+            // eslint-disable-next-line no-await-in-loop
+            await appendActivitySessionConflicts({
+                conflicts,
+                session: ses,
+                sessionIndex: index,
+                activeOrgId,
+                reqUser
+            });
+            // eslint-disable-next-line no-await-in-loop
+            await appendReportAssignmentConflicts({
+                conflicts,
+                session: ses,
+                sessionIndex: index,
+                activeOrgId,
+                classSessionsById,
+                classIdTitleMap,
+                teacherIdentityLookup
+            });
+        }
+    }
+
+    return dedupeSessionConflictRows(conflicts);
 }
 
 function normalizeTeacherAssignmentTarget(value, fallback = '') {
@@ -3874,9 +4120,13 @@ async function saveSession(req, res) {
             }).filter(Boolean);
         }
 
+        const normalizedMetadataBody = await normalizeSessionMetadataTeacherInput(req.body || {}, {
+            activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+            reqUser: req.user
+        });
         const { changed: metadataChanged } = applyAdminSessionMetadataUpdate(
             originalSession,
-            req.body || {},
+            normalizedMetadataBody,
             canOverride
         );
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, originalSession, req.user);
@@ -3889,7 +4139,9 @@ async function saveSession(req, res) {
                 sessions: mergedSessions,
                 activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
                 reqUser: req.user,
-                fallbackTeacherId: resolveSessionTeacherId(originalSession)
+                fallbackTeacherId: resolveSessionTeacherId(originalSession),
+                includeExternalScheduleConflicts: true,
+                externalFocusSessionIds: [sessionId]
             });
             if (Array.isArray(conflicts) && conflicts.length && !forceMetadataConflicts) {
                 const warningMessage = 'Schedule conflicts were detected for the updated session date, time, or teacher.';

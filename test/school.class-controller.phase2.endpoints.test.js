@@ -7,6 +7,9 @@ const schoolDataService = require('../packages/school/MVC/services/school/school
 const idempotencyGuardService = require('../packages/school/MVC/services/school/idempotencyGuardService');
 const schoolIndexService = require('../packages/school/MVC/services/school/schoolIndexService');
 const classEnrollmentSessionApplicabilityService = require('../packages/school/MVC/services/school/classEnrollmentSessionApplicabilityService');
+const classEnrollmentReadService = require('../packages/school/MVC/services/school/classEnrollmentReadService');
+const activityService = require('../packages/school/MVC/services/school/activityService');
+const schoolRepositories = require('../packages/school/MVC/repositories/school');
 
 const schoolMethodNames = [
   'getDataById',
@@ -45,6 +48,15 @@ const schoolIndexOriginals = {
 const applicabilityOriginals = {
   recomputeSessionCappedEnrollmentCompletionsForClass: classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass
 };
+const classEnrollmentReadOriginals = {
+  listActiveStudentIdsForClass: classEnrollmentReadService.listActiveStudentIdsForClass
+};
+const activityOriginals = {
+  getScheduleEventsForPerson: activityService.getScheduleEventsForPerson
+};
+const reportAssignmentOriginals = {
+  list: schoolRepositories.reportAssignments.list
+};
 
 function restoreStubs() {
   schoolMethodNames.forEach((name) => {
@@ -55,6 +67,9 @@ function restoreStubs() {
   });
   schoolIndexService.rebuildIndexesForClass = schoolIndexOriginals.rebuildIndexesForClass;
   classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = applicabilityOriginals.recomputeSessionCappedEnrollmentCompletionsForClass;
+  classEnrollmentReadService.listActiveStudentIdsForClass = classEnrollmentReadOriginals.listActiveStudentIdsForClass;
+  activityService.getScheduleEventsForPerson = activityOriginals.getScheduleEventsForPerson;
+  schoolRepositories.reportAssignments.list = reportAssignmentOriginals.list;
 }
 
 function createReq(overrides = {}) {
@@ -170,6 +185,65 @@ function applyClassLookupStubs(additional = {}) {
 
   Object.entries(additional).forEach(([name, fn]) => {
     schoolDataService[name] = fn;
+  });
+}
+
+function applySessionConflictSaveStubs({
+  classes = [],
+  sessionsByClass = {},
+  activityEvents = [],
+  reportAssignments = [],
+  teachers = []
+} = {}) {
+  const scopedClasses = classes.length
+    ? classes
+    : [{ id: 'CLS-1', orgId: 'ORG-1', title: 'Rolling Class A', registrationMode: 'rolling', cycleStartDate: '2026-07-01', cycleEndDate: '2026-07-31' }];
+
+  applyClassLookupStubs({
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes') {
+        return scopedClasses.find((row) => String(row.id) === String(id)) || null;
+      }
+      return null;
+    },
+    fetchData: async (entityType) => {
+      if (entityType === 'classes') return scopedClasses;
+      if (entityType === 'students') return [];
+      if (entityType === 'teachers') return teachers;
+      return [];
+    },
+    getClassSessions: async (classId) => sessionsByClass[String(classId)] || [],
+    saveClassSessions: async () => {
+      throw new Error('saveClassSessions should not be called while conflict confirmation is required.');
+    }
+  });
+
+  classEnrollmentReadService.listActiveStudentIdsForClass = async () => ({ source: 'test', studentIds: new Set(), usedFallback: false });
+  activityService.getScheduleEventsForPerson = async () => activityEvents;
+  schoolRepositories.reportAssignments.list = async () => reportAssignments;
+  schoolIndexService.rebuildIndexesForClass = async () => {};
+  classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = async () => {};
+}
+
+function createAdminSessionSaveReq(body = {}) {
+  return createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    user: {
+      id: 'USR-1',
+      activeOrgId: 'ORG-1',
+      activeProfile: { fullAdmin: true, orgId: 'ORG-1' },
+      isSystemAdmin: false,
+      isVirtualSuperAdmin: false
+    },
+    body: {
+      status: 'scheduled',
+      date: '2026-07-10',
+      startTime: '09:00',
+      endTime: '10:00',
+      teacherId: 'T-1',
+      teacherName: 'Teacher One',
+      ...body
+    }
   });
 }
 
@@ -520,6 +594,169 @@ test('checkConflicts rejects rolling sessions outside cycle window', async () =>
   assert.equal(res.statusCode, 400);
   assert.equal(res.payload.status, 'error');
   assert.match(String(res.payload.message || ''), /within cycle dates/i);
+});
+
+test('saveSession warns when admin metadata change overlaps another class session', async () => {
+  applyDefaultGuardStubs();
+  applySessionConflictSaveStubs({
+    classes: [
+      { id: 'CLS-1', orgId: 'ORG-1', title: 'Rolling Class A', registrationMode: 'rolling', cycleStartDate: '2026-07-01', cycleEndDate: '2026-07-31' },
+      { id: 'CLS-2', orgId: 'ORG-1', title: 'Rolling Class B', registrationMode: 'rolling', cycleStartDate: '2026-07-01', cycleEndDate: '2026-07-31' }
+    ],
+    sessionsByClass: {
+      'CLS-1': [{ sessionId: 'SES-1', date: '2026-07-10', startTime: '08:00', endTime: '08:30', status: 'scheduled', delivery: { deliveredBy: 'T-1', deliveredByName: 'Teacher One' } }],
+      'CLS-2': [{ sessionId: 'SES-2', date: '2026-07-10', startTime: '09:30', endTime: '10:30', status: 'scheduled', delivery: { deliveredBy: 'T-1', deliveredByName: 'Teacher One' } }]
+    }
+  });
+
+  const req = createAdminSessionSaveReq();
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.payload.status, 'warning');
+  assert.equal(res.payload.code, 'SESSION_METADATA_CONFLICTS');
+  assert.match(String(res.payload.data.conflicts[0].conflictClass || ''), /Rolling Class B/);
+});
+
+test('saveSession warns when admin metadata change overlaps activity work session', async () => {
+  applyDefaultGuardStubs();
+  applySessionConflictSaveStubs({
+    sessionsByClass: {
+      'CLS-1': [{ sessionId: 'SES-1', date: '2026-07-10', startTime: '08:00', endTime: '08:30', status: 'scheduled', delivery: { deliveredBy: 'T-1', deliveredByName: 'Teacher One' } }]
+    },
+    activityEvents: [{
+      activityId: 'ACT-1',
+      activityEntryId: 'ENTRY-1',
+      title: 'Staff workshop',
+      date: '2026-07-10',
+      start: '09:30',
+      end: '10:30'
+    }]
+  });
+
+  const req = createAdminSessionSaveReq();
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.payload.code, 'SESSION_METADATA_CONFLICTS');
+  assert.match(String(res.payload.data.conflicts[0].conflictClass || ''), /Activity: Staff workshop/);
+});
+
+test('saveSession warns when admin metadata change overlaps non-permitted report assignment', async () => {
+  applyDefaultGuardStubs();
+  applySessionConflictSaveStubs({
+    sessionsByClass: {
+      'CLS-1': [{ sessionId: 'SES-1', date: '2026-07-10', startTime: '08:00', endTime: '08:30', status: 'scheduled', delivery: { deliveredBy: 'T-1', deliveredByName: 'Teacher One' } }]
+    },
+    reportAssignments: [{
+      id: 'RPT-1',
+      orgId: 'ORG-1',
+      classId: 'CLS-1',
+      status: 'active',
+      targetRows: [{
+        rowId: 'ROW-1',
+        targetType: 'date',
+        dueDate: '2026-07-10',
+        taskStartTime: '09:30',
+        taskEndTime: '10:30',
+        teacherId: 'T-1',
+        conflictPermitted: false,
+        status: 'active'
+      }]
+    }]
+  });
+
+  const req = createAdminSessionSaveReq();
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.payload.code, 'SESSION_METADATA_CONFLICTS');
+  assert.match(String(res.payload.data.conflicts[0].conflictClass || ''), /Report: Rolling Class A RPT-1/);
+});
+
+test('saveSession skips report assignment conflicts when intentional overlap is permitted', async () => {
+  applyDefaultGuardStubs();
+  let saved = false;
+  applySessionConflictSaveStubs({
+    sessionsByClass: {
+      'CLS-1': [{ sessionId: 'SES-1', date: '2026-07-10', startTime: '08:00', endTime: '08:30', status: 'scheduled', delivery: { deliveredBy: 'T-1', deliveredByName: 'Teacher One' } }]
+    },
+    reportAssignments: [{
+      id: 'RPT-1',
+      orgId: 'ORG-1',
+      classId: 'CLS-1',
+      status: 'active',
+      targetRows: [{
+        rowId: 'ROW-1',
+        targetType: 'date',
+        dueDate: '2026-07-10',
+        taskStartTime: '09:30',
+        taskEndTime: '10:30',
+        teacherId: 'T-1',
+        conflictPermitted: true,
+        status: 'active'
+      }]
+    }]
+  });
+  schoolDataService.saveClassSessions = async () => {
+    saved = true;
+  };
+
+  const req = createAdminSessionSaveReq();
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.payload.status, 'success');
+  assert.equal(saved, true);
+});
+
+test('saveSession resolves teacher record id before checking class session conflicts', async () => {
+  applyDefaultGuardStubs();
+  applySessionConflictSaveStubs({
+    classes: [
+      { id: 'CLS-1', orgId: 'ORG-1', title: 'Rolling Class A', registrationMode: 'rolling', cycleStartDate: '2026-07-01', cycleEndDate: '2026-07-31' },
+      { id: 'CLS-2', orgId: 'ORG-1', title: 'Rolling Class B', registrationMode: 'rolling', cycleStartDate: '2026-07-01', cycleEndDate: '2026-07-31' }
+    ],
+    sessionsByClass: {
+      'CLS-1': [{ sessionId: 'SES-1', date: '2026-07-10', startTime: '08:00', endTime: '08:30', status: 'scheduled', delivery: { deliveredBy: 'OLD-PERSON', deliveredByName: 'Old Teacher' } }],
+      'CLS-2': [{ sessionId: 'SES-2', date: '2026-07-10', startTime: '09:30', endTime: '10:30', status: 'scheduled', delivery: { deliveredBy: 'P-1', deliveredByName: 'Teacher Person One' } }]
+    },
+    teachers: [{ id: 'TCH123', orgId: 'ORG-1', personId: 'P-1' }]
+  });
+
+  const req = createAdminSessionSaveReq({ teacherId: 'TCH123', teacherName: 'Teacher Person One' });
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.payload.code, 'SESSION_METADATA_CONFLICTS');
+  assert.match(String(res.payload.data.conflicts[0].conflictClass || ''), /Rolling Class B/);
+});
+
+test('saveSession same-class teacher conflict ignores edited session but reports another overlap', async () => {
+  applyDefaultGuardStubs();
+  applySessionConflictSaveStubs({
+    sessionsByClass: {
+      'CLS-1': [
+        { sessionId: 'SES-1', date: '2026-07-10', startTime: '08:00', endTime: '08:30', status: 'scheduled', delivery: { deliveredBy: 'OLD-PERSON', deliveredByName: 'Old Teacher' } },
+        { sessionId: 'SES-OTHER', date: '2026-07-10', startTime: '09:15', endTime: '09:45', status: 'scheduled', delivery: { deliveredBy: 'P-1', deliveredByName: 'Teacher Person One' } }
+      ]
+    },
+    teachers: [{ id: 'TCH123', orgId: 'ORG-1', personId: 'P-1' }]
+  });
+
+  const req = createAdminSessionSaveReq({ teacherId: 'TCH123', teacherName: 'Teacher Person One' });
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.payload.code, 'SESSION_METADATA_CONFLICTS');
+  assert.ok(res.payload.data.conflicts.some((row) => row.existTime === '09:15 - 09:45'));
+  assert.ok(!res.payload.data.conflicts.some((row) => row.conflictClassId === 'CLS-1' && row.conflictSessionId === 'SES-1'));
 });
 
 test('editClass saves rolling session payload when legacy class audit is missing', async () => {

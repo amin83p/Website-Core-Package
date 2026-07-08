@@ -1644,7 +1644,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
                     : undefined,
                 onSelect: function (item) {
-                    const id = String(item?.id || item?.personId || item?.value || '').trim();
+                    const id = String(item?.personId || item?.id || item?.value || '').trim();
                     const name = String(item?.name || item?.label || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || id).trim();
                     modal.querySelector('#makeupSessionTeacherId').value = id;
                     modal.querySelector('#makeupSessionTeacherName').value = name;
@@ -2461,7 +2461,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
                 : undefined,
             onSelect: function (item) {
-                const id = String(item?.id || item?.personId || item?.value || '').trim();
+                const id = String(item?.personId || item?.id || item?.value || '').trim();
                 const name = String(item?.name || item?.label || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || id).trim();
                 const teacherIdInput = document.getElementById('sessionTeacherId');
                 const teacherNameInput = document.getElementById('sessionTeacherName');

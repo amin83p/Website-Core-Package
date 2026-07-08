@@ -105,6 +105,12 @@ test('session manager includes metadata in save payload for admins', () => {
   assert.match(source, /payload\.teacherName =/);
 });
 
+test('session manager teacher picker stores person id before teacher record id', () => {
+  const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.match(source, /const id = String\(item\?\.personId \|\| item\?\.id \|\| item\?\.value \|\| ''\)\.trim\(\);/);
+  assert.doesNotMatch(source, /const id = String\(item\?\.id \|\| item\?\.personId/);
+});
+
 test('saveSession applies admin metadata updates with conflict warnings', () => {
   const source = read('packages/school/MVC/controllers/school/classController.js');
   assert.match(source, /function applyAdminSessionMetadataUpdate\(/);

@@ -12,6 +12,53 @@ function normalizeStatus(value, fallback = '') {
   return String(value || fallback || '').trim().toLowerCase();
 }
 
+function cleanText(value, { max = 500 } = {}) {
+  return String(value === undefined || value === null ? '' : value).replace(/\0/g, '').trim().slice(0, max);
+}
+
+function parseJsonArray(value, fieldName = 'value') {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null || value === '') return [];
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    throw new Error(`${fieldName} must be valid JSON.`);
+  }
+}
+
+function parseBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (value === true || value === false) return value;
+  const raw = String(value).trim().toLowerCase();
+  if (['true', '1', 'yes', 'on', 'paid', 'payable'].includes(raw)) return true;
+  if (['false', '0', 'no', 'off', 'unpaid', 'unpayable'].includes(raw)) return false;
+  return fallback;
+}
+
+function normalizeClockTime(value, fieldName = 'Time') {
+  const raw = cleanText(value, { max: 5 });
+  if (!/^\d{2}:\d{2}$/.test(raw)) throw new Error(`${fieldName} must use HH:mm.`);
+  const [hour, minute] = raw.split(':').map(Number);
+  if (hour > 23 || minute > 59) throw new Error(`${fieldName} must use HH:mm.`);
+  return raw;
+}
+
+function normalizeDate(value) {
+  const raw = cleanText(value, { max: 20 });
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  throw new Error('Work session date is required.');
+}
+
+function calculateDurationHours(startTime, endTime) {
+  const duration = typeof activityService.calculateDurationHours === 'function'
+    ? Number(activityService.calculateDurationHours(startTime, endTime) || 0)
+    : 0;
+  if (!(duration > 0)) throw new Error('Work session end time must be after start time.');
+  return Number(duration.toFixed(2));
+}
+
 function normalizeAssigneeRows(rows = []) {
   if (typeof activityService.normalizeActivityAssigneeRows === 'function') {
     return activityService.normalizeActivityAssigneeRows(rows);
@@ -53,13 +100,16 @@ function assertCanManageWorkSession(activity, entry, reqUser, accessContext = {}
   if (normalizeStatus(activity.status) === 'cancelled') {
     throw new Error('This activity has been cancelled.');
   }
-  if (normalizeStatus(entry.status, 'posted') !== 'posted') {
+  const access = schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext);
+  const entryStatus = normalizeStatus(entry.status, 'posted');
+  const adminCanViewCancelled = isOrgWideAccess(access) && entryStatus === 'cancelled';
+  if (entryStatus !== 'posted' && !adminCanViewCancelled) {
     throw new Error('This work session is not posted.');
   }
   schoolRecordAccessService.assertActivityWorkSessionAccessible({
     activity,
     entry,
-    access: schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext),
+    access,
     context: 'manageWorkSession'
   });
 }
@@ -219,9 +269,9 @@ async function getWorkSessionContext(activityId, entryId, reqUser, accessContext
   const evaluationType = activityService.normalizeEvaluationType(activity.evaluationType);
   const scopedPersonId = normalizeId(access.personId || reqUser?.personId);
   const canManageAll = isOrgWideAccess(access);
-  const assignees = normalizeAssigneeRows(entry.assignees).map((assignee) =>
-    enrichAssigneeRow(activity, assignee, { reqUser, access, scopedPersonId })
-  );
+  const assignees = normalizeAssigneeRows(entry.assignees)
+    .map((assignee) => enrichAssigneeRow(activity, assignee, { reqUser, access, scopedPersonId }))
+    .filter((assignee) => canManageAll || assignee.isSelf);
   const siblingSessions = buildSiblingSessions(activity, access, entryId);
   return {
     activity,
@@ -234,6 +284,129 @@ async function getWorkSessionContext(activityId, entryId, reqUser, accessContext
     siblingSessions,
     overviewUrl: buildOverviewManageUrl(activity.id)
   };
+}
+
+function normalizeRoleList(value, fallback = 'participant') {
+  const source = Array.isArray(value) ? value : String(value || fallback || '').split(',');
+  const roles = [...new Set(source.map((item) => cleanText(
+    typeof item === 'string' ? item : (item?.role || item?.key || item?.name || item?.label || ''),
+    { max: 40 }
+  ).toLowerCase()).filter(Boolean))];
+  return roles.length ? roles : [fallback];
+}
+
+function normalizeAdminAssigneeRow(row = {}, priorByPerson = new Map(), durationHours = 0, evaluationType = 'attendance', reqUser = {}) {
+  const personId = normalizeId(row.personId || row.id);
+  if (!personId) return null;
+  const prior = priorByPerson.get(personId) || {};
+  const role = cleanText(row.role || prior.role || 'participant', { max: 40 }).toLowerCase() || 'participant';
+  const roles = normalizeRoleList(row.roles || prior.roles || role, role);
+  if (!roles.includes(role)) roles.unshift(role);
+  const status = normalizeStatus(row.status || prior.status, 'attended');
+  if (!['attended', 'absent', 'excused'].includes(status)) throw new Error('Invalid assignee status.');
+  let completionStatus = normalizeStatus(row.completionStatus || prior.completionStatus, 'pending');
+  if (!['pending', 'completed'].includes(completionStatus)) completionStatus = 'pending';
+  const wasCompleted = normalizeStatus(prior.completionStatus) === 'completed';
+  const completedBy = toPublicId(reqUser?.personId || reqUser?.id);
+  let completedAt = prior.completedAt || '';
+  let completedByValue = prior.completedBy || '';
+  if (evaluationType === 'completion') {
+    if (completionStatus === 'completed' && !wasCompleted) {
+      completedAt = new Date().toISOString();
+      completedByValue = completedBy;
+    } else if (completionStatus === 'pending') {
+      completedAt = '';
+      completedByValue = '';
+    }
+  } else {
+    completionStatus = prior.completionStatus || 'pending';
+    completedAt = prior.completedAt || '';
+    completedByValue = prior.completedBy || '';
+  }
+  return {
+    ...prior,
+    personId,
+    personName: cleanText(row.personName || row.displayName || row.name || prior.personName || personId, { max: 180 }),
+    roles,
+    role,
+    status,
+    paid: parseBoolean(row.paid, prior.paid !== false),
+    paidHours: durationHours,
+    notes: cleanText(row.notes === undefined ? prior.notes : row.notes, { max: 500 }),
+    completionStatus,
+    completedAt,
+    completedBy: completedByValue
+  };
+}
+
+function normalizeAdminAssigneeRows(inputRows, existingRows = [], durationHours = 0, evaluationType = 'attendance', reqUser = {}) {
+  const priorByPerson = new Map(normalizeAssigneeRows(existingRows).map((row) => [normalizeId(row.personId), row]));
+  const seen = new Set();
+  return (Array.isArray(inputRows) ? inputRows : []).map((row) => {
+    const normalized = normalizeAdminAssigneeRow(row, priorByPerson, durationHours, evaluationType, reqUser);
+    if (!normalized || seen.has(normalized.personId)) return null;
+    seen.add(normalized.personId);
+    return normalized;
+  }).filter(Boolean);
+}
+
+async function saveWorkSessionMetadata({
+  activityId,
+  entryId,
+  reqUser,
+  input = {},
+  accessContext = {}
+} = {}) {
+  const activity = await activityService.getActivity(activityId, reqUser, accessContext);
+  if (!activity) throw new Error('School activity not found.');
+  const entry = findEntry(activity, entryId);
+  if (!entry) throw new Error('Work session not found.');
+  const access = schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext);
+  if (!isOrgWideAccess(access)) throw new Error('You cannot edit this work session.');
+  assertCanManageWorkSession(activity, entry, reqUser, accessContext);
+
+  const status = normalizeStatus(input.status || entry.status, 'posted');
+  if (!['posted', 'cancelled'].includes(status)) {
+    throw new Error('Manage Work Session supports only posted or cancelled status.');
+  }
+  const startTime = normalizeClockTime(input.startTime || entry.startTime, 'Start time');
+  const endTime = normalizeClockTime(input.endTime || entry.endTime, 'End time');
+  const durationHours = calculateDurationHours(startTime, endTime);
+  const date = normalizeDate(input.date || entry.date);
+  const evaluationType = activityService.normalizeEvaluationType(activity.evaluationType);
+  const submittedAssignees = input.assignees === undefined
+    ? normalizeAssigneeRows(entry.assignees)
+    : parseJsonArray(input.assignees, 'Work session assignees');
+  const nextAssignees = normalizeAdminAssigneeRows(
+    submittedAssignees,
+    entry.assignees,
+    durationHours,
+    evaluationType,
+    reqUser
+  );
+  const entries = activityService.getActivityEntries(activity).map((row) => {
+    if (!idsEqual(row.entryId, entryId)) return row;
+    return {
+      ...row,
+      title: cleanText(input.title === undefined ? row.title : input.title, { max: 180 }),
+      status,
+      location: cleanText(input.location === undefined ? row.location : input.location, { max: 180 }),
+      date,
+      startTime,
+      endTime,
+      durationHours,
+      assignees: nextAssignees
+    };
+  });
+
+  await activityService.saveActivity({
+    ...activity,
+    id: normalizeId(activityId),
+    entries,
+    attendees: activityService.flattenActivityAssignees(entries)
+  }, reqUser);
+  const nextContext = await getWorkSessionContext(activityId, entryId, reqUser, accessContext);
+  return buildMutationPayload(nextContext, accessContext, reqUser);
 }
 
 async function persistAssigneeUpdate(activityId, entryId, personId, updater, reqUser) {
@@ -445,6 +618,7 @@ module.exports = {
   assertCanManageWorkSession,
   getWorkSessionsOverview,
   getWorkSessionContext,
+  saveWorkSessionMetadata,
   saveAssigneeRow,
   completeAssignee,
   resetAssigneeCompletion,

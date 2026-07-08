@@ -90,6 +90,16 @@ router.get('/:activityId/work-sessions/:entryId/manage',
   requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.manageWorkSession);
+router.post('/:activityId/work-sessions/:entryId/metadata',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true,
+    allowSectionTokenFallback: true
+  }),
+  ctrl.saveWorkSessionMetadata);
 router.post('/:activityId/work-sessions/:entryId/save',
   requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
