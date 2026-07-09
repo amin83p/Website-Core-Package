@@ -39,6 +39,16 @@ test('session manager renders student cases tab, modal, and avoids attendance du
   assert.match(src, /id="btnResolveStudentCase"/);
   assert.match(src, /saveStudentCase\(\{ resolve: true \}\)/);
   assert.match(src, /payload\.status = 'resolved'/);
+  assert.match(src, /name="studentCaseSeverity"/);
+  assert.match(src, /id="studentCaseDetailPresets"/);
+  assert.match(src, /id="studentCaseDetails"/);
+  assert.match(src, /student-case-details-textarea/);
+  assert.match(src, /Pick a common issue below, then adjust the detail text if needed/);
+  assert.doesNotMatch(src, /id="studentCaseDetailsWrap"/);
+  assert.match(src, /studentCaseDetailPresets.*addEventListener\('change'/s);
+  assert.match(src, /function collectStudentCaseDetailsValue\(\)[\s\S]*?getElementById\('studentCaseDetails'\)/);
+  assert.match(src, /Issue Required/);
+  assert.doesNotMatch(src, /id="studentCaseSummary"/);
   assert.doesNotMatch(src, /studentCaseLate/i);
   assert.doesNotMatch(src, /studentCaseAbsent/i);
   assert.doesNotMatch(src, /studentCaseEarly/i);
@@ -104,7 +114,7 @@ test('session student case service creates and resolves source tasks', async () 
     const created = await sessionStudentCaseService.saveCase({
       classId: 'CLS-1',
       sessionId: 'SES-1',
-      input: { studentPersonId: 'STU-1', category: 'learning', summary: 'Needs support', details: 'Extra practice needed.' },
+      input: { studentPersonId: 'STU-1', category: 'learning', details: 'Extra practice needed.' },
       reqUser: user
     });
     assert.equal(created.id, 'SSC-1');
@@ -116,7 +126,7 @@ test('session student case service creates and resolves source tasks', async () 
       classId: 'CLS-1',
       sessionId: 'SES-1',
       caseId: 'SSC-1',
-      input: { studentPersonId: 'STU-1', category: 'learning', summary: 'Needs support', details: 'Resolved from modal.', status: 'resolved' },
+      input: { studentPersonId: 'STU-1', category: 'learning', details: 'Resolved from modal.', status: 'resolved' },
       reqUser: user
     });
     assert.equal(savedAndResolved.status, 'resolved');
@@ -207,7 +217,7 @@ test('session student case save accepts enrolled students missing from persisted
     const fromEnrollment = await sessionStudentCaseService.saveCase({
       classId: 'CLS-1',
       sessionId: 'SES-1',
-      input: { studentPersonId: 'STU-2', category: 'learning', summary: 'Needs support', details: 'Enrolled but not yet on stored roster.' },
+      input: { studentPersonId: 'STU-2', category: 'learning', details: 'Enrolled but not yet on stored roster.' },
       reqUser: user
     });
     assert.equal(fromEnrollment.studentPersonId, 'STU-2');
@@ -216,7 +226,7 @@ test('session student case save accepts enrolled students missing from persisted
     const fromClassList = await sessionStudentCaseService.saveCase({
       classId: 'CLS-1',
       sessionId: 'SES-1',
-      input: { studentPersonId: 'STU-3', category: 'learning', summary: 'Class list student' },
+      input: { studentPersonId: 'STU-3', category: 'learning', details: 'Class list student issue.' },
       reqUser: user
     });
     assert.equal(fromClassList.studentPersonId, 'STU-3');
@@ -225,7 +235,7 @@ test('session student case save accepts enrolled students missing from persisted
     const fromGradebook = await sessionStudentCaseService.saveCase({
       classId: 'CLS-1',
       sessionId: 'SES-1',
-      input: { studentPersonId: 'STU-4', category: 'learning', summary: 'Gradebook student' },
+      input: { studentPersonId: 'STU-4', category: 'learning', details: 'Gradebook student issue.' },
       reqUser: user
     });
     assert.equal(fromGradebook.studentPersonId, 'STU-4');
@@ -235,7 +245,7 @@ test('session student case save accepts enrolled students missing from persisted
       () => sessionStudentCaseService.saveCase({
         classId: 'CLS-1',
         sessionId: 'SES-1',
-        input: { studentPersonId: '', category: 'learning', summary: 'Missing student' },
+        input: { studentPersonId: '', category: 'learning', details: 'Missing student' },
         reqUser: user
       }),
       /Selected student is not on this session roster/

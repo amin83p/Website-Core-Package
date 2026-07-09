@@ -13,6 +13,8 @@ if (!fsSync.existsSync(dataPath)) {
 }
 
 const TIMESHEET_STATUSES = new Set(['draft', 'submitted', 'approved', 'processed']);
+const REVIEW_HISTORY_EVENTS = new Set(['submitted', 'approved', 'reopened', 'processed']);
+const MAX_REVIEW_HISTORY_ENTRIES = 100;
 
 function cleanString(v, { max = 500, allowEmpty = true } = {}) {
     if (v === undefined || v === null) return allowEmpty ? '' : null;
@@ -118,6 +120,50 @@ function sanitizeSnapshotEntry(entry) {
     if (entry.isFinalStatus === true) row.isFinalStatus = true;
     if (entry.isFinalStatus === false) row.isFinalStatus = false;
     return applyPayrollFields(row, entry);
+}
+
+function sanitizeReviewHistoryEntry(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const event = cleanString(input.event, { max: 40, allowEmpty: false }).toLowerCase();
+    if (!REVIEW_HISTORY_EVENTS.has(event)) return null;
+    const at = cleanString(input.at, { max: 40, allowEmpty: false });
+    if (!at) return null;
+    const by = cleanString(input.by, { max: 120, allowEmpty: true });
+    const byName = cleanString(input.byName, { max: 200, allowEmpty: true });
+    const note = cleanString(input.note, { max: 2000, allowEmpty: true });
+    if (event === 'reopened' && !note) {
+        throw new Error('Reopen review history entries require a note.');
+    }
+    const statusBefore = cleanString(input.statusBefore, { max: 30, allowEmpty: true }).toLowerCase();
+    const statusAfter = cleanString(input.statusAfter, { max: 30, allowEmpty: true }).toLowerCase();
+    const submissionSnapshotAt = cleanString(input.submissionSnapshotAt, { max: 40, allowEmpty: true });
+    const totalHours = Number(input.totalHours);
+    const entryCount = Number(input.entryCount);
+    const row = {
+        event,
+        at,
+        by: by || '',
+        byName: byName || ''
+    };
+    if (note) row.note = note;
+    if (statusBefore && TIMESHEET_STATUSES.has(statusBefore)) row.statusBefore = statusBefore;
+    if (statusAfter && TIMESHEET_STATUSES.has(statusAfter)) row.statusAfter = statusAfter;
+    if (submissionSnapshotAt) row.submissionSnapshotAt = submissionSnapshotAt;
+    if (Number.isFinite(totalHours)) row.totalHours = Number(totalHours.toFixed(2));
+    if (Number.isFinite(entryCount) && entryCount >= 0) row.entryCount = Math.floor(entryCount);
+    if (input.submissionSnapshot !== undefined) {
+        const snapshot = sanitizeSubmissionSnapshot(input.submissionSnapshot);
+        if (snapshot) row.submissionSnapshot = snapshot;
+    }
+    return row;
+}
+
+function sanitizeReviewHistory(input) {
+    if (!Array.isArray(input)) return [];
+    return input
+        .map(sanitizeReviewHistoryEntry)
+        .filter(Boolean)
+        .slice(-MAX_REVIEW_HISTORY_ENTRIES);
 }
 
 function sanitizeSubmissionSnapshot(input) {
@@ -289,6 +335,10 @@ function sanitizeTimesheetPayload(input) {
             .filter((ref) => ref.type);
     }
 
+    if (input.reviewHistory !== undefined) {
+        result.reviewHistory = sanitizeReviewHistory(input.reviewHistory);
+    }
+
     return result;
 }
 
@@ -344,6 +394,9 @@ async function saveTimesheet(data) {
             if (sanitized.lockedSourceRefs === undefined && existing.lockedSourceRefs) {
                 merged.lockedSourceRefs = existing.lockedSourceRefs;
             }
+            if (sanitized.reviewHistory === undefined && Array.isArray(existing.reviewHistory)) {
+                merged.reviewHistory = existing.reviewHistory;
+            }
             all[existingIndex] = merged;
 
             await fs.writeFile(dataPath, JSON.stringify(all, null, 2));
@@ -383,7 +436,10 @@ module.exports = {
     sanitizeTimesheetPayload,
     sanitizeSubmissionSnapshot,
     sanitizeSnapshotEntry,
-    TIMESHEET_STATUSES: Object.freeze([...TIMESHEET_STATUSES])
+    sanitizeReviewHistory,
+    sanitizeReviewHistoryEntry,
+    TIMESHEET_STATUSES: Object.freeze([...TIMESHEET_STATUSES]),
+    REVIEW_HISTORY_EVENTS: Object.freeze([...REVIEW_HISTORY_EVENTS])
 };
 
 

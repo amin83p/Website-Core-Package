@@ -591,6 +591,36 @@ function assertSessionNotTimesheetLocked(session = {}, label = 'This session') {
   }
 }
 
+function isSessionTimesheetApprovedLock(session = {}) {
+  return isSessionTimesheetLocked(session)
+    && String(session?.lockReason || '') === 'timesheet_approved';
+}
+
+function applySessionAdminLock(session = {}, locked, reqUser = {}) {
+  if (!session || typeof session !== 'object') {
+    throw new Error('Session is required.');
+  }
+  if (isSessionTimesheetApprovedLock(session)) {
+    throw new Error('This session is locked by an approved timesheet. Reopen the timesheet to change the lock.');
+  }
+  const shouldLock = locked === true || String(locked) === 'true';
+  if (shouldLock) {
+    session.locked = true;
+    session.lockReason = 'admin_locked';
+    session.lockedAt = new Date().toISOString();
+    session.lockedBy = toPublicId(reqUser?.id);
+    delete session.unlockedAt;
+    delete session.unlockedBy;
+    return session;
+  }
+  session.locked = false;
+  delete session.lockReason;
+  delete session.lockedTimesheetId;
+  session.unlockedAt = new Date().toISOString();
+  session.unlockedBy = toPublicId(reqUser?.id);
+  return session;
+}
+
 function assertActivityNotTimesheetLocked(activity = {}, label = 'This activity') {
   const entries = Array.isArray(activity?.entries) ? activity.entries : [];
   const entryLocked = entries.some((entry) =>
@@ -664,6 +694,8 @@ module.exports = {
   assertSessionStatusNotReferenced,
   assertActivityNotTimesheetLocked,
   assertSessionNotTimesheetLocked,
+  isSessionTimesheetApprovedLock,
+  applySessionAdminLock,
   isSessionTimesheetLocked,
   isActivityTimesheetLocked,
   isActivityEntryTimesheetLocked,

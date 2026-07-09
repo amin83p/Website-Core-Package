@@ -224,7 +224,10 @@
           </td>
           <td>${rolePills(row.roles)}</td>
           <td class="small text-muted">${escapeHtml(row.departmentHint || '-')}</td>
-          <td class="text-center">${statusBadge(row.status)}</td>
+          <td class="text-center">
+            ${statusBadge(row.status)}
+            ${Number(row.revisionCount || 0) > 0 ? `<div class="small text-muted mt-1" title="${escapeHtml(row.lastReopenNote || '')}"><i class="bi bi-arrow-repeat me-1"></i>${Number(row.revisionCount)} revision${Number(row.revisionCount) === 1 ? '' : 's'}</div>` : ''}
+          </td>
           <td class="text-end fw-bold text-success">${hours} Hrs</td>
           <td class="text-end pe-4">
             <div class="btn-group btn-group-sm">

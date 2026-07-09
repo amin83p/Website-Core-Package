@@ -18,7 +18,7 @@ const timesheetManualMaterializationService = require('../../services/school/tim
 const timesheetPayrollContextService = require('../../services/school/timesheetPayrollContextService');
 const timesheetPayRateService = require('../../services/school/timesheetPayRateService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
-const { sanitizeSnapshotEntry } = require('../../models/school/timesheetModel');
+const { sanitizeSnapshotEntry, sanitizeSubmissionSnapshot, sanitizeReviewHistory } = require('../../models/school/timesheetModel');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 function getActiveOrgIdOrThrow(reqUser) {
@@ -283,10 +283,64 @@ function resolveTimesheetEntryHours(entry) {
     return Number(parseFloat(entry.durationHours ?? entry.hours) || 0);
 }
 
-function buildSubmissionSnapshot({ normalizedEntries, period, existingTimesheet }) {
-    if (existingTimesheet?.submissionSnapshot?.submittedAt) {
-        return existingTimesheet.submissionSnapshot;
-    }
+function resolveActorId(reqUser) {
+    return String(reqUser?.id || reqUser?.username || '').trim();
+}
+
+function resolveActorName(reqUser) {
+    return String(reqUser?.displayName || reqUser?.name || reqUser?.username || reqUser?.id || '').trim();
+}
+
+function getReviewHistory(timesheet) {
+    return Array.isArray(timesheet?.reviewHistory) ? [...timesheet.reviewHistory] : [];
+}
+
+function appendReviewHistory(timesheet, entry) {
+    return sanitizeReviewHistory([...getReviewHistory(timesheet), entry]);
+}
+
+function countReviewReopenCycles(timesheet) {
+    return getReviewHistory(timesheet).filter((row) => String(row?.event || '').toLowerCase() === 'reopened').length;
+}
+
+function getLastReopenNote(timesheet) {
+    const reopened = getReviewHistory(timesheet)
+        .filter((row) => String(row?.event || '').toLowerCase() === 'reopened');
+    const last = reopened[reopened.length - 1];
+    return String(last?.note || '').trim();
+}
+
+function buildReviewHistoryEntry({
+    event,
+    reqUser,
+    note = '',
+    statusBefore = '',
+    statusAfter = '',
+    submissionSnapshot = null,
+    totalHours = 0,
+    entryCount = 0
+}) {
+    const snapshot = submissionSnapshot ? sanitizeSubmissionSnapshot(submissionSnapshot) : null;
+    return {
+        event,
+        at: new Date().toISOString(),
+        by: resolveActorId(reqUser),
+        byName: resolveActorName(reqUser),
+        note: String(note || '').trim(),
+        statusBefore: String(statusBefore || '').trim().toLowerCase(),
+        statusAfter: String(statusAfter || '').trim().toLowerCase(),
+        submissionSnapshotAt: snapshot?.submittedAt || '',
+        totalHours: Number(Number(totalHours || 0).toFixed(2)),
+        entryCount: Number(entryCount || 0),
+        ...(snapshot ? { submissionSnapshot: snapshot } : {})
+    };
+}
+
+function countActiveTimesheetEntries(entries = []) {
+    return (Array.isArray(entries) ? entries : []).filter((entry) => entry && entry.isDeleted !== true).length;
+}
+
+function buildSubmissionSnapshot({ normalizedEntries, period }) {
     const entries = normalizedEntries
         .filter((entry) => entry && entry.isDeleted !== true && entry.isPriorPeriodAdjustment !== true)
         .map((entry) => sanitizeSnapshotEntry(entry))
@@ -671,6 +725,8 @@ exports.getTimesheetManagementRoster = async (req, res) => {
                 timesheetId: timesheet?.id || '',
                 status,
                 totalHours: Number(parseFloat(timesheet?.totalHours) || 0),
+                revisionCount: countReviewReopenCycles(timesheet),
+                lastReopenNote: getLastReopenNote(timesheet),
                 openUrl: `/school/timesheets/editor/${encodeURIComponent(periodId)}?teacherId=${encodeURIComponent(personRow.personId)}`
             };
         }).filter((row) => !requestedTimesheetStatus || row.status === requestedTimesheetStatus);
@@ -1263,7 +1319,8 @@ exports.viewTimesheet = async (req, res) => {
             showPriorAdjustmentReview: priorReviewPending,
             useFrozenSnapshot,
             canAdminApprove,
-            canAdminReopen
+            canAdminReopen,
+            reviewHistory: getReviewHistory(timesheet)
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -1304,7 +1361,7 @@ exports.saveTimesheet = async (req, res) => {
         const existing = await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user);
 
         if (existing && ['submitted', 'approved', 'processed'].includes(String(existing.status || '').toLowerCase()) && !teacherContext.isAdmin) {
-            throw new Error('<b>Security Error</b><br>This timesheet has been submitted and is locked.<br>Contact an admin to make changes.');
+            throw new Error('<b>Security Error</b><br>This timesheet has been submitted and is locked.<br>Contact an admin to reopen it for revision.');
         }
 
         let nextStatus = (status === 'submitted') ? 'submitted' : 'draft';
@@ -1599,9 +1656,19 @@ exports.saveTimesheet = async (req, res) => {
         if (nextStatus === 'submitted') {
             payload.submissionSnapshot = buildSubmissionSnapshot({
                 normalizedEntries: payrollStampedEntries,
-                period,
-                existingTimesheet: existing
+                period
             });
+            payload.reviewHistory = appendReviewHistory(existing, buildReviewHistoryEntry({
+                event: 'submitted',
+                reqUser: req.user,
+                statusBefore: String(existing?.status || 'draft').toLowerCase(),
+                statusAfter: 'submitted',
+                submissionSnapshot: payload.submissionSnapshot,
+                totalHours: payload.totalHours,
+                entryCount: countActiveTimesheetEntries(payrollStampedEntries)
+            }));
+        } else if (existing && Array.isArray(existing.reviewHistory)) {
+            payload.reviewHistory = existing.reviewHistory;
         }
 
         if (existing?.priorPeriodAdjustmentsAppliedFrom) {
@@ -1958,9 +2025,18 @@ exports.approveTimesheet = async (req, res) => {
             orgId: timesheetForLock.orgId || period.orgId || activeOrgId,
             status: 'approved',
             approvedAt: new Date().toISOString(),
-            approvedBy: String(req.user?.id || req.user?.username || '').trim(),
+            approvedBy: resolveActorId(req.user),
             lockedSourceRefs: lockSummary.lockedSourceRefs || [],
-            materializationSummary: materialized?.summary || null
+            materializationSummary: materialized?.summary || null,
+            reviewHistory: appendReviewHistory(timesheetForLock, buildReviewHistoryEntry({
+                event: 'approved',
+                reqUser: req.user,
+                statusBefore: 'submitted',
+                statusAfter: 'approved',
+                submissionSnapshot: timesheetForLock.submissionSnapshot,
+                totalHours: timesheetForLock.totalHours,
+                entryCount: countActiveTimesheetEntries(timesheetForLock.entries)
+            }))
         };
         await dataService.updateData('timesheets', existing.id, payload, req.user);
         const payloadOut = { status: 'success', message: 'Timesheet approved and linked sessions/activities were locked.', lockSummary, materializationSummary: materialized?.summary || null };
@@ -2000,6 +2076,11 @@ exports.reopenTimesheet = async (req, res) => {
             throw new Error('Only approved or processed timesheets can be reopened.');
         }
 
+        const reopenNote = String(req.body?.note || req.body?.reopenNote || '').trim();
+        if (!reopenNote) {
+            throw new Error('A reopen note is required. Explain what the person should revise.');
+        }
+
         await timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet({
             timesheetId: existing.id,
             reqUser: req.user
@@ -2007,15 +2088,23 @@ exports.reopenTimesheet = async (req, res) => {
         await schoolDependencyService.unlockSourcesForTimesheet(existing, req.user);
         const payload = {
             ...existing,
-            status: 'submitted',
-            reopenedAt: new Date().toISOString(),
-            reopenedBy: String(req.user?.id || req.user?.username || '').trim(),
-            lockedSourceRefs: []
+            status: 'draft',
+            lockedSourceRefs: [],
+            reviewHistory: appendReviewHistory(existing, buildReviewHistoryEntry({
+                event: 'reopened',
+                reqUser: req.user,
+                note: reopenNote,
+                statusBefore: status,
+                statusAfter: 'draft',
+                submissionSnapshot: existing.submissionSnapshot,
+                totalHours: existing.totalHours,
+                entryCount: countActiveTimesheetEntries(existing.entries)
+            }))
         };
         delete payload.approvedAt;
         delete payload.approvedBy;
         await dataService.updateData('timesheets', existing.id, payload, req.user);
-        const payloadOut = { status: 'success', message: 'Timesheet reopened to submitted status and source locks were released.' };
+        const payloadOut = { status: 'success', message: 'Timesheet reopened to draft. The person can edit and resubmit after reviewing your note.' };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);
         return res.json(payloadOut);
     } catch (error) {

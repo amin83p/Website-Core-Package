@@ -41,6 +41,7 @@ const finalGradesWorkflowService = require('../../services/school/finalGradesWor
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const activityService = require('../../services/school/activityService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
+const { getPresetConfig } = require('../../services/school/sessionStudentCasePresetService');
 const sessionReportAssignmentService = require('../../services/school/sessionReportAssignmentService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
@@ -58,6 +59,7 @@ const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignme
 const sessionReportInstanceService = require('../../services/school/sessionReportInstanceService');
 const schoolRecordAccessService = require('../../services/school/schoolRecordAccessService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
+const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 
@@ -3687,6 +3689,9 @@ async function manageSession(req, res) {
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
         );
         const attendanceMatrixPolicyResolved = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerMs);
+        const conductRatingScaleResolved = await conductRatingScalePolicyModel.getPolicyForOrg(
+            classData?.orgId || getActiveOrgIdOrThrow(req.user)
+        );
         const sessionStudentCases = await sessionStudentCaseService.listCasesForSession({
             classId,
             sessionId,
@@ -3711,8 +3716,11 @@ async function manageSession(req, res) {
             isSessionLocked, 
             isReadOnly,
             canEditSessionMetadata: canOverride,
+            canManageConductRatingScale: canOverride,
             attendanceMatrixPolicyResolved,
+            conductRatingScaleResolved,
             sessionStudentCases,
+            studentCaseDetailPresets: getPresetConfig(),
             includeModal: true,  
             user: req.user,
             actionStateId: req.actionStateId
@@ -4476,12 +4484,69 @@ async function postOfficialFinalGradesWorkflow(req, res) {
     }
 }
 
+async function saveConductRatingScaleSettings(req, res) {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const policy = await conductRatingScalePolicyModel.savePolicyForOrg(activeOrgId, req.body, req.user?.id);
+        return res.json({ status: 'success', policy });
+    } catch (error) {
+        const validationErrors = Array.isArray(error?.validationErrors) ? error.validationErrors : [];
+        const message = validationErrors.length
+            ? validationErrors.join(' ')
+            : (error?.message || 'Failed to save conduct rating scale settings.');
+        return res.status(validationErrors.length ? 400 : 500).json({ status: 'error', message, validationErrors });
+    }
+}
+
+async function setSessionLock(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const locked = parseBoolean(req.body?.locked, null);
+        if (locked === null) {
+            return res.status(400).json({ status: 'error', message: 'locked is required (true or false).' });
+        }
+
+        const canOverride = await adminChekersService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_CLASSES,
+            OPERATIONS.UPDATE,
+            { section: { id: SECTIONS.SCHOOL_CLASSES } }
+        );
+        if (!canOverride) {
+            return res.status(403).json({ status: 'error', message: 'You do not have permission to lock or unlock sessions.' });
+        }
+
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { index: sessionIndex } = findSessionInList(sessions, sessionId);
+        if (sessionIndex === -1) {
+            return res.status(404).json({ status: 'error', message: 'Session not found.' });
+        }
+        assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
+
+        schoolDependencyService.applySessionAdminLock(sessions[sessionIndex], locked, req.user);
+        await schoolDataService.saveClassSessions(classId, sessions, req.user);
+
+        const updated = sessions[sessionIndex];
+        return res.json({
+            status: 'success',
+            message: locked ? 'Session locked.' : 'Session unlocked.',
+            locked: updated.locked === true || String(updated.locked) === 'true',
+            lockReason: String(updated.lockReason || '')
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
 module.exports = {
   listClasses, showAddForm, showAddWizardForm, addClass, showEditForm, showEditWizardForm, editClass, deleteClass,
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
   saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus,
+  saveConductRatingScaleSettings,
+  setSessionLock,
   showFinalGradesPage,
   postOfficialFinalGradesWorkflow
 };

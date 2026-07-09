@@ -7288,6 +7288,10 @@
       "label": "Attendance Matrix Policies"
     },
     {
+      "entityType": "conductRatingScalePolicy",
+      "label": "Conduct Rating Scale Policies"
+    },
+    {
       "entityType": "classEnrollmentPeriods",
       "label": "Class Enrollment Periods"
     },

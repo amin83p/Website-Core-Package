@@ -3,6 +3,7 @@ const schoolDataService = require('./schoolDataService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const taskService = require('./taskService');
 const personDisplayNameService = require('./personDisplayNameService');
+const { deriveCaseSummary } = require('./sessionStudentCasePresetService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -399,12 +400,19 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
     reqUser,
     oldStatus,
     newStatus: status,
-    note: input.summary || input.details || ''
+    note: input.details || input.summary || ''
   }), reqUser);
+
+  const category = cleanString(input.category || existing?.category || 'other', 80).toLowerCase() || 'other';
+  const details = cleanString(input.details || existing?.details || '', 5000);
+  const summary = cleanString(input.summary || existing?.summary || deriveCaseSummary(category, details), 260);
 
   const payload = {
     ...(existing || {}),
     ...input,
+    category,
+    details,
+    summary,
     orgId: toPublicId(classData.orgId || getActiveOrgId(reqUser)),
     classId: toPublicId(classData.id || classId),
     classTitle: cleanString(classData.title || classData.name || classId, 220),

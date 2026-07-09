@@ -4,6 +4,7 @@ const path = require('path');
 const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { deriveCaseSummary } = require('../../services/school/sessionStudentCasePresetService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/sessionStudentCases.json');
 const CASE_STATUSES = Object.freeze(['open', 'in_progress', 'resolved', 'reopened', 'cancelled']);
@@ -136,7 +137,11 @@ function sanitizeCaseInput(input = {}, { isUpdate = false } = {}) {
     if (!out.sessionId) throw new Error('Session is required.');
     if (!out.studentPersonId) throw new Error('Student is required.');
   }
-  if (!out.summary) throw new Error('Case summary is required.');
+  if (!out.details) throw new Error('Case issue details are required.');
+  if (!out.summary) {
+    out.summary = deriveCaseSummary(out.category, out.details);
+  }
+  if (!out.summary) throw new Error('Case summary could not be derived from issue details.');
   if (input.id) out.id = cleanId(input.id, { max: 120, allowEmpty: false });
   return out;
 }

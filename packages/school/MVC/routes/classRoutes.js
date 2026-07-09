@@ -12,6 +12,7 @@ const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
 const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
 const upload = requireCoreModule('MVC/middleware/upload');
 const { SECTIONS, OPERATIONS } = require('./schoolRouteDependencies');
+const { requireConductRatingScalePolicyAdmin } = require('../middleware/conductRatingScalePolicyAdminMiddleware');
 
 router.use(requireAuth);
 
@@ -355,6 +356,17 @@ router.post('/api/cycles/split-boundary',
   trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.splitClassEnrollmentPeriodsForCycleBoundary);
 
+router.post('/conduct-rating-scale/settings',
+  requireConductRatingScalePolicyAdmin(),
+  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true,
+    allowSectionTokenFallback: true
+  }),
+  classCtrl.saveConductRatingScaleSettings);
+
 // --- Session Execution Routes ---
 router.get('/:id/sessions/:sessionId',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
@@ -416,6 +428,10 @@ router.post('/:id/sessions/:sessionId/gradebooks/save',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),
   classCtrl.saveSessionGradebooks);
+router.post('/:id/sessions/:sessionId/lock',
+  requireConductRatingScalePolicyAdmin(),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
+  classCtrl.setSessionLock);
 router.post('/:id/sessions/:sessionId/save',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),

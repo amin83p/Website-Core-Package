@@ -8,6 +8,7 @@ const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
 const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
 const schoolRepositories = require('../../repositories/school');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
+const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const indexService = require('./schoolIndexService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveCanonicalOrganizationName } = requireCoreModule('MVC/utils/organizationDisplay');
@@ -847,6 +848,7 @@ async function buildOrgWorkspaceResetPreview({
     subjectRows,
     migrationLogFiles,
     attendancePolicy,
+    conductRatingPolicy,
     snapshotRows
   ] = await Promise.all([
     listOrgScopedRows(schoolRepositories.academicLedger, targetOrgId),
@@ -877,6 +879,7 @@ async function buildOrgWorkspaceResetPreview({
     listOrgScopedRows(schoolRepositories.subjects, targetOrgId),
     countExistingMigrationLogFiles(),
     attendanceMatrixPolicyModel.getPolicyForOrg(targetOrgId),
+    conductRatingScalePolicyModel.getPolicyForOrg(targetOrgId),
     schoolRepositories.academicSnapshots.list({
       scope: { canViewAll: false, activeOrgId: targetOrgId }
     })
@@ -888,6 +891,7 @@ async function buildOrgWorkspaceResetPreview({
   const embeddedSessionsClassCount = countClassesWithEmbeddedSessions(normalizedClassRows);
   const officialFinalGradesClassCount = countClassesWithOfficialFinalGrades(normalizedClassRows);
   const attendancePolicyCount = attendancePolicy ? 1 : 0;
+  const conductRatingPolicyCount = conductRatingPolicy ? 1 : 0;
 
   const transactionalGroups = [
     buildPreviewGroup('academicLedger', 'Academic ledger entries', ledgerRows),
@@ -933,6 +937,9 @@ async function buildOrgWorkspaceResetPreview({
     buildPreviewGroup('attendanceMatrixPolicy', 'Attendance matrix policy override', [], {
       note: attendancePolicyCount ? 'Org attendance matrix policy override is set' : 'No org attendance matrix policy override'
     }),
+    buildPreviewGroup('conductRatingScalePolicy', 'Conduct rating scale policy override', [], {
+      note: conductRatingPolicyCount ? 'Org conduct rating scale policy override is set' : 'No org conduct rating scale policy override'
+    }),
     buildPreviewGroup('officialFinalGradesClasses', 'Official final grades workflow state', [], {
       note: `${officialFinalGradesClassCount} class(es) with official final grade workflow state`
     }),
@@ -945,6 +952,7 @@ async function buildOrgWorkspaceResetPreview({
   transactionalGroups.find((g) => g.key === 'embeddedSessions').count = embeddedSessionsClassCount;
   transactionalGroups.find((g) => g.key === 'migrationLogFiles').count = migrationLogFiles;
   transactionalGroups.find((g) => g.key === 'attendanceMatrixPolicy').count = attendancePolicyCount;
+  transactionalGroups.find((g) => g.key === 'conductRatingScalePolicy').count = conductRatingPolicyCount;
   transactionalGroups.find((g) => g.key === 'officialFinalGradesClasses').count = officialFinalGradesClassCount;
 
   const masterGroups = [];
@@ -1998,8 +2006,9 @@ async function clearSampleTransactionalData({
 
   const migrationLogResult = await removeOptionalMigrationLogFiles();
 
-  const [attendancePolicyResult, officialGradesResult] = await Promise.all([
+  const [attendancePolicyResult, conductRatingPolicyResult, officialGradesResult] = await Promise.all([
     attendanceMatrixPolicyModel.removePolicyForOrg(targetOrgId),
+    conductRatingScalePolicyModel.removePolicyForOrg(targetOrgId),
     clearOfficialFinalGradesForOrg(targetOrgId)
   ]);
 
@@ -2079,6 +2088,7 @@ async function clearSampleTransactionalData({
     subjectStorageDirs: Number(subjectStorageResult?.removedDirs || 0),
     migrationLogFiles: Number(migrationLogResult?.removed || 0),
     attendanceMatrixPolicyOrgs: Number(attendancePolicyResult?.removed || 0),
+    conductRatingScalePolicyOrgs: Number(conductRatingPolicyResult?.removed || 0),
     officialFinalGradesClasses: Number(officialGradesResult?.classesUpdated || 0),
     classIndexesRebuilt
   };

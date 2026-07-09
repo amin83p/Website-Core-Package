@@ -22,6 +22,120 @@
         font-size: 0.75rem;
         line-height: 1.25;
     }
+    .conduct-rating-cell {
+        min-width: 7.5rem;
+        max-width: 9.5rem;
+        margin: 0 auto;
+    }
+    .conduct-emoji-picker {
+        display: flex;
+        justify-content: center;
+        gap: 0.2rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.35rem;
+    }
+    .conduct-emoji-btn {
+        width: 2rem;
+        height: 2rem;
+        padding: 0;
+        border: 1px solid #dbe3ef;
+        border-radius: 8px;
+        background: #fff;
+        font-size: 1rem;
+        line-height: 1;
+        opacity: 0.55;
+        transition: all 0.15s ease;
+    }
+    .conduct-emoji-btn:hover:not(:disabled) {
+        opacity: 0.9;
+        border-color: #93b4f6;
+        transform: translateY(-1px);
+    }
+    .conduct-emoji-btn.active {
+        opacity: 1;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 0.15rem rgba(37, 99, 235, 0.15);
+        background: #eff6ff;
+    }
+    .conduct-emoji-btn:disabled {
+        cursor: not-allowed;
+    }
+    .conduct-percent-input {
+        max-width: 5.5rem;
+        margin: 0 auto;
+        text-align: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 8px;
+    }
+    .conduct-legend-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.2rem 0.55rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 999px;
+        background: #fff;
+        font-size: 0.75rem;
+    }
+    .conduct-bulk-table th,
+    .conduct-bulk-table td {
+        vertical-align: middle;
+    }
+    .conduct-bulk-student-name {
+        min-width: 10rem;
+        max-width: 14rem;
+    }
+    .conduct-scale-level-row td {
+        vertical-align: middle;
+    }
+    .student-case-severity-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+    .student-case-severity-label {
+        min-width: 5.5rem;
+        font-weight: 600;
+        border-radius: 999px;
+    }
+    .btn-check[value="info"]:checked + .student-case-severity-label--info {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+    }
+    .btn-check[value="warning"]:checked + .student-case-severity-label--warning {
+        background-color: #ffc107;
+        border-color: #ffc107;
+        color: #000;
+    }
+    .btn-check[value="urgent"]:checked + .student-case-severity-label--urgent {
+        background-color: #dc3545;
+        border-color: #dc3545;
+        color: #fff;
+    }
+    .student-case-detail-presets {
+        display: grid;
+        gap: 0.45rem;
+    }
+    .student-case-details-textarea {
+        margin-top: 0.75rem;
+    }
+    .student-case-preset-option {
+        margin: 0;
+        padding: 0.55rem 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #fff;
+        transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    .student-case-preset-option:has(.student-case-preset-radio:checked) {
+        border-color: #2563eb;
+        background: #eff6ff;
+    }
+    .student-case-preset-option .form-check-input {
+        margin-top: 0.2rem;
+    }
 
     .comment-thread { max-height: 250px; overflow-y: auto; background: #f8f9fa; border-radius: 6px; padding: 10px; }
     .comment-bubble { background: #fff; border: 1px solid #e9ecef; border-radius: 8px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
@@ -733,6 +847,24 @@
         const smTeacherLabel = String(session.delivery?.deliveredByName || session.delivery?.deliveredBy || '').trim();
         const smCurrentStatusLabel = String(currentSessionStatusMeta?.label || currentSessionStatus || 'Scheduled').trim();
         const canEditSessionMetadataFlag = typeof canEditSessionMetadata !== 'undefined' && canEditSessionMetadata === true;
+        const canManageConductRatingScaleFlag = typeof canManageConductRatingScale !== 'undefined' && canManageConductRatingScale === true;
+        const isTimesheetSessionLock = typeof isSessionLocked !== 'undefined' && isSessionLocked && String(session.lockReason || '') === 'timesheet_approved';
+        const canToggleSessionLock = canEditSessionMetadataFlag && !isTimesheetSessionLock;
+        const conductScaleDefaultLevels = [
+            { code: 'S', label: 'Superior', emoji: '⭐', minPercent: 85, maxPercent: 100, defaultPercent: 92.5 },
+            { code: 'Sat', label: 'Satisfactory', emoji: '👍', minPercent: 60, maxPercent: 84, defaultPercent: 72 },
+            { code: 'NI', label: 'Needs Improvement', emoji: '😐', minPercent: 50, maxPercent: 59, defaultPercent: 54.5 },
+            { code: 'U', label: 'Unsatisfactory', emoji: '😞', minPercent: 0, maxPercent: 49, defaultPercent: 24.5 }
+        ];
+        const conductScaleLevels = (typeof conductRatingScaleResolved !== 'undefined' && conductRatingScaleResolved && Array.isArray(conductRatingScaleResolved.levels) && conductRatingScaleResolved.levels.length)
+            ? conductRatingScaleResolved.levels
+            : conductScaleDefaultLevels;
+        const conductDimensions = [
+            { key: 'classEffort', className: 'conduct-class-effort', label: 'Class Effort', valueKey: 'classEffortPercent', peClass: '' },
+            { key: 'classParticipation', className: 'conduct-class-participation', label: 'Class Participation', valueKey: 'classParticipationPercent', peClass: '' },
+            { key: 'respectsTeachers', className: 'conduct-respects-teachers', label: 'Respects The Teachers', valueKey: 'respectsTeachersPercent', peClass: '' },
+            { key: 'respectsStudents', className: 'conduct-respects-students', label: 'Treats Other Students With Respect', valueKey: 'respectsStudentsPercent', peClass: 'pe-4' }
+        ];
     %>
 
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
@@ -782,6 +914,11 @@
         </div>
         <% if (canCreateMakeupSession) { %>
             <button type="button" class="btn btn-outline-warning btn-md fw-semibold shadow-md" id="btnCreateMakeupSession"><i class="bi bi-calendar-plus me-1"></i>Create make-up session</button>
+        <% } %>
+        <% if (canToggleSessionLock) { %>
+            <button type="button" class="btn btn-outline-<%= isSessionLocked ? 'success' : 'secondary' %> btn-md fw-semibold shadow-sm" id="btnToggleSessionLock" data-next-locked="<%= isSessionLocked ? 'false' : 'true' %>">
+                <i class="bi bi-<%= isSessionLocked ? 'unlock' : 'lock-fill' %> me-1"></i><%= isSessionLocked ? 'Unlock session' : 'Lock session' %>
+            </button>
         <% } %>
         <% if (!isReadOnly) { %>
             <button type="button" class="btn btn-primary btn-md btn-filled btn-save-session shadow-md" id="btnSaveSession"><i class="bi bi-save me-1"></i>Save session</button>
@@ -955,10 +1092,12 @@
             <div>
                 <h6 class="fw-bold mb-1">Session Locked</h6>
                 <div class="small">
-                    <% if (isReadOnly) { %>
+                    <% if (isTimesheetSessionLock) { %>
+                        This session is locked because it is linked to an approved timesheet. Reopen the timesheet to unlock it for editing.
+                    <% } else if (isReadOnly) { %>
                         This session has been locked by an administrator. You can view the details, but modifications are disabled.
                     <% } else { %>
-                        This session is locked, but you have administrative override permissions to make changes.
+                        This session is locked, but you have administrative override permissions to make changes or unlock it.
                     <% } %>
                 </div>
             </div>
@@ -1150,9 +1289,26 @@
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
                         <div>
                             <h5 class="m-0 fw-bold text-primary"><i class="bi bi-person-hearts me-2"></i>Class Conduct</h5>
-                            <div class="conduct-rating-help mt-1">Values default to 100%. Adjust only when a student's effort, participation, or respect needs a different session rating.</div>
+                            <div class="conduct-rating-help mt-1">Ratings default to <strong>Superior (S)</strong>. Tap an emoji to set effort, participation, or respect quickly, or open <strong>Quick rate conduct</strong> for the whole class.</div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <% conductScaleLevels.forEach((level) => { %>
+                                    <span class="conduct-legend-chip" title="<%= level.label %> (<%= level.minPercent %>%–<%= level.maxPercent %>%)">
+                                        <span aria-hidden="true"><%= level.emoji %></span>
+                                        <strong><%= level.code %></strong>
+                                        <span class="text-muted"><%= level.minPercent %>%–<%= level.maxPercent %>%</span>
+                                    </span>
+                                <% }) %>
+                            </div>
                         </div>
-                        <span class="badge bg-light text-dark border"><%= session.roster.length %> Students</span>
+                        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                            <% if (!isReadOnly && session.roster.length > 0) { %>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenConductBulkModal"><i class="bi bi-lightning-charge me-1"></i>Quick rate conduct</button>
+                            <% } %>
+                            <% if (canManageConductRatingScaleFlag) { %>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnOpenConductScaleSettingsModal"><i class="bi bi-sliders me-1"></i>Rating scale settings</button>
+                            <% } %>
+                            <span class="badge bg-light text-dark border"><%= session.roster.length %> Students</span>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive" style="max-height: min(70vh, 700px); overflow-y: auto;">
@@ -1160,10 +1316,9 @@
                                 <thead class="table-light position-sticky top-0" style="z-index: 1;">
                                     <tr>
                                         <th class="ps-4">Student Name</th>
-                                        <th class="text-center">Class Effort</th>
-                                        <th class="text-center">Class Participation</th>
-                                        <th class="text-center">Respects The Teachers</th>
-                                        <th class="text-center pe-4">Treats Other Students With Respect</th>
+                                        <% conductDimensions.forEach((dim) => { %>
+                                            <th class="text-center <%= dim.peClass %>"><%= dim.label %></th>
+                                        <% }) %>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1171,23 +1326,23 @@
                                         <tr><td colspan="5" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
                                     <% } else { %>
                                         <% session.roster.forEach((student) => { %>
-                                            <tr class="conduct-row" data-personid="<%= student.personId %>">
+                                            <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
                                                 <td class="ps-4 fw-bold align-middle">
                                                     <%- include('../partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
                                                     <div class="small text-muted font-monospace"><%= student.personId %></div>
                                                 </td>
-                                                <td class="text-center">
-                                                    <input type="number" class="form-control form-control-sm conduct-rating-input mx-auto conduct-class-effort" min="0" max="100" step="1" value="<%= sessionRatingValue(student.classEffortPercent) %>" <%- disabledAttr %>>
-                                                </td>
-                                                <td class="text-center">
-                                                    <input type="number" class="form-control form-control-sm conduct-rating-input mx-auto conduct-class-participation" min="0" max="100" step="1" value="<%= sessionRatingValue(student.classParticipationPercent) %>" <%- disabledAttr %>>
-                                                </td>
-                                                <td class="text-center">
-                                                    <input type="number" class="form-control form-control-sm conduct-rating-input mx-auto conduct-respects-teachers" min="0" max="100" step="1" value="<%= sessionRatingValue(student.respectsTeachersPercent) %>" <%- disabledAttr %>>
-                                                </td>
-                                                <td class="text-center pe-4">
-                                                    <input type="number" class="form-control form-control-sm conduct-rating-input mx-auto conduct-respects-students" min="0" max="100" step="1" value="<%= sessionRatingValue(student.respectsStudentsPercent) %>" <%- disabledAttr %>>
-                                                </td>
+                                                <% conductDimensions.forEach((dim) => { %>
+                                                    <td class="text-center <%= dim.peClass %>">
+                                                        <div class="conduct-rating-cell" data-dimension="<%= dim.key %>">
+                                                            <div class="conduct-emoji-picker" role="group" aria-label="<%= dim.label %> rating">
+                                                                <% conductScaleLevels.forEach((level) => { %>
+                                                                    <button type="button" class="conduct-emoji-btn" data-code="<%= level.code %>" title="<%= level.label %> (<%= level.minPercent %>%–<%= level.maxPercent %>%)"><%= level.emoji %></button>
+                                                                <% }) %>
+                                                            </div>
+                                                            <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= sessionRatingValue(student[dim.valueKey]) %>" <%- disabledAttr %>>
+                                                        </div>
+                                                    </td>
+                                                <% }) %>
                                             </tr>
                                         <% }) %>
                                     <% } %>
@@ -1322,7 +1477,7 @@
                                         <th>Category</th>
                                         <th>Severity</th>
                                         <th>Status</th>
-                                        <th>Summary</th>
+                                        <th>Issue</th>
                                         <th>Updated</th>
                                         <th class="text-end pe-4">Actions</th>
                                     </tr>
@@ -1352,6 +1507,84 @@
         </main>
     </div>
 </div>
+
+<div class="modal fade" id="conductBulkRatingModal" tabindex="-1" aria-labelledby="conductBulkRatingModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="conductBulkRatingModalTitle"><i class="bi bi-lightning-charge me-2"></i>Quick rate conduct</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex flex-wrap gap-2 mb-3" id="conductBulkLegend"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0 conduct-bulk-table" id="conductBulkRatingTable">
+                        <thead class="table-light position-sticky top-0" style="z-index: 1;">
+                            <tr>
+                                <th class="conduct-bulk-student-name ps-3">Student</th>
+                                <% conductDimensions.forEach((dim) => { %>
+                                    <th class="text-center small"><%= dim.label %></th>
+                                <% }) %>
+                            </tr>
+                        </thead>
+                        <tbody id="conductBulkRatingBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light d-flex justify-content-between flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-success btn-sm" id="btnConductBulkSetAllSuperior"><i class="bi bi-stars me-1"></i>Set all to Superior</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<% if (canManageConductRatingScaleFlag) { %>
+<div class="modal fade" id="conductScaleSettingsModal" tabindex="-1" aria-labelledby="conductScaleSettingsModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title fw-bold" id="conductScaleSettingsModalTitle"><i class="bi bi-sliders me-2"></i>Conduct rating scale settings</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Adjust percentage ranges for each qualitative band. Ranges must cover 0–100% without gaps or overlaps.</p>
+                <div id="conductScaleSettingsAlert" class="alert alert-danger d-none" role="alert"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Code</th>
+                                <th>Label</th>
+                                <th>Emoji</th>
+                                <th>Min %</th>
+                                <th>Max %</th>
+                                <th>Default %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="conductScaleSettingsBody">
+                            <% conductScaleLevels.forEach((level, index) => { %>
+                                <tr class="conduct-scale-level-row" data-level-index="<%= index %>">
+                                    <td class="fw-bold font-monospace"><%= level.code %></td>
+                                    <td><input type="text" class="form-control form-control-sm conduct-scale-label" value="<%= level.label %>" maxlength="80"></td>
+                                    <td><input type="text" class="form-control form-control-sm conduct-scale-emoji" value="<%= level.emoji %>" maxlength="8" style="max-width:4rem;"></td>
+                                    <td><input type="number" class="form-control form-control-sm conduct-scale-min" min="0" max="100" step="0.5" value="<%= level.minPercent %>"></td>
+                                    <td><input type="number" class="form-control form-control-sm conduct-scale-max" min="0" max="100" step="0.5" value="<%= level.maxPercent %>"></td>
+                                    <td><input type="number" class="form-control form-control-sm conduct-scale-default" min="0" max="100" step="0.5" value="<%= level.defaultPercent %>"></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary fw-bold" id="btnSaveConductScaleSettings"><i class="bi bi-save me-1"></i>Save settings</button>
+            </div>
+        </div>
+    </div>
+</div>
+<% } %>
 
 <div class="modal fade" id="attendanceDetailsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -1513,10 +1746,38 @@
                 <input type="hidden" id="studentCasePersonId">
                 <div class="alert alert-light border small mb-3" id="studentCaseContext"></div>
                 <div class="row g-3">
-                    <div class="col-md-3"><label class="form-label fw-bold" for="studentCaseCategory">Category</label><select class="form-select" id="studentCaseCategory"><option value="learning">Learning</option><option value="technology">Technology</option><option value="engagement">Engagement</option><option value="behavior">Behavior</option><option value="support">Additional Support</option><option value="resources">Resources</option><option value="lesson_delivery">Lesson Delivery</option><option value="other">Other</option></select></div>
-                    <div class="col-md-3"><label class="form-label fw-bold" for="studentCaseSeverity">Severity</label><select class="form-select" id="studentCaseSeverity"><option value="info">Info</option><option value="warning">Warning</option><option value="urgent">Urgent</option></select></div>
-                    <div class="col-md-6"><label class="form-label fw-bold" for="studentCaseSummary">Summary</label><input type="text" class="form-control" id="studentCaseSummary" maxlength="260" placeholder="Short reason for opening this case"></div>
-                    <div class="col-12"><label class="form-label fw-bold" for="studentCaseDetails">Issue / support details</label><textarea class="form-control" id="studentCaseDetails" rows="4" maxlength="5000" placeholder="Describe what happened, what support is needed, or what office/admin should know."></textarea></div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold" for="studentCaseCategory">Category</label>
+                        <select class="form-select" id="studentCaseCategory">
+                            <option value="learning">Learning</option>
+                            <option value="technology">Technology</option>
+                            <option value="engagement">Engagement</option>
+                            <option value="behavior">Behavior</option>
+                            <option value="support">Additional Support</option>
+                            <option value="resources">Resources</option>
+                            <option value="lesson_delivery">Lesson Delivery</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="form-label fw-bold">Severity</div>
+                        <div class="student-case-severity-group" role="group" aria-label="Case severity">
+                            <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityInfo" value="info" checked>
+                            <label class="btn btn-sm btn-outline-primary student-case-severity-label student-case-severity-label--info" for="studentCaseSeverityInfo">Info</label>
+                            <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityWarning" value="warning">
+                            <label class="btn btn-sm btn-outline-warning student-case-severity-label student-case-severity-label--warning" for="studentCaseSeverityWarning">Warning</label>
+                            <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityUrgent" value="urgent">
+                            <label class="btn btn-sm btn-outline-danger student-case-severity-label student-case-severity-label--urgent" for="studentCaseSeverityUrgent">Urgent</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold" for="studentCaseDetails">Issue / support details</label>
+                        <div id="studentCaseDetailPresetsWrap">
+                            <div id="studentCaseDetailPresets" class="student-case-detail-presets"></div>
+                        </div>
+                        <textarea class="form-control student-case-details-textarea" id="studentCaseDetails" rows="4" maxlength="5000" placeholder="Describe what happened, what support is needed, or what office/admin should know."></textarea>
+                        <div class="form-text">Pick a common issue below, then adjust the detail text if needed.</div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer bg-light d-flex justify-content-between flex-wrap gap-2"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-outline-success fw-bold" id="btnResolveStudentCase"><i class="bi bi-check2-circle me-1"></i>Save &amp; Resolve</button><button type="button" class="btn btn-primary fw-bold" id="btnSaveStudentCase"><i class="bi bi-save me-1"></i>Save Case</button></div></div>
@@ -1631,6 +1892,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionReportRosterRows = <%- jsonForScript(Array.isArray(session.roster) ? session.roster : []) %>;
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
     const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag)) %>;
+    const sessionCanToggleLock = <%- jsonForScript(Boolean(canToggleSessionLock)) %>;
     const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     const sessionStatusMap = new Map((sessionStatusMeta || []).map((row) => [normalizeStatusCode(row.code), row]));
     const resolveStatusMeta = (statusCode) => sessionStatusMap.get(normalizeStatusCode(statusCode)) || null;
@@ -1843,7 +2105,309 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btnCreateMakeupSessionInline')?.addEventListener('click', openMakeupSessionModal);
     }
 
+    document.getElementById('btnToggleSessionLock')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btnToggleSessionLock');
+        if (!btn || !sessionCanToggleLock) return;
+        if (typeof showMessageModal !== 'function') return;
+        const nextLocked = String(btn.dataset.nextLocked || '').toLowerCase() === 'true';
+        const actionLabel = nextLocked ? 'lock' : 'unlock';
+        const confirmButton = nextLocked ? 'Lock session' : 'Unlock session';
+        const proceed = (await showMessageModal({
+            title: nextLocked ? 'Lock session?' : 'Unlock session?',
+            icon: 'question',
+            message: nextLocked
+                ? 'Teachers will no longer be able to edit this session until an administrator unlocks it.'
+                : 'Teachers will be able to edit this session again.',
+            buttons: [
+                { text: 'Cancel', class: 'btn-secondary' },
+                { text: confirmButton, class: nextLocked ? 'btn-warning' : 'btn-success' }
+            ]
+        })) === confirmButton;
+        if (!proceed) return;
+        btn.disabled = true;
+        try {
+            const body = new URLSearchParams();
+            body.set('locked', nextLocked ? 'true' : 'false');
+            body.set('actionStateId', actionStateId);
+            const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/lock`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-AJAX-Request': 'true',
+                    'Accept': 'application/json'
+                },
+                body: body.toString()
+            });
+            const result = await res.json().catch(() => null);
+            if (!res.ok || !result || result.status !== 'success') {
+                throw new Error(result?.message || `Failed to ${actionLabel} session.`);
+            }
+            window.location.reload();
+        } catch (error) {
+            await showMessageModal({
+                title: 'Lock update failed',
+                icon: 'error',
+                message: error?.message || `Failed to ${actionLabel} session.`,
+                buttons: [{ text: 'OK', class: 'btn-primary' }]
+            });
+            btn.disabled = false;
+        }
+    });
+
     window.__attendanceMatrixPolicy = <%- JSON.stringify(typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved ? attendanceMatrixPolicyResolved : { disqualifyLateMinutes: 30, disqualifyEarlyLeaveMinutes: 30, disqualifyCombinedMissedMinutes: null, scheduledMinutes: 180 }) %>;
+    window.__conductRatingScale = <%- JSON.stringify(typeof conductRatingScaleResolved !== 'undefined' && conductRatingScaleResolved ? conductRatingScaleResolved : { levels: conductScaleDefaultLevels }) %>;
+    const sessionConductReadOnly = <%= JSON.stringify(!!isReadOnly) %>;
+    const canManageConductRatingScaleClient = <%- jsonForScript(Boolean(canManageConductRatingScaleFlag)) %>;
+    const conductDimensionMeta = <%- jsonForScript(conductDimensions) %>;
+    const CONDUCT_SCALE_FALLBACK_LEVELS = <%- jsonForScript(conductScaleDefaultLevels) %>;
+
+    function conductEscapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, (ch) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[ch]));
+    }
+
+    function getConductScaleLevels() {
+        const levels = window.__conductRatingScale?.levels;
+        return Array.isArray(levels) && levels.length ? levels : CONDUCT_SCALE_FALLBACK_LEVELS;
+    }
+
+    function normalizeConductPercent(value, fallback = 100) {
+        const fallbackNumber = Number(fallback);
+        const safeFallback = Number.isFinite(fallbackNumber) ? fallbackNumber : 100;
+        const n = Number(value);
+        if (!Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(safeFallback * 10) / 10));
+        return Math.max(0, Math.min(100, Math.round(n * 10) / 10));
+    }
+
+    function percentToConductLevel(percent) {
+        const value = normalizeConductPercent(percent);
+        const levels = getConductScaleLevels();
+        const match = levels.find((row) => value >= Number(row.minPercent) && value <= Number(row.maxPercent));
+        return match ? { ...match } : { ...levels[0] };
+    }
+
+    function levelByConductCode(code) {
+        const key = String(code || '').trim();
+        const match = getConductScaleLevels().find((row) => row.code === key);
+        return match ? { ...match } : null;
+    }
+
+    function updateConductCellUi(cell) {
+        if (!cell) return;
+        const percentInput = cell.querySelector('.conduct-percent-input');
+        const percent = normalizeConductPercent(percentInput?.value);
+        const level = percentToConductLevel(percent);
+        cell.querySelectorAll('.conduct-emoji-btn').forEach((btn) => {
+            const active = btn.dataset.code === level.code;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        if (percentInput && String(percentInput.value) !== String(percent)) {
+            percentInput.value = String(percent);
+        }
+        cell.dataset.levelCode = level.code;
+    }
+
+    function applyConductLevel(cell, code, options = {}) {
+        const level = levelByConductCode(code);
+        if (!level || !cell) return;
+        const percentInput = cell.querySelector('.conduct-percent-input');
+        if (percentInput && !options.keepPercent) {
+            percentInput.value = String(level.defaultPercent);
+        }
+        updateConductCellUi(cell);
+    }
+
+    function applyConductPercent(cell, percent) {
+        if (!cell) return;
+        const percentInput = cell.querySelector('.conduct-percent-input');
+        if (percentInput) percentInput.value = String(normalizeConductPercent(percent));
+        updateConductCellUi(cell);
+    }
+
+    function readConductPercentFromCell(cell, fallback = 100) {
+        if (!cell) return normalizeConductPercent(fallback);
+        return normalizeConductPercent(cell.querySelector('.conduct-percent-input')?.value, fallback);
+    }
+
+    function initConductRatingCell(cell) {
+        if (!cell) return;
+        updateConductCellUi(cell);
+        if (cell.dataset.conductBound === '1') return;
+        cell.dataset.conductBound = '1';
+        cell.querySelectorAll('.conduct-emoji-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (sessionConductReadOnly) return;
+                applyConductLevel(cell, btn.dataset.code);
+            });
+        });
+        const percentInput = cell.querySelector('.conduct-percent-input');
+        percentInput?.addEventListener('change', () => updateConductCellUi(cell));
+        percentInput?.addEventListener('input', () => updateConductCellUi(cell));
+    }
+
+    function initAllConductRatingCells(root = document) {
+        root.querySelectorAll('.conduct-rating-cell').forEach(initConductRatingCell);
+    }
+
+    function buildConductEmojiPickerHtml(dimensionKey, personId) {
+        const levels = getConductScaleLevels();
+        const buttons = levels.map((level) => (
+            `<button type="button" class="conduct-emoji-btn" data-code="${conductEscapeHtml(level.code)}" title="${conductEscapeHtml(level.label)} (${level.minPercent}%–${level.maxPercent}%)">${conductEscapeHtml(level.emoji)}</button>`
+        )).join('');
+        return `<div class="conduct-rating-cell" data-dimension="${conductEscapeHtml(dimensionKey)}" data-personid="${conductEscapeHtml(personId)}"><div class="conduct-emoji-picker" role="group">${buttons}</div><input type="number" class="form-control form-control-sm conduct-percent-input" min="0" max="100" step="0.5" value="100"${sessionConductReadOnly ? ' disabled' : ''}></div>`;
+    }
+
+    function renderConductBulkLegend() {
+        const host = document.getElementById('conductBulkLegend');
+        if (!host) return;
+        host.innerHTML = getConductScaleLevels().map((level) => (
+            `<span class="conduct-legend-chip" title="${conductEscapeHtml(level.label)} (${level.minPercent}%–${level.maxPercent}%)"><span aria-hidden="true">${conductEscapeHtml(level.emoji)}</span><strong>${conductEscapeHtml(level.code)}</strong><span class="text-muted">${level.minPercent}%–${level.maxPercent}%</span></span>`
+        )).join('');
+    }
+
+    function getConductTableCell(personId, dimensionKey) {
+        const row = document.querySelector(`.conduct-row[data-personid="${CSS.escape(String(personId || ''))}"]`);
+        return row?.querySelector(`.conduct-rating-cell[data-dimension="${dimensionKey}"]`) || null;
+    }
+
+    function syncConductModalFromTable() {
+        const body = document.getElementById('conductBulkRatingBody');
+        if (!body) return;
+        const rows = Array.from(document.querySelectorAll('.conduct-row'));
+        body.innerHTML = rows.map((row) => {
+            const personId = row.getAttribute('data-personid') || '';
+            const studentName = row.getAttribute('data-student-name') || personId;
+            const cells = conductDimensionMeta.map((dim) => {
+                const tableCell = getConductTableCell(personId, dim.key);
+                const percent = readConductPercentFromCell(tableCell, 100);
+                return `<td class="text-center"><div class="conduct-bulk-cell" data-personid="${conductEscapeHtml(personId)}" data-dimension="${conductEscapeHtml(dim.key)}">${buildConductEmojiPickerHtml(dim.key, personId)}</div></td>`;
+            }).join('');
+            return `<tr data-personid="${conductEscapeHtml(personId)}"><td class="conduct-bulk-student-name ps-3 fw-semibold">${conductEscapeHtml(studentName)}</td>${cells}</tr>`;
+        }).join('');
+        body.querySelectorAll('.conduct-rating-cell').forEach((cell) => {
+            const personId = cell.closest('.conduct-bulk-cell')?.dataset.personid || cell.dataset.personid;
+            const dimensionKey = cell.closest('.conduct-bulk-cell')?.dataset.dimension || cell.dataset.dimension;
+            const tableCell = getConductTableCell(personId, dimensionKey);
+            const percent = readConductPercentFromCell(tableCell, 100);
+            applyConductPercent(cell, percent);
+            initConductRatingCell(cell);
+        });
+    }
+
+    function syncConductTableFromModal() {
+        document.querySelectorAll('#conductBulkRatingBody .conduct-bulk-cell').forEach((bulkCell) => {
+            const personId = bulkCell.dataset.personid;
+            const dimensionKey = bulkCell.dataset.dimension;
+            const modalCell = bulkCell.querySelector('.conduct-rating-cell');
+            const tableCell = getConductTableCell(personId, dimensionKey);
+            if (!modalCell || !tableCell) return;
+            applyConductPercent(tableCell, readConductPercentFromCell(modalCell, 100));
+        });
+    }
+
+    function setAllConductCellsToSuperior(root = document) {
+        const superior = levelByConductCode('S') || getConductScaleLevels()[0];
+        root.querySelectorAll('.conduct-rating-cell').forEach((cell) => applyConductLevel(cell, superior.code));
+    }
+
+    function refreshConductScaleUi() {
+        renderConductBulkLegend();
+        initAllConductRatingCells();
+        document.querySelectorAll('#conductScaleSettingsBody .conduct-scale-level-row').forEach((row, index) => {
+            const level = getConductScaleLevels()[index];
+            if (!level) return;
+            row.querySelector('.conduct-scale-label').value = level.label || level.code;
+            row.querySelector('.conduct-scale-emoji').value = level.emoji || '';
+            row.querySelector('.conduct-scale-min').value = level.minPercent;
+            row.querySelector('.conduct-scale-max').value = level.maxPercent;
+            row.querySelector('.conduct-scale-default').value = level.defaultPercent;
+        });
+    }
+
+    function collectConductScaleSettingsFromForm() {
+        return Array.from(document.querySelectorAll('#conductScaleSettingsBody .conduct-scale-level-row')).map((row) => ({
+            code: row.querySelector('td.fw-bold')?.textContent?.trim() || '',
+            label: row.querySelector('.conduct-scale-label')?.value || '',
+            emoji: row.querySelector('.conduct-scale-emoji')?.value || '',
+            minPercent: row.querySelector('.conduct-scale-min')?.value,
+            maxPercent: row.querySelector('.conduct-scale-max')?.value,
+            defaultPercent: row.querySelector('.conduct-scale-default')?.value
+        }));
+    }
+
+    let conductBulkModalInstance = null;
+    const conductBulkModalEl = document.getElementById('conductBulkRatingModal');
+    if (conductBulkModalEl && window.bootstrap) conductBulkModalInstance = new bootstrap.Modal(conductBulkModalEl);
+    let conductScaleSettingsModalInstance = null;
+    const conductScaleSettingsModalEl = document.getElementById('conductScaleSettingsModal');
+    if (conductScaleSettingsModalEl && window.bootstrap) conductScaleSettingsModalInstance = new bootstrap.Modal(conductScaleSettingsModalEl);
+
+    document.getElementById('btnOpenConductBulkModal')?.addEventListener('click', () => {
+        renderConductBulkLegend();
+        syncConductModalFromTable();
+        conductBulkModalInstance?.show();
+    });
+    conductBulkModalEl?.addEventListener('hidden.bs.modal', () => syncConductTableFromModal());
+    document.getElementById('btnConductBulkSetAllSuperior')?.addEventListener('click', () => {
+        const body = document.getElementById('conductBulkRatingBody');
+        if (body) setAllConductCellsToSuperior(body);
+    });
+    document.getElementById('btnOpenConductScaleSettingsModal')?.addEventListener('click', () => {
+        refreshConductScaleUi();
+        conductScaleSettingsModalInstance?.show();
+    });
+    document.getElementById('btnSaveConductScaleSettings')?.addEventListener('click', async () => {
+        const alertEl = document.getElementById('conductScaleSettingsAlert');
+        const btn = document.getElementById('btnSaveConductScaleSettings');
+        if (!btn) return;
+        const levels = collectConductScaleSettingsFromForm();
+        btn.disabled = true;
+        if (alertEl) {
+            alertEl.classList.add('d-none');
+            alertEl.textContent = '';
+        }
+        try {
+            const body = new URLSearchParams();
+            body.set('levels', JSON.stringify(levels));
+            body.set('actionStateId', actionStateId);
+            const res = await fetch('/school/classes/conduct-rating-scale/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-AJAX-Request': 'true',
+                    'Accept': 'application/json'
+                },
+                body: body.toString()
+            });
+            const result = await res.json().catch(() => null);
+            if (!res.ok || !result || result.status !== 'success') {
+                throw new Error(result?.message || 'Failed to save conduct rating scale settings.');
+            }
+            window.__conductRatingScale = result.policy || { levels };
+            refreshConductScaleUi();
+            conductScaleSettingsModalInstance?.hide();
+            if (typeof window.showMessageModal === 'function') {
+                await window.showMessageModal({ title: 'Saved', message: 'Conduct rating scale settings were updated.', icon: 'success' });
+            }
+        } catch (error) {
+            if (alertEl) {
+                alertEl.textContent = error?.message || 'Failed to save settings.';
+                alertEl.classList.remove('d-none');
+            }
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    initAllConductRatingCells();
+    renderConductBulkLegend();
+
     let studentCasesState = <%- jsonForScript(Array.isArray(sessionStudentCases) ? sessionStudentCases : []) %>;
     let sessionReportInstancesState = <%- jsonForScript(Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : []) %>;
     const requestedStudentCaseId = new URLSearchParams(window.location.search || '').get('caseId') || '';
@@ -1930,7 +2494,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td class="text-capitalize">${scEscapeHtml(String(row.category || 'other').replace(/_/g, ' '))}</td>
                     <td><span class="badge ${studentCaseBadgeClass(severity, 'severity')}">${scEscapeHtml(severity.toUpperCase())}</span></td>
                     <td><span class="badge ${studentCaseBadgeClass(status, 'status')}">${scEscapeHtml(status.replace(/_/g, ' ').toUpperCase())}</span></td>
-                    <td>${scEscapeHtml(row.summary || '-')}</td>
+                    <td>${scEscapeHtml(row.details || row.summary || '-')}</td>
                     <td class="small text-muted font-monospace">${scEscapeHtml(updated || '-')}</td>
                     <td class="text-end pe-4">
                         <div class="btn-group btn-group-sm">
@@ -2253,13 +2817,66 @@ document.addEventListener('DOMContentLoaded', () => {
         if (button) button.classList.toggle('d-none', !visible);
     }
 
+    window.__studentCaseDetailPresets = <%- JSON.stringify(typeof studentCaseDetailPresets !== 'undefined' && studentCaseDetailPresets ? studentCaseDetailPresets : { labels: {}, presets: {} }) %>;
+
+    function getStudentCasePresetConfig() {
+        return window.__studentCaseDetailPresets || { labels: {}, presets: {} };
+    }
+
+    function getSelectedStudentCaseSeverity() {
+        const checked = document.querySelector('input[name="studentCaseSeverity"]:checked');
+        return checked?.value || 'info';
+    }
+
+    function setSelectedStudentCaseSeverity(value) {
+        const token = String(value || 'info').trim().toLowerCase();
+        const input = document.querySelector(`input[name="studentCaseSeverity"][value="${token}"]`);
+        if (input) input.checked = true;
+    }
+
+    function studentCasePresetList(category) {
+        const key = String(category || 'learning').trim().toLowerCase();
+        const presets = getStudentCasePresetConfig().presets?.[key];
+        return Array.isArray(presets) ? presets : [];
+    }
+
+    function renderStudentCaseDetailOptions(category, selectedDetails = '') {
+        const presetsWrap = document.getElementById('studentCaseDetailPresetsWrap');
+        const presetsHost = document.getElementById('studentCaseDetailPresets');
+        const detailsInput = document.getElementById('studentCaseDetails');
+        const key = String(category || 'learning').trim().toLowerCase();
+        const presets = studentCasePresetList(key);
+        const selected = String(selectedDetails || '').trim();
+
+        if (detailsInput) detailsInput.value = selected;
+
+        if (key === 'other' || !presets.length) {
+            presetsWrap?.classList.add('d-none');
+            if (presetsHost) presetsHost.innerHTML = '';
+            return;
+        }
+
+        presetsWrap?.classList.remove('d-none');
+        if (!presetsHost) return;
+        const matchedPreset = presets.includes(selected);
+        presetsHost.innerHTML = presets.map((label, index) => {
+            const id = `studentCasePreset_${index}`;
+            const checked = matchedPreset && label === selected;
+            return `<div class="form-check student-case-preset-option"><input class="form-check-input student-case-preset-radio" type="radio" name="studentCasePreset" id="${id}" value="${scEscapeHtml(label)}"${checked ? ' checked' : ''}><label class="form-check-label" for="${id}">${scEscapeHtml(label)}</label></div>`;
+        }).join('');
+    }
+
+    function collectStudentCaseDetailsValue() {
+        return document.getElementById('studentCaseDetails')?.value || '';
+    }
+
     function resetStudentCaseModal() {
         document.getElementById('studentCaseId').value = '';
         document.getElementById('studentCasePersonId').value = '';
         document.getElementById('studentCaseCategory').value = 'learning';
-        document.getElementById('studentCaseSeverity').value = 'info';
-        document.getElementById('studentCaseSummary').value = '';
+        setSelectedStudentCaseSeverity('info');
         document.getElementById('studentCaseDetails').value = '';
+        renderStudentCaseDetailOptions('learning', '');
         setStudentCaseResolveButtonVisible(true);
     }
 
@@ -2272,10 +2889,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('studentCasePersonId').value = pid;
         document.getElementById('studentCaseModalTitle').textContent = row.id ? `Edit Case - ${name}` : `Open Case - ${name}`;
         document.getElementById('studentCaseContext').innerHTML = `<strong>${scEscapeHtml(name)}</strong> in <strong>${scEscapeHtml(<%- jsonForScript(classData.title || classData.id) %>)}</strong> on <strong>${scEscapeHtml(<%- jsonForScript(session.date || session.sessionId) %>)}</strong>.`;
-        document.getElementById('studentCaseCategory').value = row.category || 'learning';
-        document.getElementById('studentCaseSeverity').value = row.severity || 'info';
-        document.getElementById('studentCaseSummary').value = row.summary || '';
-        document.getElementById('studentCaseDetails').value = row.details || '';
+        const category = row.category || 'learning';
+        document.getElementById('studentCaseCategory').value = category;
+        setSelectedStudentCaseSeverity(row.severity || 'info');
+        renderStudentCaseDetailOptions(category, row.details || '');
         const status = String(row.status || '').trim().toLowerCase();
         setStudentCaseResolveButtonVisible(!['resolved', 'cancelled'].includes(status));
         if (studentCaseModalInstance) studentCaseModalInstance.show();
@@ -2286,9 +2903,8 @@ document.addEventListener('DOMContentLoaded', () => {
             actionStateId,
             studentPersonId: document.getElementById('studentCasePersonId').value,
             category: document.getElementById('studentCaseCategory').value,
-            severity: document.getElementById('studentCaseSeverity').value,
-            summary: document.getElementById('studentCaseSummary').value,
-            details: document.getElementById('studentCaseDetails').value
+            severity: getSelectedStudentCaseSeverity(),
+            details: collectStudentCaseDetailsValue()
         };
     }
 
@@ -2308,7 +2924,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = collectStudentCasePayload();
         if (shouldResolve) payload.status = 'resolved';
         if (!payload.studentPersonId) return showStudentCaseMessage('Student Required', 'Select a student before saving this case.', 'error');
-        if (!String(payload.summary || '').trim()) return showStudentCaseMessage('Summary Required', 'Enter a short summary before saving this case.', 'error');
+        if (!String(payload.details || '').trim()) return showStudentCaseMessage('Issue Required', 'Select an issue detail before saving this case.', 'error');
         const url = caseId
             ? `/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases/${encodeURIComponent(caseId)}`
             : `/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases`;
@@ -2351,6 +2967,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    document.getElementById('studentCaseCategory')?.addEventListener('change', (event) => {
+        renderStudentCaseDetailOptions(event.target.value, '');
+    });
+    document.getElementById('studentCaseDetailPresets')?.addEventListener('change', (event) => {
+        const radio = event.target.closest('.student-case-preset-radio');
+        if (!radio) return;
+        const detailsInput = document.getElementById('studentCaseDetails');
+        if (detailsInput) detailsInput.value = radio.value;
+    });
     document.addEventListener('click', (event) => {
         const openBtn = event.target.closest('.btn-open-student-case');
         if (openBtn) {
@@ -4038,10 +4663,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const conductRowsByPersonId = new Map(Array.from(document.querySelectorAll('.conduct-row')).map((row) => [row.getAttribute('data-personid'), row]));
             const readConductRating = (conductRow, selector) => {
                 if (!conductRow) return 100;
-                const raw = conductRow.querySelector(selector)?.value;
-                const n = Number(String(raw ?? '').trim());
-                if (!Number.isFinite(n)) return 100;
-                return Math.max(0, Math.min(100, Math.round(n * 100) / 100));
+                const input = conductRow.querySelector(selector);
+                if (!input) return 100;
+                const cell = input.closest('.conduct-rating-cell');
+                if (cell) return readConductPercentFromCell(cell, 100);
+                return normalizeConductPercent(input.value, 100);
             };
             document.querySelectorAll('.roster-row').forEach(row => {
                 const personId = row.getAttribute('data-personid');
