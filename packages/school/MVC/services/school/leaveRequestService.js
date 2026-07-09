@@ -1,4 +1,5 @@
 const schoolRepositories = require('../../repositories/school');
+const schoolDataService = require('./schoolDataService');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const leaveSessionResolutionService = require('./leaveSessionResolutionService');
 const taskService = require('./taskService');
@@ -681,7 +682,7 @@ async function deleteRequest(reqUser, id) {
   } catch (error) {
     console.warn(`School task sync skipped for delete leave request ${existing.id || ''}: ${error.message}`);
   }
-  const removed = await schoolRepositories.leaveRequests.remove(existing.id, normalizeQueryScope(reqUser));
+  const removed = await schoolDataService.deleteData('leaveRequests', existing.id, reqUser);
   if (removed === false) {
     const error = new Error('Leave request could not be deleted.');
     error.statusCode = 404;

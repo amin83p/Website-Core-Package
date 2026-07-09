@@ -597,6 +597,67 @@ test('real PTE manifest validates and exercises installer declarations + default
   assert.equal(uploadMocks.state.settings.app.uploadFolders['pte.packageAssets'], 'PTE/Package_Assets');
 });
 
+test('installer preserves existing section subsections on package sync', async () => {
+  const { deps, repos } = createInstallerDeps({
+    sections: [{
+      id: '122740',
+      name: 'SCHOOL',
+      category: 'SCHOOL',
+      description: 'School root',
+      active: true,
+      trackState: false,
+      minimumAccessRequirement: 1,
+      dashboardDisplay: true,
+      mainDashboardDisplay: true,
+      navigatorSection: true,
+      homeURL: '',
+      inactiveMessage: '',
+      message: '',
+      operations: [],
+      subsections: [{ id: '139382' }],
+      related: [],
+      packageId: 'school',
+      packageName: 'SCHOOL'
+    }]
+  });
+
+  const context = {
+    backendMode: 'json',
+    packageId: 'school',
+    manifest: {
+      id: 'school',
+      name: 'School',
+      version: '1.0.0',
+      mountPath: '/school',
+      sections: [{
+        id: '122740',
+        name: 'SCHOOL',
+        category: 'SCHOOL',
+        description: 'School root',
+        active: true,
+        trackState: false,
+        minimumAccessRequirement: 1,
+        dashboardDisplay: true,
+        mainDashboardDisplay: true,
+        navigatorSection: true,
+        homeURL: '',
+        inactiveMessage: '',
+        message: '',
+        operations: [],
+        subsections: [{ id: '139382' }, { id: '445561' }],
+        related: [],
+        adoptExisting: true
+      }]
+    }
+  };
+
+  const summary = await packageRegistryInstallerService.installPackageRegistryDeclarations(context, deps);
+  const school = repos.sectionRepo.getRows().find((row) => row.name === 'SCHOOL');
+
+  assert.equal(summary.entities.sections.updated + summary.entities.sections.skipped, 1);
+  assert.deepEqual(school.subsections, [{ id: '139382' }]);
+});
+
 test('loader hooks include route registration and keep metadata-only routes non-mounted', async () => {
   packageRouteService.resetMountedRoutes();
   const hooks = packageRegistryInstallerService.createLoaderHooks({

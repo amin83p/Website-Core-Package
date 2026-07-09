@@ -175,7 +175,6 @@ async function deleteHoliday(req, res) {
         if (!existing) throw new Error('Holiday not found.');
         assertHolidayOrgAccess(existing, activeOrgId, req.user);
 
-        // Delete via Data Service
         await schoolDataService.deleteData('holidays', id, req.user);
         const payloadOut = { status: 'success', message: 'Holiday removed successfully.' };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);

@@ -1,7 +1,6 @@
 const activityService = require('../../services/school/activityService');
 const activityWorkSessionService = require('../../services/school/activityWorkSessionService');
 const schoolDataService = require('../../services/school/schoolDataService');
-const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
@@ -159,14 +158,6 @@ exports.deleteActivity = async (req, res) => {
     const existing = await activityService.getActivity(req.params.id, req.user, schoolDataService.buildRouteAccessContext(req));
     if (!existing) throw new Error('School activity not found.');
     assertOrgAccess(existing, orgId);
-    schoolDependencyService.assertActivityNotTimesheetLocked(existing, `Activity "${existing.title || existing.id}"`);
-    await schoolDependencyService.assertSourceNotReferenced({
-      orgId,
-      sourceType: 'activity',
-      sourceRef: { activityId: existing.id },
-      label: `Activity "${existing.title || existing.id}"`,
-      reqUser: req.user
-    });
     await schoolDataService.deleteData('activities', req.params.id, req.user);
     const payload = { status: 'success', message: 'School activity deleted successfully.' };
     if (isAjax(req)) return res.json(payload);

@@ -1,0 +1,89 @@
+<%
+  const blockedPreview = (typeof preview === 'object' && preview) ? preview : {};
+  const blockedLabel = String(blockedPreview.label || blockedPreview.id || 'This record').trim();
+  const blockers = Array.isArray(blockedPreview.blockers) ? blockedPreview.blockers : [];
+  const warnings = Array.isArray(blockedPreview.warnings) ? blockedPreview.warnings : [];
+  const totalReferences = blockers.reduce((sum, row) => sum + Number(row?.count || 0), 0);
+%>
+
+<div class="delete-blocked-summary mb-4">
+  <div class="delete-blocked-summary-icon" aria-hidden="true">
+    <i class="bi bi-shield-exclamation"></i>
+  </div>
+  <div>
+    <div class="delete-blocked-summary-kicker">Deletion blocked</div>
+    <h2 class="h4 fw-bold mb-2">Cannot delete <span class="text-nowrap"><%= blockedLabel %></span></h2>
+    <p class="text-muted mb-0">
+      This record is still linked to <strong><%= totalReferences %></strong> related item<%= totalReferences === 1 ? '' : 's' %>.
+      Resolve the references below, then try deleting again.
+    </p>
+  </div>
+</div>
+
+<% if (warnings.length) { %>
+  <div class="alert alert-warning border-0 mb-4">
+    <div class="fw-semibold mb-2"><i class="bi bi-exclamation-triangle me-2"></i>Warnings</div>
+    <ul class="mb-0 ps-3">
+      <% warnings.forEach((warning) => { %>
+        <li><%= String(warning || '').trim() %></li>
+      <% }) %>
+    </ul>
+  </div>
+<% } %>
+
+<div class="delete-blocked-list">
+  <% blockers.forEach((blocker, index) => {
+    const blockerLabel = String(blocker?.label || blocker?.message || blocker?.code || 'Reference').trim();
+    const blockerCount = Number(blocker?.count || 0);
+    const samples = Array.isArray(blocker?.samples) ? blocker.samples : [];
+    const extraCount = Math.max(0, blockerCount - samples.length);
+    const resolveHint = String(blocker?.resolveHint || '').trim();
+    const severity = String(blocker?.severity || 'error').trim().toLowerCase();
+    const severityClass = severity === 'warning' ? 'delete-blocked-item-warning' : 'delete-blocked-item-error';
+  %>
+    <div class="delete-blocked-item <%= severityClass %>">
+      <div class="delete-blocked-item-header">
+        <div class="delete-blocked-item-index"><%= index + 1 %></div>
+        <div class="flex-grow-1">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <h3 class="h6 fw-bold mb-0"><%= blockerLabel %></h3>
+            <span class="badge rounded-pill delete-blocked-count-badge"><%= blockerCount %> reference<%= blockerCount === 1 ? '' : 's' %></span>
+          </div>
+          <% if (blocker?.message) { %>
+            <div class="small text-muted"><%= String(blocker.message).trim() %></div>
+          <% } %>
+        </div>
+      </div>
+
+      <% if (resolveHint) { %>
+        <div class="delete-blocked-hint">
+          <i class="bi bi-lightbulb"></i>
+          <span><%= resolveHint %></span>
+        </div>
+      <% } %>
+
+      <% if (samples.length) { %>
+        <div class="delete-blocked-samples">
+          <div class="small fw-semibold text-uppercase text-muted mb-2">Examples</div>
+          <ul class="mb-0">
+            <% samples.forEach((sample) => {
+              const sampleLabel = String(sample?.label || sample?.id || 'Record').trim();
+              const sampleHref = String(sample?.href || '').trim();
+            %>
+              <li>
+                <% if (sampleHref) { %>
+                  <a href="<%= sampleHref %>" target="_blank" rel="noopener noreferrer"><%= sampleLabel %></a>
+                <% } else { %>
+                  <%= sampleLabel %>
+                <% } %>
+              </li>
+            <% }) %>
+            <% if (extraCount > 0) { %>
+              <li class="text-muted">…and <%= extraCount %> more</li>
+            <% } %>
+          </ul>
+        </div>
+      <% } %>
+    </div>
+  <% }) %>
+</div>

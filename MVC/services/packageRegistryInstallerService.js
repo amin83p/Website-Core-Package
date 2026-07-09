@@ -484,9 +484,7 @@ function buildEntityDefinitions(deps, packageMeta, backendMode) {
         'homeURL',
         'inactiveMessage',
         'message',
-        'operations',
-        'subsections',
-        'related'
+        'operations'
       ]
     },
     symbols: {

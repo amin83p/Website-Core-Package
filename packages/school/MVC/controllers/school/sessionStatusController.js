@@ -1,5 +1,4 @@
 const schoolDataService = require('../../services/school/schoolDataService');
-const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
@@ -247,12 +246,6 @@ exports.deleteSessionStatus = async (req, res) => {
     const existing = await schoolDataService.getDataById('sessionStatuses', id, req.user);
     if (!existing) throw new Error('Session status not found.');
     assertStatusOrgAccess(existing, activeOrgId, req.user);
-    await schoolDependencyService.assertSessionStatusNotReferenced({
-      statusCode: existing.code || existing.id,
-      orgId: activeOrgId,
-      label: `Session status "${existing.label || existing.code || existing.id}"`,
-      reqUser: req.user
-    });
     await schoolDataService.deleteData('sessionStatuses', id, req.user);
     sessionStatusPolicyService.clearStatusCache(activeOrgId);
 

@@ -1040,6 +1040,69 @@ function initHeaderApplicationMenu() {
 
 //#region 3. Logic: Global Actions (Delete & Cancel)
 // =============================================================================
+function escapeDeleteBlockedHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderDeleteBlockedPreview(preview = {}) {
+    const label = escapeDeleteBlockedHtml(preview.label || preview.id || 'This record');
+    const blockers = Array.isArray(preview.blockers) ? preview.blockers : [];
+    const totalReferences = blockers.reduce((sum, row) => sum + Number(row?.count || 0), 0);
+
+    if (!blockers.length) {
+        return `<p class="mb-0">Cannot delete <strong>${label}</strong> because related records exist.</p>`;
+    }
+
+    const items = blockers.map((blocker, index) => {
+        const blockerLabel = escapeDeleteBlockedHtml(blocker.label || blocker.message || blocker.code || 'Reference');
+        const count = Number(blocker.count || 0);
+        const samples = Array.isArray(blocker.samples) ? blocker.samples : [];
+        const extra = Math.max(0, count - samples.length);
+        const hint = blocker.resolveHint
+            ? `<div class="small text-muted mt-2"><i class="bi bi-lightbulb me-1"></i>${escapeDeleteBlockedHtml(blocker.resolveHint)}</div>`
+            : '';
+        const sampleHtml = samples.map((sample) => {
+            const sampleLabel = escapeDeleteBlockedHtml(sample.label || sample.id || 'Record');
+            if (sample.href) {
+                return `<li class="list-group-item py-2"><a href="${escapeDeleteBlockedHtml(sample.href)}" target="_blank" rel="noopener noreferrer">${sampleLabel}</a></li>`;
+            }
+            return `<li class="list-group-item py-2">${sampleLabel}</li>`;
+        }).join('');
+        const extraHtml = extra > 0 ? `<li class="list-group-item py-2 text-muted">…and ${extra} more</li>` : '';
+        const samplesBlock = (samples.length || extra)
+            ? `<ul class="list-group list-group-flush mt-2 mb-0">${sampleHtml}${extraHtml}</ul>`
+            : '';
+
+        return `<div class="border rounded p-3 mb-2 bg-light-subtle">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                <span class="badge text-bg-warning">${index + 1}</span>
+                <strong>${blockerLabel}</strong>
+                <span class="badge rounded-pill text-bg-secondary">${count} reference${count === 1 ? '' : 's'}</span>
+            </div>
+            ${hint}
+            ${samplesBlock}
+        </div>`;
+    }).join('');
+
+    return `<div class="delete-blocked-modal-preview text-start">
+        <p class="mb-3">Cannot delete <strong>${label}</strong>. This record is linked to <strong>${totalReferences}</strong> related item${totalReferences === 1 ? '' : 's'}.</p>
+        <div class="small fw-semibold text-uppercase text-muted mb-2">Resolve these references first</div>
+        ${items}
+    </div>`;
+}
+
+function buildDeleteActionError(result = {}, response) {
+    const err = new Error(result.message || `Delete failed with status ${response?.status || 400}.`);
+    err.code = result.code || '';
+    err.preview = result.preview || result.details || result.data || null;
+    return err;
+}
+
 function initGlobalActions() {
     document.body.addEventListener('click', async (e) => {
         const target = e.target.closest('button, a');
@@ -1222,7 +1285,7 @@ async function handleDeleteAction(eventOrButton, maybeButton = null) {
         }
 
         if (!response.ok && result.status !== 'success') {
-            throw new Error(result.message || `Delete failed with status ${response.status}.`);
+            throw buildDeleteActionError(result, response);
         }
 
         if (typeof window.handleGuardedApiPayload === 'function' && result?.idempotency?.state) {
@@ -1260,17 +1323,19 @@ async function handleDeleteAction(eventOrButton, maybeButton = null) {
                 });
             }
         } else {
-            throw new Error(result.message || 'Failed to delete item.');
+            throw buildDeleteActionError(result, response);
         }
     } catch (error) {
         console.error('Delete Error:', error);
         closeLoading();
         if (typeof showMessageModal === 'function') {
+            const isDeleteBlocked = error?.code === 'DELETE_BLOCKED' && error?.preview;
             await showMessageModal({
-                title: 'Error',
-                icon: 'error',
-                message: error.message,
-                buttons: [{ text: 'OK', class: 'btn-danger btn-sm' }]
+                title: isDeleteBlocked ? 'Delete blocked' : 'Error',
+                icon: isDeleteBlocked ? 'warning' : 'error',
+                message: isDeleteBlocked ? renderDeleteBlockedPreview(error.preview) : error.message,
+                size: isDeleteBlocked ? 'lg' : 'md',
+                buttons: [{ text: 'OK', class: isDeleteBlocked ? 'btn-warning btn-sm' : 'btn-danger btn-sm' }]
             });
         } else {
             alert(error.message);

@@ -1,5 +1,6 @@
 /**
  * Cross-entity dependency scans and timesheet-approval source locking.
+ * Timesheet reference scanners are also consumed by schoolDeletionRuleRegistry.
  */
 const schoolDataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');

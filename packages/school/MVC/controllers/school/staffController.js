@@ -11,6 +11,7 @@ const {
 } = require('../../services/school/schoolPeopleDuplicateGuardService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolLinkedPersonProfileService = require('../../services/school/schoolLinkedPersonProfileService');
+const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
@@ -23,11 +24,6 @@ const {
   getPrimaryOrgRole
 } = requireCoreModule('MVC/utils/orgContextUtils');
 const { STAFF_STATUSES, EMPLOYMENT_TYPES, COMPENSATION_METHODS } = require('../../models/school/staffModel');
-const STAFF_DELETE_FOOTPRINT_RULES = Object.freeze([
-  { entityType: 'payRates', field: 'personId', label: 'Pay Rates', personRole: 'staff' },
-  { entityType: 'globalTransactions', field: 'party.staffId', label: 'Global Transactions' }
-]);
-const STAFF_DELETE_MAX_FOOTPRINT_SAMPLE = 5;
 
 function routeAccess(req) {
   return dataService.buildRouteAccessContext(req);
@@ -58,68 +54,9 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function getRecordIdentity(record) {
-  return toPublicId(record?.id)
-    || toPublicId(record?.code)
-    || toPublicId(record?.partyId)
-    || toPublicId(record?.orgId)
-    || toPublicId(record?._id)
-    || '';
-}
-
-function buildFootprintBlockedMessage(displayName, footprint) {
-  const safeName = escapeHtml(displayName);
-  if (!Array.isArray(footprint) || !footprint.length) {
-    return `Cannot delete ${safeName} because it has related history.`;
-  }
-
-  const items = footprint.map((entry) => {
-    const sampleText = Array.isArray(entry.samples) && entry.samples.length > 0
-      ? `<span class="font-monospace">(${entry.samples.join(', ')})</span>`
-      : '';
-    return `<li><strong>${escapeHtml(entry.label || '')}</strong>: ${Number(entry.count || 0)} record(s) found ${sampleText}</li>`;
-  });
-
-  return `Cannot delete ${safeName} because related history exists. Please remove these references first:<ul>${items.join('')}</ul>`;
-}
-
 function buildStaffDisplayName(staff, person) {
   const personLabel = `${String(person?.name?.first || '').trim()} ${String(person?.name?.last || '').trim()}`.trim();
   return personLabel || toPublicId(staff?.id) || toPublicId(staff?.personId) || 'Staff';
-}
-
-async function collectStaffFootprint(staff, personId, activeOrgId, reqUser) {
-  const targetStaffId = toPublicId(staff?.id);
-  if (!targetStaffId) return [];
-
-  const rows = [];
-  const safeActiveOrgId = String(activeOrgId || '').trim();
-  const targetPersonId = String(personId || '').trim();
-
-  for (const rule of STAFF_DELETE_FOOTPRINT_RULES) {
-    if (!rule?.entityType || !rule?.field) continue;
-
-    const query = { page: 1 };
-    if (rule.entityType === 'payRates' && targetPersonId) {
-      query.personId__eq = targetPersonId;
-      if (rule.personRole) query.personRole__eq = String(rule.personRole || '').trim();
-    } else {
-      query[`${rule.field}__eq`] = targetStaffId;
-    }
-    if (safeActiveOrgId) query.orgId__eq = safeActiveOrgId;
-
-    const relatedRows = await dataService.fetchData(rule.entityType, query, reqUser);
-    if (!Array.isArray(relatedRows) || relatedRows.length === 0) continue;
-    const samples = relatedRows.slice(0, STAFF_DELETE_MAX_FOOTPRINT_SAMPLE).map(getRecordIdentity).filter(Boolean);
-    rows.push({
-      entityType: String(rule.entityType || '').trim(),
-      label: String(rule.label || '').trim() || String(rule.entityType || '').trim(),
-      count: relatedRows.length,
-      samples
-    });
-  }
-
-  return rows;
 }
 
 function logStaffDeleteAuditEvent(level, payload) {
@@ -162,7 +99,10 @@ async function purgeLinkedStaffAccount(staff, reqUser, txContext, outcome, warni
   }
 
   const accountSnapshotClone = JSON.parse(JSON.stringify(accountSnapshot));
-  await dataService.purgeData('schoolAccounts', linkedAccountId, reqUser, { transactionContext: txContext });
+  await dataService.purgeData('schoolAccounts', linkedAccountId, reqUser, {
+    transactionContext: txContext,
+    skipDeletionGuard: true
+  });
 
   if (txContext) {
     txContext.addCompensation(async () => {
@@ -918,36 +858,16 @@ exports.deleteStaff = async (req, res) => {
     if (!staff) throw new Error('Staff not found.');
     assertStaffOrgAccess(staff, activeOrgId, req.user);
 
-    const footprint = await collectStaffFootprint(staff, staff?.personId, activeOrgId, req.user);
     const person = staff?.personId
       ? await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: staff.personId })
       : null;
     const staffDisplayName = buildStaffDisplayName(staff, person);
-    if (footprint.length > 0) {
-      idempotencyGuardService.failGuard(guardKey);
-      const detailPayload = {
-        staffId: toPublicId(staff?.id),
-        personId: toPublicId(staff?.personId),
-        footprint
-      };
-      const payloadOut = {
-        status: 'error',
-        code: 'STAFF_DELETE_BLOCKED',
-        message: buildFootprintBlockedMessage(staffDisplayName, footprint),
-        details: detailPayload,
-        data: detailPayload
-      };
-      if (isAjax(req)) return res.status(409).json(payloadOut);
-      return res.status(409).render('error', {
-        title: 'Delete blocked',
-        statusCode: 409,
-        code: payloadOut.code,
-        error: new Error(payloadOut.message),
-        message: payloadOut.message,
-        details: payloadOut.details,
-        user: req.user
-      });
-    }
+    await schoolDeletionGuardService.assertCanDelete({
+      entityKey: 'staff',
+      id: staff.id,
+      orgId: activeOrgId,
+      reqUser: req.user
+    });
 
     txContext = createTransactionContext({
       name: 'staff_delete',
@@ -997,7 +917,10 @@ exports.deleteStaff = async (req, res) => {
     }
 
     await purgeLinkedStaffAccount(staff, req.user, txContext, removed, removed.warnings);
-    await dataService.purgeData('staff', staff.id, req.user, { transactionContext: txContext });
+    await dataService.purgeData('staff', staff.id, req.user, {
+      transactionContext: txContext,
+      skipDeletionGuard: true
+    });
     if (txContext) {
       txContext.addCompensation(async () => {
         await dataService.addData('staff', staffSnapshot, req.user, { transactionContext: txContext });
@@ -1012,7 +935,7 @@ exports.deleteStaff = async (req, res) => {
       outcome: 'deleted',
       removedRole: removed.removedRole,
       removedSchoolAccount: removed.removedSchoolAccount,
-      footprintCount: footprint.length
+      footprintCount: 0
     });
 
     const payloadOut = {
@@ -1033,6 +956,9 @@ exports.deleteStaff = async (req, res) => {
     res.redirect('/school/staff');
   } catch (error) {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    if (schoolDeletionGuardService.isDeleteBlockedError(error)) {
+      return schoolDeletionGuardService.respondDeleteBlocked(req, res, error.preview);
+    }
     if (txContext) {
       await txContext.rollback({ flow: 'staff_delete', reason: error.message || 'Staff delete failed' });
       logStaffDeleteAuditEvent('error', {

@@ -218,7 +218,6 @@ exports.deleteDepartment = async (req, res) => {
         if (!existingDepartment) throw new Error('Department not found.');
         assertDepartmentOrgAccess(existingDepartment, activeOrgId, req.user);
         
-        // Here you could add logic to check if subjects are currently using this department before deleting
         await dataService.deleteData('departments', req.params.id, req.user);
         const payloadOut = { status: 'success', message: 'Department deleted successfully.' };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);

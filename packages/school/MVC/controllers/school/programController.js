@@ -17,6 +17,7 @@ const adminChekersService = requireCoreModule('MVC/services/adminChekersService'
 const postingPolicyService = require('../../services/school/postingPolicyService');
 const programTransactionService = require('../../services/school/programTransactionService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
+const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const {
   getActiveOrgIdOrThrow: getActiveOrgIdOrThrowShared,
@@ -603,7 +604,6 @@ exports.deleteProgram = async (req, res) => {
     res.redirect('/school/programs');
   } catch (error) {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
-    if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
-    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+    return respondSchoolDeleteError(req, res, error, { user: req.user });
   }
 };

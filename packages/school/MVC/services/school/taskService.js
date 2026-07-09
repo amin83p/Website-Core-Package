@@ -1,4 +1,5 @@
 const schoolRepositories = require('../../repositories/school');
+const schoolDataService = require('./schoolDataService');
 const taskModel = require('../../models/school/taskModel');
 const personDisplayNameService = require('./personDisplayNameService');
 const taskRoutingRuleService = require('./taskRoutingRuleService');
@@ -536,7 +537,7 @@ async function deleteSourceTask(input = {}, reqUser = null) {
   if (!existing) return false;
   const row = await getTaskById(existing.id, reqUser);
   if (!row) return false;
-  const removed = await schoolRepositories.tasks.remove(existing.id, normalizeQueryScope(reqUser));
+  const removed = await schoolDataService.deleteData('tasks', existing.id, reqUser, { skipDeletionGuard: true });
   return removed !== false;
 }
 
@@ -548,7 +549,7 @@ async function deleteTask(reqUser, id) {
     error.statusCode = 404;
     throw error;
   }
-  const removed = await schoolRepositories.tasks.remove(existing.id, normalizeQueryScope(reqUser));
+  const removed = await schoolDataService.deleteData('tasks', existing.id, reqUser);
   if (removed === false) {
     const error = new Error('Task could not be deleted.');
     error.statusCode = 404;

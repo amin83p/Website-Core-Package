@@ -1,6 +1,7 @@
 // MVC/controllers/school/schoolAccountController.js
 const dataService = require('../../services/school/schoolDataService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
+const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
@@ -308,17 +309,6 @@ exports.deleteAccount = async (req, res) => {
     if (!existing) throw new Error('Account not found.');
     assertAccountOrgAccess(existing, activeOrgId, req.user);
 
-    const ownerConflicts = await schoolAccountDomainService.findAccountOwnerConflicts(req.params.id, req.user, routeAccess(req));
-    if (ownerConflicts.length) {
-      const ownerLabel = ownerConflicts
-        .map((o) => `${String(o.type || '').toUpperCase()}: ${o.id} (${o.status})`)
-        .join(', ');
-      throw new Error(
-        `This account has owner linkage (${ownerLabel}).<br>` +
-        `Please archive/recover it from the owner screen instead of the Accounts section.`
-      );
-    }
-
     await dataService.deleteData('schoolAccounts', req.params.id, req.user);
     const payloadOut = {
       status: 'success',
@@ -330,6 +320,9 @@ exports.deleteAccount = async (req, res) => {
     res.redirect('/school/accounts');
   } catch (error) {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    if (schoolDeletionGuardService.isDeleteBlockedError(error)) {
+      return schoolDeletionGuardService.respondDeleteBlocked(req, res, error.preview);
+    }
     if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
     res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
   }

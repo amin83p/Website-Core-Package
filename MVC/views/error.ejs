@@ -8,6 +8,22 @@
   const isAccessNeeded = Number(pageStatusCode) === 403
     || /access\s+(denied|needed|required)|do not have access|permission/i.test(combinedAccessText);
   const cleanAccessReason = String(accessData.reason || pageMessage || 'This area is protected.').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const deleteBlockedPreview = (typeof preview !== 'undefined' && preview && typeof preview === 'object')
+    ? preview
+    : ((typeof details !== 'undefined' && details && typeof details === 'object' && Array.isArray(details.blockers))
+      ? details
+      : ((typeof error !== 'undefined' && error && error.preview && typeof error.preview === 'object') ? error.preview : null));
+  const deleteBlockedCode = String(
+    (typeof code !== 'undefined' && code)
+      || (typeof error !== 'undefined' && error && error.code)
+      || ''
+  ).trim();
+  const isDeleteBlocked = deleteBlockedCode === 'DELETE_BLOCKED'
+    || (deleteBlockedPreview && deleteBlockedPreview.canDelete === false && Array.isArray(deleteBlockedPreview.blockers) && deleteBlockedPreview.blockers.length > 0);
+  const deleteBlockedLabel = deleteBlockedPreview
+    ? String(deleteBlockedPreview.label || deleteBlockedPreview.id || 'This record').trim()
+    : '';
+  const deleteBlockedStatusCode = isDeleteBlocked ? 409 : pageStatusCode;
   const requestedPath = String(accessData.path || '').trim();
   const requestedSection = String(accessData.sectionId || (Array.isArray(accessData.sectionIds) ? accessData.sectionIds.join(', ') : '') || '').trim();
   const requestedOperation = String(accessData.operationId || '').trim();
@@ -576,6 +592,186 @@
   });
 })();
 </script>
+<% } else if (isDeleteBlocked) { %>
+<div class="container py-5 delete-blocked-page">
+  <div class="delete-blocked-shell">
+    <div class="dash-hero mb-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+      <div>
+        <h1 class="page-heading size-lg mb-1 text-warning-emphasis">Delete blocked</h1>
+        <div class="text-muted" style="font-size:1.05rem;">
+          This record cannot be removed until related references are resolved.
+        </div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <% if (user) { %>
+          <a href="/dashboard" class="btn btn-primary btn-filled btn-md">
+            <i class="bi bi-house-door me-1"></i> Dashboard
+          </a>
+        <% } %>
+        <button type="button" onclick="history.back()" class="btn btn-outline-secondary btn-md">
+          Go Back
+        </button>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <div class="module-card h-100 d-flex flex-column justify-content-center text-center p-5">
+          <div class="module-accent"></div>
+          <div class="mb-3 text-warning opacity-75">
+            <i class="bi bi-shield-exclamation" style="font-size: 4rem;"></i>
+          </div>
+          <h2 class="display-4 fw-bold text-warning-emphasis mb-0"><%= deleteBlockedStatusCode %></h2>
+          <div class="text-muted text-uppercase fw-bold small letter-spacing-1">References Found</div>
+        </div>
+      </div>
+
+      <div class="col-lg-8">
+        <div class="module-card h-100">
+          <div class="module-accent"></div>
+          <%- include('partials/deleteBlockedDetails', { preview: deleteBlockedPreview }) %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .delete-blocked-page {
+    --delete-ink: #182235;
+    --delete-muted: #667085;
+    --delete-line: #e7edf6;
+    --delete-soft: #fff8eb;
+    --delete-warn: #d97706;
+    --delete-warn-deep: #92400e;
+  }
+
+  .delete-blocked-shell {
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+
+  .delete-blocked-summary {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 1.1rem 1.15rem;
+    border: 1px solid rgba(217, 119, 6, 0.18);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(255, 247, 237, 0.96));
+  }
+
+  .delete-blocked-summary-icon {
+    width: 3rem;
+    height: 3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    box-shadow: 0 12px 24px rgba(217, 119, 6, 0.22);
+    font-size: 1.35rem;
+  }
+
+  .delete-blocked-summary-kicker {
+    color: var(--delete-warn-deep);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+  }
+
+  .delete-blocked-list {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .delete-blocked-item {
+    border: 1px solid var(--delete-line);
+    border-radius: 1rem;
+    background: #ffffff;
+    box-shadow: 0 10px 24px rgba(24, 34, 53, 0.04);
+    overflow: hidden;
+  }
+
+  .delete-blocked-item-error {
+    border-left: 4px solid #dc3545;
+  }
+
+  .delete-blocked-item-warning {
+    border-left: 4px solid #f59e0b;
+  }
+
+  .delete-blocked-item-header {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+    padding: 1rem 1rem 0.75rem;
+  }
+
+  .delete-blocked-item-index {
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    color: var(--delete-warn-deep);
+    background: rgba(245, 158, 11, 0.14);
+    font-weight: 800;
+    font-size: 0.9rem;
+  }
+
+  .delete-blocked-count-badge {
+    color: var(--delete-warn-deep);
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(217, 119, 6, 0.18);
+  }
+
+  .delete-blocked-hint {
+    display: flex;
+    gap: 0.65rem;
+    align-items: flex-start;
+    margin: 0 1rem 0.9rem;
+    padding: 0.8rem 0.9rem;
+    border-radius: 0.85rem;
+    color: #334155;
+    background: var(--delete-soft);
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .delete-blocked-hint i {
+    color: var(--delete-warn);
+    margin-top: 0.15rem;
+  }
+
+  .delete-blocked-samples {
+    padding: 0 1rem 1rem;
+    border-top: 1px dashed var(--delete-line);
+    margin-top: 0.15rem;
+    padding-top: 0.85rem;
+  }
+
+  .delete-blocked-samples ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0;
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .delete-blocked-samples li {
+    padding: 0.55rem 0.7rem;
+    border: 1px solid #edf2f7;
+    border-radius: 0.7rem;
+    background: #fbfdff;
+  }
+</style>
 <% } else { %>
 <div class="container py-5">
 

@@ -62,6 +62,7 @@ router.use('/exams', require('./examRoutes'));
 router.use('/leave-requests', require('./leaveRequestRoutes'));
 router.use('/tasks', require('./taskRoutes'));
 router.use('/withdrawal', require('./withdrawalRoutes'));
+router.use('/', require('./deletionGuardRoutes'));
 router.use('/', require('./schoolRoutes'));
 
 module.exports = router;

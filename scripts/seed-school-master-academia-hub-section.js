@@ -125,11 +125,34 @@ function mergeOperations(existingOps = []) {
   return Array.from(byId.values());
 }
 
+function hubNamePattern() {
+  return new RegExp(`^(${escapeRegex(SECTION_NAME)}|${escapeRegex(LEGACY_SECTION_NAME)})$`, 'i');
+}
+
+async function dedupeHubSections(sections) {
+  const matches = await sections.find({ name: { $regex: hubNamePattern() } }).toArray();
+  if (!matches.length) return null;
+  if (matches.length === 1) return matches[0];
+
+  const keeper = matches.find((row) => String(row?.id || '').trim() === SECTION_ID)
+    || matches.find((row) => String(row?.name || '').trim().toUpperCase() === SECTION_NAME)
+    || matches[0];
+  const duplicateIds = matches
+    .filter((row) => String(row?._id || '') !== String(keeper?._id || ''))
+    .map((row) => row._id);
+
+  if (duplicateIds.length) {
+    await sections.deleteMany({ _id: { $in: duplicateIds } });
+    console.log(`Removed ${duplicateIds.length} duplicate ${SECTION_NAME} section document(s).`);
+  }
+  return keeper;
+}
+
 async function upsertSection(sections) {
+  await dedupeHubSections(sections);
   const existing =
     await sections.findOne({ id: SECTION_ID })
-    || await sections.findOne({ name: { $regex: new RegExp(`^${escapeRegex(SECTION_NAME)}$`, 'i') } })
-    || await sections.findOne({ name: { $regex: new RegExp(`^${escapeRegex(LEGACY_SECTION_NAME)}$`, 'i') } });
+    || await sections.findOne({ name: { $regex: hubNamePattern() } });
   const next = {
     ...SECTION_DOC,
     id: String(existing?.id || SECTION_DOC.id),
@@ -183,15 +206,16 @@ async function linkUnderParent(sections, childSection) {
   }
   const childId = String(childSection?.id || '').trim();
   const refs = Array.isArray(parent.subsections) ? parent.subsections : [];
-  const normalized = refs
-    .map((row) => ({ id: String(row?.id || row || '').trim() }))
-    .filter((row) => row.id && row.id !== childId);
-  normalized.push({ id: childId });
+  const alreadyLinked = refs.some((row) => String(row?.id || row || '').trim() === childId);
+  if (alreadyLinked) {
+    console.log(`${SECTION_NAME} (${childId}) is already linked under ${PARENT_SECTION.name}.`);
+    return;
+  }
   await sections.updateOne(
     { _id: parent._id },
     {
+      $push: { subsections: { id: childId } },
       $set: {
-        subsections: normalized,
         'audit.lastUpdateUser': ACTOR,
         'audit.lastUpdateDateTime': NOW
       }

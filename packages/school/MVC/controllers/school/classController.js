@@ -30,6 +30,7 @@ const sessionStatusPolicyService = require('../../services/school/sessionStatusP
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
+const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
@@ -3196,17 +3197,9 @@ async function deleteClass(req, res) {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Class delete is already in progress. Please wait.')) return;
 
-    await schoolDependencyService.assertClassHasNoLockedSessions(classId, req.user, classData.title || 'This class');
-    await schoolDependencyService.assertClassSessionsNotReferencedByApprovedTimesheets({
-      classId,
-      orgId: activeOrgId,
-      label: classData.title || 'This class',
-      reqUser: req.user
-    });
-
     await schoolDataService.deleteData('classes', req.params.id, req.user);
     const folderCleanup = await cleanupClassRelatedFolders(classData);
-    await indexService.rebuildIndexesForClass(req.params.id); // Fixed ID reference
+    await indexService.rebuildIndexesForClass(req.params.id);
     const warningCount = Array.isArray(folderCleanup?.failed) ? folderCleanup.failed.length : 0;
     const payloadOut = {
         status: warningCount ? 'warning' : 'success',
@@ -4121,12 +4114,24 @@ async function saveSession(req, res) {
         let removedMakeupCount = 0;
         if (linkedMakeupRows.length && forceRemoveMakeups) {
             const removedIds = new Set(linkedMakeupRows.map((row) => toPublicId(row.sessionId)).filter(Boolean));
+            const activeOrgId = getActiveOrgIdOrThrow(req.user);
             for (let idx = sessions.length - 1; idx >= 0; idx -= 1) {
                 const row = sessions[idx];
                 if (idx === sessionIndex) continue;
                 if (row?.makeup?.isMakeup !== true) continue;
                 if (!idsEqual(row?.makeup?.originalClassId, classId)) continue;
                 if (!idsEqual(row?.makeup?.originalSessionId, sessionId)) continue;
+                const makeupSessionId = toPublicId(row?.sessionId || row?.id);
+                if (makeupSessionId) {
+                    // eslint-disable-next-line no-await-in-loop
+                    await schoolDeletionGuardService.assertCanDelete({
+                        entityKey: 'session',
+                        id: makeupSessionId,
+                        orgId: activeOrgId,
+                        reqUser: req.user,
+                        context: { classId }
+                    });
+                }
                 sessions.splice(idx, 1);
                 removedMakeupCount += 1;
             }

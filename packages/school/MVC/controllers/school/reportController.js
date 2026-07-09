@@ -13,7 +13,6 @@ const reportIntegrityService = require('../../services/school/reportIntegritySer
 const reportViewService = require('../../services/school/reportViewService');
 const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
-const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const { getPrefillValue } = require('../../services/school/reportPrefillKeyUtils');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
@@ -869,14 +868,6 @@ async function deleteAssignment(req, res) {
     const assignment = await schoolDataService.getDataById('reportAssignments', req.params.id, req.user);
     if (!assignment) throw new Error('Assignment not found.');
     const orgId = String(assignment.orgId || req.user?.activeOrgId || '').trim();
-    await schoolDependencyService.assertSourceNotReferenced({
-      orgId,
-      sourceType: 'reportAssignment',
-      sourceRef: { assignmentId: assignment.id },
-      label: `Report assignment "${assignment.title || assignment.id}"`,
-      reqUser: req.user
-    });
-
     await schoolDataService.deleteData('reportAssignments', req.params.id, req.user);
     if (isAjax(req)) return res.json({ status: 'success', message: 'Assignment deleted.' });
     res.redirect('/school/reports/assignments');

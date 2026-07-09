@@ -12,6 +12,12 @@ const classEnrollmentPeriodService = require('./classEnrollmentPeriodService');
 const classCycleService = require('./classCycleService');
 const examBuilderService = require('./examBuilderService');
 
+function getDeletionGuardDeps() {
+  const schoolDeletionGuardService = require('./schoolDeletionGuardService');
+  const { resolveEntityKeyFromRepositoryKey } = require('./schoolDeletionRuleRegistry');
+  return { schoolDeletionGuardService, resolveEntityKeyFromRepositoryKey };
+}
+
 const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   students: { repository: schoolRepositories.students },
   programs: { repository: schoolRepositories.programs },
@@ -208,6 +214,9 @@ const schoolDataService = {
   },
 
   deleteData: async (entityType, id, requestingUser, options = {}) => {
+    // options.skipDeletionGuard — bypass guard for internal maintenance (e.g. executeDelete API path).
+    // options.deletionContext — extra context for composite deletes (e.g. session + classId).
+    // options.orgId — org scope override when requestingUser lacks activeOrgId.
     const normalizedType = String(entityType || '');
     if (normalizedType === 'globalTransactions') {
       throw new Error('Global transactions are immutable. Use status/void/reversal operations.');
@@ -227,6 +236,20 @@ const schoolDataService = {
 
     const config = resolveEntityConfig(entityType);
     if (!config) throw new Error(`Unknown school entity type for delete: ${entityType}`);
+
+    const { schoolDeletionGuardService, resolveEntityKeyFromRepositoryKey } = getDeletionGuardDeps();
+    const entityKey = resolveEntityKeyFromRepositoryKey(normalizedType);
+    if (entityKey && options.skipDeletionGuard !== true) {
+      const orgId = options.orgId || requestingUser?.activeOrgId;
+      await schoolDeletionGuardService.assertCanDelete({
+        entityKey,
+        id,
+        orgId,
+        reqUser: requestingUser,
+        context: options.deletionContext || {}
+      });
+    }
+
     const result = await config.repository.remove(id, options);
     recordTransactionOperation(options, {
       type: 'delete',
@@ -237,10 +260,24 @@ const schoolDataService = {
   },
 
   purgeData: async (entityType, id, requestingUser, options = {}) => {
+    // options.skipDeletionGuard — bypass guard when controller already ran assertCanDelete.
     const normalizedType = String(entityType || '');
     const config = resolveEntityConfig(entityType);
     if (!config) throw new Error(`Unknown school entity type for purge: ${entityType}`);
     if (!toPublicId(id)) throw new Error('Purge requires a valid id.');
+
+    const { schoolDeletionGuardService, resolveEntityKeyFromRepositoryKey } = getDeletionGuardDeps();
+    const entityKey = resolveEntityKeyFromRepositoryKey(normalizedType);
+    if (entityKey && options.skipDeletionGuard !== true) {
+      const orgId = options.orgId || requestingUser?.activeOrgId;
+      await schoolDeletionGuardService.assertCanDelete({
+        entityKey,
+        id,
+        orgId,
+        reqUser: requestingUser,
+        context: options.deletionContext || {}
+      });
+    }
 
     const purgeFn = config.repository?.purgeById;
     if (typeof purgeFn === 'function') {
