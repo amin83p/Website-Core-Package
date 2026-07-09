@@ -62,6 +62,7 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
+const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
 
 function isSafeChildPath(basePath, targetPath) {
     const normalizedBase = path.resolve(basePath);
@@ -2463,15 +2464,19 @@ function resetRosterForMakeup(roster = []) {
 }
 
 function resetGradebooksForMakeup(gradebooks = []) {
-    return (Array.isArray(gradebooks) ? gradebooks : []).map((row, index) => ({
-        id: String(row?.id || `GB_${Date.now()}_${index}`).trim(),
-        name: String(row?.name || '').trim(),
-        skillFocus: String(row?.skillFocus || '').trim(),
-        totalScore: Number(row?.totalScore || 0),
-        activityContent: String(row?.activityContent || ''),
-        includeInGradeCalculation: Boolean(row?.includeInGradeCalculation),
-        scores: {}
-    }));
+    return (Array.isArray(gradebooks) ? gradebooks : []).map((row, index) => {
+        const { skills, skillFocus } = gradebookSkillCatalogService.normalizeGradebookActivitySkills(row);
+        return {
+            id: String(row?.id || `GB_${Date.now()}_${index}`).trim(),
+            name: String(row?.name || '').trim(),
+            skills,
+            skillFocus,
+            totalScore: Number(row?.totalScore || 0),
+            activityContent: String(row?.activityContent || ''),
+            includeInGradeCalculation: Boolean(row?.includeInGradeCalculation),
+            scores: {}
+        };
+    });
 }
 
 async function assertCanCreateMakeupSession(req, classData, originalSession) {
@@ -3721,6 +3726,7 @@ async function manageSession(req, res) {
             conductRatingScaleResolved,
             sessionStudentCases,
             studentCaseDetailPresets: getPresetConfig(),
+            gradebookSkills: gradebookSkillCatalogService.listGradebookSkills(),
             includeModal: true,  
             user: req.user,
             actionStateId: req.actionStateId
@@ -4393,10 +4399,12 @@ async function saveSessionGradebooks(req, res) {
                 }
             }
 
+            const { skills, skillFocus } = gradebookSkillCatalogService.normalizeGradebookActivitySkills(gb);
             normalized.push({
                 id: gbId,
                 name: name.slice(0, 200),
-                skillFocus: String(gb.skillFocus || '').trim().slice(0, 500),
+                skills,
+                skillFocus,
                 totalScore,
                 activityContent: String(gb.activityContent || ''),
                 includeInGradeCalculation: Boolean(gb.includeInGradeCalculation),

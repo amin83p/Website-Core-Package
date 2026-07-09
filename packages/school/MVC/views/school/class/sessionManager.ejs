@@ -779,6 +779,30 @@
         color: #1d4ed8;
         background: #f1f5f9 !important;
     }
+    .gb-skills-picker .form-check {
+        min-height: 1.35rem;
+        margin-bottom: 0;
+        padding: 0.2rem 0 0.2rem 1.65em;
+    }
+    .gb-skills-picker .form-check-label {
+        font-size: 0.88rem;
+        line-height: 1.25;
+        cursor: pointer;
+    }
+    .gb-skills-picker .form-check-input {
+        margin-top: 0.15em;
+    }
+    .session-gradebook-card .gb-skill-chips {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        max-width: 100%;
+    }
+    .session-gradebook-card .gb-skill-chip {
+        font-size: 0.72rem;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+    }
     .roster-row.attendance-late-missing-minutes {
         outline: 2px solid rgba(245, 158, 11, 0.55);
         outline-offset: -2px;
@@ -1667,8 +1691,20 @@
                     <input type="text" class="form-control" id="gbModalName" maxlength="200" placeholder="e.g. Unit 3 quiz" autocomplete="off">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold" for="gbModalSkill">Skill focus</label>
-                    <input type="text" class="form-control" id="gbModalSkill" maxlength="500" placeholder="e.g. Reading comprehension" autocomplete="off">
+                    <div class="form-label fw-bold">Skills</div>
+                    <div id="gbModalSkillsPicker" class="gb-skills-picker border rounded p-2 bg-light">
+                        <div class="row g-1 g-md-2">
+                            <% (gradebookSkills || []).forEach((skill) => { %>
+                                <div class="col-6 col-lg-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input gb-skill-checkbox" type="checkbox" value="<%= skill.id %>" id="gbSkill_<%= skill.id %>">
+                                        <label class="form-check-label" for="gbSkill_<%= skill.id %>"><%= skill.label %></label>
+                                    </div>
+                                </div>
+                            <% }); %>
+                        </div>
+                    </div>
+                    <div class="form-text">Optional. Select one or more skills this activity targets.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold" for="gbModalTotal">Total score (points)</label>
@@ -4136,6 +4172,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gbClassId = sessionManagerClassId;
     const gbSessionId = sessionManagerSessionId;
     const gradebookRoster = <%- jsonForScript((session.roster || []).map((r) => ({ personId: String(r.personId), name: r.name || 'Student' }))) %>;
+    const gradebookSkillsCatalog = <%- jsonForScript(gradebookSkills || []) %>;
     let gradebooksState = [];
     const gbCollapsedIds = new Set();
 
@@ -4160,6 +4197,75 @@ document.addEventListener('DOMContentLoaded', () => {
         return status === 'absent' || status === 'not_applicable';
     }
 
+    function gbNormalizeSkillToken(value) {
+        return String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
+    }
+
+    const gbSkillIdSet = new Set(gradebookSkillsCatalog.map((skill) => skill.id));
+    const gbSkillLabelById = new Map(gradebookSkillsCatalog.map((skill) => [skill.id, skill.label]));
+
+    function gbMatchSkillIdsFromLegacyText(skillFocus) {
+        const text = String(skillFocus || '').trim();
+        if (!text) return [];
+        const matched = new Set();
+        const lower = text.toLowerCase();
+        gradebookSkillsCatalog.forEach((skill) => {
+            const label = String(skill.label || '').trim().toLowerCase();
+            if (label && lower.includes(label)) matched.add(skill.id);
+        });
+        if (!matched.size) {
+            text.split(/[,;/|]+/).forEach((part) => {
+                const token = gbNormalizeSkillToken(part);
+                if (gbSkillIdSet.has(token)) matched.add(token);
+            });
+        }
+        return [...matched].filter((id) => gbSkillIdSet.has(id));
+    }
+
+    function gbNormalizeSkillIds(input) {
+        const source = Array.isArray(input) ? input : (input ? [input] : []);
+        const seen = new Set();
+        const output = [];
+        source.forEach((value) => {
+            const token = gbNormalizeSkillToken(value);
+            if (!token || !gbSkillIdSet.has(token) || seen.has(token)) return;
+            seen.add(token);
+            output.push(token);
+        });
+        return output;
+    }
+
+    function gbFormatSkillLabels(skillIds) {
+        return gbNormalizeSkillIds(skillIds)
+            .map((id) => gbSkillLabelById.get(id) || id)
+            .join(', ')
+            .slice(0, 500);
+    }
+
+    function gbGetModalSkills() {
+        return gbNormalizeSkillIds(
+            Array.from(document.querySelectorAll('#gbModalSkillsPicker .gb-skill-checkbox:checked'))
+                .map((el) => el.value)
+        );
+    }
+
+    function gbSetModalSkills(skillIds) {
+        const selected = new Set(gbNormalizeSkillIds(skillIds));
+        document.querySelectorAll('#gbModalSkillsPicker .gb-skill-checkbox').forEach((el) => {
+            el.checked = selected.has(el.value);
+        });
+    }
+
+    function gbRenderSkillChips(skillIds) {
+        const ids = gbNormalizeSkillIds(skillIds);
+        if (!ids.length) return '';
+        return `<span class="gb-skill-chips">${ids.map((id) => `<span class="badge bg-light text-dark border gb-skill-chip">${gbEscapeHtml(gbSkillLabelById.get(id) || id)}</span>`).join('')}</span>`;
+    }
+
     function gbNormalizeIncoming(list) {
         const arr = Array.isArray(list) ? list : [];
         return arr.map((gb) => {
@@ -4182,10 +4288,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     scores[pid] = (v === null || Number.isNaN(v)) ? null : v;
                 });
             }
+            const skills = gbNormalizeSkillIds(gb.skills || gbMatchSkillIdsFromLegacyText(gb.skillFocus));
             return {
                 id: String(gb.id || '').trim() || `gb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
                 name: String(gb.name || '').trim(),
-                skillFocus: String(gb.skillFocus || '').trim(),
+                skills,
+                skillFocus: gbFormatSkillLabels(skills) || String(gb.skillFocus || '').trim(),
                 totalScore: Number.isFinite(totalScore) && totalScore > 0 ? totalScore : 10,
                 activityContent: String(gb.activityContent || ''),
                 includeInGradeCalculation: gb.includeInGradeCalculation !== false,
@@ -4299,7 +4407,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                         <div class="flex-grow-1 min-w-0">
                             <div class="fw-bold text-primary">${gbEscapeHtml(gb.name || 'Untitled')}</div>
-                            <div class="small text-muted mt-1">${gb.skillFocus ? `<span class="me-2"><i class="bi bi-bullseye me-1"></i>${gbEscapeHtml(gb.skillFocus)}</span>` : ''}
+                            <div class="small text-muted mt-1">${gb.skills && gb.skills.length ? `<span class="me-2 d-inline-flex align-items-start gap-1"><i class="bi bi-bullseye me-1 flex-shrink-0 mt-1"></i>${gbRenderSkillChips(gb.skills)}</span>` : ''}
                                 <span class="me-2"><i class="bi bi-calculator me-1"></i>Total: <strong>${total}</strong> pts</span>${incl}
                             </div>
                         </div>
@@ -4488,13 +4596,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const gb = gradebooksState.find((g) => g.id === editId);
             if (!gb) return;
             document.getElementById('gbModalName').value = gb.name || '';
-            document.getElementById('gbModalSkill').value = gb.skillFocus || '';
+            gbSetModalSkills(gb.skills || []);
             document.getElementById('gbModalTotal').value = gb.totalScore || '';
             document.getElementById('gbModalContent').value = gb.activityContent || '';
             document.getElementById('gbModalInclude').checked = gb.includeInGradeCalculation !== false;
         } else {
             document.getElementById('gbModalName').value = '';
-            document.getElementById('gbModalSkill').value = '';
+            gbSetModalSkills([]);
             document.getElementById('gbModalTotal').value = '';
             document.getElementById('gbModalContent').value = '';
             document.getElementById('gbModalInclude').checked = true;
@@ -4507,7 +4615,8 @@ document.addEventListener('DOMContentLoaded', () => {
         gbSyncScoresFromInputs();
         const editId = document.getElementById('gbModalEditId').value.trim();
         const name = document.getElementById('gbModalName').value.trim();
-        const skillFocus = document.getElementById('gbModalSkill').value.trim();
+        const skills = gbGetModalSkills();
+        const skillFocus = gbFormatSkillLabels(skills);
         const totalScore = Number(document.getElementById('gbModalTotal').value);
         const activityContent = document.getElementById('gbModalContent').value;
         const includeInGradeCalculation = document.getElementById('gbModalInclude').checked;
@@ -4530,6 +4639,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!gb) return;
             const oldTotal = Number(gb.totalScore);
             gb.name = name;
+            gb.skills = skills;
             gb.skillFocus = skillFocus;
             gb.totalScore = totalScore;
             gb.activityContent = activityContent;
@@ -4549,6 +4659,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gradebooksState.push({
                 id: `gb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
                 name,
+                skills,
                 skillFocus,
                 totalScore,
                 activityContent,
@@ -4623,12 +4734,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (gbReadOnly) {
         const gbModalName = document.getElementById('gbModalName');
-        const gbModalSkill = document.getElementById('gbModalSkill');
         const gbModalTotal = document.getElementById('gbModalTotal');
         const gbModalContent = document.getElementById('gbModalContent');
         const gbModalInclude = document.getElementById('gbModalInclude');
         if (gbModalName) gbModalName.disabled = true;
-        if (gbModalSkill) gbModalSkill.disabled = true;
+        document.querySelectorAll('#gbModalSkillsPicker .gb-skill-checkbox').forEach((el) => { el.disabled = true; });
         if (gbModalTotal) gbModalTotal.disabled = true;
         if (gbModalContent) gbModalContent.disabled = true;
         if (gbModalInclude) gbModalInclude.disabled = true;

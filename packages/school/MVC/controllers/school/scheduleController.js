@@ -210,6 +210,50 @@ function normalizeScheduleRole(value) {
     return normalized;
 }
 
+const SCHEDULE_SCHOOL_ROLE_LABELS = Object.freeze({
+    teacher: 'Teacher',
+    student: 'Student',
+    staff: 'Staff'
+});
+
+function schoolRoleDisplayLabel(roleToken = '') {
+    return SCHEDULE_SCHOOL_ROLE_LABELS[normalizeScheduleRole(roleToken)] || '';
+}
+
+function getScheduleEventHourCategoryLabels(event = {}) {
+    if (isApprovedLeaveScheduleEvent(event)) return ['Approved Leave'];
+
+    const schoolRoles = new Set();
+    const roleSources = [
+        ...(Array.isArray(event?.roles) ? event.roles : []),
+        event?.role,
+        event?.roleLabel
+    ];
+    roleSources.forEach((value) => {
+        String(value || '')
+            .split('/')
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .forEach((part) => {
+                const label = schoolRoleDisplayLabel(part);
+                if (label) schoolRoles.add(label);
+            });
+    });
+    if (schoolRoles.size) return [...schoolRoles];
+
+    const labels = [];
+    [event?.roleLabel, event?.role].forEach((value) => {
+        String(value || '')
+            .split('/')
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .forEach((label) => {
+                if (label && !labels.includes(label)) labels.push(label);
+            });
+    });
+    return labels.length ? labels : ['Schedule'];
+}
+
 function isApprovedLeaveScheduleEvent(event) {
     return [
         event?.eventType,
@@ -1384,15 +1428,17 @@ async function getPersonSchedule(req, res) {
 
         const events = filterEventsWithCasesIfRequested(filterScheduleEventsForRole(personResult?.events, effectiveRole), req.query).map((event) => {
             const isLeaveEvent = isApprovedLeaveScheduleEvent(event);
-            return {
+            const mapped = {
                 ...event,
                 role: isLeaveEvent ? 'Leave' : (event?.roles?.[0] || event?.role || 'Participant'),
+                hourCategoryLabels: getScheduleEventHourCategoryLabels(event),
                 detailsUrl: String(event?.detailsUrl || '').trim() || (
                     event.sessionId
                         ? `/school/classes/${encodeURIComponent(event.classId)}/sessions/${encodeURIComponent(event.sessionId)}`
                         : ''
                 )
             };
+            return mapped;
         });
 
         res.json({ status: 'success', events, statusMeta, viewerScheduleAccess, availableRoles, selectedRole: effectiveRole });
@@ -1614,6 +1660,7 @@ module.exports = {
     buildSchoolSchedulePersonPickerRows,
     buildEventsForPersonAndRange,
     filterScheduleEventsForRole,
-    summarizeTimesheetHoursForEvents
+    summarizeTimesheetHoursForEvents,
+    getScheduleEventHourCategoryLabels
 };
 

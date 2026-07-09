@@ -496,7 +496,13 @@ test('buildReportDocxCollections builds students, sessions, and N/A-aware attend
       roster: [
         { personId: 'STUDENT-PERSON-1', attendance: 'present' },
         { personId: 'STUDENT-PERSON-2', attendance: 'not_applicable' }
-      ]
+      ],
+      gradebooks: [{
+        totalScore: 10,
+        includeInGradeCalculation: true,
+        skills: ['writing'],
+        scores: { 'STUDENT-PERSON-1': 7, 'STUDENT-PERSON-2': 5 }
+      }]
     },
     {
       sessionId: 'SES-2',
@@ -577,6 +583,15 @@ test('buildReportDocxCollections builds students, sessions, and N/A-aware attend
               collections.student_attendance_rows.find((row) => row.student_id === 'STUDENT-PERSON-2' && row.session_id === 'SES-2').attendance_status_label,
               'Absent'
             );
+            assert.ok(Array.isArray(collections.gradebook_skill_rows));
+            const adaWriting = collections.gradebook_skill_rows.find(
+              (row) => row.student_id === 'STUDENT-PERSON-1' && row.skill_id === 'writing'
+            );
+            assert.ok(adaWriting);
+            assert.equal(adaWriting.skill_name, 'Writing');
+            assert.equal(adaWriting.activity_count, 1);
+            assert.equal(adaWriting.avg_percent, 70);
+            assert.equal(adaWriting.points_earned, 7);
           });
         });
       });
@@ -605,7 +620,12 @@ test('report template prefill catalog keys are all produced with correct represe
         { personId: 'STUDENT-PERSON-1', attendance: 'present' },
         { personId: 'STUDENT-PERSON-2', attendance: 'present' }
       ],
-      gradebooks: [{ totalScore: 10, includeInGradeCalculation: true, scores: { 'STUDENT-PERSON-1': 8, 'STUDENT-PERSON-2': 10 } }]
+      gradebooks: [{
+        totalScore: 10,
+        includeInGradeCalculation: true,
+        skills: ['listening', 'reading'],
+        scores: { 'STUDENT-PERSON-1': 8, 'STUDENT-PERSON-2': 10 }
+      }]
     },
     {
       sessionId: 'SES-2',
@@ -797,6 +817,20 @@ test('report template prefill catalog keys are all produced with correct represe
           assert.equal(snapshot.student_gradebook_period_avg_percent, 65);
           assert.equal(snapshot.student_gradebook_period_points_earned, 18);
           assert.equal(snapshot.student_gradebook_period_points_possible, 30);
+
+          assert.equal(snapshot.student_gradebook_skill_listening_activity_count, 1);
+          assert.equal(snapshot.student_gradebook_skill_listening_avg_percent, 80);
+          assert.equal(snapshot.student_gradebook_skill_listening_min_percent, 80);
+          assert.equal(snapshot.student_gradebook_skill_listening_max_percent, 80);
+          assert.equal(snapshot.student_gradebook_skill_listening_points_earned, 8);
+          assert.equal(snapshot.student_gradebook_skill_listening_points_possible, 10);
+          assert.equal(snapshot.student_gradebook_skill_reading_activity_count, 1);
+          assert.equal(snapshot.student_gradebook_skill_reading_avg_percent, 80);
+          assert.equal(snapshot.class_gradebook_skill_listening_activity_count, 2);
+          assert.equal(snapshot.class_gradebook_skill_listening_avg_percent, 90);
+          assert.equal(snapshot.class_gradebook_skill_listening_min_percent, 80);
+          assert.equal(snapshot.class_gradebook_skill_listening_max_percent, 100);
+          assert.equal(snapshot.class_gradebook_skill_reading_points_earned, 18);
 
           assert.equal(snapshot.class_exam_period_assignment_count, 2);
           assert.equal(snapshot.class_exam_period_graded_count, 1);

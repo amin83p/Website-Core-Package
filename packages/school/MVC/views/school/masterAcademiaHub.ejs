@@ -3710,8 +3710,29 @@
     (Array.isArray(events) ? events : []).forEach(function (event) {
       const duration = Number(event?.duration || 0);
       if (!Number.isFinite(duration) || duration <= 0) return;
-      const label = isHubScheduleLeaveEvent(event) ? 'Approved Leave' : String(event?.role || event?.roleLabel || 'Schedule').trim();
-      totals.set(label, Number(totals.get(label) || 0) + duration);
+      const labels = Array.isArray(event?.hourCategoryLabels) && event.hourCategoryLabels.length
+        ? event.hourCategoryLabels
+        : (function () {
+          if (isHubScheduleLeaveEvent(event)) return ['Approved Leave'];
+          const schoolRoles = new Set();
+          [].concat(event?.roles || [], event?.role || '', event?.roleLabel || '').forEach(function (value) {
+            String(value || '').split('/').map(function (part) { return part.trim(); }).filter(Boolean).forEach(function (part) {
+              const normalized = String(part || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+              const label = normalized === 'teacher' || normalized.indexOf('school_teacher') >= 0
+                ? 'Teacher'
+                : (normalized === 'student' || normalized.indexOf('school_student') >= 0
+                  ? 'Student'
+                  : (normalized === 'staff' || normalized.indexOf('school_staff') >= 0 ? 'Staff' : ''));
+              if (label) schoolRoles.add(label);
+            });
+          });
+          if (schoolRoles.size) return Array.from(schoolRoles);
+          const fallback = String(event?.roleLabel || event?.role || 'Schedule').trim();
+          return fallback ? [fallback] : ['Schedule'];
+        })();
+      labels.forEach(function (label) {
+        totals.set(label, Number(totals.get(label) || 0) + duration);
+      });
     });
     if (!person || !totals.size) {
       host.innerHTML = '';

@@ -11,6 +11,7 @@ const reportRuleEngineService = require('./reportRuleEngineService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const { getPrefillValue, normalizePrefillKey } = require('./reportPrefillKeyUtils');
+const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 
 /**
  * PREFILL_CATALOG - Curated list of template variable keys available for report prefill.
@@ -22,6 +23,7 @@ const { getPrefillValue, normalizePrefillKey } = require('./reportPrefillKeyUtil
  *     * each-student-scope reports: Student-specific metrics (e.g., class_attendance_present = Attendance Matrix % for that student)
  * - `studentOnly`: Only available for each-student-scope reports; populated for target student
  * - `gradebookPeriodClass` / `gradebookPeriodStudent`: Period-based grade aggregates
+ * - `gradebookPeriodSkillsClass` / `gradebookPeriodSkillsStudent`: Per-skill grade aggregates in report period
  * - `examPeriodClass` / `examPeriodStudent`: Period-based exam stats
  * 
  * CRITICAL NOTES:
@@ -170,6 +172,75 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_exam_period_total_score', label: 'Student Exam Period Total Score', description: 'Sum of scoreComputed.' }),
     Object.freeze({ key: 'student_exam_period_total_max_score', label: 'Student Exam Period Total Max Score', description: 'Sum of maxScoreComputed.' })
   ])
+});
+
+function buildGradebookSkillPrefillCatalogEntries() {
+  const classEntries = [];
+  const studentEntries = [];
+  const metrics = [
+    {
+      suffix: 'activity_count',
+      label: 'Activities',
+      classDescription: 'Scored gradebook cells tagged with this skill in the report period.',
+      studentDescription: 'Gradebook activities tagged with this skill where the student has a counted score.'
+    },
+    {
+      suffix: 'avg_percent',
+      label: 'Avg %',
+      classDescription: 'Mean percentage over scored, non-absent cells for this skill.',
+      studentDescription: 'Average percent on counted activities for this skill.'
+    },
+    {
+      suffix: 'min_percent',
+      label: 'Min %',
+      classDescription: 'Minimum percentage among scored cells for this skill.',
+      studentDescription: 'Minimum percentage among counted activities for this skill.'
+    },
+    {
+      suffix: 'max_percent',
+      label: 'Max %',
+      classDescription: 'Maximum percentage among scored cells for this skill.',
+      studentDescription: 'Maximum percentage among counted activities for this skill.'
+    },
+    {
+      suffix: 'points_earned',
+      label: 'Points Earned',
+      classDescription: 'Sum of raw scores for this skill in the report period.',
+      studentDescription: 'Sum of raw scores for this skill.'
+    },
+    {
+      suffix: 'points_possible',
+      label: 'Points Possible',
+      classDescription: 'Sum of max points for scored cells tagged with this skill.',
+      studentDescription: 'Sum of max points for counted activities tagged with this skill.'
+    }
+  ];
+  gradebookSkillCatalogService.listGradebookSkills().forEach((skill) => {
+    metrics.forEach((metric) => {
+      classEntries.push(Object.freeze({
+        key: `class_gradebook_skill_${skill.id}_${metric.suffix}`,
+        label: `Class ${skill.label} ${metric.label}`,
+        description: metric.classDescription
+      }));
+      studentEntries.push(Object.freeze({
+        key: `student_gradebook_skill_${skill.id}_${metric.suffix}`,
+        label: `Student ${skill.label} ${metric.label}`,
+        description: metric.studentDescription
+      }));
+    });
+  });
+  return {
+    gradebookPeriodSkillsClass: Object.freeze(classEntries),
+    gradebookPeriodSkillsStudent: Object.freeze(studentEntries)
+  };
+}
+
+const SKILL_PREFILL_CATALOG = buildGradebookSkillPrefillCatalogEntries();
+
+const PREFILL_CATALOG_WITH_SKILLS = Object.freeze({
+  ...PREFILL_CATALOG,
+  gradebookPeriodSkillsClass: SKILL_PREFILL_CATALOG.gradebookPeriodSkillsClass,
+  gradebookPeriodSkillsStudent: SKILL_PREFILL_CATALOG.gradebookPeriodSkillsStudent
 });
 
 function toDateOnly(value) {
@@ -648,27 +719,36 @@ function collectPeriodGradeColumns(periodSessions) {
   const cols = [];
   (Array.isArray(periodSessions) ? periodSessions : []).forEach((ses) => {
     (Array.isArray(ses.gradebooks) ? ses.gradebooks : []).forEach((gb) => {
+      const skills = gradebookSkillCatalogService.normalizeGradebookSkillIds(
+        gb?.skills || gradebookSkillCatalogService.matchSkillIdsFromLegacyText(gb?.skillFocus)
+      );
       cols.push({
         session: ses,
+        sourceKind: 'gradebook',
         totalScore: Number(gb?.totalScore) || 0,
         includeInCalc: gb?.includeInGradeCalculation !== false,
-        scores: gb?.scores
+        scores: gb?.scores,
+        skills
       });
     });
-    (Array.isArray(ses.quizzes) ? ses.quizzes : []).forEach((q, idx) => {
+    (Array.isArray(ses.quizzes) ? ses.quizzes : []).forEach((q) => {
       cols.push({
         session: ses,
+        sourceKind: 'quiz',
         totalScore: Number(q?.totalScore) || 0,
         includeInCalc: q?.includeInGradeCalculation !== false,
-        scores: q?.scores
+        scores: q?.scores,
+        skills: []
       });
     });
-    (Array.isArray(ses.assignments) ? ses.assignments : []).forEach((a, idx) => {
+    (Array.isArray(ses.assignments) ? ses.assignments : []).forEach((a) => {
       cols.push({
         session: ses,
+        sourceKind: 'assignment',
         totalScore: Number(a?.totalScore) || 0,
         includeInCalc: a?.includeInGradeCalculation !== false,
-        scores: a?.scores
+        scores: a?.scores,
+        skills: []
       });
     });
   });
@@ -678,6 +758,100 @@ function collectPeriodGradeColumns(periodSessions) {
 function averageRounded(arr) {
   if (!arr.length) return 0;
   return Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 100) / 100;
+}
+
+function minRounded(arr) {
+  if (!arr.length) return 0;
+  return Math.min(...arr);
+}
+
+function maxRounded(arr) {
+  if (!arr.length) return 0;
+  return Math.max(...arr);
+}
+
+function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId, statusMap = null) {
+  const skills = gradebookSkillCatalogService.listGradebookSkills();
+  const buckets = new Map();
+  skills.forEach((skill) => {
+    buckets.set(skill.id, {
+      classPercents: [],
+      studentPercents: [],
+      classEarned: 0,
+      classPossible: 0,
+      studentEarned: 0,
+      studentPossible: 0,
+      studentActivityCount: 0
+    });
+  });
+
+  const cols = collectPeriodGradeColumns(periodSessions)
+    .filter((col) => col.sourceKind === 'gradebook' && Array.isArray(col.skills) && col.skills.length);
+  const targetStudent = toPublicId(studentPersonId);
+  const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
+
+  cols.forEach((col) => {
+    const ses = col.session;
+    const roster = Array.isArray(ses?.roster) ? ses.roster : [];
+    roster.forEach((r) => {
+      const pid = toPublicId(r?.personId);
+      if (!pid) return;
+      const forceNotApplicable = sessionForcesNotApplicableAttendance(ses, effectiveStatusMap);
+      const att = forceNotApplicable ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : rosterAttendanceLower(ses, pid);
+      const absent = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+      const raw = absent ? null : getScoreFromScoresMap(col.scores, pid);
+      const total = col.totalScore > 0 ? col.totalScore : 0;
+      let pct = null;
+      if (!absent && raw != null && total > 0) {
+        pct = Math.round((raw / total) * 1000) / 10;
+      }
+      if (!col.includeInCalc || absent || raw == null || total <= 0) return;
+
+      col.skills.forEach((skillId) => {
+        const bucket = buckets.get(skillId);
+        if (!bucket) return;
+        bucket.classPercents.push(pct);
+        bucket.classEarned += raw;
+        bucket.classPossible += total;
+        if (targetStudent && idsEqual(pid, targetStudent)) {
+          bucket.studentActivityCount += 1;
+          bucket.studentPercents.push(pct);
+          bucket.studentEarned += raw;
+          bucket.studentPossible += total;
+        }
+      });
+    });
+  });
+
+  const flatMap = {};
+  const skillRows = [];
+  skills.forEach((skill) => {
+    const bucket = buckets.get(skill.id);
+    flatMap[`class_gradebook_skill_${skill.id}_activity_count`] = bucket.classPercents.length;
+    flatMap[`class_gradebook_skill_${skill.id}_avg_percent`] = averageRounded(bucket.classPercents);
+    flatMap[`class_gradebook_skill_${skill.id}_min_percent`] = minRounded(bucket.classPercents);
+    flatMap[`class_gradebook_skill_${skill.id}_max_percent`] = maxRounded(bucket.classPercents);
+    flatMap[`class_gradebook_skill_${skill.id}_points_earned`] = Math.round(bucket.classEarned * 100) / 100;
+    flatMap[`class_gradebook_skill_${skill.id}_points_possible`] = Math.round(bucket.classPossible * 100) / 100;
+    flatMap[`student_gradebook_skill_${skill.id}_activity_count`] = bucket.studentActivityCount;
+    flatMap[`student_gradebook_skill_${skill.id}_avg_percent`] = averageRounded(bucket.studentPercents);
+    flatMap[`student_gradebook_skill_${skill.id}_min_percent`] = minRounded(bucket.studentPercents);
+    flatMap[`student_gradebook_skill_${skill.id}_max_percent`] = maxRounded(bucket.studentPercents);
+    flatMap[`student_gradebook_skill_${skill.id}_points_earned`] = Math.round(bucket.studentEarned * 100) / 100;
+    flatMap[`student_gradebook_skill_${skill.id}_points_possible`] = Math.round(bucket.studentPossible * 100) / 100;
+    skillRows.push({
+      skill_id: skill.id,
+      skill_name: skill.label,
+      activity_count: bucket.studentActivityCount,
+      avg_percent: averageRounded(bucket.studentPercents),
+      min_percent: minRounded(bucket.studentPercents),
+      max_percent: maxRounded(bucket.studentPercents),
+      points_earned: Math.round(bucket.studentEarned * 100) / 100,
+      points_possible: Math.round(bucket.studentPossible * 100) / 100
+    });
+  });
+
+  return { ...flatMap, skillRows };
 }
 
 function computeReportPeriodGradebookStats(periodSessions, studentPersonId, statusMap = null) {
@@ -1064,6 +1238,7 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
   const periodSessions = filterSessionsByDateRange(allSessions, reportPeriod.startDate, reportPeriod.dueDate)
     .filter((session) => sessionIncludedForAttendance(session, statusMap))
     .sort((a, b) => `${String(a?.date || '')}T${String(a?.startTime || '00:00')}`.localeCompare(`${String(b?.date || '')}T${String(b?.startTime || '00:00')}`));
+  const periodSessionsGrade = filterPeriodSessionsForGradeMetrics(allSessions, reportPeriod.startDate, reportPeriod.dueDate, statusMap);
   const rosterNameMap = buildRosterNameMap(periodSessions);
   const personMap = buildPersonMap(persons);
   const studentMaps = buildStudentRecordMaps(students);
@@ -1149,10 +1324,35 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
     });
   });
 
+  const gradebookSkillRows = [];
+  studentContexts.forEach((context, studentIndex) => {
+    const skillStats = computeReportPeriodGradebookSkillStats(periodSessionsGrade, context.personId, statusMap);
+    const studentRow = studentRows[studentIndex] || {};
+    (skillStats.skillRows || []).forEach((row) => {
+      gradebookSkillRows.push({
+        row_no: gradebookSkillRows.length + 1,
+        student_no: studentIndex + 1,
+        student_id: context.personId,
+        student_person_id: context.personId,
+        student_full_name: studentRow.student_full_name || context.personId,
+        student_display_name: studentRow.student_display_name || studentRow.student_full_name || context.personId,
+        skill_id: row.skill_id,
+        skill_name: row.skill_name,
+        activity_count: row.activity_count,
+        avg_percent: row.avg_percent,
+        min_percent: row.min_percent,
+        max_percent: row.max_percent,
+        points_earned: row.points_earned,
+        points_possible: row.points_possible
+      });
+    });
+  });
+
   return {
     students: studentRows,
     attendance_sessions: sessionRows,
-    student_attendance_rows: attendanceRows
+    student_attendance_rows: attendanceRows,
+    gradebook_skill_rows: gradebookSkillRows
   };
 }
 
@@ -1220,6 +1420,8 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
   const periodSessions = filterSessionsByDateRange(sessions, reportPeriod.startDate, reportPeriod.dueDate);
   const periodSessionsGrade = filterPeriodSessionsForGradeMetrics(sessions, reportPeriod.startDate, reportPeriod.dueDate, statusMap);
   const gradebookPeriodStats = computeReportPeriodGradebookStats(periodSessionsGrade, studentPersonId, statusMap);
+  const gradebookSkillPeriodStats = computeReportPeriodGradebookSkillStats(periodSessionsGrade, studentPersonId, statusMap);
+  const { skillRows: _skillRows, ...gradebookSkillPrefillStats } = gradebookSkillPeriodStats;
   const examRows = Array.isArray(examAssignmentsForClass) ? examAssignmentsForClass : [];
   const examPeriodStats = computeReportPeriodExamStats(
     examRows,
@@ -1377,6 +1579,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_org_member_role: String(studentOrgMembership?.role || ''),
     student_org_member_status: String(studentOrgMembership?.memberStatus || ''),
     ...gradebookPeriodStats,
+    ...gradebookSkillPrefillStats,
     ...examPeriodStats
   };
 
@@ -1501,13 +1704,15 @@ function buildPlaceholderPayload(template, instance, assignment = null) {
 
 function getPrefillCatalog() {
   return {
-    common: [...PREFILL_CATALOG.common],
-    classOnly: [...PREFILL_CATALOG.classOnly],
-    gradebookPeriodClass: [...PREFILL_CATALOG.gradebookPeriodClass],
-    examPeriodClass: [...PREFILL_CATALOG.examPeriodClass],
-    studentOnly: [...PREFILL_CATALOG.studentOnly],
-    gradebookPeriodStudent: [...PREFILL_CATALOG.gradebookPeriodStudent],
-    examPeriodStudent: [...PREFILL_CATALOG.examPeriodStudent]
+    common: [...PREFILL_CATALOG_WITH_SKILLS.common],
+    classOnly: [...PREFILL_CATALOG_WITH_SKILLS.classOnly],
+    gradebookPeriodClass: [...PREFILL_CATALOG_WITH_SKILLS.gradebookPeriodClass],
+    gradebookPeriodSkillsClass: [...PREFILL_CATALOG_WITH_SKILLS.gradebookPeriodSkillsClass],
+    examPeriodClass: [...PREFILL_CATALOG_WITH_SKILLS.examPeriodClass],
+    studentOnly: [...PREFILL_CATALOG_WITH_SKILLS.studentOnly],
+    gradebookPeriodStudent: [...PREFILL_CATALOG_WITH_SKILLS.gradebookPeriodStudent],
+    gradebookPeriodSkillsStudent: [...PREFILL_CATALOG_WITH_SKILLS.gradebookPeriodSkillsStudent],
+    examPeriodStudent: [...PREFILL_CATALOG_WITH_SKILLS.examPeriodStudent]
   };
 }
 

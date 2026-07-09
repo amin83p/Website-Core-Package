@@ -432,21 +432,42 @@ document.addEventListener('DOMContentLoaded', () => {
         return String(event?.className || event?.title || event?.label || event?.classId || 'Schedule Item').trim();
     }
     function getEventCategoryLabels(event) {
-        if (isLeaveEvent(event)) return ['Approved Leave'];
-        const labels = [];
-        if (Array.isArray(event?.roles)) {
-            event.roles.forEach((role) => {
-                const label = String(role || '').trim();
-                if (label && !labels.includes(label)) labels.push(label);
-            });
+        if (Array.isArray(event?.hourCategoryLabels) && event.hourCategoryLabels.length) {
+            return event.hourCategoryLabels;
         }
+        if (isLeaveEvent(event)) return ['Approved Leave'];
+
+        const schoolRoles = new Set();
+        const roleSources = [
+            ...(Array.isArray(event?.roles) ? event.roles : []),
+            event?.role,
+            event?.roleLabel
+        ];
+        roleSources.forEach((value) => {
+            String(value || '')
+                .split('/')
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .forEach((part) => {
+                    const normalized = String(part || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+                    const label = normalized === 'teacher' || normalized.includes('school_teacher')
+                        ? 'Teacher'
+                        : (normalized === 'student' || normalized.includes('school_student')
+                            ? 'Student'
+                            : (normalized === 'staff' || normalized.includes('school_staff') ? 'Staff' : ''));
+                    if (label) schoolRoles.add(label);
+                });
+        });
+        if (schoolRoles.size) return [...schoolRoles];
+
+        const labels = [];
         [event?.roleLabel, event?.role].forEach((role) => {
             String(role || '')
                 .split('/')
                 .map((part) => part.trim())
                 .filter(Boolean)
                 .forEach((label) => {
-                    if (!labels.includes(label)) labels.push(label);
+                    if (label && !labels.includes(label)) labels.push(label);
                 });
         });
         return labels.length ? labels : ['Schedule'];

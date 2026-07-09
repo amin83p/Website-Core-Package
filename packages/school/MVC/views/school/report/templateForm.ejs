@@ -15,18 +15,22 @@
       common: [],
       classOnly: [],
       gradebookPeriodClass: [],
+      gradebookPeriodSkillsClass: [],
       examPeriodClass: [],
       studentOnly: [],
       gradebookPeriodStudent: [],
+      gradebookPeriodSkillsStudent: [],
       examPeriodStudent: []
     };
   const allPrefillKeys = [
     ...(Array.isArray(prefillCatalogData.common) ? prefillCatalogData.common : []),
     ...(Array.isArray(prefillCatalogData.classOnly) ? prefillCatalogData.classOnly : []),
     ...(Array.isArray(prefillCatalogData.gradebookPeriodClass) ? prefillCatalogData.gradebookPeriodClass : []),
+    ...(Array.isArray(prefillCatalogData.gradebookPeriodSkillsClass) ? prefillCatalogData.gradebookPeriodSkillsClass : []),
     ...(Array.isArray(prefillCatalogData.examPeriodClass) ? prefillCatalogData.examPeriodClass : []),
     ...(Array.isArray(prefillCatalogData.studentOnly) ? prefillCatalogData.studentOnly : []),
     ...(Array.isArray(prefillCatalogData.gradebookPeriodStudent) ? prefillCatalogData.gradebookPeriodStudent : []),
+    ...(Array.isArray(prefillCatalogData.gradebookPeriodSkillsStudent) ? prefillCatalogData.gradebookPeriodSkillsStudent : []),
     ...(Array.isArray(prefillCatalogData.examPeriodStudent) ? prefillCatalogData.examPeriodStudent : [])
   ];
 %>
@@ -196,6 +200,28 @@
             </div>
           </div>
           <div class="accordion-item">
+            <h2 class="accordion-header" id="prefillGbSkillsClassHeading">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#prefillGbSkillsClassPanel" aria-expanded="false" aria-controls="prefillGbSkillsClassPanel">
+                Gradebook skills - report period (class)
+              </button>
+            </h2>
+            <div id="prefillGbSkillsClassPanel" class="accordion-collapse collapse" aria-labelledby="prefillGbSkillsClassHeading" data-bs-parent="#prefillCatalogAccordion">
+              <div class="accordion-body p-2">
+                <% (prefillCatalogData.gradebookPeriodSkillsClass || []).forEach((item) => { %>
+                  <div class="prefill-item d-flex justify-content-between align-items-start border rounded px-2 py-2 mb-1">
+                    <div class="me-2">
+                      <div class="font-monospace small"><%= item.key %></div>
+                      <div class="prefill-desc text-muted"><%= item.description || '' %></div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key" data-copy-token="{{<%= item.key %>}}" title="Copy DOCX token">
+                      <i class="bi bi-copy"></i>
+                    </button>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          </div>
+          <div class="accordion-item">
             <h2 class="accordion-header" id="prefillExamClassHeading">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#prefillExamClassPanel" aria-expanded="false" aria-controls="prefillExamClassPanel">
                 Exams - report period (class)
@@ -248,6 +274,28 @@
             <div id="prefillGbStudentPanel" class="accordion-collapse collapse" aria-labelledby="prefillGbStudentHeading" data-bs-parent="#prefillCatalogAccordion">
               <div class="accordion-body p-2">
                 <% (prefillCatalogData.gradebookPeriodStudent || []).forEach((item) => { %>
+                  <div class="prefill-item d-flex justify-content-between align-items-start border rounded px-2 py-2 mb-1">
+                    <div class="me-2">
+                      <div class="font-monospace small"><%= item.key %></div>
+                      <div class="prefill-desc text-muted"><%= item.description || '' %></div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key" data-copy-token="{{<%= item.key %>}}" title="Copy DOCX token">
+                      <i class="bi bi-copy"></i>
+                    </button>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          </div>
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="prefillGbSkillsStudentHeading">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#prefillGbSkillsStudentPanel" aria-expanded="false" aria-controls="prefillGbSkillsStudentPanel">
+                Gradebook skills - report period (student)
+              </button>
+            </h2>
+            <div id="prefillGbSkillsStudentPanel" class="accordion-collapse collapse" aria-labelledby="prefillGbSkillsStudentHeading" data-bs-parent="#prefillCatalogAccordion">
+              <div class="accordion-body p-2">
+                <% (prefillCatalogData.gradebookPeriodSkillsStudent || []).forEach((item) => { %>
                   <div class="prefill-item d-flex justify-content-between align-items-start border rounded px-2 py-2 mb-1">
                     <div class="me-2">
                       <div class="font-monospace small"><%= item.key %></div>
@@ -320,6 +368,17 @@
               <div class="fw-bold mb-2">Student Attendance Rows</div>
               <pre class="small bg-light border rounded p-2 mb-2 text-wrap"><code>{{#student_attendance_rows}}{{student_full_name}} {{session_date}} {{attendance_status_label}}{{/student_attendance_rows}}</code></pre>
               <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key" data-copy-token="{{#student_attendance_rows}}{{student_full_name}} {{session_date}} {{attendance_status_label}}{{/student_attendance_rows}}">
+                <i class="bi bi-copy me-1"></i>Copy Example
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-lg-6">
+            <div class="border rounded p-3 h-100">
+              <div class="fw-bold mb-2">Gradebook Skill Rows</div>
+              <pre class="small bg-light border rounded p-2 mb-2 text-wrap"><code>{{#gradebook_skill_rows}}{{student_full_name}} {{skill_name}} {{activity_count}} {{avg_percent}}{{/gradebook_skill_rows}}</code></pre>
+              <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key" data-copy-token="{{#gradebook_skill_rows}}{{student_full_name}} {{skill_name}} {{activity_count}} {{avg_percent}}{{/gradebook_skill_rows}}">
                 <i class="bi bi-copy me-1"></i>Copy Example
               </button>
             </div>

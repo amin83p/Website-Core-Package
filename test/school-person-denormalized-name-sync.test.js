@@ -12,6 +12,7 @@ function read(relativePath) {
 const teacherIdentityService = require('../packages/school/MVC/services/school/teacherIdentityService');
 const schoolRecordAccessService = require('../packages/school/MVC/services/school/schoolRecordAccessService');
 const personDenormalizedNameSyncService = require('../packages/school/MVC/services/school/personDenormalizedNameSyncService');
+const scheduleController = require('../packages/school/MVC/controllers/school/scheduleController');
 const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
 const schoolRepositories = require('../packages/school/MVC/repositories/school');
 
@@ -168,4 +169,30 @@ test('teacher, staff, and student list pages expose sync saved names button', ()
   assert.match(teacherList, /syncDenormalizedLinkType: 'teacher'/);
   assert.match(staffList, /syncDenormalizedLinkType: 'staff'/);
   assert.match(studentList, /syncDenormalizedLinkType: 'student'/);
+});
+
+test('schedule hour categories use one canonical school role label per event', () => {
+  assert.deepEqual(
+    scheduleController.getScheduleEventHourCategoryLabels({
+      roles: ['Teacher'],
+      roleLabel: 'Teacher'
+    }),
+    ['Teacher']
+  );
+  assert.deepEqual(
+    scheduleController.getScheduleEventHourCategoryLabels({
+      roles: ['teacher'],
+      roleLabel: 'Paid Activity',
+      eventType: 'school_activity'
+    }),
+    ['Teacher']
+  );
+  assert.deepEqual(
+    scheduleController.getScheduleEventHourCategoryLabels({
+      roles: ['student'],
+      roleLabel: 'Paid Activity',
+      eventType: 'school_activity'
+    }),
+    ['Student']
+  );
 });

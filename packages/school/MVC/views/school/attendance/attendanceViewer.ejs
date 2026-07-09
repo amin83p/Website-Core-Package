@@ -75,6 +75,9 @@
   tableName: typeof tableName !== 'undefined' ? tableName : 'Attendance_Matrix',
   btn_export: false,
   print: false,
+  optionalBtnsBeforePrint: [
+    '<button type="button" id="btn_printAttendanceMatrix" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Load the matrix first">🖨 Print</button>'
+  ],
   headerManageBtns: [
     '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
@@ -148,7 +151,7 @@
     </div>
 
     <div class="card border-0 shadow-sm d-none" id="resultsContainer">
-        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h5 class="m-0 fw-bold text-primary" id="lbl_displayClassName">Class Name</h5>
             <div class="small text-muted text-md-end">
                 <span class="me-3"><i class="bi bi-check-circle-fill text-success"></i> Present</span>
@@ -466,10 +469,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    function setAttendancePrintEnabled(enabled) {
+        const btn = document.getElementById('btn_printAttendanceMatrix');
+        if (!btn) return;
+        btn.disabled = !enabled;
+        btn.title = enabled ? 'Print attendance matrix for the loaded range' : 'Load the matrix first';
+    }
+
     document.getElementById('btn_clearClass')?.addEventListener('click', () => {
         document.getElementById('filter_classId').value = '';
         document.getElementById('filter_className').value = '';
         document.getElementById('resultsContainer').classList.add('d-none');
+        window.currentMatrixData = null;
+        setAttendancePrintEnabled(false);
     });
 
     document.getElementById('btn_reset')?.addEventListener('click', () => {
@@ -478,6 +490,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('filter_startDate').value = '';
         document.getElementById('filter_endDate').value = '';
         document.getElementById('resultsContainer').classList.add('d-none');
+        window.currentMatrixData = null;
+        setAttendancePrintEnabled(false);
         setActiveRangeChip('');
     });
 
@@ -569,6 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             window.currentMatrixData = result;
             document.getElementById('resultsContainer').classList.remove('d-none');
+            setAttendancePrintEnabled(true);
             
             document.getElementById('filter_className').value = result.className || 'Loaded Class';
             document.getElementById('lbl_displayClassName').innerText = result.className || 'Class Attendance';
@@ -684,6 +699,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error(error);
+            window.currentMatrixData = null;
+            setAttendancePrintEnabled(false);
             showAttendanceMatrixMessage({
                 title: 'Error',
                 icon: 'error',
@@ -699,6 +716,470 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('btn_loadData').addEventListener('click', () => loadAttendanceMatrixData());
+
+    // --- 3b. Attendance Matrix Print ---
+    const ATT_PRINT_STATUS_LETTER = {
+        present: 'P',
+        late: 'L',
+        excused: 'E',
+        absent: 'A',
+        not_applicable: '—'
+    };
+
+    function attPrintEscapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function attPrintFormatDateShort(ymd) {
+        const raw = String(ymd || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw || '—';
+        const d = new Date(`${raw}T00:00:00`);
+        if (Number.isNaN(d.getTime())) return raw;
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function attPrintFormatWeekday(ymd) {
+        const raw = String(ymd || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
+        const d = new Date(`${raw}T00:00:00`);
+        if (Number.isNaN(d.getTime())) return '';
+        return d.toLocaleDateString('en-US', { weekday: 'short' });
+    }
+
+    function attPrintFormatRangeLabel(startDate, endDate) {
+        const start = String(startDate || '').trim();
+        const end = String(endDate || '').trim();
+        if (!start && !end) return 'All sessions';
+        if (start && end) return `${attPrintFormatDateShort(start)} – ${attPrintFormatDateShort(end)}`;
+        if (start) return `From ${attPrintFormatDateShort(start)}`;
+        return `Through ${attPrintFormatDateShort(end)}`;
+    }
+
+    function attPrintMinutesPart(rec) {
+        const late = Number(rec?.lateMinutes) || 0;
+        const early = Number(rec?.earlyLeaveMinutes) || 0;
+        if (late <= 0 && early <= 0) return '';
+        if (late > 0 && early > 0) return `${late}'/${early}'`;
+        if (late > 0) return `${late}'`;
+        return `/${early}'`;
+    }
+
+    function attPrintStatusLetter(status) {
+        const key = String(status || '').trim().toLowerCase();
+        return ATT_PRINT_STATUS_LETTER[key] || '—';
+    }
+
+    function attPrintCellText(rec) {
+        const letter = attPrintStatusLetter(rec?.status);
+        const mins = attPrintMinutesPart(rec);
+        if (!mins) return letter;
+        if (letter === '—') return letter;
+        return `${letter} ${mins}`;
+    }
+
+    function attPrintCollectNoteParts(rec) {
+        const parts = [];
+        const excuse = String(rec?.excuseRef || '').trim();
+        const rosterNote = String(rec?.rosterStudentNotes || '').trim();
+        const sessionNote = String(rec?.sessionLevelNote || '').trim();
+        if (excuse) parts.push(`Excuse: ${excuse}`);
+        if (rosterNote) parts.push(`Note: ${rosterNote}`);
+        if (sessionNote) parts.push(`Session: ${sessionNote}`);
+        return parts;
+    }
+
+    function attPrintToSuperscript(n) {
+        const map = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+        return String(n).split('').map((ch) => map[ch] || ch).join('');
+    }
+
+    function attPrintBuildSummary(matrixData) {
+        const counts = { present: 0, late: 0, excused: 0, absent: 0, not_applicable: 0, other: 0 };
+        const students = Array.isArray(matrixData?.matrix) ? matrixData.matrix : [];
+        const sessions = Array.isArray(matrixData?.sessions) ? matrixData.sessions : [];
+        let pctSum = 0;
+        let pctCount = 0;
+
+        students.forEach((stu) => {
+            (Array.isArray(stu.records) ? stu.records : []).forEach((rec) => {
+                const key = String(rec?.status || '').trim().toLowerCase();
+                if (Object.prototype.hasOwnProperty.call(counts, key)) counts[key] += 1;
+                else counts.other += 1;
+            });
+            const pct = stu?.summary?.performancePercent;
+            if (pct != null && Number.isFinite(Number(pct))) {
+                pctSum += Number(pct);
+                pctCount += 1;
+            }
+        });
+
+        const avgPct = pctCount ? Math.round((pctSum / pctCount) * 100) / 100 : null;
+        return {
+            studentCount: students.length,
+            sessionCount: sessions.length,
+            counts,
+            avgPct
+        };
+    }
+
+    function buildAttendancePrintDocument(matrixData, meta = {}) {
+        const data = matrixData && typeof matrixData === 'object' ? matrixData : {};
+        const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+        const students = Array.isArray(data.matrix) ? data.matrix : [];
+        const summary = attPrintBuildSummary(data);
+        const className = String(data.className || meta.className || 'Class').trim() || 'Class';
+        const orgName = String(meta.orgName || '').trim();
+        const rangeLabel = attPrintFormatRangeLabel(meta.startDate, meta.endDate);
+        const printedAt = meta.printedAt instanceof Date ? meta.printedAt : new Date();
+        const printedAtLabel = printedAt.toLocaleString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit'
+        });
+
+        const footnotes = [];
+        const footnoteByKey = new Map();
+
+        function footnoteMarkerFor(studentName, rec) {
+            const parts = attPrintCollectNoteParts(rec);
+            if (!parts.length) return '';
+            const key = [
+                String(rec?.sessionId || ''),
+                String(studentName || ''),
+                parts.join('|')
+            ].join('::');
+            let num = footnoteByKey.get(key);
+            if (!num) {
+                num = footnotes.length + 1;
+                footnoteByKey.set(key, num);
+                const late = Number(rec?.lateMinutes) || 0;
+                const early = Number(rec?.earlyLeaveMinutes) || 0;
+                const timingBits = [];
+                if (late > 0) timingBits.push(`Late ${late}'`);
+                if (early > 0) timingBits.push(`Early leave ${early}'`);
+                footnotes.push({
+                    num,
+                    studentName: String(studentName || 'Student'),
+                    dateLabel: attPrintFormatDateShort(rec?.date),
+                    statusLetter: attPrintStatusLetter(rec?.status),
+                    timing: timingBits.join(', '),
+                    parts
+                });
+            }
+            return `<sup class="fn-mark">${attPrintEscapeHtml(attPrintToSuperscript(num))}</sup>`;
+        }
+
+        const headerCells = sessions.map((s) => {
+            const shortDate = attPrintFormatDateShort(s.date);
+            const weekday = attPrintFormatWeekday(s.date);
+            return `<th class="day-col"><div class="day-date">${attPrintEscapeHtml(shortDate)}</div>${weekday ? `<div class="day-wd">${attPrintEscapeHtml(weekday)}</div>` : ''}</th>`;
+        }).join('');
+
+        const bodyRows = students.map((stu, index) => {
+            const s = stu.summary || {};
+            const p = Number(s.totalPresentSessions) || 0;
+            const a = Number(s.totalAbsentSessions) || 0;
+            const na = Number(s.totalNotApplicableSessions) || 0;
+            const pct = s.performancePercent;
+            const pctStr = pct == null ? '—' : `${pct}%`;
+            const rollupNa = na ? ` / ${na}` : '';
+            const name = String(stu.name || 'Student');
+            const cells = (Array.isArray(stu.records) ? stu.records : []).map((rec) => {
+                const text = attPrintCellText(rec);
+                const statusClass = `st-${String(rec?.status || 'na').replace(/_/g, '-')}`;
+                const fn = footnoteMarkerFor(name, rec);
+                return `<td class="att-print-cell ${statusClass}">${attPrintEscapeHtml(text)}${fn}</td>`;
+            }).join('');
+            return `<tr>
+                <td class="num-col">${index + 1}</td>
+                <td class="name-col">${attPrintEscapeHtml(name)}</td>
+                <td class="rollup-col"><div class="rollup-pa">${p} / ${a}${rollupNa}</div><div class="rollup-pct">${attPrintEscapeHtml(pctStr)}</div></td>
+                ${cells}
+            </tr>`;
+        }).join('');
+
+        const emptyRow = !students.length
+            ? `<tr><td colspan="${sessions.length + 3}" class="empty-msg">No students found for this range.</td></tr>`
+            : (!sessions.length
+                ? `<tr><td colspan="3" class="empty-msg">No active sessions found in this date range.</td></tr>`
+                : '');
+
+        const footnotesHtml = footnotes.length
+            ? `<section class="footnotes">
+                <h2>Notes</h2>
+                <ol>
+                  ${footnotes.map((fn) => {
+                    const headBits = [
+                      attPrintEscapeHtml(fn.studentName),
+                      attPrintEscapeHtml(fn.dateLabel),
+                      attPrintEscapeHtml(fn.statusLetter)
+                    ];
+                    if (fn.timing) headBits.push(attPrintEscapeHtml(fn.timing));
+                    return `<li value="${fn.num}"><span class="fn-head">${headBits.join(' · ')}</span> — ${attPrintEscapeHtml(fn.parts.join(' · '))}</li>`;
+                  }).join('')}
+                </ol>
+              </section>`
+            : '';
+
+        const avgPctLabel = summary.avgPct == null ? '—' : `${summary.avgPct}%`;
+        const c = summary.counts;
+
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${attPrintEscapeHtml(`Attendance Matrix — ${className}`)}</title>
+  <style>
+    @page { size: letter landscape; margin: 10mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10px;
+      color: #111;
+      line-height: 1.25;
+    }
+    .sheet { padding: 0; }
+    .doc-header { margin-bottom: 8px; }
+    .doc-header h1 {
+      margin: 0 0 2px 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .org-name {
+      font-size: 13px;
+      font-weight: 700;
+      margin: 0 0 4px 0;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      color: #333;
+      margin-bottom: 6px;
+    }
+    .meta-row span strong { font-weight: 600; }
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      border: 1px solid #ccc;
+      background: #f8f9fa;
+      padding: 6px 8px;
+      margin-bottom: 8px;
+      border-radius: 2px;
+    }
+    .summary .stat { white-space: nowrap; }
+    .summary .stat b { font-weight: 700; }
+    .legend {
+      margin: 0 0 8px 0;
+      color: #444;
+      font-size: 9.5px;
+    }
+    table.matrix {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: auto;
+    }
+    table.matrix th,
+    table.matrix td {
+      border: 1px solid #bbb;
+      padding: 3px 4px;
+      vertical-align: middle;
+    }
+    table.matrix thead th {
+      background: #eef1f4;
+      font-weight: 700;
+      text-align: center;
+    }
+    table.matrix thead { display: table-header-group; }
+    table.matrix tbody tr { page-break-inside: avoid; }
+    .num-col { width: 28px; text-align: center; color: #555; }
+    .name-col { text-align: left; min-width: 110px; max-width: 160px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rollup-col { text-align: center; min-width: 52px; white-space: nowrap; }
+    .rollup-pa { font-size: 9px; color: #444; }
+    .rollup-pct { font-weight: 700; font-size: 10px; }
+    .day-col { min-width: 42px; }
+    .day-date { font-size: 9.5px; }
+    .day-wd { font-size: 8px; color: #666; font-weight: 500; }
+    .att-print-cell {
+      text-align: center;
+      white-space: nowrap;
+      font-weight: 600;
+      font-size: 9.5px;
+    }
+    .st-present { color: #0f5132; }
+    .st-late { color: #997404; }
+    .st-excused { color: #055160; }
+    .st-absent { color: #842029; }
+    .st-not-applicable, .st-na { color: #6c757d; font-weight: 500; }
+    .fn-mark { font-size: 8px; font-weight: 700; color: #0d6efd; margin-left: 1px; }
+    .empty-msg { text-align: center; color: #666; padding: 16px !important; }
+    .footnotes {
+      margin-top: 12px;
+      page-break-inside: avoid;
+    }
+    .footnotes h2 {
+      margin: 0 0 4px 0;
+      font-size: 12px;
+    }
+    .footnotes ol {
+      margin: 0;
+      padding-left: 18px;
+    }
+    .footnotes li {
+      margin-bottom: 3px;
+      page-break-inside: avoid;
+    }
+    .fn-head { font-weight: 600; }
+    .doc-footer {
+      margin-top: 10px;
+      padding-top: 4px;
+      border-top: 1px solid #ddd;
+      color: #666;
+      font-size: 9px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    @media print {
+      body { margin: 0; }
+      .no-print { display: none !important; }
+      a { color: inherit; text-decoration: none; }
+    }
+    @media screen {
+      body { background: #e9ecef; padding: 16px; }
+      .sheet {
+        background: #fff;
+        padding: 14px 16px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+        max-width: 100%;
+      }
+      .screen-actions {
+        margin-bottom: 10px;
+        display: flex;
+        gap: 8px;
+      }
+      .screen-actions button {
+        font: inherit;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="screen-actions no-print">
+    <button type="button" onclick="window.print()">Print</button>
+    <button type="button" onclick="window.close()">Close</button>
+  </div>
+  <div class="sheet">
+    <header class="doc-header">
+      ${orgName ? `<div class="org-name">${attPrintEscapeHtml(orgName)}</div>` : ''}
+      <h1>Attendance Matrix</h1>
+      <div class="meta-row">
+        <span><strong>Class:</strong> ${attPrintEscapeHtml(className)}</span>
+        <span><strong>Range:</strong> ${attPrintEscapeHtml(rangeLabel)}</span>
+        <span><strong>Printed:</strong> ${attPrintEscapeHtml(printedAtLabel)}</span>
+      </div>
+    </header>
+
+    <div class="summary">
+      <span class="stat"><b>${summary.studentCount}</b> students</span>
+      <span class="stat"><b>${summary.sessionCount}</b> sessions</span>
+      <span class="stat">P <b>${c.present}</b></span>
+      <span class="stat">L <b>${c.late}</b></span>
+      <span class="stat">E <b>${c.excused}</b></span>
+      <span class="stat">A <b>${c.absent}</b></span>
+      <span class="stat">N/A <b>${c.not_applicable}</b></span>
+      <span class="stat">Avg rollup <b>${attPrintEscapeHtml(avgPctLabel)}</b></span>
+    </div>
+    <div class="legend">Legend: P Present · L Late · E Excused · A Absent · — N/A · minutes as late'/early' (e.g. L 12', L /5', or L 12'/5')</div>
+
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th class="num-col">#</th>
+          <th class="name-col">Student</th>
+          <th class="rollup-col">P/A/%</th>
+          ${headerCells}
+        </tr>
+      </thead>
+      <tbody>
+        ${bodyRows || emptyRow}
+      </tbody>
+    </table>
+
+    ${footnotesHtml}
+
+    <footer class="doc-footer">
+      <span>Generated from Attendance Matrix</span>
+      <span>${attPrintEscapeHtml(className)} · ${attPrintEscapeHtml(rangeLabel)}</span>
+    </footer>
+  </div>
+</body>
+</html>`;
+    }
+
+    function openAttendancePrint() {
+        if (!window.currentMatrixData || window.currentMatrixData.status !== 'success') {
+            showAttendanceMatrixMessage({
+                title: 'Nothing to print',
+                icon: 'warning',
+                message: 'Load an attendance matrix for a class first.',
+                buttons: [{ text: 'Close', class: 'btn-secondary' }]
+            });
+            return;
+        }
+
+        const orgName = String(document.getElementById('activeOrgNameRef')?.getAttribute('data-name') || '').trim();
+        const startDate = document.getElementById('filter_startDate')?.value || '';
+        const endDate = document.getElementById('filter_endDate')?.value || '';
+        const html = buildAttendancePrintDocument(window.currentMatrixData, {
+            orgName,
+            startDate,
+            endDate,
+            className: window.currentMatrixData.className,
+            printedAt: new Date()
+        });
+
+        // Do not pass noopener/noreferrer in features: browsers return null and we cannot write the print HTML.
+        const printWindow = window.open('', '_blank', 'height=720,width=1100');
+        if (!printWindow) {
+            showAttendanceMatrixMessage({
+                title: 'Popup blocked',
+                icon: 'warning',
+                message: 'Allow pop-ups for this site to open the print page.',
+                buttons: [{ text: 'Close', class: 'btn-secondary' }]
+            });
+            return;
+        }
+
+        try {
+            printWindow.opener = null;
+        } catch (_) { /* ignore */ }
+
+        try {
+            const byLabel = String(document.getElementById('activeOrgIdRef')?.getAttribute('data-id') || '').trim();
+            const qsParts = ['print=1', 'view=attendance-matrix'];
+            if (byLabel) qsParts.push(`org=${encodeURIComponent(byLabel)}`);
+            printWindow.history.replaceState({}, '', `${location.pathname}?${qsParts.join('&')}`);
+        } catch (_) { /* ignore */ }
+
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            try { printWindow.print(); } catch (_) { /* ignore */ }
+        }, 250);
+    }
+
+    document.getElementById('btn_printAttendanceMatrix')?.addEventListener('click', () => openAttendancePrint());
 
     // --- 4. Interactive Note Saving Logic ---
     document.getElementById('btn_saveComment').addEventListener('click', async () => {
