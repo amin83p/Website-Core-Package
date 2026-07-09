@@ -11,6 +11,7 @@ const sessionStudentCaseService = require('../../services/school/sessionStudentC
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const activityService = require('../../services/school/activityService');
+const teacherIdentityService = require('../../services/school/teacherIdentityService');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
@@ -507,22 +508,26 @@ async function buildSchoolSchedulePersonPickerRows({ activeOrgId, reqUser }) {
     }).sort((a, b) => String(a.displayName || a.id).localeCompare(String(b.displayName || b.id)));
 }
 
-function buildTeacherPersonMap(teachers = []) {
-    const map = new Map();
-    (Array.isArray(teachers) ? teachers : []).forEach((teacher) => {
-        const teacherId = normalizeId(teacher?.id);
-        const personId = normalizeId(teacher?.personId);
-        if (teacherId && personId) {
-            map.set(teacherId, personId);
-        }
-    });
-    return map;
-}
+const { buildTeacherPersonMap, resolveTeacherPersonId } = teacherIdentityService;
+const resolveLinkedPersonId = resolveTeacherPersonId;
 
-function resolveLinkedPersonId(rawId, teacherPersonMap = new Map()) {
-    const normalized = normalizeId(rawId);
-    if (!normalized) return '';
-    return normalizeId(teacherPersonMap.get(normalized) || normalized);
+function collectClassIdsFromTeacherIndex(teacherIndex, personId, teacherPersonMap = new Map()) {
+    const classIds = new Set();
+    const keys = teacherIdentityService.collectTeacherRecordIdsForPerson(personId, teacherPersonMap);
+    const indexRoot = teacherIndex && typeof teacherIndex === 'object' && !Array.isArray(teacherIndex)
+        ? teacherIndex
+        : {};
+    keys.forEach((key) => {
+        const byDate = indexRoot[key];
+        if (!byDate || typeof byDate !== 'object') return;
+        Object.values(byDate).forEach((entries) => {
+            (Array.isArray(entries) ? entries : []).forEach((entry) => {
+                const classId = normalizeId(entry?.classId);
+                if (classId) classIds.add(classId);
+            });
+        });
+    });
+    return classIds;
 }
 
 function hasInstructorMatchWithTeacherLink(classRow, personId, teacherPersonMap = new Map()) {
@@ -918,8 +923,9 @@ async function getPersonById(personId, reqUser) {
 }
 
 async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqUser, activeOrgId, statusMap = null, accessContext = {} }) {
-    const [studentIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents] = await Promise.all([
+    const [studentIndex, teacherIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents] = await Promise.all([
         schoolDataService.getStudentIndex(),
+        schoolDataService.getTeacherIndex(),
         schoolDataService.fetchData('classes', {}, reqUser, accessContext),
         schoolRepositories.reportAssignments.list({ query: {}, scope: { canViewAll: true } }),
         schoolRepositories.reportTemplates.list({ query: {}, scope: { canViewAll: true } }),
@@ -1051,6 +1057,16 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
         }
     }
 
+    collectClassIdsFromTeacherIndex(teacherIndex, normalizedPersonId, teacherPersonMap)
+        .forEach((classId) => candidateClassIds.add(classId));
+
+    for (const classId of candidateClassIds) {
+        if (classMap.has(classId)) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const classRow = await schoolDataService.getDataById('classes', classId, reqUser, accessContext);
+        if (classRow) classMap.set(classId, classRow);
+    }
+
     const classIdsToScan = candidateClassIds.size
         ? [...candidateClassIds]
         : [...classMap.keys()];
@@ -1060,7 +1076,7 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
     for (const classId of classIdsToScan) {
         const classDef = classMap.get(classId) || null;
         const classHasInstructor = hasInstructorMatchWithTeacherLink(classDef, normalizedPersonId, teacherPersonMap);
-        const sessions = await schoolDataService.getClassSessions(classId, reqUser);
+        const sessions = await schoolDataService.getClassSessions(classId, reqUser, accessContext);
         classSessionsById.set(classId, Array.isArray(sessions) ? sessions : []);
 
         for (const session of sessions || []) {
@@ -1215,7 +1231,7 @@ async function getMyScheduleData(req, res) {
     try {
         const isAdminViewer = isScheduleAdminViewer(req.user);
         const requestedPersonId = normalizeId(req.query.personId);
-        const selfPersonId = normalizeId(req.user?.personId);
+        const selfPersonId = getUserPersonId(req.user);
         const targetPersonId = isAdminViewer ? requestedPersonId : selfPersonId;
 
         if (!targetPersonId) {

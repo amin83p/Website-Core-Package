@@ -122,7 +122,17 @@ function isRecordAccessibleByAssignment(record = {}, scope = {}, options = {}) {
 
   if (kind === 'instructor') {
     const instructors = Array.isArray(record?.instructors) ? record.instructors : [];
-    return instructors.some((row) => idsEqual(row?.personId, personId));
+    if (instructors.some((row) => idsEqual(row?.personId, personId))) return true;
+    const aliasIds = new Set(
+      [personId, ...(Array.isArray(scope?.delivererAliasIds) ? scope.delivererAliasIds : [])]
+        .map((id) => toPublicId(id))
+        .filter(Boolean)
+    );
+    const sessions = Array.isArray(record?.sessions) ? record.sessions : [];
+    return sessions.some((session) => {
+      const deliveredBy = toPublicId(session?.delivery?.deliveredBy);
+      return deliveredBy && [...aliasIds].some((id) => idsEqual(id, deliveredBy));
+    });
   }
 
   if (kind === 'assignees') {
@@ -175,7 +185,20 @@ function buildAssignmentScopeFilter(scope = {}, options = {}) {
   if (!personId) return { id: '__NO_MATCH__' };
 
   if (kind === 'instructor') {
-    return { 'instructors.personId': personId };
+    const aliasIds = [...new Set(
+      [personId, ...(Array.isArray(scope?.delivererAliasIds) ? scope.delivererAliasIds : [])]
+        .map((id) => toPublicId(id))
+        .filter(Boolean)
+    )];
+    const deliveryClause = aliasIds.length === 1
+      ? { 'sessions.delivery.deliveredBy': aliasIds[0] }
+      : { 'sessions.delivery.deliveredBy': { $in: aliasIds } };
+    return {
+      $or: [
+        { 'instructors.personId': personId },
+        deliveryClause
+      ]
+    };
   }
   if (kind === 'assignees') {
     return {

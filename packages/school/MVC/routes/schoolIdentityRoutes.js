@@ -100,4 +100,24 @@ router.patch('/api/linked-person/:personId',
   trackLinkedPersonProfilePatch,
   linkedPersonCtrl.patchLinkedPersonProfile);
 
+function trackDenormalizedNameSync(req, res, next) {
+  const linkType = String(req.body?.linkType || req.query?.linkType || '').trim().toLowerCase();
+  const sectionId = LINK_TYPE_SECTION_MAP[linkType] || SECTIONS.SCHOOL_TEACHERS;
+  return trackActionState(sectionId, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true,
+    keepActive: true
+  })(req, res, next);
+}
+
+router.post('/api/sync-denormalized-names',
+  requireAccessAny([
+    SECTIONS.SCHOOL_TEACHERS,
+    SECTIONS.SCHOOL_STAFF,
+    SECTIONS.SCHOOL_STUDENTS
+  ], OPERATIONS.UPDATE),
+  trackDenormalizedNameSync,
+  linkedPersonCtrl.syncDenormalizedNames);
+
 module.exports = router;

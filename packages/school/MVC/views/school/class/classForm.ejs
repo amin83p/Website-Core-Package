@@ -4166,23 +4166,29 @@ async function applyBulkTeacherChange() {
     const includeLocked = !!bulkIncludeLockedCb?.checked;
 
     if (!oldVal || !newVal) { await uiAlert('Please select both current and new teacher.', 'Missing fields'); return; }
-    if (oldVal === newVal) { await uiAlert('Current teacher and new teacher are the same.', 'No change'); return; }
 
     const newTeacherId = (bulkNewTeacherId?.value || '').trim();
-const newTeacherName = (bulkNewTeacherName?.value || newTeacherId || '').trim();
+    const newTeacherName = (bulkNewTeacherName?.value || newTeacherId || '').trim();
     const oldOption = bulkOldSel?.selectedOptions?.[0] || null;
     const oldTeacherId = String(oldOption?.dataset?.teacherId || oldVal || '').trim();
     const oldTeacherName = String(oldOption?.dataset?.teacherName || oldVal || '').trim();
-    let impact = null;
-    try {
-        impact = await fetchBulkTeacherImpactPreview();
-    } catch (error) {
-        await uiAlert(error.message || 'Could not preview teacher assignment impact.', 'Preview Failed');
+    const isLabelRefreshOnly = Boolean(oldTeacherId && newTeacherId && oldTeacherId === newTeacherId && oldTeacherName !== newTeacherName);
+    if (oldVal === newVal && !isLabelRefreshOnly) {
+        await uiAlert('Current teacher and new teacher are the same.', 'No change');
         return;
     }
-    if (impact) {
-        const confirmed = await confirmBulkTeacherImpact(impact);
-        if (!confirmed) return;
+    let impact = null;
+    if (!isLabelRefreshOnly) {
+        try {
+            impact = await fetchBulkTeacherImpactPreview();
+        } catch (error) {
+            await uiAlert(error.message || 'Could not preview teacher assignment impact.', 'Preview Failed');
+            return;
+        }
+        if (impact) {
+            const confirmed = await confirmBulkTeacherImpact(impact);
+            if (!confirmed) return;
+        }
     }
 
     let changed = 0;

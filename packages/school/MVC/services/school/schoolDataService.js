@@ -151,10 +151,26 @@ async function resolveLinkedAccountIdsForUser(requestingUser, scope = {}) {
   return Array.from(linkedIds);
 }
 
+async function resolveLinkedTeacherRecordIdsForPerson(requestingUser, scope = {}) {
+  const personId = toPublicId(scope?.personId);
+  if (!personId) return [];
+  const orgScope = buildSchoolListScope(requestingUser, { accessContext: { scopeId: 'SCP_ORG' } });
+  const teachers = await schoolRepositories.teachers.list({
+    query: { personId__eq: personId, page: 1, limit: 100 },
+    scope: orgScope
+  });
+  return (Array.isArray(teachers) ? teachers : [])
+    .map((row) => toPublicId(row?.id))
+    .filter(Boolean);
+}
+
 async function buildEntityScopeForRequest(entityType, requestingUser, accessContext = {}) {
   const scope = buildEntityScope(entityType, requestingUser, accessContext);
   if (String(entityType || '') === 'schoolAccounts' && scope.scopeMode === SCOPE_MODES.ASSIGNMENT) {
     scope.linkedAccountIds = await resolveLinkedAccountIdsForUser(requestingUser, scope);
+  }
+  if (String(entityType || '') === 'classes' && scope.scopeMode === SCOPE_MODES.ASSIGNMENT) {
+    scope.delivererAliasIds = await resolveLinkedTeacherRecordIdsForPerson(requestingUser, scope);
   }
   return scope;
 }

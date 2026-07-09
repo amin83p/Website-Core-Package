@@ -5,6 +5,7 @@ const {
   getScopedPersonId,
   getScopedUserId
 } = require('./schoolDataScopeBuilder');
+const teacherIdentityService = require('./teacherIdentityService');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 const SESSION_ACCESS_DENIED = 'You do not have access to this session.';
@@ -41,9 +42,19 @@ function isActiveInstructor(personId, classRow) {
   });
 }
 
-function isSessionDeliveredByPerson(session, personId) {
+function classHasSessionDeliveredByPerson(classRow, personId) {
+  const normalizedPersonId = toPublicId(personId);
+  if (!normalizedPersonId || !classRow) return false;
+  const sessions = Array.isArray(classRow?.sessions) ? classRow.sessions : [];
+  return sessions.some((session) => isSessionDeliveredByPerson(session, normalizedPersonId));
+}
+
+function isSessionDeliveredByPerson(session, personId, teacherPersonMap = null) {
   const normalizedPersonId = toPublicId(personId);
   if (!normalizedPersonId || !session) return false;
+  if (teacherPersonMap instanceof Map) {
+    return teacherIdentityService.sessionDeliveredByMatchesPerson(session, normalizedPersonId, teacherPersonMap);
+  }
   return idsEqual(session?.delivery?.deliveredBy, normalizedPersonId);
 }
 
@@ -99,19 +110,20 @@ function isClassAccessible(classRow, access = {}) {
   }
   if (access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
     return isActiveInstructor(access.personId, classRow)
+      || classHasSessionDeliveredByPerson(classRow, access.personId)
       || isRecordOwnedByUser(classRow, access.userId);
   }
   return true;
 }
 
-function isSessionAccessible({ classRow, session, access = {}, context = 'list' } = {}) {
+function isSessionAccessible({ classRow, session, access = {}, context = 'list', teacherPersonMap = null } = {}) {
   if (!session) return false;
   if (access?.denyAll === true || access?.scopeMode === SCOPE_MODES.USER) return false;
   if (isOrgWideScope(access)) return true;
 
   if (context === 'manageSession' || context === 'mutation') {
     if (access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
-      return isSessionDeliveredByPerson(session, access.personId);
+      return isSessionDeliveredByPerson(session, access.personId, teacherPersonMap);
     }
     if (access?.scopeMode === SCOPE_MODES.OWNER) {
       return isSessionOwnedByUser(session, access.userId);
@@ -124,7 +136,7 @@ function isSessionAccessible({ classRow, session, access = {}, context = 'list' 
       || isRecordOwnedByUser(classRow, access.userId);
   }
   if (access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
-    return isSessionDeliveredByPerson(session, access.personId)
+    return isSessionDeliveredByPerson(session, access.personId, teacherPersonMap)
       || isActiveInstructor(access.personId, classRow);
   }
   return true;

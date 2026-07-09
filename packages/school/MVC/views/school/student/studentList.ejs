@@ -5,7 +5,8 @@
     '<a href="/dashboard/section-nav/SCHOOL_PEOPLE" class="school-navigator-dashboard btn btn-filled btn-secondary mb-2 btn-md"><i class="bi bi-people me-1"></i> People Dashboard</a>'
   ],
   manageBtns: [
-    `<a href="/school/students/archived" class="btn btn-outline-warning btn-md mb-2"><i class="bi bi-arrow-counterclockwise me-1"></i> Recover Archived</a>`
+    `<a href="/school/students/archived" class="btn btn-outline-warning btn-md mb-2"><i class="bi bi-arrow-counterclockwise me-1"></i> Recover Archived</a>`,
+    '<button type="button" class="btn btn-outline-success btn-md mb-2" id="btnSyncStudentDenormalizedNames"><i class="bi bi-arrow-repeat me-1"></i> Sync Saved Names</button>'
   ]
 }) %>
 
@@ -81,3 +82,9 @@
 <span id="urlRef" data-id="school/students" hidden></span>
 <%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/students' }) %>
 <%- include('partials/tablePages-end') %>
+<%- include('../partials/syncDenormalizedNamesManage', {
+  syncDenormalizedLinkType: 'student',
+  syncDenormalizedSectionLabel: 'Students',
+  syncDenormalizedButtonId: 'btnSyncStudentDenormalizedNames',
+  actionStateId
+}) %>

@@ -1,0 +1,140 @@
+<%
+  const syncLinkType = String(typeof syncDenormalizedLinkType !== 'undefined' ? syncDenormalizedLinkType : 'teacher').trim().toLowerCase();
+  const syncSectionLabel = String(typeof syncDenormalizedSectionLabel !== 'undefined' ? syncDenormalizedSectionLabel : 'People').trim();
+  const syncButtonId = String(typeof syncDenormalizedButtonId !== 'undefined' ? syncDenormalizedButtonId : 'btnSyncDenormalizedNames').trim();
+  const syncActionStateId = String(typeof actionStateId !== 'undefined' ? actionStateId : '').trim();
+%>
+<script>
+  (function () {
+    const btn = document.getElementById(<%- JSON.stringify(syncButtonId) %>);
+    const linkType = <%- JSON.stringify(syncLinkType) %>;
+    const sectionLabel = <%- JSON.stringify(syncSectionLabel) %>;
+    const actionStateId = <%- JSON.stringify(syncActionStateId) %>;
+
+    function escapeHtml(v) {
+      return String(v || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function renderSafeMessageHtml(v) {
+      return escapeHtml(v)
+        .replace(/&lt;br\s*\/?&gt;/gi, '<br>')
+        .replace(/&lt;b&gt;/gi, '<b>')
+        .replace(/&lt;\/b&gt;/gi, '</b>');
+    }
+
+    function buildProgressModalHtml(statusText) {
+      return [
+        '<div class="mb-2">', escapeHtml(statusText), '</div>',
+        '<div class="progress" role="progressbar" aria-label="Sync progress" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">',
+        '<div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>',
+        '</div>',
+        '<div class="small text-muted mt-2">Updating class sessions, instructors, cases, activities, tasks, and leave records where saved names still reference old person labels.</div>'
+      ].join('');
+    }
+
+    function buildSummaryHtml(data) {
+      const updated = data && data.updated ? data.updated : {};
+      return [
+        '<div class="mb-2"><b>Done.</b> Saved names for <b>', escapeHtml(sectionLabel), '</b> were synced from the Persons directory.</div>',
+        '<div class="small">',
+        'People processed: <b>', Number(data?.peopleProcessed || 0), '</b><br>',
+        'Classes touched: <b>', Number(updated.classes || 0), '</b><br>',
+        'Sessions updated: <b>', Number(updated.sessions || 0), '</b><br>',
+        'Instructors updated: <b>', Number(updated.instructors || 0), '</b><br>',
+        'Session issues updated: <b>', Number(updated.sessionStudentCases || 0), '</b><br>',
+        'Activities updated: <b>', Number(updated.activities || 0), '</b><br>',
+        'Tasks updated: <b>', Number(updated.tasks || 0), '</b><br>',
+        'Leave requests updated: <b>', Number(updated.leaveRequests || 0), '</b><br>',
+        'Errors: <b>', Number(updated.errors || 0), '</b>',
+        '</div>'
+      ].join('');
+    }
+
+    if (!btn) return;
+
+    btn.addEventListener('click', async function () {
+      const confirmMsg = 'Sync saved ' + sectionLabel.toLowerCase() + ' names from the Persons directory for the active organization?';
+      let confirmed = false;
+      if (typeof window.showMessageModal === 'function') {
+        const answer = await window.showMessageModal({
+          title: 'Sync saved names?',
+          icon: 'warning',
+          message: escapeHtml(confirmMsg) + '<br><br>This refreshes denormalized names in class sessions, instructors, session issues, activities, tasks, and leave records.',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary btn-md' },
+            { text: 'Sync Names', class: 'btn-success btn-md' }
+          ]
+        });
+        confirmed = answer === 'Sync Names';
+      } else {
+        confirmed = window.confirm(confirmMsg);
+      }
+      if (!confirmed) return;
+
+      btn.disabled = true;
+      const original = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Syncing...';
+
+      try {
+        if (typeof window.showMessageModal === 'function') {
+          window.showMessageModal({
+            title: 'Syncing saved names…',
+            icon: 'info',
+            message: buildProgressModalHtml('Checking ' + sectionLabel.toLowerCase() + ' records and updating saved name fields…'),
+            buttons: []
+          });
+        }
+
+        const res = await fetch('/school/identity/api/sync-denormalized-names', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-AJAX-Request': 'true',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            actionStateId,
+            linkType
+          })
+        });
+        const payload = await res.json();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(payload, { busyTitle: 'Sync In Progress', replayTitle: 'Sync Already Completed' })
+          : { stop: false };
+        if (guarded.stop) return;
+        if (payload.status !== 'success') throw new Error(payload.message || 'Sync failed');
+
+        const summaryHtml = buildSummaryHtml(payload.data || {});
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: 'Sync completed',
+            icon: 'success',
+            message: summaryHtml,
+            buttons: [{ text: 'OK', class: 'btn-success btn-md' }]
+          });
+        } else {
+          alert('Sync completed.');
+        }
+      } catch (err) {
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: 'Sync failed',
+            icon: 'error',
+            message: renderSafeMessageHtml(err?.message || String(err)),
+            buttons: [{ text: 'Close', class: 'btn-secondary btn-md' }]
+          });
+        } else {
+          alert(err?.message || String(err));
+        }
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    });
+  })();
+</script>

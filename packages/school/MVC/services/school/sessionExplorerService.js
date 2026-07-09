@@ -3,6 +3,7 @@ const sessionStudentCaseService = require('./sessionStudentCaseService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const schoolRecordAccessService = require('./schoolRecordAccessService');
+const teacherIdentityService = require('./teacherIdentityService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -226,6 +227,8 @@ async function listSessions(req, query = {}) {
   }
 
   const personById = await schoolPersonAccessService.buildPersonByIdMap({ reqUser: req.user });
+  const allTeachers = await schoolDataService.fetchData('teachers', {}, req.user, accessContext).catch(() => []);
+  const teacherPersonMap = teacherIdentityService.buildTeacherPersonMap(allTeachers);
   let rows = [];
 
   for (const classRow of classes) {
@@ -237,7 +240,13 @@ async function listSessions(req, query = {}) {
 
     (Array.isArray(sessions) ? sessions : []).forEach((session) => {
       if (session?.notes === 'Holiday/Off') return;
-      if (!schoolRecordAccessService.isSessionAccessible({ classRow, session, access, context: 'list' })) return;
+      if (!schoolRecordAccessService.isSessionAccessible({
+        classRow,
+        session,
+        access,
+        context: 'list',
+        teacherPersonMap
+      })) return;
 
       if (filters.startDate && session.date < filters.startDate) return;
       if (filters.endDate && session.date > filters.endDate) return;
@@ -245,10 +254,16 @@ async function listSessions(req, query = {}) {
       if (filters.endTime && session.startTime > filters.endTime) return;
 
       const sessionTeacherId = session?.delivery?.deliveredBy;
-      if (viewer.lockedTeacherPersonId && !idsEqual(sessionTeacherId, viewer.lockedTeacherPersonId)) return;
-      if (filters.teacherIds.length && !filters.teacherIds.some((teacherFilterId) => idsEqual(sessionTeacherId, teacherFilterId))) return;
+      const resolvedTeacherPersonId = teacherIdentityService.resolveTeacherPersonId(sessionTeacherId, teacherPersonMap);
+      if (viewer.lockedTeacherPersonId
+        && !teacherIdentityService.sessionDeliveredByMatchesPerson(session, viewer.lockedTeacherPersonId, teacherPersonMap)) {
+        return;
+      }
+      if (filters.teacherIds.length && !filters.teacherIds.some((teacherFilterId) => (
+        teacherIdentityService.sessionDeliveredByMatchesPerson(session, teacherFilterId, teacherPersonMap)
+      ))) return;
 
-      const teacher = personById.get(String(sessionTeacherId || '').trim());
+      const teacher = personById.get(String(resolvedTeacherPersonId || sessionTeacherId || '').trim());
       const teacherName = teacher
         ? schoolPersonAccessService.formatPersonName(teacher, '')
         : (session?.delivery?.deliveredByName || 'Unassigned');
@@ -268,7 +283,7 @@ async function listSessions(req, query = {}) {
         endTime: session?.endTime || '00:00',
         status: normalizedStatus,
         locked: session?.locked === true || String(session?.locked) === 'true',
-        teacherId: sessionTeacherId || '',
+        teacherId: resolvedTeacherPersonId || sessionTeacherId || '',
         teacherName,
         room: session?.room || '',
         notes: session?.notes || '',

@@ -1,5 +1,6 @@
 const schoolDataService = require('./schoolDataService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
+const personDenormalizedNameSyncService = require('./personDenormalizedNameSyncService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
@@ -189,6 +190,8 @@ async function updateLinkedPersonProfile({ reqUser, personId, linkType, linkId =
   const existing = await loadPersonRecord(personId, reqUser);
   assertSchoolProfileFields(body);
 
+  const priorDisplayName = schoolPersonAccessService.formatPersonName(existing, toPublicId(existing.id || personId));
+
   await validatePersonInput(body, {
     isSelfRegistration: false,
     requirePrimaryEmail: true,
@@ -212,10 +215,33 @@ async function updateLinkedPersonProfile({ reqUser, personId, linkType, linkId =
 
   const refreshed = await loadPersonRecord(existing.id, reqUser);
   const profile = toProfileDto(refreshed);
+  const displayName = schoolPersonAccessService.formatPersonName(refreshed, profile.id);
+  let nameSync = null;
+
+  if (displayName && displayName !== priorDisplayName) {
+    try {
+      const activeOrgId = getActiveOrgIdOrThrow(reqUser);
+      nameSync = await personDenormalizedNameSyncService.syncPersonDisplayName({
+        personId: profile.id,
+        displayName,
+        activeOrgId,
+        reqUser
+      });
+    } catch (error) {
+      nameSync = {
+        personId: profile.id,
+        displayName,
+        error: error?.message || 'Failed to sync denormalized person names.'
+      };
+      console.error('schoolLinkedPersonProfileService name sync failed:', error);
+    }
+  }
+
   return {
     person: profile,
-    displayName: schoolPersonAccessService.formatPersonName(refreshed, profile.id),
-    organizations: profile.organizations
+    displayName,
+    organizations: profile.organizations,
+    nameSync
   };
 }
 
