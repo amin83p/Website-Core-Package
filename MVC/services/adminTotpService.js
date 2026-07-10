@@ -7,10 +7,14 @@ const { encrypt, decrypt } = require('../utils/encyptors');
 const { toPublicId, idsEqual } = require('../utils/idAdapter');
 const adminAuthorityService = require('./adminAuthorityService');
 const { queueWrite } = require('../models/fileQueue');
+const { getMongoCollection } = require('../infrastructure/mongo/mongoConnection');
 
 const STORE_PATH = path.join(__dirname, '../../data/adminTotpSecrets.json');
+const TOTP_MONGO_COLLECTION = 'adminTotpSecrets';
 const ISSUER = 'Website Core Admin';
 const PENDING_TTL_MS = 15 * 60 * 1000;
+/** Lifetime cap on self-service key changes (counts only successfully confirmed enrollments). */
+const MAX_TOTP_REGENERATIONS = 5;
 
 authenticator.options = { window: 1, step: 30, digits: 6 };
 
@@ -28,6 +32,40 @@ async function readStore() {
 async function writeStore(store) {
   await fs.mkdir(path.dirname(STORE_PATH), { recursive: true });
   await fs.writeFile(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
+}
+
+function normalizeMongoTotpDoc(doc) {
+  if (!doc || typeof doc !== 'object') return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+
+/** Returns the record when Mongo is reachable and has one, null when reachable but empty, undefined when Mongo is unavailable. */
+async function getRecordFromMongo(key) {
+  try {
+    const doc = await getMongoCollection(TOTP_MONGO_COLLECTION).findOne({ userId: key });
+    return normalizeMongoTotpDoc(doc);
+  } catch (_) {
+    return undefined;
+  }
+}
+
+/** Best-effort Mongo write; failures are swallowed so the JSON fallback write can still proceed. */
+async function writeRecordToMongo(key, record) {
+  try {
+    const collection = getMongoCollection(TOTP_MONGO_COLLECTION);
+    if (!record) {
+      await collection.deleteOne({ userId: key });
+    } else {
+      await collection.updateOne(
+        { userId: key },
+        { $set: { ...record, userId: key, updatedAt: new Date().toISOString() } },
+        { upsert: true }
+      );
+    }
+  } catch (_) {
+    // Mongo unavailable/erroring — JSON fallback below remains the source of truth for this write.
+  }
 }
 
 function userKey(userId) {
@@ -98,19 +136,32 @@ function canManageTotp(viewer, targetUser) {
   return idsEqual(userKey(viewer.id || viewer.userId), userKey(targetUser.id || targetUser.userId));
 }
 
+function remainingRegenerations(regenCount) {
+  return Math.max(0, MAX_TOTP_REGENERATIONS - Number(regenCount || 0));
+}
+
 function publicStatus(record) {
+  const regenCount = Number(record?.regenCount || 0);
   if (!record || !record.enabled || !record.secretEnc) {
-    return { enabled: false, enrolledAt: null };
+    return { enabled: false, enrolledAt: null, regenCount, remainingRegenerations: remainingRegenerations(regenCount) };
   }
   return {
     enabled: true,
-    enrolledAt: record.enrolledAt || null
+    enrolledAt: record.enrolledAt || null,
+    regenCount,
+    remainingRegenerations: remainingRegenerations(regenCount)
   };
 }
 
 async function getRecord(userId) {
   const key = userKey(userId);
   if (!key) return null;
+
+  // Mongo is the primary store; only fall back to the JSON file when Mongo is
+  // unavailable or does not (yet) have a document for this user.
+  const mongoRecord = await getRecordFromMongo(key);
+  if (mongoRecord) return mongoRecord;
+
   const store = await readStore();
   const row = store[key];
   return row && typeof row === 'object' ? row : null;
@@ -120,6 +171,10 @@ async function saveRecord(userId, record) {
   const key = userKey(userId);
   if (!key) throw new Error('User id is required.');
   await queueWrite(async () => {
+    await writeRecordToMongo(key, record);
+
+    // Always mirror to JSON too: keeps the fallback path current when Mongo
+    // succeeds, and is the only persistence when Mongo write failed above.
     const store = await readStore();
     if (!record) {
       delete store[key];
@@ -152,10 +207,24 @@ async function beginEnrollment({ req, targetUser }) {
   if (!targetId) throw new Error('Target user is required.');
 
   const existing = await getRecord(targetId);
-  if (existing?.enabled && existing?.secretEnc) {
-    const err = new Error('Authenticator is already enrolled. Disable it before setting up again.');
-    err.code = 'ALREADY_ENROLLED';
+  const regenCount = Number(existing?.regenCount || 0);
+  if (regenCount >= MAX_TOTP_REGENERATIONS) {
+    const err = new Error(
+      `You have used all ${MAX_TOTP_REGENERATIONS} authenticator key changes allowed for this account. Contact a system administrator to reset it.`
+    );
+    err.code = 'REGEN_LIMIT_REACHED';
     throw err;
+  }
+
+  // Requesting a new key immediately invalidates any currently active key, so a
+  // user (including the super admin with no recovery code) is never locked out
+  // waiting on an old key while a new one is pending confirmation.
+  if (existing?.enabled && existing?.secretEnc) {
+    await saveRecord(targetId, {
+      ...existing,
+      enabled: false,
+      secretEnc: ''
+    });
   }
 
   const secret = authenticator.generateSecret();
@@ -174,7 +243,8 @@ async function beginEnrollment({ req, targetUser }) {
     accountName,
     issuer: ISSUER,
     createdAt: Date.now(),
-    salt: crypto.randomBytes(6).toString('hex')
+    salt: crypto.randomBytes(6).toString('hex'),
+    regenCount
   };
 
   return {
@@ -183,7 +253,9 @@ async function beginEnrollment({ req, targetUser }) {
     secretGrouped: formatSecretGrouped(secret),
     otpauthUrl,
     accountName,
-    issuer: ISSUER
+    issuer: ISSUER,
+    regenCount,
+    remainingRegenerations: remainingRegenerations(regenCount)
   };
 }
 
@@ -219,17 +291,19 @@ async function confirmEnrollment({ req, targetUser, code }) {
   }
 
   const enrolledAt = new Date().toISOString();
+  const regenCount = Number(pending.regenCount || 0) + 1;
   await saveRecord(targetId, {
     enabled: true,
     secretEnc: encryptSecret(secret),
     enrolledAt,
     lastUsedStep: currentStep(),
     accountName: pending.accountName || '',
-    issuer: pending.issuer || ISSUER
+    issuer: pending.issuer || ISSUER,
+    regenCount
   });
   clearPending(req);
 
-  return { enabled: true, enrolledAt };
+  return { enabled: true, enrolledAt, regenCount, remainingRegenerations: remainingRegenerations(regenCount) };
 }
 
 function verifyCodeAgainstRecord(record, code) {
@@ -278,18 +352,85 @@ async function verifyUserCode(userId, code) {
 async function disableEnrollment({ targetUser, code, requireCode = true }) {
   const targetId = userKey(targetUser?.id);
   const record = await getRecord(targetId);
+  const existingRegenCount = Number(record?.regenCount || 0);
   if (!record?.enabled) {
-    return { enabled: false, enrolledAt: null };
+    return { enabled: false, enrolledAt: null, regenCount: existingRegenCount, remainingRegenerations: remainingRegenerations(existingRegenCount) };
   }
   if (requireCode) {
     verifyCodeAgainstRecord(record, code);
   }
-  await saveRecord(targetId, null);
-  return { enabled: false, enrolledAt: null };
+  // Preserve regenCount across disable/re-enroll cycles so the lifetime cap survives it.
+  await saveRecord(targetId, {
+    enabled: false,
+    secretEnc: '',
+    regenCount: existingRegenCount,
+    disabledAt: new Date().toISOString()
+  });
+  return {
+    enabled: false,
+    enrolledAt: null,
+    regenCount: existingRegenCount,
+    remainingRegenerations: remainingRegenerations(existingRegenCount)
+  };
+}
+
+/** Load all TOTP records into a Map keyed by userId (Mongo wins on conflict). */
+async function listAllRecords() {
+  const map = new Map();
+  const store = await readStore();
+  for (const [key, record] of Object.entries(store)) {
+    if (record && typeof record === 'object') map.set(key, record);
+  }
+  try {
+    const docs = await getMongoCollection(TOTP_MONGO_COLLECTION).find({}).toArray();
+    for (const doc of docs) {
+      const normalized = normalizeMongoTotpDoc(doc);
+      const key = userKey(normalized?.userId || doc?.userId);
+      if (key && normalized) map.set(key, normalized);
+    }
+  } catch (_) {
+    // JSON fallback already populated above.
+  }
+  return map;
+}
+
+function buildAdminUsageRow(user, record) {
+  const userId = userKey(user?.id || user?.userId || record?.userId);
+  const status = publicStatus(record);
+  return {
+    userId,
+    email: String(user?.email || record?.accountName || '').trim() || '—',
+    username: String(user?.username || '').trim() || '—',
+    isOrphan: !user,
+    ...status
+  };
+}
+
+/** Rows for TOTP records with no matching users row (e.g. virtual ROOT_001). */
+function buildOrphanUsageRows(totpMap, knownUserIds = []) {
+  const known = new Set(knownUserIds.map((id) => userKey(id)).filter(Boolean));
+  const rows = [];
+  for (const [uid, record] of totpMap.entries()) {
+    if (known.has(uid)) continue;
+    rows.push(buildAdminUsageRow(null, { ...record, userId: uid }));
+  }
+  return rows.sort((a, b) => String(a.userId).localeCompare(String(b.userId)));
+}
+
+/** Super-admin reset: clear lifetime key-change counter without touching enrollment. */
+async function resetRegenCount(userId) {
+  const key = userKey(userId);
+  if (!key) throw new Error('User id is required.');
+  const record = await getRecord(key);
+  if (!record) return publicStatus(null);
+  const updated = { ...record, regenCount: 0 };
+  await saveRecord(key, updated);
+  return publicStatus(updated);
 }
 
 module.exports = {
   ISSUER,
+  MAX_TOTP_REGENERATIONS,
   isSystemSuperAdminUser,
   isTotpEligibleUser,
   isTotpEligibleTarget,
@@ -302,5 +443,9 @@ module.exports = {
   disableEnrollment,
   clearPending,
   formatSecretGrouped,
-  buildOtpauthUrl
+  buildOtpauthUrl,
+  listAllRecords,
+  buildAdminUsageRow,
+  buildOrphanUsageRows,
+  resetRegenCount
 };

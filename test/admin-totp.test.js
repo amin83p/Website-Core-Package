@@ -215,3 +215,168 @@ test('virtual root remains eligible for self TOTP', () => {
   assert.equal(adminTotpService.isTotpEligibleUser(root), true);
   assert.equal(adminTotpService.canManageOwnTotp(root), true);
 });
+
+test('requesting a new key immediately invalidates the previous key, regenCount only increments on confirm', async () => {
+  await withTempStore(async () => {
+    const user = sectionAdminUser('TOTP-REGEN-1');
+    const req = mockReq(user, {});
+
+    const setup1 = await adminTotpService.beginEnrollment({ req, targetUser: user });
+    assert.equal(setup1.regenCount, 0);
+    const confirmed1 = await adminTotpService.confirmEnrollment({ req, targetUser: user, code: authenticator.generate(setup1.secret) });
+    assert.equal(confirmed1.regenCount, 1);
+
+    const statusAfterFirst = await adminTotpService.getStatus(user.id);
+    assert.equal(statusAfterFirst.enabled, true);
+    assert.equal(statusAfterFirst.regenCount, 1);
+    assert.equal(statusAfterFirst.remainingRegenerations, adminTotpService.MAX_TOTP_REGENERATIONS - 1);
+
+    // Requesting a new key invalidates the active one right away, before any confirmation.
+    const setup2 = await adminTotpService.beginEnrollment({ req, targetUser: user });
+    const statusMidRegen = await adminTotpService.getStatus(user.id);
+    assert.equal(statusMidRegen.enabled, false);
+    assert.equal(statusMidRegen.regenCount, 1, 'regenCount must not change until the new key is confirmed');
+
+    await assert.rejects(
+      () => adminTotpService.verifyUserCode(user.id, authenticator.generate(setup1.secret)),
+      (err) => err && err.code === 'NOT_ENROLLED'
+    );
+
+    const confirmed2 = await adminTotpService.confirmEnrollment({ req, targetUser: user, code: authenticator.generate(setup2.secret) });
+    assert.equal(confirmed2.enabled, true);
+    assert.equal(confirmed2.regenCount, 2);
+    assert.equal(confirmed2.remainingRegenerations, adminTotpService.MAX_TOTP_REGENERATIONS - 2);
+  });
+});
+
+test('self-service key regeneration is capped at MAX_TOTP_REGENERATIONS confirmed enrollments', async () => {
+  await withTempStore(async () => {
+    const user = sectionAdminUser('TOTP-REGEN-LIMIT-1');
+    const req = mockReq(user, {});
+    const max = adminTotpService.MAX_TOTP_REGENERATIONS;
+
+    let lastSecret = null;
+    for (let i = 0; i < max; i += 1) {
+      const setup = await adminTotpService.beginEnrollment({ req, targetUser: user });
+      lastSecret = setup.secret;
+      const confirmed = await adminTotpService.confirmEnrollment({ req, targetUser: user, code: authenticator.generate(setup.secret) });
+      assert.equal(confirmed.regenCount, i + 1);
+    }
+
+    const status = await adminTotpService.getStatus(user.id);
+    assert.equal(status.regenCount, max);
+    assert.equal(status.remainingRegenerations, 0);
+
+    await assert.rejects(
+      () => adminTotpService.beginEnrollment({ req, targetUser: user }),
+      (err) => err && err.code === 'REGEN_LIMIT_REACHED'
+    );
+
+    // A blocked regeneration attempt must not invalidate the last confirmed key.
+    // (CODE_REUSED can happen if this runs within the same 30s step as the final confirm.)
+    try {
+      await adminTotpService.verifyUserCode(user.id, authenticator.generate(lastSecret));
+    } catch (err) {
+      if (err.code !== 'CODE_REUSED') throw err;
+    }
+  });
+});
+
+test('regenCount survives a disable and re-enroll cycle', async () => {
+  await withTempStore(async () => {
+    const user = sectionAdminUser('TOTP-REGEN-DISABLE-1');
+    const req = mockReq(user, {});
+
+    const setup1 = await adminTotpService.beginEnrollment({ req, targetUser: user });
+    await adminTotpService.confirmEnrollment({ req, targetUser: user, code: authenticator.generate(setup1.secret) });
+
+    const disableResult = await adminTotpService.disableEnrollment({ targetUser: user, requireCode: false });
+    assert.equal(disableResult.enabled, false);
+    assert.equal(disableResult.regenCount, 1);
+    assert.equal(disableResult.remainingRegenerations, adminTotpService.MAX_TOTP_REGENERATIONS - 1);
+
+    const statusAfterDisable = await adminTotpService.getStatus(user.id);
+    assert.equal(statusAfterDisable.enabled, false);
+    assert.equal(statusAfterDisable.regenCount, 1);
+
+    const setup2 = await adminTotpService.beginEnrollment({ req, targetUser: user });
+    assert.equal(setup2.regenCount, 1);
+    const confirmed2 = await adminTotpService.confirmEnrollment({ req, targetUser: user, code: authenticator.generate(setup2.secret) });
+    assert.equal(confirmed2.regenCount, 2);
+  });
+});
+
+test('resetRegenCount clears counter while preserving active enrollment', async () => {
+  await withTempStore(async () => {
+    const user = sectionAdminUser('TOTP-RESET-1');
+    const req = mockReq(user, {});
+
+    const setup = await adminTotpService.beginEnrollment({ req, targetUser: user });
+    await adminTotpService.confirmEnrollment({ req, targetUser: user, code: authenticator.generate(setup.secret) });
+
+    const statusBefore = await adminTotpService.getStatus(user.id);
+    assert.equal(statusBefore.enabled, true);
+    assert.equal(statusBefore.regenCount, 1);
+
+    const resetResult = await adminTotpService.resetRegenCount(user.id);
+    assert.equal(resetResult.regenCount, 0);
+    assert.equal(resetResult.remainingRegenerations, adminTotpService.MAX_TOTP_REGENERATIONS);
+    assert.equal(resetResult.enabled, true);
+
+    const store = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
+    const record = store[user.id];
+    assert.ok(record.secretEnc, 'enrolled secret should remain after counter reset');
+    assert.equal(record.regenCount, 0);
+    assert.equal(record.enabled, true);
+
+    delete store[user.id].lastUsedStep;
+    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
+    await adminTotpService.verifyUserCode(user.id, authenticator.generate(setup.secret));
+  });
+});
+
+test('user at regen limit can begin enrollment again after super-admin reset', async () => {
+  await withTempStore(async () => {
+    const user = sectionAdminUser('TOTP-RESET-LIMIT-1');
+    const req = mockReq(user, {});
+    const max = adminTotpService.MAX_TOTP_REGENERATIONS;
+
+    for (let i = 0; i < max; i += 1) {
+      const setup = await adminTotpService.beginEnrollment({ req, targetUser: user });
+      await adminTotpService.confirmEnrollment({ req, targetUser: user, code: authenticator.generate(setup.secret) });
+    }
+
+    await assert.rejects(
+      () => adminTotpService.beginEnrollment({ req, targetUser: user }),
+      (err) => err && err.code === 'REGEN_LIMIT_REACHED'
+    );
+
+    await adminTotpService.resetRegenCount(user.id);
+
+    const setupAfterReset = await adminTotpService.beginEnrollment({ req, targetUser: user });
+    assert.ok(setupAfterReset.secret);
+    assert.equal(setupAfterReset.regenCount, 0);
+  });
+});
+
+test('buildOrphanUsageRows includes TOTP records without a users row', () => {
+  const totpMap = new Map([
+    ['ROOT_001', { enabled: true, secretEnc: 'enc', regenCount: 3, accountName: 'root@example.com', enrolledAt: '2026-01-01T00:00:00.000Z' }],
+    ['USER-1', { enabled: false, regenCount: 1 }]
+  ]);
+  const orphans = adminTotpService.buildOrphanUsageRows(totpMap, ['USER-1']);
+  assert.equal(orphans.length, 1);
+  assert.equal(orphans[0].userId, 'ROOT_001');
+  assert.equal(orphans[0].regenCount, 3);
+  assert.equal(orphans[0].isOrphan, true);
+  assert.equal(orphans[0].email, 'root@example.com');
+});
+
+test('buildAdminUsageRow defaults missing record to zero usage', () => {
+  const user = { id: 'USER-NO-TOTP', email: 'plain@example.com', username: 'plain' };
+  const row = adminTotpService.buildAdminUsageRow(user, null);
+  assert.equal(row.userId, 'USER-NO-TOTP');
+  assert.equal(row.regenCount, 0);
+  assert.equal(row.enabled, false);
+  assert.equal(row.remainingRegenerations, adminTotpService.MAX_TOTP_REGENERATIONS);
+});

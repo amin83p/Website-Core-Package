@@ -47,4 +47,13 @@ router.post('/authenticator/disable',
     profileController.disableAuthenticatorEnrollment
 );
 
+router.get('/authenticator/usage',
+    requireAuth,
+    profileController.showAuthenticatorUsageAdmin
+);
+router.post('/authenticator/usage/:userId/reset',
+    requireAuth,
+    profileController.resetAuthenticatorUsage
+);
+
 module.exports = router;

@@ -1,0 +1,185 @@
+<%
+  const maxRegen = (typeof adminTotpMaxRegenerations !== 'undefined' && adminTotpMaxRegenerations) ? adminTotpMaxRegenerations : 5;
+  const rows = Array.isArray(usageRows) ? usageRows : [];
+%>
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: false,
+  print
+}) %>
+
+<div class="alert alert-info border small mb-3">
+  <i class="bi bi-info-circle me-1"></i>
+  Resetting a user's key count sets their lifetime key changes back to <strong>0 of <%= maxRegen %></strong> without disabling their current enrolled authenticator key.
+</div>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search users by email, username, or id...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="email">User <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="enabled">Enrolled <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="regenCount">Key changes used <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="remainingRegenerations">Remaining <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (rows.length) { %>
+        <% rows.forEach((row) => { %>
+          <tr data-user-id="<%= row.userId %>">
+            <td>
+              <div class="fw-bold"><%= row.email %></div>
+              <div class="small text-muted">
+                <%= row.username !== '—' ? row.username + ' · ' : '' %>
+                <span class="font-monospace"><%= row.userId %></span>
+                <% if (row.isOrphan) { %>
+                  <span class="badge bg-light text-secondary border ms-1">No user record</span>
+                <% } %>
+              </div>
+            </td>
+            <td class="text-center">
+              <% if (row.enabled) { %>
+                <span class="badge bg-success">Yes</span>
+              <% } else { %>
+                <span class="badge bg-secondary">No</span>
+              <% } %>
+            </td>
+            <td class="text-center regen-count-cell"><%= Number(row.regenCount || 0) %> / <%= maxRegen %></td>
+            <td class="text-center remaining-cell"><%= Number(row.remainingRegenerations != null ? row.remainingRegenerations : maxRegen) %></td>
+            <td class="text-end pe-4">
+              <button
+                type="button"
+                class="btn btn-outline-warning btn-sm btn-reset-regen"
+                data-user-id="<%= row.userId %>"
+                data-user-label="<%= row.email %>"
+                <%= Number(row.regenCount || 0) > 0 ? '' : 'disabled' %>
+              >
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Reset count
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      <% } else { %>
+        <tr>
+          <td colspan="5" class="text-center text-muted py-4">No users found.</td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: newUrl
+}) %>
+
+<div class="mt-3">
+  <a href="/profile/authenticator" class="btn btn-secondary btn-filled btn-md">
+    <i class="bi bi-arrow-left me-1"></i> Back to Authenticator
+  </a>
+</div>
+
+<%- include('../partials/tablePages-end') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const MAX_REGEN = <%- JSON.stringify(maxRegen) %>;
+
+  async function postReset(userId) {
+    const res = await fetch(`/profile/authenticator/usage/${encodeURIComponent(userId)}/reset`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.status === 'error') {
+      throw new Error(data.message || 'Reset failed.');
+    }
+    return data;
+  }
+
+  function updateRow(tr, data) {
+    const regenCell = tr.querySelector('.regen-count-cell');
+    const remainingCell = tr.querySelector('.remaining-cell');
+    const resetBtn = tr.querySelector('.btn-reset-regen');
+    const regenCount = Number(data.regenCount || 0);
+    const remaining = Number(data.remainingRegenerations != null ? data.remainingRegenerations : MAX_REGEN);
+    if (regenCell) regenCell.textContent = `${regenCount} / ${MAX_REGEN}`;
+    if (remainingCell) remainingCell.textContent = String(remaining);
+    if (resetBtn) resetBtn.disabled = regenCount <= 0;
+  }
+
+  document.querySelectorAll('.btn-reset-regen').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const userId = btn.getAttribute('data-user-id');
+      const userLabel = btn.getAttribute('data-user-label') || userId;
+      if (!userId) return;
+
+      let proceed = true;
+      if (typeof showMessageModal === 'function') {
+        const btnResult = await showMessageModal({
+          title: 'Reset key change count?',
+          icon: 'warning',
+          message: `Reset the authenticator key-change counter for <strong>${userLabel}</strong>? Their current enrolled key will stay active.`,
+          size: 'md',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary btn-md' },
+            { text: 'Reset count', class: 'btn-warning btn-md' }
+          ]
+        });
+        proceed = btnResult === 'Reset count';
+      } else {
+        proceed = window.confirm(`Reset key change count for ${userLabel}?`);
+      }
+      if (!proceed) return;
+
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+      try {
+        const data = await postReset(userId);
+        const tr = btn.closest('tr');
+        if (tr) updateRow(tr, data);
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Counter reset',
+            icon: 'success',
+            message: `Key change count reset for ${userLabel}.`,
+            buttons: [{ text: 'OK', class: 'btn-primary' }]
+          });
+        }
+      } catch (err) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Reset failed',
+            icon: 'error',
+            message: err.message || String(err),
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(err.message || String(err));
+        }
+        btn.disabled = false;
+      } finally {
+        btn.innerHTML = originalHtml;
+      }
+    });
+  });
+});
+</script>

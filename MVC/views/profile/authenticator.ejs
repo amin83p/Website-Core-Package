@@ -1,5 +1,8 @@
 <%
-  const totpStatus = (typeof adminTotpStatus !== 'undefined' && adminTotpStatus) ? adminTotpStatus : { enabled: false, enrolledAt: null };
+  const totpStatus = (typeof adminTotpStatus !== 'undefined' && adminTotpStatus) ? adminTotpStatus : { enabled: false, enrolledAt: null, regenCount: 0, remainingRegenerations: 5 };
+  const totpMaxRegenerations = (typeof adminTotpMaxRegenerations !== 'undefined' && adminTotpMaxRegenerations) ? adminTotpMaxRegenerations : 5;
+  const adminCtx = typeof adminContext !== 'undefined' && adminContext ? adminContext : {};
+  const isSuperAdminViewer = !!adminCtx.isSuperAdmin;
 %>
 <div class="sections-page">
   <div class="dash-hero mb-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
@@ -9,12 +12,19 @@
         Google Authenticator protects sensitive admin operations for your account.
       </div>
     </div>
-    <a href="/profile/" class="btn btn-secondary btn-filled btn-md">
-      <i class="bi bi-person me-1"></i> My Profile
-    </a>
+    <div class="d-flex flex-wrap gap-2">
+      <% if (isSuperAdminViewer) { %>
+        <a href="/profile/authenticator/usage" class="btn btn-outline-primary btn-md">
+          <i class="bi bi-key me-1"></i> Manage key usage
+        </a>
+      <% } %>
+      <a href="/profile/" class="btn btn-secondary btn-filled btn-md">
+        <i class="bi bi-person me-1"></i> My Profile
+      </a>
+    </div>
   </div>
 
-  <div class="form-container" style="max-width: 900px;">
+  <div class="form-container wide" style="width: 100%; max-width: 1400px;">
     <div class="alert alert-warning border small mb-3">
       <i class="bi bi-shield-lock-fill me-1"></i>
       Enroll your device here, then use 6-digit codes when the app asks for admin verification.
@@ -32,10 +42,19 @@
                 Not enrolled
               <% } %>
             </div>
+            <div class="small text-muted" id="adminTotpRegenLabel">
+              Key changes used: <%= Number(totpStatus.regenCount || 0) %> of <%= totpMaxRegenerations %>
+            </div>
           </div>
           <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-filled btn-primary btn-md" id="btnAdminTotpBegin" <%= totpStatus.enabled ? 'disabled' : '' %>>
-              <i class="bi bi-qr-code-scan me-1"></i>Begin setup
+            <button
+              type="button"
+              class="btn btn-filled btn-primary btn-md"
+              id="btnAdminTotpBegin"
+              <%= (Number(totpStatus.remainingRegenerations != null ? totpStatus.remainingRegenerations : totpMaxRegenerations) <= 0) ? 'disabled' : '' %>
+              title="<%= (Number(totpStatus.remainingRegenerations != null ? totpStatus.remainingRegenerations : totpMaxRegenerations) <= 0) ? ('You have used all ' + totpMaxRegenerations + ' key changes allowed for this account. Contact a system administrator to reset it.') : '' %>"
+            >
+              <i class="bi bi-qr-code-scan me-1"></i><span id="btnAdminTotpBeginLabel"><%= totpStatus.enabled ? 'Get new key' : 'Begin setup' %></span>
             </button>
             <button type="button" class="btn btn-outline-danger btn-md" id="btnAdminTotpDisable" <%= totpStatus.enabled ? '' : 'disabled' %>>
               Disable / Reset
@@ -96,7 +115,9 @@
 document.addEventListener('DOMContentLoaded', function () {
   (function initSelfAdminTotp() {
     const statusLabel = document.getElementById('adminTotpStatusLabel');
+    const regenLabel = document.getElementById('adminTotpRegenLabel');
     const beginBtn = document.getElementById('btnAdminTotpBegin');
+    const beginBtnLabel = document.getElementById('btnAdminTotpBeginLabel');
     const disableBtn = document.getElementById('btnAdminTotpDisable');
     const setupCard = document.getElementById('adminTotpSetupCard');
     const disableCard = document.getElementById('adminTotpDisableCard');
@@ -112,15 +133,42 @@ document.addEventListener('DOMContentLoaded', function () {
     const copySecretBtn = document.getElementById('btnCopyAdminTotpSecret');
     const copyOtpauthBtn = document.getElementById('btnCopyAdminTotpOtpauth');
 
-    let pendingSecretContinuous = '';
+    const MAX_TOTP_REGENERATIONS = <%- JSON.stringify(totpMaxRegenerations) %>;
 
-    function setEnrolledUi(enabled, enrolledAt) {
+    let pendingSecretContinuous = '';
+    let state = {
+      enabled: <%- JSON.stringify(!!totpStatus.enabled) %>,
+      regenCount: <%- JSON.stringify(Number(totpStatus.regenCount || 0)) %>,
+      remainingRegenerations: <%- JSON.stringify(Number(totpStatus.remainingRegenerations != null ? totpStatus.remainingRegenerations : totpMaxRegenerations)) %>
+    };
+
+    function applyBeginButtonState() {
+      if (!beginBtn) return;
+      const limitReached = state.remainingRegenerations <= 0;
+      beginBtn.disabled = limitReached;
+      beginBtn.title = limitReached
+        ? `You have used all ${MAX_TOTP_REGENERATIONS} key changes allowed for this account. Contact a system administrator to reset it.`
+        : '';
+      if (beginBtnLabel) beginBtnLabel.textContent = state.enabled ? 'Get new key' : 'Begin setup';
+    }
+
+    function setEnrolledUi(status) {
+      const enabled = !!status?.enabled;
+      const enrolledAt = status?.enrolledAt || null;
+      state = {
+        enabled,
+        regenCount: Number(status?.regenCount != null ? status.regenCount : state.regenCount),
+        remainingRegenerations: Number(status?.remainingRegenerations != null ? status.remainingRegenerations : state.remainingRegenerations)
+      };
       if (statusLabel) {
         statusLabel.textContent = enabled
           ? (`Enrolled${enrolledAt ? (' · ' + new Date(enrolledAt).toLocaleString()) : ''}`)
           : 'Not enrolled';
       }
-      if (beginBtn) beginBtn.disabled = !!enabled;
+      if (regenLabel) {
+        regenLabel.textContent = `Key changes used: ${state.regenCount} of ${MAX_TOTP_REGENERATIONS}`;
+      }
+      applyBeginButtonState();
       if (disableBtn) disableBtn.disabled = !enabled;
       if (setupCard) setupCard.classList.add('d-none');
       if (disableCard) disableCard.classList.toggle('d-none', !enabled);
@@ -157,8 +205,28 @@ document.addEventListener('DOMContentLoaded', function () {
       return data;
     }
 
+    async function confirmKeyChangeIfEnrolled() {
+      if (!state.enabled) return true;
+      if (typeof showMessageModal !== 'function') {
+        return window.confirm('Getting a new key immediately invalidates your current authenticator key. Continue?');
+      }
+      const btnResult = await showMessageModal({
+        title: 'Get a new key?',
+        icon: 'warning',
+        message: 'Your current authenticator key will stop working <strong>immediately</strong>, before the new one is confirmed. Make sure you can complete setup with a new device/app right away.',
+        size: 'md',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+          { text: 'Get new key', class: 'btn-warning btn-md' }
+        ]
+      });
+      return btnResult === 'Get new key';
+    }
+
     beginBtn?.addEventListener('click', async () => {
       if (setupError) setupError.textContent = '';
+      const proceed = await confirmKeyChangeIfEnrolled();
+      if (!proceed) return;
       beginBtn.disabled = true;
       try {
         const data = await postJson('/profile/authenticator/begin', {});
@@ -167,11 +235,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (secretInput) secretInput.value = data.secretGrouped || data.secret || '';
         if (otpauthInput) otpauthInput.value = data.otpauthUrl || '';
         if (confirmCode) confirmCode.value = '';
+        // The old key (if any) is already invalidated server-side by this point.
+        state = { enabled: false, regenCount: state.regenCount, remainingRegenerations: state.remainingRegenerations };
+        if (statusLabel) statusLabel.textContent = 'Not enrolled';
+        if (disableBtn) disableBtn.disabled = true;
         setupCard?.classList.remove('d-none');
         disableCard?.classList.add('d-none');
       } catch (err) {
         if (setupError) setupError.textContent = err.message || String(err);
-        beginBtn.disabled = false;
+      } finally {
+        applyBeginButtonState();
       }
     });
 
@@ -183,7 +256,7 @@ document.addEventListener('DOMContentLoaded', function () {
           code: String(confirmCode?.value || '').trim()
         });
         pendingSecretContinuous = '';
-        setEnrolledUi(true, data.enrolledAt);
+        setEnrolledUi({ enabled: true, enrolledAt: data.enrolledAt, regenCount: data.regenCount, remainingRegenerations: data.remainingRegenerations });
         if (typeof showMessageModal === 'function') {
           await showMessageModal({
             title: 'Authenticator active',
@@ -210,11 +283,10 @@ document.addEventListener('DOMContentLoaded', function () {
       if (disableError) disableError.textContent = '';
       disableConfirmBtn.disabled = true;
       try {
-        await postJson('/profile/authenticator/disable', {
+        const data = await postJson('/profile/authenticator/disable', {
           code: String(disableCode?.value || '').trim()
         });
-        setEnrolledUi(false, null);
-        if (beginBtn) beginBtn.disabled = false;
+        setEnrolledUi({ enabled: false, enrolledAt: null, regenCount: data.regenCount, remainingRegenerations: data.remainingRegenerations });
       } catch (err) {
         if (disableError) disableError.textContent = err.message || String(err);
       } finally {

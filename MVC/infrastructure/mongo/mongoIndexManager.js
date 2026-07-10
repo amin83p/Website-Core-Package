@@ -412,6 +412,9 @@ const INDEX_DEFINITIONS = Object.freeze({
     { key: { orgId: 1, userId: 1, consumedAt: -1 }, options: { name: 'idx_ielts_ai_usage_org_user_consumed' } },
     { key: { providerId: 1, modelUsed: 1, consumedAt: -1 }, options: { name: 'idx_ielts_ai_usage_provider_model_consumed' } },
     { key: { billingStatus: 1, consumedAt: -1 }, options: { name: 'idx_ielts_ai_usage_billing_consumed' } }
+  ],
+  adminTotpSecrets: [
+    { key: { userId: 1 }, options: { name: 'idx_admin_totp_secrets_userId', unique: true } }
   ]
 });
 
@@ -467,6 +470,14 @@ const STARTUP_INDEX_GROUPS = Object.freeze({
       schoolExamAnswers: [
         'idx_school_exam_answers_org_attempt_question',
         'idx_school_exam_answers_org_attempt_status'
+      ]
+    }
+  },
+  adminTotpFoundation: {
+    label: 'Admin TOTP Foundation',
+    collections: {
+      adminTotpSecrets: [
+        'idx_admin_totp_secrets_userId'
       ]
     }
   }

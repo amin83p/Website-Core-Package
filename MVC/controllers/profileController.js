@@ -2,7 +2,17 @@
 const dataService = require('../services/dataService');
 const bcrypt = require('bcryptjs');
 const adminTotpService = require('../services/adminTotpService');
+const adminAuthorityService = require('../services/adminAuthorityService');
+const { SYSTEM_CONTEXT } = require('../../config/constants');
+const { buildDataServiceQuery } = require('../utils/generalTools');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
+
+const USAGE_LIST_QUERY_OPTIONS = Object.freeze({
+  allowedExactKeys: ['id', 'email', 'username', 'status', 'active'],
+  allowedSearchFields: ['id', 'email', 'username'],
+  defaultSearchFields: ['id', 'email', 'username'],
+  allowMetaKeys: true
+});
 
 function denyAuthenticator(req, res, statusCode, message) {
   if (req.headers['x-ajax-request'] || req.xhr || req.headers.accept?.includes('json')) {
@@ -28,6 +38,18 @@ function requireOwnAuthenticatorAccess(req, res) {
       403,
       'Authenticator setup is available to users with admin access on their profile.'
     );
+    return false;
+  }
+  return true;
+}
+
+function requireSuperAdminAccess(req, res) {
+  if (!req.user) {
+    denyAuthenticator(req, res, 401, 'Authentication required.');
+    return false;
+  }
+  if (!adminAuthorityService.isSuperAdmin(req.user)) {
+    denyAuthenticator(req, res, 403, 'This page is available to super administrators only.');
     return false;
   }
   return true;
@@ -174,7 +196,8 @@ async function showAuthenticator(req, res) {
       title: 'Authenticator',
       user: req.user,
       includeModal: true,
-      adminTotpStatus
+      adminTotpStatus,
+      adminTotpMaxRegenerations: adminTotpService.MAX_TOTP_REGENERATIONS
     });
   } catch (error) {
     console.error('Authenticator View Error:', error);
@@ -204,7 +227,7 @@ async function beginAuthenticatorEnrollment(req, res) {
     return res.json({ status: 'success', ...setup });
   } catch (error) {
     const code = error?.code || 'BEGIN_FAILED';
-    const statusCode = code === 'ALREADY_ENROLLED' ? 409 : 400;
+    const statusCode = code === 'REGEN_LIMIT_REACHED' ? 409 : 400;
     return res.status(statusCode).json({ status: 'error', code, message: error.message });
   }
 }
@@ -255,6 +278,86 @@ async function disableAuthenticatorEnrollment(req, res) {
   }
 }
 
+/* ============================================================
+   GET: Super-admin Authenticator key usage list
+============================================================ */
+async function showAuthenticatorUsageAdmin(req, res) {
+  try {
+    if (!requireSuperAdminAccess(req, res)) return;
+
+    const query = await buildDataServiceQuery(req.query, USAGE_LIST_QUERY_OPTIONS);
+    const page = Number.parseInt(req.query?.page, 10) || Number.parseInt(query?.page, 10) || 1;
+    const limit = Number.parseInt(req.query?.limit, 10) || Number.parseInt(query?.limit, 10) || undefined;
+
+    const [pagedUsers, totpMap] = await Promise.all([
+      dataService.fetchDataPaged('users', { ...query, page, limit }, SYSTEM_CONTEXT),
+      adminTotpService.listAllRecords()
+    ]);
+
+    const usersOnPage = Array.isArray(pagedUsers?.rows) ? pagedUsers.rows : [];
+    const pagination = pagedUsers?.pagination || null;
+    const knownUserIds = usersOnPage.map((u) => u.id).filter(Boolean);
+
+    let rows = usersOnPage.map((user) => {
+      const key = String(user.id || '').trim();
+      const record = totpMap.get(key) || null;
+      return adminTotpService.buildAdminUsageRow(user, record);
+    });
+
+    if (page === 1) {
+      rows = rows.concat(adminTotpService.buildOrphanUsageRows(totpMap, knownUserIds));
+    }
+
+    if (req.headers['x-ajax-request']) {
+      return res.json({ status: 'success', results: rows, pagination });
+    }
+
+    return res.render('profile/authenticatorUsageAdmin', {
+      title: 'Authenticator Key Usage',
+      tableName: 'Authenticator_Key_Usage',
+      newUrl: 'profile/authenticator/usage',
+      newLabel: null,
+      includeModal: true,
+      includeModal_Table: true,
+      print: true,
+      usageRows: rows,
+      pagination,
+      searchableFields: USAGE_LIST_QUERY_OPTIONS.defaultSearchFields,
+      filters: req.query,
+      user: req.user,
+      adminTotpMaxRegenerations: adminTotpService.MAX_TOTP_REGENERATIONS
+    });
+  } catch (error) {
+    console.error('Authenticator Usage Admin Error:', error);
+    if (req.headers['x-ajax-request']) {
+      return res.status(500).json({ status: 'error', message: error.message });
+    }
+    return res.status(500).render('error', {
+      title: 'Error',
+      message: 'Unable to load authenticator key usage.',
+      user: req.user
+    });
+  }
+}
+
+async function resetAuthenticatorUsage(req, res) {
+  try {
+    if (!requireSuperAdminAccess(req, res)) return;
+    const targetUserId = String(req.params?.userId || '').trim();
+    if (!targetUserId) {
+      return res.status(400).json({ status: 'error', message: 'User id is required.' });
+    }
+    const result = await adminTotpService.resetRegenCount(targetUserId);
+    return res.json({ status: 'success', userId: targetUserId, ...result });
+  } catch (error) {
+    return res.status(400).json({
+      status: 'error',
+      code: error?.code || 'RESET_FAILED',
+      message: error.message || 'Failed to reset key usage.'
+    });
+  }
+}
+
 module.exports = {
     showProfile,
     updateProfile,
@@ -262,5 +365,7 @@ module.exports = {
     getAuthenticatorStatus,
     beginAuthenticatorEnrollment,
     confirmAuthenticatorEnrollment,
-    disableAuthenticatorEnrollment
+    disableAuthenticatorEnrollment,
+    showAuthenticatorUsageAdmin,
+    resetAuthenticatorUsage
 };
