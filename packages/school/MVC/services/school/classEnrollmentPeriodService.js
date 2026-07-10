@@ -1,6 +1,7 @@
 const schoolRepositories = require('../../repositories/school');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const classEnrollmentPolicyService = require('./classEnrollmentPolicyService');
+const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -192,12 +193,28 @@ async function createPeriod(input = {}, requestingUser = null, options = {}) {
   const requestedStatus = normalizeStatus(input.status, 'active');
   const sessionCap = classEnrollmentSessionApplicabilityService.sanitizeSessionCapFields(input);
 
-  if (
-    String(classRow?.registrationMode || '').trim().toLowerCase() === 'rolling' &&
-    classRow?.isClosedForNewEnrollment === true &&
-    isOpenPeriodStatus(requestedStatus)
-  ) {
-    throw new Error('Class cycle is closed for new enrollment.');
+  const skipCyclePolicyCheck = options.skipCyclePolicyCheck === true || input.skipCyclePolicyCheck === true;
+  if (!skipCyclePolicyCheck) {
+    classCycleEnrollmentPolicyService.assertNewEnrollmentAllowed({ classRow, targetStatus: requestedStatus });
+    classCycleEnrollmentPolicyService.assertEnrollmentDatesWithinCycle({
+      classRow,
+      startDate,
+      endDate
+    });
+    const programRegistrationId = toPublicId(input.programRegistrationId);
+    if (programRegistrationId) {
+      const progReg = await dependencies.repositories.studentProgramRegistrations.getById(programRegistrationId, options);
+      if (progReg) {
+        classCycleEnrollmentPolicyService.assertProgramRegistrationDateWithinCycle({
+          classRow,
+          registrationDate: progReg.registrationDate
+        });
+        classCycleEnrollmentPolicyService.assertEnrollmentNotBeforeProgramRegistration({
+          enrollmentStartDate: startDate,
+          programRegistrationDate: progReg.registrationDate
+        });
+      }
+    }
   }
 
   const overlapCheck = await checkOverlap({
@@ -379,6 +396,129 @@ async function reopenViaNewPeriod(periodId, input = {}, requestingUser = null, o
   };
 }
 
+async function resolveProgramRegistrationDate(programRegistrationId, options = {}) {
+  const normalizedId = toPublicId(programRegistrationId);
+  if (!normalizedId) return '';
+  const progReg = await dependencies.repositories.studentProgramRegistrations.getById(normalizedId, options);
+  return String(progReg?.registrationDate || '').trim();
+}
+
+async function assertCyclePolicyForPeriod({
+  classRow,
+  startDate,
+  endDate,
+  status,
+  previousStatus,
+  programRegistrationId,
+  skipCyclePolicyCheck = false
+}, options = {}) {
+  if (skipCyclePolicyCheck) return;
+
+  classCycleEnrollmentPolicyService.assertEnrollmentDatesWithinCycle({
+    classRow,
+    startDate,
+    endDate
+  });
+
+  const regDate = await resolveProgramRegistrationDate(programRegistrationId, options);
+  if (regDate) {
+    classCycleEnrollmentPolicyService.assertProgramRegistrationDateWithinCycle({
+      classRow,
+      registrationDate: regDate
+    });
+    classCycleEnrollmentPolicyService.assertEnrollmentNotBeforeProgramRegistration({
+      enrollmentStartDate: startDate,
+      programRegistrationDate: regDate
+    });
+  }
+
+  if (previousStatus !== undefined && previousStatus !== null && String(previousStatus).trim()) {
+    classCycleEnrollmentPolicyService.assertClosedCycleEnrollmentTransitionAllowed({
+      classRow,
+      previousStatus,
+      nextStatus: status
+    });
+  }
+}
+
+async function updatePeriod(periodId, input = {}, requestingUser = null, options = {}) {
+  const normalizedPeriodId = toPublicId(periodId);
+  if (!normalizedPeriodId) throw new Error('periodId is required.');
+  const actor = resolveActor(requestingUser);
+  const skipCyclePolicyCheck = options.skipCyclePolicyCheck === true || input.skipCyclePolicyCheck === true;
+
+  const existing = await dependencies.repositories.classEnrollmentPeriods.getById(normalizedPeriodId, options);
+  if (!existing) throw new Error('Enrollment period not found.');
+
+  const classRow = await getClassOrThrow(existing.classId, options);
+  const startDate = input.startDate !== undefined
+    ? requireDateOnly(input.startDate, 'startDate')
+    : requireDateOnly(existing.startDate, 'startDate');
+  const endDate = input.endDate !== undefined
+    ? normalizeDateOnly(input.endDate)
+    : normalizeDateOnly(existing.endDate);
+  if (endDate && endDate < startDate) throw new Error('endDate cannot be before startDate.');
+
+  const previousStatus = normalizeStatus(existing.status);
+  const nextStatus = input.status !== undefined
+    ? normalizeStatus(input.status, previousStatus)
+    : previousStatus;
+
+  const programRegistrationId = input.programRegistrationId !== undefined
+    ? toPublicId(input.programRegistrationId)
+    : toPublicId(existing.programRegistrationId);
+
+  await assertCyclePolicyForPeriod({
+    classRow,
+    startDate,
+    endDate,
+    status: nextStatus,
+    previousStatus,
+    programRegistrationId,
+    skipCyclePolicyCheck
+  }, options);
+
+  const patch = {
+    updatedBy: actor
+  };
+  if (input.startDate !== undefined) patch.startDate = startDate;
+  if (input.endDate !== undefined) patch.endDate = endDate;
+  if (input.status !== undefined) patch.status = nextStatus;
+  if (input.programId !== undefined) patch.programId = toPublicId(input.programId);
+  if (input.termId !== undefined) patch.termId = toPublicId(input.termId);
+  if (input.programRegistrationId !== undefined) patch.programRegistrationId = programRegistrationId;
+  if (input.funderType !== undefined) patch.funderType = String(input.funderType || '').trim();
+  if (input.funderId !== undefined) patch.funderId = String(input.funderId || '').trim();
+  if (input.authorizationRef !== undefined) patch.authorizationRef = String(input.authorizationRef || '').trim();
+  if (input.reasonStart !== undefined) patch.reasonStart = String(input.reasonStart || '').trim();
+  if (input.reasonEnd !== undefined) patch.reasonEnd = String(input.reasonEnd || '').trim();
+  if (input.notes !== undefined) patch.notes = String(input.notes || '').trim();
+  if (input.targetSessionCount !== undefined) {
+    const sessionCap = classEnrollmentSessionApplicabilityService.sanitizeSessionCapFields(input);
+    patch.targetSessionCount = sessionCap.targetSessionCount;
+    patch.sessionCountPolicy = sessionCap.sessionCountPolicy;
+    patch.completionDate = sessionCap.completionDate;
+    patch.completionSessionId = sessionCap.completionSessionId;
+    patch.completionReason = sessionCap.completionReason;
+  } else if (input.sessionCountPolicy !== undefined) {
+    patch.sessionCountPolicy = classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(input.sessionCountPolicy);
+  }
+  if (input.plannedNotApplicableSessionIds !== undefined) {
+    patch.plannedNotApplicableSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(input.plannedNotApplicableSessionIds);
+  }
+  if (input.transactionSummary !== undefined) {
+    patch.transactionSummary = (input.transactionSummary && typeof input.transactionSummary === 'object')
+      ? input.transactionSummary
+      : {};
+  }
+  if (input.pricing !== undefined) {
+    patch.pricing = (input.pricing && typeof input.pricing === 'object') ? { ...input.pricing } : {};
+  }
+
+  const updated = await dependencies.repositories.classEnrollmentPeriods.update(normalizedPeriodId, patch, options);
+  return updated;
+}
+
 function __setDependenciesForTest(nextDeps = {}) {
   dependencies = {
     ...dependencies,
@@ -397,6 +537,7 @@ module.exports = {
   createPeriod,
   closePeriod,
   reopenViaNewPeriod,
+  updatePeriod,
   checkOverlap,
   evaluateReentryRules,
   __setDependenciesForTest,

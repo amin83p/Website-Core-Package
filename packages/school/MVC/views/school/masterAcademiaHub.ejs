@@ -1501,6 +1501,16 @@
     return 'text-bg-secondary';
   }
 
+  function renderClassLifecycleCell(row) {
+    const lifecycleLabel = row.lifecycleMode === 'rolling'
+      ? 'Rolling' + (row.cycleNo ? ' | Cycle #' + escapeHtml(row.cycleNo) : '')
+      : 'Term-Based';
+    const closedBadge = row.lifecycleMode === 'rolling' && row.isClosedForNewEnrollment === true
+      ? ' <span class="badge text-bg-danger">Closed</span>'
+      : '';
+    return lifecycleLabel + closedBadge + '<div class="small text-muted">Active periods: ' + escapeHtml(row.activePeriodCount || 0) + '</div>';
+  }
+
   function renderClassWorkspace(payload) {
     const section = payload && payload.section ? payload.section : workspaceSections.classes;
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
@@ -1525,6 +1535,7 @@
           row.deliveryDepartmentName,
           row.defaultTeacherName,
           lifecycle,
+          row.isClosedForNewEnrollment ? 'closed' : '',
           row.scheduleLabel,
           row.totalHours
         ].join(' ');
@@ -1535,7 +1546,7 @@
           '<div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div>',
           '</td>',
           '<td>' + escapeHtml(row.deliveryDepartmentName || '-') + '</td>',
-          '<td>' + escapeHtml(lifecycle) + '<div class="small text-muted">Active periods: ' + escapeHtml(row.activePeriodCount || 0) + '</div></td>',
+          '<td>' + renderClassLifecycleCell(row) + '</td>',
           '<td>' + escapeHtml(row.scheduleLabel || 'Not scheduled') + '</td>',
           '<td><div class="fw-semibold">' + escapeHtml(row.defaultTeacherName || 'Unassigned') + '</div><div class="small text-muted mt-1">' + escapeHtml(row.totalHours || 0) + ' total hrs</div></td>',
           '<td><span class="badge ' + classStatusBadgeClass(row.status) + '">' + escapeHtml(String(row.status || 'unknown').toUpperCase()) + '</span></td>',

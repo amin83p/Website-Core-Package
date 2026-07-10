@@ -33,6 +33,8 @@ const academicSnapshotService = require('../../services/school/academicSnapshotS
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
+const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
+const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
@@ -1101,6 +1103,10 @@ async function buildClassLifecycleContext(classData, reqUser) {
 
     return {
         isRolling: String(classData?.registrationMode || '').trim().toLowerCase() === 'rolling',
+        cycleStartDate: String(classData?.cycleStartDate || '').trim(),
+        cycleEndDate: String(classData?.cycleEndDate || '').trim(),
+        isClosedForNewEnrollment: classData?.isClosedForNewEnrollment === true
+            || String(classData?.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true',
         activePeriodCount: Number(metrics.activePeriodCount || 0),
         openPeriodCount: Number(metrics.openPeriodCount || 0),
         totalPeriodCount: Number(metrics.totalPeriodCount || 0),
@@ -1570,6 +1576,27 @@ function isApprovedTermRegistrationStatus(status) {
   return String(status || '').trim().toLowerCase() === 'registered';
 }
 
+async function resolveProgramRegistrationDateForRollingPreview(req, student, programId, body = {}) {
+  const explicitId = toPublicId(body?.programRegistrationId);
+  if (explicitId) {
+    const reg = await schoolDataService.getDataById('studentProgramRegistrations', explicitId, req.user);
+    return String(reg?.registrationDate || '').trim();
+  }
+  const studentId = toPublicId(student?.id);
+  const pid = toPublicId(programId);
+  if (!studentId || !pid) return '';
+  const rows = await schoolDataService.fetchData('studentProgramRegistrations', {
+    studentId__eq: studentId,
+    page: 1,
+    limit: 100
+  }, req.user);
+  const match = (Array.isArray(rows) ? rows : [])
+    .filter((row) => idsEqual(row?.programId, pid)
+      && registrationIntegrityService.isApprovedProgramRegistrationStatus(row?.status))
+    .sort((a, b) => String(b.registrationDate || '').localeCompare(String(a.registrationDate || '')))[0];
+  return String(match?.registrationDate || '').trim();
+}
+
 /**
  * Rolling enrollment: program/term come from the student's active program (and when required, term)
  * registrations that intersect the class allowedProgramTerms â€” not from a free-form program picker.
@@ -1632,6 +1659,9 @@ async function resolveRollingEnrollmentProgramFromStudentRegistrations(req, clas
     hasAllowedProgramRegistration = true;
 
     const regDate = String(progReg?.registrationDate || '');
+    if (!classCycleEnrollmentPolicyService.isProgramRegistrationDateWithinCycle(classData, regDate)) {
+      continue;
+    }
     const programChoices = choices.filter((c) => idsEqual(c.programId, pid));
 
     for (const ch of programChoices) {
@@ -1677,6 +1707,11 @@ async function resolveRollingEnrollmentProgramFromStudentRegistrations(req, clas
   }
 
   if (explicitPrId && !candidates.length) {
+    const explicitReg = progRegs.find((row) => idsEqual(row?.id, explicitPrId));
+    if (explicitReg && allowedProgramIds.has(toPublicId(explicitReg?.programId))
+      && !classCycleEnrollmentPolicyService.isProgramRegistrationDateWithinCycle(classData, explicitReg.registrationDate)) {
+      throw new Error('The selected program registration date falls outside this class cycle window.');
+    }
     throw new Error('The selected program registration does not match an allowed program on this class, or the required term registration is missing.');
   }
 
@@ -1702,7 +1737,8 @@ async function resolveRollingEnrollmentProgramFromStudentRegistrations(req, clas
   return {
     programId: chosen.programId,
     termId: chosen.termId,
-    programRegistrationId: chosen.programRegistrationId
+    programRegistrationId: chosen.programRegistrationId,
+    registrationDate: String(chosen.regDate || '').trim()
   };
 }
 
@@ -1766,6 +1802,13 @@ async function buildRollingEnrollmentPrerequisitePreview(req, classData, student
     activeOrgId: toPublicId(classData?.orgId)
   });
 
+  const programRegistrationDate = await resolveProgramRegistrationDateForRollingPreview(
+    req,
+    student,
+    pid,
+    req.body || {}
+  );
+
   const preview = registrationIntegrityService.buildTermClassPreview({
     classItem: classData,
     program,
@@ -1777,7 +1820,8 @@ async function buildRollingEnrollmentPrerequisitePreview(req, classData, student
     subjectCatalogMap,
     selectedSubjectOwners: new Map(),
     existingRosterClassIds,
-    classEnrollmentCountsByClassId: enrollmentCountResult.map || new Map()
+    classEnrollmentCountsByClassId: enrollmentCountResult.map || new Map(),
+    programRegistrationDate
   });
 
   return {
@@ -1859,12 +1903,20 @@ async function previewRollingEnrollmentEligibility(req, res) {
         programId: merged.programId,
         termId: merged.termId,
         programRegistrationId: merged.programRegistrationId,
+        registrationDate: merged.registrationDate || '',
         label: resolvedLabel
       },
       prerequisite: {
         status: prereqPreview.status,
         issues: Array.isArray(prereqPreview.issues) ? prereqPreview.issues : [],
         warnings: Array.isArray(prereqPreview.warnings) ? prereqPreview.warnings : [],
+        capacity: (prereqPreview.capacity && typeof prereqPreview.capacity === 'object')
+          ? {
+            max: Number(prereqPreview.capacity.max || 0),
+            enrolled: Number(prereqPreview.capacity.enrolled || 0),
+            isAtCapacity: prereqPreview.capacity.isAtCapacity === true
+          }
+          : { max: 0, enrolled: 0, isAtCapacity: false },
         missingSubjects: Array.isArray(prereqPreview.missingSubjects) ? prereqPreview.missingSubjects : [],
         canCreatePriorCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
         repairProgramId: prereqPreview.repairProgramId || merged.programId || ''
@@ -1908,12 +1960,22 @@ async function buildEnrollmentSessionAlignmentPayload(classData, body = {}, reqU
   const startDate = String(body?.startDate || '').trim();
   const endDate = String(body?.endDate || '').trim();
   const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(body?.targetSessionCount);
+  const pendingBatch = parsePendingGapBatchFromBody(body);
   const [sessions, statusMap] = await Promise.all([
     schoolDataService.getClassSessions(classData.id, reqUser),
     sessionStatusPolicyService.getStatusMap(classData?.orgId || reqUser?.activeOrgId || '', { includeInactive: true })
   ]);
+  let mergedSessions = Array.isArray(sessions) ? sessions : [];
+  if (pendingBatch) {
+    const preview = await rollingEnrollmentSessionAlignmentService.previewGapBatchSessions({
+      classData,
+      batchSpec: pendingBatch,
+      reqUser
+    });
+    mergedSessions = [...mergedSessions, ...(preview.proposedSessions || [])];
+  }
   const alignment = rollingEnrollmentSessionAlignmentService.evaluateAlignment({
-    sessions,
+    sessions: mergedSessions,
     startDate,
     endDate,
     targetSessionCount,
@@ -1924,37 +1986,80 @@ async function buildEnrollmentSessionAlignmentPayload(classData, body = {}, reqU
     startDate,
     endDate,
     targetSessionCount,
-    scheduleDefaults: rollingEnrollmentSessionAlignmentService.extractScheduleDefaults(classData)
+    enforceSessionCount: rollingEnrollmentSessionAlignmentService.isTargetSessionCountEnforced(targetSessionCount),
+    scheduleDefaults: rollingEnrollmentSessionAlignmentService.extractScheduleDefaults(classData),
+    hasPendingGapBatch: Boolean(pendingBatch)
+  };
+}
+
+function parseGapBatchSpecFromBody(body = {}) {
+  const defaults = rollingEnrollmentSessionAlignmentService.extractScheduleDefaults(body?.classData || {});
+  return rollingEnrollmentSessionAlignmentService.parseGapBatchSpec(body, defaults);
+}
+
+function parsePendingGapBatchFromBody(body = {}, period = null) {
+  const fromBody = parseGapBatchSpecFromBody(body);
+  if (fromBody) return fromBody;
+  const stored = period?.transactionSummary?.pendingGapBatch;
+  if (stored && typeof stored === 'object') {
+    return rollingEnrollmentSessionAlignmentService.parseGapBatchSpec({ pendingGapBatch: stored });
+  }
+  return null;
+}
+
+async function commitPendingGapBatchIfPresent({
+  classData,
+  body = {},
+  period = null,
+  reqUser,
+  enrollingStudentId = ''
+} = {}) {
+  const batchSpec = parsePendingGapBatchFromBody(body, period);
+  if (!batchSpec) return { committed: false, classData, appendResult: null };
+
+  const preview = await rollingEnrollmentSessionAlignmentService.previewGapBatchSessions({
+    classData,
+    batchSpec,
+    reqUser
+  });
+  const proposedSessions = preview.proposedSessions || [];
+  if (!proposedSessions.length) {
+    return { committed: false, classData, appendResult: null };
+  }
+
+  const resolvedTeacher = rollingEnrollmentSessionAlignmentService.resolveDefaultTeacherFromClass(classData, batchSpec);
+  const conflictResult = await sessionConflictDetectionService.evaluateEnrollmentGapBatchConflicts({
+    classData,
+    proposedSessions,
+    teacherId: resolvedTeacher.teacherId,
+    enrollingStudentId: enrollingStudentId || String(body?.studentId || '').trim(),
+    reqUser
+  });
+  if (conflictResult.hasConflicts) {
+    throw new Error(sessionConflictDetectionService.buildConflictBlockingMessage(conflictResult.allConflicts));
+  }
+
+  const appendResult = await rollingEnrollmentSessionAlignmentService.commitGapBatchSessions({
+    classData,
+    batchSpec,
+    extendCycleEndDate: batchSpec.extendCycleEndDate === true,
+    reqUser
+  });
+  return {
+    committed: true,
+    classData: appendResult.classData || classData,
+    appendResult
   };
 }
 
 async function assertEnrollmentSessionAlignmentForCreate({ classData, body = {}, reqUser } = {}) {
   const payload = await buildEnrollmentSessionAlignmentPayload(classData, body, reqUser);
   const plannedNaSessionIds = rollingEnrollmentSessionAlignmentService.parsePlannedNaSessionIdsFromBody(body);
-
-  if (payload.alignmentStatus === 'no_end_date') {
-    return payload;
-  }
-
-  if (payload.alignmentStatus === 'insufficient_sessions') {
-    const need = payload.effectiveTarget || payload.targetSessionCount || 0;
-    throw new Error(`Not enough countable sessions between ${payload.startDate} and ${payload.endDate}. Need ${need}, found ${payload.availableCount}.`);
-  }
-
-  if (payload.alignmentStatus === 'overage_requires_na') {
-    const validation = rollingEnrollmentSessionAlignmentService.validatePlannedNaSelection({
-      countableSessions: payload.countableSessions,
-      targetSessionCount: payload.targetSessionCount,
-      plannedNaSessionIds
-    });
-    if (!validation.valid) {
-      throw new Error(validation.message || 'Invalid N/A session selection.');
-    }
-  } else if (plannedNaSessionIds.length) {
-    throw new Error('N/A session selection is only required when enrolling for fewer sessions than exist in the date window.');
-  }
-
-  return payload;
+  return rollingEnrollmentSessionAlignmentService.assertEnrollmentSessionAlignmentForCreate({
+    classData,
+    payload,
+    plannedNaSessionIds
+  });
 }
 
 async function materializeEnrollmentPlannedNa({ classData, period, student, reqUser } = {}) {
@@ -1986,6 +2091,65 @@ async function postEnrollmentSessionAlignment(req, res) {
   }
 }
 
+async function postPreviewBatchSessions(req, res) {
+  try {
+    const classId = toPublicId(req.params?.classId || req.body?.classId || '');
+    if (!classId) throw new Error('classId is required.');
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+
+    const batchSpec = parseGapBatchSpecFromBody(req.body);
+    if (!batchSpec) throw new Error('Batch session specification is required.');
+
+    const preview = await rollingEnrollmentSessionAlignmentService.previewGapBatchSessions({
+      classData,
+      batchSpec,
+      reqUser: req.user
+    });
+    const proposedSessions = preview.proposedSessions || [];
+    const resolvedTeacher = rollingEnrollmentSessionAlignmentService.resolveDefaultTeacherFromClass(classData, batchSpec);
+    const enrollingStudentId = String(req.body?.studentId || '').trim();
+    const conflictResult = await sessionConflictDetectionService.evaluateEnrollmentGapBatchConflicts({
+      classData,
+      proposedSessions,
+      teacherId: resolvedTeacher.teacherId,
+      enrollingStudentId,
+      reqUser: req.user
+    });
+
+    const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || req.user?.activeOrgId || '', { includeInactive: true });
+    const mergedSessions = [...(preview.existingSessions || []), ...proposedSessions];
+    const alignmentPreview = rollingEnrollmentSessionAlignmentService.evaluateAlignment({
+      sessions: mergedSessions,
+      startDate: String(req.body?.startDate || '').trim(),
+      endDate: String(req.body?.endDate || '').trim(),
+      targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount),
+      statusMap
+    });
+
+    return res.json({
+      status: 'success',
+      message: conflictResult.hasConflicts
+        ? 'Proposed sessions have scheduling conflicts.'
+        : (proposedSessions.length
+          ? `${proposedSessions.length} session(s) can be staged for enrollment.`
+          : 'No new sessions would be added (dates may already exist).'),
+      data: {
+        createdCount: proposedSessions.length,
+        proposedSessions,
+        conflicts: conflictResult.allConflicts,
+        hasConflicts: conflictResult.hasConflicts,
+        teacherConflicts: conflictResult.teacherConflicts,
+        rosterStudentConflicts: conflictResult.rosterStudentConflicts,
+        enrollingStudentConflicts: conflictResult.enrollingStudentConflicts,
+        alignmentPreview
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function postAppendBatchSessions(req, res) {
   try {
     const classId = toPublicId(req.params?.classId || req.body?.classId || '');
@@ -2002,22 +2166,32 @@ async function postAppendBatchSessions(req, res) {
         startTime: String(req.body?.startTime || '').trim(),
         endTime: String(req.body?.endTime || '').trim(),
         room: String(req.body?.room || '').trim(),
+        teacherId: String(req.body?.teacherId || '').trim(),
+        teacherName: String(req.body?.teacherName || '').trim(),
         exceptionDates: parseData(req.body?.exceptionDates) || req.body?.exceptionDates,
         skipExistingDates: parseBoolean(req.body?.skipExistingDates, true),
         status: String(req.body?.status || 'scheduled').trim()
       },
+      extendCycleEndDate: parseBoolean(req.body?.extendCycleEndDate, false),
       reqUser: req.user
     });
 
-    const alignment = await buildEnrollmentSessionAlignmentPayload(classData, req.body, req.user);
+    const classDataForAlignment = appendResult.classData || classData;
+    const alignment = await buildEnrollmentSessionAlignmentPayload(classDataForAlignment, req.body, req.user);
+    const cycleNote = appendResult.cycleEndDateExtended
+      ? ` Cycle end date extended from ${appendResult.previousCycleEndDate || 'not set'} to ${appendResult.newCycleEndDate}.`
+      : '';
     return res.json({
       status: 'success',
       message: appendResult.createdCount
-        ? `${appendResult.createdCount} session(s) added to the class.`
+        ? `${appendResult.createdCount} session(s) added to the class.${cycleNote}`
         : 'No new sessions were added (dates may already exist).',
       data: {
         createdCount: appendResult.createdCount,
         createdSessions: appendResult.createdSessions,
+        cycleEndDateExtended: appendResult.cycleEndDateExtended === true,
+        previousCycleEndDate: appendResult.previousCycleEndDate || '',
+        newCycleEndDate: appendResult.newCycleEndDate || '',
         alignment
       }
     });
@@ -2138,7 +2312,16 @@ async function createClassEnrollmentWithTransactions(req, res) {
       const createdPeriod = result?.period || null;
       let academicLedger = null;
       if (createdPeriod) {
-        const { classData: classAfterCreate } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        let { classData: classAfterCreate } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        if (String(createdPeriod.status || '').trim().toLowerCase() === 'active') {
+          const batchCommit = await commitPendingGapBatchIfPresent({
+            classData: classAfterCreate,
+            body: req.body,
+            reqUser: req.user,
+            enrollingStudentId: enrollmentPayload.studentId
+          });
+          classAfterCreate = batchCommit.classData || classAfterCreate;
+        }
         academicLedger = await tryPostAcademicLedgerForRollingClassEnrollment({
           req,
           period: createdPeriod,
@@ -2239,7 +2422,8 @@ async function createClassEnrollmentWithTransactions(req, res) {
       throw new Error('Draft enrollment period was not created.');
     }
 
-    const updatedDraft = await schoolDataService.updateData('classEnrollmentPeriods', draftPeriodId, {
+    const pendingGapBatch = parsePendingGapBatchFromBody(req.body);
+    const updatedDraft = await schoolDataService.updateClassEnrollmentPeriod(draftPeriodId, {
       status: 'draft',
       notes: enrollmentPayload.notes || `Draft rolling enrollment for class ${classData.id}.`,
       transactionSummary: {
@@ -2251,7 +2435,8 @@ async function createClassEnrollmentWithTransactions(req, res) {
         draftPreviewRows: finalDraftState.previewRows,
         postedTransactionIds: [],
         draftSavedAt: new Date().toISOString(),
-        note: 'Draft generated before posting.'
+        note: 'Draft generated before posting.',
+        pendingGapBatch: pendingGapBatch || null
       }
     }, req.user);
 
@@ -2334,7 +2519,7 @@ async function saveClassEnrollmentDraft(req, res) {
     const nextStatus = ['draft', 'planned', 'active'].includes(nextStatusRaw) ? nextStatusRaw : 'draft';
     const currency = String(finalDraftState.previewRows[0]?.currency || 'CAD').trim().toUpperCase() || 'CAD';
 
-    const updated = await schoolDataService.updateData('classEnrollmentPeriods', periodId, {
+    const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate: nextStartDate,
       endDate: nextEndDate,
       status: nextStatus,
@@ -2591,7 +2776,7 @@ async function syncAcademicLedgerForEnrollmentPeriod(req, res) {
         const hasTermOnPeriod = Boolean(toPublicId(period?.termId));
         let workingPeriod = period;
         if ((!hasProgOnPeriod && inferredProg) || (!hasTermOnPeriod && inferredTerm)) {
-            const patched = await schoolDataService.updateData('classEnrollmentPeriods', periodId, {
+            const patched = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
                 programId: toPublicId(period?.programId) || inferredProg || '',
                 termId: toPublicId(period?.termId) || inferredTerm || ''
             }, req.user);
@@ -2714,7 +2899,7 @@ async function approveClassEnrollmentDraft(req, res) {
     const programIdToStore = toPublicId(period?.programId) || inferredLedgerProgramId || '';
     const termIdToStore = toPublicId(period?.termId) || inferredLedgerTermId || '';
 
-    const updated = await schoolDataService.updateData('classEnrollmentPeriods', periodId, {
+    const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate: String(req.body?.startDate || period?.startDate || '').trim(),
       endDate: String(req.body?.endDate || period?.endDate || '').trim(),
       status: String(req.body?.status || 'active').trim().toLowerCase() || 'active',
@@ -2740,12 +2925,21 @@ async function approveClassEnrollmentDraft(req, res) {
         postedTransactionIds,
         postedAt: new Date().toISOString(),
         draftSavedAt: String(period?.transactionSummary?.draftSavedAt || '').trim(),
-        note: String(req.body?.draftNote || '').trim()
+        note: String(req.body?.draftNote || '').trim(),
+        pendingGapBatch: null
       }
     }, req.user);
 
     const periodForLedger = updated || period;
-    const { classData: classAfterApprove } = await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    let { classData: classAfterApprove } = await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    const batchCommit = await commitPendingGapBatchIfPresent({
+      classData: classAfterApprove,
+      body: req.body,
+      period,
+      reqUser: req.user,
+      enrollingStudentId: period?.studentId || student?.id
+    });
+    classAfterApprove = batchCommit.classData || classAfterApprove;
     const academicLedger = await tryPostAcademicLedgerForRollingClassEnrollment({
       req,
       period: periodForLedger,
@@ -2810,8 +3004,24 @@ async function editClassEnrollmentPeriod(req, res) {
     const status = ['draft', 'planned', 'active', 'completed', 'withdrawn', 'cancelled', 'archived', 'error'].includes(statusInput)
       ? statusInput
       : String(periodRow?.status || 'active').trim().toLowerCase();
+    const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(
+      req.body?.targetSessionCount !== undefined ? req.body?.targetSessionCount : periodRow?.targetSessionCount
+    );
 
-    const updated = await schoolDataService.updateData('classEnrollmentPeriods', periodId, {
+    if (rollingEnrollmentSessionAlignmentService.isTargetSessionCountEnforced(targetSessionCount)) {
+      const alignmentPayload = await buildEnrollmentSessionAlignmentPayload(classData, {
+        startDate,
+        endDate: endDate || periodRow?.endDate || '',
+        targetSessionCount
+      }, req.user);
+      rollingEnrollmentSessionAlignmentService.assertEnrollmentSessionAlignmentForCreate({
+        classData,
+        payload: alignmentPayload,
+        plannedNaSessionIds: rollingEnrollmentSessionAlignmentService.parsePlannedNaSessionIdsFromBody(req.body)
+      });
+    }
+
+    const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate,
       endDate,
       status,
@@ -2819,7 +3029,7 @@ async function editClassEnrollmentPeriod(req, res) {
       funderId: String(req.body?.funderId || periodRow?.funderId || '').trim(),
       authorizationRef: String(req.body?.authorizationRef || periodRow?.authorizationRef || '').trim(),
       reasonStart: String(req.body?.reasonStart || periodRow?.reasonStart || '').trim(),
-      targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount || periodRow?.targetSessionCount),
+      targetSessionCount,
       sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || periodRow?.sessionCountPolicy)
     }, req.user);
 
@@ -2892,7 +3102,7 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
       ? 'Rolled back posted transactions; returned to draft.'
       : `Rollback issues: ${(rollback?.issues || []).join(' | ')}`;
 
-    const updated = await schoolDataService.updateData('classEnrollmentPeriods', periodId, {
+    const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       status: nextStatus,
       // Drafts should be editable; clear endDate so users can adjust.
       endDate: '',
@@ -3433,6 +3643,7 @@ module.exports = {
   showEnrollmentOutcomesPage,
   saveEnrollmentCompletionDecision,
   postEnrollmentSessionAlignment,
+  postPreviewBatchSessions,
   postAppendBatchSessions
 };
 

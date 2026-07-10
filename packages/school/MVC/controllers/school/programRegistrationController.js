@@ -10,6 +10,7 @@ const programRegistrationViewService = require('../../services/school/programReg
 const { PROGRAM_REGISTRATION_LIST_SEARCHABLE_FIELDS } = programRegistrationViewService;
 const programRegistrationDraftService = require('../../services/school/programRegistrationDraftService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
+const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
 const {
   getActiveOrgIdOrThrow,
   assertCreateOrgContextOrThrow,
@@ -46,6 +47,17 @@ function roundMoney(value) {
   const num = Number(value || 0);
   if (!Number.isFinite(num)) return 0;
   return Number(num.toFixed(2));
+}
+
+async function assertRollingClassProgramRegistrationDateOrThrow(req, effectiveDate) {
+  const classId = toPublicId(req.body?.classId);
+  if (!classId) return;
+  const classRow = await dataService.getDataById('classes', classId, req.user);
+  if (!classRow) throw new Error('Class not found.');
+  classCycleEnrollmentPolicyService.assertProgramRegistrationDateWithinCycle({
+    classRow,
+    registrationDate: effectiveDate
+  });
 }
 
 function sendGuardedResponse(res, guardResult, duplicateMessage, duplicateStatus = 409) {
@@ -410,6 +422,8 @@ exports.previewBatchRegistration = async (req, res) => {
     if (!programId) throw new Error('Program is required.');
     if (!studentIds.length) throw new Error('Select at least one student.');
 
+    await assertRollingClassProgramRegistrationDateOrThrow(req, req.body.effectiveDate);
+
     const result = await buildBatchPreview(studentIds, programId, req.user, {
       effectiveDate: req.body.effectiveDate,
       sourceEventType: 'program_registration_fee',
@@ -452,6 +466,8 @@ exports.applyBatchRegistration = async (req, res) => {
     const note = String(req.body.note || '').trim();
     if (!programId) throw new Error('Program is required.');
     if (!studentIds.length) throw new Error('Select at least one student.');
+
+    await assertRollingClassProgramRegistrationDateOrThrow(req, registrationDate);
 
     const guardKey = idempotencyGuardService.createGuardKey([
       'program_batch_apply',

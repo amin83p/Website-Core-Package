@@ -4237,6 +4237,26 @@ if (bulkAddNewInstructorCb) bulkAddNewInstructorCb.addEventListener('change', co
 if (bulkInactivateOldInstructorCb) bulkInactivateOldInstructorCb.addEventListener('change', computeBulkPreview);
 if (bulkApplyBtn) bulkApplyBtn.addEventListener('click', applyBulkTeacherChange);
 
+    if (window.location.hash === '#inp_capacity') {
+        const capacityInput = document.getElementById('inp_capacity');
+        if (capacityInput) {
+            setTimeout(() => {
+                try {
+                    capacityInput.scrollIntoView({ block: 'center' });
+                    capacityInput.focus();
+                    if (typeof capacityInput.select === 'function') capacityInput.select();
+                } catch (_) {}
+            }, 150);
+        }
+    }
+
+    if (window.location.hash === '#tab-sessions') {
+        const sessionsTab = document.querySelector('[data-bs-target="#tab-sessions"]');
+        if (sessionsTab && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+            bootstrap.Tab.getOrCreateInstance(sessionsTab).show();
+        }
+    }
+
     // Initial Render
     renderSessions();
 });

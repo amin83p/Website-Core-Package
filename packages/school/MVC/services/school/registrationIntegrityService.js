@@ -5,6 +5,7 @@ const academicSnapshotService = require('./academicSnapshotService');
 const indexService = require('./schoolIndexService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const leaveRequestService = require('./leaveRequestService');
+const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -639,7 +640,8 @@ const registrationIntegrityService = {
     subjectCatalogMap,
     selectedSubjectOwners,
     existingRosterClassIds,
-    classEnrollmentCountsByClassId = null
+    classEnrollmentCountsByClassId = null,
+    programRegistrationDate = ''
   }) {
     const resolvedClassId = String(classItem?.id || '').trim();
     const mappedEnrollmentCount = classEnrollmentCountsByClassId instanceof Map
@@ -660,7 +662,8 @@ const registrationIntegrityService = {
         max: Number(classItem?.enrollment?.maxCapacity || 0),
         enrolled: Number.isFinite(mappedEnrollmentCount)
           ? mappedEnrollmentCount
-          : 0
+          : 0,
+        isAtCapacity: false
       },
       pricing: {
         currency: 'CAD',
@@ -744,8 +747,24 @@ const registrationIntegrityService = {
     }
     if (classPricing.warnings.length) preview.warnings.push(...classPricing.warnings);
     if (preview.capacity.max > 0 && preview.capacity.enrolled >= preview.capacity.max) {
-      preview.warnings.push('Class is at or above its configured capacity.');
+      preview.capacity.isAtCapacity = true;
+      preview.warnings.push(
+        `Enrollment is at capacity: ${preview.capacity.enrolled} of ${preview.capacity.max} open enrollment slot(s) are already used for this class. Increase Max Student Capacity to enroll more students.`
+      );
     }
+
+    const cycleIssues = classCycleEnrollmentPolicyService.collectCycleEnrollmentViolations({
+      classRow: classItem,
+      enrollmentStartDate: effectiveDate,
+      enrollmentEndDate: '',
+      programRegistrationDate,
+      targetStatus: 'active'
+    });
+    if (cycleIssues.length) {
+      preview.status = 'error';
+      preview.issues.push(...cycleIssues);
+    }
+
     if (preview.status !== 'error' && preview.warnings.length) {
       preview.status = 'warning';
     }

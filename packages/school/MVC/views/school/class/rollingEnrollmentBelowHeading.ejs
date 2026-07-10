@@ -2,6 +2,11 @@
   const rc = typeof classData !== 'undefined' ? (classData || {}) : {};
   const rLife = typeof lifecycleContext !== 'undefined' ? (lifecycleContext || {}) : {};
   const rIsRolling = String(rc.registrationMode || '').trim().toLowerCase() === 'rolling';
+  const rCycleStart = String(rLife.cycleStartDate || rc.cycleStartDate || '').trim();
+  const rCycleEnd = String(rLife.cycleEndDate || rc.cycleEndDate || '').trim();
+  const rCycleClosed = rLife.isClosedForNewEnrollment === true
+    || rc.isClosedForNewEnrollment === true
+    || String(rLife.isClosedForNewEnrollment || rc.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true';
 %>
 <div class="text-muted small mb-2">
   <span class="fw-semibold"><%= rc.title || rc.id %></span>
@@ -13,5 +18,14 @@
   </span>
   <span class="badge bg-info-subtle text-info border border-info-subtle">Active Periods: <%= Number(rLife.activePeriodCount || 0) %></span>
   <span class="badge bg-light text-dark border">Open Periods: <%= Number(rLife.openPeriodCount || 0) %></span>
+  <% if (rIsRolling && rCycleStart) { %>
+    <span class="badge bg-light text-dark border">Cycle Start: <%= rCycleStart %></span>
+  <% } %>
+  <% if (rIsRolling && rCycleEnd) { %>
+    <span class="badge bg-light text-dark border">Cycle End: <%= rCycleEnd %></span>
+  <% } %>
+  <% if (rIsRolling && rCycleClosed) { %>
+    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Closed for new enrollment</span>
+  <% } %>
   <span class="badge bg-light text-dark border ms-auto" id="lbl_periodCount">0 rows</span>
 </div>

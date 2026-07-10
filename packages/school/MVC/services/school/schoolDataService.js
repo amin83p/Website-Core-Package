@@ -10,6 +10,7 @@ const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
 const classEnrollmentPeriodService = require('./classEnrollmentPeriodService');
 const classCycleService = require('./classCycleService');
+const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyService');
 const examBuilderService = require('./examBuilderService');
 
 function getDeletionGuardDeps() {
@@ -431,6 +432,9 @@ const schoolDataService = {
     schoolRepositories.classEnrollmentPeriods.findActiveByStudentIdOnDate(studentId, onDate, options),
   createClassEnrollmentPeriod: async (input, requestingUser, options = {}) =>
     classEnrollmentPeriodService.createPeriod(input, requestingUser, options),
+  updateClassEnrollmentPeriod: async (periodId, input, requestingUser, options = {}) =>
+    classEnrollmentPeriodService.updatePeriod(periodId, input, requestingUser, options),
+  classCycleEnrollmentPolicyService,
   closeClassEnrollmentPeriod: async (periodId, input, requestingUser, options = {}) =>
     classEnrollmentPeriodService.closePeriod(periodId, input, requestingUser, options),
   reopenClassEnrollmentPeriodViaNewPeriod: async (periodId, input, requestingUser, options = {}) =>

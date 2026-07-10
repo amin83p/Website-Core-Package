@@ -318,6 +318,26 @@ function assertRollingSessionsWithinCycleWindowOrThrow(input = {}) {
   throw new Error(`Rolling class sessions must stay within cycle dates. Out-of-window session date(s): ${outsideSample}${outsideSuffix}.`);
 }
 
+function resolveDefaultTeacherFromClass(classData = {}, batchSpec = {}) {
+  const fromSpecId = toPublicId(batchSpec.teacherId);
+  if (fromSpecId) {
+    return {
+      teacherId: fromSpecId,
+      teacherName: cleanText(batchSpec.teacherName)
+    };
+  }
+  const fromPrimary = toPublicId(classData?.primaryTeacherId);
+  if (fromPrimary) {
+    return { teacherId: fromPrimary, teacherName: '' };
+  }
+  const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
+  const active = instructors.find((row) => String(row?.status || '').trim().toLowerCase() === 'active') || instructors[0] || null;
+  return {
+    teacherId: toPublicId(active?.personId),
+    teacherName: cleanText(active?.name || '')
+  };
+}
+
 function generateBatchSessionRows({
   classData = {},
   existingSessions = [],
@@ -355,8 +375,9 @@ function generateBatchSessionRows({
   const durationHours = computeDurationHours(startTime, endTime);
   const room = cleanText(batchSpec.room || defaults.room);
   const defaultStatus = cleanText(batchSpec.status || 'scheduled') || 'scheduled';
-  const teacherId = toPublicId(batchSpec.teacherId || classData?.primaryTeacherId || '');
-  const teacherName = cleanText(batchSpec.teacherName || '');
+  const resolvedTeacher = resolveDefaultTeacherFromClass(classData, batchSpec);
+  const teacherId = resolvedTeacher.teacherId;
+  const teacherName = cleanText(batchSpec.teacherName || resolvedTeacher.teacherName);
 
   const created = [];
   const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
@@ -398,7 +419,30 @@ function generateBatchSessionRows({
   return created;
 }
 
-async function appendBatchSessions({ classData, batchSpec = {}, reqUser } = {}) {
+function computeLatestSessionDate(sessions = []) {
+  const rows = Array.isArray(sessions) ? sessions : [];
+  let latest = '';
+  rows.forEach((row) => {
+    const dateToken = getSessionDate(row);
+    if (dateToken && (!latest || dateToken > latest)) latest = dateToken;
+  });
+  return latest;
+}
+
+function computeProposedCycleEndDate({ cycleEndDate = '', sessions = [] } = {}) {
+  const currentEnd = normalizeDateOnly(cycleEndDate);
+  const latestSessionDate = computeLatestSessionDate(sessions);
+  if (!latestSessionDate) return currentEnd;
+  if (!currentEnd || latestSessionDate > currentEnd) return latestSessionDate;
+  return currentEnd;
+}
+
+function isTargetSessionCountEnforced(targetSessionCount = 0) {
+  const target = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(targetSessionCount);
+  return target >= 1;
+}
+
+async function appendBatchSessions({ classData, batchSpec = {}, reqUser, extendCycleEndDate = false } = {}) {
   if (!classData?.id) throw new Error('classData.id is required.');
   const schoolDataService = resolveSchoolDataService();
   const existingSessions = await schoolDataService.getClassSessions(classData.id, reqUser);
@@ -407,15 +451,36 @@ async function appendBatchSessions({ classData, batchSpec = {}, reqUser } = {}) 
     return {
       createdCount: 0,
       sessions: existingSessions,
-      createdSessions: []
+      createdSessions: [],
+      cycleEndDateExtended: false,
+      previousCycleEndDate: normalizeDateOnly(classData?.cycleEndDate),
+      newCycleEndDate: normalizeDateOnly(classData?.cycleEndDate)
     };
   }
 
   const nextSessions = [...(Array.isArray(existingSessions) ? existingSessions : []), ...created];
+  let workingClassData = { ...classData };
+  const previousCycleEndDate = normalizeDateOnly(workingClassData?.cycleEndDate);
+  const proposedCycleEndDate = computeProposedCycleEndDate({
+    cycleEndDate: previousCycleEndDate,
+    sessions: nextSessions
+  });
+  let cycleEndDateExtended = false;
+
+  if (proposedCycleEndDate && proposedCycleEndDate !== previousCycleEndDate) {
+    if (!extendCycleEndDate) {
+      throw new Error(`New sessions extend beyond the cycle end date (${previousCycleEndDate || 'not set'}). Confirm cycle extension to add sessions through ${proposedCycleEndDate}.`);
+    }
+    workingClassData = await schoolDataService.updateData('classes', classData.id, {
+      cycleEndDate: proposedCycleEndDate
+    }, reqUser);
+    cycleEndDateExtended = true;
+  }
+
   assertRollingSessionsWithinCycleWindowOrThrow({
-    registrationMode: classData?.registrationMode,
-    cycleStartDate: classData?.cycleStartDate,
-    cycleEndDate: classData?.cycleEndDate,
+    registrationMode: workingClassData?.registrationMode,
+    cycleStartDate: workingClassData?.cycleStartDate,
+    cycleEndDate: workingClassData?.cycleEndDate,
     sessions: nextSessions
   });
 
@@ -423,7 +488,11 @@ async function appendBatchSessions({ classData, batchSpec = {}, reqUser } = {}) 
   return {
     createdCount: created.length,
     sessions: saved,
-    createdSessions: created
+    createdSessions: created,
+    cycleEndDateExtended,
+    previousCycleEndDate,
+    newCycleEndDate: normalizeDateOnly(workingClassData?.cycleEndDate),
+    classData: workingClassData
   };
 }
 
@@ -493,15 +562,116 @@ function parsePlannedNaSessionIdsFromBody(body = {}) {
   return [];
 }
 
+function isEnrollmentSessionCountEnforced(classRow = {}) {
+  return classRow?.enforceEnrollmentSessionCount === true
+    || String(classRow?.enforceEnrollmentSessionCount || '').trim().toLowerCase() === 'true';
+}
+
+function assertEnrollmentSessionAlignmentForCreate({
+  classData,
+  payload = {},
+  plannedNaSessionIds = []
+} = {}) {
+  void classData;
+  const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(payload.targetSessionCount);
+  const enforced = isTargetSessionCountEnforced(targetSessionCount);
+  const result = { ...payload, enforceSessionCount: enforced, targetSessionCount };
+
+  if (!enforced) {
+    return result;
+  }
+
+  const endDate = normalizeDateOnly(payload.endDate);
+
+  if (!endDate) {
+    throw new Error('End date is required when a target session count is set on this enrollment.');
+  }
+
+  if (payload.alignmentStatus === 'insufficient_sessions') {
+    const need = payload.effectiveTarget || payload.targetSessionCount || 0;
+    throw new Error(`Not enough countable sessions between ${payload.startDate} and ${payload.endDate}. Need ${need}, found ${payload.availableCount}.`);
+  }
+
+  if (payload.alignmentStatus === 'overage_requires_na') {
+    const validation = validatePlannedNaSelection({
+      countableSessions: payload.countableSessions,
+      targetSessionCount: payload.targetSessionCount,
+      plannedNaSessionIds
+    });
+    if (!validation.valid) {
+      throw new Error(validation.message || 'Invalid N/A session selection.');
+    }
+  } else if (plannedNaSessionIds.length) {
+    throw new Error('N/A session selection is only required when enrolling for fewer sessions than exist in the date window.');
+  }
+
+  return result;
+}
+
+function parseGapBatchSpec(source = {}, defaults = {}) {
+  const raw = source?.pendingGapBatch ?? source?.gapBatch ?? source?.batchSpec ?? source;
+  const body = raw && typeof raw === 'object' ? raw : {};
+  const startDate = normalizeDateOnly(body.startDate);
+  const endDate = normalizeDateOnly(body.endDate);
+  const startTime = cleanText(body.startTime || defaults.startTime || '');
+  const endTime = cleanText(body.endTime || defaults.endTime || '');
+  const daysOfWeek = normalizeDaysOfWeek(body.daysOfWeek).length
+    ? normalizeDaysOfWeek(body.daysOfWeek)
+    : normalizeDaysOfWeek(defaults.daysOfWeek);
+  if (!startDate || !endDate || !startTime || !endTime || !daysOfWeek.length) return null;
+  const skipExistingDates = body.skipExistingDates !== false && String(body.skipExistingDates).toLowerCase() !== 'false';
+  return {
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+    daysOfWeek,
+    room: cleanText(body.room || defaults.room || ''),
+    teacherId: toPublicId(body.teacherId),
+    teacherName: cleanText(body.teacherName || ''),
+    exceptionDates: Array.isArray(body.exceptionDates)
+      ? body.exceptionDates.map((row) => normalizeDateOnly(row)).filter(Boolean)
+      : [],
+    skipExistingDates,
+    status: cleanText(body.status || 'scheduled') || 'scheduled',
+    extendCycleEndDate: body.extendCycleEndDate === true || String(body.extendCycleEndDate).toLowerCase() === 'true'
+  };
+}
+
+async function previewGapBatchSessions({ classData, batchSpec = {}, reqUser } = {}) {
+  if (!classData?.id) throw new Error('classData.id is required.');
+  const schoolDataService = resolveSchoolDataService();
+  const existingSessions = await schoolDataService.getClassSessions(classData.id, reqUser);
+  const proposedSessions = generateBatchSessionRows({ classData, existingSessions, batchSpec });
+  return {
+    createdCount: proposedSessions.length,
+    proposedSessions,
+    existingSessions
+  };
+}
+
+async function commitGapBatchSessions({ classData, batchSpec = {}, reqUser, extendCycleEndDate = false } = {}) {
+  return appendBatchSessions({ classData, batchSpec, reqUser, extendCycleEndDate });
+}
+
 module.exports = {
   listSessionsInWindow,
   evaluateAlignment,
   validatePlannedNaSelection,
   extractScheduleDefaults,
+  resolveDefaultTeacherFromClass,
   generateBatchSessionRows,
+  parseGapBatchSpec,
+  previewGapBatchSessions,
+  commitGapBatchSessions,
   appendBatchSessions,
   materializePlannedNaAttendance,
   sanitizePlannedNaSessionIds,
   parsePlannedNaSessionIdsFromBody,
-  assertRollingSessionsWithinCycleWindowOrThrow
+  assertRollingSessionsWithinCycleWindowOrThrow,
+  isEnrollmentSessionCountEnforced,
+  isTargetSessionCountEnforced,
+  computeProposedCycleEndDate,
+  computeLatestSessionDate,
+  assertEnrollmentSessionAlignmentForCreate
 };

@@ -322,7 +322,8 @@ async function splitPeriodsCrossingCycleBoundary({
       funderId: String(row.funderId || '').trim(),
       authorizationRef: String(row.authorizationRef || '').trim(),
       reasonStart: String(note || `Continuation split from ${fromClass.id} at cycle boundary.`).trim(),
-      reasonEnd: String(row.reasonEnd || '').trim()
+      reasonEnd: String(row.reasonEnd || '').trim(),
+      skipCyclePolicyCheck: true
     }, requestingUser, options);
 
     details.push({
@@ -387,7 +388,8 @@ async function carryForwardEligibleStudents({
       funderId: String(row.funderId || '').trim(),
       authorizationRef: String(row.authorizationRef || '').trim(),
       reasonStart: `Moved whole period from ${fromClassId} during carry-forward.`,
-      reasonEnd: String(row.reasonEnd || '').trim()
+      reasonEnd: String(row.reasonEnd || '').trim(),
+      skipCyclePolicyCheck: true
     }, requestingUser, options);
 
     movedWhole.push({

@@ -107,6 +107,7 @@ function sanitizeClassBasic(item) {
     cycleStartDate,
     cycleEndDate,
     isClosedForNewEnrollment: toBoolean(item.isClosedForNewEnrollment, false),
+    enforceEnrollmentSessionCount: toBoolean(item.enforceEnrollmentSessionCount, false),
     previousClassId: cleanId(item.previousClassId, { max: 64, allowEmpty: true }),
     nextClassId: cleanId(item.nextClassId, { max: 64, allowEmpty: true }),
     cycleNo,

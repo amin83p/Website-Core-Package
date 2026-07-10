@@ -370,6 +370,7 @@ function normalizeClassDataContract(record) {
   normalized.cycleStartDate = String(record.cycleStartDate || '').trim();
   normalized.cycleEndDate = String(record.cycleEndDate || '').trim();
   normalized.isClosedForNewEnrollment = record.isClosedForNewEnrollment === true || String(record.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true';
+  normalized.enforceEnrollmentSessionCount = record.enforceEnrollmentSessionCount === true || String(record.enforceEnrollmentSessionCount || '').trim().toLowerCase() === 'true';
   normalized.previousClassId = String(record.previousClassId || '').trim();
   normalized.nextClassId = String(record.nextClassId || '').trim();
   const parsedCycleNo = Number.parseInt(String(record.cycleNo || '').trim(), 10);
