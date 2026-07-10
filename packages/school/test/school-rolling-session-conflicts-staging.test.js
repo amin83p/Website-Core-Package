@@ -100,6 +100,54 @@ test('rolling enrollment controller commits pending batch after enrollment creat
   assert.match(source, /pendingGapBatch/);
 });
 
+test('parsePendingStagedSessions normalizes explicit staged session rows', () => {
+  const rows = alignmentService.parsePendingStagedSessions({
+    pendingStagedSessions: [{
+      sessionId: 'STAGED_001',
+      date: '2026-02-03',
+      startTime: '09:00',
+      endTime: '10:00',
+      status: 'scheduled',
+      delivery: { deliveredBy: 'PERSON_01', deliveredByName: 'Jane Doe' }
+    }]
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].sessionId, 'STAGED_001');
+  assert.equal(rows[0].delivery.deliveredBy, 'PERSON_01');
+});
+
+test('commitStagedSessions is exported for explicit staged commit path', () => {
+  assert.equal(typeof alignmentService.commitStagedSessions, 'function');
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '../MVC/services/school/rollingEnrollmentSessionAlignmentService.js'),
+    'utf8'
+  );
+  assert.match(source, /async function commitStagedSessions/);
+});
+
+test('rolling enrollment controller parses pendingStagedSessions for alignment and commit', () => {
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '../MVC/controllers/school/classRollingEnrollmentController.js'),
+    'utf8'
+  );
+  assert.match(source, /parsePendingStagedSessionsFromBody/);
+  assert.match(source, /commitStagedSessions/);
+  assert.match(source, /pendingStagedSessions/);
+});
+
+test('rolling enrollment UI highlights staged sessions and persists gap form draft', () => {
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '../MVC/views/school/class/rollingEnrollment.ejs'),
+    'utf8'
+  );
+  assert.match(source, /pendingStagedSessions/);
+  assert.match(source, /gapFormDraft/);
+  assert.match(source, /gap-session-row-staged/);
+  assert.match(source, /btn-remove-staged/);
+  assert.match(source, /captureGapFormDraft/);
+  assert.match(source, /applyGapFormDraft/);
+});
+
 test('rolling enrollment UI uses preview-batch instead of immediate append-batch save', () => {
   const source = require('fs').readFileSync(
     require('path').join(__dirname, '../MVC/views/school/class/rollingEnrollment.ejs'),

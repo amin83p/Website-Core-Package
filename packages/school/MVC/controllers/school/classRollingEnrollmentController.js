@@ -1960,13 +1960,16 @@ async function buildEnrollmentSessionAlignmentPayload(classData, body = {}, reqU
   const startDate = String(body?.startDate || '').trim();
   const endDate = String(body?.endDate || '').trim();
   const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(body?.targetSessionCount);
-  const pendingBatch = parsePendingGapBatchFromBody(body);
+  const pendingStagedSessions = parsePendingStagedSessionsFromBody(body);
+  const pendingBatch = pendingStagedSessions.length ? null : parsePendingGapBatchFromBody(body);
   const [sessions, statusMap] = await Promise.all([
     schoolDataService.getClassSessions(classData.id, reqUser),
     sessionStatusPolicyService.getStatusMap(classData?.orgId || reqUser?.activeOrgId || '', { includeInactive: true })
   ]);
   let mergedSessions = Array.isArray(sessions) ? sessions : [];
-  if (pendingBatch) {
+  if (pendingStagedSessions.length) {
+    mergedSessions = [...mergedSessions, ...pendingStagedSessions];
+  } else if (pendingBatch) {
     const preview = await rollingEnrollmentSessionAlignmentService.previewGapBatchSessions({
       classData,
       batchSpec: pendingBatch,
@@ -1988,7 +1991,8 @@ async function buildEnrollmentSessionAlignmentPayload(classData, body = {}, reqU
     targetSessionCount,
     enforceSessionCount: rollingEnrollmentSessionAlignmentService.isTargetSessionCountEnforced(targetSessionCount),
     scheduleDefaults: rollingEnrollmentSessionAlignmentService.extractScheduleDefaults(classData),
-    hasPendingGapBatch: Boolean(pendingBatch)
+    hasPendingGapBatch: Boolean(pendingBatch || pendingStagedSessions.length),
+    pendingStagedCount: pendingStagedSessions.length
   };
 }
 
@@ -2007,6 +2011,24 @@ function parsePendingGapBatchFromBody(body = {}, period = null) {
   return null;
 }
 
+function parsePendingStagedSessionsFromBody(body = {}, period = null) {
+  const fromBody = rollingEnrollmentSessionAlignmentService.parsePendingStagedSessions(body);
+  if (fromBody.length) return fromBody;
+  const stored = period?.transactionSummary?.pendingStagedSessions;
+  if (Array.isArray(stored) && stored.length) {
+    return rollingEnrollmentSessionAlignmentService.parsePendingStagedSessions({ pendingStagedSessions: stored });
+  }
+  return [];
+}
+
+function resolvePendingGapExtendCycleEndDate(body = {}, period = null) {
+  const batch = parsePendingGapBatchFromBody(body, period);
+  if (batch?.extendCycleEndDate === true) return true;
+  const raw = body?.extendCycleEndDate ?? body?.pendingGapBatch?.extendCycleEndDate
+    ?? period?.transactionSummary?.extendCycleEndDate;
+  return parseBoolean(raw, false);
+}
+
 async function commitPendingGapBatchIfPresent({
   classData,
   body = {},
@@ -2014,6 +2036,39 @@ async function commitPendingGapBatchIfPresent({
   reqUser,
   enrollingStudentId = ''
 } = {}) {
+  const stagedSessions = parsePendingStagedSessionsFromBody(body, period);
+  const extendCycleEndDate = resolvePendingGapExtendCycleEndDate(body, period);
+
+  if (stagedSessions.length) {
+    const teacherId = toPublicId(
+      stagedSessions[0]?.delivery?.deliveredBy
+      || body?.pendingGapBatch?.teacherId
+      || ''
+    );
+    const conflictResult = await sessionConflictDetectionService.evaluateEnrollmentGapBatchConflicts({
+      classData,
+      proposedSessions: stagedSessions,
+      teacherId,
+      enrollingStudentId: enrollingStudentId || String(body?.studentId || '').trim(),
+      reqUser
+    });
+    if (conflictResult.hasConflicts) {
+      throw new Error(sessionConflictDetectionService.buildConflictBlockingMessage(conflictResult.allConflicts));
+    }
+
+    const appendResult = await rollingEnrollmentSessionAlignmentService.commitStagedSessions({
+      classData,
+      sessionsToAdd: stagedSessions,
+      extendCycleEndDate,
+      reqUser
+    });
+    return {
+      committed: appendResult.createdCount > 0,
+      classData: appendResult.classData || classData,
+      appendResult
+    };
+  }
+
   const batchSpec = parsePendingGapBatchFromBody(body, period);
   if (!batchSpec) return { committed: false, classData, appendResult: null };
 
@@ -2423,6 +2478,7 @@ async function createClassEnrollmentWithTransactions(req, res) {
     }
 
     const pendingGapBatch = parsePendingGapBatchFromBody(req.body);
+    const pendingStagedSessions = parsePendingStagedSessionsFromBody(req.body);
     const updatedDraft = await schoolDataService.updateClassEnrollmentPeriod(draftPeriodId, {
       status: 'draft',
       notes: enrollmentPayload.notes || `Draft rolling enrollment for class ${classData.id}.`,
@@ -2436,7 +2492,9 @@ async function createClassEnrollmentWithTransactions(req, res) {
         postedTransactionIds: [],
         draftSavedAt: new Date().toISOString(),
         note: 'Draft generated before posting.',
-        pendingGapBatch: pendingGapBatch || null
+        pendingGapBatch: pendingGapBatch || null,
+        pendingStagedSessions: pendingStagedSessions.length ? pendingStagedSessions : null,
+        extendCycleEndDate: resolvePendingGapExtendCycleEndDate(req.body)
       }
     }, req.user);
 
@@ -2926,7 +2984,9 @@ async function approveClassEnrollmentDraft(req, res) {
         postedAt: new Date().toISOString(),
         draftSavedAt: String(period?.transactionSummary?.draftSavedAt || '').trim(),
         note: String(req.body?.draftNote || '').trim(),
-        pendingGapBatch: null
+        pendingGapBatch: null,
+        pendingStagedSessions: null,
+        extendCycleEndDate: false
       }
     }, req.user);
 

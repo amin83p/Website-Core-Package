@@ -39,6 +39,9 @@
     font-size: 0.78rem;
     white-space: nowrap;
   }
+  .rolling-enrollment-page tr.gap-session-row-staged > td {
+    background-color: var(--bs-warning-bg-subtle, #fff3cd);
+  }
   .rolling-enrollment-page .rolling-row-actions-wrap {
     position: relative;
     display: inline-block;
@@ -643,10 +646,10 @@
           <div class="table-responsive border rounded">
             <table class="table table-sm align-middle mb-0">
               <thead class="table-light">
-                <tr><th>Date</th><th>Time</th><th>Status</th><th>Countable</th></tr>
+                <tr><th>Date</th><th>Time</th><th>Status</th><th>Countable</th><th class="text-end">Actions</th></tr>
               </thead>
               <tbody id="gapSessionsTbody">
-                <tr><td colspan="4" class="text-center text-muted py-3">No sessions loaded.</td></tr>
+                <tr><td colspan="5" class="text-center text-muted py-3">No sessions loaded.</td></tr>
               </tbody>
             </table>
           </div>
@@ -787,6 +790,9 @@
   let pendingPlannedNaSessionIds = [];
   let pendingGapBatch = null;
   let pendingGapPreview = null;
+  let pendingStagedSessions = [];
+  let gapFormDraft = null;
+  let gapFormDraftTimer = null;
   let alignmentDebounceTimer = null;
   let gapModalClosedShouldRecheck = false;
 
@@ -1529,8 +1535,14 @@
     if (hasTargetSessionCount()) {
       payload.targetSessionCount = String(qs('inp_targetSessionCount')?.value || '').trim();
     }
+    if (pendingStagedSessions.length) {
+      payload.pendingStagedSessions = pendingStagedSessions.map((row) => ({ ...row }));
+    }
     if (pendingGapBatch) {
       payload.pendingGapBatch = { ...pendingGapBatch };
+    }
+    if (pendingGapBatch?.extendCycleEndDate === true) {
+      payload.extendCycleEndDate = true;
     }
     return payload;
   }
@@ -1544,24 +1556,186 @@
       endDate: String(overrides.endDate ?? payload.endDate ?? '').trim(),
       targetSessionCount: String(overrides.targetSessionCount ?? payload.targetSessionCount ?? '').trim()
     };
-    if (pendingGapBatch) {
+    if (pendingStagedSessions.length) {
+      body.pendingStagedSessions = pendingStagedSessions.map((row) => ({ ...row }));
+    } else if (pendingGapBatch) {
       body.pendingGapBatch = { ...pendingGapBatch };
+    }
+    if (pendingGapBatch?.extendCycleEndDate === true) {
+      body.extendCycleEndDate = true;
     }
     return body;
   }
 
-  function clearPendingGapBatch() {
+  function sessionScheduleKeyClient(session = {}) {
+    return [
+      String(session?.date || '').trim(),
+      String(session?.startTime || session?.start || '').trim(),
+      String(session?.endTime || session?.end || '').trim()
+    ].join('|');
+  }
+
+  function getStagedSessionIdSet() {
+    return new Set(
+      (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : [])
+        .map((row) => String(row?.sessionId || '').trim())
+        .filter(Boolean)
+    );
+  }
+
+  function isStagedSessionRow(row = {}) {
+    if (row?.isStaged === true) return true;
+    const id = String(row?.sessionId || '').trim();
+    return Boolean(id && getStagedSessionIdSet().has(id));
+  }
+
+  function buildGapModalSessionRows() {
+    const stagedIds = getStagedSessionIdSet();
+    const stagedKeys = new Set(
+      (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : []).map((row) => sessionScheduleKeyClient(row))
+    );
+    const baseRows = (Array.isArray(lastAlignmentResult?.sessions) ? lastAlignmentResult.sessions : [])
+      .filter((row) => {
+        const id = String(row?.sessionId || '').trim();
+        if (id && stagedIds.has(id)) return false;
+        if (stagedKeys.has(sessionScheduleKeyClient(row))) return false;
+        return true;
+      });
+    const stagedRows = (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : []).map((row) => ({
+      sessionId: row.sessionId,
+      date: row.date,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      status: row.status || 'scheduled',
+      countable: true,
+      isStaged: true
+    }));
+    return [...baseRows, ...stagedRows].sort((a, b) => {
+      const keyA = `${a.date || ''}|${a.startTime || ''}|${a.endTime || ''}`;
+      const keyB = `${b.date || ''}|${b.startTime || ''}|${b.endTime || ''}`;
+      return keyA.localeCompare(keyB);
+    });
+  }
+
+  function clearPendingGapBatch({ clearFormDraft = true } = {}) {
     pendingGapBatch = null;
     pendingGapPreview = null;
+    pendingStagedSessions = [];
+    if (clearFormDraft) gapFormDraft = null;
     updateGapStagedBadge();
+    renderGapSessionTable();
+  }
+
+  function captureGapFormDraft() {
+    gapFormDraft = {
+      startDate: String(qs('gap_batchStart')?.value || '').trim(),
+      endDate: String(qs('gap_batchEnd')?.value || '').trim(),
+      startTime: String(qs('gap_batchStartTime')?.value || '').trim(),
+      endTime: String(qs('gap_batchEndTime')?.value || '').trim(),
+      daysOfWeek: Array.from(document.querySelectorAll('.gap-day-cb:checked')).map((input) => Number(input.value)),
+      teacherId: String(qs('gap_teacherId')?.value || '').trim(),
+      teacherName: String(qs('gap_teacherName')?.value || '').trim(),
+      room: String(qs('gap_room')?.value || '').trim(),
+      exceptions: String(qs('gap_exceptions')?.value || '').trim(),
+      skipHolidays: Boolean(qs('gap_skipHolidays')?.checked)
+    };
+  }
+
+  function applyGapFormDraft(draft = {}) {
+    if (!draft || typeof draft !== 'object') return;
+    if (qs('gap_batchStart')) qs('gap_batchStart').value = String(draft.startDate || '').trim();
+    if (qs('gap_batchEnd')) qs('gap_batchEnd').value = String(draft.endDate || '').trim();
+    if (qs('gap_batchStartTime')) qs('gap_batchStartTime').value = String(draft.startTime || '').trim();
+    if (qs('gap_batchEndTime')) qs('gap_batchEndTime').value = String(draft.endTime || '').trim();
+    if (qs('gap_room')) qs('gap_room').value = String(draft.room || '').trim();
+    if (qs('gap_teacherId')) qs('gap_teacherId').value = String(draft.teacherId || '').trim();
+    if (qs('gap_teacherName')) qs('gap_teacherName').value = String(draft.teacherName || '').trim();
+    if (qs('gap_exceptions')) qs('gap_exceptions').value = String(draft.exceptions || '').trim();
+    if (qs('gap_skipHolidays')) qs('gap_skipHolidays').checked = draft.skipHolidays === true;
+    const selected = new Set((Array.isArray(draft.daysOfWeek) ? draft.daysOfWeek : []).map((row) => String(row)));
+    document.querySelectorAll('.gap-day-cb').forEach((input) => {
+      input.checked = selected.has(String(input.value));
+    });
+    updateGapCycleExtendWarning();
+  }
+
+  function scheduleGapFormDraftCapture() {
+    if (gapFormDraftTimer) clearTimeout(gapFormDraftTimer);
+    gapFormDraftTimer = setTimeout(() => {
+      gapFormDraftTimer = null;
+      captureGapFormDraft();
+    }, 200);
+  }
+
+  function appendUniqueStagedSessions(proposed = []) {
+    const rows = Array.isArray(proposed) ? proposed : [];
+    if (!rows.length) return 0;
+    const existingKeys = new Set((pendingStagedSessions || []).map((row) => sessionScheduleKeyClient(row)));
+    const existingIds = getStagedSessionIdSet();
+    let added = 0;
+    rows.forEach((row) => {
+      const key = sessionScheduleKeyClient(row);
+      const id = String(row?.sessionId || '').trim();
+      if (existingKeys.has(key) || (id && existingIds.has(id))) return;
+      pendingStagedSessions.push({ ...row });
+      existingKeys.add(key);
+      if (id) existingIds.add(id);
+      added += 1;
+    });
+    pendingGapPreview = {
+      createdCount: pendingStagedSessions.length,
+      proposedSessions: pendingStagedSessions.slice()
+    };
+    return added;
+  }
+
+  async function refreshAlignmentWithStagedSessions() {
+    const alignment = await fetchEnrollmentSessionAlignment(buildAlignmentRequestBody());
+    if (alignment) {
+      lastAlignmentResult = alignment;
+      updateSessionCountHint(alignment);
+      if (hasTargetSessionCount() && alignment.alignmentStatus !== 'insufficient_sessions') {
+        const targetInput = qs('inp_targetSessionCount');
+        if (targetInput && !String(targetInput.dataset.userEdited || '').trim()) {
+          targetInput.value = String(alignment.availableCount || '');
+        }
+      }
+    }
+    renderGapSessionTable();
+    updateGapStagedBadge();
+    return alignment;
+  }
+
+  async function removeStagedSession(sessionId) {
+    const id = String(sessionId || '').trim();
+    if (!id) return;
+    pendingStagedSessions = (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : [])
+      .filter((row) => String(row?.sessionId || '').trim() !== id);
+    if (!pendingStagedSessions.length) {
+      pendingGapBatch = null;
+      pendingGapPreview = null;
+    } else {
+      pendingGapPreview = {
+        createdCount: pendingStagedSessions.length,
+        proposedSessions: pendingStagedSessions.slice()
+      };
+    }
+    updateGapStagedBadge();
+    gapModalClosedShouldRecheck = true;
+    await refreshAlignmentWithStagedSessions();
   }
 
   function updateGapStagedBadge() {
     const badge = qs('gapStagedBadge');
     const clearBtn = qs('btn_gapClearStaged');
-    const count = Number(pendingGapPreview?.createdCount || pendingGapPreview?.proposedSessions?.length || 0);
+    const count = Number(
+      pendingStagedSessions.length
+      || pendingGapPreview?.createdCount
+      || pendingGapPreview?.proposedSessions?.length
+      || 0
+    );
     if (!badge) return;
-    if (!pendingGapBatch || count <= 0) {
+    if (!count) {
       badge.classList.add('d-none');
       badge.innerHTML = '';
       clearBtn?.classList.add('d-none');
@@ -1621,7 +1795,10 @@
   }
 
   function openEnrollmentSessionListModal() {
-    renderSessionWindowTable(lastAlignmentResult?.sessions || [], 'enrollmentSessionListTbody');
+    const rows = pendingStagedSessions.length
+      ? buildGapModalSessionRows()
+      : (lastAlignmentResult?.sessions || []);
+    renderSessionWindowTable(rows, 'enrollmentSessionListTbody', { highlightStaged: true });
     enrollmentSessionListModal?.show();
   }
 
@@ -1719,29 +1896,44 @@
     updateGapCycleExtendWarning();
   }
 
-  function renderSessionWindowTable(sessions = [], tbodyId = 'gapSessionsTbody') {
+  function renderSessionWindowTable(sessions = [], tbodyId = 'gapSessionsTbody', options = {}) {
     const tbodyEl = qs(tbodyId);
     if (!tbodyEl) return;
     const rows = Array.isArray(sessions) ? sessions : [];
+    const showActions = options.showActions === true;
+    const highlightStaged = options.highlightStaged === true || showActions;
+    const colSpan = showActions ? 5 : 4;
     if (!rows.length) {
-      tbodyEl.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No sessions in this enrollment window yet.</td></tr>';
+      tbodyEl.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted py-3">No sessions in this enrollment window yet.</td></tr>`;
       return;
     }
     tbodyEl.innerHTML = rows.map((row) => {
+      const staged = highlightStaged && isStagedSessionRow(row);
+      const rowClass = staged ? 'gap-session-row-staged' : '';
       const countableBadge = row.countable
         ? '<span class="badge bg-success-subtle text-success border">Yes</span>'
         : `<span class="badge bg-secondary-subtle text-secondary border" title="${htmlEscape(row.excludeReason || '')}">No</span>`;
-      return `<tr>
+      const statusCell = staged
+        ? '<span class="badge bg-warning-subtle text-warning-emphasis border">Staged</span>'
+        : htmlEscape(row.status || '-');
+      const actionsCell = showActions && staged
+        ? `<button type="button" class="btn btn-sm btn-outline-danger btn-remove-staged" data-session-id="${htmlEscape(row.sessionId || '')}" title="Remove staged session"><i class="bi bi-trash"></i></button>`
+        : '';
+      const actionsTd = showActions
+        ? `<td class="text-end">${actionsCell}</td>`
+        : '';
+      return `<tr class="${rowClass}">
         <td>${htmlEscape(row.date || '-')}</td>
         <td>${htmlEscape([row.startTime, row.endTime].filter(Boolean).join(' - ') || '-')}</td>
-        <td>${htmlEscape(row.status || '-')}</td>
+        <td>${statusCell}</td>
         <td>${countableBadge}</td>
+        ${actionsTd}
       </tr>`;
     }).join('');
   }
 
-  function renderGapSessionTable(sessions = []) {
-    renderSessionWindowTable(sessions, 'gapSessionsTbody');
+  function renderGapSessionTable() {
+    renderSessionWindowTable(buildGapModalSessionRows(), 'gapSessionsTbody', { showActions: true, highlightStaged: true });
   }
 
   function parseGapExceptionDatesInput() {
@@ -1852,8 +2044,12 @@
     if (summary) {
       summary.textContent = `Need ${need || 'at least 1'} countable session(s) between ${alignment?.startDate || ''} and ${alignment?.endDate || ''}, but only ${available} exist. Stage missing sessions below or reduce Number of Sessions.`;
     }
-    renderGapSessionTable(alignment?.sessions || []);
-    applyScheduleDefaultsToGapForm(alignment?.scheduleDefaults || {});
+    if (gapFormDraft) {
+      applyGapFormDraft(gapFormDraft);
+    } else {
+      applyScheduleDefaultsToGapForm(alignment?.scheduleDefaults || {});
+    }
+    renderGapSessionTable();
     updateGapCycleExtendWarning();
     updateGapStagedBadge();
     gapModalClosedShouldRecheck = false;
@@ -1996,8 +2192,9 @@
         await showSessionConflictModal(result.data.conflicts || []);
         return;
       }
-      const proposedCount = Number(result?.data?.createdCount || 0);
-      if (!proposedCount) {
+      const proposedSessions = Array.isArray(result?.data?.proposedSessions) ? result.data.proposedSessions : [];
+      const addedCount = appendUniqueStagedSessions(proposedSessions);
+      if (!addedCount) {
         await showMsg('No Sessions', 'info', result.message || 'No new sessions would be added (dates may already exist).');
         return;
       }
@@ -2015,25 +2212,11 @@
         status: 'scheduled',
         extendCycleEndDate: needsCycleExtend
       };
-      pendingGapPreview = {
-        createdCount: proposedCount,
-        proposedSessions: result?.data?.proposedSessions || []
-      };
+      captureGapFormDraft();
       updateGapStagedBadge();
-      const alignment = result?.data?.alignmentPreview || null;
-      if (alignment) {
-        lastAlignmentResult = alignment;
-        renderGapSessionTable(alignment.sessions || []);
-        updateSessionCountHint(alignment);
-        if (hasTargetSessionCount() && alignment.alignmentStatus !== 'insufficient_sessions') {
-          const targetInput = qs('inp_targetSessionCount');
-          if (targetInput && !String(targetInput.dataset.userEdited || '').trim()) {
-            targetInput.value = String(alignment.availableCount || '');
-          }
-        }
-      }
+      await refreshAlignmentWithStagedSessions();
       gapModalClosedShouldRecheck = true;
-      await showMsg('Sessions Staged', 'success', result.message || `${proposedCount} session(s) staged. Complete enrollment to save them to the class.`);
+      await showMsg('Sessions Staged', 'success', `${addedCount} session(s) staged. Complete enrollment to save them to the class.`);
     } catch (error) {
       await showMsg('Stage Sessions Failed', 'error', error.message || 'Unable to stage sessions.');
     } finally {
@@ -2779,7 +2962,7 @@
     lastRollingEligibility = null;
     lastAlignmentResult = null;
     pendingPlannedNaSessionIds = [];
-    clearPendingGapBatch();
+    clearPendingGapBatch({ clearFormDraft: true });
     updateSessionCountHint(null);
     setRollingRegistrationPanelHtml('<span class="text-muted">Select a student to verify program registration and prerequisites.</span>');
   }
@@ -3287,25 +3470,30 @@
   qs('btn_gapPickTeacher')?.addEventListener('click', pickGapTeacher);
   qs('btn_gapAppendSessions')?.addEventListener('click', appendGapBatchSessions);
   qs('btn_gapClearStaged')?.addEventListener('click', async () => {
-    clearPendingGapBatch();
+    clearPendingGapBatch({ clearFormDraft: true });
     gapModalClosedShouldRecheck = true;
     await runAlignmentRefresh({ showSpinner: false });
   });
-  ['gap_batchStart', 'gap_batchEnd', 'gap_batchStartTime', 'gap_batchEndTime', 'gap_teacherId', 'gap_room'].forEach((id) => {
-    qs(id)?.addEventListener('change', () => {
-      if (pendingGapBatch) clearPendingGapBatch();
-    });
+  ['gap_batchStart', 'gap_batchEnd', 'gap_batchStartTime', 'gap_batchEndTime', 'gap_teacherId', 'gap_teacherName', 'gap_room', 'gap_exceptions'].forEach((id) => {
+    qs(id)?.addEventListener('change', scheduleGapFormDraftCapture);
+    qs(id)?.addEventListener('input', scheduleGapFormDraftCapture);
   });
+  qs('gap_skipHolidays')?.addEventListener('change', scheduleGapFormDraftCapture);
   document.querySelectorAll('.gap-day-cb').forEach((input) => {
-    input.addEventListener('change', () => {
-      if (pendingGapBatch) clearPendingGapBatch();
-    });
+    input.addEventListener('change', scheduleGapFormDraftCapture);
+  });
+  qs('gapSessionsTbody')?.addEventListener('click', (event) => {
+    const btn = event.target?.closest?.('.btn-remove-staged');
+    if (!btn) return;
+    const sessionId = String(btn.getAttribute('data-session-id') || '').trim();
+    if (sessionId) removeStagedSession(sessionId);
   });
   qs('btn_confirmNaSelection')?.addEventListener('click', confirmNaSelection);
   qs('naSessionsTbody')?.addEventListener('change', (event) => {
     if (event.target && event.target.classList.contains('na-session-cb')) updateNaSelectionCounter();
   });
   gapModalEl?.addEventListener('hidden.bs.modal', () => {
+    captureGapFormDraft();
     if (!gapModalClosedShouldRecheck) return;
     gapModalClosedShouldRecheck = false;
     runAlignmentRefresh({ showSpinner: false });

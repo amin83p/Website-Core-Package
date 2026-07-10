@@ -654,6 +654,150 @@ async function commitGapBatchSessions({ classData, batchSpec = {}, reqUser, exte
   return appendBatchSessions({ classData, batchSpec, reqUser, extendCycleEndDate });
 }
 
+function sanitizeStagedSessionRow(session = {}, index = 0) {
+  const date = normalizeDateOnly(session?.date || session?.sessionDate);
+  const startTime = cleanText(session?.startTime || session?.start || '');
+  const endTime = cleanText(session?.endTime || session?.end || '');
+  if (!date || !startTime || !endTime) return null;
+  const sessionId = getSessionId(session, `STAGED_${String(index + 1).padStart(3, '0')}`);
+  const teacherId = toPublicId(session?.delivery?.deliveredBy || session?.teacherId || '');
+  const teacherName = cleanText(session?.delivery?.deliveredByName || session?.teacherName || '');
+  return {
+    sessionId,
+    date,
+    originalDate: date,
+    startTime,
+    endTime,
+    durationHours: computeDurationHours(startTime, endTime),
+    room: cleanText(session?.room || ''),
+    status: cleanText(session?.status || 'scheduled') || 'scheduled',
+    notes: '',
+    locked: false,
+    delivery: {
+      deliveredBy: teacherId || null,
+      deliveredByName: teacherName,
+      substitute: false
+    },
+    roster: Array.isArray(session?.roster) ? session.roster : []
+  };
+}
+
+function parsePendingStagedSessions(source = {}) {
+  let raw = source?.pendingStagedSessions ?? source?.stagedSessions ?? [];
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw);
+    } catch (_) {
+      raw = [];
+    }
+  }
+  const rows = Array.isArray(raw) ? raw : [];
+  return rows.map((row, index) => sanitizeStagedSessionRow(row, index)).filter(Boolean);
+}
+
+function sessionScheduleKey(session = {}) {
+  return [
+    normalizeDateOnly(session?.date),
+    cleanText(session?.startTime || session?.start || ''),
+    cleanText(session?.endTime || session?.end || '')
+  ].join('|');
+}
+
+async function commitStagedSessions({
+  classData,
+  sessionsToAdd = [],
+  reqUser,
+  extendCycleEndDate = false
+} = {}) {
+  if (!classData?.id) throw new Error('classData.id is required.');
+  const stagedRows = parsePendingStagedSessions({ pendingStagedSessions: sessionsToAdd });
+  if (!stagedRows.length) {
+    return {
+      createdCount: 0,
+      sessions: await resolveSchoolDataService().getClassSessions(classData.id, reqUser),
+      createdSessions: [],
+      cycleEndDateExtended: false,
+      previousCycleEndDate: normalizeDateOnly(classData?.cycleEndDate),
+      newCycleEndDate: normalizeDateOnly(classData?.cycleEndDate),
+      classData
+    };
+  }
+
+  const schoolDataService = resolveSchoolDataService();
+  const existingSessions = await schoolDataService.getClassSessions(classData.id, reqUser);
+  const existingDates = new Set(
+    (Array.isArray(existingSessions) ? existingSessions : []).map((row) => getSessionDate(row)).filter(Boolean)
+  );
+  const existingIds = new Set(
+    (Array.isArray(existingSessions) ? existingSessions : []).map((row) => getSessionId(row)).filter(Boolean)
+  );
+  const working = [...(Array.isArray(existingSessions) ? existingSessions : [])];
+  const created = [];
+
+  stagedRows.forEach((row, index) => {
+    if (existingDates.has(row.date)) return;
+    const nextRow = { ...row };
+    if (!getSessionId(nextRow) || existingIds.has(getSessionId(nextRow))) {
+      nextRow.sessionId = buildNextSessionId(working);
+    }
+    while (existingIds.has(getSessionId(nextRow))) {
+      nextRow.sessionId = buildNextSessionId([...working, ...created, nextRow]);
+    }
+    created.push(nextRow);
+    working.push(nextRow);
+    existingDates.add(nextRow.date);
+    existingIds.add(getSessionId(nextRow));
+  });
+
+  if (!created.length) {
+    return {
+      createdCount: 0,
+      sessions: existingSessions,
+      createdSessions: [],
+      cycleEndDateExtended: false,
+      previousCycleEndDate: normalizeDateOnly(classData?.cycleEndDate),
+      newCycleEndDate: normalizeDateOnly(classData?.cycleEndDate),
+      classData
+    };
+  }
+
+  let workingClassData = { ...classData };
+  const previousCycleEndDate = normalizeDateOnly(workingClassData?.cycleEndDate);
+  const proposedCycleEndDate = computeProposedCycleEndDate({
+    cycleEndDate: previousCycleEndDate,
+    sessions: working
+  });
+  let cycleEndDateExtended = false;
+
+  if (proposedCycleEndDate && proposedCycleEndDate !== previousCycleEndDate) {
+    if (!extendCycleEndDate) {
+      throw new Error(`New sessions extend beyond the cycle end date (${previousCycleEndDate || 'not set'}). Confirm cycle extension to add sessions through ${proposedCycleEndDate}.`);
+    }
+    workingClassData = await schoolDataService.updateData('classes', classData.id, {
+      cycleEndDate: proposedCycleEndDate
+    }, reqUser);
+    cycleEndDateExtended = true;
+  }
+
+  assertRollingSessionsWithinCycleWindowOrThrow({
+    registrationMode: workingClassData?.registrationMode,
+    cycleStartDate: workingClassData?.cycleStartDate,
+    cycleEndDate: workingClassData?.cycleEndDate,
+    sessions: working
+  });
+
+  const saved = await schoolDataService.saveClassSessions(classData.id, working, reqUser);
+  return {
+    createdCount: created.length,
+    sessions: saved,
+    createdSessions: created,
+    cycleEndDateExtended,
+    previousCycleEndDate,
+    newCycleEndDate: normalizeDateOnly(workingClassData?.cycleEndDate),
+    classData: workingClassData
+  };
+}
+
 module.exports = {
   listSessionsInWindow,
   evaluateAlignment,
@@ -662,8 +806,12 @@ module.exports = {
   resolveDefaultTeacherFromClass,
   generateBatchSessionRows,
   parseGapBatchSpec,
+  parsePendingStagedSessions,
+  sanitizeStagedSessionRow,
+  sessionScheduleKey,
   previewGapBatchSessions,
   commitGapBatchSessions,
+  commitStagedSessions,
   appendBatchSessions,
   materializePlannedNaAttendance,
   sanitizePlannedNaSessionIds,
