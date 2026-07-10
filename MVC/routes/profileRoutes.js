@@ -25,4 +25,26 @@ router.post('/',
     profileController.updateProfile
 );
 
+// Self-serve Admin Authenticator (any admin privilege on active profile)
+router.get('/authenticator',
+    requireAuth,
+    profileController.showAuthenticator
+);
+router.get('/authenticator/status',
+    requireAuth,
+    profileController.getAuthenticatorStatus
+);
+router.post('/authenticator/begin',
+    requireAuth,
+    profileController.beginAuthenticatorEnrollment
+);
+router.post('/authenticator/confirm',
+    requireAuth,
+    profileController.confirmAuthenticatorEnrollment
+);
+router.post('/authenticator/disable',
+    requireAuth,
+    profileController.disableAuthenticatorEnrollment
+);
+
 module.exports = router;

@@ -10,15 +10,18 @@
 
       <div class="modal-body">
         <p class="text-muted">
-          This action requires administrator verification. Enter today's code to continue.
+          This action requires administrator verification. Enter the 6-digit code from Google Authenticator to continue.
+          If you have not set one up yet, open your avatar menu → <strong>Authenticator</strong>.
         </p>
 
         <input
-          type="password"
+          type="text"
           id="adminVerifyInput"
           class="form-control"
-          placeholder="Enter verification code..."
-          autocomplete="off"
+          placeholder="Enter 6-digit authenticator code..."
+          inputmode="numeric"
+          maxlength="8"
+          autocomplete="one-time-code"
         />
         <div id="adminVerifyError" class="text-danger mt-2" style="min-height:18px;"></div>
       </div>

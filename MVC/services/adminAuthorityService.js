@@ -200,6 +200,38 @@ function isOperationConfigAdminSync(operationConfig = null) {
   return effectiveAccessResolverService.isAdminScopeSync(scopeToken);
 }
 
+/**
+ * True when the hydrated session user has any admin privilege on their active profile:
+ * super/system (fullAdmin), category admin, section adminAccess, or operation admin.
+ */
+function hasAnyAdminPrivilege(user, orgId) {
+  if (!user) return false;
+  if (isSuperAdmin(user)) return true;
+
+  const profile = getActiveProfile(user);
+  if (!profileAppliesToOrg(profile, user, orgId)) {
+    return isSystemAdmin(user, orgId ? { orgId } : undefined);
+  }
+
+  if (normalizeBoolean(profile.fullAdmin, false)) return true;
+
+  const categories = Array.isArray(profile.adminCategories) ? profile.adminCategories : [];
+  if (categories.map(normalizeCategory).some(Boolean)) return true;
+
+  const sections = Array.isArray(profile.sections) ? profile.sections : [];
+  for (const section of sections) {
+    if (!section || typeof section !== 'object') continue;
+    if (normalizeBoolean(section.adminAccess, false)) return true;
+    if (normalizeAccessType(section.accessType, 'custom') === 'full_access') return true;
+    const operations = Array.isArray(section.operations) ? section.operations : [];
+    for (const operation of operations) {
+      if (isOperationConfigAdminSync(operation)) return true;
+    }
+  }
+
+  return false;
+}
+
 function buildAuthorityPayload({
   superAdmin = false,
   systemAdmin = false,
@@ -493,5 +525,6 @@ module.exports = {
   isAdminForSection,
   isAdminForSectionAsync,
   isAdminForRequest,
-  isAdminForRequestAsync
+  isAdminForRequestAsync,
+  hasAnyAdminPrivilege
 };

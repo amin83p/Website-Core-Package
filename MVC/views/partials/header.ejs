@@ -263,6 +263,11 @@
                                 <a class="dropdown-item rounded py-2" href="/sessions/mysessions">
                                     <i class="bi bi-laptop me-2 text-secondary"></i> My Sessions (Devices)
                                 </a>
+                                <% if (typeof canUseAdminAuthenticator !== 'undefined' && canUseAdminAuthenticator) { %>
+                                <a class="dropdown-item rounded py-2" href="/profile/authenticator">
+                                    <i class="bi bi-shield-lock me-2 text-secondary"></i> Authenticator
+                                </a>
+                                <% } %>
                             </li>
 
 	                            <li><hr class="dropdown-divider m-0"></li>

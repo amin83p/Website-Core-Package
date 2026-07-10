@@ -48,6 +48,7 @@ const requestRatePhaseOne = require('./MVC/middleware/requestRateMonitor');
 const settingService = require('./MVC/services/settingService'); // Import Setting Service
 const appBrandingService = require('./MVC/services/appBrandingService');
 const smsProviderService = require('./MVC/services/sms/smsProviderService');
+const adminAuthorityService = require('./MVC/services/adminAuthorityService');
 const { registerCoreEntityQueryExecutors } = require('./MVC/models/queryExecutorBootstrap');
 const dataBackendRuntimeService = require('./MVC/services/dataBackendRuntimeService');
 const dataBackendRecoveryMiddleware = require('./MVC/middleware/dataBackendRecoveryMiddleware');
@@ -237,6 +238,9 @@ app.use((req, res, next) => {
   res.locals.publicMenu = appBrandingService.getPublicMenu(req.user || null);
   res.locals.publicMenuEndpointOptions = appBrandingService.getPublicMenuEndpointOptions();
   res.locals.buildVersionShort = cleanBuildVersionToken(req.app?.locals?.buildVersionShort);
+  res.locals.canUseAdminAuthenticator = Boolean(
+    req.user && adminAuthorityService.hasAnyAdminPrivilege(req.user)
+  );
   next();
 });
 app.use(dataBackendRecoveryMiddleware.enforceRecoveryMode);

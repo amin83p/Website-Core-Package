@@ -1,0 +1,233 @@
+<%
+  const totpStatus = (typeof adminTotpStatus !== 'undefined' && adminTotpStatus) ? adminTotpStatus : { enabled: false, enrolledAt: null };
+%>
+<div class="sections-page">
+  <div class="dash-hero mb-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+      <h1 class="page-heading size-lg mb-1">Authenticator</h1>
+      <div class="text-muted" style="font-size:1.05rem;">
+        Google Authenticator protects sensitive admin operations for your account.
+      </div>
+    </div>
+    <a href="/profile/" class="btn btn-secondary btn-filled btn-md">
+      <i class="bi bi-person me-1"></i> My Profile
+    </a>
+  </div>
+
+  <div class="form-container" style="max-width: 900px;">
+    <div class="alert alert-warning border small mb-3">
+      <i class="bi bi-shield-lock-fill me-1"></i>
+      Enroll your device here, then use 6-digit codes when the app asks for admin verification.
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+          <div>
+            <div class="fw-bold">Authenticator status</div>
+            <div class="small text-muted" id="adminTotpStatusLabel">
+              <% if (totpStatus.enabled) { %>
+                Enrolled<%= totpStatus.enrolledAt ? (' · ' + new Date(totpStatus.enrolledAt).toLocaleString()) : '' %>
+              <% } else { %>
+                Not enrolled
+              <% } %>
+            </div>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-filled btn-primary btn-md" id="btnAdminTotpBegin" <%= totpStatus.enabled ? 'disabled' : '' %>>
+              <i class="bi bi-qr-code-scan me-1"></i>Begin setup
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-md" id="btnAdminTotpDisable" <%= totpStatus.enabled ? '' : 'disabled' %>>
+              Disable / Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border shadow-sm mb-3 d-none" id="adminTotpSetupCard">
+      <div class="card-header bg-white fw-bold">Set up Google Authenticator</div>
+      <div class="card-body">
+        <p class="small text-muted mb-3">
+          Prefer scan QR; if the camera fails, choose <strong>Enter a setup key</strong> in Google Authenticator and paste the secret.
+        </p>
+        <div class="row g-3 align-items-start">
+          <div class="col-md-4 text-center">
+            <img id="adminTotpQrImage" alt="Authenticator QR code" class="img-fluid border rounded p-2 bg-white" style="max-width: 280px;">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label fw-bold">Secret key</label>
+            <div class="input-group mb-2">
+              <input type="text" class="form-control font-monospace" id="adminTotpSecretInput" readonly>
+              <button type="button" class="btn btn-outline-secondary" id="btnCopyAdminTotpSecret">Copy</button>
+            </div>
+            <label class="form-label fw-bold">otpauth URI</label>
+            <div class="input-group mb-3">
+              <input type="text" class="form-control font-monospace small" id="adminTotpOtpauthInput" readonly>
+              <button type="button" class="btn btn-outline-secondary" id="btnCopyAdminTotpOtpauth">Copy</button>
+            </div>
+            <label class="form-label fw-bold" for="adminTotpConfirmCode">Confirm with current 6-digit code</label>
+            <div class="input-group" style="max-width: 320px;">
+              <input type="text" class="form-control" id="adminTotpConfirmCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+              <button type="button" class="btn btn-filled btn-success" id="btnAdminTotpConfirm">Confirm &amp; activate</button>
+            </div>
+            <div class="form-text">Activation requires a live code from the device you just configured.</div>
+          </div>
+        </div>
+        <div id="adminTotpSetupError" class="text-danger small mt-2" style="min-height: 1.2rem;"></div>
+      </div>
+    </div>
+
+    <div class="card border-0 bg-light mb-0 d-none" id="adminTotpDisableCard">
+      <div class="card-body">
+        <div class="fw-bold mb-2">Disable authenticator</div>
+        <p class="small text-muted mb-2">Enter a current code from your authenticator app to clear enrollment.</p>
+        <div class="input-group" style="max-width: 360px;">
+          <input type="text" class="form-control" id="adminTotpDisableCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code">
+          <button type="button" class="btn btn-danger" id="btnAdminTotpDisableConfirm">Confirm disable</button>
+        </div>
+        <div id="adminTotpDisableError" class="text-danger small mt-2" style="min-height: 1.2rem;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  (function initSelfAdminTotp() {
+    const statusLabel = document.getElementById('adminTotpStatusLabel');
+    const beginBtn = document.getElementById('btnAdminTotpBegin');
+    const disableBtn = document.getElementById('btnAdminTotpDisable');
+    const setupCard = document.getElementById('adminTotpSetupCard');
+    const disableCard = document.getElementById('adminTotpDisableCard');
+    const qrImage = document.getElementById('adminTotpQrImage');
+    const secretInput = document.getElementById('adminTotpSecretInput');
+    const otpauthInput = document.getElementById('adminTotpOtpauthInput');
+    const confirmCode = document.getElementById('adminTotpConfirmCode');
+    const confirmBtn = document.getElementById('btnAdminTotpConfirm');
+    const setupError = document.getElementById('adminTotpSetupError');
+    const disableCode = document.getElementById('adminTotpDisableCode');
+    const disableConfirmBtn = document.getElementById('btnAdminTotpDisableConfirm');
+    const disableError = document.getElementById('adminTotpDisableError');
+    const copySecretBtn = document.getElementById('btnCopyAdminTotpSecret');
+    const copyOtpauthBtn = document.getElementById('btnCopyAdminTotpOtpauth');
+
+    let pendingSecretContinuous = '';
+
+    function setEnrolledUi(enabled, enrolledAt) {
+      if (statusLabel) {
+        statusLabel.textContent = enabled
+          ? (`Enrolled${enrolledAt ? (' · ' + new Date(enrolledAt).toLocaleString()) : ''}`)
+          : 'Not enrolled';
+      }
+      if (beginBtn) beginBtn.disabled = !!enabled;
+      if (disableBtn) disableBtn.disabled = !enabled;
+      if (setupCard) setupCard.classList.add('d-none');
+      if (disableCard) disableCard.classList.toggle('d-none', !enabled);
+      if (setupError) setupError.textContent = '';
+      if (disableError) disableError.textContent = '';
+    }
+
+    async function copyText(value) {
+      const text = String(value || '');
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+    }
+
+    async function postJson(url, body) {
+      const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify(body || {})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.status === 'error') {
+        throw new Error(data.message || 'Request failed.');
+      }
+      return data;
+    }
+
+    beginBtn?.addEventListener('click', async () => {
+      if (setupError) setupError.textContent = '';
+      beginBtn.disabled = true;
+      try {
+        const data = await postJson('/profile/authenticator/begin', {});
+        pendingSecretContinuous = String(data.secret || '').replace(/\s+/g, '');
+        if (qrImage) qrImage.src = data.qrDataUrl || '';
+        if (secretInput) secretInput.value = data.secretGrouped || data.secret || '';
+        if (otpauthInput) otpauthInput.value = data.otpauthUrl || '';
+        if (confirmCode) confirmCode.value = '';
+        setupCard?.classList.remove('d-none');
+        disableCard?.classList.add('d-none');
+      } catch (err) {
+        if (setupError) setupError.textContent = err.message || String(err);
+        beginBtn.disabled = false;
+      }
+    });
+
+    confirmBtn?.addEventListener('click', async () => {
+      if (setupError) setupError.textContent = '';
+      confirmBtn.disabled = true;
+      try {
+        const data = await postJson('/profile/authenticator/confirm', {
+          code: String(confirmCode?.value || '').trim()
+        });
+        pendingSecretContinuous = '';
+        setEnrolledUi(true, data.enrolledAt);
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Authenticator active',
+            icon: 'success',
+            message: 'Google Authenticator is enrolled for your account.',
+            buttons: [{ text: 'OK', class: 'btn-primary' }]
+          });
+        }
+      } catch (err) {
+        if (setupError) setupError.textContent = err.message || String(err);
+      } finally {
+        confirmBtn.disabled = false;
+      }
+    });
+
+    disableBtn?.addEventListener('click', () => {
+      disableCard?.classList.remove('d-none');
+      setupCard?.classList.add('d-none');
+      if (disableCode) disableCode.value = '';
+      if (disableError) disableError.textContent = '';
+    });
+
+    disableConfirmBtn?.addEventListener('click', async () => {
+      if (disableError) disableError.textContent = '';
+      disableConfirmBtn.disabled = true;
+      try {
+        await postJson('/profile/authenticator/disable', {
+          code: String(disableCode?.value || '').trim()
+        });
+        setEnrolledUi(false, null);
+        if (beginBtn) beginBtn.disabled = false;
+      } catch (err) {
+        if (disableError) disableError.textContent = err.message || String(err);
+      } finally {
+        disableConfirmBtn.disabled = false;
+      }
+    });
+
+    copySecretBtn?.addEventListener('click', () => copyText(pendingSecretContinuous || String(secretInput?.value || '').replace(/\s+/g, '')));
+    copyOtpauthBtn?.addEventListener('click', () => copyText(otpauthInput?.value || ''));
+
+    <% if (totpStatus.enabled) { %>
+    if (disableCard) disableCard.classList.remove('d-none');
+    <% } %>
+  })();
+});
+</script>

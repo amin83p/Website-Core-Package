@@ -5,6 +5,7 @@ node_modules/
 /data/actionStates.json
 /data/logs.json
 /data/sessions.json
+/data/adminTotpSecrets.json
 .env
 /.local-runtime/
 /install_packages/

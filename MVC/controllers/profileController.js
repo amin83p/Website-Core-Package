@@ -1,7 +1,44 @@
 // MVC/controllers/profileController.js
 const dataService = require('../services/dataService');
 const bcrypt = require('bcryptjs');
+const adminTotpService = require('../services/adminTotpService');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
+
+function denyAuthenticator(req, res, statusCode, message) {
+  if (req.headers['x-ajax-request'] || req.xhr || req.headers.accept?.includes('json')) {
+    return res.status(statusCode).json({ status: 'error', message });
+  }
+  return res.status(statusCode).render('error', {
+    title: statusCode === 403 ? 'Access Needed' : 'Error',
+    statusCode,
+    message,
+    user: req.user || null
+  });
+}
+
+function requireOwnAuthenticatorAccess(req, res) {
+  if (!req.user) {
+    denyAuthenticator(req, res, 401, 'Authentication required.');
+    return false;
+  }
+  if (!adminTotpService.canManageOwnTotp(req.user)) {
+    denyAuthenticator(
+      req,
+      res,
+      403,
+      'Authenticator setup is available to users with admin access on their profile.'
+    );
+    return false;
+  }
+  return true;
+}
+
+async function saveSession(req) {
+  if (typeof req.session?.save !== 'function') return;
+  await new Promise((resolve, reject) => {
+    req.session.save((err) => (err ? reject(err) : resolve()));
+  });
+}
 
 /* ============================================================
    GET: Show Profile Page
@@ -126,7 +163,104 @@ async function updateProfile(req, res) {
     }
 }
 
+/* ============================================================
+   GET: Self-serve Authenticator (admin-privilege users)
+============================================================ */
+async function showAuthenticator(req, res) {
+  try {
+    if (!requireOwnAuthenticatorAccess(req, res)) return;
+    const adminTotpStatus = await adminTotpService.getStatus(req.user.id);
+    return res.render('profile/authenticator', {
+      title: 'Authenticator',
+      user: req.user,
+      includeModal: true,
+      adminTotpStatus
+    });
+  } catch (error) {
+    console.error('Authenticator View Error:', error);
+    return res.status(500).render('error', {
+      title: 'Error',
+      message: 'Unable to load authenticator settings.',
+      user: req.user
+    });
+  }
+}
+
+async function getAuthenticatorStatus(req, res) {
+  try {
+    if (!requireOwnAuthenticatorAccess(req, res)) return;
+    const status = await adminTotpService.getStatus(req.user.id);
+    return res.json({ status: 'success', ...status });
+  } catch (error) {
+    return res.status(500).json({ status: 'error', message: error.message || 'Failed to load authenticator status.' });
+  }
+}
+
+async function beginAuthenticatorEnrollment(req, res) {
+  try {
+    if (!requireOwnAuthenticatorAccess(req, res)) return;
+    const setup = await adminTotpService.beginEnrollment({ req, targetUser: req.user });
+    await saveSession(req);
+    return res.json({ status: 'success', ...setup });
+  } catch (error) {
+    const code = error?.code || 'BEGIN_FAILED';
+    const statusCode = code === 'ALREADY_ENROLLED' ? 409 : 400;
+    return res.status(statusCode).json({ status: 'error', code, message: error.message });
+  }
+}
+
+async function confirmAuthenticatorEnrollment(req, res) {
+  try {
+    if (!requireOwnAuthenticatorAccess(req, res)) return;
+    const result = await adminTotpService.confirmEnrollment({
+      req,
+      targetUser: req.user,
+      code: req.body?.code
+    });
+    await saveSession(req);
+    return res.json({ status: 'success', ...result });
+  } catch (error) {
+    return res.status(400).json({
+      status: 'error',
+      code: error?.code || 'CONFIRM_FAILED',
+      message: error.message
+    });
+  }
+}
+
+async function disableAuthenticatorEnrollment(req, res) {
+  try {
+    if (!requireOwnAuthenticatorAccess(req, res)) return;
+    const code = String(req.body?.code || '').trim();
+    if (!code) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Enter a current authenticator code to disable enrollment.'
+      });
+    }
+    const result = await adminTotpService.disableEnrollment({
+      targetUser: req.user,
+      code,
+      requireCode: true
+    });
+    adminTotpService.clearPending(req);
+    await saveSession(req);
+    return res.json({ status: 'success', ...result });
+  } catch (error) {
+    return res.status(400).json({
+      status: 'error',
+      code: error?.code || 'DISABLE_FAILED',
+      message: error.message
+    });
+  }
+}
+
 module.exports = {
     showProfile,
-    updateProfile
+    updateProfile,
+    showAuthenticator,
+    getAuthenticatorStatus,
+    beginAuthenticatorEnrollment,
+    confirmAuthenticatorEnrollment,
+    disableAuthenticatorEnrollment
 };

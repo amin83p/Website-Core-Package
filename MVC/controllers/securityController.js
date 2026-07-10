@@ -1,25 +1,7 @@
 const crypto = require('crypto');
-
-// Secret key for encryption (In production, this should be an environment variable)
-// Must be 32 bytes for aes-256-cbc
-// const { ENCRYPTION_KEY, IV_LENGTH } = require('../../config/security'); 
 const { encrypt, getAdminVerificationState } = require('../utils/encyptors');
 const { VALIDITY_TIME } = require('../../config/security');
-//const ENCRYPTION_KEY = process.env.SESSION_ENCRYPTION_KEY || crypto.randomBytes(32); 
-// const IV_LENGTH = 16; // For AES, this is always 16
-
-// function encrypt(text) {
-//   let iv = crypto.randomBytes(IV_LENGTH);
-//   let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
-//   let encrypted = cipher.update(text);
-//   encrypted = Buffer.concat([encrypted, cipher.final()]);
-//   return iv.toString('hex') + ':' + encrypted.toString('hex');
-// }
-
-function getTodayCode() {
-  const now = new Date();
-  return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2,'0')}`;
-}
+const adminTotpService = require('../services/adminTotpService');
 
 function logAdminVerification(req, event, extra = {}) {
   const state = getAdminVerificationState(req, { clearExpired: false });
@@ -41,56 +23,72 @@ function saveSession(req) {
   });
 }
 
+async function markAdminVerified(req) {
+  const timestamp = Date.now();
+  const payload = JSON.stringify({
+    timestamp,
+    salt: crypto.randomBytes(8).toString('hex')
+  });
+  req.session.adminKey = encrypt(payload);
+  await saveSession(req);
+  return new Date(timestamp + VALIDITY_TIME).toISOString();
+}
+
 exports.verifyAdminCode = async (req, res) => {
   const { code } = req.body;
 
   if (!req.session) {
     logAdminVerification(req, 'VERIFY_FAILED', { reason: 'missing_express_session' });
     return res.status(500).json({
-      status: "error",
-      message: "Admin verification session is not available. Please refresh the page and try again."
+      status: 'error',
+      message: 'Admin verification session is not available. Please refresh the page and try again.'
     });
   }
-  
-  // Verify the code (e.g. against today's date or your hardcoded '1')
-  // Using strict comparison for security
-  if (code === '1') { // or getTodayCode()
-    const timestamp = Date.now();
-    
-    // Create payload with timestamp and random salt
-    const payload = JSON.stringify({
-        timestamp,
-        salt: crypto.randomBytes(8).toString('hex')
+
+  const actor = req.user;
+  if (!actor) {
+    logAdminVerification(req, 'VERIFY_FAILED', { reason: 'unauthenticated' });
+    return res.status(401).json({ status: 'error', message: 'Authentication required.' });
+  }
+
+  if (!adminTotpService.isTotpEligibleUser(actor)) {
+    logAdminVerification(req, 'VERIFY_FAILED', { reason: 'not_admin_privilege' });
+    return res.status(403).json({
+      status: 'error',
+      message: 'Admin verification requires admin access on your profile. Contact a system admin if you need this.'
     });
+  }
 
-    // Encrypt the payload and store it in the session
-    req.session.adminKey = encrypt(payload);
-
-    try {
-      await saveSession(req);
-      const expiresAt = new Date(timestamp + VALIDITY_TIME).toISOString();
-      logAdminVerification(req, 'VERIFY_SUCCESS', { expiresAt });
-      return res.json({
-        status: "success",
-        message: "Admin verified",
-        expiresAt,
-        validityMs: VALIDITY_TIME
-      });
-    } catch (error) {
-      console.error('[AdminVerification] VERIFY_SAVE_FAILED', {
-        requestId: String(req.requestId || ''),
-        userId: String(req.user?.id || ''),
-        error: error?.message || String(error)
-      });
-      return res.status(500).json({
-        status: "error",
-        message: "Admin verification could not be saved. Please try again."
+  try {
+    const status = await adminTotpService.getStatus(actor.id);
+    if (!status.enabled) {
+      logAdminVerification(req, 'VERIFY_FAILED', { reason: 'not_enrolled' });
+      return res.status(403).json({
+        status: 'error',
+        code: 'ADMIN_TOTP_NOT_ENROLLED',
+        message: 'Set up Google Authenticator first: open your avatar menu → Authenticator.'
       });
     }
-  }
 
-  logAdminVerification(req, 'VERIFY_FAILED', { reason: 'invalid_code' });
-  return res.status(403).json({ status: "error", message: "Invalid admin code" });
+    await adminTotpService.verifyUserCode(actor.id, code);
+    const expiresAt = await markAdminVerified(req);
+    logAdminVerification(req, 'VERIFY_SUCCESS', { expiresAt });
+    return res.json({
+      status: 'success',
+      message: 'Admin verified',
+      expiresAt,
+      validityMs: VALIDITY_TIME
+    });
+  } catch (error) {
+    const reason = error?.code || 'invalid_code';
+    logAdminVerification(req, 'VERIFY_FAILED', { reason, error: error?.message });
+    const statusCode = ['NOT_ENROLLED', 'SECRET_CORRUPT'].includes(error?.code) ? 403 : 403;
+    return res.status(statusCode).json({
+      status: 'error',
+      code: error?.code || 'INVALID_CODE',
+      message: error?.message || 'Invalid authenticator code'
+    });
+  }
 };
 
 exports.getAdminVerificationStatus = (req, res) => {
