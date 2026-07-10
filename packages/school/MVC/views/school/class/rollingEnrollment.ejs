@@ -42,6 +42,34 @@
   .rolling-enrollment-page tr.gap-session-row-staged > td {
     background-color: var(--bs-warning-bg-subtle, #fff3cd);
   }
+  .rolling-enrollment-page tr.conflict-session-row > td {
+    background-color: var(--bs-danger-bg-subtle, #f8d7da);
+  }
+  .rolling-enrollment-page .enroll-wizard-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .rolling-enrollment-page .enroll-wizard-step-pill {
+    font-size: 0.78rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid #ced4da;
+    color: #6c757d;
+    background: #f8f9fa;
+  }
+  .rolling-enrollment-page .enroll-wizard-step-pill.is-active {
+    border-color: #0d6efd;
+    color: #0d6efd;
+    background: #e7f1ff;
+    font-weight: 600;
+  }
+  .rolling-enrollment-page .enroll-wizard-step-pill.is-done {
+    border-color: #198754;
+    color: #198754;
+    background: #e8f5ee;
+  }
   .rolling-enrollment-page .rolling-row-actions-wrap {
     position: relative;
     display: inline-block;
@@ -162,88 +190,197 @@
 </div>
 
 <div class="modal fade" id="addEnrollmentPeriodModal" tabindex="-1" aria-labelledby="addEnrollmentPeriodModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-xl">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="addEnrollmentPeriodModalLabel"><i class="bi bi-person-plus me-1"></i>New Enrollment Period</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <input type="hidden" id="inp_studentId">
-        <div class="mb-2">
-          <label class="form-label">Student *</label>
-          <div class="input-group">
-            <input type="text" id="inp_studentLabel" class="form-control bg-white" placeholder="Select student..." readonly>
-            <button type="button" class="btn btn-outline-primary" id="btn_pickStudent"><i class="bi bi-person-vcard"></i></button>
-          </div>
-        </div>
-        <div class="mb-2" id="wrap_enrollmentRegistration">
-          <label class="form-label" id="lbl_enrollmentRegistration">Program registration</label>
-          <div id="roll_enrollmentRegistrationPanel" class="form-control bg-light small py-2" style="min-height: 2.4rem;">
-            <span class="text-muted">Select a student to verify program registration and prerequisites.</span>
-          </div>
-          <div class="form-text small text-muted" id="hint_enrollmentRegistration">
-            The student must already be registered in a program that appears under this class’s allowed programs (and in the required term, if the class specifies one). Prerequisites are checked before enrollment is saved.
-          </div>
-        </div>
-        <div class="row g-2">
-          <div class="col-md-4">
-            <label class="form-label">Start Date *</label>
-            <input type="date" id="inp_startDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label" id="lbl_endDate">End Date<span id="lbl_endDateRequired" class="d-none"> *</span></label>
-            <input type="date" id="inp_endDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %>>
-          </div>
-          <div class="col-md-4" id="wrap_inp_targetSessionCount">
-            <label class="form-label">Number of Sessions <span class="text-muted fw-normal">(optional)</span></label>
-            <input type="number" id="inp_targetSessionCount" class="form-control" min="1" step="1" placeholder="e.g. 10">
-            <div class="form-text compact-help">Leave blank to enroll by date window only. N/A sessions do not count.</div>
-            <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
-              <div class="form-text compact-help mb-0" id="hint_sessionAlignment">Set an end date to see how many countable sessions fall in the enrollment window.</div>
-              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 d-none" id="btn_viewEnrollmentSessions">View Sessions</button>
+        <div class="enroll-wizard-steps" id="enrollWizardStepIndicator" aria-hidden="true"></div>
+
+        <div id="enrollWizardStepForm">
+          <input type="hidden" id="inp_studentId">
+          <div class="mb-2">
+            <label class="form-label">Student *</label>
+            <div class="input-group">
+              <input type="text" id="inp_studentLabel" class="form-control bg-white" placeholder="Select student..." readonly>
+              <button type="button" class="btn btn-outline-primary" id="btn_pickStudent"><i class="bi bi-person-vcard"></i></button>
             </div>
-            <div id="roll_sessionAlignmentResolve" class="d-none mt-2"></div>
+          </div>
+          <div class="mb-2" id="wrap_enrollmentRegistration">
+            <label class="form-label" id="lbl_enrollmentRegistration">Program registration</label>
+            <div id="roll_enrollmentRegistrationPanel" class="form-control bg-light small py-2" style="min-height: 2.4rem;">
+              <span class="text-muted">Select a student to verify program registration and prerequisites.</span>
+            </div>
+            <div class="form-text small text-muted" id="hint_enrollmentRegistration">
+              The student must already be registered in a program that appears under this class’s allowed programs (and in the required term, if the class specifies one). Prerequisites are checked before enrollment is saved.
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label">Start Date *</label>
+              <input type="date" id="inp_startDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" id="lbl_endDate">End Date<span id="lbl_endDateRequired" class="d-none"> *</span></label>
+              <input type="date" id="inp_endDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %>>
+            </div>
+            <div class="col-md-4" id="wrap_inp_targetSessionCount">
+              <label class="form-label">Number of Sessions <span class="text-muted fw-normal">(optional)</span></label>
+              <input type="number" id="inp_targetSessionCount" class="form-control" min="1" step="1" placeholder="e.g. 10">
+              <div class="form-text compact-help">Leave blank to enroll by date window only. N/A sessions do not count.</div>
+              <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
+                <div class="form-text compact-help mb-0" id="hint_sessionAlignment">Set an end date to see how many countable sessions fall in the enrollment window.</div>
+                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 d-none" id="btn_viewEnrollmentSessions">View Sessions</button>
+              </div>
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-md-4">
+              <label class="form-label">Funder ID</label>
+              <input type="text" id="inp_funderId" class="form-control" placeholder="Optional">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Funder Type</label>
+              <input type="text" id="inp_funderType" class="form-control" placeholder="e.g. WCB">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Authorization Ref</label>
+              <input type="text" id="inp_authorizationRef" class="form-control" placeholder="Optional">
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-md-4">
+              <label class="form-label">Status</label>
+              <select id="inp_status" class="form-select">
+                <option value="active" selected>Active</option>
+                <option value="planned">Planned</option>
+                <option value="draft">Draft</option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-2">
+            <label class="form-label">Reason Start</label>
+            <textarea id="inp_reasonStart" class="form-control" rows="2" placeholder="Optional start note"></textarea>
+          </div>
+          <div class="alert alert-light border small mb-0 mt-3 text-secondary">
+            <div class="fw-semibold text-dark mb-1">Tips</div>
+            <p class="mb-1">When Number of Sessions does not match scheduled sessions, use Next to add sessions or mark N/A before saving.</p>
+            <p class="mb-0"><kbd>Alt</kbd>+<kbd>S</kbd> pick student, <kbd>Alt</kbd>+<kbd>A</kbd> primary action, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> from notes.</p>
           </div>
         </div>
-        <div class="row g-2 mt-2">
-          <div class="col-md-4">
-            <label class="form-label">Funder ID</label>
-            <input type="text" id="inp_funderId" class="form-control" placeholder="Optional">
+
+        <div id="enrollWizardStepAddSessions" class="d-none">
+          <div class="alert alert-warning border small" id="gapSummaryText">Session alignment issue.</div>
+          <div class="alert alert-info border small mb-3">
+            <b>Class-wide impact:</b> Sessions staged here are <b>not saved</b> until enrollment completes successfully. They will count toward every enrolled student whose end date covers those session dates once saved.
           </div>
-          <div class="col-md-4">
-            <label class="form-label">Funder Type</label>
-            <input type="text" id="inp_funderType" class="form-control" placeholder="e.g. WCB">
+          <div class="alert alert-primary border small mb-3 d-none" id="gapStagedBadge"></div>
+          <div class="alert alert-warning border small mb-3 d-none" id="gapCycleExtendWarning"></div>
+          <div class="mb-3">
+            <div class="fw-semibold mb-2">Sessions currently in enrollment window</div>
+            <div class="table-responsive border rounded">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr><th>Date</th><th>Time</th><th>Status</th><th>Countable</th><th class="text-end">Actions</th></tr>
+                </thead>
+                <tbody id="gapSessionsTbody">
+                  <tr><td colspan="5" class="text-center text-muted py-3">No sessions loaded.</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div class="col-md-4">
-            <label class="form-label">Authorization Ref</label>
-            <input type="text" id="inp_authorizationRef" class="form-control" placeholder="Optional">
+          <div class="border rounded p-3 bg-light-subtle" id="gapBatchPanel">
+            <div class="fw-semibold mb-2">Quick batch add</div>
+            <div class="row g-2">
+              <div class="col-md-3"><label class="form-label small">Start</label><input type="date" id="gap_batchStart" class="form-control form-control-sm"></div>
+              <div class="col-md-3"><label class="form-label small">End</label><input type="date" id="gap_batchEnd" class="form-control form-control-sm"></div>
+              <div class="col-md-3"><label class="form-label small">Start time</label><input type="time" id="gap_batchStartTime" class="form-control form-control-sm"></div>
+              <div class="col-md-3"><label class="form-label small">End time</label><input type="time" id="gap_batchEndTime" class="form-control form-control-sm"></div>
+              <div class="col-12">
+                <label class="form-label small">Weekdays</label>
+                <div class="d-flex flex-wrap gap-2" id="gap_weekdayWrap">
+                  <% ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach((label, idx) => { %>
+                    <label class="form-check form-check-inline small mb-0"><input type="checkbox" class="form-check-input gap-day-cb" value="<%= idx %>"> <%= label %></label>
+                  <% }) %>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small">Teacher</label>
+                <div class="input-group input-group-sm">
+                  <input type="hidden" id="gap_teacherId">
+                  <input type="text" id="gap_teacherName" class="form-control bg-white" placeholder="Select teacher..." readonly>
+                  <button type="button" class="btn btn-outline-secondary" id="btn_gapPickTeacher" title="Select Teacher"><i class="bi bi-person"></i></button>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small">Room</label>
+                <input type="text" id="gap_room" class="form-control form-control-sm" placeholder="Optional">
+              </div>
+              <div class="col-12">
+                <label class="form-label small text-muted">Skip Specific Dates (comma-separated YYYY-MM-DD)</label>
+                <input type="text" id="gap_exceptions" class="form-control form-control-sm" placeholder="2026-11-26, 2026-12-25">
+                <div class="form-check form-switch mt-2">
+                  <input class="form-check-input" type="checkbox" role="switch" id="gap_skipHolidays">
+                  <label class="form-check-label small text-muted" for="gap_skipHolidays">Skip Holidays/Off Days</label>
+                  <div class="small text-muted" id="gap_holidayHint" style="display:none;"></div>
+                </div>
+              </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <button type="button" class="btn btn-primary btn-sm" id="btn_gapAppendSessions"><i class="bi bi-plus-circle me-1"></i>Stage Sessions</button>
+              <button type="button" class="btn btn-outline-danger btn-sm d-none" id="btn_gapClearStaged"><i class="bi bi-x-circle me-1"></i>Clear Staged</button>
+              <a class="btn btn-outline-secondary btn-sm" id="gap_classFormLink" href="/school/classes/edit/<%= encodeURIComponent(c.id || '') %>" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>Open Class Session Builder</a>
+            </div>
           </div>
         </div>
-        <div class="row g-2 mt-2">
-          <div class="col-md-4">
-            <label class="form-label">Status</label>
-            <select id="inp_status" class="form-select">
-              <option value="active" selected>Active</option>
-              <option value="planned">Planned</option>
-              <option value="draft">Draft</option>
-            </select>
+
+        <div id="enrollWizardStepMarkNa" class="d-none">
+          <div class="alert alert-info border small" id="naSummaryText">Select sessions that should not count toward this enrollment.</div>
+          <div class="small text-muted mb-2" id="naSelectionCounter">Selected 0 / 0</div>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr><th style="width:3rem;">N/A</th><th>Date</th><th>Time</th><th>Status</th></tr>
+              </thead>
+              <tbody id="naSessionsTbody">
+                <tr><td colspan="4" class="text-center text-muted py-3">No sessions loaded.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
-        <div class="mt-2">
-          <label class="form-label">Reason Start</label>
-          <textarea id="inp_reasonStart" class="form-control" rows="2" placeholder="Optional start note"></textarea>
-        </div>
-        <div class="alert alert-light border small mb-0 mt-3 text-secondary">
-          <div class="fw-semibold text-dark mb-1">Tips</div>
-          <p class="mb-1">Re-entry creates a new period linked to the selected source period. Close periods or add the next period from the row menu.</p>
-          <p class="mb-0"><kbd>Alt</kbd>+<kbd>S</kbd> pick student, <kbd>Alt</kbd>+<kbd>A</kbd> submit add, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> from notes.</p>
+
+        <div id="enrollWizardStepConflicts" class="d-none">
+          <div class="alert alert-danger border small d-none" id="conflictReviewBlockingAlert">
+            Resolve scheduling conflicts by going Back to the add-sessions step before you can add this enrollment period.
+          </div>
+          <div class="alert alert-success border small d-none" id="conflictReviewClearAlert">
+            No scheduling conflicts found for the staged sessions in each student’s allowed window.
+          </div>
+          <div id="conflictReviewStudentsHost"></div>
+          <div class="mt-3">
+            <div class="fw-semibold mb-2">Teacher conflicts</div>
+            <div class="table-responsive border rounded">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr><th>Date</th><th>Teacher</th><th>Conflict</th><th>Time</th><th>Type</th></tr>
+                </thead>
+                <tbody id="conflictReviewTeacherTbody">
+                  <tr><td colspan="5" class="text-center text-muted py-3">No teacher conflicts.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btn_enrollWizardBack">
+          <i class="bi bi-arrow-left me-1"></i>Back
+        </button>
         <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_addPeriod" <%= isRolling ? '' : 'disabled' %>>
-          <i class="bi bi-plus-circle me-1"></i>Add Period
+          <i class="bi bi-plus-circle me-1"></i>Add Enrollment Period
         </button>
       </div>
     </div>
@@ -627,113 +764,6 @@
   </div>
 </div>
 
-<div class="modal fade" id="enrollmentSessionGapModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title fw-bold"><i class="bi bi-calendar-plus me-1"></i>Add Missing Class Sessions</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert alert-warning border small" id="gapSummaryText">Session alignment issue.</div>
-        <div class="alert alert-info border small mb-3">
-          <b>Class-wide impact:</b> Sessions staged here are <b>not saved</b> until enrollment completes successfully. They will count toward every enrolled student whose end date covers those session dates once saved.
-        </div>
-        <div class="alert alert-primary border small mb-3 d-none" id="gapStagedBadge"></div>
-        <div class="alert alert-warning border small mb-3 d-none" id="gapCycleExtendWarning"></div>
-        <div class="mb-3">
-          <div class="fw-semibold mb-2">Sessions currently in enrollment window</div>
-          <div class="table-responsive border rounded">
-            <table class="table table-sm align-middle mb-0">
-              <thead class="table-light">
-                <tr><th>Date</th><th>Time</th><th>Status</th><th>Countable</th><th class="text-end">Actions</th></tr>
-              </thead>
-              <tbody id="gapSessionsTbody">
-                <tr><td colspan="5" class="text-center text-muted py-3">No sessions loaded.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="border rounded p-3 bg-light-subtle" id="gapBatchPanel">
-          <div class="fw-semibold mb-2">Quick batch add</div>
-          <div class="row g-2">
-            <div class="col-md-3"><label class="form-label small">Start</label><input type="date" id="gap_batchStart" class="form-control form-control-sm"></div>
-            <div class="col-md-3"><label class="form-label small">End</label><input type="date" id="gap_batchEnd" class="form-control form-control-sm"></div>
-            <div class="col-md-3"><label class="form-label small">Start time</label><input type="time" id="gap_batchStartTime" class="form-control form-control-sm"></div>
-            <div class="col-md-3"><label class="form-label small">End time</label><input type="time" id="gap_batchEndTime" class="form-control form-control-sm"></div>
-            <div class="col-12">
-              <label class="form-label small">Weekdays</label>
-              <div class="d-flex flex-wrap gap-2" id="gap_weekdayWrap">
-                <% ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach((label, idx) => { %>
-                  <label class="form-check form-check-inline small mb-0"><input type="checkbox" class="form-check-input gap-day-cb" value="<%= idx %>"> <%= label %></label>
-                <% }) %>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label small">Teacher</label>
-              <div class="input-group input-group-sm">
-                <input type="hidden" id="gap_teacherId">
-                <input type="text" id="gap_teacherName" class="form-control bg-white" placeholder="Select teacher..." readonly>
-                <button type="button" class="btn btn-outline-secondary" id="btn_gapPickTeacher" title="Select Teacher"><i class="bi bi-person"></i></button>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label small">Room</label>
-              <input type="text" id="gap_room" class="form-control form-control-sm" placeholder="Optional">
-            </div>
-            <div class="col-12">
-              <label class="form-label small text-muted">Skip Specific Dates (comma-separated YYYY-MM-DD)</label>
-              <input type="text" id="gap_exceptions" class="form-control form-control-sm" placeholder="2026-11-26, 2026-12-25">
-              <div class="form-check form-switch mt-2">
-                <input class="form-check-input" type="checkbox" role="switch" id="gap_skipHolidays">
-                <label class="form-check-label small text-muted" for="gap_skipHolidays">Skip Holidays/Off Days</label>
-                <div class="small text-muted" id="gap_holidayHint" style="display:none;"></div>
-              </div>
-            </div>
-          </div>
-          <div class="d-flex flex-wrap gap-2 mt-3">
-            <button type="button" class="btn btn-primary btn-sm" id="btn_gapAppendSessions"><i class="bi bi-plus-circle me-1"></i>Stage Sessions</button>
-            <button type="button" class="btn btn-outline-danger btn-sm d-none" id="btn_gapClearStaged"><i class="bi bi-x-circle me-1"></i>Clear Staged</button>
-            <a class="btn btn-outline-secondary btn-sm" id="gap_classFormLink" href="/school/classes/edit/<%= encodeURIComponent(c.id || '') %>" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>Open Class Session Builder</a>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="enrollmentSessionNaModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title fw-bold"><i class="bi bi-slash-circle me-1"></i>Select Sessions to Mark N/A</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert alert-info border small" id="naSummaryText">Select sessions that should not count toward this enrollment.</div>
-        <div class="small text-muted mb-2" id="naSelectionCounter">Selected 0 / 0</div>
-        <div class="table-responsive border rounded">
-          <table class="table table-sm align-middle mb-0">
-            <thead class="table-light">
-              <tr><th style="width:3rem;">N/A</th><th>Date</th><th>Time</th><th>Status</th></tr>
-            </thead>
-            <tbody id="naSessionsTbody">
-              <tr><td colspan="4" class="text-center text-muted py-3">No sessions loaded.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary btn-sm" id="btn_confirmNaSelection" disabled>Confirm Selection</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="modal fade" id="enrollmentSessionListModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -794,7 +824,10 @@
   let gapFormDraft = null;
   let gapFormDraftTimer = null;
   let alignmentDebounceTimer = null;
-  let gapModalClosedShouldRecheck = false;
+  let enrollWizardStep = 'form'; // form | addSessions | markNa | conflicts
+  let enrollWizardPath = null; // null | 'planA' | 'planB'
+  let lastConflictReview = null;
+  let conflictReviewHasConflicts = false;
 
   const qs = (id) => document.getElementById(id);
   const tbody = qs('tbody_periods');
@@ -866,8 +899,6 @@
   const chargeModalEl = qs('enrollmentChargeModal');
   const programShortcutModalEl = qs('programRegistrationShortcutModal');
   const priorCreditRepairModalEl = qs('priorCreditRepairModal');
-  const gapModalEl = qs('enrollmentSessionGapModal');
-  const naModalEl = qs('enrollmentSessionNaModal');
   const enrollmentSessionListModalEl = qs('enrollmentSessionListModal');
   const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
 
@@ -943,8 +974,6 @@
   const chargeModal = createModalController(chargeModalEl);
   const programShortcutModal = createModalController(programShortcutModalEl);
   const priorCreditRepairModal = createModalController(priorCreditRepairModalEl);
-  const gapModal = createModalController(gapModalEl);
-  const naModal = createModalController(naModalEl);
   const enrollmentSessionListModal = createModalController(enrollmentSessionListModalEl);
   const addButton = qs('btn_addPeriod');
 
@@ -1430,6 +1459,7 @@
     }
     clearEntryDraft();
     applyTargetSessionCountUi();
+    resetEnrollmentWizard();
     setRollingRegistrationPanelHtml('<span class="text-muted">Select a student to verify program registration and prerequisites.</span>');
     addEnrollmentModal?.show();
   }
@@ -1703,6 +1733,7 @@
     }
     renderGapSessionTable();
     updateGapStagedBadge();
+    syncEnrollmentWizardPrimaryButton();
     return alignment;
   }
 
@@ -1721,8 +1752,8 @@
       };
     }
     updateGapStagedBadge();
-    gapModalClosedShouldRecheck = true;
     await refreshAlignmentWithStagedSessions();
+    syncEnrollmentWizardPrimaryButton();
   }
 
   function updateGapStagedBadge() {
@@ -1811,60 +1842,301 @@
       hint.textContent = targetSet
         ? 'Set start and end dates to count available sessions.'
         : 'Set an end date to see how many countable sessions fall in the enrollment window.';
-      renderSessionAlignmentResolvePanel(null);
       updateViewSessionsButton(null);
+      syncEnrollmentWizardPrimaryButton();
       return;
     }
     const available = Number(alignment.availableCount || 0);
     if (!targetSet) {
       hint.className = 'form-text compact-help text-muted mb-0';
       hint.textContent = `${available} countable session(s) in this window.`;
-      renderSessionAlignmentResolvePanel(null);
       updateViewSessionsButton(alignment);
+      syncEnrollmentWizardPrimaryButton();
       return;
     }
     const target = Number(alignment.targetSessionCount || alignment.effectiveTarget || 0);
     if (alignment.alignmentStatus === 'insufficient_sessions') {
       hint.className = 'form-text compact-help text-danger mb-0';
-      hint.textContent = `Only ${available} countable session(s) in this window${target ? `; need ${target}` : ''}.`;
-      renderSessionAlignmentResolvePanel(alignment);
+      hint.textContent = `Only ${available} countable session(s) in this window${target ? `; need ${target}` : ''}. Use Next to add sessions.`;
       updateViewSessionsButton(alignment);
+      syncEnrollmentWizardPrimaryButton();
       return;
     }
     if (alignment.alignmentStatus === 'overage_requires_na') {
       hint.className = 'form-text compact-help text-warning mb-0';
-      hint.textContent = `${available} countable sessions in window. Select ${alignment.requiredNaCount} as N/A when enrolling for ${target}.`;
-      renderSessionAlignmentResolvePanel(alignment);
+      hint.textContent = `${available} countable sessions in window. Use Next to select ${alignment.requiredNaCount} as N/A for ${target}.`;
       updateViewSessionsButton(alignment);
+      syncEnrollmentWizardPrimaryButton();
       return;
     }
     hint.className = 'form-text compact-help text-success mb-0';
     hint.textContent = `${available} countable session(s) in this window.`;
-    renderSessionAlignmentResolvePanel(null);
     updateViewSessionsButton(alignment);
+    syncEnrollmentWizardPrimaryButton();
   }
 
-  function renderSessionAlignmentResolvePanel(alignment) {
-    const host = qs('roll_sessionAlignmentResolve');
+  function getEnrollmentWizardStepMeta() {
+    if (enrollWizardPath === 'planA') {
+      return [
+        { id: 'form', label: 'Enrollment' },
+        { id: 'addSessions', label: 'Sessions' },
+        { id: 'conflicts', label: 'Conflicts' }
+      ];
+    }
+    if (enrollWizardPath === 'planB') {
+      return [
+        { id: 'form', label: 'Enrollment' },
+        { id: 'markNa', label: 'Mark N/A' }
+      ];
+    }
+    return [{ id: 'form', label: 'Enrollment' }];
+  }
+
+  function renderEnrollmentWizardStepIndicator() {
+    const host = qs('enrollWizardStepIndicator');
     if (!host) return;
-    if (!hasTargetSessionCount() || !alignment || ['ok', 'no_end_date'].includes(String(alignment.alignmentStatus || ''))) {
+    const steps = getEnrollmentWizardStepMeta();
+    if (steps.length <= 1) {
       host.innerHTML = '';
-      host.classList.add('d-none');
+      host.setAttribute('aria-hidden', 'true');
       return;
     }
-    const status = String(alignment.alignmentStatus || '');
-    const buttons = [];
-    if (status === 'insufficient_sessions') {
-      buttons.push('<button type="button" class="btn btn-sm btn-outline-warning" id="btn_resolveAddSessions"><i class="bi bi-calendar-plus me-1"></i>Add Sessions</button>');
+    host.setAttribute('aria-hidden', 'false');
+    const activeIdx = Math.max(0, steps.findIndex((row) => row.id === enrollWizardStep));
+    host.innerHTML = steps.map((step, idx) => {
+      const classes = ['enroll-wizard-step-pill'];
+      if (idx === activeIdx) classes.push('is-active');
+      else if (idx < activeIdx) classes.push('is-done');
+      return `<span class="${classes.join(' ')}">${idx + 1}. ${htmlEscape(step.label)}</span>`;
+    }).join('');
+  }
+
+  function setEnrollmentWizardStepVisibility() {
+    qs('enrollWizardStepForm')?.classList.toggle('d-none', enrollWizardStep !== 'form');
+    qs('enrollWizardStepAddSessions')?.classList.toggle('d-none', enrollWizardStep !== 'addSessions');
+    qs('enrollWizardStepMarkNa')?.classList.toggle('d-none', enrollWizardStep !== 'markNa');
+    qs('enrollWizardStepConflicts')?.classList.toggle('d-none', enrollWizardStep !== 'conflicts');
+    qs('btn_enrollWizardBack')?.classList.toggle('d-none', enrollWizardStep === 'form');
+    renderEnrollmentWizardStepIndicator();
+    syncEnrollmentWizardPrimaryButton();
+  }
+
+  function syncEnrollmentWizardPrimaryButton() {
+    const btn = qs('btn_addPeriod');
+    if (!btn) return;
+    const iconPlus = '<i class="bi bi-plus-circle me-1"></i>';
+    const iconNext = '<i class="bi bi-arrow-right me-1"></i>';
+    if (enrollWizardStep === 'form') {
+      const status = String(lastAlignmentResult?.alignmentStatus || '');
+      const needsNext = hasTargetSessionCount()
+        && (status === 'insufficient_sessions' || status === 'overage_requires_na');
+      btn.innerHTML = needsNext ? `${iconNext}Next` : `${iconPlus}Add Enrollment Period`;
+      if (isRollingClass()) btn.disabled = false;
+      return;
     }
-    if (status === 'overage_requires_na') {
-      buttons.push('<button type="button" class="btn btn-sm btn-outline-warning" id="btn_resolveMarkNaSessions"><i class="bi bi-slash-circle me-1"></i>Mark Sessions N/A</button>');
+    if (enrollWizardStep === 'addSessions') {
+      const ok = String(lastAlignmentResult?.alignmentStatus || '') === 'ok'
+        && pendingStagedSessions.length > 0;
+      btn.innerHTML = `${iconNext}Next`;
+      btn.disabled = !ok;
+      return;
     }
-    buttons.push('<a class="btn btn-sm btn-outline-secondary" href="/school/classes/edit/' + encodeURIComponent(classId) + '#tab-sessions" target="_blank" rel="noopener"><i class="bi bi-pencil-square me-1"></i>Edit Sessions</a>');
-    host.classList.remove('d-none');
-    host.innerHTML = '<div class="d-flex flex-wrap align-items-center gap-2">' + buttons.join('') + '</div>';
-    qs('btn_resolveAddSessions')?.addEventListener('click', () => openSessionGapModal(alignment));
-    qs('btn_resolveMarkNaSessions')?.addEventListener('click', () => openSessionNaModal(alignment));
+    if (enrollWizardStep === 'markNa') {
+      const required = Number(lastAlignmentResult?.requiredNaCount || 0);
+      const selected = readSelectedNaSessionIds().length;
+      btn.innerHTML = `${iconPlus}Add Enrollment Period`;
+      btn.disabled = required <= 0 || selected !== required;
+      return;
+    }
+    if (enrollWizardStep === 'conflicts') {
+      btn.innerHTML = `${iconPlus}Add Enrollment Period`;
+      btn.disabled = conflictReviewHasConflicts === true;
+    }
+  }
+
+  function isRollingClass() {
+    return <%= JSON.stringify(Boolean(isRolling)) %>;
+  }
+
+  function resetEnrollmentWizard() {
+    enrollWizardStep = 'form';
+    enrollWizardPath = null;
+    lastConflictReview = null;
+    conflictReviewHasConflicts = false;
+    setEnrollmentWizardStepVisibility();
+  }
+
+  function prepareAddSessionsStep(alignment) {
+    lastAlignmentResult = alignment || lastAlignmentResult;
+    const need = Number(alignment?.effectiveTarget || alignment?.targetSessionCount || 0);
+    const available = Number(alignment?.availableCount || 0);
+    const summary = qs('gapSummaryText');
+    if (summary) {
+      summary.textContent = `Need ${need || 'at least 1'} countable session(s) between ${alignment?.startDate || ''} and ${alignment?.endDate || ''}, but only ${available} exist. Stage missing sessions below or reduce Number of Sessions.`;
+    }
+    if (gapFormDraft) {
+      applyGapFormDraft(gapFormDraft);
+    } else {
+      applyScheduleDefaultsToGapForm(alignment?.scheduleDefaults || {});
+    }
+    renderGapSessionTable();
+    updateGapCycleExtendWarning();
+    updateGapStagedBadge();
+  }
+
+  function prepareMarkNaStep(alignment) {
+    lastAlignmentResult = alignment || lastAlignmentResult;
+    const required = Number(alignment?.requiredNaCount || 0);
+    const target = Number(alignment?.targetSessionCount || alignment?.effectiveTarget || 0);
+    const available = Number(alignment?.availableCount || 0);
+    const summary = qs('naSummaryText');
+    if (summary) {
+      summary.textContent = `This enrollment uses ${target} session(s), but ${available} countable sessions exist in the window. Select exactly ${required} session(s) to mark N/A (they will not count toward enrollment).`;
+    }
+    const preselected = pendingPlannedNaSessionIds.length === required
+      ? pendingPlannedNaSessionIds.slice()
+      : [];
+    renderNaSessionTable(alignment?.countableSessions || [], preselected);
+  }
+
+  function renderConflictReview(review = {}) {
+    lastConflictReview = review || null;
+    conflictReviewHasConflicts = review?.hasConflicts === true;
+    const blocking = qs('conflictReviewBlockingAlert');
+    const clear = qs('conflictReviewClearAlert');
+    blocking?.classList.toggle('d-none', !conflictReviewHasConflicts);
+    clear?.classList.toggle('d-none', conflictReviewHasConflicts);
+
+    const host = qs('conflictReviewStudentsHost');
+    const students = Array.isArray(review?.students) ? review.students : [];
+    if (host) {
+      if (!students.length) {
+        host.innerHTML = '<div class="text-muted small">No students to review for the staged sessions.</div>';
+      } else {
+        host.innerHTML = students.map((student) => {
+          const roleLabel = student.role === 'enrolling' ? 'Enrolling' : 'Enrolled';
+          const windowLabel = `${student.windowStart || '?'} → ${student.windowEnd || 'Open'}`;
+          const sessions = Array.isArray(student.sessions) ? student.sessions : [];
+          const rows = sessions.length
+            ? sessions.map((session) => {
+              const conflictBadge = session.hasConflict
+                ? `<span class="badge bg-danger-subtle text-danger border">Conflict</span> ${htmlEscape(session.conflictDetail || '')}`
+                : '<span class="badge bg-success-subtle text-success border">OK</span>';
+              return `<tr class="${session.hasConflict ? 'conflict-session-row' : ''}">
+                <td>${htmlEscape(session.date || '-')}</td>
+                <td>${htmlEscape([session.startTime, session.endTime].filter(Boolean).join(' - ') || '-')}</td>
+                <td>${conflictBadge}</td>
+              </tr>`;
+            }).join('')
+            : '<tr><td colspan="3" class="text-center text-muted py-2">No staged sessions in this student’s window.</td></tr>';
+          return `<div class="mb-3">
+            <div class="fw-semibold mb-1">${htmlEscape(student.displayName || student.studentId || '')}
+              <span class="badge bg-secondary-subtle text-secondary border ms-1">${roleLabel}</span>
+              <span class="text-muted small ms-2">${htmlEscape(windowLabel)}</span>
+            </div>
+            <div class="table-responsive border rounded">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light"><tr><th>Date</th><th>Time</th><th>Status</th></tr></thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    const teacherBody = qs('conflictReviewTeacherTbody');
+    const teacherConflicts = Array.isArray(review?.teacherConflicts) ? review.teacherConflicts : [];
+    if (teacherBody) {
+      if (!teacherConflicts.length) {
+        teacherBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No teacher conflicts.</td></tr>';
+      } else {
+        teacherBody.innerHTML = teacherConflicts.map((row) => `<tr class="conflict-session-row">
+          <td>${htmlEscape(row.date || '-')}</td>
+          <td>${htmlEscape(row.teacherName || '-')}</td>
+          <td>${htmlEscape(row.conflictClass || '-')}</td>
+          <td>${htmlEscape(row.existTime || '-')}</td>
+          <td>${htmlEscape(row.conflictType || '-')}</td>
+        </tr>`).join('');
+      }
+    }
+    syncEnrollmentWizardPrimaryButton();
+  }
+
+  async function loadConflictReviewStep() {
+    if (!pendingStagedSessions.length) {
+      await showMsg('Sessions required', 'warning', 'Stage the missing sessions before reviewing conflicts.');
+      return false;
+    }
+    try {
+      showBusy('Checking session conflicts...');
+      const payload = collectEnrollmentPayloadFromForm();
+      const result = await requestJson(
+        `/school/classes/api/${encodeURIComponent(classId)}/sessions/enrollment-gap-conflict-review`,
+        'POST',
+        {
+          studentId: payload.studentId,
+          startDate: payload.startDate,
+          endDate: payload.endDate,
+          pendingStagedSessions: pendingStagedSessions.map((row) => ({ ...row })),
+          pendingGapBatch: pendingGapBatch ? { ...pendingGapBatch } : undefined,
+          teacherId: String(qs('gap_teacherId')?.value || pendingGapBatch?.teacherId || '').trim()
+        }
+      );
+      if (!result) return false;
+      renderConflictReview(result.data || {});
+      return true;
+    } catch (error) {
+      await showMsg('Conflict Review Failed', 'error', error.message || 'Unable to review conflicts.');
+      return false;
+    } finally {
+      hideBusy();
+    }
+  }
+
+  async function goEnrollmentWizardBack() {
+    if (enrollWizardStep === 'conflicts') {
+      captureGapFormDraft();
+      enrollWizardStep = 'addSessions';
+      setEnrollmentWizardStepVisibility();
+      return;
+    }
+    if (enrollWizardStep === 'addSessions' || enrollWizardStep === 'markNa') {
+      if (enrollWizardStep === 'addSessions') captureGapFormDraft();
+      if (enrollWizardStep === 'markNa') {
+        pendingPlannedNaSessionIds = readSelectedNaSessionIds();
+      }
+      enrollWizardStep = 'form';
+      enrollWizardPath = null;
+      setEnrollmentWizardStepVisibility();
+      await runAlignmentRefresh({ showSpinner: false });
+    }
+  }
+
+  async function ensureEnrollmentSessionAlignment() {
+    if (!hasTargetSessionCount()) {
+      return { ok: true, alignment: lastAlignmentResult, nextStep: null };
+    }
+    const alignment = await runAlignmentRefresh({ showSpinner: true });
+    if (!alignment) return { ok: false, alignment: null, nextStep: null };
+    const endDate = String(qs('inp_endDate')?.value || '').trim();
+    const targetSessionCount = String(qs('inp_targetSessionCount')?.value || '').trim();
+    if (!endDate || !targetSessionCount) {
+      await showMsg('Session count required', 'warning', 'End date and Number of Sessions are required when you set a target session count.');
+      return { ok: false, alignment, nextStep: null };
+    }
+    if (alignment.alignmentStatus === 'insufficient_sessions') {
+      return { ok: false, alignment, nextStep: 'addSessions' };
+    }
+    if (alignment.alignmentStatus === 'overage_requires_na') {
+      const required = Number(alignment.requiredNaCount || 0);
+      if (pendingPlannedNaSessionIds.length !== required) {
+        return { ok: false, alignment, nextStep: 'markNa' };
+      }
+    } else {
+      pendingPlannedNaSessionIds = [];
+    }
+    return { ok: true, alignment, nextStep: null };
   }
 
   function applyScheduleDefaultsToGapForm(defaults = {}) {
@@ -2029,47 +2301,10 @@
 
   function updateNaSelectionCounter() {
     const counter = qs('naSelectionCounter');
-    const confirmBtn = qs('btn_confirmNaSelection');
     const required = Number(lastAlignmentResult?.requiredNaCount || 0);
     const selected = readSelectedNaSessionIds().length;
     if (counter) counter.textContent = `Selected ${selected} / ${required}`;
-    if (confirmBtn) confirmBtn.disabled = required <= 0 || selected !== required;
-  }
-
-  function openSessionGapModal(alignment) {
-    lastAlignmentResult = alignment || lastAlignmentResult;
-    const need = Number(alignment?.effectiveTarget || alignment?.targetSessionCount || 0);
-    const available = Number(alignment?.availableCount || 0);
-    const summary = qs('gapSummaryText');
-    if (summary) {
-      summary.textContent = `Need ${need || 'at least 1'} countable session(s) between ${alignment?.startDate || ''} and ${alignment?.endDate || ''}, but only ${available} exist. Stage missing sessions below or reduce Number of Sessions.`;
-    }
-    if (gapFormDraft) {
-      applyGapFormDraft(gapFormDraft);
-    } else {
-      applyScheduleDefaultsToGapForm(alignment?.scheduleDefaults || {});
-    }
-    renderGapSessionTable();
-    updateGapCycleExtendWarning();
-    updateGapStagedBadge();
-    gapModalClosedShouldRecheck = false;
-    gapModal?.show();
-  }
-
-  function openSessionNaModal(alignment) {
-    lastAlignmentResult = alignment || lastAlignmentResult;
-    const required = Number(alignment?.requiredNaCount || 0);
-    const target = Number(alignment?.targetSessionCount || alignment?.effectiveTarget || 0);
-    const available = Number(alignment?.availableCount || 0);
-    const summary = qs('naSummaryText');
-    if (summary) {
-      summary.textContent = `This enrollment uses ${target} session(s), but ${available} countable sessions exist in the window. Select exactly ${required} session(s) to mark N/A (they will not count toward enrollment).`;
-    }
-    const preselected = pendingPlannedNaSessionIds.length === required
-      ? pendingPlannedNaSessionIds.slice()
-      : [];
-    renderNaSessionTable(alignment?.countableSessions || [], preselected);
-    naModal?.show();
+    if (enrollWizardStep === 'markNa') syncEnrollmentWizardPrimaryButton();
   }
 
   async function runAlignmentRefresh({ showSpinner = false } = {}) {
@@ -2109,34 +2344,6 @@
     }, 300);
   }
 
-  async function ensureEnrollmentSessionAlignment() {
-    if (!hasTargetSessionCount()) {
-      return { ok: true, alignment: lastAlignmentResult };
-    }
-    const alignment = await runAlignmentRefresh({ showSpinner: true });
-    if (!alignment) return { ok: false, alignment: null };
-    const endDate = String(qs('inp_endDate')?.value || '').trim();
-    const targetSessionCount = String(qs('inp_targetSessionCount')?.value || '').trim();
-    if (!endDate || !targetSessionCount) {
-      await showMsg('Session count required', 'warning', 'End date and Number of Sessions are required when you set a target session count.');
-      return { ok: false, alignment };
-    }
-    if (alignment.alignmentStatus === 'insufficient_sessions') {
-      openSessionGapModal(alignment);
-      return { ok: false, alignment };
-    }
-    if (alignment.alignmentStatus === 'overage_requires_na') {
-      const required = Number(alignment.requiredNaCount || 0);
-      if (pendingPlannedNaSessionIds.length !== required) {
-        openSessionNaModal(alignment);
-        return { ok: false, alignment };
-      }
-    } else {
-      pendingPlannedNaSessionIds = [];
-    }
-    return { ok: true, alignment };
-  }
-
   async function confirmAppendGapBatchSessions() {
     const batchEnd = String(qs('gap_batchEnd')?.value || '').trim();
     const cycleEnd = String(cycleWindow?.endDate || '').trim();
@@ -2160,7 +2367,8 @@
           { text: 'Stage Sessions', class: 'btn-warning', value: true }
         ]
       });
-      confirmed = result === true;
+      // showMessageModal resolves with button text, not btn.value
+      confirmed = result === true || String(result || '').trim() === 'Stage Sessions';
     } else {
       confirmed = window.confirm(lines.join('\n\n'));
     }
@@ -2182,16 +2390,12 @@
     const needsCycleExtend = Boolean(batchEnd && (!cycleEnd || batchEnd > cycleEnd));
     body.exceptionDates = await collectGapExceptionDates(body.startDate, body.endDate);
     try {
-      showBusy('Checking conflicts and staging sessions...');
+      showBusy('Staging sessions...');
       const result = await requestJson(`/school/classes/api/${encodeURIComponent(classId)}/sessions/preview-batch`, 'POST', {
         ...body,
         extendCycleEndDate: needsCycleExtend
       });
       if (!result) return;
-      if (result?.data?.hasConflicts) {
-        await showSessionConflictModal(result.data.conflicts || []);
-        return;
-      }
       const proposedSessions = Array.isArray(result?.data?.proposedSessions) ? result.data.proposedSessions : [];
       const addedCount = appendUniqueStagedSessions(proposedSessions);
       if (!addedCount) {
@@ -2215,25 +2419,16 @@
       captureGapFormDraft();
       updateGapStagedBadge();
       await refreshAlignmentWithStagedSessions();
-      gapModalClosedShouldRecheck = true;
-      await showMsg('Sessions Staged', 'success', `${addedCount} session(s) staged. Complete enrollment to save them to the class.`);
+      syncEnrollmentWizardPrimaryButton();
+      const conflictNote = result?.data?.hasConflicts
+        ? ' Scheduling conflicts were detected and will be reviewed on the next step.'
+        : '';
+      await showMsg('Sessions Staged', 'success', `${addedCount} session(s) staged.${conflictNote} Complete enrollment to save them to the class.`);
     } catch (error) {
       await showMsg('Stage Sessions Failed', 'error', error.message || 'Unable to stage sessions.');
     } finally {
       hideBusy();
     }
-  }
-
-  async function confirmNaSelection() {
-    const required = Number(lastAlignmentResult?.requiredNaCount || 0);
-    const selected = readSelectedNaSessionIds();
-    if (selected.length !== required) {
-      await showMsg('Validation', 'warning', `Select exactly ${required} session(s) to mark N/A.`);
-      return;
-    }
-    pendingPlannedNaSessionIds = selected.slice();
-    naModal?.hide();
-    await proceedWithEnrollmentAfterAlignment();
   }
 
   async function proceedWithEnrollmentAfterAlignment() {
@@ -2963,7 +3158,12 @@
     lastAlignmentResult = null;
     pendingPlannedNaSessionIds = [];
     clearPendingGapBatch({ clearFormDraft: true });
+    lastConflictReview = null;
+    conflictReviewHasConflicts = false;
+    enrollWizardStep = 'form';
+    enrollWizardPath = null;
     updateSessionCountHint(null);
+    setEnrollmentWizardStepVisibility();
     setRollingRegistrationPanelHtml('<span class="text-muted">Select a student to verify program registration and prerequisites.</span>');
   }
 
@@ -2978,11 +3178,64 @@
   }
 
   async function addPeriod() {
-    if (hasTargetSessionCount()) {
+    if (enrollWizardStep === 'form') {
+      if (!hasTargetSessionCount()) {
+        await proceedWithEnrollmentAfterAlignment();
+        return;
+      }
       const alignmentGate = await ensureEnrollmentSessionAlignment();
+      if (alignmentGate.nextStep === 'addSessions') {
+        enrollWizardPath = 'planA';
+        enrollWizardStep = 'addSessions';
+        prepareAddSessionsStep(alignmentGate.alignment);
+        setEnrollmentWizardStepVisibility();
+        return;
+      }
+      if (alignmentGate.nextStep === 'markNa') {
+        enrollWizardPath = 'planB';
+        enrollWizardStep = 'markNa';
+        prepareMarkNaStep(alignmentGate.alignment);
+        setEnrollmentWizardStepVisibility();
+        return;
+      }
       if (!alignmentGate.ok) return;
+      await proceedWithEnrollmentAfterAlignment();
+      return;
     }
-    await proceedWithEnrollmentAfterAlignment();
+
+    if (enrollWizardStep === 'addSessions') {
+      const alignment = await refreshAlignmentWithStagedSessions();
+      if (!pendingStagedSessions.length || String(alignment?.alignmentStatus || '') !== 'ok') {
+        await showMsg('Sessions required', 'warning', 'Stage enough sessions to match Number of Sessions before continuing.');
+        syncEnrollmentWizardPrimaryButton();
+        return;
+      }
+      const loaded = await loadConflictReviewStep();
+      if (!loaded) return;
+      enrollWizardStep = 'conflicts';
+      setEnrollmentWizardStepVisibility();
+      return;
+    }
+
+    if (enrollWizardStep === 'markNa') {
+      const required = Number(lastAlignmentResult?.requiredNaCount || 0);
+      const selected = readSelectedNaSessionIds();
+      if (selected.length !== required) {
+        await showMsg('Validation', 'warning', `Select exactly ${required} session(s) to mark N/A.`);
+        return;
+      }
+      pendingPlannedNaSessionIds = selected.slice();
+      await proceedWithEnrollmentAfterAlignment();
+      return;
+    }
+
+    if (enrollWizardStep === 'conflicts') {
+      if (conflictReviewHasConflicts) {
+        await showMsg('Conflicts remain', 'warning', 'Go Back to the add-sessions step and resolve conflicts before adding the enrollment period.');
+        return;
+      }
+      await proceedWithEnrollmentAfterAlignment();
+    }
   }
 
   function openCloseModal(periodId) {
@@ -3434,6 +3687,7 @@
   qs('btn_openAddEnrollmentModal')?.addEventListener('click', openAddEnrollmentModal);
   qs('btn_pickStudent')?.addEventListener('click', pickStudent);
   qs('btn_addPeriod')?.addEventListener('click', addPeriod);
+  qs('btn_enrollWizardBack')?.addEventListener('click', goEnrollmentWizardBack);
   qs('btn_shortcutPreview')?.addEventListener('click', previewProgramRegistrationShortcut);
   qs('btn_shortcutSaveDraft')?.addEventListener('click', saveProgramRegistrationShortcutDraft);
   qs('btn_shortcutApprove')?.addEventListener('click', approveProgramRegistrationShortcutDraft);
@@ -3471,8 +3725,8 @@
   qs('btn_gapAppendSessions')?.addEventListener('click', appendGapBatchSessions);
   qs('btn_gapClearStaged')?.addEventListener('click', async () => {
     clearPendingGapBatch({ clearFormDraft: true });
-    gapModalClosedShouldRecheck = true;
-    await runAlignmentRefresh({ showSpinner: false });
+    await refreshAlignmentWithStagedSessions();
+    syncEnrollmentWizardPrimaryButton();
   });
   ['gap_batchStart', 'gap_batchEnd', 'gap_batchStartTime', 'gap_batchEndTime', 'gap_teacherId', 'gap_teacherName', 'gap_room', 'gap_exceptions'].forEach((id) => {
     qs(id)?.addEventListener('change', scheduleGapFormDraftCapture);
@@ -3488,15 +3742,11 @@
     const sessionId = String(btn.getAttribute('data-session-id') || '').trim();
     if (sessionId) removeStagedSession(sessionId);
   });
-  qs('btn_confirmNaSelection')?.addEventListener('click', confirmNaSelection);
   qs('naSessionsTbody')?.addEventListener('change', (event) => {
     if (event.target && event.target.classList.contains('na-session-cb')) updateNaSelectionCounter();
   });
-  gapModalEl?.addEventListener('hidden.bs.modal', () => {
-    captureGapFormDraft();
-    if (!gapModalClosedShouldRecheck) return;
-    gapModalClosedShouldRecheck = false;
-    runAlignmentRefresh({ showSpinner: false });
+  addEnrollmentModalEl?.addEventListener('hidden.bs.modal', () => {
+    if (enrollWizardStep === 'addSessions' || pendingStagedSessions.length) captureGapFormDraft();
   });
   qs('btn_confirmClosePeriod')?.addEventListener('click', submitClosePeriod);
   qs('btn_confirmReentry')?.addEventListener('click', submitReentry);

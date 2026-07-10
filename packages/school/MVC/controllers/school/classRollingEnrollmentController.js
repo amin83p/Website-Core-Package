@@ -2205,6 +2205,172 @@ async function postPreviewBatchSessions(req, res) {
   }
 }
 
+async function buildStudentWindowsForGapConflictReview({
+  classData,
+  stagedSessions = [],
+  enrollingStudentId = '',
+  enrollmentStartDate = '',
+  enrollmentEndDate = '',
+  reqUser
+} = {}) {
+  const classId = toPublicId(classData?.id);
+  const activeOrgId = String(classData?.orgId || reqUser?.activeOrgId || '').trim();
+  const sessionDates = (Array.isArray(stagedSessions) ? stagedSessions : [])
+    .map((row) => String(row?.date || '').trim())
+    .filter(Boolean);
+
+  const [periodRows, allStudents] = await Promise.all([
+    schoolDataService.getClassEnrollmentPeriodsByClassId(classId, reqUser),
+    schoolDataService.fetchData('students', {}, reqUser)
+  ]);
+  const studentRows = Array.isArray(allStudents) ? allStudents : [];
+  const studentNameMap = new Map(
+    studentRows
+      .map((student) => {
+        const sid = toPublicId(student?.id);
+        if (!sid) return null;
+        const name = [student?.firstName, student?.lastName].map((part) => String(part || '').trim()).filter(Boolean).join(' ')
+          || toPublicId(student?.id);
+        return [sid, name];
+      })
+      .filter(Boolean)
+  );
+
+  const openStatuses = new Set(['active', 'planned']);
+  const scopedPeriods = (Array.isArray(periodRows) ? periodRows : []).filter((row) => {
+    if (activeOrgId && !idsEqual(row?.orgId, activeOrgId)) return false;
+    const status = String(row?.status || '').trim().toLowerCase();
+    return openStatuses.has(status);
+  });
+
+  const windowBounds = (() => {
+    if (!sessionDates.length) {
+      const today = new Date().toISOString().slice(0, 10);
+      return { start: today, end: today };
+    }
+    const sorted = sessionDates.slice().sort();
+    return { start: sorted[0], end: sorted[sorted.length - 1] };
+  })();
+
+  const rosterByStudent = new Map();
+  scopedPeriods.forEach((period) => {
+    const studentId = toPublicId(period?.studentId);
+    if (!studentId) return;
+    const start = String(period?.startDate || '').trim();
+    const end = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(period);
+    if (!start) return;
+    if (start > windowBounds.end || end < windowBounds.start) return;
+    const existing = rosterByStudent.get(studentId);
+    if (!existing) {
+      rosterByStudent.set(studentId, { windowStart: start, windowEnd: end });
+      return;
+    }
+    rosterByStudent.set(studentId, {
+      windowStart: start < existing.windowStart ? start : existing.windowStart,
+      windowEnd: end > existing.windowEnd ? end : existing.windowEnd
+    });
+  });
+
+  const enrollingId = toPublicId(enrollingStudentId);
+  const windows = [];
+  rosterByStudent.forEach((window, studentId) => {
+    if (enrollingId && idsEqual(studentId, enrollingId)) return;
+    windows.push({
+      studentId,
+      displayName: studentNameMap.get(studentId) || studentId,
+      role: 'enrolled',
+      windowStart: window.windowStart,
+      windowEnd: window.windowEnd
+    });
+  });
+
+  if (enrollingId) {
+    windows.push({
+      studentId: enrollingId,
+      displayName: studentNameMap.get(enrollingId) || enrollingId,
+      role: 'enrolling',
+      windowStart: String(enrollmentStartDate || '').trim(),
+      windowEnd: String(enrollmentEndDate || '').trim() || '9999-12-31'
+    });
+  }
+
+  windows.sort((a, b) => {
+    if (a.role !== b.role) return a.role === 'enrolling' ? 1 : -1;
+    return String(a.displayName || '').localeCompare(String(b.displayName || ''));
+  });
+
+  return windows;
+}
+
+async function postEnrollmentGapConflictReview(req, res) {
+  try {
+    const classId = toPublicId(req.params?.classId || req.body?.classId || '');
+    if (!classId) throw new Error('classId is required.');
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+
+    let stagedSessions = parsePendingStagedSessionsFromBody(req.body);
+    if (!stagedSessions.length) {
+      const batchSpec = parseGapBatchSpecFromBody(req.body);
+      if (batchSpec) {
+        const preview = await rollingEnrollmentSessionAlignmentService.previewGapBatchSessions({
+          classData,
+          batchSpec,
+          reqUser: req.user
+        });
+        stagedSessions = preview.proposedSessions || [];
+      }
+    }
+    if (!stagedSessions.length) {
+      throw new Error('Staged sessions are required for conflict review.');
+    }
+
+    const teacherId = toPublicId(
+      stagedSessions[0]?.delivery?.deliveredBy
+      || req.body?.teacherId
+      || req.body?.pendingGapBatch?.teacherId
+      || ''
+    ) || rollingEnrollmentSessionAlignmentService.resolveDefaultTeacherFromClass(classData, req.body || {}).teacherId;
+
+    const enrollingStudentId = String(req.body?.studentId || '').trim();
+    const enrollmentStartDate = String(req.body?.startDate || '').trim();
+    const enrollmentEndDate = String(req.body?.endDate || '').trim();
+
+    const conflictResult = await sessionConflictDetectionService.evaluateEnrollmentGapBatchConflicts({
+      classData,
+      proposedSessions: stagedSessions,
+      teacherId,
+      enrollingStudentId,
+      reqUser: req.user
+    });
+
+    const studentWindows = await buildStudentWindowsForGapConflictReview({
+      classData,
+      stagedSessions,
+      enrollingStudentId,
+      enrollmentStartDate,
+      enrollmentEndDate,
+      reqUser: req.user
+    });
+
+    const review = sessionConflictDetectionService.buildEnrollmentGapConflictReview({
+      stagedSessions,
+      conflictResult,
+      studentWindows
+    });
+
+    return res.json({
+      status: 'success',
+      message: review.hasConflicts
+        ? 'Scheduling conflicts found for staged sessions.'
+        : 'No scheduling conflicts found for staged sessions.',
+      data: review
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function postAppendBatchSessions(req, res) {
   try {
     const classId = toPublicId(req.params?.classId || req.body?.classId || '');
@@ -3704,6 +3870,7 @@ module.exports = {
   saveEnrollmentCompletionDecision,
   postEnrollmentSessionAlignment,
   postPreviewBatchSessions,
+  postEnrollmentGapConflictReview,
   postAppendBatchSessions
 };
 

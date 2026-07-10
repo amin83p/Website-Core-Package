@@ -158,3 +158,120 @@ test('rolling enrollment UI uses preview-batch instead of immediate append-batch
   assert.match(source, /Stage Sessions/);
   assert.doesNotMatch(source, /sessions\/append-batch/);
 });
+
+test('buildEnrollmentGapConflictReview filters staged sessions by student windows', () => {
+  const staged = [
+    { sessionId: 'S1', date: '2026-01-05', startTime: '09:00', endTime: '10:00' },
+    { sessionId: 'S2', date: '2026-01-12', startTime: '09:00', endTime: '10:00' },
+    { sessionId: 'S3', date: '2026-02-02', startTime: '09:00', endTime: '10:00' }
+  ];
+  const review = conflictService.buildEnrollmentGapConflictReview({
+    stagedSessions: staged,
+    conflictResult: {
+      teacherConflicts: [{
+        date: '2026-01-12',
+        teacherName: 'Jane Doe',
+        conflictClass: 'Other Class',
+        existTime: '09:00 - 10:00',
+        conflictType: 'teacher_schedule'
+      }],
+      rosterStudentConflicts: [{
+        sessionIndex: 1,
+        date: '2026-01-12',
+        teacherName: 'Student A',
+        conflictClass: 'Math Lab',
+        existTime: '09:00 - 10:00',
+        conflictType: 'student_schedule',
+        studentId: 'STU_A'
+      }],
+      enrollingStudentConflicts: []
+    },
+    studentWindows: [
+      {
+        studentId: 'STU_A',
+        displayName: 'Student A',
+        role: 'enrolled',
+        windowStart: '2026-01-01',
+        windowEnd: '2026-01-31'
+      },
+      {
+        studentId: 'STU_B',
+        displayName: 'Student B',
+        role: 'enrolling',
+        windowStart: '2026-01-01',
+        windowEnd: '2026-02-28'
+      }
+    ]
+  });
+
+  assert.equal(review.hasConflicts, true);
+  assert.equal(review.teacherConflicts.length, 1);
+  assert.equal(review.students.length, 2);
+
+  const enrolled = review.students.find((row) => row.studentId === 'STU_A');
+  assert.ok(enrolled);
+  assert.equal(enrolled.sessions.length, 2);
+  assert.equal(enrolled.sessions.some((row) => row.date === '2026-02-02'), false);
+  const conflicted = enrolled.sessions.find((row) => row.date === '2026-01-12');
+  assert.equal(conflicted.hasConflict, true);
+  assert.match(conflicted.conflictDetail, /Math Lab/);
+
+  const enrolling = review.students.find((row) => row.role === 'enrolling');
+  assert.ok(enrolling);
+  assert.equal(enrolling.sessions.length, 3);
+  assert.equal(enrolling.hasConflicts, false);
+});
+
+test('buildEnrollmentGapConflictReview reports clear when no conflicts', () => {
+  const review = conflictService.buildEnrollmentGapConflictReview({
+    stagedSessions: [{ sessionId: 'S1', date: '2026-01-05', startTime: '09:00', endTime: '10:00' }],
+    conflictResult: {
+      teacherConflicts: [],
+      rosterStudentConflicts: [],
+      enrollingStudentConflicts: []
+    },
+    studentWindows: [{
+      studentId: 'STU_NEW',
+      displayName: 'New Student',
+      role: 'enrolling',
+      windowStart: '2026-01-01',
+      windowEnd: '2026-01-31'
+    }]
+  });
+  assert.equal(review.hasConflicts, false);
+  assert.equal(review.students[0].sessions.length, 1);
+  assert.equal(review.students[0].sessions[0].hasConflict, false);
+});
+
+test('rolling enrollment controller exposes enrollment-gap conflict review endpoint', () => {
+  const controllerSource = require('fs').readFileSync(
+    require('path').join(__dirname, '../MVC/controllers/school/classRollingEnrollmentController.js'),
+    'utf8'
+  );
+  const routeSource = require('fs').readFileSync(
+    require('path').join(__dirname, '../MVC/routes/classRoutes.js'),
+    'utf8'
+  );
+  assert.match(controllerSource, /postEnrollmentGapConflictReview/);
+  assert.match(controllerSource, /buildEnrollmentGapConflictReview/);
+  assert.match(routeSource, /enrollment-gap-conflict-review/);
+});
+
+test('rolling enrollment UI uses multi-step enrollment wizard', () => {
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '../MVC/views/school/class/rollingEnrollment.ejs'),
+    'utf8'
+  );
+  assert.match(source, /enrollWizardStepForm/);
+  assert.match(source, /enrollWizardStepAddSessions/);
+  assert.match(source, /enrollWizardStepMarkNa/);
+  assert.match(source, /enrollWizardStepConflicts/);
+  assert.match(source, /btn_enrollWizardBack/);
+  assert.match(source, /Add Enrollment Period/);
+  assert.match(source, /enrollment-gap-conflict-review/);
+  assert.match(source, /goEnrollmentWizardBack/);
+  assert.doesNotMatch(source, /enrollmentSessionGapModal/);
+  assert.doesNotMatch(source, /enrollmentSessionNaModal/);
+  assert.doesNotMatch(source, /openSessionGapModal/);
+  assert.doesNotMatch(source, /openSessionNaModal/);
+});

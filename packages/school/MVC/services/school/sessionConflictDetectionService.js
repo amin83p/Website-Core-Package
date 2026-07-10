@@ -691,13 +691,127 @@ function buildConflictBlockingMessage(conflicts = []) {
   return `Scheduling conflicts detected. Resolve the session overlaps before saving. ${lines.join(' | ')}${suffix}`;
 }
 
+const TEACHER_CONFLICT_TYPES = new Set([
+  'teacher_schedule',
+  'approved_leave',
+  'activity_work_session',
+  'report_assignment'
+]);
+
+function sessionScheduleKey(session = {}) {
+  return [
+    normalizeDateOnlyValue(session?.date),
+    normalizeClockTime(session?.startTime || session?.start),
+    normalizeClockTime(session?.endTime || session?.end)
+  ].join('|');
+}
+
+function dateInStudentWindow(date, windowStart, windowEnd) {
+  const day = normalizeDateOnlyValue(date);
+  const start = normalizeDateOnlyValue(windowStart);
+  const end = normalizeDateOnlyValue(windowEnd) || '9999-12-31';
+  return Boolean(day && start && start <= day && end >= day);
+}
+
+/**
+ * Pure builder for Plan A conflict-review UI payload.
+ * studentWindows: [{ studentId, displayName, role, windowStart, windowEnd }]
+ */
+function buildEnrollmentGapConflictReview({
+  stagedSessions = [],
+  conflictResult = {},
+  studentWindows = []
+} = {}) {
+  const sessions = Array.isArray(stagedSessions) ? stagedSessions : [];
+  const windows = Array.isArray(studentWindows) ? studentWindows : [];
+  const teacherConflicts = (Array.isArray(conflictResult?.teacherConflicts) ? conflictResult.teacherConflicts : [])
+    .filter((row) => TEACHER_CONFLICT_TYPES.has(String(row?.conflictType || '').trim()));
+  const studentConflictRows = [
+    ...(Array.isArray(conflictResult?.rosterStudentConflicts) ? conflictResult.rosterStudentConflicts : []),
+    ...(Array.isArray(conflictResult?.enrollingStudentConflicts) ? conflictResult.enrollingStudentConflicts : [])
+  ];
+  const studentLeaveConflicts = (Array.isArray(conflictResult?.teacherConflicts) ? conflictResult.teacherConflicts : [])
+    .filter((row) => String(row?.conflictType || '').trim() === 'student_approved_leave');
+
+  const conflictsByStudentAndKey = new Map();
+  studentConflictRows.forEach((row) => {
+    const studentId = toPublicId(row?.studentId || '');
+    if (!studentId) return;
+    const key = [
+      normalizeDateOnlyValue(row?.date),
+      String(row?.sessionIndex ?? '')
+    ].join('|');
+    const list = conflictsByStudentAndKey.get(studentId) || [];
+    list.push({ ...row, _matchKey: key });
+    conflictsByStudentAndKey.set(studentId, list);
+  });
+
+  const students = windows.map((windowRow) => {
+    const studentId = toPublicId(windowRow?.studentId || '');
+    const displayName = String(windowRow?.displayName || studentId).trim();
+    const windowStart = normalizeDateOnlyValue(windowRow?.windowStart);
+    const windowEnd = normalizeDateOnlyValue(windowRow?.windowEnd) || '9999-12-31';
+    const studentConflicts = [
+      ...(conflictsByStudentAndKey.get(studentId) || []),
+      ...studentLeaveConflicts.filter((row) => {
+        const leaveName = String(row?.teacherName || '').trim().toLowerCase();
+        return leaveName && leaveName === displayName.toLowerCase();
+      })
+    ];
+    const allowedSessions = sessions
+      .map((session, sessionIndex) => {
+        const date = normalizeDateOnlyValue(session?.date);
+        const startTime = normalizeClockTime(session?.startTime || session?.start);
+        const endTime = normalizeClockTime(session?.endTime || session?.end);
+        if (!dateInStudentWindow(date, windowStart, windowEnd)) return null;
+        const matched = studentConflicts.find((row) => Number(row?.sessionIndex) === sessionIndex)
+          || studentConflicts.find((row) => normalizeDateOnlyValue(row?.date) === date);
+        return {
+          sessionId: String(session?.sessionId || '').trim(),
+          date,
+          startTime,
+          endTime,
+          hasConflict: Boolean(matched),
+          conflictType: matched ? String(matched.conflictType || '') : '',
+          conflictDetail: matched
+            ? `${matched.conflictClass || 'Conflict'} (${matched.existTime || ''})`.trim()
+            : ''
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      studentId,
+      displayName,
+      role: windowRow?.role === 'enrolling' ? 'enrolling' : 'enrolled',
+      windowStart,
+      windowEnd,
+      sessions: allowedSessions,
+      hasConflicts: allowedSessions.some((row) => row.hasConflict)
+    };
+  });
+
+  const hasStudentConflicts = students.some((row) => row.hasConflicts);
+  const hasTeacherConflicts = teacherConflicts.length > 0;
+
+  return {
+    hasConflicts: hasStudentConflicts || hasTeacherConflicts,
+    teacherConflicts,
+    students,
+    stagedSessionCount: sessions.length
+  };
+}
+
 module.exports = {
   detectSessionConflicts,
   detectStudentScheduleConflicts,
   evaluateEnrollmentGapBatchConflicts,
+  buildEnrollmentGapConflictReview,
   buildConflictBlockingMessage,
   buildTeacherIdentityLookup,
   resolveTeacherPersonId,
   resolveSessionTeacherId,
-  dedupeSessionConflictRows
+  dedupeSessionConflictRows,
+  TEACHER_CONFLICT_TYPES,
+  sessionScheduleKey
 };

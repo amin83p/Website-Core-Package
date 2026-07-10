@@ -243,6 +243,12 @@ router.post('/api/:classId/sessions/preview-batch',
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.postPreviewBatchSessions);
 
+router.post('/api/:classId/sessions/enrollment-gap-conflict-review',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.postEnrollmentGapConflictReview);
+
 router.post('/api/:classId/sessions/append-batch',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
