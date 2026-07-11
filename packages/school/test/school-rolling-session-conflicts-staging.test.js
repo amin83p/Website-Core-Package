@@ -215,6 +215,8 @@ test('buildEnrollmentGapConflictReview filters staged sessions by student window
   const conflicted = enrolled.sessions.find((row) => row.date === '2026-01-12');
   assert.equal(conflicted.hasConflict, true);
   assert.match(conflicted.conflictDetail, /Math Lab/);
+  assert.match(conflicted.conflictDetail, /Student A/);
+  assert.equal(conflicted.studentDisplayName, 'Student A');
 
   const enrolling = review.students.find((row) => row.role === 'enrolling');
   assert.ok(enrolling);
@@ -270,8 +272,34 @@ test('rolling enrollment UI uses multi-step enrollment wizard', () => {
   assert.match(source, /Add Enrollment Period/);
   assert.match(source, /enrollment-gap-conflict-review/);
   assert.match(source, /goEnrollmentWizardBack/);
+  assert.match(source, /wizard-step-rail/);
+  assert.match(source, /wizard-step-pill/);
+  assert.match(source, /wizardStepRail\.js/);
+  assert.match(source, /conflictReviewReadyPanel/);
+  assert.match(source, /conflictReviewConflictPanel/);
+  assert.match(source, /renderConflictReview/);
   assert.doesNotMatch(source, /enrollmentSessionGapModal/);
   assert.doesNotMatch(source, /enrollmentSessionNaModal/);
   assert.doesNotMatch(source, /openSessionGapModal/);
   assert.doesNotMatch(source, /openSessionNaModal/);
+});
+
+test('buildStudentWindowsForGapConflictReview uses person-based student display names', () => {
+  const controllerSource = require('fs').readFileSync(
+    require('path').join(__dirname, '../MVC/controllers/school/classRollingEnrollmentController.js'),
+    'utf8'
+  );
+  assert.match(controllerSource, /buildStudentWindowsForGapConflictReview/);
+  assert.match(controllerSource, /buildPersonByIdMap/);
+  assert.match(controllerSource, /formatPersonName/);
+});
+
+test('session conflict service enriches enrollment gap conflict details with display names', () => {
+  const serviceSource = require('fs').readFileSync(
+    require('path').join(__dirname, '../MVC/services/school/sessionConflictDetectionService.js'),
+    'utf8'
+  );
+  assert.match(serviceSource, /buildStudentDisplayNameMap/);
+  assert.match(serviceSource, /enrichConflictRowsWithDisplayNames/);
+  assert.match(serviceSource, /studentDisplayName/);
 });

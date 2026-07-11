@@ -592,7 +592,7 @@
 
   .school-master-hub .single-day-list .event-row {
     display: grid;
-    grid-template-columns: 170px 1fr auto;
+    grid-template-columns: auto 170px 1fr auto;
     gap: 0.85rem;
     align-items: start;
     padding: 0.7rem 0.9rem;
@@ -610,6 +610,49 @@
   .school-master-hub .single-day-list .event-row.leave-event {
     background: linear-gradient(90deg, #fff9db 0%, #ffffff 72%);
     border-left: 5px solid #f08c00;
+  }
+
+  .school-master-hub .single-day-list .event-row-complete {
+    background-color: rgba(209, 231, 221, 0.35);
+    border-left: 4px solid #a3cfbb;
+  }
+
+  .school-master-hub .single-day-list .event-row-pending {
+    background-color: rgba(255, 243, 205, 0.45);
+    border-left: 4px solid #ffc107;
+  }
+
+  .school-master-hub .single-day-list .schedule-scan-cell {
+    display: flex;
+    align-items: flex-start;
+    padding-top: 0.1rem;
+  }
+
+  .school-master-hub .schedule-scan-icon {
+    font-size: 1rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .school-master-hub .day-completion-chip {
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  .school-master-hub .event-block-complete {
+    border-left-color: #198754 !important;
+  }
+
+  .school-master-hub .event-block-pending {
+    border-left-color: #ffc107 !important;
+  }
+
+  .school-master-hub .event-block .block-scan-icon {
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    font-size: 0.75rem;
+    opacity: 0.9;
   }
 
   .school-master-hub .single-day-list .event-time {
@@ -675,6 +718,10 @@
     padding: 1px 5px;
     border-radius: 10px;
     color: white;
+  }
+
+  .school-master-hub .cal-badge-pending {
+    right: 18px;
   }
 
   .school-master-hub .hub-workspace-actions {
@@ -975,6 +1022,7 @@
 <%- include('partials/modal', { user }) %>
 <%- include('partials/modal_GenericPicker') %>
 
+<script src="/scripts/scheduleCompletionDisplay.js"></script>
 <script>
 (function () {
   const root = document.querySelector('[data-master-hub]');
@@ -3503,21 +3551,33 @@
     return grouped;
   }
 
+  function hubScheduleEventScanBadge(event, statusMap) {
+    const scd = window.ScheduleCompletionDisplay;
+    if (!scd) return hubScheduleStatusBadge(event && event.status, statusMap);
+    const scan = scd.resolveScheduleCompletionScan(event, statusMap);
+    return scd.buildScheduleStatusBadge(scan, hubScheduleStatusLabel(event && event.status, statusMap), '');
+  }
+
   function renderHubScheduleLegend(mode) {
     const host = document.getElementById('hubScheduleLegend');
     if (!host) return;
     if (mode === 'calendar') {
-      host.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</div><div class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</div><div class="text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</div><div class="text-muted small">Click any day to zoom in</div>';
+      host.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</div><div class="text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</div><div class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</div><div class="text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</div><div class="text-muted small">Click any day to zoom in</div>';
       return;
     }
     if (mode === 'timeline') {
-      host.innerHTML = '<div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</div><div class="text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</div>';
+      host.innerHTML = '<div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</div>';
+      return;
+    }
+    if (mode === 'single') {
+      host.innerHTML = '<div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-muted small">Vertical full-detail view for selected day</div>';
       return;
     }
     host.innerHTML = '<div class="text-muted small">Vertical full-detail view for selected day</div>';
   }
 
   function renderHubScheduleSingleDayView(eventsByDate, statusMap) {
+    const scd = window.ScheduleCompletionDisplay;
     const dates = Object.keys(eventsByDate || {}).sort();
     if (!dates.length) {
       return '<div class="alert alert-light text-center border py-4 text-muted">No schedule items found for this day.</div>';
@@ -3528,15 +3588,23 @@
       const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
       const dayEvents = eventsByDate[dateStr] || [];
       const hasConflict = dayEvents.some(function (event) { return event?.hasOverlap; });
-      html += '<div class="day-card"><div class="day-card-header ' + (hasConflict ? 'conflict' : '') + '"><span>' + escapeHtml(displayDate) + '</span><span class="badge ' + (hasConflict ? 'bg-danger' : 'bg-primary') + '">' + escapeHtml(dayEvents.length) + ' item' + (dayEvents.length === 1 ? '' : 's') + '</span></div>';
+      const daySummary = scd ? scd.summarizeDayCompletion(dayEvents, statusMap) : null;
+      const completionChip = scd && daySummary ? scd.buildDayCompletionChip(daySummary) : '';
+      html += '<div class="day-card"><div class="day-card-header ' + (hasConflict ? 'conflict' : '') + '"><span>' + escapeHtml(displayDate) + '</span><span class="d-flex align-items-center gap-2 flex-wrap justify-content-end">' + completionChip + '<span class="badge ' + (hasConflict ? 'bg-danger' : 'bg-primary') + '">' + escapeHtml(dayEvents.length) + ' item' + (dayEvents.length === 1 ? '' : 's') + '</span></span></div>';
       dayEvents.forEach(function (event) {
         const leave = isHubScheduleLeaveEvent(event);
         const title = getHubScheduleEventTitle(event);
         const detailUrl = getHubScheduleEventDetailsUrl(event);
-        const statusBadge = hubScheduleStatusBadge(event?.status, statusMap);
+        const scan = scd ? scd.resolveScheduleCompletionScan(event, statusMap) : null;
+        const rowClasses = scd
+          ? scd.buildScheduleRowClasses(scan, 'event-row ' + (event?.hasOverlap ? 'overlap ' : ''))
+          : 'event-row ' + (event?.hasOverlap ? 'overlap ' : '') + (leave ? 'leave-event' : '');
+        const scanIcon = scd ? scd.buildScheduleScanIcon(scan) : '';
+        const statusBadge = hubScheduleEventScanBadge(event, statusMap);
         const caseBadge = buildSessionCaseBadgeHtml(event?.caseSummary);
         html += [
-          '<div class="event-row ' + (event?.hasOverlap ? 'overlap ' : '') + (leave ? 'leave-event' : '') + '">',
+          '<div class="' + rowClasses + '">',
+          '<div class="schedule-scan-cell">' + scanIcon + '</div>',
           '<div class="event-time">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</div>',
           '<div>',
           '<div class="fw-bold">' + escapeHtml(title) + '</div>',
@@ -3558,6 +3626,7 @@
   }
 
   function renderHubScheduleTimelineView(eventsByDate, statusMap) {
+    const scd = window.ScheduleCompletionDisplay;
     let html = '';
     Object.keys(eventsByDate || {}).sort().forEach(function (dateStr) {
       const dayEvents = eventsByDate[dateStr] || [];
@@ -3597,15 +3666,21 @@
         const detailUrl = getHubScheduleEventDetailsUrl(event);
         const encodedDetailUrl = encodeURIComponent(detailUrl);
         const caseBadge = buildSessionCaseBadgeHtml(event?.caseSummary);
+        const scan = scd ? scd.resolveScheduleCompletionScan(event, statusMap) : null;
+        const blockClasses = scd
+          ? scd.buildScheduleBlockClasses(scan, 'event-block ' + cssClass + ' ' + (event?.hasOverlap ? 'border-danger border-2' : ''))
+          : 'event-block ' + cssClass + ' ' + (event?.hasOverlap ? 'border-danger border-2' : '');
+        const scanIcon = scd && scan && scan.state !== 'leave' ? '<i class="bi ' + escapeHtml(scan.iconClass) + ' block-scan-icon" aria-hidden="true"></i>' : '';
         html += [
-          '<div class="event-block ' + cssClass + ' ' + (event?.hasOverlap ? 'border-danger border-2' : '') + '"',
+          '<div class="' + blockClasses + '"',
           ' style="left:' + escapeHtml(event.__hubPos.left) + '%;width:' + escapeHtml(event.__hubPos.width) + '%;top:' + escapeHtml(topPos) + 'px;"',
           ' title="' + escapeHtml(title) + ' | ' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '"',
           detailUrl ? ' onclick="window.open(decodeURIComponent(\'' + escapeHtml(encodedDetailUrl) + '\'), \'_blank\')"' : '',
           '>',
+          scanIcon,
           '<div class="fw-bold text-truncate">' + escapeHtml(title) + '</div>',
           caseBadge ? '<div class="mt-1">' + caseBadge + '</div>' : '',
-          '<div class="event-meta x-small"><span class="text-truncate">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</span>' + hubScheduleStatusBadge(event?.status, statusMap) + '</div>',
+          '<div class="event-meta x-small"><span class="text-truncate">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</span>' + hubScheduleEventScanBadge(event, statusMap) + '</div>',
           '</div>'
         ].join('');
       });
@@ -3620,7 +3695,8 @@
     return html || '<div class="alert alert-light text-center border py-4 text-muted">No schedule items found in this range.</div>';
   }
 
-  function renderHubScheduleCalendarView(eventsByDate, startStr, endStr) {
+  function renderHubScheduleCalendarView(eventsByDate, startStr, endStr, statusMap) {
+    const scd = window.ScheduleCompletionDisplay;
     let current = new Date(startStr + 'T00:00:00');
     current.setDate(1);
     const end = new Date(endStr + 'T00:00:00');
@@ -3654,7 +3730,9 @@
           badge = '<div class="cal-badge bg-warning text-dark">' + escapeHtml(count) + '</div>';
         } else if (count > 0) {
           classes += 'active';
-          badge = '<div class="cal-badge bg-primary">' + escapeHtml(count) + '</div>';
+          badge = scd
+            ? scd.buildCalendarDayBadges(dayEvents, statusMap, { hasConflict: false, hasLeave: false })
+            : '<div class="cal-badge bg-primary">' + escapeHtml(count) + '</div>';
         } else {
           classes += 'empty';
         }
@@ -3707,7 +3785,7 @@
       content = renderHubScheduleTimelineView(grouped, statusMap);
     } else {
       mode = 'calendar';
-      content = renderHubScheduleCalendarView(grouped, range.startDate, range.endDate);
+      content = renderHubScheduleCalendarView(grouped, range.startDate, range.endDate, statusMap);
     }
     renderHubScheduleLegend(mode);
     host.innerHTML = '<div class="hub-schedule-visual">' + content + '</div>';

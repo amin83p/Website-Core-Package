@@ -690,35 +690,66 @@ async function getScheduleEventsForPerson({ orgId, personId, startDate, endDate,
       if (!isPersonEligibleForEntry(activity, entry, targetPersonId)) return [];
       const assignees = normalizeActivityAssigneeRows(entry.assignees);
       const entryTitle = entry.title && entry.title !== activity.title ? `${activity.title}: ${entry.title}` : activity.title;
+      const evaluationType = normalizeEvaluationType(activity.evaluationType);
       return assignees
         .filter((attendee) => idsEqual(attendee.personId, targetPersonId))
         .filter((attendee) => normalizeStatus(attendee.status, 'attended') === 'attended')
-        .map((attendee) => ({
-          id: `ACT-${activity.id}-${entry.entryId}-${targetPersonId}`,
-          activityId: activity.id,
-          activityEntryId: entry.entryId,
-          targetType: 'activity',
-          personId: targetPersonId,
-          date: entry.date,
-          start: entry.startTime,
-          end: entry.endTime,
-          title: entryTitle,
-          className: entryTitle,
-          categoryName: activity.categoryName,
-          departmentId: activity.departmentId,
-          departmentName: activity.departmentName,
-          visibilityScope: activity.visibilityScope,
-          duration: Number(entry.durationHours || attendee.paidHours || 0),
-          paid: activity.paid === true && attendee.paid !== false,
-          status: 'posted',
-          roles: [attendee.role || 'Participant'],
-          roleLabel: activity.paid === true && attendee.paid !== false ? 'Paid Activity' : 'Activity',
-          detailsUrl: `/school/activities/${encodeURIComponent(activity.id)}/work-sessions/${encodeURIComponent(entry.entryId)}/manage`,
-          hasOverlap: false,
-          eventType: 'school_activity'
-        }));
+        .map((attendee) => {
+          const completionScan = buildActivityScheduleCompletionScan(activity, attendee);
+          const statusLabel = buildIncompleteActivityStatusLabel(activity, attendee);
+          const status = evaluationType === 'completion'
+            ? (completionScan.isComplete ? 'completed' : 'pending_completion')
+            : 'attended';
+          return {
+            id: `ACT-${activity.id}-${entry.entryId}-${targetPersonId}`,
+            activityId: activity.id,
+            activityEntryId: entry.entryId,
+            targetType: 'activity',
+            personId: targetPersonId,
+            date: entry.date,
+            start: entry.startTime,
+            end: entry.endTime,
+            title: entryTitle,
+            className: entryTitle,
+            categoryName: activity.categoryName,
+            departmentId: activity.departmentId,
+            departmentName: activity.departmentName,
+            visibilityScope: activity.visibilityScope,
+            duration: Number(entry.durationHours || attendee.paidHours || 0),
+            paid: activity.paid === true && attendee.paid !== false,
+            status,
+            statusLabel,
+            evaluationType,
+            completionStatus: normalizeCompletionStatus(attendee),
+            completionScan,
+            roles: [attendee.role || 'Participant'],
+            roleLabel: activity.paid === true && attendee.paid !== false ? 'Paid Activity' : 'Activity',
+            detailsUrl: `/school/activities/${encodeURIComponent(activity.id)}/work-sessions/${encodeURIComponent(entry.entryId)}/manage`,
+            hasOverlap: false,
+            eventType: 'school_activity'
+          };
+        });
     });
   });
+}
+
+function buildActivityScheduleCompletionScan(activity = {}, assignee = {}) {
+  const evaluationType = normalizeEvaluationType(activity.evaluationType);
+  const statusLabel = buildIncompleteActivityStatusLabel(activity, assignee);
+  if (evaluationType === 'completion') {
+    const isComplete = normalizeCompletionStatus(assignee) === 'completed';
+    return {
+      state: isComplete ? 'completed' : 'pending',
+      isComplete,
+      scanLabel: statusLabel
+    };
+  }
+  const isComplete = normalizeStatus(assignee.status, 'attended') === 'attended';
+  return {
+    state: isComplete ? 'completed' : 'pending',
+    isComplete,
+    scanLabel: statusLabel
+  };
 }
 
 function buildIncompleteActivityStatusLabel(activity = {}, assignee = {}) {
@@ -851,6 +882,7 @@ module.exports = {
   isPersonEligibleForActivity,
   isPersonEligibleForEntry,
   getScheduleEventsForPerson,
+  buildActivityScheduleCompletionScan,
   listManualEntryActivitiesForPerson,
   getTimesheetEntriesForPerson,
   getIncompleteActivityWorkSessionsForPerson,

@@ -7,6 +7,7 @@ const academicLedgerService = require('../../services/school/academicLedgerServi
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
+const studentAcademicOverviewService = require('../../services/school/studentAcademicOverviewService');
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
 
@@ -347,6 +348,48 @@ exports.showStudentStatement = async (req, res) => {
       programs,
       snapshots,
       selectedProgramId: programId,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+};
+
+exports.showStudentOverview = async (req, res) => {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    res.render('school/academicLedger/studentOverview', {
+      title: 'Student Registration Overview',
+      activeOrgId,
+      student: null,
+      person: null,
+      overview: null,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+};
+
+exports.showStudentOverviewForStudent = async (req, res) => {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const overview = await studentAcademicOverviewService.buildStudentAcademicOverview({
+      reqUser: req.user,
+      activeOrgId,
+      studentId: req.params.studentId
+    });
+
+    res.render('school/academicLedger/studentOverview', {
+      title: 'Student Registration Overview',
+      activeOrgId,
+      student: overview.student,
+      person: overview.person,
+      overview,
       user: req.user,
       actionStateId: req.actionStateId
     });

@@ -385,3 +385,146 @@ test('School activities sanitize and resolve scope-based person controls', () =>
   assert.equal(activityService.isPersonEligibleForActivity(schoolScope, 'P9'), false);
   assert.equal(activityService.isPersonEligibleForEntry(schoolScope, schoolScope.entries[0], 'P8'), true);
 });
+
+test('getScheduleEventsForPerson enriches work-session completion scan fields', async () => {
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+  const originalFetchData = schoolDataService.fetchData;
+
+  const baseEntry = {
+    entryId: 'ENTRY-1',
+    date: '2026-07-10',
+    startTime: '09:00',
+    endTime: '10:00',
+    durationHours: 1,
+    status: 'posted',
+    assignees: [{ personId: 'P1', status: 'attended', paidHours: 1, role: 'staff' }]
+  };
+  const baseActivity = {
+    orgId: 'ORG-1',
+    title: 'Work Session',
+    status: 'posted',
+    paid: true,
+    categoryName: 'Admin',
+    departmentId: 'DEP-1',
+    departmentName: 'Ops',
+    visibilityScope: 'school'
+  };
+  const activities = [
+    {
+      ...baseActivity,
+      id: 'ACT-COMPLETE',
+      evaluationType: 'completion',
+      entries: [{
+        ...baseEntry,
+        assignees: [{ personId: 'P1', status: 'attended', completionStatus: 'completed', paidHours: 1, role: 'staff' }]
+      }]
+    },
+    {
+      ...baseActivity,
+      id: 'ACT-PENDING',
+      evaluationType: 'completion',
+      entries: [{
+        ...baseEntry,
+        assignees: [{ personId: 'P1', status: 'attended', completionStatus: 'pending', paidHours: 1, role: 'staff' }]
+      }]
+    },
+    {
+      ...baseActivity,
+      id: 'ACT-ATTEND',
+      evaluationType: 'attendance',
+      entries: [{
+        ...baseEntry,
+        assignees: [{ personId: 'P1', status: 'attended', paidHours: 1, role: 'staff' }]
+      }]
+    }
+  ];
+
+  try {
+    schoolDataService.fetchData = async (entityType) => {
+      if (entityType === 'activities') return activities;
+      if (entityType === 'activityCategories') return [];
+      if (entityType === 'departments') return [];
+      return [];
+    };
+
+    const events = await activityService.getScheduleEventsForPerson({
+      orgId: 'ORG-1',
+      personId: 'P1',
+      startDate: '2026-07-10',
+      endDate: '2026-07-10',
+      reqUser: { activeOrgId: 'ORG-1' }
+    });
+
+    assert.equal(events.length, 3);
+
+    const completed = events.find((event) => event.activityId === 'ACT-COMPLETE');
+    assert.ok(completed, 'completed activity event should be returned');
+    assert.equal(completed.evaluationType, 'completion');
+    assert.equal(completed.completionStatus, 'completed');
+    assert.equal(completed.statusLabel, 'Completed');
+    assert.equal(completed.status, 'completed');
+    assert.equal(completed.completionScan.isComplete, true);
+    assert.equal(completed.completionScan.state, 'completed');
+    assert.equal(completed.completionScan.scanLabel, 'Completed');
+    assert.equal(completed.eventType, 'school_activity');
+
+    const pending = events.find((event) => event.activityId === 'ACT-PENDING');
+    assert.ok(pending, 'pending activity event should be returned');
+    assert.equal(pending.statusLabel, 'Pending completion');
+    assert.equal(pending.status, 'pending_completion');
+    assert.equal(pending.completionScan.isComplete, false);
+    assert.equal(pending.completionScan.state, 'pending');
+    assert.equal(pending.completionScan.scanLabel, 'Pending completion');
+
+    const attended = events.find((event) => event.activityId === 'ACT-ATTEND');
+    assert.ok(attended, 'attendance activity event should be returned');
+    assert.equal(attended.evaluationType, 'attendance');
+    assert.equal(attended.status, 'attended');
+    assert.equal(attended.statusLabel, 'Attended');
+    assert.equal(attended.completionScan.isComplete, true);
+    assert.equal(attended.completionScan.scanLabel, 'Attended');
+  } finally {
+    schoolDataService.fetchData = originalFetchData;
+  }
+});
+
+test('buildActivityScheduleCompletionScan maps completion and attendance assignee states', () => {
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+
+  const completionDone = activityService.buildActivityScheduleCompletionScan(
+    { evaluationType: 'completion' },
+    { completionStatus: 'completed' }
+  );
+  assert.equal(completionDone.isComplete, true);
+  assert.equal(completionDone.scanLabel, 'Completed');
+
+  const completionPending = activityService.buildActivityScheduleCompletionScan(
+    { evaluationType: 'completion' },
+    { completionStatus: 'pending' }
+  );
+  assert.equal(completionPending.isComplete, false);
+  assert.equal(completionPending.scanLabel, 'Pending completion');
+
+  const attendance = activityService.buildActivityScheduleCompletionScan(
+    { evaluationType: 'attendance' },
+    { status: 'attended' }
+  );
+  assert.equal(attendance.isComplete, true);
+  assert.equal(attendance.scanLabel, 'Attended');
+});
+
+test('Schedule completion display script is wired into schedule views', () => {
+  const personSchedule = readText('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const masterHub = readText('packages/school/MVC/views/school/masterAcademiaHub.ejs');
+  const helper = readText('packages/school/public/scripts/scheduleCompletionDisplay.js');
+
+  assert.ok(fs.existsSync(path.join(ROOT, 'packages/school/public/scripts/scheduleCompletionDisplay.js')));
+  assert.match(personSchedule, /scheduleCompletionDisplay\.js/);
+  assert.match(personSchedule, /ScheduleCompletionDisplay/);
+  assert.match(masterHub, /scheduleCompletionDisplay\.js/);
+  assert.match(masterHub, /hubScheduleEventScanBadge/);
+  assert.match(helper, /resolveScheduleCompletionScan/);
+  assert.match(helper, /summarizeDayCompletion/);
+  assert.match(helper, /buildCalendarDayBadges/);
+});

@@ -1,4 +1,5 @@
 const schoolDataService = require('./schoolDataService');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const leaveRequestService = require('./leaveRequestService');
@@ -71,6 +72,72 @@ function resolveTeacherPersonId(value, teacherIdentityLookup = {}) {
   const clean = cleanPersonId(value);
   if (!clean) return '';
   return teacherIdentityLookup?.teacherToPerson?.get(clean) || clean;
+}
+
+async function buildStudentDisplayNameMap(studentRows = [], reqUser) {
+  const rows = Array.isArray(studentRows) ? studentRows : [];
+  const personIds = rows.map((student) => toPublicId(student?.personId)).filter(Boolean);
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({ reqUser, personIds });
+  return new Map(
+    rows.map((student) => {
+      const studentId = toPublicId(student?.id);
+      const personId = toPublicId(student?.personId);
+      if (!studentId) return null;
+      return [
+        studentId,
+        schoolPersonAccessService.formatPersonName(personById.get(personId), studentId)
+      ];
+    }).filter(Boolean)
+  );
+}
+
+async function buildPersonDisplayNameMap(personIds = [], reqUser) {
+  const ids = [...new Set((Array.isArray(personIds) ? personIds : []).map((id) => toPublicId(id)).filter(Boolean))];
+  if (!ids.length) return new Map();
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({ reqUser, personIds: ids });
+  return new Map(ids.map((personId) => [
+    personId,
+    schoolPersonAccessService.formatPersonName(personById.get(personId), personId)
+  ]));
+}
+
+function resolveConflictPersonDisplayName(rawName, personId, personDisplayMap = new Map()) {
+  const fromMap = personDisplayMap.get(toPublicId(personId));
+  if (fromMap) return fromMap;
+  const cleaned = String(rawName || '').trim();
+  if (cleaned && !idsEqual(cleaned, personId)) return cleaned;
+  return personDisplayMap.get(toPublicId(cleaned)) || cleaned || toPublicId(personId);
+}
+
+async function enrichConflictRowsWithDisplayNames(conflicts = [], reqUser) {
+  const rows = Array.isArray(conflicts) ? conflicts : [];
+  if (!rows.length) return rows;
+  const personIds = rows.flatMap((row) => {
+    const ids = [row?.personId];
+    const teacherToken = String(row?.teacherName || '').trim();
+    if (teacherToken && (idsEqual(teacherToken, row?.personId) || !row?.studentId)) {
+      ids.push(teacherToken);
+    }
+    return ids;
+  }).map((id) => toPublicId(id)).filter(Boolean);
+  const personDisplayMap = await buildPersonDisplayNameMap(personIds, reqUser);
+  return rows.map((row) => {
+    const personId = toPublicId(row?.personId);
+    const teacherToken = String(row?.teacherName || '').trim();
+    const teacherName = resolveConflictPersonDisplayName(
+      row?.teacherName,
+      personId || teacherToken,
+      personDisplayMap
+    );
+    const studentDisplayName = row?.studentId
+      ? resolveConflictPersonDisplayName(row?.teacherName, personId, personDisplayMap)
+      : undefined;
+    return {
+      ...row,
+      teacherName,
+      ...(studentDisplayName ? { studentDisplayName } : {})
+    };
+  });
 }
 
 function clockTimeToMinutes(value) {
@@ -349,16 +416,21 @@ async function detectSessionConflicts({
       : [];
     if (activeStudentIds.length) {
       const allStudents = await schoolDataService.fetchData('students', {}, reqUser);
+      const studentRows = (Array.isArray(allStudents) ? allStudents : [])
+        .filter((student) => activeStudentIds.some((id) => idsEqual(id, student?.id)));
+      const studentDisplayNameMap = await buildStudentDisplayNameMap(studentRows, reqUser);
       const studentPersonMap = new Map(
-        (Array.isArray(allStudents) ? allStudents : [])
-          .map((student) => [
-            toPublicId(student?.id),
-            {
-              personId: toPublicId(student?.personId),
-              name: [student?.firstName, student?.lastName].map((part) => String(part || '').trim()).filter(Boolean).join(' ') || toPublicId(student?.id)
-            }
-          ])
-          .filter(([studentId, info]) => Boolean(studentId && info.personId))
+        studentRows
+          .map((student) => {
+            const studentId = toPublicId(student?.id);
+            const personId = toPublicId(student?.personId);
+            if (!studentId || !personId) return null;
+            return [studentId, {
+              personId,
+              name: studentDisplayNameMap.get(studentId) || studentId
+            }];
+          })
+          .filter(Boolean)
       );
       const studentLeaveWindows = [];
       normalizedSessions
@@ -427,6 +499,7 @@ async function detectSessionConflicts({
           sessionIndex: index,
           date: ses.date,
           teacherName: ses?.delivery?.deliveredByName || tid,
+          personId: tid,
           conflictClass: conflictClassTitle,
           existTime: `${existingSes.startTime} - ${existingSes.endTime}`,
           conflictType: 'teacher_schedule'
@@ -454,6 +527,7 @@ async function detectSessionConflicts({
           sessionIndex: index,
           date: ses.date,
           teacherName: ses?.delivery?.deliveredByName || tid,
+          personId: tid,
           conflictClass: 'Another unsaved session in this list',
           existTime: `${otherSes.startTime} - ${otherSes.endTime}`,
           conflictType: 'teacher_schedule'
@@ -498,7 +572,7 @@ async function detectSessionConflicts({
     }
   }
 
-  return dedupeSessionConflictRows(conflicts);
+  return enrichConflictRowsWithDisplayNames(dedupeSessionConflictRows(conflicts), reqUser);
 }
 
 function buildStudentPersonEntries(studentPersonIds = [], studentPersonMap = new Map()) {
@@ -619,16 +693,19 @@ async function evaluateEnrollmentGapBatchConflicts({
 
   const allStudents = await schoolDataService.fetchData('students', {}, reqUser);
   const studentRows = Array.isArray(allStudents) ? allStudents : [];
+  const studentDisplayNameMap = await buildStudentDisplayNameMap(studentRows, reqUser);
   const studentPersonMap = new Map(
     studentRows
-      .map((student) => [
-        toPublicId(student?.id),
-        {
-          personId: toPublicId(student?.personId),
-          name: [student?.firstName, student?.lastName].map((part) => String(part || '').trim()).filter(Boolean).join(' ') || toPublicId(student?.id)
-        }
-      ])
-      .filter(([studentId, info]) => Boolean(studentId && info.personId))
+      .map((student) => {
+        const studentId = toPublicId(student?.id);
+        const personId = toPublicId(student?.personId);
+        if (!studentId || !personId) return null;
+        return [studentId, {
+          personId,
+          name: studentDisplayNameMap.get(studentId) || studentId
+        }];
+      })
+      .filter(Boolean)
   );
 
   const enrollingStudentToken = toPublicId(enrollingStudentId);
@@ -766,6 +843,9 @@ function buildEnrollmentGapConflictReview({
         if (!dateInStudentWindow(date, windowStart, windowEnd)) return null;
         const matched = studentConflicts.find((row) => Number(row?.sessionIndex) === sessionIndex)
           || studentConflicts.find((row) => normalizeDateOnlyValue(row?.date) === date);
+        const conflictStudentLabel = String(
+          matched?.studentDisplayName || displayName || studentId
+        ).trim();
         return {
           sessionId: String(session?.sessionId || '').trim(),
           date,
@@ -773,8 +853,9 @@ function buildEnrollmentGapConflictReview({
           endTime,
           hasConflict: Boolean(matched),
           conflictType: matched ? String(matched.conflictType || '') : '',
+          studentDisplayName: conflictStudentLabel,
           conflictDetail: matched
-            ? `${matched.conflictClass || 'Conflict'} (${matched.existTime || ''})`.trim()
+            ? `${conflictStudentLabel} — ${matched.conflictClass || 'Conflict'} (${matched.existTime || ''})`.trim()
             : ''
         };
       })

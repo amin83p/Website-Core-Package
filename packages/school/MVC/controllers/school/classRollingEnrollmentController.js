@@ -2224,14 +2224,17 @@ async function buildStudentWindowsForGapConflictReview({
     schoolDataService.fetchData('students', {}, reqUser)
   ]);
   const studentRows = Array.isArray(allStudents) ? allStudents : [];
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser,
+    personIds: studentRows.map((student) => student?.personId)
+  });
   const studentNameMap = new Map(
     studentRows
       .map((student) => {
         const sid = toPublicId(student?.id);
         if (!sid) return null;
-        const name = [student?.firstName, student?.lastName].map((part) => String(part || '').trim()).filter(Boolean).join(' ')
-          || toPublicId(student?.id);
-        return [sid, name];
+        const personId = toPublicId(student?.personId);
+        return [sid, schoolPersonAccessService.formatPersonName(personById.get(personId), sid)];
       })
       .filter(Boolean)
   );

@@ -357,6 +357,7 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
 
   const normalizedStatus = String(filters.status || '').trim().toLowerCase();
   const normalizedVerification = String(filters.verificationStatus || '').trim().toLowerCase();
+  const normalizedStudentId = String(filters.studentId || '').trim();
   const searchQuery = String(filters.q || '').trim();
 
   let rows = registrations
@@ -444,6 +445,7 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
   rows = rows.filter((row) => {
     if (normalizedStatus && String(row.status || '').toLowerCase() !== normalizedStatus) return false;
     if (normalizedVerification && String(row.verificationStatus || '').toLowerCase() !== normalizedVerification) return false;
+    if (normalizedStudentId && !idsEqual(row.studentId, normalizedStudentId)) return false;
     if (!matchesSearch([row.id, row.studentId, row.studentName, row.programLabel, row.termLabel, row.feeCategorySnapshot, row.note], searchQuery)) return false;
     return true;
   });

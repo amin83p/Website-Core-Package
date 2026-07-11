@@ -21,6 +21,16 @@ router.get('/student/:studentId',
   trackActionState(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
   ctrl.showStudentStatement);
 
+router.get('/student-overview',
+  requireAccess(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
+  ctrl.showStudentOverview);
+
+router.get('/student-overview/:studentId',
+  requireAccess(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
+  ctrl.showStudentOverviewForStudent);
+
 router.post('/program-registration',
   requireAccess(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.CREATE, { requireToken: true }),

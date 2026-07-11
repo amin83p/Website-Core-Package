@@ -7,7 +7,12 @@
       <h1 class="page-heading size-md m-0"><i class="bi bi-mortarboard-fill me-2"></i><%= title %></h1>
       <div class="text-muted small mt-1"><%= studentName || student?.id %> | Student ID: <%= student?.id %> | Active Org: <%= activeOrgId %></div>
     </div>
-    <a href="/school/academic-ledger" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Ledger</a>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="/school/academic-ledger/student-overview/<%= encodeURIComponent(student.id) %>" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-person-vcard me-1"></i> Registration Overview
+      </a>
+      <a href="/school/academic-ledger" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Ledger</a>
+    </div>
   </div>
 
   <div class="row g-3 mb-4">
