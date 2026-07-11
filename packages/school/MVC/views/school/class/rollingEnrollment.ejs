@@ -3116,9 +3116,17 @@
       const canSyncAcademicLedger = hasPostedTransactions || status === 'active';
       const removeLabel = hasPostedTransactions ? 'Rollback' : 'Delete';
       const funderLabel = [row?.funderType, row?.funderId].filter(Boolean).join(' / ') || '-';
-      const targetSessionCount = Number(row?.targetSessionCount || 0);
-      const consumedSessionCount = Number(row?.consumedSessionCount || 0);
-      const remainingSessionCount = targetSessionCount ? Math.max(0, Number(row?.remainingSessionCount ?? (targetSessionCount - consumedSessionCount))) : null;
+      const explicitTargetSessionCount = Number(row?.targetSessionCount || 0);
+      const effectiveTargetSessionCount = row?.effectiveTargetSessionCount === null || row?.effectiveTargetSessionCount === undefined
+        ? (explicitTargetSessionCount || null)
+        : Number(row.effectiveTargetSessionCount || 0);
+      const displayTargetSessionCount = explicitTargetSessionCount || effectiveTargetSessionCount;
+      const consumedSessionCount = row?.consumedSessionCount === null || row?.consumedSessionCount === undefined
+        ? null
+        : Number(row.consumedSessionCount || 0);
+      const remainingSessionCount = displayTargetSessionCount !== null && consumedSessionCount !== null
+        ? Math.max(0, Number(row?.remainingSessionCount ?? (displayTargetSessionCount - consumedSessionCount)))
+        : null;
       const completion = row?.sessionCompletion || (row?.completionDate ? { date: row.completionDate, sessionId: row?.completionSessionId || '', reason: row?.completionReason || '' } : null);
       const completionHtml = completion?.date
         ? '<div class="small fw-semibold">' + htmlEscape(String(completion.date || '')) + '</div>'
@@ -3132,9 +3140,9 @@
           </td>
           <td>${htmlEscape(String(row?.startDate || '-'))}</td>
           <td>${htmlEscape(String(row?.endDate || 'Open'))}</td>
-          <td class="text-center">${targetSessionCount ? htmlEscape(String(targetSessionCount)) : '<span class="text-muted">-</span>'}</td>
-          <td class="text-center">${targetSessionCount ? htmlEscape(String(consumedSessionCount)) : '<span class="text-muted">-</span>'}</td>
-          <td class="text-center">${targetSessionCount ? htmlEscape(String(remainingSessionCount)) : '<span class="text-muted">-</span>'}</td>
+          <td class="text-center">${displayTargetSessionCount !== null ? htmlEscape(String(displayTargetSessionCount)) : '<span class="text-muted">-</span>'}</td>
+          <td class="text-center">${consumedSessionCount !== null ? htmlEscape(String(consumedSessionCount)) : '<span class="text-muted">-</span>'}</td>
+          <td class="text-center">${remainingSessionCount !== null ? htmlEscape(String(remainingSessionCount)) : '<span class="text-muted">-</span>'}</td>
           <td>${completionHtml}</td>
           <td class="text-center"><span class="badge ${badgeClass}">${htmlEscape(status || '-')}</span></td>
           <td>${htmlEscape(funderLabel)}</td>

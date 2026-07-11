@@ -188,6 +188,46 @@ function evaluateAlignment({
   };
 }
 
+function resolveDisplaySessionTarget({
+  sessions = [],
+  startDate = '',
+  endDate = '',
+  targetSessionCount = 0,
+  statusMap = {}
+} = {}) {
+  const target = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(targetSessionCount);
+  if (target > 0) {
+    return {
+      targetSessionCount: target,
+      effectiveTargetSessionCount: target,
+      windowSessionCount: null,
+      targetSource: 'explicit'
+    };
+  }
+  const normalizedEnd = normalizeDateOnly(endDate);
+  if (!normalizedEnd) {
+    return {
+      targetSessionCount: 0,
+      effectiveTargetSessionCount: null,
+      windowSessionCount: null,
+      targetSource: 'none'
+    };
+  }
+  const alignment = evaluateAlignment({
+    sessions,
+    startDate,
+    endDate,
+    targetSessionCount: 0,
+    statusMap
+  });
+  return {
+    targetSessionCount: 0,
+    effectiveTargetSessionCount: alignment.effectiveTarget,
+    windowSessionCount: alignment.availableCount,
+    targetSource: 'date_window'
+  };
+}
+
 function validatePlannedNaSelection({
   countableSessions = [],
   targetSessionCount = 0,
@@ -801,6 +841,7 @@ async function commitStagedSessions({
 module.exports = {
   listSessionsInWindow,
   evaluateAlignment,
+  resolveDisplaySessionTarget,
   validatePlannedNaSelection,
   extractScheduleDefaults,
   resolveDefaultTeacherFromClass,

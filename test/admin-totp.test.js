@@ -156,6 +156,26 @@ test('section admin can enroll confirm verify and disable', async () => {
   });
 });
 
+test('confirm enrollment does not consume a TOTP step for admin verification', async () => {
+  await withTempStore(async () => {
+    const user = sectionAdminUser('TOTP-NOBLOCK');
+    const req = mockReq(user, {});
+    const setup = await adminTotpService.beginEnrollment({ req, targetUser: user });
+    const enrollCode = authenticator.generate(setup.secret);
+    await adminTotpService.confirmEnrollment({ req, targetUser: user, code: enrollCode });
+
+    const store = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
+    assert.equal(store[user.id].lastUsedStep, undefined);
+
+    await adminTotpService.verifyUserCode(user.id, enrollCode);
+
+    await assert.rejects(
+      () => adminTotpService.verifyUserCode(user.id, enrollCode),
+      (err) => err && err.code === 'CODE_REUSED'
+    );
+  });
+});
+
 test('verifyAdminCode rejects hardcoded 1 and requires enrollment', async () => {
   await withTempStore(async () => {
     const user = { id: 'TOTP-USER-2', email: 'totp2@example.com', accessLevel: 10, isVirtualSuperAdmin: true };
@@ -178,10 +198,6 @@ test('verifyAdminCode accepts valid TOTP for section admin and sets adminKey', a
     const setup = await adminTotpService.beginEnrollment({ req, targetUser: user });
     const enrollCode = authenticator.generate(setup.secret);
     await adminTotpService.confirmEnrollment({ req, targetUser: user, code: enrollCode });
-
-    const store = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
-    if (store['TOTP-USER-3']) delete store['TOTP-USER-3'].lastUsedStep;
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
 
     const req2 = mockReq(user, { save(cb) { cb(null); } });
     req2.body = { code: authenticator.generate(setup.secret) };
@@ -329,8 +345,6 @@ test('resetRegenCount clears counter while preserving active enrollment', async 
     assert.equal(record.regenCount, 0);
     assert.equal(record.enabled, true);
 
-    delete store[user.id].lastUsedStep;
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
     await adminTotpService.verifyUserCode(user.id, authenticator.generate(setup.secret));
   });
 });

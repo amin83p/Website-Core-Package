@@ -4,6 +4,14 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const OPEN_OR_HISTORICAL_STATUSES = new Set(['active', 'planned', 'completed']);
+const ROLLING_DISPLAY_PERIOD_STATUSES = new Set([
+  'active',
+  'planned',
+  'completed',
+  'withdrawn',
+  'cancelled',
+  'archived'
+]);
 const OPEN_STATUSES = new Set(['active', 'planned']);
 const COUNTED_ATTENDANCE_STATUSES = new Set([
   attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT,
@@ -246,6 +254,7 @@ function resolveRollingEnrollmentApplicability({
         consumedCount,
         reservedCount,
         remainingCount: targetSessionCount ? Math.max(0, targetSessionCount - consumedCount) : null,
+        lastConsumedSession: consumedCount > 0 ? completionCandidate : null,
         completionCandidate: targetSessionCount && consumedCount >= targetSessionCount ? completionCandidate : null
       });
     });
@@ -368,6 +377,7 @@ async function recomputeSessionCappedEnrollmentCompletionsForClass({
 module.exports = {
   COUNTED_ATTENDANCE_STATUSES,
   OPEN_OR_HISTORICAL_STATUSES,
+  ROLLING_DISPLAY_PERIOD_STATUSES,
   OPEN_STATUSES,
   SESSION_COUNT_POLICY,
   normalizeDateOnly,

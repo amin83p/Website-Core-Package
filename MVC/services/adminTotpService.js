@@ -283,8 +283,8 @@ async function confirmEnrollment({ req, targetUser, code }) {
     throw err;
   }
 
-  const ok = authenticator.check(token, secret);
-  if (!ok) {
+  const delta = authenticator.checkDelta(token, secret);
+  if (delta === null || delta === undefined || Number.isNaN(Number(delta))) {
     const err = new Error('That code is not valid. Check your authenticator app and try again.');
     err.code = 'INVALID_CODE';
     throw err;
@@ -296,7 +296,6 @@ async function confirmEnrollment({ req, targetUser, code }) {
     enabled: true,
     secretEnc: encryptSecret(secret),
     enrolledAt,
-    lastUsedStep: currentStep(),
     accountName: pending.accountName || '',
     issuer: pending.issuer || ISSUER,
     regenCount
@@ -331,7 +330,8 @@ function verifyCodeAgainstRecord(record, code) {
     throw err;
   }
   const usedStep = currentStep() + Number(delta);
-  if (record.lastUsedStep != null && Number(record.lastUsedStep) === usedStep) {
+  const lastUsedStep = record.lastUsedStep != null ? Number(record.lastUsedStep) : null;
+  if (lastUsedStep != null && usedStep <= lastUsedStep) {
     const err = new Error('That code was already used. Wait for the next code.');
     err.code = 'CODE_REUSED';
     throw err;
