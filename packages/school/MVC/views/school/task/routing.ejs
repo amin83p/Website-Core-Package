@@ -23,7 +23,7 @@
         <label class="form-label" for="routingSourceType">Source Type</label>
         <select class="form-select" id="routingSourceType" name="sourceType" required>
           <% (routingSourceTypes || []).forEach((value) => { %>
-            <option value="<%= value %>"><%= String(value).replace(/_/g, ' ') %></option>
+            <option value="<%= value %>"><%= formatSourceTypeLabel(value) %></option>
           <% }) %>
         </select>
       </div>
@@ -76,7 +76,7 @@
       <% } %>
       <% (rules || []).forEach((rule) => { %>
         <tr>
-          <td class="ps-4 text-capitalize"><%= String(rule.sourceType || '').replace(/_/g, ' ') %></td>
+          <td class="ps-4"><%= formatSourceTypeLabel(rule.sourceType || '') %></td>
           <td>
             <div><%= rule.assigneePersonName || rule.assigneePersonId || 'Unassigned' %></div>
             <% if (rule.assigneePersonId) { %><div class="small text-muted font-monospace"><%= rule.assigneePersonId %></div><% } %>

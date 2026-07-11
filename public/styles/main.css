@@ -88,6 +88,9 @@
   --table-row-hover: #f8f9fa;
   --table-stripe-bg: #ffffff; 
   
+  /* --- Page layout width --- */
+  --sections-page-max-width: 1200px;
+  
 }
 
 
@@ -126,10 +129,29 @@ body.header-layout-compact main {
 }
 
 .sections-page {
-  max-width: 1200px;
+  max-width: var(--sections-page-max-width);
   margin: 0 auto;
   padding: var(--spacing-md);
   width: 100%;
+}
+
+html.app-page-width-wide {
+  --sections-page-max-width: min(1640px, calc(100vw - 32px));
+}
+
+html.app-page-width-full {
+  --sections-page-max-width: min(100%, calc(100vw - 32px));
+  --app-side-controls-gutter: 64px;
+}
+
+html.app-page-width-wide main.container,
+html.app-page-width-full main.container {
+  max-width: 100%;
+  width: 100%;
+}
+
+html.app-page-width-full main.container {
+  padding-left: calc(var(--spacing-md) + var(--app-side-controls-gutter));
 }
 
 /* ==========================================================================

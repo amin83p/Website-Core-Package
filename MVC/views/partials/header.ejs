@@ -599,6 +599,19 @@
                             <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2 app-font-reset-btn" id="appFontResetBtn">Reset</button>
                         </div>
                     </div>
+                    <hr class="dropdown-divider my-3">
+                    <div class="px-2" id="appPageWidthMenuBlock">
+                        <h6 class="dropdown-header x-small text-uppercase fw-bold mb-2 px-0" style="font-size: 0.65rem;">Page Width</h6>
+                        <p class="small text-muted mb-2">Use more horizontal space on wide monitors.</p>
+                        <div class="btn-group w-100" role="group" aria-label="Page width">
+                            <input type="radio" class="btn-check" name="appPageWidth" id="appPageWidthStandard" value="standard" autocomplete="off" checked>
+                            <label class="btn btn-outline-secondary btn-sm" for="appPageWidthStandard">Standard</label>
+                            <input type="radio" class="btn-check" name="appPageWidth" id="appPageWidthWide" value="wide" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm" for="appPageWidthWide">Wide</label>
+                            <input type="radio" class="btn-check" name="appPageWidth" id="appPageWidthFull" value="full" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm" for="appPageWidthFull">Full</label>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer bg-light border-top-0 justify-content-end">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>

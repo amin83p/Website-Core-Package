@@ -1,6 +1,7 @@
 <%
   const safeModules = Array.isArray(modules) ? modules : [];
   const initialType = String(defaultType || safeModules[0]?.type || '').trim();
+  const canManageAllTasksFlag = canManageAllTasks === true;
 %>
 
 <style>
@@ -860,7 +861,8 @@
 <div class="container-fluid school-master-hub hub-sidebar-collapsed py-3"
      data-master-hub
      data-modules='<%- JSON.stringify(safeModules) %>'
-     data-default-type="<%= initialType %>">
+     data-default-type="<%= initialType %>"
+     data-can-manage-all-tasks="<%= canManageAllTasksFlag ? 'true' : 'false' %>">
   <div class="hub-page-header d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
     <div>
       <div class="text-uppercase text-muted small fw-bold">School Package</div>
@@ -1028,6 +1030,25 @@
   const root = document.querySelector('[data-master-hub]');
   if (!root) return;
 
+  const canManageAllTasks = root.getAttribute('data-can-manage-all-tasks') === 'true';
+  const TASK_ADMIN_SHOW_ALL_KEY = 'school_tasks_admin_show_all';
+
+  function readTaskAdminShowAll() {
+    try {
+      return window.localStorage.getItem(TASK_ADMIN_SHOW_ALL_KEY) === 'true';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function writeTaskAdminShowAll(value) {
+    try {
+      window.localStorage.setItem(TASK_ADMIN_SHOW_ALL_KEY, value ? 'true' : 'false');
+    } catch (error) {
+      // ignore storage errors
+    }
+  }
+
   let modules = [];
   try {
     modules = JSON.parse(root.getAttribute('data-modules') || '[]');
@@ -1126,7 +1147,11 @@
     taskState.loading = true;
 
     try {
-      const response = await fetch('/school/master-hub/api/task-count', {
+      let taskCountUrl = '/school/master-hub/api/task-count';
+      if (canManageAllTasks && !workspaceState.taskShowAll) {
+        taskCountUrl += '?assignment=mine';
+      }
+      const response = await fetch(taskCountUrl, {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin'
       });
@@ -1209,6 +1234,7 @@
     },
     holidaysYear: String(new Date().getFullYear())
     ,
+    taskShowAll: canManageAllTasks ? readTaskAdminShowAll() : false,
     taskPersonId: '',
     taskPersonName: '',
     activityPersonId: '',
@@ -1405,8 +1431,27 @@
     GenericPicker.open(config);
   }
 
-  function taskAdminFilterHtml(payload) {
+  function taskAdminScopeToggleHtml(payload) {
     if (!payload || payload.canManageAll !== true) return '';
+    const checked = workspaceState.taskShowAll ? ' checked' : '';
+    return [
+      '<div class="form-check form-switch mb-0">',
+      '<input class="form-check-input" type="checkbox" role="switch" id="hubTaskAdminShowAllSwitch"' + checked + '>',
+      '<label class="form-check-label small fw-semibold" for="hubTaskAdminShowAllSwitch">Show all tasks</label>',
+      '</div>'
+    ].join('');
+  }
+
+  function taskListFullPageUrl(section, payload) {
+    let url = (section && section.sourceUrl) || '/school/tasks';
+    if (payload && payload.canManageAll === true && !workspaceState.taskShowAll) {
+      url += '?assignment=mine';
+    }
+    return url;
+  }
+
+  function taskAdminFilterHtml(payload) {
+    if (!payload || payload.canManageAll !== true || !workspaceState.taskShowAll) return '';
     const selectedLabel = workspaceState.taskPersonName || payload.selectedPersonName || payload.selectedPersonId || '';
     return [
       '<div class="hub-workspace-toolbar border-top-0">',
@@ -1428,6 +1473,19 @@
 
   function bindTaskWorkspaceControls(payload) {
     bindWorkspaceSearchControls('tasks');
+    const scopeSwitch = document.getElementById('hubTaskAdminShowAllSwitch');
+    if (scopeSwitch) {
+      scopeSwitch.addEventListener('change', function () {
+        workspaceState.taskShowAll = scopeSwitch.checked;
+        writeTaskAdminShowAll(workspaceState.taskShowAll);
+        if (!workspaceState.taskShowAll) {
+          workspaceState.taskPersonId = '';
+          workspaceState.taskPersonName = '';
+        }
+        loadWorkspaceSection('tasks');
+        refreshTaskCount();
+      });
+    }
     if (!payload || payload.canManageAll !== true) return;
     const openBtn = document.getElementById('hubTaskOpenPersonPicker');
     const clearBtn = document.getElementById('hubTaskClearPerson');
@@ -1446,9 +1504,11 @@
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
     const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
     const taskScopeText = payload && payload.canManageAll === true
-      ? ((workspaceState.taskPersonName || payload.selectedPersonName || payload.selectedPersonId)
-        ? 'task(s) assigned to the selected person'
-        : 'task(s) found')
+      ? (workspaceState.taskShowAll
+        ? ((workspaceState.taskPersonName || payload.selectedPersonName || payload.selectedPersonId)
+          ? 'task(s) assigned to the selected person'
+          : 'task(s) found')
+        : 'task(s) assigned to you')
       : 'task(s) assigned to you';
     const body = rows.length
       ? rows.map(function (row) {
@@ -1496,9 +1556,10 @@
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-list-task') + ' me-2"></i>' + escapeHtml(section.label || 'School Tasks') + '</h2>',
       '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' ' + escapeHtml(taskScopeText) + '. Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
       '</div>',
-      '<div class="d-flex gap-2">',
+      '<div class="d-flex gap-2 align-items-center flex-wrap">',
+      taskAdminScopeToggleHtml(payload),
       '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="tasks"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>',
-      '<a href="' + escapeHtml(section.sourceUrl || '/school/tasks') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '<a href="' + escapeHtml(taskListFullPageUrl(section, payload)) + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
       '</div>',
       '</div>',
       workspaceToolbarHtml('tasks', { label: 'tasks' }),
@@ -6526,9 +6587,13 @@
     const requestQuery = new URLSearchParams();
     const serverSearch = String(workspaceState.serverSearch[key] || '').trim();
     if (serverSearch) requestQuery.set('q', serverSearch);
-    if (key === 'tasks' && workspaceState.taskPersonId) {
-      requestQuery.set('assignedPersonId', workspaceState.taskPersonId);
-      if (workspaceState.taskPersonName) requestQuery.set('assignedPersonName', workspaceState.taskPersonName);
+    if (key === 'tasks') {
+      if (canManageAllTasks && !workspaceState.taskShowAll) {
+        requestQuery.set('assignment', 'mine');
+      } else if (workspaceState.taskPersonId) {
+        requestQuery.set('assignedPersonId', workspaceState.taskPersonId);
+        if (workspaceState.taskPersonName) requestQuery.set('assignedPersonName', workspaceState.taskPersonName);
+      }
     }
     if (key === 'activities') appendActivityWorkspaceQuery(requestQuery);
     if (key === 'sessions') appendSessionWorkspaceQuery(requestQuery);

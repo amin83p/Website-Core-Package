@@ -458,6 +458,7 @@ async function buildCreatePayload(reqUser, input = {}) {
 async function createRequest(reqUser, input = {}) {
   const payload = await buildCreatePayload(reqUser, input);
   const created = await schoolRepositories.leaveRequests.create(payload, normalizeQueryScope(reqUser));
+  await syncLeaveRequestTask('upsert', created, reqUser);
   return created;
 }
 
@@ -528,6 +529,11 @@ async function updateRequest(reqUser, id, input = {}, options = {}) {
   ];
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser, {}, accessContext));
+  if (ACTIVE_REVIEW_STATUSES.has(String(updated?.status || '').toLowerCase())) {
+    await syncLeaveRequestTask('upsert', updated, reqUser);
+  } else if (String(updated?.status || '').toLowerCase() === 'approved' || FINAL_STATUSES.has(String(updated?.status || '').toLowerCase())) {
+    await syncLeaveRequestTask('resolve', updated, reqUser);
+  }
   return updated;
 }
 
@@ -575,6 +581,7 @@ async function approveRequest(reqUser, id, note = '') {
   ];
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  await syncLeaveRequestTask('resolve', updated, reqUser, { note });
   return updated;
 }
 
@@ -617,6 +624,7 @@ async function rejectRequest(reqUser, id, note = '') {
   };
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  await syncLeaveRequestTask('resolve', updated, reqUser, { note });
   return updated;
 }
 
@@ -662,6 +670,7 @@ async function cancelRequest(reqUser, id, note = '', options = {}) {
   };
 
   const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser, {}, accessContext));
+  await syncLeaveRequestTask('resolve', updated, reqUser, { note });
   return updated;
 }
 
@@ -700,7 +709,14 @@ async function syncLeaveRequestTask(action, row, reqUser, options = {}) {
       await taskService.resolveLeaveRequestTask(row, reqUser, options);
       return;
     }
-    await taskService.upsertLeaveRequestTask(row, reqUser, options);
+    const status = String(row?.status || '').toLowerCase();
+    if (ACTIVE_REVIEW_STATUSES.has(status)) {
+      await taskService.upsertLeaveRequestTask(row, reqUser, options);
+      return;
+    }
+    if (status === 'approved' || FINAL_STATUSES.has(status)) {
+      await taskService.resolveLeaveRequestTask(row, reqUser, options);
+    }
   } catch (error) {
     console.warn(`School task sync skipped for leave request ${row?.id || ''}: ${error.message}`);
   }
@@ -781,7 +797,7 @@ async function createTaskForRequest(reqUser, id, input = {}, options = {}) {
       endDate: existing.endDate || existing.startDate,
       reason: existing.reason
     }
-  }, reqUser);
+  }, reqUser, { requireActiveRoutingRule: false });
 }
 
 function getActiveApprovedSnapshot(row) {
@@ -967,6 +983,7 @@ module.exports = {
   cancelRequest,
   deleteRequest,
   createTaskForRequest,
+  syncLeaveRequestTask,
   getActiveApprovedSnapshot,
   findApprovedLeaveConflicts,
   getApprovedLeaveEventsForPerson,

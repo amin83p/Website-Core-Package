@@ -26,6 +26,12 @@
         if (localStorage.getItem('app_header_compact') === '1') {
           document.documentElement.classList.add('header-pref-compact');
         }
+        const pageWidth = String(localStorage.getItem('app_page_width') || '').trim().toLowerCase();
+        if (pageWidth === 'wide') {
+          document.documentElement.classList.add('app-page-width-wide');
+        } else if (pageWidth === 'full') {
+          document.documentElement.classList.add('app-page-width-full');
+        }
       } catch (_) {}
     })();
   </script>

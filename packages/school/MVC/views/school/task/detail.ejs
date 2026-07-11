@@ -345,7 +345,7 @@
             </div>
             <div class="task-data-item">
               <div class="task-data-label">Source</div>
-              <div class="task-data-value text-capitalize"><%= String(row.sourceType || 'manual').replace(/_/g, ' ') %></div>
+              <div class="task-data-value"><%= formatSourceTypeLabel(row.sourceType || 'manual') %></div>
               <% if (row.sourceUrl) { %>
                 <div class="task-data-support"><a href="<%= row.sourceUrl %>"><%= displayValue(row.sourceId, 'Open source record') %></a></div>
               <% } else { %>

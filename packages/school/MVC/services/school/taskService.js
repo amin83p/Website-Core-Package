@@ -1,6 +1,7 @@
 const schoolRepositories = require('../../repositories/school');
 const schoolDataService = require('./schoolDataService');
 const taskModel = require('../../models/school/taskModel');
+const routingRuleModel = require('../../models/school/taskRoutingRuleModel');
 const personDisplayNameService = require('./personDisplayNameService');
 const taskRoutingRuleService = require('./taskRoutingRuleService');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -488,10 +489,25 @@ async function resolveAssignmentInput(input = {}, fallback = {}) {
   };
 }
 
+function isRoutableSourceType(sourceType) {
+  return routingRuleModel.TASK_ROUTING_SOURCE_TYPES.includes(
+    cleanString(sourceType, 80).toLowerCase()
+  );
+}
+
+async function hasActiveRoutingRule({ orgId, sourceType, reqUser } = {}) {
+  const rule = await taskRoutingRuleService.getActiveRuleForSource({
+    orgId,
+    sourceType,
+    reqUser
+  });
+  return Boolean(rule);
+}
+
 async function applyRoutingRule(input = {}, actorUser = null) {
   const sourceType = cleanString(input.sourceType, 80).toLowerCase();
   const explicitPersonId = toPublicId(input.assignedPersonId || '');
-  if (explicitPersonId || sourceType !== 'leave_request') return input;
+  if (explicitPersonId || !isRoutableSourceType(sourceType)) return input;
 
   const rule = await taskRoutingRuleService.getActiveRuleForSource({
     orgId: input.orgId || getActiveOrgId(actorUser),
@@ -646,14 +662,32 @@ async function buildDefaultReviewTask(input = {}) {
   };
 }
 
-async function upsertSourceTask(input = {}, actorUser = null) {
-  const routedInput = await applyRoutingRule(input, actorUser);
-  const orgId = toPublicId(routedInput.orgId || getActiveOrgId(actorUser));
-  const sourceType = cleanString(routedInput.sourceType, 80).toLowerCase();
-  const sourceId = toPublicId(routedInput.sourceId || '');
+async function upsertSourceTask(input = {}, actorUser = null, options = {}) {
+  const orgId = toPublicId(input.orgId || getActiveOrgId(actorUser));
+  const sourceType = cleanString(input.sourceType, 80).toLowerCase();
+  const sourceId = toPublicId(input.sourceId || '');
   if (!orgId || !sourceType || !sourceId) return null;
 
+  const requireActiveRoutingRule = options.requireActiveRoutingRule !== false;
   const existing = await findBySource({ orgId, sourceType, sourceId });
+  if (requireActiveRoutingRule && isRoutableSourceType(sourceType)) {
+    const hasRule = await hasActiveRoutingRule({ orgId, sourceType, reqUser: actorUser });
+    if (!hasRule) {
+      if (existing && OPEN_STATUSES.has(String(existing.status || '').toLowerCase())) {
+        await resolveSourceTask({
+          orgId,
+          sourceType,
+          sourceId,
+          status: 'resolved',
+          action: 'source_task_routing_inactive',
+          note: 'No active routing rule for this source type.'
+        }, actorUser);
+      }
+      return null;
+    }
+  }
+
+  const routedInput = await applyRoutingRule(input, actorUser);
   const now = new Date().toISOString();
   const lifecycleAction = existing ? 'source_task_reopened' : 'source_task_created';
   const nextStatus = OPEN_STATUSES.has(String(existing?.status || '').toLowerCase()) ? (existing.status || 'open') : 'open';
@@ -804,6 +838,51 @@ async function resolveLeaveRequestTask(leaveRequest = {}, actorUser = null, opti
     status: 'resolved',
     action: options.action || 'leave_request_resolved',
     note: options.note || `Leave request ${cleanString(leaveRequest.status, 40) || 'resolved'}.`
+  }, actorUser);
+}
+
+async function upsertTimesheetTask(timesheet = {}, period = {}, actorUser = null, options = {}) {
+  const id = toPublicId(timesheet?.id);
+  if (!id) return null;
+  const teacherId = toPublicId(timesheet.teacherId || '');
+  const teacherName = await personDisplayNameService.resolvePersonDisplayName(teacherId, {
+    fallback: cleanString(teacherId, 160) || 'Teacher'
+  });
+  const periodId = toPublicId(timesheet.periodId || period?.id || '');
+  const periodLabel = cleanString(period?.name || period?.label || period?.title || periodId, 120) || 'timesheet period';
+  const totalHours = Number(parseFloat(timesheet.totalHours) || 0);
+  return upsertSourceTask({
+    orgId: timesheet.orgId || period?.orgId,
+    sourceType: 'timesheet',
+    sourceId: id,
+    sourceUrl: periodId && teacherId
+      ? `/school/timesheets/editor/${encodeURIComponent(periodId)}?teacherId=${encodeURIComponent(teacherId)}`
+      : '',
+    title: `Timesheet needs review: ${teacherName}`,
+    message: `${teacherName} submitted a timesheet for ${periodLabel} (${totalHours.toFixed(2)} hours).`,
+    severity: options.severity || 'info',
+    taskTitle: 'Review timesheet',
+    taskDescription: 'Review the submitted timesheet and approve or reopen it.',
+    metadata: {
+      timesheetStatus: timesheet.status,
+      teacherId,
+      teacherName,
+      periodId
+    },
+    note: options.note || ''
+  }, actorUser, options);
+}
+
+async function resolveTimesheetTask(timesheet = {}, actorUser = null, options = {}) {
+  const id = toPublicId(timesheet?.id);
+  if (!id) return null;
+  return resolveSourceTask({
+    orgId: timesheet.orgId,
+    sourceType: 'timesheet',
+    sourceId: id,
+    status: 'resolved',
+    action: options.action || 'timesheet_resolved',
+    note: options.note || `Timesheet ${cleanString(timesheet.status, 40) || 'resolved'}.`
   }, actorUser);
 }
 
@@ -1128,8 +1207,12 @@ module.exports = {
   getTaskById,
   upsertSourceTask,
   resolveSourceTask,
+  hasActiveRoutingRule,
+  isRoutableSourceType,
   upsertLeaveRequestTask,
   resolveLeaveRequestTask,
+  upsertTimesheetTask,
+  resolveTimesheetTask,
   deleteSourceTask,
   deleteTask,
   updateTaskStatus,

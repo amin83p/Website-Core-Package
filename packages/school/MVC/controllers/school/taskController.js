@@ -65,6 +65,7 @@ function baseViewModel(req, res, extra = {}) {
     statuses: taskModel.TASK_STATUSES,
     severities: taskModel.TASK_SEVERITIES,
     sourceTypes: taskModel.TASK_SOURCE_TYPES,
+    formatSourceTypeLabel: taskModel.formatTaskSourceTypeLabel,
     assignmentStatuses: taskModel.TASK_ASSIGNMENT_STATUSES,
     assignmentFilters: ['all', 'mine', 'unassigned'],
     canManageAll: taskService.isAdminViewer(req.user),

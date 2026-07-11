@@ -17,6 +17,7 @@ const schoolDependencyService = require('../../services/school/schoolDependencyS
 const timesheetManualMaterializationService = require('../../services/school/timesheetManualMaterializationService');
 const timesheetPayrollContextService = require('../../services/school/timesheetPayrollContextService');
 const timesheetPayRateService = require('../../services/school/timesheetPayRateService');
+const taskService = require('../../services/school/taskService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const { sanitizeSnapshotEntry, sanitizeSubmissionSnapshot, sanitizeReviewHistory } = require('../../models/school/timesheetModel');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -1675,10 +1676,20 @@ exports.saveTimesheet = async (req, res) => {
             payload.priorPeriodAdjustmentsAppliedFrom = existing.priorPeriodAdjustmentsAppliedFrom;
         }
 
+        let saved;
         if (existing?.id) {
-            await dataService.updateData('timesheets', existing.id, payload, req.user);
+            saved = await dataService.updateData('timesheets', existing.id, payload, req.user);
         } else {
-            await dataService.addData('timesheets', payload, req.user);
+            saved = await dataService.addData('timesheets', payload, req.user);
+        }
+
+        if (nextStatus === 'submitted') {
+            const savedRow = saved && typeof saved === 'object' ? saved : { ...payload, id: existing?.id || saved };
+            try {
+                await taskService.upsertTimesheetTask(savedRow, period, req.user);
+            } catch (error) {
+                console.warn(`School task sync skipped for timesheet ${savedRow?.id || ''}: ${error.message}`);
+            }
         }
 
         const payloadOut = {
@@ -2039,6 +2050,11 @@ exports.approveTimesheet = async (req, res) => {
             }))
         };
         await dataService.updateData('timesheets', existing.id, payload, req.user);
+        try {
+            await taskService.resolveTimesheetTask(payload, req.user, { note: 'Timesheet approved.' });
+        } catch (error) {
+            console.warn(`School task sync skipped for timesheet ${existing.id || ''}: ${error.message}`);
+        }
         const payloadOut = { status: 'success', message: 'Timesheet approved and linked sessions/activities were locked.', lockSummary, materializationSummary: materialized?.summary || null };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);
         return res.json(payloadOut);
@@ -2104,6 +2120,11 @@ exports.reopenTimesheet = async (req, res) => {
         delete payload.approvedAt;
         delete payload.approvedBy;
         await dataService.updateData('timesheets', existing.id, payload, req.user);
+        try {
+            await taskService.resolveTimesheetTask(existing, req.user, { note: reopenNote });
+        } catch (error) {
+            console.warn(`School task sync skipped for timesheet ${existing.id || ''}: ${error.message}`);
+        }
         const payloadOut = { status: 'success', message: 'Timesheet reopened to draft. The person can edit and resubmit after reviewing your note.' };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);
         return res.json(payloadOut);

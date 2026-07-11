@@ -72,6 +72,11 @@ function normalizeSourceType(value, fallback = 'manual') {
   return normalizeEnum(value, TASK_SOURCE_TYPES, fallback);
 }
 
+function formatTaskSourceTypeLabel(value) {
+  const text = String(value || '').replace(/_/g, ' ').trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+}
+
 function normalizeTaskStatus(value, fallback = 'open') {
   return normalizeEnum(value, TASK_ASSIGNMENT_STATUSES, fallback);
 }
@@ -285,6 +290,7 @@ module.exports = {
   TASK_SEVERITIES,
   TASK_SOURCE_TYPES,
   TASK_ASSIGNMENT_STATUSES,
+  formatTaskSourceTypeLabel,
   sanitizeTaskInput,
   sanitizeTasks,
   getAllTasks,

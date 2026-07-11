@@ -445,6 +445,78 @@ const APP_FONT_SCALE_STEP = 0.05;
 const APP_FONT_SCALE_MIN_PERCENT = Math.round(APP_FONT_SCALE_MIN * 100);
 const APP_FONT_SCALE_MAX_PERCENT = Math.round(APP_FONT_SCALE_MAX * 100);
 const APP_FONT_SCALE_STEP_PERCENT = Math.round(APP_FONT_SCALE_STEP * 100);
+const APP_PAGE_WIDTH_STORAGE_KEY = 'app_page_width';
+const APP_PAGE_WIDTH_MODES = new Set(['standard', 'wide', 'full']);
+const APP_PAGE_WIDTH_CLASS_MAP = {
+    standard: '',
+    wide: 'app-page-width-wide',
+    full: 'app-page-width-full'
+};
+
+function normalizeAppPageWidth(mode) {
+    const normalized = String(mode || '').trim().toLowerCase();
+    return APP_PAGE_WIDTH_MODES.has(normalized) ? normalized : 'standard';
+}
+
+function getStoredAppPageWidth() {
+    try {
+        return normalizeAppPageWidth(localStorage.getItem(APP_PAGE_WIDTH_STORAGE_KEY));
+    } catch (_) {
+        return 'standard';
+    }
+}
+
+function updateAppPageWidthUi(mode) {
+    const normalized = normalizeAppPageWidth(mode);
+    const standardInput = document.getElementById('appPageWidthStandard');
+    const wideInput = document.getElementById('appPageWidthWide');
+    const fullInput = document.getElementById('appPageWidthFull');
+    if (standardInput) standardInput.checked = normalized === 'standard';
+    if (wideInput) wideInput.checked = normalized === 'wide';
+    if (fullInput) fullInput.checked = normalized === 'full';
+}
+
+function applyAppPageWidth(mode, options = {}) {
+    const persist = options.persist !== false;
+    const normalized = normalizeAppPageWidth(mode);
+    const root = document.documentElement;
+    if (root) {
+        root.classList.remove('app-page-width-wide', 'app-page-width-full');
+        const widthClass = APP_PAGE_WIDTH_CLASS_MAP[normalized];
+        if (widthClass) root.classList.add(widthClass);
+    }
+    updateAppPageWidthUi(normalized);
+    if (persist) {
+        try {
+            localStorage.setItem(APP_PAGE_WIDTH_STORAGE_KEY, normalized);
+        } catch (_) {}
+    }
+    return normalized;
+}
+
+function initAppPageWidthControls() {
+    const menuBlock = document.getElementById('appPageWidthMenuBlock');
+    const standardInput = document.getElementById('appPageWidthStandard');
+    const wideInput = document.getElementById('appPageWidthWide');
+    const fullInput = document.getElementById('appPageWidthFull');
+
+    applyAppPageWidth(getStoredAppPageWidth(), { persist: false });
+
+    if (!menuBlock || !standardInput || !wideInput || !fullInput) return;
+
+    ['click', 'mousedown', 'pointerdown'].forEach((eventName) => {
+        menuBlock.addEventListener(eventName, (event) => {
+            event.stopPropagation();
+        });
+    });
+
+    [standardInput, wideInput, fullInput].forEach((input) => {
+        input.addEventListener('change', () => {
+            if (!input.checked) return;
+            applyAppPageWidth(input.value);
+        });
+    });
+}
 
 function clampAppZoom(level) {
     const parsed = Number(level);
@@ -3407,6 +3479,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     initAppZoomControls();
     initAppFontControls();
+    initAppPageWidthControls();
     initHeaderInteractions();
     initHeaderApplicationMenu();
     initHeaderShortcuts();

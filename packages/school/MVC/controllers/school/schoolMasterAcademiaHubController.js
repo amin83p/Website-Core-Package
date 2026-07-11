@@ -1,4 +1,5 @@
 const masterAcademiaHubService = require('../../services/school/schoolMasterAcademiaHubService');
+const taskService = require('../../services/school/taskService');
 
 exports.showMasterAcademiaHubPage = async (req, res) => {
   try {
@@ -9,6 +10,7 @@ exports.showMasterAcademiaHubPage = async (req, res) => {
       title: 'Master Academia Hub',
       modules,
       defaultType: defaultModule ? defaultModule.type : '',
+      canManageAllTasks: taskService.isAdminViewer(req.user),
       user: req.user
     });
   } catch (error) {

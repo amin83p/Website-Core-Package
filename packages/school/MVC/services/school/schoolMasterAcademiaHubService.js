@@ -1013,7 +1013,7 @@ async function getActiveUserTasks(req, filters = {}) {
 }
 
 async function getTaskSummary(req) {
-  const rows = await getActiveUserTasks(req, { limit: 5000 });
+  const rows = await getActiveUserTasks(req, req.query || {});
 
   return {
     totalCount: rows.length,
