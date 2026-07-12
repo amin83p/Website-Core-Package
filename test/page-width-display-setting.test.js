@@ -48,6 +48,13 @@ test('main.css reserves left gutter for side controls in full page width mode', 
   assert.match(source, /html\.app-page-width-full main\.container[\s\S]*padding-left/s);
 });
 
+test('wide page width mode uses the same left gutter as full mode', () => {
+  const source = read('public/styles/main.css');
+  assert.match(source, /html\.app-page-width-wide[\s\S]*--app-side-controls-gutter:\s*64px/s);
+  assert.match(source, /html\.app-page-width-wide main\.container[\s\S]*padding-left/s);
+  assert.match(source, /html\.app-page-width-wide[\s\S]*calc\(100vw - 32px - var\(--app-side-controls-gutter\)\)/s);
+});
+
 test('academic ledger pages inherit global sections-page width', () => {
   const ledgerSource = read('packages/school/MVC/views/school/academicLedger/ledgerList.ejs');
   const overviewSource = read('packages/school/MVC/views/school/academicLedger/studentOverview.ejs');

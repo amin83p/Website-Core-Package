@@ -136,11 +136,12 @@ body.header-layout-compact main {
 }
 
 html.app-page-width-wide {
-  --sections-page-max-width: min(1640px, calc(100vw - 32px));
+  --sections-page-max-width: min(1640px, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  --app-side-controls-gutter: 64px;
 }
 
 html.app-page-width-full {
-  --sections-page-max-width: min(100%, calc(100vw - 32px));
+  --sections-page-max-width: min(100%, calc(100vw - 32px - var(--app-side-controls-gutter)));
   --app-side-controls-gutter: 64px;
 }
 
@@ -148,9 +149,6 @@ html.app-page-width-wide main.container,
 html.app-page-width-full main.container {
   max-width: 100%;
   width: 100%;
-}
-
-html.app-page-width-full main.container {
   padding-left: calc(var(--spacing-md) + var(--app-side-controls-gutter));
 }
 
