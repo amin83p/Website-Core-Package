@@ -32,11 +32,35 @@ window.showMessageModal = function({ title = "", icon = null, message = "", size
       if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
     } catch (_) {}
 
+    if (modalEl.parentElement !== document.body) {
+      document.body.appendChild(modalEl);
+    }
+
     // 1. GET OR CREATE INSTANCE
     // We check if an instance already exists to avoid re-initializing
     let bsModal = bootstrap.Modal.getInstance(modalEl);
     if (!bsModal) {
       bsModal = new bootstrap.Modal(modalEl, { backdrop: "static", keyboard: false });
+    }
+
+    function raiseMessageModalAboveStack() {
+      let maxZ = 1050;
+      document.querySelectorAll('.modal.show').forEach((openModal) => {
+        if (openModal === modalEl) return;
+        const z = parseInt(window.getComputedStyle(openModal).zIndex, 10);
+        if (!Number.isNaN(z) && z > maxZ) maxZ = z;
+      });
+      const loadingEl = document.getElementById('globalLoadingModal');
+      if (loadingEl && loadingEl.classList.contains('is-visible')) {
+        const loadingZ = parseInt(window.getComputedStyle(loadingEl).zIndex, 10);
+        if (!Number.isNaN(loadingZ) && loadingZ > maxZ) maxZ = loadingZ;
+      }
+      const modalZ = Math.max(maxZ + 10, 12000);
+      const backdropZ = modalZ - 5;
+      modalEl.style.setProperty('z-index', String(modalZ), 'important');
+      const backdrops = document.querySelectorAll('.modal-backdrop');
+      const backdrop = backdrops[backdrops.length - 1];
+      if (backdrop) backdrop.style.zIndex = String(backdropZ);
     }
 
     // Elements
@@ -177,6 +201,10 @@ window.showMessageModal = function({ title = "", icon = null, message = "", size
       modalEl.addEventListener('keydown', keydownHandler);
       modalEl.addEventListener('shown.bs.modal', () => focusButtonAt(0), { once: true });
     }
+
+    modalEl.addEventListener('shown.bs.modal', () => {
+      raiseMessageModalAboveStack();
+    }, { once: true });
 
     bsModal.show();
 

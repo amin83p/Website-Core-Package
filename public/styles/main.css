@@ -262,6 +262,10 @@ html.app-page-width-full main.container {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
 }
 
+a.header-side-control-btn {
+  text-decoration: none;
+}
+
 .header-org-switch-toggle {
   font-size: 1.1rem;
 }
@@ -2168,14 +2172,19 @@ footer {
 #chatInterfaceModal {
     z-index: 1070 !important; /* Extremely high to sit above everything */
 }
-   /* Ensure Message Modal is always on top */
-#messageModal {
-    z-index: 1100 !important; /* Higher than Bootstrap default (1055) */
+   /* App modal stacking (lowest → highest):
+      bootstrap default 1055, blocked report delete 1105, loading 11150, message 12000 */
+#globalLoadingModal {
+    z-index: 11150 !important;
 }
 
-/* Ensure the backdrop for the message modal is also higher */
-.modal-backdrop.show:nth-of-type(2) {
-    z-index: 1065 !important; 
+#messageModal {
+    z-index: 12000 !important;
+}
+
+/* Keep the message modal backdrop above other stacked modal backdrops */
+body:has(#messageModal.show) .modal-backdrop:last-of-type {
+    z-index: 11950 !important;
 }
 
 /* ==========================================================================
