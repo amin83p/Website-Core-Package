@@ -95,6 +95,8 @@ function sanitizeAudit(v, existingAudit = {}) {
     lastUpdateDateTime: cleanString(raw.lastUpdateDateTime, { max: 60, allowEmpty: true }),
     submittedAt: cleanString(raw.submittedAt || existingAudit.submittedAt, { max: 60, allowEmpty: true }),
     lockedAt: cleanString(raw.lockedAt || existingAudit.lockedAt, { max: 60, allowEmpty: true }),
+    unlockedAt: cleanString(raw.unlockedAt || existingAudit.unlockedAt, { max: 60, allowEmpty: true }),
+    unlockedBy: cleanString(raw.unlockedBy || existingAudit.unlockedBy, { max: 80, allowEmpty: true }),
     archivedAt: cleanString(raw.archivedAt || existingAudit.archivedAt, { max: 60, allowEmpty: true }),
     archivedReason: cleanString(raw.archivedReason || existingAudit.archivedReason, { max: 500, allowEmpty: true })
   };

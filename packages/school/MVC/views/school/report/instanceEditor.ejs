@@ -11,6 +11,7 @@
     : {};
   
   const isLocked = String(instance?.status || '').toLowerCase() === 'locked';
+  const canUnlockReportInstanceSafe = Boolean(typeof canUnlockReportInstance !== 'undefined' && canUnlockReportInstance);
   const lifecycleMode = String(classData?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
   const parsedCycleNo = Number.parseInt(String(classData?.cycleNo || '').trim(), 10);
   const lifecycleCycleNo = Number.isFinite(parsedCycleNo) && parsedCycleNo > 0 ? parsedCycleNo : 1;
@@ -608,6 +609,11 @@
             <button class="btn btn-primary btn-sm" type="submit" name="submitAction" value="save"><i class="bi bi-save me-1"></i>Save Draft</button>
             <button class="btn btn-success btn-sm" type="submit" name="submitAction" value="submit"><i class="bi bi-send-check me-1"></i>Submit Report</button>
             <button class="btn btn-outline-dark btn-sm" formaction="/school/reports/instances/lock/<%= instance.id %>" type="submit"><i class="bi bi-lock me-1"></i>Lock Report</button>
+          <% } else if (canUnlockReportInstanceSafe) { %>
+            <form method="post" action="/school/reports/instances/unlock/<%= instance.id %>" class="d-inline js-unlock-report-instance-form" data-instance-id="<%= instance.id %>">
+              <button type="submit" class="btn btn-warning btn-sm"><i class="bi bi-unlock me-1"></i>Unlock Report</button>
+            </form>
+            <span class="badge bg-dark p-2 ms-1">Currently Locked</span>
           <% } else { %>
             <span class="badge bg-dark p-2">Locked Report</span>
           <% } %>
@@ -1809,6 +1815,25 @@
 
     bindReportReviewNavigatorLinks();
     bindPrefillRefreshControls();
+
+    document.querySelectorAll('.js-unlock-report-instance-form').forEach(function (form) {
+      form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const confirmed = typeof showMessageModal === 'function'
+          ? (await showMessageModal({
+            title: 'Unlock Report',
+            icon: 'warning',
+            message: 'Unlock this report? It will become editable again.',
+            buttons: [
+              { text: 'Cancel', class: 'btn-secondary btn-sm' },
+              { text: 'Unlock', class: 'btn-warning btn-sm' }
+            ]
+          })) === 'Unlock'
+          : window.confirm('Unlock this report? It will become editable again.');
+        if (!confirmed) return;
+        form.submit();
+      });
+    });
   })();
 </script>
 

@@ -559,6 +559,20 @@
             "category": "feature-regression",
             "status": "package-only",
             "targetStatus": "package-active"
+        },
+        {
+            "source": "test/report-assignment-delete.test.js",
+            "target": "packages/school/test/report-assignment-delete.test.js",
+            "category": "feature-regression",
+            "status": "package-only",
+            "targetStatus": "package-active"
+        },
+        {
+            "source": "test/report-instance-unlock.test.js",
+            "target": "packages/school/test/report-instance-unlock.test.js",
+            "category": "feature-regression",
+            "status": "package-only",
+            "targetStatus": "package-active"
         }
     ]
 }

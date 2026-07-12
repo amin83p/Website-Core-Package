@@ -365,6 +365,7 @@ test('school package pass14 owns reportRoutes implementation', () => {
   assert.match(routeSource, /ctrl\.listTemplates/);
   assert.match(routeSource, /ctrl\.saveAssignment/);
   assert.match(routeSource, /ctrl\.lockInstance/);
+  assert.match(routeSource, /ctrl\.unlockInstance/);
   assert.match(routeSource, /ctrl\.exportInstance/);
 });
 

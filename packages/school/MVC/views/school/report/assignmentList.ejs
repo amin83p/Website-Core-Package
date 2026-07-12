@@ -209,7 +209,7 @@
                 <a href="/school/reports/assignments/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
                 <% const firstTargetRow = Array.isArray(row.targetRows) && row.targetRows.length ? row.targetRows[0] : null; %>
                 <a href="/school/reports/instances/start/<%= row.id %>?teacherId=<%= encodeURIComponent((row.teacherIds || [])[0] || '') %><%= firstTargetRow?.rowId ? ('&rowId=' + encodeURIComponent(firstTargetRow.rowId)) : '' %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-play-circle me-2"></i>Start</a>
-                <a href="/school/reports/assignments/delete/<%= row.id %>" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-2"></i>Delete</a>
+                <button type="button" class="btn btn-outline-danger btn-sm js-delete-report-assignment" data-assignment-id="<%= row.id %>" data-assignment-title="<%= row.title || row.id %>"><i class="bi bi-trash me-2"></i>Delete</button>
               </div>
             </div>
           </td>
@@ -220,10 +220,31 @@
 </div>
 
 <span id="urlRef" data-id="<%= newUrl %>" hidden></span>
+<input type="hidden" id="hid_actionStateId" value="<%= actionStateId || '' %>">
+
+<div class="modal fade" id="reportAssignmentDeleteBlockedModal" tabindex="-1" aria-hidden="true" style="z-index: 1105;">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle me-2"></i>Resolve Report Instances First</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="reportAssignmentDeleteBlockedBody">
+        <div class="text-muted">Loading...</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-danger btn-sm" id="btnRetryReportAssignmentDelete">Retry Delete Assignment</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
 <%- include('partials/tablePages-end') %>
 <%- include('partials/modal_GenericPicker') %>
 
+<script src="/scripts/reportAssignmentDelete.js"></script>
 <script>
   (function () {
     const classIdInput = document.getElementById('classIdFilterInput');
@@ -400,6 +421,187 @@
       closeIcon: 'bi-chevron-up',
       openLabel: 'Open filters',
       closeLabel: 'Close filters'
+    });
+
+    const blockedModalEl = document.getElementById('reportAssignmentDeleteBlockedModal');
+    const blockedModalBody = document.getElementById('reportAssignmentDeleteBlockedBody');
+    const retryDeleteBtn = document.getElementById('btnRetryReportAssignmentDelete');
+    let blockedModalInstance = null;
+    let activeAssignmentDeleteId = '';
+
+    function cleanupModalLayerArtifacts() {
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
+      const openModals = document.querySelectorAll('.modal.show');
+      if (!openModals.length) {
+        document.querySelectorAll('.modal-backdrop').forEach((backdrop) => backdrop.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+      }
+    }
+
+    function getBlockedModal() {
+      if (!blockedModalEl || !window.bootstrap || typeof window.bootstrap.Modal !== 'function') return null;
+      if (blockedModalEl.parentElement !== document.body) {
+        document.body.appendChild(blockedModalEl);
+      }
+      if (!blockedModalInstance) {
+        blockedModalInstance = window.bootstrap.Modal.getOrCreateInstance(blockedModalEl, {
+          backdrop: true,
+          keyboard: true,
+          focus: true
+        });
+      }
+      return blockedModalInstance;
+    }
+
+    function openBlockedModal() {
+      cleanupModalLayerArtifacts();
+      const modal = getBlockedModal();
+      if (!modal) return;
+      modal.show();
+    }
+
+    if (blockedModalEl) {
+      blockedModalEl.addEventListener('shown.bs.modal', function () {
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        const backdrop = backdrops[backdrops.length - 1];
+        if (backdrop) backdrop.style.zIndex = '1100';
+        cleanupModalLayerArtifacts();
+        const loadingEl = document.getElementById('globalLoadingModal');
+        if (loadingEl && loadingEl.classList.contains('is-visible')) {
+          loadingEl.classList.remove('is-visible');
+          loadingEl.setAttribute('aria-hidden', 'true');
+        }
+      });
+      blockedModalEl.addEventListener('hidden.bs.modal', function () {
+        cleanupModalLayerArtifacts();
+      });
+    }
+
+    function renderBlockedModal(preview) {
+      if (!blockedModalBody || !window.ReportAssignmentDelete) return;
+      const assignment = preview.assignment || {};
+      const instancesHtml = window.ReportAssignmentDelete.renderInstancesTable(preview.instances || [], { bindDelete: true });
+      const blockersHtml = window.ReportAssignmentDelete.renderBlockersList(preview.timesheetBlockers || preview.blockers || []);
+      blockedModalBody.innerHTML = `
+        <p class="mb-3">Cannot delete <strong>${window.ReportAssignmentDelete.escapeHtml(assignment.title || assignment.id || 'this assignment')}</strong> yet.</p>
+        <p class="small text-muted">Delete all started report instances below before removing this assignment. Locked instances must be unlocked or deleted first. Assignment admins can unlock locked instances when needed.</p>
+        ${blockersHtml}
+        <div class="fw-bold mb-2">Report Instances</div>
+        ${instancesHtml}
+      `;
+    }
+
+    async function runAssignmentDeleteFlow(assignmentId) {
+      if (!window.ReportAssignmentDelete) return;
+      const id = String(assignmentId || '').trim();
+      if (!id) return;
+      activeAssignmentDeleteId = id;
+      const preview = await window.ReportAssignmentDelete.withLoading('Checking assignment references...', function () {
+        return window.ReportAssignmentDelete.fetchAssignmentDeletePreview(id);
+      });
+      if (preview.canDelete) {
+        const title = String(preview.assignment?.title || id).trim();
+        const confirmed = await window.ReportAssignmentDelete.confirmDelete(
+          'Delete report assignment "' + title + '"? This cannot be undone.'
+        );
+        if (!confirmed) return;
+        await window.ReportAssignmentDelete.withLoading('Deleting assignment...', function () {
+          return window.ReportAssignmentDelete.deleteReportAssignment(id);
+        });
+        window.location.reload();
+        return;
+      }
+      renderBlockedModal(preview);
+      openBlockedModal();
+    }
+
+    document.addEventListener('click', function (event) {
+      const deleteAssignmentBtn = event.target.closest('.js-delete-report-assignment');
+      if (deleteAssignmentBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const assignmentId = String(deleteAssignmentBtn.getAttribute('data-assignment-id') || '').trim();
+        runAssignmentDeleteFlow(assignmentId).catch(function (error) {
+          window.ReportAssignmentDelete?.showError(error.message || 'Unable to delete assignment.');
+        });
+        return;
+      }
+
+      const unlockInstanceBtn = event.target.closest('[data-report-instance-unlock]');
+      if (unlockInstanceBtn && activeAssignmentDeleteId && window.ReportAssignmentDelete) {
+        event.preventDefault();
+        event.stopPropagation();
+        const instanceId = String(unlockInstanceBtn.getAttribute('data-instance-id') || '').trim();
+        if (!instanceId) return;
+        window.ReportAssignmentDelete.confirmUnlock('Unlock this report instance? It will become editable again.')
+          .then(function (confirmed) {
+            if (!confirmed) return null;
+            return window.ReportAssignmentDelete.withLoading('Unlocking report instance...', function () {
+              return window.ReportAssignmentDelete.unlockReportInstance(instanceId);
+            });
+          })
+          .then(function (result) {
+            if (!result) return null;
+            return window.ReportAssignmentDelete.fetchAssignmentDeletePreview(activeAssignmentDeleteId);
+          })
+          .then(function (preview) {
+            if (!preview) return;
+            if (preview.canDelete) {
+              const modal = getBlockedModal();
+              if (modal) modal.hide();
+              return runAssignmentDeleteFlow(activeAssignmentDeleteId);
+            }
+            renderBlockedModal(preview);
+          })
+          .catch(function (error) {
+            window.ReportAssignmentDelete.showError(error.message || 'Unable to unlock report instance.');
+          });
+        return;
+      }
+
+      const deleteInstanceBtn = event.target.closest('[data-report-instance-delete]');
+      if (deleteInstanceBtn && activeAssignmentDeleteId && window.ReportAssignmentDelete) {
+        event.preventDefault();
+        event.stopPropagation();
+        const instanceId = String(deleteInstanceBtn.getAttribute('data-instance-id') || '').trim();
+        if (!instanceId) return;
+        window.ReportAssignmentDelete.confirmDelete('Delete this report instance? This cannot be undone.')
+          .then(function (confirmed) {
+            if (!confirmed) return null;
+            return window.ReportAssignmentDelete.withLoading('Deleting report instance...', function () {
+              return window.ReportAssignmentDelete.deleteReportInstance(instanceId);
+            });
+          })
+          .then(function (result) {
+            if (!result) return null;
+            const row = deleteInstanceBtn.closest('[data-instance-row-id]');
+            if (row) row.remove();
+            return window.ReportAssignmentDelete.fetchAssignmentDeletePreview(activeAssignmentDeleteId);
+          })
+          .then(function (preview) {
+            if (!preview) return;
+            if (preview.canDelete) {
+              const modal = getBlockedModal();
+              if (modal) modal.hide();
+              return runAssignmentDeleteFlow(activeAssignmentDeleteId);
+            }
+            renderBlockedModal(preview);
+          })
+          .catch(function (error) {
+            window.ReportAssignmentDelete.showError(error.message || 'Unable to delete report instance.');
+          });
+      }
+    });
+
+    retryDeleteBtn?.addEventListener('click', function () {
+      if (!activeAssignmentDeleteId) return;
+      runAssignmentDeleteFlow(activeAssignmentDeleteId).catch(function (error) {
+        window.ReportAssignmentDelete?.showError(error.message || 'Unable to delete assignment.');
+      });
     });
   })();
 </script>

@@ -18,6 +18,16 @@ function isSchoolReportAdminViewer(reqUser) {
   });
 }
 
+async function canUnlockReportInstance(reqUser) {
+  if (adminChekersService.isSuperAdmin(reqUser)) return true;
+  return adminChekersService.isAdminForRequestAsync(
+    reqUser,
+    SECTIONS.SCHOOL_REPORTS_ASSIGNMENT,
+    OPERATIONS.UPDATE,
+    { section: { id: SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, category: 'SCHOOL' } }
+  );
+}
+
 function parseJsonSafe(v, fallback) {
   if (v === undefined || v === null || v === '') return fallback;
   try {
@@ -1545,6 +1555,80 @@ function resolveInstanceNextStatus(instance, submitActionRaw) {
   return nextStatus;
 }
 
+function mapAssignmentDeletePreviewInstances(instanceRows, options = {}) {
+  const allowUnlock = options.canUnlockAssignmentInstances === true;
+  return (Array.isArray(instanceRows) ? instanceRows : [])
+    .filter((row) => !row?.isPendingAssignment)
+    .map((row) => {
+      const status = String(row?.status || '').trim().toLowerCase();
+      const instanceId = toPublicId(row?.id);
+      return {
+        id: instanceId,
+        teacherName: String(row?.teacherName || row?.teacherId || '-').trim(),
+        studentName: String(row?.studentName || 'Whole class').trim(),
+        sessionDate: String(row?.sessionDate || row?.reportDueDate || '-').trim(),
+        status,
+        editUrl: instanceId ? `/school/reports/instances/edit-v2/${encodeURIComponent(instanceId)}` : '',
+        canDelete: status !== 'locked',
+        canUnlock: status === 'locked' && allowUnlock
+      };
+    });
+}
+
+function partitionAssignmentDeleteBlockers(blockers) {
+  const rows = Array.isArray(blockers) ? blockers : [];
+  const timesheetBlockers = rows.filter((blocker) => {
+    const code = String(blocker?.code || '').toUpperCase();
+    const section = String(blocker?.section || '').toLowerCase();
+    return code.includes('TIMESHEET') || section === 'timesheets';
+  });
+  return {
+    blockers: rows,
+    timesheetBlockers
+  };
+}
+
+async function buildAssignmentDeletePreview({ reqUser, activeOrgId, assignmentId }) {
+  const reportIntegrityService = require('./reportIntegrityService');
+  const schoolDeletionGuardService = require('./schoolDeletionGuardService');
+  const normalizedAssignmentId = toPublicId(assignmentId);
+  if (!normalizedAssignmentId) throw new Error('Assignment is required.');
+
+  await reportIntegrityService.assertAssignmentAccessible(normalizedAssignmentId, reqUser);
+  const assignment = await schoolDataService.getDataById('reportAssignments', normalizedAssignmentId, reqUser);
+  if (!assignment) throw new Error('Assignment not found.');
+
+  const orgId = String(activeOrgId || assignment?.orgId || reqUser?.activeOrgId || '').trim();
+  const preview = await schoolDeletionGuardService.previewDelete({
+    entityKey: 'reportAssignment',
+    id: normalizedAssignmentId,
+    orgId,
+    reqUser
+  });
+  const classItem = assignment?.classId
+    ? await schoolDataService.getDataById('classes', assignment.classId, reqUser)
+    : null;
+  const instanceRows = await buildInstanceListRows({
+    reqUser,
+    assignmentFilter: normalizedAssignmentId
+  });
+  const partitioned = partitionAssignmentDeleteBlockers(preview?.blockers || []);
+  const canUnlockAssignmentInstances = await canUnlockReportInstance(reqUser);
+
+  return {
+    canDelete: preview?.canDelete === true,
+    assignment: {
+      id: normalizedAssignmentId,
+      title: String(assignment?.title || assignment?.name || normalizedAssignmentId).trim(),
+      classTitle: String(classItem?.title || assignment?.classId || '').trim()
+    },
+    instances: mapAssignmentDeletePreviewInstances(instanceRows, { canUnlockAssignmentInstances }),
+    blockers: partitioned.blockers,
+    timesheetBlockers: partitioned.timesheetBlockers,
+    preview
+  };
+}
+
 module.exports = {
   parseDateOnlyValue,
   parseDateOnlyList,
@@ -1572,5 +1656,9 @@ module.exports = {
   buildReportReviewNavigator,
   buildPersonReportListContext,
   buildInstanceAnswers,
-  resolveInstanceNextStatus
+  buildAssignmentDeletePreview,
+  mapAssignmentDeletePreviewInstances,
+  partitionAssignmentDeleteBlockers,
+  resolveInstanceNextStatus,
+  canUnlockReportInstance
 };

@@ -216,6 +216,11 @@ router.delete('/assignments/delete/:id',
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.DELETE, { requireToken: true }),
   ctrl.deleteAssignment);
 
+router.get('/assignments/:id/delete-preview',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.DELETE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.DELETE, { keepActive: true }),
+  ctrl.getAssignmentDeletePreview);
+
 // Instances
 router.get('/instances',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
@@ -270,6 +275,21 @@ router.post('/instances/lock/:id',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
   ctrl.lockInstance);
+
+router.post('/instances/unlock/:id',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.unlockInstance);
+
+router.get('/instances/delete/:id',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.DELETE),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.DELETE),
+  ctrl.deleteInstance);
+
+router.delete('/instances/delete/:id',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.DELETE),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.DELETE, { requireToken: true }),
+  ctrl.deleteInstance);
 
 router.get('/instances/export/:id',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),

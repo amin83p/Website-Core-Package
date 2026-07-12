@@ -792,6 +792,39 @@ const reportIntegrityService = {
       throw new Error('This report is locked and cannot be edited.');
     }
     return instance;
+  },
+
+  resolveInstanceDeleteEligibility(status) {
+    const normalized = String(status || '').trim().toLowerCase();
+    if (normalized === 'locked') {
+      return {
+        allowed: false,
+        reason: 'Locked report instances cannot be deleted.'
+      };
+    }
+    return { allowed: true, reason: '' };
+  },
+
+  resolveInstanceUnlockTargetStatus(instance) {
+    const submittedAt = String(instance?.audit?.submittedAt || '').trim();
+    return submittedAt ? 'submitted' : 'draft';
+  },
+
+  async assertInstanceUnlockable(instanceId, reqUser) {
+    const instance = await this.getAccessibleInstanceOrThrow(instanceId, reqUser);
+    if (String(instance.status || '').trim().toLowerCase() !== 'locked') {
+      throw new Error('Only locked report instances can be unlocked.');
+    }
+    return instance;
+  },
+
+  async assertInstanceDeletable(instanceId, reqUser) {
+    const instance = await this.getAccessibleInstanceOrThrow(instanceId, reqUser);
+    const eligibility = this.resolveInstanceDeleteEligibility(instance.status);
+    if (!eligibility.allowed) {
+      throw new Error(eligibility.reason);
+    }
+    return instance;
   }
 };
 

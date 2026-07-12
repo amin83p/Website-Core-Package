@@ -13,6 +13,7 @@
 
 <%
   const instanceStateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const canUnlockReportInstanceSafe = Boolean(typeof canUnlockReportInstance !== 'undefined' && canUnlockReportInstance);
   const selectedAssignmentRowId = String(instanceStateFilters?.assignmentRowId || instanceStateFilters?.rowId || '').trim();
   const selectedSessionId = String(instanceStateFilters?.sessionId || '').trim();
   const selectedSessionDate = String(instanceStateFilters?.sessionDate || '').trim();
@@ -201,6 +202,15 @@
                 <% } else { %>
                   <a href="/school/reports/instances/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right me-2"></i>Open</a>
                   <a href="/school/reports/instances/edit-v2/<%= row.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-layout-text-window-reverse me-2"></i>Open V2</a>
+                  <% if (String(row.status || '').toLowerCase() === 'locked') { %>
+                    <% if (canUnlockReportInstanceSafe) { %>
+                      <button type="button" class="btn btn-outline-warning btn-sm js-unlock-report-instance" data-instance-id="<%= row.id %>" data-instance-label="<%= (row.teacherName || '') + ' / ' + (row.studentName || 'Whole class') %>"><i class="bi bi-unlock me-2"></i>Unlock</button>
+                    <% } else { %>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="Locked reports cannot be deleted."><i class="bi bi-lock me-2"></i>Locked</button>
+                    <% } %>
+                  <% } else { %>
+                    <button type="button" class="btn btn-outline-danger btn-sm js-delete-report-instance" data-instance-id="<%= row.id %>" data-instance-label="<%= (row.teacherName || '') + ' / ' + (row.studentName || 'Whole class') %>"><i class="bi bi-trash me-2"></i>Delete</button>
+                  <% } %>
                   <% if (row.hasDocxTemplate) { %>
                     <a href="/school/reports/instances/export/<%= row.id %>?format=docx&download=1" class="btn btn-outline-primary btn-sm"><i class="bi bi-filetype-docx me-2"></i>DOCX</a>
                   <% } %>
@@ -219,6 +229,7 @@
 <%- include('partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
 <%- include('partials/tablePages-end') %>
 
+<script src="/scripts/reportAssignmentDelete.js"></script>
 <script>
 (() => {
   function initCollapseToggleIcon(options = {}) {
@@ -252,6 +263,54 @@
     closeIcon: 'bi-chevron-up',
     openLabel: 'Open filters',
     closeLabel: 'Close filters'
+  });
+
+  document.addEventListener('click', function (event) {
+    const unlockButton = event.target.closest('.js-unlock-report-instance');
+    if (unlockButton && window.ReportAssignmentDelete) {
+      event.preventDefault();
+      event.stopPropagation();
+      const instanceId = String(unlockButton.getAttribute('data-instance-id') || '').trim();
+      const label = String(unlockButton.getAttribute('data-instance-label') || instanceId).trim();
+      if (!instanceId) return;
+      window.ReportAssignmentDelete.confirmUnlock('Unlock report instance for ' + label + '? It will become editable again.')
+        .then(function (confirmed) {
+          if (!confirmed) return null;
+          return window.ReportAssignmentDelete.withLoading('Unlocking report instance...', function () {
+            return window.ReportAssignmentDelete.unlockReportInstance(instanceId);
+          });
+        })
+        .then(function (result) {
+          if (!result) return;
+          window.location.reload();
+        })
+        .catch(function (error) {
+          window.ReportAssignmentDelete.showError(error.message || 'Unable to unlock report instance.');
+        });
+      return;
+    }
+
+    const button = event.target.closest('.js-delete-report-instance');
+    if (!button || !window.ReportAssignmentDelete) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const instanceId = String(button.getAttribute('data-instance-id') || '').trim();
+    const label = String(button.getAttribute('data-instance-label') || instanceId).trim();
+    if (!instanceId) return;
+    const message = 'Delete report instance for ' + label + '? This cannot be undone.';
+    window.ReportAssignmentDelete.confirmDelete(message).then(function (confirmed) {
+      if (!confirmed) return;
+      return window.ReportAssignmentDelete.withLoading('Deleting report instance...', function () {
+        return window.ReportAssignmentDelete.deleteReportInstance(instanceId);
+      });
+    }).then(function (result) {
+      if (!result) return;
+      const row = button.closest('tr');
+      if (row) row.remove();
+      else window.location.reload();
+    }).catch(function (error) {
+      window.ReportAssignmentDelete.showError(error.message || 'Unable to delete report instance.');
+    });
   });
 })();
 </script>

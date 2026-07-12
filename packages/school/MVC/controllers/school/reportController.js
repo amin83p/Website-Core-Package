@@ -14,6 +14,7 @@ const reportViewService = require('../../services/school/reportViewService');
 const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
+const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const { getPrefillValue } = require('../../services/school/reportPrefillKeyUtils');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const reportTemplateModel = require('../../models/school/reportTemplateModel');
@@ -867,13 +868,42 @@ async function deleteAssignment(req, res) {
     await reportIntegrityService.assertAssignmentAccessible(req.params.id, req.user);
     const assignment = await schoolDataService.getDataById('reportAssignments', req.params.id, req.user);
     if (!assignment) throw new Error('Assignment not found.');
-    const orgId = String(assignment.orgId || req.user?.activeOrgId || '').trim();
     await schoolDataService.deleteData('reportAssignments', req.params.id, req.user);
     if (isAjax(req)) return res.json({ status: 'success', message: 'Assignment deleted.' });
     res.redirect('/school/reports/assignments');
   } catch (error) {
+    return schoolDeletionGuardService.handleDeleteError(req, res, error);
+  }
+}
+
+async function getAssignmentDeletePreview(req, res) {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrowShared(req.user);
+    const preview = await reportViewService.buildAssignmentDeletePreview({
+      reqUser: req.user,
+      activeOrgId,
+      assignmentId: req.params.id
+    });
+    return res.json({
+      status: 'success',
+      ...preview
+    });
+  } catch (error) {
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
-    res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+    return res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+async function deleteInstance(req, res) {
+  try {
+    await reportIntegrityService.assertInstanceDeletable(req.params.id, req.user);
+    const instance = await schoolDataService.getDataById('reportInstances', req.params.id, req.user);
+    if (!instance) throw new Error('Report instance not found.');
+    await schoolDataService.deleteData('reportInstances', req.params.id, req.user);
+    if (isAjax(req)) return res.json({ status: 'success', message: 'Report instance deleted.' });
+    res.redirect('/school/reports/instances');
+  } catch (error) {
+    return schoolDeletionGuardService.handleDeleteError(req, res, error);
   }
 }
 
@@ -914,6 +944,8 @@ async function listInstances(req, res) {
     const { data, pagination } = paginate(instances, req.query);
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
 
+    const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
+
     res.render('school/report/instanceList', {
       title: 'Report Instances',
       tableName: 'Report_Instances',
@@ -922,6 +954,7 @@ async function listInstances(req, res) {
       newLabel: null,
       pagination,
       filters: req.query,
+      canUnlockReportInstance,
       includeModal: true,
       includeModal_Table: true,
       print: true,
@@ -1121,6 +1154,7 @@ async function buildInstanceEditorRenderContext(req) {
     reqUser: req.user,
     participantOnly: req.reportInstanceParticipantAccess === true
   });
+  const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
 
   return {
     title: `Report Editor: ${template.title}`,
@@ -1132,6 +1166,7 @@ async function buildInstanceEditorRenderContext(req) {
     mergedData,
     validationSummary,
     reportReviewNavigator,
+    canUnlockReportInstance,
     safeReturnUrl: resolveSafeSameOriginReturnUrl(req, latestInstance?.id),
     includeModal: true,
     user: req.user,
@@ -1440,6 +1475,51 @@ async function lockInstance(req, res) {
   }
 }
 
+async function unlockInstance(req, res) {
+  let guardKey = '';
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    guardKey = idempotencyGuardService.createGuardKey([
+      'report_instance_unlock',
+      activeOrgId,
+      String(req.params.id || '').trim()
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 90000,
+      replayTtlMs: 10000
+    });
+    if (sendGuardedResponse(res, guardResult, 'Report unlock is already in progress. Please wait.')) return;
+
+    const instance = await reportIntegrityService.assertInstanceUnlockable(req.params.id, req.user);
+    const nextStatus = reportIntegrityService.resolveInstanceUnlockTargetStatus(instance);
+    const now = new Date().toISOString();
+
+    await schoolDataService.updateData('reportInstances', instance.id, {
+      status: nextStatus,
+      audit: {
+        lastUpdateUser: req.user?.id || '',
+        lastUpdateDateTime: now,
+        unlockedAt: now,
+        unlockedBy: toPublicId(req.user?.id || '')
+      }
+    }, req.user);
+
+    const payloadOut = {
+      status: 'success',
+      message: `Report unlocked successfully. Status is now ${nextStatus}.`,
+      nextStatus
+    };
+    idempotencyGuardService.completeGuard(guardKey, payloadOut);
+    if (isAjax(req)) return res.json(payloadOut);
+    res.redirect(`/school/reports/instances/edit/${instance.id}`);
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
 async function exportInstance(req, res) {
   try {
     const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(req.params.id, req.user);
@@ -1522,6 +1602,7 @@ module.exports = {
   previewAssignmentTargetRows,
   saveAssignment,
   deleteAssignment,
+  getAssignmentDeletePreview,
   listInstances,
   listPersonReports,
   startInstance,
@@ -1531,6 +1612,8 @@ module.exports = {
   previewInstancePrefillRefresh,
   applyInstancePrefillRefresh,
   lockInstance,
+  unlockInstance,
+  deleteInstance,
   exportInstance
 };
 

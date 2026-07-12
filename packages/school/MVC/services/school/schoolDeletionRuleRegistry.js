@@ -19,7 +19,7 @@ const SECTION_HREFS = Object.freeze({
   reports: {
     template: (id) => `/school/reports/templates/edit/${encodeURIComponent(id)}`,
     assignment: (id) => `/school/reports/assignments/edit/${encodeURIComponent(id)}`,
-    instance: (id) => `/school/reports/instances/${encodeURIComponent(id)}`
+    instance: (id) => `/school/reports/instances/edit-v2/${encodeURIComponent(id)}`
   },
   timesheets: (periodId, teacherId) => {
     const params = new URLSearchParams();
