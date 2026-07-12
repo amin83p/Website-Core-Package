@@ -8,6 +8,7 @@ const academicSnapshotService = require('../../services/school/academicSnapshotS
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const studentAcademicOverviewService = require('../../services/school/studentAcademicOverviewService');
+const studentEnrollmentDetailService = require('../../services/school/studentEnrollmentDetailService');
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
 
@@ -396,6 +397,24 @@ exports.showStudentOverviewForStudent = async (req, res) => {
   } catch (error) {
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+};
+
+exports.getStudentEnrollmentDetail = async (req, res) => {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const detail = await studentEnrollmentDetailService.buildEnrollmentDetail({
+      reqUser: req.user,
+      activeOrgId,
+      studentId: req.params.studentId,
+      enrollmentId: req.params.enrollmentId
+    });
+    return res.json({
+      status: 'success',
+      ...detail
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 };
 

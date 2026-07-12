@@ -60,11 +60,84 @@ function enrichTermRows(rows) {
   }));
 }
 
-async function buildClassEnrollmentRows({ reqUser, activeOrgId, studentId, programs, terms, classes, subjects }) {
+function buildKnownTermRegistrationIdSet(termRows) {
+  const ids = new Set();
+  (Array.isArray(termRows) ? termRows : []).forEach((row) => {
+    const id = toPublicId(row?.id);
+    if (id) ids.add(id);
+  });
+  return ids;
+}
+
+function resolveRegistrationSource(period, options = {}) {
+  const knownTermRegistrationIds = options.knownTermRegistrationIds instanceof Set
+    ? options.knownTermRegistrationIds
+    : new Set();
+  const enrollmentSource = String(period?.enrollmentSource || '').trim().toLowerCase();
+  const enrollmentText = `${String(period?.reasonStart || '')} ${String(period?.notes || '')}`;
+  const termRegistrationMatch = enrollmentText.match(/term registration\s+([A-Za-z0-9:_-]+)/i);
+  const authorizationRef = String(period?.authorizationRef || '').trim();
+  const regexTermRegistrationId = termRegistrationMatch ? String(termRegistrationMatch[1] || '').trim() : '';
+  const termRegistrationId = authorizationRef || regexTermRegistrationId;
+
+  const isTermRegistration = enrollmentSource === 'term_registration'
+    || (authorizationRef && knownTermRegistrationIds.has(authorizationRef))
+    || Boolean(regexTermRegistrationId)
+    || (authorizationRef && /term registration/i.test(enrollmentText));
+
+  if (isTermRegistration) {
+    return {
+      registrationType: 'term_registration',
+      registrationId: termRegistrationId || authorizationRef,
+      registrationLabel: 'Term Registration',
+      termRegistrationId: termRegistrationId || authorizationRef
+    };
+  }
+
+  const rollingSource = enrollmentSource === 'rolling_enrollment';
+  return {
+    registrationType: 'class_enrollment',
+    registrationId: String(period?.id || '').trim(),
+    registrationLabel: rollingSource ? 'Rolling Enrollment' : 'Class Enrollment',
+    termRegistrationId: ''
+  };
+}
+
+function buildRegistrationSummary(period, registrationMeta, termRowById) {
+  if (registrationMeta.registrationType === 'term_registration') {
+    const termRow = termRowById?.get(toPublicId(registrationMeta.termRegistrationId)) || null;
+    const status = String(termRow?.status || termRow?.verificationStatus || '').trim() || 'unknown';
+    const date = String(termRow?.registrationDate || period?.startDate || '').trim();
+    return [status, date].filter(Boolean).join(' · ') || 'Term registration';
+  }
+  const status = String(period?.status || '').trim() || 'unknown';
+  const startDate = String(period?.startDate || '').trim();
+  return [status, startDate].filter(Boolean).join(' · ') || registrationMeta.registrationLabel;
+}
+
+function buildEnrollmentDetailApiUrl(studentId, enrollmentId) {
+  const normalizedStudentId = toPublicId(studentId);
+  const normalizedEnrollmentId = toPublicId(enrollmentId);
+  if (!normalizedStudentId || !normalizedEnrollmentId) return '';
+  return `/school/academic-ledger/student-overview/${encodeURIComponent(normalizedStudentId)}/enrollment-detail/${encodeURIComponent(normalizedEnrollmentId)}`;
+}
+
+async function buildClassEnrollmentRows({
+  reqUser,
+  activeOrgId,
+  studentId,
+  programs,
+  terms,
+  classes,
+  subjects,
+  termRows = []
+}) {
   const programMap = new Map((Array.isArray(programs) ? programs : []).map((row) => [toPublicId(row.id), row]));
   const termMap = new Map((Array.isArray(terms) ? terms : []).map((row) => [toPublicId(row.id), row]));
   const classMap = new Map((Array.isArray(classes) ? classes : []).map((row) => [toPublicId(row.id), row]));
   const subjectMap = new Map((Array.isArray(subjects) ? subjects : []).map((row) => [toPublicId(row.id), row]));
+  const knownTermRegistrationIds = buildKnownTermRegistrationIdSet(termRows);
+  const termRowById = new Map((Array.isArray(termRows) ? termRows : []).map((row) => [toPublicId(row.id), row]));
 
   const periods = await dataService.getClassEnrollmentPeriodsByStudentId(studentId, reqUser);
   const rows = (Array.isArray(periods) ? periods : [])
@@ -76,9 +149,7 @@ async function buildClassEnrollmentRows({ reqUser, activeOrgId, studentId, progr
       const classRow = classMap.get(classId) || null;
       const program = programMap.get(programId) || null;
       const term = termMap.get(termId) || null;
-      const enrollmentText = `${String(period?.reasonStart || '')} ${String(period?.notes || '')}`;
-      const termRegistrationMatch = enrollmentText.match(/term registration\s+([A-Za-z0-9:_-]+)/i);
-      const termRegistrationId = String(period?.authorizationRef || (termRegistrationMatch ? termRegistrationMatch[1] : '')).trim();
+      const registrationMeta = resolveRegistrationSource(period, { knownTermRegistrationIds });
       return {
         id: period.id,
         enrollmentId: period.id,
@@ -92,7 +163,12 @@ async function buildClassEnrollmentRows({ reqUser, activeOrgId, studentId, progr
         startDate: String(period?.startDate || '').trim(),
         endDate: String(period?.endDate || '').trim(),
         status: String(period?.status || '').trim(),
-        termRegistrationId,
+        termRegistrationId: registrationMeta.termRegistrationId || '',
+        registrationType: registrationMeta.registrationType,
+        registrationId: registrationMeta.registrationId,
+        registrationLabel: registrationMeta.registrationLabel,
+        registrationSummary: buildRegistrationSummary(period, registrationMeta, termRowById),
+        detailApiUrl: buildEnrollmentDetailApiUrl(studentId, period.id),
         programRegistrationId: String(period?.programRegistrationId || '').trim(),
         editUrl: classId ? `/school/classes/edit/${encodeURIComponent(classId)}` : ''
       };
@@ -138,7 +214,8 @@ async function buildStudentAcademicOverview({ reqUser, activeOrgId, studentId } 
     programs,
     terms,
     classes,
-    subjects
+    subjects,
+    termRows
   });
 
   const programsEnriched = enrichProgramRows(programRows);
@@ -167,6 +244,9 @@ async function buildStudentAcademicOverview({ reqUser, activeOrgId, studentId } 
 
 module.exports = {
   buildStudentAcademicOverview,
+  buildClassEnrollmentRows,
+  buildEnrollmentDetailApiUrl,
+  resolveRegistrationSource,
   registrationSortRank,
   sortRegistrationRows
 };

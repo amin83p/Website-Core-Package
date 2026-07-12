@@ -16,6 +16,17 @@
   .student-overview-page .overview-row-link:hover {
     background-color: rgba(13, 110, 253, 0.04);
   }
+  .student-overview-page .registration-detail-trigger {
+    cursor: pointer;
+    border-radius: 0.375rem;
+    padding: 0.35rem 0.5rem;
+    transition: background-color 0.15s ease;
+  }
+  .student-overview-page .registration-detail-trigger:hover,
+  .student-overview-page .registration-detail-trigger:focus {
+    background-color: rgba(13, 110, 253, 0.08);
+    outline: none;
+  }
 </style>
 <div class="sections-page student-overview-page">
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
@@ -216,7 +227,7 @@
                 <th>Enrollment Period</th>
                 <th>Status</th>
                 <th>Enrollment ID</th>
-                <th class="pe-3">Term Registration</th>
+                <th class="pe-3">Registration</th>
               </tr>
             </thead>
             <tbody>
@@ -243,7 +254,27 @@
                   <td class="small"><%= row.startDate || '-' %> to <%= row.endDate || '-' %></td>
                   <td><span class="badge bg-secondary-subtle text-secondary-emphasis border"><%= row.status || '-' %></span></td>
                   <td class="font-monospace small"><%= row.enrollmentId || '-' %></td>
-                  <td class="font-monospace small pe-3"><%= row.termRegistrationId || '-' %></td>
+                  <td class="font-monospace small pe-3">
+                    <% if (row.detailApiUrl) { %>
+                      <div
+                        class="registration-detail-trigger"
+                        role="button"
+                        tabindex="0"
+                        data-detail-url="<%= row.detailApiUrl %>"
+                        data-registration-type="<%= row.registrationType || 'class_enrollment' %>"
+                        data-registration-label="<%= row.registrationLabel || 'Registration' %>"
+                        aria-label="View <%= row.registrationLabel || 'registration' %> details"
+                      >
+                        <span class="badge <%= row.registrationType === 'term_registration' ? 'bg-info-subtle text-info-emphasis' : 'bg-primary-subtle text-primary-emphasis' %> border mb-1">
+                          <%= row.registrationLabel || 'Registration' %>
+                        </span>
+                        <div class="fw-semibold text-primary"><%= row.registrationId || row.enrollmentId || '-' %></div>
+                        <div class="text-muted x-small"><%= row.registrationSummary || '-' %></div>
+                      </div>
+                    <% } else { %>
+                      -
+                    <% } %>
+                  </td>
                 </tr>
               <% }) %>
             </tbody>
@@ -254,9 +285,240 @@
   <% } %>
 </div>
 
+<div class="modal fade" id="termRegistrationDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-stars me-2"></i>Term Registration Summary</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="termRegistrationDetailBody">
+        <div class="text-muted text-center py-4">Loading...</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="classEnrollmentDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-easel me-2"></i>Class Enrollment Summary</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="classEnrollmentDetailBody">
+        <div class="text-muted text-center py-4">Loading...</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/modal_GenericPicker') %>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  const actionStateId = '<%= actionStateId || '' %>';
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function formatValue(value) {
+    const token = String(value ?? '').trim();
+    return token ? escapeHtml(token) : '-';
+  }
+
+  async function fetchEnrollmentDetail(url) {
+    const headers = {
+      'X-Requested-With': 'XMLHttpRequest',
+      'x-ajax-request': 'true'
+    };
+    if (actionStateId) headers['x-action-state-id'] = actionStateId;
+    const response = await fetch(url, { headers });
+    const payload = await response.json().catch(function () { return {}; });
+    if (!response.ok || payload.status === 'error') {
+      throw new Error(payload.message || 'Failed to load registration details.');
+    }
+    return payload;
+  }
+
+  function renderDefinitionList(rows) {
+    return '<dl class="row small mb-0">' + rows.map(function (row) {
+      return '<dt class="col-sm-4 text-muted">' + escapeHtml(row.label) + '</dt>'
+        + '<dd class="col-sm-8">' + formatValue(row.value) + '</dd>';
+    }).join('') + '</dl>';
+  }
+
+  function renderTable(headers, rows, rowRenderer) {
+    if (!rows.length) {
+      return '<div class="text-muted small py-3 text-center">No records found.</div>';
+    }
+    return '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr>'
+      + headers.map(function (header) { return '<th>' + escapeHtml(header) + '</th>'; }).join('')
+      + '</tr></thead><tbody>'
+      + rows.map(rowRenderer).join('')
+      + '</tbody></table></div>';
+  }
+
+  function renderTermRegistrationModal(payload) {
+    const term = payload.termRegistration || {};
+    const linked = term.linkedClassEnrollment || {};
+  const body = document.getElementById('termRegistrationDetailBody');
+    if (!body) return;
+
+    const headerHtml = renderDefinitionList([
+      { label: 'Registration ID', value: term.id },
+      { label: 'Status', value: term.status },
+      { label: 'Verification', value: term.verificationStatus },
+      { label: 'Registration Date', value: term.registrationDate },
+      { label: 'Student', value: term.studentName },
+      { label: 'Program', value: term.programLabel },
+      { label: 'Term', value: term.termLabel },
+      { label: 'Fee Category', value: term.feeCategorySnapshot },
+      { label: 'Credits', value: Number(term.selectedCredits || 0).toFixed(2) },
+      { label: 'Classes', value: term.classCount },
+      { label: 'Finance', value: 'Posted ' + (term.finance?.posted || 0) + ' / ' + (term.finance?.expected || 0) },
+      { label: 'Academic', value: 'Posted ' + (term.academic?.posted || 0) + ' / ' + (term.academic?.expected || 0) },
+      { label: 'Note', value: term.note }
+    ]);
+
+    const classesHtml = renderTable(
+      ['Class', 'Credits', 'Status'],
+      Array.isArray(term.selectedClasses) ? term.selectedClasses : [],
+      function (row) {
+        return '<tr><td><div class="fw-semibold">' + formatValue(row.classTitle || row.classId) + '</div>'
+          + '<div class="small text-muted font-monospace">' + formatValue(row.classId) + '</div></td>'
+          + '<td>' + formatValue(row.credits) + '</td>'
+          + '<td>' + formatValue(row.status) + '</td></tr>';
+      }
+    );
+
+    const linkedHtml = '<div class="card border mt-3"><div class="card-body">'
+      + '<div class="fw-bold mb-2">This Class Enrollment</div>'
+      + renderDefinitionList([
+        { label: 'Enrollment ID', value: linked.enrollmentId },
+        { label: 'Class', value: linked.classTitle },
+        { label: 'Period', value: (linked.startDate || '-') + ' to ' + (linked.endDate || '-') },
+        { label: 'Status', value: linked.status }
+      ])
+      + '</div></div>';
+
+    body.innerHTML = headerHtml + '<hr><div class="fw-bold mb-2">Selected Classes</div>' + classesHtml + linkedHtml;
+  }
+
+  function renderClassEnrollmentModal(payload) {
+    const enrollment = payload.enrollment || {};
+    const sessions = enrollment.sessions || {};
+    const gradebook = payload.gradebookHistory || {};
+    const body = document.getElementById('classEnrollmentDetailBody');
+    if (!body) return;
+
+    const summaryHtml = '<div class="row g-3 mb-3"><div class="col-lg-6"><div class="card border h-100"><div class="card-body">'
+      + '<div class="fw-bold mb-2">Enrollment Period</div>'
+      + renderDefinitionList([
+        { label: 'Enrollment ID', value: enrollment.enrollmentId },
+        { label: 'Class', value: enrollment.classTitle },
+        { label: 'Program', value: enrollment.programLabel },
+        { label: 'Term', value: enrollment.termLabel },
+        { label: 'Period', value: (enrollment.startDate || '-') + ' to ' + (enrollment.endDate || 'Open') },
+        { label: 'Status', value: enrollment.status },
+        { label: 'Source', value: payload.registrationLabel || enrollment.enrollmentSource },
+        { label: 'Program Registration', value: enrollment.programRegistrationId },
+        { label: 'Notes', value: enrollment.notes }
+      ])
+      + '</div></div></div><div class="col-lg-6"><div class="card border h-100"><div class="card-body">'
+      + '<div class="fw-bold mb-2">Sessions</div>'
+      + renderDefinitionList([
+        { label: 'Target', value: sessions.effectiveTargetSessionCount ?? sessions.targetSessionCount ?? '-' },
+        { label: 'Consumed', value: sessions.consumedSessionCount ?? '-' },
+        { label: 'Remaining', value: sessions.remainingSessionCount ?? '-' },
+        { label: 'Window Sessions', value: sessions.windowSessionCount ?? '-' },
+        { label: 'Target Source', value: sessions.targetSource },
+        { label: 'Completion', value: sessions.sessionCompletion ? ((sessions.sessionCompletion.date || '-') + ' (' + (sessions.sessionCompletion.reason || '') + ')') : '-' }
+      ])
+      + '<div class="small text-muted mt-2">Attendance: ' + formatValue(payload.attendancePercent != null ? payload.attendancePercent + '%' : '-') + '</div>'
+      + '<div class="small text-muted">Assignments: ' + formatValue(gradebook.assignmentsPercent != null ? gradebook.assignmentsPercent + '%' : '-') + '</div>'
+      + '<div class="small text-muted">Final: ' + formatValue(gradebook.finalPercent != null ? gradebook.finalPercent + '%' : '-') + '</div>'
+      + '</div></div></div></div>';
+
+    const attendanceHtml = '<div class="fw-bold mb-2">Attendance History</div>'
+      + renderTable(
+        ['Date', 'Status', 'Late Min', 'Early Leave Min'],
+        Array.isArray(payload.attendanceHistory) ? payload.attendanceHistory : [],
+        function (row) {
+          return '<tr><td>' + formatValue(row.date) + '</td><td>' + formatValue(row.status) + '</td>'
+            + '<td>' + formatValue(row.lateMinutes) + '</td><td>' + formatValue(row.earlyLeaveMinutes) + '</td></tr>';
+        }
+      );
+
+    const gradebookHtml = '<div class="fw-bold mb-2 mt-4">Gradebook History</div>'
+      + renderTable(
+        ['Date', 'Activity', 'Score', 'Percent', 'Attendance'],
+        Array.isArray(gradebook.activities) ? gradebook.activities : [],
+        function (row) {
+          return '<tr><td>' + formatValue(row.date) + '</td><td>' + formatValue(row.label) + '</td>'
+            + '<td>' + formatValue(row.score) + (row.totalScore != null ? ' / ' + escapeHtml(row.totalScore) : '') + '</td>'
+            + '<td>' + formatValue(row.percent != null ? row.percent + '%' : '-') + '</td>'
+            + '<td>' + formatValue(row.attendanceStatus) + '</td></tr>';
+        }
+      );
+
+    const relatedHtml = '<div class="fw-bold mb-2 mt-4">Related Academic Records</div>'
+      + renderTable(
+        ['Date', 'Type', 'Status', 'Memo'],
+        Array.isArray(payload.relatedRecords) ? payload.relatedRecords : [],
+        function (row) {
+          return '<tr><td>' + formatValue(row.effectiveDate) + '</td><td>' + formatValue(row.entryType) + '</td>'
+            + '<td>' + formatValue(row.status) + '</td><td>' + formatValue(row.memo) + '</td></tr>';
+        }
+      );
+
+    body.innerHTML = summaryHtml + attendanceHtml + gradebookHtml + relatedHtml;
+  }
+
+  function showModal(modalId) {
+    const modalEl = document.getElementById(modalId);
+    if (!modalEl || !window.bootstrap || typeof window.bootstrap.Modal !== 'function') return;
+    window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  }
+
+  async function openRegistrationDetail(trigger) {
+    const url = String(trigger.getAttribute('data-detail-url') || '').trim();
+    if (!url) return;
+
+    let loadingToken = null;
+    if (typeof window.showLoading === 'function') {
+      loadingToken = window.showLoading({ note: 'Loading registration details...' });
+    }
+
+    try {
+      const payload = await fetchEnrollmentDetail(url);
+      if (payload.view === 'term_registration') {
+        renderTermRegistrationModal(payload);
+        showModal('termRegistrationDetailModal');
+      } else {
+        renderClassEnrollmentModal(payload);
+        showModal('classEnrollmentDetailModal');
+      }
+    } catch (error) {
+      window.alert(error.message || 'Failed to load registration details.');
+    } finally {
+      if (typeof window.hideLoading === 'function') {
+        if (loadingToken) window.hideLoading(loadingToken);
+        else window.hideLoading({ force: true });
+      }
+    }
+  }
+
   document.getElementById('btnPickOverviewStudent')?.addEventListener('click', function () {
     if (typeof GenericPicker === 'undefined' || typeof GenericPickerPresets === 'undefined') return;
     GenericPicker.open(GenericPickerPresets.student({
@@ -272,8 +534,23 @@ document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.overview-row-link[data-href]').forEach(function (row) {
     row.addEventListener('click', function (event) {
       if (event.target.closest('a')) return;
+      if (event.target.closest('.registration-detail-trigger')) return;
       const href = row.getAttribute('data-href');
       if (href) window.location.href = href;
+    });
+  });
+
+  document.querySelectorAll('.registration-detail-trigger').forEach(function (trigger) {
+    trigger.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      openRegistrationDetail(trigger);
+    });
+    trigger.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      event.stopPropagation();
+      openRegistrationDetail(trigger);
     });
   });
 });

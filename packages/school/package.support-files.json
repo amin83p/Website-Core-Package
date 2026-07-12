@@ -552,6 +552,13 @@
             "category": "feature-regression",
             "status": "root-active",
             "targetStatus": "package-planned"
+        },
+        {
+            "source": "test/student-enrollment-detail.test.js",
+            "target": "packages/school/test/student-enrollment-detail.test.js",
+            "category": "feature-regression",
+            "status": "package-only",
+            "targetStatus": "package-active"
         }
     ]
 }
