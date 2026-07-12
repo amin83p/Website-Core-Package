@@ -1,0 +1,255 @@
+<%
+  const rows = Array.isArray(activeUsers) ? activeUsers : [];
+  const summaryData = (summary && typeof summary === 'object') ? summary : {};
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+
+  function formatRelativeTime(value) {
+    const date = value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) return '-';
+    const diffMins = Math.floor((Date.now() - date.getTime()) / 1000 / 60);
+    if (diffMins <= 0) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  }
+%>
+
+<%- include('../partials/tablePages-start', {
+  title: 'Active Users',
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: false,
+  print
+}) %>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div class="small text-muted">
+    Refreshes automatically every 60 seconds.
+  </div>
+  <button type="button" class="btn btn-outline-secondary btn-sm" id="activeUsersRefreshBtn">
+    <i class="bi bi-arrow-clockwise me-1"></i>Refresh now
+  </button>
+</div>
+
+<div class="row g-2 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="border rounded p-2 bg-light h-100 text-center">
+      <div class="small text-muted text-uppercase">Active Users</div>
+      <div class="fw-bold fs-5"><%= Number(summaryData.activeUserCount || 0) %></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="border rounded p-2 bg-light h-100 text-center">
+      <div class="small text-muted text-uppercase">Active Sessions</div>
+      <div class="fw-bold fs-5"><%= Number(summaryData.activeSessionCount || 0) %></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="border rounded p-2 bg-light h-100 text-center">
+      <div class="small text-muted text-uppercase">Avg Daily Active</div>
+      <div class="fw-bold fs-5"><%= Number(summaryData.avgDailyActiveUsers || 0) %></div>
+      <div class="x-small text-muted">Last <%= Number(summaryData.lookbackDays || 7) %> days</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="border rounded p-2 bg-light h-100 text-center">
+      <div class="small text-muted text-uppercase">Avg Last Activity</div>
+      <div class="fw-bold fs-5"><%= Number(summaryData.avgMinutesSinceLastActivity || 0) %>m</div>
+      <div class="x-small text-muted">ago per user</div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search by name, username, email, or user ID...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="active-users-table">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th class="draggable" data-column="lastActivityAt">Last Activity <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastLoginAt">Last Login <span class="sort-icon"></span></th>
+        <th class="text-center">Org</th>
+        <th class="text-center">Sessions</th>
+        <th>Device / IP</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="activeUsersTableBody">
+      <% if (!rows.length) { %>
+        <tr data-empty-row="true">
+          <td colspan="7" class="text-center text-muted py-4">No active users right now.</td>
+        </tr>
+      <% } %>
+      <% rows.forEach((row) => { %>
+        <tr data-user-id="<%= row.userId %>">
+          <td>
+            <div class="fw-bold"><%= row.displayName || row.username || row.userId %></div>
+            <div class="small text-muted"><%= row.username || '-' %></div>
+            <div class="small text-muted"><%= row.email || '-' %></div>
+          </td>
+          <td>
+            <div><%= row.lastActivityAt ? new Date(row.lastActivityAt).toLocaleString() : '-' %></div>
+            <div class="small text-muted"><%= formatRelativeTime(row.lastActivityAt) %></div>
+          </td>
+          <td>
+            <div><%= row.lastLoginAt ? new Date(row.lastLoginAt).toLocaleString() : '-' %></div>
+            <div class="small text-muted"><%= formatRelativeTime(row.lastLoginAt) %></div>
+          </td>
+          <td class="text-center">
+            <span class="badge bg-light text-dark border"><%= row.currentOrgId || '-' %></span>
+          </td>
+          <td class="text-center">
+            <span class="badge bg-success-subtle text-success border border-success-subtle"><%= row.sessionCount || 0 %></span>
+          </td>
+          <td>
+            <% const ua = row.deviceFingerprint?.browser || ''; %>
+            <% let icon = 'bi-laptop'; %>
+            <% if (ua.toLowerCase().includes('mobile')) icon = 'bi-phone'; %>
+            <div class="font-monospace small"><%= row.deviceFingerprint?.ip || 'Unknown' %></div>
+            <div class="small text-muted text-truncate" style="max-width: 220px;">
+              <i class="bi <%= icon %> me-1"></i><%= ua || 'Unknown device' %>
+            </div>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <a href="<%= row.trackActivityUrl %>" class="btn btn-outline-primary btn-sm" title="Open track activity">
+              <i class="bi bi-clock-history me-1"></i>Track Activity
+            </a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="security/active-users" hidden></span>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: stateFilters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<script>
+  (function () {
+    const tableBody = document.getElementById('activeUsersTableBody');
+    const refreshBtn = document.getElementById('activeUsersRefreshBtn');
+    if (!tableBody) return;
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatRelativeTime(value) {
+      const date = value ? new Date(value) : null;
+      if (!date || Number.isNaN(date.getTime())) return '-';
+      const diffMins = Math.floor((Date.now() - date.getTime()) / 1000 / 60);
+      if (diffMins <= 0) return 'Just now';
+      if (diffMins < 60) return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    }
+
+    function formatDateTime(value) {
+      const date = value ? new Date(value) : null;
+      if (!date || Number.isNaN(date.getTime())) return '-';
+      return date.toLocaleString();
+    }
+
+    function renderRows(rows) {
+      if (!Array.isArray(rows) || !rows.length) {
+        tableBody.innerHTML = '<tr data-empty-row="true"><td colspan="7" class="text-center text-muted py-4">No active users right now.</td></tr>';
+        return;
+      }
+
+      tableBody.innerHTML = rows.map((row) => {
+        const ua = String(row?.deviceFingerprint?.browser || '');
+        const icon = ua.toLowerCase().includes('mobile') ? 'bi-phone' : 'bi-laptop';
+        const displayName = row.displayName || row.username || row.userId || '-';
+        const trackUrl = row.trackActivityUrl || `/security/track-activity/?userId=${encodeURIComponent(row.userId || '')}`;
+        return `
+          <tr data-user-id="${escapeHtml(row.userId)}">
+            <td>
+              <div class="fw-bold">${escapeHtml(displayName)}</div>
+              <div class="small text-muted">${escapeHtml(row.username || '-')}</div>
+              <div class="small text-muted">${escapeHtml(row.email || '-')}</div>
+            </td>
+            <td>
+              <div>${escapeHtml(formatDateTime(row.lastActivityAt))}</div>
+              <div class="small text-muted">${escapeHtml(formatRelativeTime(row.lastActivityAt))}</div>
+            </td>
+            <td>
+              <div>${escapeHtml(formatDateTime(row.lastLoginAt))}</div>
+              <div class="small text-muted">${escapeHtml(formatRelativeTime(row.lastLoginAt))}</div>
+            </td>
+            <td class="text-center">
+              <span class="badge bg-light text-dark border">${escapeHtml(row.currentOrgId || '-')}</span>
+            </td>
+            <td class="text-center">
+              <span class="badge bg-success-subtle text-success border border-success-subtle">${escapeHtml(row.sessionCount || 0)}</span>
+            </td>
+            <td>
+              <div class="font-monospace small">${escapeHtml(row.deviceFingerprint?.ip || 'Unknown')}</div>
+              <div class="small text-muted text-truncate" style="max-width: 220px;">
+                <i class="bi ${icon} me-1"></i>${escapeHtml(ua || 'Unknown device')}
+              </div>
+            </td>
+            <td class="table-actions text-end pe-4">
+              <a href="${escapeHtml(trackUrl)}" class="btn btn-outline-primary btn-sm" title="Open track activity">
+                <i class="bi bi-clock-history me-1"></i>Track Activity
+              </a>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function refreshActiveUsers() {
+      const params = new URLSearchParams(window.location.search);
+      const response = await fetch(`/security/active-users/data?${params.toString()}`, {
+        headers: { 'x-ajax-request': 'true' }
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Failed to refresh active users.');
+      }
+      renderRows(payload.results || []);
+      const summary = payload.summary || {};
+      const statCards = document.querySelectorAll('[data-active-users-stat]');
+      statCards.forEach((card) => {
+        const key = card.getAttribute('data-active-users-stat');
+        if (!key || summary[key] === undefined) return;
+        const valueEl = card.querySelector('[data-active-users-value]');
+        if (valueEl) valueEl.textContent = String(summary[key]);
+      });
+    }
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        refreshActiveUsers().catch((error) => {
+          if (typeof showToast === 'function') showToast(error.message || 'Refresh failed.', 'danger');
+        });
+      });
+    }
+
+    setInterval(() => {
+      refreshActiveUsers().catch(() => {});
+    }, 60000);
+  })();
+</script>

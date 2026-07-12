@@ -222,6 +222,17 @@ function normalizeLoadingState(input = {}) {
     return next;
 }
 
+function raiseLoadingAboveModalStack(root) {
+    if (!root) return;
+    let maxZ = 1050;
+    document.querySelectorAll('.modal.show').forEach((openModal) => {
+        const z = parseInt(window.getComputedStyle(openModal).zIndex, 10);
+        if (!Number.isNaN(z) && z > maxZ) maxZ = z;
+    });
+    const loadingZ = Math.max(maxZ + 10, 11150);
+    root.style.setProperty('z-index', String(loadingZ), 'important');
+}
+
 function renderLoadingState(isVisible = true) {
     const el = getLoadingElements();
     if (!el) return;
@@ -256,6 +267,7 @@ function renderLoadingState(isVisible = true) {
     }
 
     if (isVisible) {
+        raiseLoadingAboveModalStack(el.root);
         el.root.classList.add('is-visible');
         el.root.setAttribute('aria-hidden', 'false');
     } else {
@@ -712,6 +724,128 @@ function initAppZoomControls() {
             rangeInput.focus();
         });
     }
+}
+
+function escapeActiveUsersHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function formatActiveUsersRelativeTime(value) {
+    const date = value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) return '-';
+    const diffMins = Math.floor((Date.now() - date.getTime()) / 1000 / 60);
+    if (diffMins <= 0) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+}
+
+function initActiveUsersPreviewModal() {
+    const modal = document.getElementById('activeUsersPreviewModal');
+    if (!modal) return;
+
+    const loadingEl = document.getElementById('activeUsersPreviewLoading');
+    const errorEl = document.getElementById('activeUsersPreviewError');
+    const contentEl = document.getElementById('activeUsersPreviewContent');
+    const tableBody = document.getElementById('activeUsersPreviewTableBody');
+    const emptyEl = document.getElementById('activeUsersPreviewEmpty');
+    const footnoteEl = document.getElementById('activeUsersPreviewFootnote');
+
+    const statCount = document.getElementById('activeUsersStatCount');
+    const statSessions = document.getElementById('activeUsersStatSessions');
+    const statDailyAvg = document.getElementById('activeUsersStatDailyAvg');
+    const statDailyHint = document.getElementById('activeUsersStatDailyHint');
+    const statAvgIdle = document.getElementById('activeUsersStatAvgIdle');
+    const statAvgSessions = document.getElementById('activeUsersStatAvgSessions');
+    const statMultiSession = document.getElementById('activeUsersStatMultiSession');
+
+    function setLoading(isLoading) {
+        if (loadingEl) loadingEl.classList.toggle('d-none', !isLoading);
+        if (contentEl) contentEl.classList.toggle('d-none', isLoading);
+        if (errorEl) errorEl.classList.add('d-none');
+    }
+
+    function renderPreview(payload) {
+        const rows = Array.isArray(payload?.results) ? payload.results : [];
+        const summary = payload?.summary || {};
+        const totalUsers = Number(summary.activeUserCount || 0);
+
+        if (tableBody) {
+            if (!rows.length) {
+                tableBody.innerHTML = '';
+            } else {
+                tableBody.innerHTML = rows.map((row) => `
+                    <tr>
+                        <td class="ps-3">
+                            <div class="fw-semibold">${escapeActiveUsersHtml(row.displayName || row.username || row.userId)}</div>
+                            <div class="small text-muted">${escapeActiveUsersHtml(row.email || row.username || '-')}</div>
+                        </td>
+                        <td>
+                            <div class="small">${escapeActiveUsersHtml(formatActiveUsersRelativeTime(row.lastActivityAt))}</div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">${escapeActiveUsersHtml(row.sessionCount || 0)}</span>
+                        </td>
+                        <td class="pe-3 small text-muted">${escapeActiveUsersHtml(row.currentOrgId || '-')}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        if (emptyEl) emptyEl.classList.toggle('d-none', rows.length > 0);
+        if (statCount) statCount.textContent = String(summary.activeUserCount || 0);
+        if (statSessions) statSessions.textContent = String(summary.activeSessionCount || 0);
+        if (statDailyAvg) statDailyAvg.textContent = String(summary.avgDailyActiveUsers ?? 0);
+        if (statDailyHint) {
+            const days = Number(summary.lookbackDays || 7);
+            const sampled = Number(summary.sampledDays || 0);
+            statDailyHint.textContent = sampled
+                ? `Last ${days} days (${sampled} day${sampled === 1 ? '' : 's'} sampled)`
+                : `Last ${days} days`;
+        }
+        if (statAvgIdle) statAvgIdle.textContent = `${Number(summary.avgMinutesSinceLastActivity || 0)}m`;
+        if (statAvgSessions) statAvgSessions.textContent = String(summary.avgSessionsPerUser ?? 0);
+        if (statMultiSession) statMultiSession.textContent = String(summary.multiSessionUsers || 0);
+        if (footnoteEl) {
+            const showing = rows.length;
+            footnoteEl.textContent = showing < totalUsers
+                ? `Showing ${showing} of ${totalUsers} active users`
+                : `${totalUsers} active user${totalUsers === 1 ? '' : 's'} right now`;
+        }
+    }
+
+    async function loadPreview() {
+        setLoading(true);
+        try {
+            const response = await fetch('/security/active-users/data?preview=1&limit=12', {
+                headers: { 'x-ajax-request': 'true' }
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== 'success') {
+                throw new Error(payload.message || 'Failed to load active users.');
+            }
+            setLoading(false);
+            renderPreview(payload);
+        } catch (error) {
+            setLoading(false);
+            if (contentEl) contentEl.classList.add('d-none');
+            if (errorEl) {
+                errorEl.textContent = error.message || 'Failed to load active users.';
+                errorEl.classList.remove('d-none');
+            }
+        }
+    }
+
+    modal.addEventListener('show.bs.modal', () => {
+        loadPreview();
+    });
 }
 
 function initAppFontControls() {
@@ -3478,6 +3612,7 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(() => hideLoading({ force: true }), 2000);
     
     initAppZoomControls();
+    initActiveUsersPreviewModal();
     initAppFontControls();
     initAppPageWidthControls();
     initHeaderInteractions();

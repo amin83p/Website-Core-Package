@@ -49,6 +49,8 @@ const settingService = require('./MVC/services/settingService'); // Import Setti
 const appBrandingService = require('./MVC/services/appBrandingService');
 const smsProviderService = require('./MVC/services/sms/smsProviderService');
 const adminAuthorityService = require('./MVC/services/adminAuthorityService');
+const accessUiService = require('./MVC/services/security/accessUiService');
+const { SECTIONS, OPERATIONS } = require('./config/accessConstants');
 const { registerCoreEntityQueryExecutors } = require('./MVC/models/queryExecutorBootstrap');
 const dataBackendRuntimeService = require('./MVC/services/dataBackendRuntimeService');
 const dataBackendRecoveryMiddleware = require('./MVC/middleware/dataBackendRecoveryMiddleware');
@@ -231,7 +233,7 @@ app.use((req, res, next) => {
 app.use(softAuth); 
 app.use(dataBackendRecoveryMiddleware.exposeBackendStatus);
 app.use(chatAccessLocals);
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   res.locals.appBrand = appBrandingService.getBrand();
   res.locals.appContact = appBrandingService.getContact();
   res.locals.appContactPage = appBrandingService.getContactPage();
@@ -241,6 +243,17 @@ app.use((req, res, next) => {
   res.locals.canUseAdminAuthenticator = Boolean(
     req.user && adminAuthorityService.hasAnyAdminPrivilege(req.user)
   );
+  res.locals.canViewActiveUsers = false;
+  if (req.user) {
+    try {
+      res.locals.canViewActiveUsers = await accessUiService.canAccessTarget(req, {
+        sectionId: SECTIONS.ACTIVE_USERS,
+        operationId: OPERATIONS.READ_ALL
+      });
+    } catch (_) {
+      res.locals.canViewActiveUsers = false;
+    }
+  }
   next();
 });
 app.use(dataBackendRecoveryMiddleware.enforceRecoveryMode);
@@ -275,6 +288,7 @@ const accessPolicyRoutes = require('./MVC/routes/accessPolicyRoutes');
 const debugRoutes = require('./MVC/routes/debugRoutes');
 const actionStateRoutes = require('./MVC/routes/actionStateRoutes');
 const trackActivityRoutes = require('./MVC/routes/trackActivityRoutes');
+const activeUsersRoutes = require('./MVC/routes/activeUsersRoutes');
 const organizationPolicies = require('./MVC/routes/orgPolicyRoutes');
 const websitePolicyRoutes = require('./MVC/routes/websitePolicyRoutes');
 const symbolRoutes = require('./MVC/routes/symbolRoutes');
@@ -318,6 +332,7 @@ app.use('/accessPolicies', accessPolicyRoutes);
 app.use('/debug', debugRoutes);
 app.use('/actionStates', actionStateRoutes);
 app.use('/security', trackActivityRoutes);
+app.use('/security', activeUsersRoutes);
 app.use('/organizationPolicies', organizationPolicies);
 app.use('/symbols', symbolRoutes);
 app.use('/styles', styleRoutes);

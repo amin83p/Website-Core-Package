@@ -379,6 +379,20 @@
             >
                 <i class="bi bi-gear-fill" aria-hidden="true"></i>
             </button>
+
+            <% if (typeof canViewActiveUsers !== 'undefined' && canViewActiveUsers) { %>
+                <button
+                    type="button"
+                    id="activeUsersModalToggle"
+                    class="header-settings-toggle header-side-control-btn"
+                    aria-label="Open active users preview"
+                    data-bs-toggle="modal"
+                    data-bs-target="#activeUsersPreviewModal"
+                    title="Active users"
+                >
+                    <i class="bi bi-person-lines-fill" aria-hidden="true"></i>
+                </button>
+            <% } %>
         </div>
     </header>
 
@@ -619,3 +633,82 @@
             </div>
         </div>
     </div>
+
+    <% if (typeof canViewActiveUsers !== 'undefined' && canViewActiveUsers) { %>
+    <div class="modal fade" id="activeUsersPreviewModal" tabindex="-1" aria-labelledby="activeUsersPreviewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <div class="modal-header bg-light border-bottom">
+                    <h5 class="modal-title fw-bold text-dark" id="activeUsersPreviewModalLabel">
+                        <i class="bi bi-person-lines-fill me-2"></i>Active Users
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="activeUsersPreviewLoading" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <div class="mt-2 text-muted small">Loading active users...</div>
+                    </div>
+                    <div id="activeUsersPreviewError" class="alert alert-danger m-3 d-none" role="alert"></div>
+                    <div id="activeUsersPreviewContent" class="d-none">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-3">User</th>
+                                        <th>Last Activity</th>
+                                        <th class="text-center">Sessions</th>
+                                        <th class="pe-3">Org</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activeUsersPreviewTableBody"></tbody>
+                            </table>
+                        </div>
+                        <div id="activeUsersPreviewEmpty" class="text-center text-muted py-4 d-none">No active users right now.</div>
+                        <div class="border-top bg-light p-3">
+                            <div class="row g-2 text-center">
+                                <div class="col-6 col-md-3">
+                                    <div class="small text-muted text-uppercase">Active Users</div>
+                                    <div class="fw-bold fs-5" id="activeUsersStatCount">0</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="small text-muted text-uppercase">Active Sessions</div>
+                                    <div class="fw-bold fs-5" id="activeUsersStatSessions">0</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="small text-muted text-uppercase">Avg Daily Active</div>
+                                    <div class="fw-bold fs-5" id="activeUsersStatDailyAvg">0</div>
+                                    <div class="x-small text-muted" id="activeUsersStatDailyHint">Last 7 days</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="small text-muted text-uppercase">Avg Last Activity</div>
+                                    <div class="fw-bold fs-5" id="activeUsersStatAvgIdle">0m</div>
+                                    <div class="x-small text-muted">ago per user</div>
+                                </div>
+                            </div>
+                            <div class="row g-2 text-center mt-2">
+                                <div class="col-6">
+                                    <div class="small text-muted">Avg sessions per user</div>
+                                    <div class="fw-semibold" id="activeUsersStatAvgSessions">0</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="small text-muted">Users with multiple sessions</div>
+                                    <div class="fw-semibold" id="activeUsersStatMultiSession">0</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top justify-content-between">
+                    <span class="small text-muted" id="activeUsersPreviewFootnote"></span>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                        <a href="/security/active-users/" class="btn btn-primary btn-sm" id="activeUsersOpenFullPageBtn">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Open Active Users Page
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <% } %>

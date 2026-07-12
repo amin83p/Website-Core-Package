@@ -1098,6 +1098,9 @@
       },
       {
         "id": "851321"
+      },
+      {
+        "id": "862451"
       }
     ],
     "trackState": false
@@ -2086,6 +2089,37 @@
       },
       {
         "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "related": [],
+    "subsections": [],
+    "trackState": true
+  },
+  {
+    "id": "862451",
+    "active": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-07-12T17:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-07-12T17:00:00.000Z"
+    },
+    "category": "LOGGING",
+    "dashboardDisplay": true,
+    "description": "View users with active auth sessions and their last activity time.",
+    "homeURL": "/security/active-users/",
+    "inactiveMessage": "",
+    "mainDashboardDisplay": false,
+    "message": "",
+    "minimumAccessRequirement": 8,
+    "name": "ACTIVE_USERS",
+    "navigatorSection": false,
+    "operations": [
+      {
+        "id": "OP1003",
         "sessionAttempts": 5,
         "sessionTime": 15,
         "active": true

@@ -787,6 +787,23 @@
     }
   },
   {
+    "id": "SYM_SYSTEM_122",
+    "name": "ACTIVE_USERS",
+    "orgId": "SYSTEM",
+    "tags": [
+      "ACTIVE_USERS",
+      "862451"
+    ],
+    "type": "class",
+    "value": "bi bi-person-lines-fill",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-07-12T17:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-07-12T17:00:00.000Z"
+    }
+  },
+  {
     "id": "SYM_SYSTEM_120",
     "name": "SYSTEM_PACKAGE_MANAGER",
     "type": "class",
