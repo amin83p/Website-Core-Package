@@ -1,7 +1,8 @@
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { requireCoreModule, resolveCoreRoot } = require('./schoolCoreContracts');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { resolveCoreRoot } = require('./schoolCoreModuleResolver');
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');

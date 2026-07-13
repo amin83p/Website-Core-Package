@@ -146,7 +146,7 @@ router.get('/edit-wizard/:id',
 
 router.get('/storage-integrity',
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.READ_ALL, { keepActive: true }),
+  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE, { keepActive: true }),
   classCtrl.showClassStorageIntegrityPage);
 
 router.get('/api/storage-integrity/scan',
@@ -155,7 +155,7 @@ router.get('/api/storage-integrity/scan',
 
 router.post('/api/storage-integrity/apply',
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE, { requireToken: true, keepActive: true }),
   classCtrl.postClassStorageIntegrityApplyApi);
 
 router.get('/:id/rolling-enrollment',

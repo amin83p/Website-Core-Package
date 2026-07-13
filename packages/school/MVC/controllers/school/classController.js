@@ -2747,13 +2747,13 @@ async function getDeletePreparationApi(req, res) {
 async function showClassStorageIntegrityPage(req, res) {
   try {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(activeOrgId, req.user);
     res.render('school/class/classStorageIntegrity', {
       title: 'Class Storage & Integrity',
-      scan,
+      scan: null,
       orgId: activeOrgId,
       user: req.user,
-      actionStateId: req.actionStateId
+      actionStateId: req.actionStateId,
+      includeModal: true
     });
   } catch (error) {
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });

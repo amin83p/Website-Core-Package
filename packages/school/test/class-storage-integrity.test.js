@@ -43,6 +43,8 @@ test('class routes expose storage integrity endpoints', () => {
   assert.match(routes, /showClassStorageIntegrityPage/);
   assert.match(routes, /getClassStorageIntegrityScanApi/);
   assert.match(routes, /postClassStorageIntegrityApplyApi/);
+  assert.match(routes, /\/storage-integrity'[\s\S]*trackActionState\(SECTIONS\.SCHOOL_CLASSES,\s*OPERATIONS\.UPDATE,\s*\{\s*keepActive:\s*true\s*\}\)/);
+  assert.match(routes, /\/api\/storage-integrity\/apply'[\s\S]*trackActionState\(SECTIONS\.SCHOOL_CLASSES,\s*OPERATIONS\.UPDATE,\s*\{\s*requireToken:\s*true,\s*keepActive:\s*true\s*\}\)/);
 });
 
 test('classes list includes Storage & Integrity maintenance button', () => {
@@ -50,6 +52,32 @@ test('classes list includes Storage & Integrity maintenance button', () => {
   assert.match(view, /Storage\s*&(?:amp;)?\s*Integrity/);
   assert.match(view, /\/school\/classes\/storage-integrity/);
   assert.match(view, /btn-outline-warning/);
+});
+
+test('storage integrity page uses message modals and loading overlay for scan/apply', () => {
+  const view = read('MVC/views/school/class/classStorageIntegrity.ejs');
+  const controller = read('MVC/controllers/school/classController.js');
+  assert.match(view, /showMessageModal/);
+  assert.match(view, /showLoading/);
+  assert.match(view, /applyGuardedApiResult/);
+  assert.match(view, /actionStateId/);
+  assert.match(view, /confirmAction/);
+  assert.match(view, /No scan has been run yet/);
+  assert.match(view, /renderScanResults/);
+  assert.match(view, /\/api\/storage-integrity\/scan/);
+  assert.doesNotMatch(view, /integrityFeedback/);
+  assert.doesNotMatch(view, /window\.alert/);
+  assert.doesNotMatch(view, /window\.confirm/);
+  assert.doesNotMatch(view, /location\.assign\('\/school\/classes\/storage-integrity/);
+  assert.match(controller, /classStorageIntegrity[\s\S]*includeModal:\s*true/);
+});
+
+test('storage integrity page load skips scan until user requests it', () => {
+  const controller = read('MVC/controllers/school/classController.js');
+  const pageHandler = controller.match(/async function showClassStorageIntegrityPage[\s\S]*?^}/m);
+  assert.ok(pageHandler, 'showClassStorageIntegrityPage should exist');
+  assert.match(pageHandler[0], /scan:\s*null/);
+  assert.doesNotMatch(pageHandler[0], /scanClassStorageIntegrity/);
 });
 
 test('scanClassStorageIntegrity detects orphan folder when class row is missing', async () => {
