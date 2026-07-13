@@ -60,9 +60,14 @@
             <button type="button" class="btn btn-danger btn-sm" id="btnRollbackRegistration">
               <i class="bi bi-arrow-counterclockwise me-1"></i><%= isDraftRecord ? 'Cancel Draft' : 'Move Registration Back to Draft' %>
             </button>
-          <% } else if (canManageRegistrations && registration.termRegistrationsCount) { %>
+          <% } else if (canManageRegistrations && !registration.canRollback && ['registered', 'draft', 'error'].includes(String(registration.status || '').toLowerCase()) && (registration.termRegistrationsCount || registration.classEnrollmentsCount)) { %>
+            <% const rollbackBlockers = []; %>
+            <% if (registration.termRegistrationsCount) rollbackBlockers.push('term registrations'); %>
+            <% if (registration.classEnrollmentsCount) rollbackBlockers.push('class enrollments'); %>
             <div class="alert alert-warning py-2 small mb-0">
-              Move back to draft is blocked because this program registration has term registrations. Move the term registrations back to draft first.
+              Move back to draft is blocked because this program registration has <%= rollbackBlockers.join(' and ') %>.
+              <% if (registration.termRegistrationsCount) { %> Move the term registrations back to draft first.<% } %>
+              <% if (registration.classEnrollmentsCount) { %> Withdraw or rollback class enrollments under this program first.<% } %>
             </div>
           <% } %>
         </div>

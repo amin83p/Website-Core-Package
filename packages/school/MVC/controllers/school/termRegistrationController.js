@@ -1785,7 +1785,15 @@ exports.rollbackRegistration = async (req, res) => {
     const registration = await registrationIntegrityService.getTermRegistrationInOrgOrThrow(registrationId, activeOrgId);
     const currentStatus = String(registration.status || '').toLowerCase();
     if (currentStatus === 'draft') {
-      const payloadOut = { status: 'success', message: 'Registration is already in draft.' };
+      await registrationIntegrityService.deleteDraftTermRegistration(registrationId, {
+        reqUser: req.user,
+        activeOrgId
+      });
+      const payloadOut = {
+        status: 'success',
+        message: 'Draft term registration deleted.',
+        redirectTo: '/school/programs/term-registrations'
+      };
       idempotencyGuardService.completeGuard(guardKey, payloadOut);
       return res.json(payloadOut);
     }
@@ -1822,6 +1830,7 @@ exports.rollbackRegistration = async (req, res) => {
         transactionSummary: {
           ...(registration.transactionSummary || {}),
           postedCount: 0,
+          transactionIds: [],
           approvedAt: '',
           approvedBy: '',
           lastRollbackAt: new Date().toISOString(),
@@ -1833,6 +1842,7 @@ exports.rollbackRegistration = async (req, res) => {
         academicSummary: {
           ...(registration.academicSummary || {}),
           entryCount: 0,
+          entryIds: [],
           voidedEntryIds: Array.from(new Set([
             ...asIdArray(registration?.academicSummary?.voidedEntryIds),
             ...rollbackResult.voidedEntryIds

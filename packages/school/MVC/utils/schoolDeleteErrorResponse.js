@@ -1,9 +1,15 @@
 const { requireCoreModule } = require('../services/school/schoolCoreContracts');
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
+const {
+  isDeleteBlockedError: isGuardDeleteBlockedError
+} = require('../services/school/schoolDeletionGuardService');
 
 const DELETE_BLOCKED_CODE = 'DELETE_BLOCKED';
 
 function isDeleteBlockedError(error) {
+  if (isGuardDeleteBlockedError(error)) {
+    return Boolean(error.preview);
+  }
   return Boolean(error && error.code === DELETE_BLOCKED_CODE && error.preview);
 }
 

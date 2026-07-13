@@ -237,7 +237,7 @@
                 <% (recentRegistrations || []).forEach(function (row) { %>
                   <tr>
                     <td><div class="fw-bold"><a href="/school/programs/term-registrations/<%= encodeURIComponent(row.id) %>"><%= row.id %></a></div><div class="small text-muted"><%= row.registrationDate || '-' %></div></td>
-                    <td><div class="fw-bold"><%- include('../../partials/studentNameLink', { name: row.studentName || row.studentId, studentRecordId: row.studentRecordId || row.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div><div class="small text-muted font-monospace"><%= row.studentId || '-' %></div></td>
+                    <td><div class="fw-bold"><%- include('../partials/studentNameLink', { name: row.studentName || row.studentId, studentRecordId: row.studentRecordId || row.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div><div class="small text-muted font-monospace"><%= row.studentId || '-' %></div></td>
                     <td><div class="fw-bold"><%= row.programLabel || row.programId %></div><div class="small text-muted"><%= row.termLabel || row.termId %></div></td>
                     <td><%= Number(row.selectedCredits || 0).toFixed(2) %> / <%= row.classCount || 0 %> classes</td>
                     <td>Posted <strong><%= row.finance.posted %></strong> / <%= row.finance.expected %></td>
@@ -249,9 +249,14 @@
                           <i class="bi bi-check2-circle me-1"></i>Approve & Post
                         </button>
                       <% } %>
+                      <% if (canManageRegistrations && row.canDeleteDraft) { %>
+                        <button type="button" class="btn btn-outline-danger btn-sm me-1" data-delete-term-registration="<%= row.id %>" data-delete-term-student="<%= row.studentName || row.studentId %>">
+                          <i class="bi bi-trash me-1"></i>Delete Draft
+                        </button>
+                      <% } %>
                       <% if (canManageRegistrations && row.canRollback) { %>
                         <button type="button" class="btn btn-outline-danger btn-sm" data-rollback-term-registration="<%= row.id %>" data-rollback-term-student="<%= row.studentName || row.studentId %>" data-rollback-term-status="<%= String(row.status || '').toLowerCase() %>">
-                          <i class="bi bi-arrow-counterclockwise me-1"></i><%= String(row.status || '').toLowerCase() === 'draft' ? 'Cancel Draft' : 'Rollback' %>
+                          <i class="bi bi-arrow-counterclockwise me-1"></i>Rollback
                         </button>
                       <% } %>
                     </td>
@@ -1023,36 +1028,97 @@
     });
   });
 
-  document.querySelectorAll('button[data-rollback-term-registration]').forEach(function (btn) {
+  document.querySelectorAll('button[data-delete-term-registration]').forEach(function (btn) {
     btn.addEventListener('click', async function () {
-      const registrationId = String(btn.getAttribute('data-rollback-term-registration') || '').trim();
-      const studentName = String(btn.getAttribute('data-rollback-term-student') || registrationId).trim();
-      const status = String(btn.getAttribute('data-rollback-term-status') || '').toLowerCase();
-      const isDraft = status === 'draft';
+      const registrationId = String(btn.getAttribute('data-delete-term-registration') || '').trim();
+      const studentName = String(btn.getAttribute('data-delete-term-student') || registrationId).trim();
       if (!registrationId) return;
 
       let confirmed = false;
       if (typeof window.showMessageModal === 'function') {
         const result = await window.showMessageModal({
-          title: isDraft ? 'Cancel Draft Term Registration?' : 'Rollback Term Registration?',
+          title: 'Delete Draft Term Registration?',
           icon: 'warning',
-          message: (isDraft ? 'Cancel draft registration for <b>' : 'Rollback registration for <b>') + escapeHtml(studentName) + '</b>?',
+          message: 'Permanently delete draft registration for <b>' + escapeHtml(studentName) + '</b>?<br><br>This will permanently delete the draft registration.',
           buttons: [
             { text: 'Cancel', class: 'btn-secondary' },
-            { text: isDraft ? 'Cancel Draft' : 'Rollback', class: 'btn-danger' }
+            { text: 'Delete Draft', class: 'btn-danger' }
           ]
         });
-        confirmed = result === (isDraft ? 'Cancel Draft' : 'Rollback');
+        confirmed = result === 'Delete Draft';
       } else {
-        confirmed = window.confirm((isDraft ? 'Cancel draft registration for ' : 'Rollback registration for ') + studentName + '?');
+        confirmed = window.confirm('Permanently delete draft registration for ' + studentName + '?');
       }
       if (!confirmed) return;
 
       const original = btn.innerHTML;
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + (isDraft ? 'Cancelling...' : 'Rolling back...');
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Deleting...';
       try {
-        const body = new URLSearchParams({ note: isDraft ? 'Draft cancelled from Term Registration page' : 'Manual rollback from Term Registration page' });
+        const body = new URLSearchParams({ note: 'Draft deleted from Term Registration page' });
+        const response = await fetch('/school/programs/register-terms/rollback/' + encodeURIComponent(registrationId), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: body.toString()
+        });
+        const result = await response.json();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Delete Draft In Progress', replayTitle: 'Delete Draft Already Processed' })
+          : { stop: false };
+        if (guarded.stop) return;
+        if (result.status === 'error') throw new Error(result.message || 'Delete draft failed.');
+        await showMsg({
+          title: 'Draft Deleted',
+          icon: 'success',
+          message: result.message || 'Draft term registration deleted.',
+          buttons: [{ text: 'OK', class: 'btn-success' }]
+        });
+        window.location.reload();
+      } catch (error) {
+        await showMsg({
+          title: 'Delete Draft Error',
+          icon: 'error',
+          message: error.message || 'Delete draft failed.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    });
+  });
+
+  document.querySelectorAll('button[data-rollback-term-registration]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const registrationId = String(btn.getAttribute('data-rollback-term-registration') || '').trim();
+      const studentName = String(btn.getAttribute('data-rollback-term-student') || registrationId).trim();
+      if (!registrationId) return;
+
+      let confirmed = false;
+      if (typeof window.showMessageModal === 'function') {
+        const result = await window.showMessageModal({
+          title: 'Rollback Term Registration?',
+          icon: 'warning',
+          message: 'Rollback registration for <b>' + escapeHtml(studentName) + '</b>?',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Rollback', class: 'btn-danger' }
+          ]
+        });
+        confirmed = result === 'Rollback';
+      } else {
+        confirmed = window.confirm('Rollback registration for ' + studentName + '?');
+      }
+      if (!confirmed) return;
+
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Rolling back...';
+      try {
+        const body = new URLSearchParams({ note: 'Manual rollback from Term Registration page' });
         const response = await fetch('/school/programs/register-terms/rollback/' + encodeURIComponent(registrationId), {
           method: 'POST',
           headers: {

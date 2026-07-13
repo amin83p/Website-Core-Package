@@ -144,6 +144,20 @@ router.get('/edit-wizard/:id',
   trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
   classCtrl.showEditWizardForm);
 
+router.get('/storage-integrity',
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.READ_ALL, { keepActive: true }),
+  classCtrl.showClassStorageIntegrityPage);
+
+router.get('/api/storage-integrity/scan',
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.READ_ALL),
+  classCtrl.getClassStorageIntegrityScanApi);
+
+router.post('/api/storage-integrity/apply',
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE, { requireToken: true }),
+  classCtrl.postClassStorageIntegrityApplyApi);
+
 router.get('/:id/rolling-enrollment',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, { keepActive: true }),
@@ -153,6 +167,39 @@ router.get('/:id/cycle-rollover',
   requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, { keepActive: true }),
   rollingCtrl.showCycleRolloverWizard);
+
+router.get('/:id/resolve-cycle-links',
+  requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, { keepActive: true }),
+  classCtrl.showResolveCycleLinksPage);
+
+router.get('/:id/delete-preparation',
+  requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, { keepActive: true }),
+  classCtrl.showDeletePreparationPage);
+
+router.get('/api/:id/delete-preparation',
+  requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.READ_ALL),
+  classCtrl.getDeletePreparationApi);
+
+router.post('/api/:id/delete-preparation/enrollments/:periodId/delete',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.DELETE, rollingEnrollmentMutationActionState),
+  rollingCtrl.removeOrRollbackClassEnrollmentPeriodFromPreparation);
+
+router.get('/api/:id/cycle-link-blockers',
+  requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.READ_ALL),
+  classCtrl.getCycleLinkBlockersApi);
+
+router.post('/api/:id/cycle-link-blockers/unlink',
+  requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  classCtrl.unlinkCycleLinkApi);
+
+router.post('/api/:id/cycle-link-blockers/unlink-all',
+  requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  classCtrl.unlinkAllCycleLinksApi);
 
 router.get('/:id/final-grades',
   requireAnyOfAccess([

@@ -2219,6 +2219,136 @@ a .spinner-border.spinner-border-sm,
   border-width: 0.14rem;
 }
 
+/* Delete-blocked modal preview (renderDeleteBlockedPreview in main.js) */
+.delete-blocked-modal-preview {
+  --delete-modal-ink: #0f172a;
+  --delete-modal-muted: #64748b;
+  --delete-modal-line: #dbe3ef;
+  --delete-modal-card: #ffffff;
+  --delete-modal-index-bg: #1d4ed8;
+  --delete-modal-index-text: #ffffff;
+  --delete-modal-count-bg: #e2e8f0;
+  --delete-modal-count-text: #334155;
+  --delete-modal-accent: #ea580c;
+  --delete-modal-hint-bg: #eff6ff;
+  --delete-modal-hint-text: #1e3a8a;
+  --delete-modal-hint-icon: #2563eb;
+  color: var(--delete-modal-ink);
+}
+
+.delete-blocked-modal-preview > p {
+  line-height: 1.55;
+  color: var(--delete-modal-ink);
+}
+
+.delete-blocked-modal-section-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--delete-modal-muted);
+  margin-bottom: 0.65rem;
+}
+
+.delete-blocked-modal-item {
+  border: 1px solid var(--delete-modal-line);
+  border-left: 4px solid var(--delete-modal-accent);
+  border-radius: 0.9rem;
+  background: var(--delete-modal-card);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+  padding: 0.95rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.delete-blocked-modal-item-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.7rem;
+  margin-bottom: 0.35rem;
+}
+
+.delete-blocked-modal-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: var(--delete-modal-index-bg);
+  color: var(--delete-modal-index-text);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.delete-blocked-modal-label {
+  color: var(--delete-modal-ink);
+  font-size: 1rem;
+}
+
+.delete-blocked-modal-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: var(--delete-modal-count-bg);
+  color: var(--delete-modal-count-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.delete-blocked-modal-hint {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  margin-top: 0.55rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.75rem;
+  background: var(--delete-modal-hint-bg);
+  color: var(--delete-modal-hint-text);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.delete-blocked-modal-hint i {
+  color: var(--delete-modal-hint-icon);
+  margin-top: 0.12rem;
+}
+
+.delete-blocked-modal-samples {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.65rem 0 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.delete-blocked-modal-sample {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--delete-modal-line);
+  border-radius: 0.7rem;
+  background: #f8fafc;
+}
+
+.delete-blocked-modal-sample a {
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.delete-blocked-modal-sample a:hover {
+  color: #1e40af;
+  text-decoration: underline;
+}
+
+.delete-blocked-modal-sample-muted {
+  color: var(--delete-modal-muted);
+  font-style: italic;
+  background: #f1f5f9;
+}
+
 /* Make the header a drag handle */
 #tableSearchModal .modal-header {
   cursor: move;

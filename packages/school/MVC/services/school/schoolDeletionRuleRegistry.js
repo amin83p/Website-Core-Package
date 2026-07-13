@@ -4,6 +4,8 @@
 const schoolDataService = require('./schoolDataService');
 const schoolDependencyService = require('./schoolDependencyService');
 const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
+const classCycleLinkResolutionService = require('./classCycleLinkResolutionService');
+const classDeletePreparationHrefs = require('./classDeletePreparationHrefs');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -15,6 +17,10 @@ const SECTION_HREFS = Object.freeze({
   subjects: (id) => `/school/subjects/edit/${encodeURIComponent(id)}`,
   terms: (id) => `/school/terms/edit/${encodeURIComponent(id)}`,
   classes: (id) => `/school/classes/edit/${encodeURIComponent(id)}`,
+  resolveCycleLinks: (targetClassId, referringClassId = '') =>
+    classDeletePreparationHrefs.buildDeletePreparationHref(targetClassId, referringClassId, 'delete'),
+  deletePreparation: (targetClassId, focusClassId = '') =>
+    classDeletePreparationHrefs.buildDeletePreparationHref(targetClassId, focusClassId, 'delete'),
   sessions: (classId, sessionId) => `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`,
   reports: {
     template: (id) => `/school/reports/templates/edit/${encodeURIComponent(id)}`,
@@ -43,7 +49,15 @@ const SECTION_HREFS = Object.freeze({
     assignment: (id) => `/school/exams/assignments/${encodeURIComponent(id)}`
   },
   withdrawals: (id) => `/school/withdrawal/${encodeURIComponent(id)}`,
-  academicLedger: (id) => `/school/academic-ledger/${encodeURIComponent(id)}`,
+  academicLedger: (row = {}) => {
+    const studentId = toPublicId(row?.studentId);
+    if (studentId) {
+      const programId = toPublicId(row?.programId);
+      const base = `/school/academic-ledger/student/${encodeURIComponent(studentId)}`;
+      return programId ? `${base}?programId=${encodeURIComponent(programId)}` : base;
+    }
+    return '/school/academic-ledger';
+  },
   cases: (classId, sessionId) => `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}/cases`,
   leaveRequests: (id) => `/school/leave-requests/${encodeURIComponent(id)}`,
   students: (id) => `/school/students/edit/${encodeURIComponent(id)}`,
@@ -92,7 +106,9 @@ function buildBlocker({
   resolveHint,
   section,
   severity = 'error',
-  childPolicy = ''
+  childPolicy = '',
+  actionHref = '',
+  actionLabel = ''
 }) {
   if (!count) return null;
   return {
@@ -103,7 +119,9 @@ function buildBlocker({
     count,
     samples,
     resolveHint: resolveHint || `Remove or update these ${label.toLowerCase()} references first.`,
-    section: section || 'general'
+    section: section || 'general',
+    actionHref: sanitizeSampleHref(actionHref),
+    actionLabel: String(actionLabel || '').trim() || undefined
   };
 }
 
@@ -111,8 +129,26 @@ function samplesFromRows(rows = [], labelFn, hrefFn) {
   return rows.slice(0, MAX_SAMPLES).map((row) => ({
     id: recordId(row),
     label: typeof labelFn === 'function' ? labelFn(row) : recordLabel(row),
-    href: typeof hrefFn === 'function' ? hrefFn(row) : ''
+    href: sanitizeSampleHref(typeof hrefFn === 'function' ? hrefFn(row) : '')
   })).filter((row) => row.id || row.label);
+}
+
+function sectionHrefUsesRow(fn) {
+  if (typeof fn !== 'function') return false;
+  return /\(\s*row\b/.test(Function.prototype.toString.call(fn));
+}
+
+function sanitizeSampleHref(href = '') {
+  const value = String(href || '').trim();
+  if (!value) return '';
+  if (value.includes('[object Object]') || value.includes('%5Bobject%20Object%5D')) return '';
+  return value;
+}
+
+function resolveSectionHref(sectionHref, row) {
+  if (typeof sectionHref !== 'function') return '';
+  const href = sectionHrefUsesRow(sectionHref) ? sectionHref(row) : sectionHref(recordId(row));
+  return sanitizeSampleHref(href);
 }
 
 async function fetchScoped(entityType, field, targetId, orgId, reqUser) {
@@ -123,10 +159,16 @@ async function fetchScoped(entityType, field, targetId, orgId, reqUser) {
 }
 
 async function scanFieldMatch(rule, targetId, orgId, reqUser) {
-  const rows = await fetchScoped(rule.entityType, rule.field, targetId, orgId, reqUser);
+  let rows = await fetchScoped(rule.entityType, rule.field, targetId, orgId, reqUser);
+  if (rule.entityType === 'academicLedger') {
+    rows = rows.filter((row) => String(row?.status || '').trim().toLowerCase() !== 'void');
+  }
   if (!rows.length) return null;
   const hrefFn = rule.href
-    || ((row) => (typeof rule.sectionHref === 'function' ? rule.sectionHref(row) : ''));
+    || ((row) => resolveSectionHref(rule.sectionHref, row));
+  const resolvedActionHref = typeof rule.actionHref === 'function'
+    ? sanitizeSampleHref(rule.actionHref({ id: toPublicId(targetId) }))
+    : sanitizeSampleHref(rule.actionHref);
   return buildBlocker({
     code: rule.code,
     label: rule.label,
@@ -135,7 +177,56 @@ async function scanFieldMatch(rule, targetId, orgId, reqUser) {
     resolveHint: rule.resolveHint,
     section: rule.section,
     severity: rule.severity,
-    childPolicy: rule.childPolicy
+    childPolicy: rule.childPolicy,
+    actionHref: resolvedActionHref,
+    actionLabel: rule.actionLabel
+  });
+}
+
+const CYCLE_LINK_RESOLVE_HINT = 'Open delete preparation to remove downstream cycles, enrollments, and locked-session blockers before deleting this class.';
+const DELETE_PREPARATION_ACTION_LABEL = 'Open delete preparation';
+
+async function scanClassDownstreamCycle(classId, reqUser, rule) {
+  const classRow = await schoolDataService.getDataById('classes', toPublicId(classId), reqUser);
+  if (!classRow) return null;
+  const nextClassId = toPublicId(classRow?.nextClassId);
+  if (!nextClassId) return null;
+  const nextClass = await schoolDataService.getDataById('classes', nextClassId, reqUser);
+  if (!nextClass) return null;
+
+  const normalizedTargetId = toPublicId(classId);
+  return buildBlocker({
+    code: rule.code,
+    label: rule.label,
+    count: 1,
+    samples: [{
+      id: nextClassId,
+      label: String(nextClass?.title || nextClass?.name || nextClassId).trim(),
+      href: SECTION_HREFS.classes(nextClassId)
+    }],
+    resolveHint: rule.resolveHint || 'Delete downstream cycles first (tail-first).',
+    section: rule.section || 'classes',
+    actionHref: SECTION_HREFS.deletePreparation(normalizedTargetId, nextClassId),
+    actionLabel: DELETE_PREPARATION_ACTION_LABEL
+  });
+}
+
+async function scanClassCycleLinkField(rule, targetId, orgId, reqUser) {
+  const rows = await fetchScoped(rule.entityType, rule.field, targetId, orgId, reqUser);
+  if (!rows.length) return null;
+  const normalizedTargetId = toPublicId(targetId);
+  const hrefFn = (row) => SECTION_HREFS.deletePreparation(normalizedTargetId, recordId(row));
+  return buildBlocker({
+    code: rule.code,
+    label: rule.label,
+    count: rows.length,
+    samples: samplesFromRows(rows, rule.sampleLabel, hrefFn),
+    resolveHint: rule.resolveHint || CYCLE_LINK_RESOLVE_HINT,
+    section: rule.section,
+    severity: rule.severity,
+    childPolicy: rule.childPolicy,
+    actionHref: SECTION_HREFS.deletePreparation(normalizedTargetId),
+    actionLabel: DELETE_PREPARATION_ACTION_LABEL
   });
 }
 
@@ -674,7 +765,7 @@ const ENTITY_DEFINITIONS = Object.freeze({
       { type: 'fieldMatch', code: 'TERM_REGISTRATION', entityType: 'studentTermRegistrations', field: 'programId', label: 'Student Term Registrations', section: 'registrations', childPolicy: 'immutable_child', resolveHint: 'Complete withdrawal workflows instead of deleting registrations.' },
       { type: 'fieldMatch', code: 'CLASS_ALLOWED_PROGRAM', entityType: 'classes', field: 'allowedProgramTerms.programId', label: 'Classes', section: 'classes', sectionHref: SECTION_HREFS.classes },
       { type: 'fieldMatch', code: 'ENROLLMENT_PERIOD', entityType: 'classEnrollmentPeriods', field: 'programId', label: 'Class Enrollment Periods', section: 'enrollments', sectionHref: SECTION_HREFS.enrollments },
-      { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'programId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: SECTION_HREFS.academicLedger, resolveHint: 'Academic ledger entries cannot be deleted. Void entries if corrections are required.' },
+      { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'programId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: (row) => SECTION_HREFS.academicLedger(row), resolveHint: 'Academic ledger entries cannot be deleted. Void entries if corrections are required.' },
       { type: 'fieldMatch', code: 'ACADEMIC_SNAPSHOT', entityType: 'academicSnapshots', field: 'programId', label: 'Academic Snapshots', section: 'academicLedger', childPolicy: 'immutable_child', resolveHint: 'Academic snapshots are derived records and cannot be removed directly.' },
       { type: 'fieldMatch', code: 'PRIOR_SUBJECT_CREDIT', entityType: 'studentProgramPriorSubjects', field: 'programId', label: 'Prior Subject Credits', section: 'registrations', sectionHref: (id) => `/school/students/prior-subjects/${encodeURIComponent(id)}` },
       { type: 'fieldMatch', code: 'GLOBAL_TRANSACTION', entityType: 'globalTransactions', field: 'party.programId', label: 'Global Transactions', section: 'transactions', childPolicy: 'immutable_child', resolveHint: 'Financial transactions are immutable. Use reversal or void workflows.' }
@@ -714,7 +805,7 @@ const ENTITY_DEFINITIONS = Object.freeze({
     labelFields: ['name', 'code', 'title'],
     fieldRules: [
       { type: 'fieldMatch', code: 'PRIOR_SUBJECT_CREDIT', entityType: 'studentProgramPriorSubjects', field: 'subjectId', label: 'Prior Subject Credits', section: 'registrations' },
-      { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'subjectId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: SECTION_HREFS.academicLedger },
+      { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'subjectId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: (row) => SECTION_HREFS.academicLedger(row) },
       { type: 'fieldMatch', code: 'ACADEMIC_SNAPSHOT', entityType: 'academicSnapshots', field: 'subjectId', label: 'Academic Snapshots', section: 'academicLedger', childPolicy: 'immutable_child' },
       { type: 'fieldMatch', code: 'EXAM_TEMPLATE', entityType: 'examTemplates', field: 'subjectId', label: 'Exam Templates', section: 'exams', sectionHref: (id) => `/school/exams/templates/edit/${encodeURIComponent(id)}` }
     ],
@@ -743,7 +834,7 @@ const ENTITY_DEFINITIONS = Object.freeze({
       { type: 'fieldMatch', code: 'TERM_REGISTRATION', entityType: 'studentTermRegistrations', field: 'termId', label: 'Student Term Registrations', section: 'registrations', childPolicy: 'immutable_child' },
       { type: 'fieldMatch', code: 'CLASS_ALLOWED_TERM', entityType: 'classes', field: 'allowedProgramTerms.termId', label: 'Classes', section: 'classes', sectionHref: SECTION_HREFS.classes },
       { type: 'fieldMatch', code: 'ENROLLMENT_PERIOD', entityType: 'classEnrollmentPeriods', field: 'termId', label: 'Class Enrollment Periods', section: 'enrollments', sectionHref: SECTION_HREFS.enrollments },
-      { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'termId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: SECTION_HREFS.academicLedger },
+      { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'termId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: (row) => SECTION_HREFS.academicLedger(row) },
       { type: 'fieldMatch', code: 'ACADEMIC_SNAPSHOT', entityType: 'academicSnapshots', field: 'termId', label: 'Academic Snapshots', section: 'academicLedger', childPolicy: 'immutable_child' }
     ],
     customScanners: [
@@ -777,15 +868,19 @@ const ENTITY_DEFINITIONS = Object.freeze({
     fieldRules: [
       { type: 'fieldMatch', code: 'REPORT_ASSIGNMENT', entityType: 'reportAssignments', field: 'classId', label: 'Report Assignments', section: 'reports', sectionHref: SECTION_HREFS.reports.assignment },
       { type: 'fieldMatch', code: 'REPORT_INSTANCE', entityType: 'reportInstances', field: 'classId', label: 'Report Instances', section: 'reports', sectionHref: SECTION_HREFS.reports.instance },
-      { type: 'fieldMatch', code: 'ENROLLMENT_PERIOD', entityType: 'classEnrollmentPeriods', field: 'classId', label: 'Class Enrollment Periods', section: 'enrollments', sectionHref: SECTION_HREFS.enrollments },
+      { type: 'fieldMatch', code: 'ENROLLMENT_PERIOD', entityType: 'classEnrollmentPeriods', field: 'classId', label: 'Class Enrollment Periods', section: 'enrollments', sectionHref: SECTION_HREFS.enrollments, resolveHint: 'Open delete preparation to remove enrollments before deleting this class.', actionHref: (ctx) => SECTION_HREFS.deletePreparation(ctx?.id), actionLabel: DELETE_PREPARATION_ACTION_LABEL },
       { type: 'fieldMatch', code: 'SESSION_CASE', entityType: 'sessionStudentCases', field: 'classId', label: 'Session Student Cases', section: 'cases', sectionHref: (row) => SECTION_HREFS.cases(row?.classId, row?.sessionId) },
       { type: 'fieldMatch', code: 'EXAM_ALLOCATION', entityType: 'examAllocations', field: 'classId', label: 'Exam Allocations', section: 'exams', sectionHref: SECTION_HREFS.exams.allocation },
       { type: 'fieldMatch', code: 'EXAM_ASSIGNMENT', entityType: 'examAssignments', field: 'classId', label: 'Exam Assignments', section: 'exams', sectionHref: SECTION_HREFS.exams.assignment },
-      { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'classId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: SECTION_HREFS.academicLedger },
-      { type: 'fieldMatch', code: 'CLASS_PREVIOUS', entityType: 'classes', field: 'previousClassId', label: 'Linked Next Classes', section: 'classes', sectionHref: SECTION_HREFS.classes },
-      { type: 'fieldMatch', code: 'CLASS_NEXT', entityType: 'classes', field: 'nextClassId', label: 'Linked Previous Classes', section: 'classes', sectionHref: SECTION_HREFS.classes }
+      { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'classId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: (row) => SECTION_HREFS.academicLedger(row) }
     ],
     customScanners: [
+      async (ctx) => scanClassDownstreamCycle(ctx.id, ctx.reqUser, {
+        code: 'CLASS_DOWNSTREAM_CYCLE',
+        label: 'Downstream rolling cycle',
+        section: 'classes',
+        resolveHint: 'Delete downstream cycles first (tail-first).'
+      }),
       async (ctx) => scanClassLockedSessions(ctx.id, ctx.reqUser, {
         code: 'TIMESHEET_LOCKED_SESSION',
         label: 'Timesheet-locked sessions'
@@ -1016,7 +1111,7 @@ const ENTITY_DEFINITIONS = Object.freeze({
       { type: 'fieldMatch', code: 'PROGRAM_REGISTRATION', entityType: 'studentProgramRegistrations', field: 'studentId', label: 'Student Program Registrations', section: 'registrations', childPolicy: 'immutable_child', resolveHint: 'Complete withdrawal workflows instead of deleting registrations.' },
       { type: 'fieldMatch', code: 'TERM_REGISTRATION', entityType: 'studentTermRegistrations', field: 'studentId', label: 'Student Term Registrations', section: 'registrations', childPolicy: 'immutable_child', resolveHint: 'Complete withdrawal workflows instead of deleting registrations.' },
       { type: 'fieldMatch', code: 'ENROLLMENT_PERIOD', entityType: 'classEnrollmentPeriods', field: 'studentId', label: 'Class Enrollment Periods', section: 'enrollments', sectionHref: SECTION_HREFS.enrollments },
-      { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'studentId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: SECTION_HREFS.academicLedger, resolveHint: 'Academic ledger entries cannot be deleted. Void entries if corrections are required.' },
+      { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'studentId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: (row) => SECTION_HREFS.academicLedger(row), resolveHint: 'Academic ledger entries cannot be deleted. Void entries if corrections are required.' },
       { type: 'fieldMatch', code: 'GLOBAL_TRANSACTION', entityType: 'globalTransactions', field: 'party.studentId', label: 'Global Transactions', section: 'transactions', childPolicy: 'immutable_child', resolveHint: 'Financial transactions are immutable. Use reversal or void workflows.' },
       { type: 'fieldMatch', code: 'REPORT_INSTANCE', entityType: 'reportInstances', field: 'studentId', label: 'Report Instances', section: 'reports', sectionHref: SECTION_HREFS.reports.instance },
       { type: 'fieldMatch', code: 'EXAM_ASSIGNMENT', entityType: 'examAssignments', field: 'studentId', label: 'Exam Assignments', section: 'exams', sectionHref: SECTION_HREFS.exams.assignment },
@@ -1333,5 +1428,7 @@ module.exports = {
   recordLabel,
   recordId,
   buildBlocker,
-  samplesFromRows
+  samplesFromRows,
+  resolveSectionHref,
+  sanitizeSampleHref
 };

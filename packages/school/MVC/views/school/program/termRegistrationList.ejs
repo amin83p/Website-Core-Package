@@ -99,9 +99,14 @@
                     <i class="bi bi-check2-circle me-2"></i>Approve & Post
                   </button>
                 <% } %>
+                <% if (canManageRegistrations && item.canDeleteDraft) { %>
+                  <button type="button" class="btn btn-danger btn-sm delete-draft-btn" data-id="<%= item.id %>" data-name="<%= item.studentName || item.studentId %>">
+                    <i class="bi bi-trash me-2"></i>Delete Draft
+                  </button>
+                <% } %>
                 <% if (canManageRegistrations && item.canRollback) { %>
                   <button type="button" class="btn btn-danger btn-sm rollback-btn" data-id="<%= item.id %>" data-name="<%= item.studentName || item.studentId %>" data-status="<%= String(item.status || '').toLowerCase() %>">
-                    <i class="bi bi-arrow-counterclockwise me-2"></i><%= String(item.status || '').toLowerCase() === 'draft' ? 'Cancel Draft' : 'Move Back to Draft' %>
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Move Back to Draft
                   </button>
                 <% } %>
               </div>
@@ -127,7 +132,8 @@
 
   const approveButtons = Array.from(document.querySelectorAll('.approve-btn'));
   const rollbackButtons = Array.from(document.querySelectorAll('.rollback-btn'));
-  const actionButtons = approveButtons.concat(rollbackButtons);
+  const deleteDraftButtons = Array.from(document.querySelectorAll('.delete-draft-btn'));
+  const actionButtons = approveButtons.concat(rollbackButtons, deleteDraftButtons);
   let actionInProgress = false;
 
   function setActionLock(isLocked, activeButton, loadingLabel) {
@@ -152,32 +158,90 @@
     }
   }
 
+  document.querySelectorAll('.delete-draft-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      if (actionInProgress) return;
+      const id = String(btn.getAttribute('data-id') || '').trim();
+      const name = String(btn.getAttribute('data-name') || id).trim();
+      if (!id) return;
+      const confirmed = typeof window.showMessageModal === 'function'
+        ? (await window.showMessageModal({
+            title: 'Delete Draft Term Registration?',
+            icon: 'warning',
+            message: 'Permanently delete draft registration for <b>' + String(name || '').replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; }) + '</b>?<br><br>This will permanently delete the draft registration.',
+            buttons: [
+              { text: 'Cancel', class: 'btn-secondary' },
+              { text: 'Delete Draft', class: 'btn-danger' }
+            ]
+          })) === 'Delete Draft'
+        : window.confirm('Permanently delete draft registration for ' + name + '?');
+      if (!confirmed) return;
+
+      const body = new URLSearchParams({ note: 'Draft deleted from Term Registrations list' });
+
+      try {
+        actionInProgress = true;
+        setActionLock(true, btn, 'Deleting...');
+        const response = await fetch('/school/programs/register-terms/rollback/' + encodeURIComponent(id), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: body.toString()
+        });
+        const result = await response.json();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Delete Draft In Progress', replayTitle: 'Delete Draft Already Processed' })
+          : { stop: false };
+        if (guarded.stop) return;
+        if (result.status === 'error') throw new Error(result.message || 'Delete draft failed.');
+        actionInProgress = false;
+        setActionLock(false, btn);
+        await showMsg({
+          title: 'Draft Deleted',
+          icon: 'success',
+          message: result.message || 'Draft term registration deleted.',
+          buttons: [{ text: 'OK', class: 'btn-success' }]
+        });
+        window.location.reload();
+      } catch (error) {
+        actionInProgress = false;
+        setActionLock(false, btn);
+        await showMsg({
+          title: 'Delete Draft Error',
+          icon: 'error',
+          message: error.message || 'Delete draft failed.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      }
+    });
+  });
+
   document.querySelectorAll('.rollback-btn').forEach(function (btn) {
     btn.addEventListener('click', async function () {
       if (actionInProgress) return;
       const id = String(btn.getAttribute('data-id') || '').trim();
       const name = String(btn.getAttribute('data-name') || id).trim();
-      const status = String(btn.getAttribute('data-status') || '').toLowerCase();
-      const isDraft = status === 'draft';
       if (!id) return;
       const confirmed = typeof window.showMessageModal === 'function'
         ? (await window.showMessageModal({
-            title: isDraft ? 'Cancel Draft Term Registration?' : 'Move Term Registration Back to Draft?',
+            title: 'Move Term Registration Back to Draft?',
             icon: 'warning',
-            message: (isDraft ? 'Cancel draft registration for <b>' : 'Move registration for <b>') + String(name || '').replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; }) + (isDraft ? '</b>?' : '</b> back to draft?'),
+            message: 'Move registration for <b>' + String(name || '').replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; }) + '</b> back to draft?',
             buttons: [
               { text: 'Cancel', class: 'btn-secondary' },
-              { text: isDraft ? 'Cancel Draft' : 'Move Back to Draft', class: 'btn-danger' }
+              { text: 'Move Back to Draft', class: 'btn-danger' }
             ]
-          })) === (isDraft ? 'Cancel Draft' : 'Move Back to Draft')
-        : window.confirm((isDraft ? 'Cancel draft registration for ' : 'Move registration for ') + name + (isDraft ? '?' : ' back to draft?'));
+          })) === 'Move Back to Draft'
+        : window.confirm('Move registration for ' + name + ' back to draft?');
       if (!confirmed) return;
 
-      const body = new URLSearchParams({ note: isDraft ? 'Draft cancelled from Term Registrations list' : 'Manual rollback from Term Registrations list' });
+      const body = new URLSearchParams({ note: 'Manual rollback from Term Registrations list' });
 
       try {
         actionInProgress = true;
-        setActionLock(true, btn, isDraft ? 'Cancelling...' : 'Moving back...');
+        setActionLock(true, btn, 'Moving back...');
         const response = await fetch('/school/programs/register-terms/rollback/' + encodeURIComponent(id), {
           method: 'POST',
           headers: {

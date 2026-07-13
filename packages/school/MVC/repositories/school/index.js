@@ -1413,6 +1413,22 @@ schoolRepositories.studentTermRegistrations.clearByOrg = async (orgId, options =
   }, 'school.studentTermRegistrations.clearByOrg');
 };
 
+schoolRepositories.studentTermRegistrations.deleteDraftRegistration = async (id, options = {}) => {
+  const normalizedId = toPublicId(id);
+  if (!normalizedId) throw new Error('Registration id is required.');
+  return runByRepositoryBackend(options, {
+    json: async () => studentTermRegistrationModel.deleteRegistration(normalizedId, options),
+    mongo: async () => {
+      const collection = getMongoCollection('schoolStudentTermRegistrations');
+      const result = await collection.deleteOne(resolveMongoIdFilter(normalizedId));
+      if (!Number(result?.deletedCount || 0)) {
+        throw new Error('Student term registration not found.');
+      }
+      return { id: normalizedId, deleted: true };
+    }
+  }, 'school.studentTermRegistrations.deleteDraftRegistration');
+};
+
 schoolRepositories.studentProgramPriorSubjects.clearByOrg = async (orgId, options = {}) => {
   const targetOrgId = toPublicId(orgId);
   if (!targetOrgId) throw new Error('orgId is required to clear prior subject credits.');
@@ -2144,6 +2160,38 @@ schoolRepositories.studentTermRegistrations.existsActiveByProgramRegistrationId 
   return (await schoolRepositories.studentTermRegistrations.countActiveByProgramRegistrationId(programRegistrationId, options)) > 0;
 };
 
+function isBlockingClassEnrollmentForProgramRollback(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  return !['withdrawn', 'cancelled', 'archived', 'error'].includes(normalized);
+}
+
+schoolRepositories.classEnrollmentPeriods.findBlockingByStudentAndProgram = async (studentId, programId, options = {}) => {
+  const normalizedStudentId = toPublicId(studentId);
+  const normalizedProgramId = toPublicId(programId);
+  if (!normalizedStudentId || !normalizedProgramId) return [];
+
+  const orgId = options?.orgId ? toPublicId(options.orgId) : '';
+  const limit = Number(options?.limit) > 0 ? Number(options.limit) : null;
+  const rows = await schoolRepositories.classEnrollmentPeriods.list({
+    query: {
+      studentId__eq: normalizedStudentId,
+      programId__eq: normalizedProgramId,
+      ...(orgId ? { orgId__eq: orgId } : {})
+    },
+    scope: { canViewAll: true }
+  });
+
+  const blockingRows = normalizeRows(rows).filter((row) => isBlockingClassEnrollmentForProgramRollback(row?.status));
+  return limit ? blockingRows.slice(0, limit) : blockingRows;
+};
+
+schoolRepositories.classEnrollmentPeriods.countBlockingByStudentAndProgram = async (studentId, programId, options = {}) => {
+  const rows = await schoolRepositories.classEnrollmentPeriods.findBlockingByStudentAndProgram(studentId, programId, options);
+  return rows.length;
+};
+
+schoolRepositories.isBlockingClassEnrollmentForProgramRollback = isBlockingClassEnrollmentForProgramRollback;
+
 assertQueryableCrudRepository('schoolRepositories.students', schoolRepositories.students);
 assertQueryableCrudRepository('schoolRepositories.programs', schoolRepositories.programs);
 assertQueryableCrudRepository('schoolRepositories.transactionDefinitions', schoolRepositories.transactionDefinitions);
@@ -2187,7 +2235,8 @@ module.exports = schoolRepositories;
 module.exports.__scopeTestHelpers = {
   isRecordVisibleUnderScope,
   applyOrgScope,
-  buildSchoolScopeFilter
+  buildSchoolScopeFilter,
+  isBlockingClassEnrollmentForProgramRollback
 };
 
 

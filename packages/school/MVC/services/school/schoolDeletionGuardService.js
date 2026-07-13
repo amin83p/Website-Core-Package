@@ -31,11 +31,14 @@ function buildPreviewMessage(preview = {}) {
   if (!blockers.length) {
     return `Cannot delete ${label} because related records exist.`;
   }
-  const items = blockers.map((blocker) => {
-    const hint = blocker.resolveHint ? ` ${blocker.resolveHint}` : '';
-    return `${blocker.label || blocker.message || blocker.code}: ${blocker.count || 0} reference(s).${hint}`;
+  const summary = `Cannot delete ${label}. ${blockers.length} blocking reference group${blockers.length === 1 ? '' : 's'}.`;
+  const lines = blockers.map((blocker, index) => {
+    const blockerLabel = String(blocker.label || blocker.code || 'Reference').trim();
+    const count = Number(blocker.count || 0);
+    const hint = blocker.resolveHint ? ` — ${blocker.resolveHint}` : '';
+    return `${index + 1}. ${blockerLabel}: ${count} reference${count === 1 ? '' : 's'}${hint}`;
   });
-  return `Cannot delete ${label}. Resolve these references first: ${items.join(' ')}`;
+  return [summary, ...lines].join('\n');
 }
 
 function buildRecordLabel(record = {}, def = {}, fallbackId = '') {

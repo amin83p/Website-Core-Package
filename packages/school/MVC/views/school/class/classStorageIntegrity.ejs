@@ -1,0 +1,286 @@
+<%
+  const scanData = (typeof scan !== 'undefined' && scan) ? scan : {};
+  const folders = scanData.folders || {};
+  const orphanDirs = Array.isArray(folders.orphanDirs) ? folders.orphanDirs : [];
+  const missingDirs = Array.isArray(folders.missingDirsForClasses) ? folders.missingDirsForClasses : [];
+  const stalePointers = Array.isArray(scanData.cycleLinks?.stalePointers) ? scanData.cycleLinks.stalePointers : [];
+  const ledgerOrphans = Array.isArray(scanData.ledger?.orphanEntries) ? scanData.ledger.orphanEntries : [];
+  const dbOrphans = scanData.dbOrphans || {};
+  const safeFix = scanData.safeFixPreview || {};
+  const totals = scanData.totals || {};
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const orgLabel = String(orgId || scanData.orgId || '').trim();
+%>
+
+<style>
+  .storage-integrity-page .severity-safe { color: #198754; }
+  .storage-integrity-page .severity-review { color: #6c757d; }
+  .storage-integrity-page .severity-rollback { color: #dc3545; }
+</style>
+
+<div class="sections-page storage-integrity-page">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-hdd-network me-2"></i>Class Storage &amp; Integrity</h1>
+      <div class="text-muted mt-1">Scan orphan folders and database references for the active organization.</div>
+      <div class="small text-muted font-monospace mt-1">Org: <%= orgLabel %></div>
+      <% if (scanData.scannedAt) { %>
+        <div class="small text-muted">Last scan: <%= scanData.scannedAt %></div>
+      <% } %>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="/school/classes" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Class Management</a>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="btnRefreshScan"><i class="bi bi-arrow-clockwise me-1"></i>Run Scan</button>
+      <button type="button" class="btn btn-warning btn-sm" id="btnApplySafeFixes" <%= Number(safeFix.folderCount || 0) + Number(safeFix.staleLinkCount || 0) + Number(safeFix.ledgerVoidCount || 0) ? '' : 'disabled' %>>
+        <i class="bi bi-shield-check me-1"></i>Apply Safe Fixes
+      </button>
+      <button type="button" class="btn btn-danger btn-sm" id="btnDeleteSelected" <%= Number(totals.selectableDeleteCount || 0) ? '' : 'disabled' %>>
+        <i class="bi bi-trash me-1"></i>Delete Selected
+      </button>
+    </div>
+  </div>
+
+  <div class="alert border <%= Number(totals.issueCount || 0) ? 'border-warning' : 'border-success' %>" role="status"
+       style="<%= Number(totals.issueCount || 0) ? 'background:rgba(255,193,7,0.08)' : 'background:rgba(25,135,84,0.08)' %>">
+    <% if (!Number(totals.issueCount || 0)) { %>
+      <div class="fw-semibold text-success"><i class="bi bi-check-circle me-1"></i>No integrity issues found for this organization.</div>
+    <% } else { %>
+      <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i><%= totals.issueCount %> issue(s) found across folders, links, ledger, and database references.</div>
+      <div class="small mb-0 mt-1">Safe fixes: <%= safeFix.folderCount || 0 %> folder(s), <%= safeFix.staleLinkCount || 0 %> stale link(s), <%= safeFix.ledgerVoidCount || 0 %> ledger row(s).</div>
+    <% } %>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom py-3 fw-bold">Orphan Folders (<%= orphanDirs.length %>)</div>
+    <div class="card-body p-0">
+      <% if (!orphanDirs.length) { %>
+        <div class="text-muted small p-3">No orphan class folders detected.</div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead class="table-light"><tr><th class="ps-3">Class ID</th><th>Source</th><th>Path</th><th class="pe-3">Note</th></tr></thead>
+            <tbody>
+              <% orphanDirs.forEach(function(row) { %>
+                <tr>
+                  <td class="ps-3 font-monospace small"><%= row.classId %></td>
+                  <td><%= row.source %></td>
+                  <td class="small"><%= row.path %></td>
+                  <td class="pe-3 small text-muted"><%= row.blockedByGlobalClass ? 'Blocked: class exists in another org' : 'Removable on safe fix' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom py-3 fw-bold">Stale Cycle Links (<%= stalePointers.length %>)</div>
+    <div class="card-body p-0">
+      <% if (!stalePointers.length) { %>
+        <div class="text-muted small p-3">No stale cycle pointers.</div>
+      <% } else { %>
+        <ul class="list-group list-group-flush">
+          <% stalePointers.forEach(function(row) { %>
+            <li class="list-group-item small">
+              <strong><%= row.classTitle || row.classId %></strong>:
+              <%= row.field %> → <span class="font-monospace"><%= row.pointsTo %></span> (missing)
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom py-3 fw-bold">Orphan Academic Ledger (class_enrolled) (<%= ledgerOrphans.length %>)</div>
+    <div class="card-body p-0">
+      <% if (!ledgerOrphans.length) { %>
+        <div class="text-muted small p-3">No orphan class_enrolled ledger rows.</div>
+      <% } else { %>
+        <ul class="list-group list-group-flush">
+          <% ledgerOrphans.forEach(function(row) { %>
+            <li class="list-group-item small font-monospace">
+              <%= row.entryId %> · class <%= row.classId %> · student <%= row.studentId || '?' %>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  </div>
+
+  <% Object.keys(dbOrphans).forEach(function(groupKey) {
+    const group = dbOrphans[groupKey] || {};
+    const rows = Array.isArray(group.rows) ? group.rows : [];
+  %>
+    <div class="card border-0 shadow-sm mb-4" data-orphan-group="<%= groupKey %>">
+      <div class="card-header bg-white border-bottom py-3 fw-bold"><%= group.label || groupKey %> (<%= group.count || 0 %>)</div>
+      <div class="card-body p-0">
+        <% if (!rows.length) { %>
+          <div class="text-muted small p-3">No orphan records.</div>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3" style="width:40px;"></th>
+                  <th>Record</th>
+                  <th>Class</th>
+                  <th>Severity</th>
+                  <th class="pe-3">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% rows.forEach(function(row) { %>
+                  <tr>
+                    <td class="ps-3">
+                      <% if (row.canSelect) { %>
+                        <input type="checkbox" class="form-check-input orphan-select" data-group="<%= groupKey %>" value="<%= row.id %>">
+                      <% } %>
+                    </td>
+                    <td>
+                      <% if (row.href) { %>
+                        <a href="<%= row.href %>" target="_blank" rel="noopener noreferrer"><%= row.label || row.id %></a>
+                      <% } else { %>
+                        <%= row.label || row.id %>
+                      <% } %>
+                      <div class="small text-muted font-monospace"><%= row.id %></div>
+                    </td>
+                    <td class="font-monospace small"><%= row.classId %></td>
+                    <td class="small severity-<%= row.severity === 'safe_draft_delete' ? 'safe' : (row.severity === 'needs_rollback' ? 'rollback' : 'review') %>"><%= row.severity %></td>
+                    <td class="pe-3 small text-muted"><%= row.blockReason || '' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  <% }) %>
+
+  <% if (missingDirs.length) { %>
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-bottom py-3 fw-bold">Live Classes Missing Workspace Folders (<%= missingDirs.length %>) — informational</div>
+      <div class="card-body">
+        <ul class="small mb-0">
+          <% missingDirs.forEach(function(row) { %>
+            <li><%= row.title || row.classId %> <span class="font-monospace text-muted">(<%= row.classId %>)</span></li>
+          <% }) %>
+        </ul>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="small text-muted" id="integrityFeedback"></div>
+</div>
+
+<script>
+(function () {
+  const actionStateId = '<%= asid %>';
+  const feedback = document.getElementById('integrityFeedback');
+
+  function buildHeaders() {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    };
+    if (actionStateId) headers['X-Action-State-Id'] = actionStateId;
+    return headers;
+  }
+
+  function collectSelected() {
+    const selected = {};
+    document.querySelectorAll('.orphan-select:checked').forEach((input) => {
+      const group = String(input.dataset.group || '').trim();
+      const id = String(input.value || '').trim();
+      if (!group || !id) return;
+      if (!selected[group]) selected[group] = [];
+      selected[group].push(id);
+    });
+    return selected;
+  }
+
+  async function refreshScan() {
+    const response = await fetch('/school/classes/api/storage-integrity/scan', {
+      method: 'GET',
+      headers: buildHeaders(),
+      credentials: 'same-origin'
+    });
+    const payload = await response.json();
+    if (!response.ok || payload.status === 'error') {
+      throw new Error(payload.message || 'Scan failed.');
+    }
+    window.location.reload();
+  }
+
+  async function applyMode(mode) {
+    const selected = mode === 'delete_selected' ? collectSelected() : {};
+    if (mode === 'delete_selected') {
+      const count = Object.values(selected).reduce((sum, rows) => sum + rows.length, 0);
+      if (!count) {
+        window.alert('Select at least one deletable orphan record.');
+        return;
+      }
+      if (!window.confirm('Delete ' + count + ' selected orphan record(s)? This cannot be undone.')) return;
+    } else if (!window.confirm('Apply safe fixes (orphan folders, stale cycle links, void orphan ledger rows)?')) {
+      return;
+    }
+
+    if (feedback) feedback.textContent = 'Applying...';
+    const response = await fetch('/school/classes/api/storage-integrity/apply', {
+      method: 'POST',
+      headers: buildHeaders(),
+      credentials: 'same-origin',
+      body: JSON.stringify({ mode, selected })
+    });
+    const payload = await response.json();
+    if (!response.ok || payload.status === 'error') {
+      throw new Error(payload.message || 'Apply failed.');
+    }
+    if (feedback) feedback.textContent = payload.message || 'Done.';
+    await refreshScan();
+  }
+
+  const btnRefresh = document.getElementById('btnRefreshScan');
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', async () => {
+      btnRefresh.disabled = true;
+      try {
+        await refreshScan();
+      } catch (error) {
+        if (feedback) feedback.textContent = error.message || 'Scan failed.';
+        btnRefresh.disabled = false;
+      }
+    });
+  }
+
+  const btnSafe = document.getElementById('btnApplySafeFixes');
+  if (btnSafe) {
+    btnSafe.addEventListener('click', async () => {
+      btnSafe.disabled = true;
+      try {
+        await applyMode('safe_fixes');
+      } catch (error) {
+        if (feedback) feedback.textContent = error.message || 'Apply failed.';
+        btnSafe.disabled = false;
+      }
+    });
+  }
+
+  const btnDelete = document.getElementById('btnDeleteSelected');
+  if (btnDelete) {
+    btnDelete.addEventListener('click', async () => {
+      btnDelete.disabled = true;
+      try {
+        await applyMode('delete_selected');
+      } catch (error) {
+        if (feedback) feedback.textContent = error.message || 'Delete failed.';
+        btnDelete.disabled = false;
+      }
+    });
+  }
+})();
+</script>

@@ -31,6 +31,7 @@ const idempotencyGuardService = require('../../services/school/idempotencyGuardS
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
+const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
@@ -46,6 +47,10 @@ const sessionReportAssignmentService = require('../../services/school/sessionRep
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const schoolRepositories = require('../../repositories/school');
+const classCycleLinkResolutionService = require('../../services/school/classCycleLinkResolutionService');
+const classDeletePreparationService = require('../../services/school/classDeletePreparationService');
+const classStorageIntegrityService = require('../../services/school/classStorageIntegrityService');
+const classFolderPaths = require('../../services/school/classFolderPaths');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { isRollingClassWorkflowEnabledForClass } = require('../../services/school/phase2FeatureFlagService');
 const {
@@ -102,59 +107,7 @@ async function deleteDirectoryIfExists(basePath, relativeSegments = []) {
 }
 
 async function cleanupClassRelatedFolders(classData) {
-    const classId = String(classData?.id || '').trim();
-    const orgId = String(classData?.orgId || '').trim();
-    if (!classId) return { removed: [], failed: [] };
-
-    const removed = [];
-    const failed = [];
-
-    const tryDelete = async (basePath, segments = []) => {
-        try {
-            const result = await deleteDirectoryIfExists(basePath, segments);
-            if (result.existed && result.removed) {
-                removed.push(result.path);
-            }
-        } catch (error) {
-            failed.push({
-                basePath,
-                segments: (Array.isArray(segments) ? segments : []).join('/'),
-                message: error?.message || String(error)
-            });
-        }
-    };
-
-    const classStorageBase = path.join(resolveCoreRoot(), 'data/school/classes_storage');
-    await tryDelete(classStorageBase, [classId]);
-
-    const storedWorkspace = String(classData?.uploadWorkspace?.relativePath || '').trim();
-    const configuredWorkspace = uploadFolderSettingsService.resolveUploadFolder('school.classWorkspace', { classId });
-    const defaultWorkspace = uploadFolderSettingsService.resolveDefaultUploadFolder('school.classWorkspace', { classId });
-    const workspaceTargets = [storedWorkspace, defaultWorkspace, configuredWorkspace].filter(Boolean);
-    const scopeKey = orgId || 'GLOBAL';
-    const uploadTargets = [
-        ...workspaceTargets.map((relativePath) => ({ scopeKey, relativePath })),
-        { scopeKey, relativePath: `classes/${classId}` },
-        { scopeKey, relativePath: `class/${classId}` }
-    ];
-
-    for (const target of uploadTargets.filter((target, index, list) => (
-        list.findIndex((item) => item.scopeKey === target.scopeKey && item.relativePath === target.relativePath) === index
-    ))) {
-        try {
-            // eslint-disable-next-line no-await-in-loop
-            const removedUpload = await fileAssetStorage.deleteRelativePath(target);
-            if (removedUpload) removed.push(`/uploads/${fileAssetStorage.scopeFolder(target.scopeKey)}/${target.relativePath}`);
-        } catch (error) {
-            failed.push({
-                basePath: `/uploads/${fileAssetStorage.scopeFolder(target.scopeKey)}`,
-                segments: target.relativePath,
-                message: error?.message || String(error)
-            });
-        }
-    }
-
-    return { removed, failed };
+    return classFolderPaths.deleteClassFolderTargets(classData);
 }
 
 function roundMoney(value) {
@@ -2744,6 +2697,173 @@ async function editClass(req, res) {
   }
 }
 
+async function showResolveCycleLinksPage(req, res) {
+  try {
+    const classId = String(req.params.id || '').trim();
+    await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    const returnTo = String(req.query?.returnTo || 'delete').trim();
+    const focusClassId = toPublicId(req.query?.highlight || req.query?.focus || '');
+    const href = classDeletePreparationService.buildDeletePreparationHref(classId, focusClassId, returnTo);
+    return res.redirect(href);
+  } catch (error) {
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+}
+
+async function showDeletePreparationPage(req, res) {
+  try {
+    const classId = String(req.params.id || '').trim();
+    await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    const plan = await classDeletePreparationService.buildDeletePreparationPlan(classId, req.user);
+    const returnTo = String(req.query?.returnTo || 'delete').trim();
+    const focusClassId = toPublicId(req.query?.focus || '');
+
+    res.render('school/class/classDeletePreparation', {
+      title: `Delete Preparation: ${plan.targetClass?.title || classId}`,
+      plan,
+      returnTo,
+      focusClassId,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+}
+
+async function getDeletePreparationApi(req, res) {
+  try {
+    const classId = String(req.params.id || req.params.classId || '').trim();
+    await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    const plan = await classDeletePreparationService.buildDeletePreparationPlan(classId, req.user);
+    return res.json({ status: 'success', data: plan });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function showClassStorageIntegrityPage(req, res) {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(activeOrgId, req.user);
+    res.render('school/class/classStorageIntegrity', {
+      title: 'Class Storage & Integrity',
+      scan,
+      orgId: activeOrgId,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+}
+
+async function getClassStorageIntegrityScanApi(req, res) {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(activeOrgId, req.user);
+    return res.json({ status: 'success', data: scan });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function postClassStorageIntegrityApplyApi(req, res) {
+  let guardKey = '';
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const mode = String(req.body?.mode || '').trim();
+    const selected = req.body?.selected && typeof req.body.selected === 'object' ? req.body.selected : {};
+
+    guardKey = idempotencyGuardService.createGuardKey([
+      'class_storage_integrity_apply',
+      activeOrgId,
+      mode
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 120000,
+      replayTtlMs: 15000
+    });
+    if (sendGuardedResponse(req, res, guardResult, 'Storage integrity apply is already in progress. Please wait.')) return;
+
+    const result = await classStorageIntegrityService.applyClassStorageIntegrity({
+      orgId: activeOrgId,
+      reqUser: req.user,
+      mode,
+      selected
+    });
+    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(activeOrgId, req.user);
+    const payloadOut = {
+      status: 'success',
+      message: mode === 'safe_fixes'
+        ? 'Safe fixes applied.'
+        : 'Selected orphan records processed.',
+      data: result,
+      scan
+    };
+    idempotencyGuardService.completeGuard(guardKey, payloadOut);
+    return res.json(payloadOut);
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function getCycleLinkBlockersApi(req, res) {
+  try {
+    const classId = String(req.params.id || req.params.classId || '').trim();
+    await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    const snapshot = await classCycleLinkResolutionService.collectCycleLinkBlockers(classId, req.user);
+    return res.json({ status: 'success', data: snapshot });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function unlinkCycleLinkApi(req, res) {
+  try {
+    const classId = String(req.params.id || req.params.classId || '').trim();
+    await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    const referencingClassId = toPublicId(req.body?.referencingClassId || req.body?.referencingClass || '');
+    const linkType = String(req.body?.linkType || '').trim();
+    const result = await classCycleLinkResolutionService.unlinkCycleReference({
+      targetClassId: classId,
+      referencingClassId,
+      linkType,
+      reqUser: req.user
+    });
+    return res.json({
+      status: 'success',
+      message: 'Cycle link removed.',
+      data: result
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function unlinkAllCycleLinksApi(req, res) {
+  try {
+    const classId = String(req.params.id || req.params.classId || '').trim();
+    await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    const result = await classCycleLinkResolutionService.unlinkAllCycleReferences(classId, req.user);
+    const hasIssues = Array.isArray(result?.issues) && result.issues.length > 0;
+    return res.json({
+      status: hasIssues ? 'warning' : 'success',
+      message: hasIssues
+        ? `Unlinked ${result.unlinked.length} reference(s) with ${result.issues.length} issue(s).`
+        : `Unlinked ${result.unlinked.length} reference(s).`,
+      data: result
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function deleteClass(req, res) {
   let guardKey = '';
   try {
@@ -2761,6 +2881,41 @@ async function deleteClass(req, res) {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Class delete is already in progress. Please wait.')) return;
 
+    try {
+      await classDeletePreparationService.assertClassDeleteAllowed(classId, req.user);
+    } catch (prepError) {
+      if (prepError?.name === 'ClassDeleteNotAllowedError') {
+        const message = String(prepError.message || 'Class cannot be deleted yet.');
+        const preparationHref = String(prepError.preparationHref || classDeletePreparationService.buildDeletePreparationHref(classId)).trim();
+        if (isAjax(req)) {
+          return res.status(409).json({
+            status: 'error',
+            code: 'DELETE_BLOCKED',
+            message,
+            preparationHref,
+            blockers: prepError.blockers || []
+          });
+        }
+        return res.status(409).render('error', {
+          title: 'Delete blocked',
+          statusCode: 409,
+          message,
+          preparationHref,
+          error: prepError,
+          user: req.user
+        });
+      }
+      throw prepError;
+    }
+
+    await registrationIntegrityService.reconcileOrphanedClassEnrollmentLedgerForClass({
+      classId,
+      reqUser: req.user,
+      reason: `Reconciled orphaned class enrollment ledger before deleting class ${classId}.`
+    });
+
+    await classCycleLinkResolutionService.clearInboundCycleReferencesForClassDelete(classId, req.user);
+
     await schoolDataService.deleteData('classes', req.params.id, req.user);
     const folderCleanup = await cleanupClassRelatedFolders(classData);
     await indexService.rebuildIndexesForClass(req.params.id);
@@ -2777,8 +2932,7 @@ async function deleteClass(req, res) {
     res.redirect('/school/classes');
   } catch (error) {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
-    if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
-    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+    return respondSchoolDeleteError(req, res, error, { user: req.user });
   }
 }
 
@@ -4106,6 +4260,9 @@ async function setSessionLock(req, res) {
 
 module.exports = {
   listClasses, showAddForm, showAddWizardForm, addClass, showEditForm, showEditWizardForm, editClass, deleteClass,
+  showResolveCycleLinksPage, showDeletePreparationPage, getDeletePreparationApi,
+  showClassStorageIntegrityPage, getClassStorageIntegrityScanApi, postClassStorageIntegrityApplyApi,
+  getCycleLinkBlockersApi, unlinkCycleLinkApi, unlinkAllCycleLinksApi,
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,

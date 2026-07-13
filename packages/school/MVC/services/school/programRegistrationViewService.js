@@ -84,14 +84,22 @@ function isRolledBackStatus(status) {
   return normalizeStatus(status) === 'rolled_back';
 }
 
+function buildStudentProgramKey(studentId, programId) {
+  const studentKey = toPublicId(studentId);
+  const programKey = toPublicId(programId);
+  if (!studentKey || !programKey) return '';
+  return `${studentKey}::${programKey}`;
+}
+
 async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, registrationId = '', filters = {} } = {}) {
-  const [registrations, students, programs, allTransactions, allEntries, termRegistrations] = await Promise.all([
+  const [registrations, students, programs, allTransactions, allEntries, termRegistrations, classEnrollmentPeriods] = await Promise.all([
     schoolRepositories.studentProgramRegistrations.list({ query: {}, scope: { canViewAll: true } }),
     dataService.fetchData('students', {}, reqUser),
     dataService.fetchData('programs', {}, reqUser),
     schoolRepositories.globalTransactions.list({ query: {}, scope: { canViewAll: true } }),
     schoolRepositories.academicLedger.list({ query: {}, scope: { canViewAll: true } }),
-    schoolRepositories.studentTermRegistrations.list({ query: {}, scope: { canViewAll: true } })
+    schoolRepositories.studentTermRegistrations.list({ query: {}, scope: { canViewAll: true } }),
+    schoolRepositories.classEnrollmentPeriods.list({ query: {}, scope: { canViewAll: true } })
   ]);
 
   const studentMap = new Map(students.map((row) => [toPublicId(row.id), row]));
@@ -111,6 +119,21 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
       if (!prId) return;
       if (isRolledBackStatus(row?.status)) return;
       termRegCountsByProgramRegId.set(prId, (termRegCountsByProgramRegId.get(prId) || 0) + 1);
+    });
+
+  const classEnrollmentCountsByStudentProgram = new Map();
+  const isBlockingClassEnrollment = schoolRepositories.isBlockingClassEnrollmentForProgramRollback
+    || ((status) => !['withdrawn', 'cancelled', 'archived', 'error'].includes(normalizeStatus(status)));
+  (classEnrollmentPeriods || [])
+    .filter((row) => idsEqual(row?.orgId, activeOrgId))
+    .forEach((row) => {
+      if (!isBlockingClassEnrollment(row?.status)) return;
+      const key = buildStudentProgramKey(row?.studentId, row?.programId);
+      if (!key) return;
+      classEnrollmentCountsByStudentProgram.set(
+        key,
+        (classEnrollmentCountsByStudentProgram.get(key) || 0) + 1
+      );
     });
 
   const normalizedStatus = String(filters.status || '').trim().toLowerCase();
@@ -157,6 +180,12 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
         verificationStatus = 'failed';
       }
 
+      const termRegistrationsCount = termRegCountsByProgramRegId.get(toPublicId(registration.id)) || 0;
+      const classEnrollmentsCount = classEnrollmentCountsByStudentProgram.get(
+        buildStudentProgramKey(registration.studentId, registration.programId)
+      ) || 0;
+      const rollbackEligibleStatus = ['registered', 'draft', 'error'].includes(String(registration.status || '').toLowerCase());
+
       return {
         id: registration.id,
         status: registration.status,
@@ -180,10 +209,12 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
           voided: voidedAcademicEntries
         },
         statusBadgeClass: getVerificationBadgeClass(verificationStatus),
-        canRollback: ['registered', 'draft', 'error'].includes(String(registration.status || '').toLowerCase())
-          && (termRegCountsByProgramRegId.get(toPublicId(registration.id)) || 0) === 0,
+        canRollback: rollbackEligibleStatus
+          && termRegistrationsCount === 0
+          && classEnrollmentsCount === 0,
         canApprove: String(registration.status || '').toLowerCase() === 'draft',
-        termRegistrationsCount: termRegCountsByProgramRegId.get(toPublicId(registration.id)) || 0,
+        termRegistrationsCount,
+        classEnrollmentsCount,
         transactionIds,
         reversalIds,
         academicEntryIds,

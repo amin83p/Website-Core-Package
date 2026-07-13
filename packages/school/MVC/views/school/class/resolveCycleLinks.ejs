@@ -1,0 +1,289 @@
+<%
+  const data = (typeof snapshot !== 'undefined' && snapshot) ? snapshot : {};
+  const target = data.targetClass || {};
+  const previousCycles = Array.isArray(data.previousCycles) ? data.previousCycles : [];
+  const nextCycles = Array.isArray(data.nextCycles) ? data.nextCycles : [];
+  const blockerCount = Number(data.blockerCount || 0);
+  const returnToDelete = String(returnTo || '').trim().toLowerCase() === 'delete';
+  const highlightId = String(highlightClassId || '').trim();
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const targetClassId = String(target.id || '').trim();
+%>
+
+<style>
+  .resolve-cycle-links-page .cycle-link-row.is-highlighted {
+    background-color: rgba(255, 193, 7, 0.12);
+  }
+  .resolve-cycle-links-page .status-banner.ready {
+    border-color: #198754;
+    background: rgba(25, 135, 84, 0.08);
+  }
+  .resolve-cycle-links-page .status-banner.pending {
+    border-color: #ffc107;
+    background: rgba(255, 193, 7, 0.08);
+  }
+</style>
+
+<div class="sections-page resolve-cycle-links-page" data-target-class-id="<%= targetClassId %>">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-link-45deg me-2"></i>Resolve Cycle Links</h1>
+      <div class="text-muted mt-1">
+        Prepare <strong><%= target.title || targetClassId %></strong> for deletion by unlinking rolling class cycles.
+      </div>
+      <div class="small text-muted font-monospace mt-1"><%= targetClassId %></div>
+      <div class="d-flex flex-wrap gap-2 mt-2">
+        <span class="badge bg-light text-dark border">Cycle #<%= Number(target.cycleNo || 1) %></span>
+        <% if (target.cycleStartDate || target.cycleEndDate) { %>
+          <span class="badge bg-light text-dark border"><%= target.cycleStartDate || '?' %> → <%= target.cycleEndDate || 'Open' %></span>
+        <% } %>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="/school/classes/edit/<%= encodeURIComponent(targetClassId) %>" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Class
+      </a>
+      <% if (returnToDelete) { %>
+        <button type="button" class="btn btn-danger btn-sm" id="btnDeleteClassWhenReady" <%= blockerCount ? 'disabled' : '' %>>
+          <i class="bi bi-trash me-1"></i>Delete Class
+        </button>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="alert border status-banner <%= blockerCount ? 'pending' : 'ready' %>" id="cycleLinkStatusBanner" role="status">
+    <% if (blockerCount) { %>
+      <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i><span id="cycleLinkStatusCount"><%= blockerCount %></span> cycle link<%= blockerCount === 1 ? '' : 's' %> still block deletion.</div>
+      <div class="small mb-0 mt-1">Cycle links are managed here because they are read-only on the main class edit form.</div>
+    <% } else { %>
+      <div class="fw-semibold text-success"><i class="bi bi-check-circle me-1"></i>All cycle links are resolved. You can delete this class.</div>
+    <% } %>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="fw-bold"><i class="bi bi-arrow-left-circle me-2"></i>Previous Cycles Linked to This Class</div>
+      <span class="badge bg-secondary-subtle text-secondary-emphasis border"><%= previousCycles.length %> link<%= previousCycles.length === 1 ? '' : 's' %></span>
+    </div>
+    <div class="card-body p-0">
+      <% if (!previousCycles.length) { %>
+        <div class="text-center text-muted py-4 small">No previous cycles point forward to this class.</div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Class</th>
+                <th>Cycle</th>
+                <th>Dates</th>
+                <th class="pe-3 text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% previousCycles.forEach(function(row) { %>
+                <tr class="cycle-link-row <%= highlightId && highlightId === row.referencingClassId ? 'is-highlighted' : '' %>"
+                    data-referencing-class-id="<%= row.referencingClassId %>"
+                    data-link-type="<%= row.linkType %>">
+                  <td class="ps-3">
+                    <div class="fw-bold">
+                      <a href="/school/classes/edit/<%= encodeURIComponent(row.referencingClassId) %>" class="text-decoration-none"><%= row.referencingClassTitle || row.referencingClassId %></a>
+                    </div>
+                    <div class="small text-muted font-monospace"><%= row.referencingClassId %></div>
+                  </td>
+                  <td>#<%= row.cycleNo || 1 %></td>
+                  <td><%= row.cycleStartDate || '?' %> → <%= row.cycleEndDate || 'Open' %></td>
+                  <td class="pe-3 text-end">
+                    <button type="button" class="btn btn-outline-warning btn-sm btn-unlink-cycle" data-referencing-class-id="<%= row.referencingClassId %>" data-link-type="<%= row.linkType %>">
+                      Unlink
+                    </button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="fw-bold"><i class="bi bi-arrow-right-circle me-2"></i>Next Cycles Linked to This Class</div>
+      <span class="badge bg-secondary-subtle text-secondary-emphasis border"><%= nextCycles.length %> link<%= nextCycles.length === 1 ? '' : 's' %></span>
+    </div>
+    <div class="card-body p-0">
+      <% if (!nextCycles.length) { %>
+        <div class="text-center text-muted py-4 small">No next cycles point backward to this class.</div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Class</th>
+                <th>Cycle</th>
+                <th>Dates</th>
+                <th class="pe-3 text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% nextCycles.forEach(function(row) { %>
+                <tr class="cycle-link-row <%= highlightId && highlightId === row.referencingClassId ? 'is-highlighted' : '' %>"
+                    data-referencing-class-id="<%= row.referencingClassId %>"
+                    data-link-type="<%= row.linkType %>">
+                  <td class="ps-3">
+                    <div class="fw-bold">
+                      <a href="/school/classes/edit/<%= encodeURIComponent(row.referencingClassId) %>" class="text-decoration-none"><%= row.referencingClassTitle || row.referencingClassId %></a>
+                    </div>
+                    <div class="small text-muted font-monospace"><%= row.referencingClassId %></div>
+                  </td>
+                  <td>#<%= row.cycleNo || 1 %></td>
+                  <td><%= row.cycleStartDate || '?' %> → <%= row.cycleEndDate || 'Open' %></td>
+                  <td class="pe-3 text-end">
+                    <button type="button" class="btn btn-outline-warning btn-sm btn-unlink-cycle" data-referencing-class-id="<%= row.referencingClassId %>" data-link-type="<%= row.linkType %>">
+                      Unlink
+                    </button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <button type="button" class="btn btn-warning" id="btnUnlinkAllCycleLinks" <%= blockerCount ? '' : 'disabled' %>>
+      <i class="bi bi-link-45deg me-1"></i>Unlink All
+    </button>
+    <div class="small text-muted" id="cycleLinkActionFeedback"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const page = document.querySelector('.resolve-cycle-links-page');
+  if (!page) return;
+
+  const targetClassId = String(page.dataset.targetClassId || '').trim();
+  const actionStateId = '<%= asid %>';
+  const returnToDelete = <%= returnToDelete ? 'true' : 'false' %>;
+  const statusBanner = document.getElementById('cycleLinkStatusBanner');
+  const statusCount = document.getElementById('cycleLinkStatusCount');
+  const feedback = document.getElementById('cycleLinkActionFeedback');
+  const btnUnlinkAll = document.getElementById('btnUnlinkAllCycleLinks');
+  const btnDelete = document.getElementById('btnDeleteClassWhenReady');
+
+  function buildHeaders() {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    };
+    if (actionStateId) headers['X-Action-State-Id'] = actionStateId;
+    return headers;
+  }
+
+  function updateUiFromSnapshot(snapshot) {
+    const count = Number(snapshot?.blockerCount || 0);
+    if (statusCount) statusCount.textContent = String(count);
+    if (statusBanner) {
+      statusBanner.classList.toggle('ready', count === 0);
+      statusBanner.classList.toggle('pending', count > 0);
+      if (count === 0) {
+        statusBanner.innerHTML = '<div class="fw-semibold text-success"><i class="bi bi-check-circle me-1"></i>All cycle links are resolved. You can delete this class.</div>';
+      } else {
+        statusBanner.innerHTML = '<div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i><span id="cycleLinkStatusCount">' + count + '</span> cycle link' + (count === 1 ? '' : 's') + ' still block deletion.</div><div class="small mb-0 mt-1">Cycle links are managed here because they are read-only on the main class edit form.</div>';
+      }
+    }
+    if (btnUnlinkAll) btnUnlinkAll.disabled = count === 0;
+    if (btnDelete) btnDelete.disabled = count > 0;
+  }
+
+  async function refreshSnapshot() {
+    const response = await fetch('/school/classes/api/' + encodeURIComponent(targetClassId) + '/cycle-link-blockers', {
+      method: 'GET',
+      headers: buildHeaders(),
+      credentials: 'same-origin'
+    });
+    const payload = await response.json();
+    if (!response.ok || payload.status === 'error') {
+      throw new Error(payload.message || 'Could not refresh cycle link status.');
+    }
+    updateUiFromSnapshot(payload.data || {});
+    if (Number(payload.data?.blockerCount || 0) === 0) {
+      window.location.reload();
+    }
+  }
+
+  async function unlinkOne(referencingClassId, linkType, button) {
+    if (!referencingClassId || !linkType) return;
+    if (button) button.disabled = true;
+    if (feedback) feedback.textContent = 'Unlinking...';
+    try {
+      const response = await fetch('/school/classes/api/' + encodeURIComponent(targetClassId) + '/cycle-link-blockers/unlink', {
+        method: 'POST',
+        headers: buildHeaders(),
+        credentials: 'same-origin',
+        body: JSON.stringify({ referencingClassId, linkType })
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.status === 'error') {
+        throw new Error(payload.message || 'Unlink failed.');
+      }
+      if (feedback) feedback.textContent = payload.message || 'Cycle link removed.';
+      await refreshSnapshot();
+    } catch (error) {
+      if (feedback) feedback.textContent = error.message || 'Unlink failed.';
+      if (button) button.disabled = false;
+    }
+  }
+
+  page.querySelectorAll('.btn-unlink-cycle').forEach((button) => {
+    button.addEventListener('click', () => {
+      unlinkOne(
+        String(button.dataset.referencingClassId || '').trim(),
+        String(button.dataset.linkType || '').trim(),
+        button
+      );
+    });
+  });
+
+  if (btnUnlinkAll) {
+    btnUnlinkAll.addEventListener('click', async () => {
+      if (!window.confirm('Unlink all cycle references that block deleting this class?')) return;
+      btnUnlinkAll.disabled = true;
+      if (feedback) feedback.textContent = 'Unlinking all references...';
+      try {
+        const response = await fetch('/school/classes/api/' + encodeURIComponent(targetClassId) + '/cycle-link-blockers/unlink-all', {
+          method: 'POST',
+          headers: buildHeaders(),
+          credentials: 'same-origin',
+          body: JSON.stringify({})
+        });
+        const payload = await response.json();
+        if (!response.ok || payload.status === 'error') {
+          throw new Error(payload.message || 'Unlink all failed.');
+        }
+        if (feedback) feedback.textContent = payload.message || 'All cycle links removed.';
+        await refreshSnapshot();
+      } catch (error) {
+        if (feedback) feedback.textContent = error.message || 'Unlink all failed.';
+        btnUnlinkAll.disabled = false;
+      }
+    });
+  }
+
+  if (btnDelete && returnToDelete) {
+    btnDelete.addEventListener('click', () => {
+      if (!window.confirm('Delete this class now?')) return;
+      window.location.href = '/school/classes/delete/' + encodeURIComponent(targetClassId);
+    });
+  }
+
+  const highlighted = document.querySelector('.cycle-link-row.is-highlighted');
+  if (highlighted && typeof highlighted.scrollIntoView === 'function') {
+    highlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+})();
+</script>

@@ -5,6 +5,7 @@ const academicSnapshotService = require('./academicSnapshotService');
 const indexService = require('./schoolIndexService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const leaveRequestService = require('./leaveRequestService');
+const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
 const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
@@ -72,6 +73,236 @@ function asIdArray(value) {
   return Array.from(new Set((Array.isArray(value) ? value : [])
     .map((item) => toPublicId(item))
     .filter(Boolean)));
+}
+
+async function countUnresolvedPostedTransactions(transactionIds = []) {
+  const ids = asIdArray(transactionIds);
+  if (!ids.length) return 0;
+
+  let count = 0;
+  for (const txId of ids) {
+    const reversal = await schoolRepositories.globalTransactions.findReversalByTransactionId(txId);
+    if (reversal) continue;
+    const transaction = await schoolRepositories.globalTransactions.getById(txId);
+    if (transaction && normalizeStatus(transaction.status) === 'posted') {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+async function countNonVoidAcademicEntries(entryIds = []) {
+  const ids = asIdArray(entryIds);
+  if (!ids.length) return 0;
+
+  let count = 0;
+  for (const entryId of ids) {
+    const entry = await schoolRepositories.academicLedger.getById(entryId);
+    if (entry && normalizeStatus(entry.status) !== 'void') {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function rollingClassEnrolledIdempotencyKey(periodId) {
+  const normalizedPeriodId = toPublicId(periodId);
+  return normalizedPeriodId ? `rolling|cep|${normalizedPeriodId}|class_enrolled` : '';
+}
+
+function entryMatchesRollingClassEnrollmentLedger(row, { periodId = '', classId = '', studentId = '' } = {}) {
+  if (String(row?.entryType || '') !== 'class_enrolled') return false;
+  if (normalizeStatus(row?.status) === 'void') return false;
+
+  const normalizedPeriodId = toPublicId(periodId);
+  const normalizedClassId = toPublicId(classId);
+  const normalizedStudentId = toPublicId(studentId);
+  const key = String(row?.source?.idempotencyKey || '').trim();
+  const eventId = String(row?.source?.eventId || '').trim();
+
+  if (normalizedPeriodId) {
+    if (key === rollingClassEnrolledIdempotencyKey(normalizedPeriodId)) return true;
+    if (eventId === `CEP-${normalizedPeriodId}-rolling`) return true;
+    return false;
+  }
+
+  if (normalizedClassId && !idsEqual(row?.classId, normalizedClassId)) return false;
+  if (normalizedStudentId && !idsEqual(row?.studentId, normalizedStudentId)) return false;
+  return Boolean(normalizedClassId || normalizedStudentId);
+}
+
+function periodStillNeedsClassEnrolledLedger(period, classId) {
+  if (!period) return false;
+  if (!idsEqual(period?.classId, classId)) return false;
+  const status = normalizeStatus(period?.status);
+  return status === 'active' || status === 'completed';
+}
+
+async function discoverRollingClassEnrollmentLedgerEntryIds({
+  periodId = '',
+  classId = '',
+  studentId = '',
+  reqUser,
+  options = {}
+} = {}) {
+  const normalizedClassId = toPublicId(classId);
+  const normalizedStudentId = toPublicId(studentId);
+  const query = { page: 1 };
+  if (normalizedStudentId) query.studentId__eq = normalizedStudentId;
+  if (normalizedClassId) query.classId__eq = normalizedClassId;
+  const rows = await schoolDataService.fetchData('academicLedger', query, reqUser, options);
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => entryMatchesRollingClassEnrollmentLedger(row, { periodId, classId, studentId }))
+    .map((row) => toPublicId(row?.id))
+    .filter(Boolean);
+}
+
+async function reconcileOrphanedClassEnrollmentLedgerForClass({
+  classId,
+  reqUser,
+  reason = '',
+  options = {}
+} = {}) {
+  const normalizedClassId = toPublicId(classId);
+  if (!normalizedClassId) return { voidedEntryIds: [], issues: [] };
+
+  const rows = await schoolDataService.fetchData('academicLedger', { page: 1, classId__eq: normalizedClassId }, reqUser, options);
+  const candidates = (Array.isArray(rows) ? rows : []).filter((row) =>
+    String(row?.entryType || '') === 'class_enrolled' && normalizeStatus(row?.status) !== 'void'
+  );
+  const voidedEntryIds = [];
+  const issues = [];
+
+  for (const row of candidates) {
+    const key = String(row?.source?.idempotencyKey || '').trim();
+    const periodMatch = key.match(/^rolling\|cep\|([^|]+)\|class_enrolled$/);
+    const periodId = periodMatch ? toPublicId(periodMatch[1]) : '';
+    let keepEntry = false;
+
+    if (periodId) {
+      const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, reqUser, options);
+      keepEntry = periodStillNeedsClassEnrolledLedger(period, normalizedClassId);
+    } else {
+      const studentId = toPublicId(row?.studentId);
+      if (studentId) {
+        const periods = await schoolDataService.getClassEnrollmentPeriodsByStudentId(studentId, reqUser, options);
+        keepEntry = (Array.isArray(periods) ? periods : []).some((period) =>
+          periodStillNeedsClassEnrolledLedger(period, normalizedClassId)
+        );
+      }
+    }
+
+    if (!keepEntry) {
+      try {
+        const updated = await schoolRepositories.academicLedger.voidEntry(
+          row.id,
+          reason || `Reconciled class enrollment ledger for class ${normalizedClassId}`,
+          options
+        );
+        voidedEntryIds.push(String(updated?.id || row.id || ''));
+        recordTransactionOperation(options, {
+          type: 'update',
+          entityType: 'academicLedger',
+          id: toPublicId(updated?.id || row?.id),
+          operation: 'void'
+        });
+      } catch (error) {
+        issues.push(`Failed to void academic entry ${row.id}: ${error.message}`);
+      }
+    }
+  }
+
+  return { voidedEntryIds, issues };
+}
+
+async function reconcileOrphanedClassEnrollmentLedgerForOrg(orgId, reqUser, options = {}) {
+  const normalizedOrgId = String(orgId || '').trim();
+  if (!normalizedOrgId) return { voidedEntryIds: [], issues: [], classIdsProcessed: 0 };
+
+  const rows = await schoolDataService.fetchData(
+    'academicLedger',
+    { page: 1, orgId__eq: normalizedOrgId },
+    reqUser,
+    options
+  );
+  const classIds = new Set();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (String(row?.entryType || '') !== 'class_enrolled') continue;
+    if (normalizeStatus(row?.status) === 'void') continue;
+    const classId = toPublicId(row?.classId);
+    if (classId) classIds.add(classId);
+  }
+
+  const voidedEntryIds = [];
+  const issues = [];
+  for (const classId of classIds) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await reconcileOrphanedClassEnrollmentLedgerForClass({
+      classId,
+      reqUser,
+      reason: `Org-wide class enrollment ledger reconcile for org ${normalizedOrgId}.`,
+      options
+    });
+    voidedEntryIds.push(...(result?.voidedEntryIds || []));
+    issues.push(...(result?.issues || []));
+  }
+
+  return {
+    voidedEntryIds,
+    issues,
+    classIdsProcessed: classIds.size
+  };
+}
+
+async function previewOrphanedClassEnrollmentLedgerForOrg(orgId, reqUser, options = {}) {
+  const normalizedOrgId = String(orgId || '').trim();
+  if (!normalizedOrgId) return [];
+
+  const rows = await schoolDataService.fetchData(
+    'academicLedger',
+    { page: 1, orgId__eq: normalizedOrgId },
+    reqUser,
+    options
+  );
+  const orphanEntries = [];
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (String(row?.entryType || '') !== 'class_enrolled') continue;
+    if (normalizeStatus(row?.status) === 'void') continue;
+
+    const normalizedClassId = toPublicId(row?.classId);
+    const key = String(row?.source?.idempotencyKey || '').trim();
+    const periodMatch = key.match(/^rolling\|cep\|([^|]+)\|class_enrolled$/);
+    const periodId = periodMatch ? toPublicId(periodMatch[1]) : '';
+    let keepEntry = false;
+
+    if (periodId) {
+      // eslint-disable-next-line no-await-in-loop
+      const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, reqUser, options);
+      keepEntry = periodStillNeedsClassEnrolledLedger(period, normalizedClassId);
+    } else {
+      const studentId = toPublicId(row?.studentId);
+      if (studentId) {
+        // eslint-disable-next-line no-await-in-loop
+        const periods = await schoolDataService.getClassEnrollmentPeriodsByStudentId(studentId, reqUser, options);
+        keepEntry = (Array.isArray(periods) ? periods : []).some((period) =>
+          periodStillNeedsClassEnrolledLedger(period, normalizedClassId)
+        );
+      }
+    }
+
+    if (!keepEntry) {
+      orphanEntries.push({
+        entryId: toPublicId(row?.id),
+        classId: normalizedClassId,
+        periodId,
+        studentId: toPublicId(row?.studentId),
+        status: normalizeStatus(row?.status)
+      });
+    }
+  }
+
+  return orphanEntries;
 }
 
 function normalizeWeight(value) {
@@ -316,6 +547,13 @@ function formatDependentTermExamples(rows) {
   return (Array.isArray(rows) ? rows : [])
     .slice(0, 5)
     .map((row) => `${row.id || '(no-id)'} (term: ${row.termId || '-'}, status: ${row.status || '-'})`)
+    .join(', ');
+}
+
+function formatDependentClassEnrollmentExamples(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .slice(0, 5)
+    .map((row) => `${row.id || '(no-id)'} (class: ${row.classId || '-'}, status: ${row.status || '-'})`)
     .join(', ');
 }
 
@@ -1076,20 +1314,40 @@ const registrationIntegrityService = {
     const registrationId = String(registration?.id || '').trim();
     if (!registrationId) throw new Error('Program registration not found.');
 
-    const dependentCount = await schoolRepositories.studentTermRegistrations.countActiveByProgramRegistrationId(
+    const termDependentCount = await schoolRepositories.studentTermRegistrations.countActiveByProgramRegistrationId(
       registrationId,
       { orgId: activeOrgId }
     );
-    if (dependentCount <= 0) return;
+    if (termDependentCount > 0) {
+      const dependentPreview = await schoolRepositories.studentTermRegistrations.findActiveByProgramRegistrationId(
+        registrationId,
+        { orgId: activeOrgId, limit: 5 }
+      );
+      const examples = formatDependentTermExamples(dependentPreview);
+      throw new Error(
+        `Cannot rollback program registration ${registrationId} because term registrations exist for it (${termDependentCount}). ` +
+        `Rollback the student's term registrations first. ${examples ? `Examples: ${examples}` : ''}`
+      );
+    }
 
-    const dependentPreview = await schoolRepositories.studentTermRegistrations.findActiveByProgramRegistrationId(
-      registrationId,
+    const studentId = String(registration?.studentId || '').trim();
+    const programId = String(registration?.programId || '').trim();
+    const classDependentCount = await schoolRepositories.classEnrollmentPeriods.countBlockingByStudentAndProgram(
+      studentId,
+      programId,
+      { orgId: activeOrgId }
+    );
+    if (classDependentCount <= 0) return;
+
+    const classDependentPreview = await schoolRepositories.classEnrollmentPeriods.findBlockingByStudentAndProgram(
+      studentId,
+      programId,
       { orgId: activeOrgId, limit: 5 }
     );
-    const examples = formatDependentTermExamples(dependentPreview);
+    const classExamples = formatDependentClassEnrollmentExamples(classDependentPreview);
     throw new Error(
-      `Cannot rollback program registration ${registrationId} because term registrations exist for it (${dependentCount}). ` +
-      `Rollback the student's term registrations first. ${examples ? `Examples: ${examples}` : ''}`
+      `Cannot rollback program registration ${registrationId} because class enrollments exist under this program (${classDependentCount}). ` +
+      `Withdraw or rollback class enrollments first. ${classExamples ? `Examples: ${classExamples}` : ''}`
     );
   },
 
@@ -1119,7 +1377,78 @@ const registrationIntegrityService = {
       throw new Error('Only draft term registrations can be edited.');
     }
     return registration;
-  }
+  },
+
+  async assertTermDraftDeletionAllowed(registration, { reqUser, activeOrgId } = {}) {
+    const registrationId = toPublicId(registration?.id);
+    if (!registrationId) throw new Error('Term registration not found.');
+
+    const status = normalizeStatus(registration.status);
+    if (status !== 'draft') {
+      throw new Error('Only draft term registrations can be deleted.');
+    }
+
+    const activePostedTransactions = await countUnresolvedPostedTransactions(
+      registration?.transactionSummary?.transactionIds
+    );
+    if (activePostedTransactions > 0) {
+      throw new Error('Cannot delete this draft because active finance postings still exist. Move the registration back to draft instead.');
+    }
+
+    const activeAcademicEntries = await countNonVoidAcademicEntries(
+      registration?.academicSummary?.entryIds
+    );
+    if (activeAcademicEntries > 0) {
+      throw new Error('Cannot delete this draft because active academic ledger entries still exist. Move the registration back to draft instead.');
+    }
+
+    const enrollmentDiscovery = await classEnrollmentReadService.discoverClassEnrollmentRowsByRegistrationId({
+      registrationId,
+      reqUser,
+      activeOrgId: toPublicId(activeOrgId) || toPublicId(registration?.orgId)
+    });
+    const linkedEnrollments = Array.isArray(enrollmentDiscovery?.rows) ? enrollmentDiscovery.rows : [];
+    if (linkedEnrollments.length) {
+      const examples = linkedEnrollments
+        .slice(0, 3)
+        .map((row) => `${row.classId}/${row.enrollmentId}`)
+        .join(', ');
+      throw new Error(
+        `Cannot delete this draft because class enrollments are linked (${linkedEnrollments.length}). ` +
+        `Remove linked enrollments first.${examples ? ` Examples: ${examples}` : ''}`
+      );
+    }
+
+    const withdrawals = await withdrawalRepository.list({
+      query: { page: 1, limit: 5, termRegistrationId__eq: registrationId },
+      scope: { canViewAll: true }
+    });
+    if (Array.isArray(withdrawals) && withdrawals.length) {
+      throw new Error('Cannot delete this draft because withdrawal records reference it.');
+    }
+  },
+
+  async deleteDraftTermRegistration(registrationId, { reqUser, activeOrgId, options = {} } = {}) {
+    const normalizedId = toPublicId(registrationId);
+    if (!normalizedId) throw new Error('Registration id is required.');
+
+    const registration = await this.getTermRegistrationInOrgOrThrow(normalizedId, activeOrgId);
+    await this.assertTermDraftDeletionAllowed(registration, { reqUser, activeOrgId });
+    await schoolRepositories.studentTermRegistrations.deleteDraftRegistration(normalizedId, options);
+    recordTransactionOperation(options, {
+      type: 'delete',
+      entityType: 'studentTermRegistrations',
+      id: normalizedId
+    });
+    return { registrationId: normalizedId };
+  },
+
+  discoverRollingClassEnrollmentLedgerEntryIds,
+  reconcileOrphanedClassEnrollmentLedgerForClass,
+  reconcileOrphanedClassEnrollmentLedgerForOrg,
+  previewOrphanedClassEnrollmentLedgerForOrg,
+  rollingClassEnrolledIdempotencyKey,
+  entryMatchesRollingClassEnrollmentLedger
 };
 
 module.exports = registrationIntegrityService;

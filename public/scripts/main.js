@@ -813,11 +813,18 @@ function initActiveUsersPreviewModal() {
         if (statAvgIdle) statAvgIdle.textContent = `${Number(summary.avgMinutesSinceLastActivity || 0)}m`;
         if (statAvgSessions) statAvgSessions.textContent = String(summary.avgSessionsPerUser ?? 0);
         if (statMultiSession) statMultiSession.textContent = String(summary.multiSessionUsers || 0);
+        const subtitleEl = document.getElementById('activeUsersPreviewSubtitle');
+        if (subtitleEl) {
+            const staleMinutes = Number(summary.staleMinutes || 5);
+            subtitleEl.textContent = `Users active in the last ${staleMinutes} minute${staleMinutes === 1 ? '' : 's'}.`;
+        }
         if (footnoteEl) {
             const showing = rows.length;
+            const staleMinutes = Number(summary.staleMinutes || 5);
+            const windowLabel = `active in the last ${staleMinutes} minute${staleMinutes === 1 ? '' : 's'}`;
             footnoteEl.textContent = showing < totalUsers
-                ? `Showing ${showing} of ${totalUsers} active users`
-                : `${totalUsers} active user${totalUsers === 1 ? '' : 's'} right now`;
+                ? `Showing ${showing} of ${totalUsers} users ${windowLabel}`
+                : `${totalUsers} user${totalUsers === 1 ? '' : 's'} ${windowLabel}`;
         }
     }
 
@@ -1255,6 +1262,13 @@ function escapeDeleteBlockedHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+function sanitizeDeleteBlockedHref(href = '') {
+    const value = String(href || '').trim();
+    if (!value) return '';
+    if (value.includes('[object Object]') || value.includes('%5Bobject%20Object%5D')) return '';
+    return value;
+}
+
 function renderDeleteBlockedPreview(preview = {}) {
     const label = escapeDeleteBlockedHtml(preview.label || preview.id || 'This record');
     const blockers = Array.isArray(preview.blockers) ? preview.blockers : [];
@@ -1269,35 +1283,46 @@ function renderDeleteBlockedPreview(preview = {}) {
         const count = Number(blocker.count || 0);
         const samples = Array.isArray(blocker.samples) ? blocker.samples : [];
         const extra = Math.max(0, count - samples.length);
+        const isCycleLinkBlocker = blocker.code === 'CLASS_DOWNSTREAM_CYCLE'
+            || blocker.code === 'ENROLLMENT_PERIOD';
         const hint = blocker.resolveHint
-            ? `<div class="small text-muted mt-2"><i class="bi bi-lightbulb me-1"></i>${escapeDeleteBlockedHtml(blocker.resolveHint)}</div>`
+            ? `<div class="delete-blocked-modal-hint"><i class="bi bi-lightbulb me-1"></i>${escapeDeleteBlockedHtml(blocker.resolveHint)}</div>`
+            : '';
+        const actionHref = sanitizeDeleteBlockedHref(blocker.actionHref || ((isCycleLinkBlocker && preview.id)
+            ? `/school/classes/${encodeURIComponent(String(preview.id))}/delete-preparation?returnTo=delete`
+            : ''));
+        const actionLabel = escapeDeleteBlockedHtml(blocker.actionLabel || (isCycleLinkBlocker ? 'Open delete preparation' : ''));
+        const actionHtml = actionHref && actionLabel
+            ? `<div class="delete-blocked-modal-action mt-2"><a href="${actionHref}" class="btn btn-sm btn-warning">${actionLabel}</a></div>`
             : '';
         const sampleHtml = samples.map((sample) => {
             const sampleLabel = escapeDeleteBlockedHtml(sample.label || sample.id || 'Record');
             if (sample.href) {
-                return `<li class="list-group-item py-2"><a href="${escapeDeleteBlockedHtml(sample.href)}" target="_blank" rel="noopener noreferrer">${sampleLabel}</a></li>`;
+                const linkTarget = isCycleLinkBlocker ? '' : ' target="_blank" rel="noopener noreferrer"';
+                return `<li class="delete-blocked-modal-sample"><a href="${escapeDeleteBlockedHtml(sample.href)}"${linkTarget}>${sampleLabel}</a></li>`;
             }
-            return `<li class="list-group-item py-2">${sampleLabel}</li>`;
+            return `<li class="delete-blocked-modal-sample">${sampleLabel}</li>`;
         }).join('');
-        const extraHtml = extra > 0 ? `<li class="list-group-item py-2 text-muted">…and ${extra} more</li>` : '';
+        const extraHtml = extra > 0 ? `<li class="delete-blocked-modal-sample delete-blocked-modal-sample-muted">…and ${extra} more</li>` : '';
         const samplesBlock = (samples.length || extra)
-            ? `<ul class="list-group list-group-flush mt-2 mb-0">${sampleHtml}${extraHtml}</ul>`
+            ? `<ul class="delete-blocked-modal-samples">${sampleHtml}${extraHtml}</ul>`
             : '';
 
-        return `<div class="border rounded p-3 mb-2 bg-light-subtle">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                <span class="badge text-bg-warning">${index + 1}</span>
-                <strong>${blockerLabel}</strong>
-                <span class="badge rounded-pill text-bg-secondary">${count} reference${count === 1 ? '' : 's'}</span>
+        return `<div class="delete-blocked-modal-item">
+            <div class="delete-blocked-modal-item-header">
+                <span class="delete-blocked-modal-index">${index + 1}</span>
+                <strong class="delete-blocked-modal-label">${blockerLabel}</strong>
+                <span class="delete-blocked-modal-count">${count} reference${count === 1 ? '' : 's'}</span>
             </div>
             ${hint}
+            ${actionHtml}
             ${samplesBlock}
         </div>`;
     }).join('');
 
     return `<div class="delete-blocked-modal-preview text-start">
         <p class="mb-3">Cannot delete <strong>${label}</strong>. This record is linked to <strong>${totalReferences}</strong> related item${totalReferences === 1 ? '' : 's'}.</p>
-        <div class="small fw-semibold text-uppercase text-muted mb-2">Resolve these references first</div>
+        <div class="delete-blocked-modal-section-title">Resolve these references first</div>
         ${items}
     </div>`;
 }

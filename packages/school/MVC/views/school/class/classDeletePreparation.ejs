@@ -1,0 +1,303 @@
+<%
+  const planData = (typeof plan !== 'undefined' && plan) ? plan : {};
+  const target = planData.targetClass || {};
+  const chain = Array.isArray(planData.chain) ? planData.chain : [];
+  const currentStep = planData.currentStep || null;
+  const returnToDelete = String(returnTo || '').trim().toLowerCase() === 'delete';
+  const focusedCycleId = String(typeof focusClassId !== 'undefined' ? focusClassId : '').trim();
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const targetClassId = String(planData.targetClassId || target.id || '').trim();
+  const currentStepClassId = String(planData.currentStepClassId || '').trim();
+%>
+
+<style>
+  .delete-preparation-page .cycle-card.is-current-step {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 1px rgba(13, 110, 253, 0.25);
+  }
+  .delete-preparation-page .cycle-card.is-focus {
+    background: rgba(255, 193, 7, 0.06);
+  }
+  .delete-preparation-page .cycle-card.is-ready .cycle-status-badge {
+    background: rgba(25, 135, 84, 0.12);
+    color: #198754;
+  }
+  .delete-preparation-page .cycle-card.is-blocked .cycle-status-badge {
+    background: rgba(220, 53, 69, 0.12);
+    color: #dc3545;
+  }
+  .delete-preparation-page .chain-pill.is-target {
+    border-color: #0d6efd;
+    background: rgba(13, 110, 253, 0.08);
+  }
+  .delete-preparation-page .chain-pill.is-current {
+    border-color: #ffc107;
+    background: rgba(255, 193, 7, 0.12);
+  }
+</style>
+
+<div class="sections-page delete-preparation-page" data-target-class-id="<%= targetClassId %>">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-diagram-3 me-2"></i>Class Delete Preparation</h1>
+      <div class="text-muted mt-1">
+        Tail-first procedure to delete <strong><%= target.title || targetClassId %></strong> and its rolling cycle chain.
+      </div>
+      <div class="small text-muted font-monospace mt-1"><%= targetClassId %></div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="/school/classes/edit/<%= encodeURIComponent(targetClassId) %>" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Class
+      </a>
+      <% if (returnToDelete) { %>
+        <button type="button" class="btn btn-danger btn-sm" id="btnDeleteTargetClass" <%= planData.canDeleteTarget ? '' : 'disabled' %>>
+          <i class="bi bi-trash me-1"></i>Delete Class
+        </button>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="alert border <%= planData.canDeleteTarget ? 'border-success' : 'border-warning' %>" id="prepStatusBanner" role="status"
+       style="<%= planData.canDeleteTarget ? 'background:rgba(25,135,84,0.08)' : 'background:rgba(255,193,7,0.08)' %>">
+    <% if (planData.canDeleteTarget) { %>
+      <div class="fw-semibold text-success"><i class="bi bi-check-circle me-1"></i>This class is ready to delete.</div>
+    <% } else if (currentStep) { %>
+      <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i>Start with <strong><%= currentStep.title || currentStep.id %></strong> (Cycle #<%= currentStep.cycleNo || 1 %>).</div>
+      <div class="small mb-0 mt-1">Delete downstream cycles first, then clear locked sessions and enrollments on each cycle.</div>
+    <% } else { %>
+      <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i>Complete preparation steps before deleting this class.</div>
+    <% } %>
+  </div>
+
+  <% if (chain.length > 1) { %>
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-bottom py-3 fw-bold">
+        <i class="bi bi-arrow-right me-2"></i>Cycle Chain (tail-first order)
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <% chain.slice().reverse().forEach(function(cycle, index, reversed) { %>
+            <span class="badge border chain-pill <%= cycle.id === targetClassId ? 'is-target' : '' %> <%= cycle.id === currentStepClassId ? 'is-current' : '' %>">
+              #<%= cycle.cycleNo || 1 %> <%= cycle.title || cycle.id %>
+            </span>
+            <% if (index < reversed.length - 1) { %>
+              <i class="bi bi-arrow-left text-muted"></i>
+            <% } %>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% chain.forEach(function(cycle) {
+    const isCurrent = cycle.id === currentStepClassId;
+    const isFocus = focusedCycleId && focusedCycleId === cycle.id;
+    const statusClass = cycle.canDeleteClass ? 'is-ready' : (cycle.hasDownstream ? 'is-blocked' : 'is-current-step');
+  %>
+    <div class="card border-0 shadow-sm mb-4 cycle-card <%= statusClass %> <%= isFocus ? 'is-focus' : '' %>"
+         data-cycle-class-id="<%= cycle.id %>"
+         id="cycle-<%= encodeURIComponent(cycle.id).replace(/%/g, '') %>">
+      <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <div class="fw-bold">
+            Cycle #<%= cycle.cycleNo || 1 %>: <%= cycle.title || cycle.id %>
+            <% if (cycle.id === targetClassId) { %><span class="badge bg-primary-subtle text-primary-emphasis border ms-1">Target</span><% } %>
+            <% if (isCurrent && !cycle.canDeleteClass) { %><span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Current step</span><% } %>
+          </div>
+          <div class="small text-muted font-monospace"><%= cycle.id %></div>
+        </div>
+        <span class="badge border cycle-status-badge">
+          <%= cycle.canDeleteClass ? 'Ready to delete' : (cycle.hasDownstream ? 'Blocked (downstream exists)' : 'In progress') %>
+        </span>
+      </div>
+      <div class="card-body">
+        <% if (cycle.hasDownstream) { %>
+          <div class="alert alert-danger py-2 small mb-3">
+            Delete downstream cycle <strong><%= cycle.downstreamClassTitle || cycle.downstreamClassId %></strong> first.
+            <a href="<%= planData.preparationHref %>?returnTo=<%= returnToDelete ? 'delete' : '' %>&focus=<%= encodeURIComponent(cycle.downstreamClassId) %>" class="alert-link">Open downstream preparation</a>
+          </div>
+        <% } %>
+
+        <% if (cycle.lockedSessions && cycle.lockedSessions.length) { %>
+          <div class="mb-3">
+            <div class="fw-semibold small text-danger mb-2"><i class="bi bi-lock me-1"></i>Timesheet-locked sessions (<%= cycle.lockedSessionCount %>)</div>
+            <ul class="small mb-0">
+              <% cycle.lockedSessions.forEach(function(session) { %>
+                <li><a href="<%= session.href %>" target="_blank" rel="noopener noreferrer"><%= session.label %></a></li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+
+        <div class="fw-semibold mb-2">Enrollments (<%= cycle.enrollmentCount || 0 %>)</div>
+        <% if (!cycle.enrollments || !cycle.enrollments.length) { %>
+          <div class="text-muted small mb-3">No enrollment periods on this class.</div>
+        <% } else { %>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3">Student</th>
+                  <th>Dates</th>
+                  <th>Status</th>
+                  <th>Origin</th>
+                  <th class="pe-3 text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% cycle.enrollments.forEach(function(row) { %>
+                  <tr data-period-id="<%= row.periodId %>">
+                    <td class="ps-3">
+                      <div class="fw-semibold"><%= row.studentLabel || row.studentId %></div>
+                      <div class="small text-muted font-monospace"><%= row.studentId %></div>
+                    </td>
+                    <td><%= row.startDate || '?' %> → <%= row.endDate || 'Open' %></td>
+                    <td><span class="badge bg-light text-dark border"><%= row.status || 'unknown' %></span></td>
+                    <td>
+                      <% if (row.origin === 'carry_forward') { %>
+                        <span class="badge bg-info-subtle text-info-emphasis border">Carry-forward</span>
+                        <% if (row.upstreamSummary) { %>
+                          <div class="small text-muted mt-1">From cycle #<%= row.upstreamSummary.originCycleNo || '?' %> (<%= row.upstreamSummary.upstreamStatus || 'historical' %>)</div>
+                        <% } %>
+                      <% } else if (row.origin === 'term_registration') { %>
+                        <span class="badge bg-secondary-subtle text-secondary-emphasis border">Term registration</span>
+                      <% } else { %>
+                        <span class="badge bg-primary-subtle text-primary-emphasis border">Native</span>
+                      <% } %>
+                    </td>
+                    <td class="pe-3 text-end">
+                      <% if (row.canDelete) { %>
+                        <button type="button"
+                                class="btn btn-outline-danger btn-sm btn-delete-enrollment"
+                                data-class-id="<%= cycle.id %>"
+                                data-period-id="<%= row.periodId %>"
+                                data-origin="<%= row.origin %>"
+                                data-student-label="<%= row.studentLabel || row.studentId %>"
+                                data-warnings="<%= (row.warnings || []).join(' ') %>"
+                                data-carry-forward="<%= row.origin === 'carry_forward' ? '1' : '0' %>">
+                          Delete
+                        </button>
+                      <% } else { %>
+                        <span class="small text-danger" title="<%= row.blockReason || '' %>">Blocked</span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <% if (cycle.canDeleteClass && cycle.id !== targetClassId) { %>
+          <button type="button" class="btn btn-danger btn-sm btn-delete-cycle-class" data-class-id="<%= cycle.id %>" data-class-title="<%= cycle.title || cycle.id %>">
+            <i class="bi bi-trash me-1"></i>Delete This Cycle Class
+          </button>
+        <% } %>
+      </div>
+    </div>
+  <% }) %>
+
+  <div class="small text-muted" id="prepActionFeedback"></div>
+</div>
+
+<script>
+(function () {
+  const page = document.querySelector('.delete-preparation-page');
+  if (!page) return;
+
+  const targetClassId = String(page.dataset.targetClassId || '').trim();
+  const actionStateId = '<%= asid %>';
+  const returnToDelete = <%= returnToDelete ? 'true' : 'false' %>;
+  const feedback = document.getElementById('prepActionFeedback');
+
+  function buildHeaders() {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    };
+    if (actionStateId) headers['X-Action-State-Id'] = actionStateId;
+    return headers;
+  }
+
+  async function refreshPlan() {
+    const response = await fetch('/school/classes/api/' + encodeURIComponent(targetClassId) + '/delete-preparation', {
+      method: 'GET',
+      headers: buildHeaders(),
+      credentials: 'same-origin'
+    });
+    const payload = await response.json();
+    if (!response.ok || payload.status === 'error') {
+      throw new Error(payload.message || 'Could not refresh delete preparation plan.');
+    }
+    window.location.reload();
+  }
+
+  function confirmEnrollmentDelete(button) {
+    const isCarryForward = String(button.dataset.carryForward || '') === '1';
+    const studentLabel = String(button.dataset.studentLabel || 'this student');
+    const warnings = String(button.dataset.warnings || '').trim();
+    let message = 'Delete enrollment for ' + studentLabel + '?';
+    if (isCarryForward) {
+      message += '\n\nThis will unenroll the student from this cycle only. Their previous-cycle record (completed or cancelled) will not be changed.';
+    }
+    message += '\n\nRelated attendance, exams, reports, and session-case data on this class during the enrollment window will be removed. This cannot be undone.';
+    if (warnings) message += '\n\n' + warnings;
+    return window.confirm(message);
+  }
+
+  page.querySelectorAll('.btn-delete-enrollment').forEach((button) => {
+    button.addEventListener('click', async () => {
+      if (!confirmEnrollmentDelete(button)) return;
+      const classId = String(button.dataset.classId || '').trim();
+      const periodId = String(button.dataset.periodId || '').trim();
+      button.disabled = true;
+      if (feedback) feedback.textContent = 'Deleting enrollment...';
+      try {
+        const response = await fetch('/school/classes/api/' + encodeURIComponent(classId) + '/delete-preparation/enrollments/' + encodeURIComponent(periodId) + '/delete', {
+          method: 'POST',
+          headers: buildHeaders(),
+          credentials: 'same-origin',
+          body: JSON.stringify({})
+        });
+        const payload = await response.json();
+        if (!response.ok || payload.status === 'error') {
+          throw new Error(payload.message || 'Delete enrollment failed.');
+        }
+        if (feedback) feedback.textContent = payload.message || 'Enrollment deleted.';
+        await refreshPlan();
+      } catch (error) {
+        if (feedback) feedback.textContent = error.message || 'Delete enrollment failed.';
+        button.disabled = false;
+      }
+    });
+  });
+
+  page.querySelectorAll('.btn-delete-cycle-class').forEach((button) => {
+    button.addEventListener('click', () => {
+      const classId = String(button.dataset.classId || '').trim();
+      const title = String(button.dataset.classTitle || classId);
+      if (!window.confirm('Delete cycle class "' + title + '" now?')) return;
+      window.location.href = '/school/classes/delete/' + encodeURIComponent(classId);
+    });
+  });
+
+  const btnDeleteTarget = document.getElementById('btnDeleteTargetClass');
+  if (btnDeleteTarget && returnToDelete) {
+    btnDeleteTarget.addEventListener('click', () => {
+      if (!window.confirm('Delete this class now?')) return;
+      window.location.href = '/school/classes/delete/' + encodeURIComponent(targetClassId);
+    });
+  }
+
+  const focusCard = document.querySelector('.cycle-card.is-focus');
+  if (focusCard && typeof focusCard.scrollIntoView === 'function') {
+    focusCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else {
+    const currentCard = document.querySelector('.cycle-card.is-current-step');
+    if (currentCard && typeof currentCard.scrollIntoView === 'function') {
+      currentCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+})();
+</script>

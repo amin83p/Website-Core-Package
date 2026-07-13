@@ -11,6 +11,7 @@ const {
     canCreateOrgScopedItem,
     assertOrgAccess
 } = requireCoreModule('MVC/utils/orgContextUtils');
+const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 function getActiveOrgIdOrThrow(reqUser) {
     return getActiveOrgIdOrThrowShared(reqUser);
@@ -225,7 +226,6 @@ exports.deleteTimesheetPeriod = async (req, res) => {
         res.redirect('/school/timesheetPeriods');
     } catch (error) {
         if (guardKey) idempotencyGuardService.failGuard(guardKey);
-        if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
-        res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+        return respondSchoolDeleteError(req, res, error, { user: req.user });
     }
 };

@@ -14,6 +14,7 @@ const {
 } = requireCoreModule('MVC/utils/orgContextUtils');
 
 const postingPolicyService = require('../../services/school/postingPolicyService');
+const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 function parseJsonSafe(v, fallback) {
     if (v === undefined || v === null || v === '') return fallback;
@@ -224,6 +225,6 @@ exports.deleteDepartment = async (req, res) => {
         res.json(payloadOut);
     } catch (error) {
         if (guardKey) idempotencyGuardService.failGuard(guardKey);
-        res.status(400).json({ status: 'error', message: error.message });
+        return respondSchoolDeleteError(req, res, error, { user: req.user });
     }
 };

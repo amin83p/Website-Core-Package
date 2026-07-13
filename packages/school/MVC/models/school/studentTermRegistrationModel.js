@@ -186,6 +186,21 @@ async function clearRegistrationsByOrg(orgId) {
   });
 }
 
+async function deleteRegistration(id, options = {}) {
+  void options;
+  return queueWrite(async () => {
+    const normalizedId = toPublicId(id);
+    if (!normalizedId) throw new Error('Registration id is required.');
+
+    const all = await getAllRegistrations();
+    const filtered = all.filter((row) => !idsEqual(row?.id, normalizedId));
+    if (filtered.length === all.length) throw new Error('Student term registration not found.');
+
+    await fs.writeFile(dataPath, JSON.stringify(filtered, null, 2));
+    return { id: normalizedId, deleted: true };
+  });
+}
+
 module.exports = {
   REGISTRATION_STATUSES: Object.freeze([...REGISTRATION_STATUSES]),
   getAllRegistrations,
@@ -193,6 +208,7 @@ module.exports = {
   findByStudentProgramAndTerm,
   addRegistration,
   updateRegistration,
+  deleteRegistration,
   clearRegistrationsByOrg
 };
 

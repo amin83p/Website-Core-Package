@@ -5,6 +5,7 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 function getActiveOrgIdOrThrow(reqUser = {}) {
   const orgId = String(reqUser.activeOrgId || reqUser.orgId || '').trim();
@@ -243,8 +244,7 @@ exports.saveCategory = async (req, res) => {
     if (isAjax(req)) return res.json(payload);
     res.redirect('/school/activities/categories');
   } catch (error) {
-    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
-    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+    return respondSchoolDeleteError(req, res, error, { user: req.user });
   }
 };
 
@@ -259,8 +259,7 @@ exports.deleteCategory = async (req, res) => {
     if (isAjax(req)) return res.json(payload);
     res.redirect('/school/activities/categories');
   } catch (error) {
-    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
-    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+    return respondSchoolDeleteError(req, res, error, { user: req.user });
   }
 };
 

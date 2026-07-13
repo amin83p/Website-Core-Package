@@ -27,6 +27,11 @@ function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
+function sanitizePricing(value) {
+  if (!isPlainObject(value)) return {};
+  return { ...value };
+}
+
 function sanitizeTransactionSummary(value) {
   if (!isPlainObject(value)) return {};
   const raw = value;
@@ -134,17 +139,26 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
 
   const programId = cleanId(input.programId, { max: 64, allowEmpty: true }) || '';
   const termId = cleanId(input.termId, { max: 64, allowEmpty: true }) || '';
+  const programRegistrationId = cleanId(input.programRegistrationId, { max: 64, allowEmpty: true }) || '';
+  const personId = cleanId(input.personId, { max: 64, allowEmpty: true }) || '';
+  const enrollmentSource = cleanString(input.enrollmentSource, { max: 80, allowEmpty: true });
+  const feeCategory = cleanString(input.feeCategory, { max: 80, allowEmpty: true });
   const sessionCap = classEnrollmentSessionApplicabilityService.sanitizeSessionCapFields(input);
 
   const out = {
     orgId,
     classId,
     studentId,
+    personId,
     status,
     startDate: startDate || '',
     endDate: endDate || '',
     programId,
     termId,
+    programRegistrationId,
+    enrollmentSource,
+    feeCategory,
+    pricing: sanitizePricing(input.pricing),
     funderType: cleanString(input.funderType, { max: 80, allowEmpty: true }),
     funderId: cleanId(input.funderId, { max: 80, allowEmpty: true }),
     authorizationRef: cleanString(input.authorizationRef, { max: 120, allowEmpty: true }),

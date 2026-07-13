@@ -19,6 +19,7 @@ const {
   assertOrgAccess
 } = requireCoreModule('MVC/utils/orgContextUtils');
 const schoolFileService = require('../../services/school/schoolFileService');
+const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 // Helpers
 function parseData(input) {
@@ -266,8 +267,7 @@ async function deleteSubject(req, res) {
     if (isAjax(req)) return res.json({ status: 'success', message: 'Subject deleted.' });
     res.redirect('/school/subjects');
   } catch (error) {
-    if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
-    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+    return respondSchoolDeleteError(req, res, error, { user: req.user });
   }
 }
 

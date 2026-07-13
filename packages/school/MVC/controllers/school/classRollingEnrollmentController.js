@@ -35,6 +35,7 @@ const classEnrollmentSessionApplicabilityService = require('../../services/schoo
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
 const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
+const classEnrollmentDeleteService = require('../../services/school/classEnrollmentDeleteService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
@@ -3247,6 +3248,26 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
     const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
+    const eligibility = await classEnrollmentDeleteService.assessEnrollmentDeleteEligibility(periodRow, classData, req.user);
+    if (!eligibility.canDelete) {
+      const payload = {
+        status: 'error',
+        message: eligibility.blockReason || 'This enrollment cannot be deleted.',
+        code: eligibility.blockCode || 'ENROLLMENT_DELETE_BLOCKED',
+        eligibility
+      };
+      if (eligibility.blockCode === 'TERM_REGISTRATION' && eligibility.termRegistrationHref) {
+        payload.termRegistrationHref = eligibility.termRegistrationHref;
+      }
+      if (eligibility.blockCode === 'TIMESHEET_LOCKED_SESSION' && eligibility.lockedSessions?.length) {
+        payload.lockedSessions = eligibility.lockedSessions;
+      }
+      if (eligibility.blockCode === 'ENROLLMENT_POSTED' && eligibility.postedTransactionIds?.length) {
+        payload.postedTransactionIds = eligibility.postedTransactionIds;
+      }
+      return res.status(400).json(payload);
+    }
+
     guardKey = idempotencyGuardService.createGuardKey([
       'class_enrollment_period_remove_or_rollback',
       String(classData?.orgId || '').trim(),
@@ -3267,7 +3288,23 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
 
     // Draft periods should be deletable even if they carry historical transaction references
     // from a previous rollback (for statement traceability).
+    const academicEntryIds = await registrationIntegrityService.discoverRollingClassEnrollmentLedgerEntryIds({
+      periodId,
+      classId: periodRow?.classId,
+      studentId: periodRow?.studentId,
+      reqUser: req.user
+    });
     if (currentStatus === 'draft' || !postedTransactionIds.length) {
+      if (academicEntryIds.length) {
+        await registrationIntegrityService.rollbackRegistrationSideEffects({
+          registrationId: periodId,
+          transactionIds: [],
+          academicEntryIds,
+          reqUser: req.user,
+          reason: `Class enrollment draft deleted for period ${periodId}.`,
+          reverseEventPrefix: 'CLSENRREV'
+        });
+      }
       await schoolDataService.deleteData('classEnrollmentPeriods', periodId, req.user);
       const payloadOut = { status: 'success', message: 'Draft enrollment deleted before posting.' };
       idempotencyGuardService.completeGuard(guardKey, payloadOut);
@@ -3277,7 +3314,7 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
     const rollback = await registrationIntegrityService.rollbackRegistrationSideEffects({
       registrationId: periodId,
       transactionIds: postedTransactionIds,
-      academicEntryIds: [],
+      academicEntryIds,
       reqUser: req.user,
       reason: `Class enrollment rollback requested for ${periodId}.`,
       reverseEventPrefix: 'CLSENRREV'
@@ -3322,6 +3359,25 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
     return res.json(payloadOut);
   } catch (error) {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function removeOrRollbackClassEnrollmentPeriodFromPreparation(req, res) {
+  try {
+    const classId = toPublicId(req.params?.id || req.params?.classId || '');
+    const periodId = toPublicId(req.params?.periodId || '');
+    if (!classId) throw new Error('classId is required.');
+    if (!periodId) throw new Error('periodId is required.');
+
+    const periodRow = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!periodRow) throw new Error('Enrollment period not found.');
+    if (!idsEqual(periodRow?.classId, classId)) {
+      throw new Error('Enrollment period does not belong to this class.');
+    }
+
+    return removeOrRollbackClassEnrollmentPeriod(req, res);
+  } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
   }
 }
@@ -3822,6 +3878,7 @@ module.exports = {
   syncAcademicLedgerForEnrollmentPeriod,
   editClassEnrollmentPeriod,
   removeOrRollbackClassEnrollmentPeriod,
+  removeOrRollbackClassEnrollmentPeriodFromPreparation,
   createClassEnrollmentPeriod,
   closeClassEnrollmentPeriod,
   reopenClassEnrollmentPeriod,

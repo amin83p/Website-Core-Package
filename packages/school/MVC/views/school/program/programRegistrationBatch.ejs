@@ -488,6 +488,7 @@
     const canApprove = Boolean(model.canApprove);
     const canRollback = Boolean(model.canRollback);
     const termRegistrationsCount = Number(model.termRegistrationsCount || 0);
+    const classEnrollmentsCount = Number(model.classEnrollmentsCount || 0);
 
     let actionsHtml = '<div class="d-flex flex-wrap gap-2 justify-content-end align-items-center program-registration-action-group">';
     actionsHtml += '<a href="/school/programs/registrations/' + encodeURIComponent(registrationId) + '" class="btn btn-sm btn-primary rounded-pill shadow-sm px-3"><i class="bi bi-box-arrow-up-right me-1"></i>' + (recordStatus.toLowerCase() === 'draft' ? 'Review Draft' : 'Details') + '</a>';
@@ -500,8 +501,11 @@
       actionsHtml +=
         '<button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" data-rollback-registration="' + escapeHtml(registrationId) + '" data-rollback-student="' + escapeHtml(studentName) + '">' +
         '<i class="bi bi-arrow-counterclockwise me-1"></i>' + (recordStatus.toLowerCase() === 'draft' ? 'Cancel Draft' : 'Rollback') + '</button>';
-    } else if (canManageRegistrations && termRegistrationsCount > 0) {
-      actionsHtml += '<span class="text-muted small">Rollback blocked (term registrations exist)</span>';
+    } else if (canManageRegistrations && (termRegistrationsCount > 0 || classEnrollmentsCount > 0)) {
+      const blockers = [];
+      if (termRegistrationsCount > 0) blockers.push('term registrations');
+      if (classEnrollmentsCount > 0) blockers.push('class enrollments');
+      actionsHtml += '<span class="text-muted small">Rollback blocked (' + blockers.join(' and ') + ' exist)</span>';
     } else if (canManageRegistrations) {
       actionsHtml += '<span class="text-muted small">No action</span>';
     }
@@ -564,7 +568,8 @@
       note: String(document.getElementById('inp_note')?.value || '').trim(),
       canApprove: true,
       canRollback: true,
-      termRegistrationsCount: 0
+      termRegistrationsCount: 0,
+      classEnrollmentsCount: 0
     };
 
     let rowEl = findRecentRegistrationRow(registrationId);

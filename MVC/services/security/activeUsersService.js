@@ -1,11 +1,15 @@
 const dataService = require('../dataService');
 const { getMongoCollection } = require('../../infrastructure/mongo/mongoConnection');
-const { SYSTEM_CONTEXT } = require('../../../config/constants');
+const { SYSTEM_CONTEXT, DEFAULTS } = require('../../../config/constants');
 const { toPublicId } = require('../../utils/idAdapter');
 
 function parseSafeInt(value, fallback) {
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function getActiveUserStaleMinutes() {
+  return Math.max(1, parseSafeInt(DEFAULTS.ACTIVE_USER_STALE_MINUTES, 5));
 }
 
 function toDate(value) {
@@ -14,7 +18,7 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function isSessionCurrentlyActive(session, now = new Date()) {
+function isRecentlyActiveSession(session, now = new Date(), staleMinutes = getActiveUserStaleMinutes()) {
   if (!session || String(session.status || '').trim().toLowerCase() !== 'active') {
     return false;
   }
@@ -24,16 +28,15 @@ function isSessionCurrentlyActive(session, now = new Date()) {
   if (!lastActive) return false;
   if (absoluteExpiry && now > absoluteExpiry) return false;
 
-  const idleMins = parseSafeInt(session.idleTimeoutMinutes, 30);
-  const idleLimitMs = idleMins * 60 * 1000;
-  return (now.getTime() - lastActive.getTime()) <= idleLimitMs;
+  const staleLimitMs = Math.max(1, parseSafeInt(staleMinutes, getActiveUserStaleMinutes())) * 60 * 1000;
+  return (now.getTime() - lastActive.getTime()) <= staleLimitMs;
 }
 
-function groupSessionsByUser(sessions = [], now = new Date()) {
+function groupSessionsByUser(sessions = [], now = new Date(), staleMinutes = getActiveUserStaleMinutes()) {
   const grouped = new Map();
 
   (Array.isArray(sessions) ? sessions : []).forEach((session) => {
-    if (!isSessionCurrentlyActive(session, now)) return;
+    if (!isRecentlyActiveSession(session, now, staleMinutes)) return;
 
     const userId = toPublicId(session.userId);
     if (!userId) return;
@@ -192,7 +195,7 @@ async function computeAvgDailyActiveUsers(now = new Date(), lookbackDays = 7) {
   };
 }
 
-async function buildSummary(enrichedRows = [], groupedRows = [], now = new Date()) {
+async function buildSummary(enrichedRows = [], groupedRows = [], now = new Date(), staleMinutes = getActiveUserStaleMinutes()) {
   const base = computeSummaryMetrics(enrichedRows, groupedRows, now);
   let dailyStats = { avgDailyActiveUsers: 0, sampledDays: 0, lookbackDays: 7 };
   try {
@@ -203,7 +206,8 @@ async function buildSummary(enrichedRows = [], groupedRows = [], now = new Date(
 
   return {
     ...base,
-    ...dailyStats
+    ...dailyStats,
+    staleMinutes: Math.max(1, parseSafeInt(staleMinutes, getActiveUserStaleMinutes()))
   };
 }
 
@@ -233,10 +237,15 @@ function mapActiveUserRow(groupRow, userMap) {
 
 async function listActiveUsers({ query = {} } = {}) {
   const now = new Date();
+  const staleMinutes = getActiveUserStaleMinutes();
+  const cutoff = new Date(now.getTime() - (staleMinutes * 60 * 1000)).toISOString();
   const collection = getMongoCollection('sessions');
-  const sessions = await collection.find({ status: 'active' }).toArray();
+  const sessions = await collection.find({
+    status: 'active',
+    lastActivityAt: { $gte: cutoff }
+  }).toArray();
 
-  const grouped = groupSessionsByUser(sessions, now);
+  const grouped = groupSessionsByUser(sessions, now, staleMinutes);
   const userMap = await loadUsersByIds(grouped.map((row) => row.userId));
 
   const searchText = normalizeSearchText(query.q);
@@ -244,7 +253,7 @@ async function listActiveUsers({ query = {} } = {}) {
     .map((row) => mapActiveUserRow(row, userMap))
     .filter((row) => matchesSearch(row, searchText));
 
-  const summary = await buildSummary(enriched, grouped, now);
+  const summary = await buildSummary(enriched, grouped, now, staleMinutes);
 
   const previewLimit = String(query.preview || '').trim() === '1'
     ? Math.max(1, Math.min(parseSafeInt(query.limit, 12), 50))
@@ -261,7 +270,8 @@ async function listActiveUsers({ query = {} } = {}) {
 }
 
 module.exports = {
-  isSessionCurrentlyActive,
+  getActiveUserStaleMinutes,
+  isRecentlyActiveSession,
   groupSessionsByUser,
   computeSummaryMetrics,
   listActiveUsers

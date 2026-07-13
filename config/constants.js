@@ -36,6 +36,9 @@ module.exports = {
       // Newsletter
       NEWSLETTER_DEFAULT_GROUP: '',
       NEWSLETTER_DOUBLE_OPT_IN: false,
-      NEWSLETTER_WELCOME_EMAIL: true
+      NEWSLETTER_WELCOME_EMAIL: true,
+
+      // Security / Active Users monitor
+      ACTIVE_USER_STALE_MINUTES: 5
   }
 };

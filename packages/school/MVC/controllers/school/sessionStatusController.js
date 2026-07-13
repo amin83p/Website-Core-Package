@@ -7,6 +7,7 @@ const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 function getActiveOrgIdOrThrow(reqUser) {
   const activeOrgId = reqUser?.activeOrgId ? String(reqUser.activeOrgId) : '';
@@ -259,7 +260,6 @@ exports.deleteSessionStatus = async (req, res) => {
     return res.redirect('/school/session-statuses');
   } catch (error) {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
-    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
-    return res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+    return respondSchoolDeleteError(req, res, error, { user: req.user });
   }
 };

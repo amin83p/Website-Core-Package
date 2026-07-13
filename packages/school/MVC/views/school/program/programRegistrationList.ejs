@@ -97,8 +97,11 @@
                     <i class="bi bi-arrow-counterclockwise me-2"></i>
                     <%= String(item.status || '').toLowerCase() === 'draft' ? 'Cancel Draft' : 'Move Back to Draft' %>
                   </button>
-                <% } else if (canManageRegistrations && item.termRegistrationsCount) { %>
-                  <span class="text-muted small d-block ps-1">Move back to draft is blocked (term registrations exist)</span>
+                <% } else if (canManageRegistrations && !item.canRollback && ['registered', 'draft', 'error'].includes(String(item.status || '').toLowerCase()) && (item.termRegistrationsCount || item.classEnrollmentsCount)) { %>
+                  <% const listRollbackBlockers = []; %>
+                  <% if (item.termRegistrationsCount) listRollbackBlockers.push('term registrations'); %>
+                  <% if (item.classEnrollmentsCount) listRollbackBlockers.push('class enrollments'); %>
+                  <span class="text-muted small d-block ps-1">Move back to draft is blocked (<%= listRollbackBlockers.join(' and ') %> exist)</span>
                 <% } %>
               </div>
             </div>

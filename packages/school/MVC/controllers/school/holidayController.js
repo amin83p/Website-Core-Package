@@ -8,6 +8,7 @@ const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModu
 const settingService = requireCoreModule('MVC/services/settingService'); 
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 function getActiveOrgIdOrThrow(reqUser) {
     const activeOrgId = reqUser?.activeOrgId ? String(reqUser.activeOrgId) : '';
@@ -181,7 +182,7 @@ async function deleteHoliday(req, res) {
         res.json(payloadOut);
     } catch (error) {
         if (guardKey) idempotencyGuardService.failGuard(guardKey);
-        res.status(400).json({ status: 'error', message: error.message });
+        return respondSchoolDeleteError(req, res, error, { user: req.user });
     }
 }
 

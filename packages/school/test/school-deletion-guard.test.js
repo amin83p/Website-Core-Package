@@ -219,10 +219,17 @@ test('phase 1 delete controllers route through deleteData without per-controller
       assert.match(source, /deleteData\s*\(\s*['"]classes['"]/, 'classController deleteClass should use deleteData');
       assert.match(source, /assertCanDelete/, 'classController keeps session makeup assertCanDelete');
       assert.doesNotMatch(source, /schoolDeletionGuardService\.executeDelete/, 'classController should not use executeDelete');
+      assert.match(source, /respondSchoolDeleteError/, 'classController deleteClass should use respondSchoolDeleteError');
+      return;
+    }
+    if (relativePath.endsWith('reportController.js')) {
+      assert.match(source, /handleDeleteError/, 'reportController should use handleDeleteError for blocked deletes');
+      assert.match(source, /deleteData\s*\(/, 'reportController should call deleteData');
       return;
     }
     assert.doesNotMatch(source, /schoolDeletionGuardService/, `${relativePath} should not import deletion guard service`);
     assert.match(source, /deleteData\s*\(/, `${relativePath} should call deleteData`);
+    assert.match(source, /respondSchoolDeleteError/, `${relativePath} should use respondSchoolDeleteError`);
   });
 });
 
@@ -271,8 +278,74 @@ test('program delete uses school delete error response helper', () => {
   assert.doesNotMatch(source, /schoolDeletionGuardService/, 'programController should not import deletion guard service');
 });
 
+test('buildPreviewMessage formats multi-line blocker summary', () => {
+  const { buildPreviewMessage } = require('../MVC/services/school/schoolDeletionGuardService');
+  const message = buildPreviewMessage({
+    label: 'EAL-M/I-CLB 5-6-Elahe',
+    blockers: [
+      { label: 'Report Instances', count: 1, resolveHint: 'Remove report instances first.' },
+      { label: 'Session Student Cases', count: 2 }
+    ]
+  });
+  assert.match(message, /Cannot delete EAL-M\/I-CLB 5-6-Elahe\. 2 blocking reference groups\./);
+  assert.match(message, /1\. Report Instances: 1 reference — Remove report instances first\./);
+  assert.match(message, /2\. Session Student Cases: 2 references/);
+  assert.doesNotMatch(message, /record\(s\) found/);
+});
+
+test('school delete error response recognizes DeleteBlockedError instances', () => {
+  const { DeleteBlockedError } = require('../MVC/services/school/schoolDeletionGuardService');
+  const { isDeleteBlockedError } = require('../MVC/utils/schoolDeleteErrorResponse');
+  const preview = {
+    canDelete: false,
+    label: 'Fall 2026',
+    blockers: [{ code: 'PROGRAM_EMBED', count: 1, label: 'Programs' }]
+  };
+  const error = new DeleteBlockedError(preview);
+  assert.equal(isDeleteBlockedError(error), true);
+});
+
+test('resolveSectionHref uses record ids for id-based href builders', () => {
+  const { SECTION_HREFS, resolveSectionHref } = require('../MVC/services/school/schoolDeletionRuleRegistry');
+  const row = { id: 'CLASS/42', name: 'Math 101' };
+  assert.equal(
+    resolveSectionHref(SECTION_HREFS.classes, row),
+    '/school/classes/edit/CLASS%2F42'
+  );
+});
+
+test('academic ledger sample href links to student statement instead of object id', () => {
+  const {
+    SECTION_HREFS,
+    resolveSectionHref,
+    samplesFromRows,
+    sanitizeSampleHref
+  } = require('../MVC/services/school/schoolDeletionRuleRegistry');
+  const row = {
+    id: 'LEDGER/9',
+    studentId: 'STU/77',
+    programId: 'PROG/3',
+    entryType: 'class_enrolled'
+  };
+  const href = resolveSectionHref((row) => SECTION_HREFS.academicLedger(row), row);
+  assert.equal(href, '/school/academic-ledger/student/STU%2F77?programId=PROG%2F3');
+  const [sample] = samplesFromRows([row], null, (entry) => SECTION_HREFS.academicLedger(entry));
+  assert.equal(sample.href, href);
+  assert.equal(sanitizeSampleHref('/school/academic-ledger/%5Bobject%20Object%5D'), '');
+});
+
+test('resolve cycle links href builder targets delete preparation page for delete workflow', () => {
+  const { SECTION_HREFS } = require('../MVC/services/school/schoolDeletionRuleRegistry');
+  const href = SECTION_HREFS.resolveCycleLinks('CLASS/42', 'CLASS/41');
+  assert.equal(
+    href,
+    '/school/classes/CLASS%2F42/delete-preparation?returnTo=delete&focus=CLASS%2F41'
+  );
+});
+
 test('global delete action renders structured blocked preview in modal', () => {
   const mainScript = read('../../public/scripts/main.js');
   assert.match(mainScript, /renderDeleteBlockedPreview/);
   assert.match(mainScript, /DELETE_BLOCKED/);
+  assert.match(mainScript, /delete-blocked-modal-item/);
 });

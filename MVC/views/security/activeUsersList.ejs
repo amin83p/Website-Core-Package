@@ -28,6 +28,7 @@
 
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div class="small text-muted">
+    Users active in the last <%= Number(summaryData.staleMinutes || 5) %> minute<%= Number(summaryData.staleMinutes || 5) === 1 ? '' : 's' %>.
     Refreshes automatically every 60 seconds.
   </div>
   <button type="button" class="btn btn-outline-secondary btn-sm" id="activeUsersRefreshBtn">

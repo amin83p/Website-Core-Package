@@ -10,6 +10,7 @@ const {
   canCreateOrgScopedItem,
   assertOrgAccess
 } = requireCoreModule('MVC/utils/orgContextUtils');
+const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 function getActiveOrgIdOrThrow(reqUser) {
   return getActiveOrgIdOrThrowShared(reqUser);
@@ -161,8 +162,7 @@ async function deleteTerm(req, res) {
     if (isAjax(req)) return res.json({ status: 'success', message: 'Term deleted successfully.' });
     res.redirect('/school/terms');
   } catch (error) {
-    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
-    res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+    return respondSchoolDeleteError(req, res, error, { user: req.user });
   }
 }
 
