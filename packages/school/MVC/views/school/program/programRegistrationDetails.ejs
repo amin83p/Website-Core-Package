@@ -56,17 +56,27 @@
             </button>
           <% } %>
 
+          <% if (canManageRegistrations && registration.canDeleteDraft) { %>
+            <button type="button" class="btn btn-danger btn-sm" id="btnDeleteDraftRegistration">
+              <i class="bi bi-trash me-1"></i>Delete Draft
+            </button>
+          <% } %>
+
           <% if (canManageRegistrations && registration.canRollback) { %>
             <button type="button" class="btn btn-danger btn-sm" id="btnRollbackRegistration">
-              <i class="bi bi-arrow-counterclockwise me-1"></i><%= isDraftRecord ? 'Cancel Draft' : 'Move Registration Back to Draft' %>
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Move Registration Back to Draft
             </button>
-          <% } else if (canManageRegistrations && !registration.canRollback && ['registered', 'draft', 'error'].includes(String(registration.status || '').toLowerCase()) && (registration.termRegistrationsCount || registration.classEnrollmentsCount)) { %>
+          <% } else if (canManageRegistrations && !registration.canDeleteDraft && !registration.canRollback && ['registered', 'draft', 'error'].includes(String(registration.status || '').toLowerCase()) && (registration.termRegistrationsCount || registration.classEnrollmentsCount)) { %>
             <% const rollbackBlockers = []; %>
             <% if (registration.termRegistrationsCount) rollbackBlockers.push('term registrations'); %>
             <% if (registration.classEnrollmentsCount) rollbackBlockers.push('class enrollments'); %>
             <div class="alert alert-warning py-2 small mb-0">
-              Move back to draft is blocked because this program registration has <%= rollbackBlockers.join(' and ') %>.
-              <% if (registration.termRegistrationsCount) { %> Move the term registrations back to draft first.<% } %>
+              <% if (isDraftRecord) { %>
+                Delete draft is blocked because this program registration has <%= rollbackBlockers.join(' and ') %>.
+              <% } else { %>
+                Move back to draft is blocked because this program registration has <%= rollbackBlockers.join(' and ') %>.
+              <% } %>
+              <% if (registration.termRegistrationsCount) { %> Remove the term registrations first.<% } %>
               <% if (registration.classEnrollmentsCount) { %> Withdraw or rollback class enrollments under this program first.<% } %>
             </div>
           <% } %>
@@ -352,6 +362,7 @@
 <script>
 (function () {
   const btn = document.getElementById('btnRollbackRegistration');
+  const btnDeleteDraft = document.getElementById('btnDeleteDraftRegistration');
   const btnApproveTop = document.getElementById('btnApproveRegistration');
   const btnSaveDraft = document.getElementById('btnSaveDraftTransactions');
   const btnApproveDraftFromEditor = document.getElementById('btnApproveDraftFromEditor');
@@ -359,7 +370,7 @@
   const registrationId = <%- JSON.stringify(registration.id || '') %>;
   const studentName = <%- JSON.stringify(registration.studentName || registration.studentId || 'student') %>;
   const isDraftRecord = <%- JSON.stringify(isDraftRecord) %>;
-  const actionButtons = [btn, btnApproveTop, btnSaveDraft, btnApproveDraftFromEditor].filter(Boolean);
+  const actionButtons = [btn, btnDeleteDraft, btnApproveTop, btnSaveDraft, btnApproveDraftFromEditor].filter(Boolean);
   const manualRows = [];
   let actionInProgress = false;
 
@@ -720,6 +731,38 @@
     }
   }
 
+  if (btnDeleteDraft) {
+    btnDeleteDraft.addEventListener('click', async function () {
+      if (!registrationId) return;
+      try {
+        const result = await postDraftAction(
+          '/school/programs/register-students/rollback/' + encodeURIComponent(registrationId),
+          {
+            activeButton: btnDeleteDraft,
+            loadingLabel: 'Deleting...',
+            title: 'Delete Draft?',
+            message: 'Permanently delete draft registration for <b>' + escapeHtml(studentName) + '</b>?<br><br>This will permanently delete the draft registration.',
+            confirmLabel: 'Delete Draft',
+            confirmClass: 'btn-danger',
+            resultTitle: 'Draft Deleted',
+            note: 'Draft deleted from Program Registration details',
+            includeDraftPayload: false
+          }
+        );
+        if (result) {
+          window.location.href = String(result.redirectTo || '/school/programs/registrations');
+        }
+      } catch (error) {
+        await showMsg({
+          title: 'Delete Draft Error',
+          icon: 'error',
+          message: error.message || 'Draft deletion failed.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      }
+    });
+  }
+
   if (btn) {
     btn.addEventListener('click', async function () {
       if (!registrationId) return;
@@ -728,24 +771,22 @@
           '/school/programs/register-students/rollback/' + encodeURIComponent(registrationId),
           {
             activeButton: btn,
-            loadingLabel: isDraftRecord ? 'Cancelling...' : 'Moving back...',
-            title: isDraftRecord ? 'Cancel Draft?' : 'Move Registration Back to Draft?',
-            message: isDraftRecord
-              ? 'Cancel draft registration for <b>' + escapeHtml(studentName) + '</b>?<br><br>This keeps the registration in draft.'
-              : 'Move registration for <b>' + escapeHtml(studentName) + '</b> back to draft?<br><br>This will reverse finance postings and void academic entries that belong to this registration.',
-            confirmLabel: isDraftRecord ? 'Cancel Draft' : 'Move Back to Draft',
+            loadingLabel: 'Moving back...',
+            title: 'Move Registration Back to Draft?',
+            message: 'Move registration for <b>' + escapeHtml(studentName) + '</b> back to draft?<br><br>This will reverse finance postings and void academic entries that belong to this registration.',
+            confirmLabel: 'Move Back to Draft',
             confirmClass: 'btn-danger',
-            resultTitle: isDraftRecord ? 'Draft Cancel Result' : 'Move Back to Draft Result',
-            note: isDraftRecord ? 'Draft cancelled from Program Registration details' : 'Manual rollback from Program Registration details',
+            resultTitle: 'Move Back to Draft Result',
+            note: 'Manual rollback from Program Registration details',
             includeDraftPayload: false
           }
         );
         if (result) window.location.reload();
       } catch (error) {
         await showMsg({
-          title: isDraftRecord ? 'Cancel Error' : 'Move Back to Draft Error',
+          title: 'Move Back to Draft Error',
           icon: 'error',
-          message: error.message || (isDraftRecord ? 'Draft cancellation failed.' : 'Move back to draft failed.'),
+          message: error.message || 'Move back to draft failed.',
           buttons: [{ text: 'Close', class: 'btn-secondary' }]
         });
       }

@@ -1196,6 +1196,29 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     };
   }
 
+  if (key === 'academic-ledger') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Academic Ledger',
+      sectionId: SECTIONS.SCHOOL_ACADEMIC_LEDGER
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Academic Ledger.');
+      error.statusCode = 403;
+      throw error;
+    }
+    return {
+      section: {
+        key: 'academic-ledger',
+        label: 'Academic Ledger',
+        icon: 'bi bi-journal-bookmark-fill',
+        sourceUrl: '/school/academic-ledger'
+      },
+      rows: [],
+      total: 0,
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
   if (key === 'activities') {
     const access = await evaluateModuleAccess(req, {
       label: 'Activities',

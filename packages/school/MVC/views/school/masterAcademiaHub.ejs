@@ -45,7 +45,7 @@
 
   .school-master-hub .hub-section-panel-inner {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     direction: rtl;
   }
 
@@ -58,7 +58,7 @@
     border-left: 1px solid rgba(15, 23, 42, 0.09);
     background: rgba(255, 255, 255, 0.68);
     color: #475569;
-    padding: 1rem 1.1rem;
+    padding: 1rem 0.85rem;
     min-height: 4.25rem;
     text-align: center;
     font-weight: 700;
@@ -840,7 +840,7 @@
     }
 
     .school-master-hub .hub-section-panel-inner {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .school-master-hub .hub-shell {
@@ -917,6 +917,9 @@
       </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="leave-requests">
         <span><i class="bi bi-calendar-heart me-1"></i> Leave Requests</span>
+      </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="academic-ledger">
+        <span><i class="bi bi-journal-bookmark-fill me-1"></i> Academic Ledger</span>
       </button>
     </div>
   </div>
@@ -1241,7 +1244,8 @@
     activityPersonName: '',
     reportAssignmentTeacherPersonId: '',
     reportAssignmentTeacherName: '',
-    reportAssignmentScope: ''
+    reportAssignmentScope: '',
+    academicLedgerStudents: []
   };
 
   const workspaceSections = {
@@ -1292,6 +1296,12 @@
       endpoint: '/school/master-hub/api/workspace/holidays',
       sourceUrl: '/school/holidays',
       icon: 'bi bi-calendar-event-fill'
+    },
+    'academic-ledger': {
+      label: 'Academic Ledger',
+      endpoint: '/school/master-hub/api/workspace/academic-ledger',
+      sourceUrl: '/school/academic-ledger',
+      icon: 'bi bi-journal-bookmark-fill'
     }
   };
 
@@ -4259,6 +4269,126 @@
     bindHubAttendanceControls();
   }
 
+  function resolveHubStudentRecordId(item) {
+    return String(item?.id || item?.studentId || '').trim();
+  }
+
+  function formatHubStudentRecordName(item, fallbackId) {
+    return formatHubSchedulePersonName(item, fallbackId);
+  }
+
+  function mergeAcademicLedgerStudents(items) {
+    (Array.isArray(items) ? items : [items]).forEach(function (item) {
+      const id = resolveHubStudentRecordId(item);
+      if (!id) return;
+      const name = formatHubStudentRecordName(item, id);
+      if (!workspaceState.academicLedgerStudents.some(function (row) { return row.id === id; })) {
+        workspaceState.academicLedgerStudents.push({ id: id, name: name });
+      }
+    });
+  }
+
+  function renderAcademicLedgerStudentListHtml() {
+    const students = workspaceState.academicLedgerStudents || [];
+    if (!students.length) {
+      return [
+        '<div class="hub-empty">',
+        '<div><i class="bi bi-person-lines-fill display-6 d-block mb-3"></i>',
+        '<div class="fw-semibold">No students selected</div>',
+        '<div class="text-muted small mt-1">Use Select Students to choose one or more students, then open their Academic Ledger overview.</div>',
+        '</div></div>'
+      ].join('');
+    }
+    const rows = students.map(function (student) {
+      const href = '/school/academic-ledger/student-overview/' + encodeURIComponent(student.id);
+      return [
+        '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer"',
+        ' class="list-group-item list-group-item-action d-flex justify-content-between align-items-center hub-academic-ledger-student">',
+        '<div><div class="fw-semibold">' + escapeHtml(student.name) + '</div>',
+        '<div class="small text-muted font-monospace">' + escapeHtml(student.id) + '</div></div>',
+        '<i class="bi bi-box-arrow-up-right text-primary"></i>',
+        '</a>'
+      ].join('');
+    }).join('');
+    return '<div class="list-group list-group-flush border rounded">' + rows + '</div>';
+  }
+
+  function renderAcademicLedgerWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : {
+      key: 'academic-ledger',
+      label: 'Academic Ledger',
+      icon: 'bi bi-journal-bookmark-fill',
+      sourceUrl: '/school/academic-ledger'
+    };
+    const count = (workspaceState.academicLedgerStudents || []).length;
+    const countLabel = count === 1 ? '1 student selected' : count + ' students selected';
+    els.workspace.innerHTML = [
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div><div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-journal-bookmark-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Academic Ledger') + '</h2>',
+      '<p class="text-muted mb-0">Select students, then open each student\'s registration overview from the Academic Ledger.</p></div>',
+      '<div class="d-flex gap-2"><a href="' + escapeHtml(section.sourceUrl || '/school/academic-ledger') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Ledger</a></div>',
+      '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="d-flex flex-wrap align-items-center justify-content-between gap-3">',
+      '<div><span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2" id="hubAcademicLedgerCount">' + escapeHtml(countLabel) + '</span></div>',
+      '<div class="d-flex flex-wrap gap-2">',
+      '<button type="button" class="btn btn-primary btn-sm" id="hubAcademicLedgerPickStudents"><i class="bi bi-person-plus me-1"></i> Select Students</button>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="hubAcademicLedgerClearStudents"><i class="bi bi-x-circle me-1"></i> Clear</button>',
+      '</div></div></div>',
+      '<div class="p-3" id="hubAcademicLedgerStudentList">' + renderAcademicLedgerStudentListHtml() + '</div>',
+      '</div>'
+    ].join('');
+    bindHubAcademicLedgerControls();
+  }
+
+  function openHubAcademicLedgerStudentPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Student Picker', icon: 'warning', message: 'Student picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.student({
+      title: 'Select Students',
+      placeholder: 'Search students, select one or more...',
+      multiselect: true,
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (items) {
+        mergeAcademicLedgerStudents(items);
+        const config = workspaceSections['academic-ledger'] || {};
+        renderAcademicLedgerWorkspace({
+          section: {
+            key: 'academic-ledger',
+            label: config.label || 'Academic Ledger',
+            icon: config.icon || 'bi bi-journal-bookmark-fill',
+            sourceUrl: config.sourceUrl || '/school/academic-ledger'
+          }
+        });
+      }
+    }));
+  }
+
+  function bindHubAcademicLedgerControls() {
+    const pickBtn = document.getElementById('hubAcademicLedgerPickStudents');
+    const clearBtn = document.getElementById('hubAcademicLedgerClearStudents');
+    if (pickBtn) pickBtn.addEventListener('click', openHubAcademicLedgerStudentPicker);
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function () {
+        workspaceState.academicLedgerStudents = [];
+        renderAcademicLedgerWorkspace({
+          section: {
+            key: 'academic-ledger',
+            label: 'Academic Ledger',
+            icon: 'bi bi-journal-bookmark-fill',
+            sourceUrl: '/school/academic-ledger'
+          }
+        });
+      });
+    }
+  }
+
   function bindHubAttendanceControls() {
     const pickerBtn = document.getElementById('hubAttendancePickClass');
     const loadBtn = document.getElementById('hubAttendanceLoad');
@@ -6578,6 +6708,14 @@
         icon: 'bi bi-calendar-event-fill'
       };
     }
+    if (key === 'academic-ledger' && !workspaceSections['academic-ledger']) {
+      workspaceSections['academic-ledger'] = {
+        label: 'Academic Ledger',
+        endpoint: '/school/master-hub/api/workspace/academic-ledger',
+        sourceUrl: '/school/academic-ledger',
+        icon: 'bi bi-journal-bookmark-fill'
+      };
+    }
     const config = workspaceSections[key];
     if (!config || workspaceState.loading) return;
 
@@ -6651,6 +6789,8 @@
         renderReportInstanceWorkspace(payload);
       } else if (key === 'holidays') {
         renderHolidayWorkspace(payload);
+      } else if (key === 'academic-ledger') {
+        renderAcademicLedgerWorkspace(payload);
       }
     } catch (error) {
       renderWorkspaceStatus(error.message || 'Unable to load this section.', 'bi-exclamation-triangle', 'danger');
@@ -6783,6 +6923,21 @@
           label: 'Attendance',
           icon: 'bi bi-clipboard-check-fill',
           sourceUrl: '/school/attendances'
+        },
+        rows: [],
+        total: 0
+      });
+      return;
+    }
+
+    if (key === 'academic-ledger') {
+      renderAcademicLedgerWorkspace({
+        status: 'success',
+        section: {
+          key: 'academic-ledger',
+          label: 'Academic Ledger',
+          icon: 'bi bi-journal-bookmark-fill',
+          sourceUrl: '/school/academic-ledger'
         },
         rows: [],
         total: 0

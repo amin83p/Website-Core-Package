@@ -184,7 +184,7 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
       const classEnrollmentsCount = classEnrollmentCountsByStudentProgram.get(
         buildStudentProgramKey(registration.studentId, registration.programId)
       ) || 0;
-      const rollbackEligibleStatus = ['registered', 'draft', 'error'].includes(String(registration.status || '').toLowerCase());
+      const rollbackEligibleStatus = ['registered', 'error'].includes(String(registration.status || '').toLowerCase());
 
       return {
         id: registration.id,
@@ -209,10 +209,11 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
           voided: voidedAcademicEntries
         },
         statusBadgeClass: getVerificationBadgeClass(verificationStatus),
+        canApprove: String(registration.status || '').toLowerCase() === 'draft',
+        canDeleteDraft: String(registration.status || '').toLowerCase() === 'draft',
         canRollback: rollbackEligibleStatus
           && termRegistrationsCount === 0
           && classEnrollmentsCount === 0,
-        canApprove: String(registration.status || '').toLowerCase() === 'draft',
         termRegistrationsCount,
         classEnrollmentsCount,
         transactionIds,

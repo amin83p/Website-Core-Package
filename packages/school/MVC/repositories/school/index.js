@@ -1397,6 +1397,22 @@ schoolRepositories.studentProgramRegistrations.clearByOrg = async (orgId, option
   }, 'school.studentProgramRegistrations.clearByOrg');
 };
 
+schoolRepositories.studentProgramRegistrations.deleteDraftRegistration = async (id, options = {}) => {
+  const normalizedId = toPublicId(id);
+  if (!normalizedId) throw new Error('Registration id is required.');
+  return runByRepositoryBackend(options, {
+    json: async () => studentProgramRegistrationModel.deleteRegistration(normalizedId, options),
+    mongo: async () => {
+      const collection = getMongoCollection('schoolStudentProgramRegistrations');
+      const result = await collection.deleteOne(resolveMongoIdFilter(normalizedId));
+      if (!Number(result?.deletedCount || 0)) {
+        throw new Error('Student program registration not found.');
+      }
+      return { id: normalizedId, deleted: true };
+    }
+  }, 'school.studentProgramRegistrations.deleteDraftRegistration');
+};
+
 schoolRepositories.studentTermRegistrations.clearByOrg = async (orgId, options = {}) => {
   const targetOrgId = toPublicId(orgId);
   if (!targetOrgId) throw new Error('orgId is required to clear term registrations.');

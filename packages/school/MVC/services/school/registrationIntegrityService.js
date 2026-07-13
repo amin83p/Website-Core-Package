@@ -1379,6 +1379,90 @@ const registrationIntegrityService = {
     return registration;
   },
 
+  async assertProgramDraftDeletionAllowed(registration, { reqUser, activeOrgId } = {}) {
+    const registrationId = toPublicId(registration?.id);
+    if (!registrationId) throw new Error('Program registration not found.');
+
+    const status = normalizeStatus(registration.status);
+    if (status !== 'draft') {
+      throw new Error('Only draft program registrations can be deleted.');
+    }
+
+    const activePostedTransactions = await countUnresolvedPostedTransactions(
+      registration?.transactionSummary?.transactionIds
+    );
+    if (activePostedTransactions > 0) {
+      throw new Error('Cannot delete this draft because active finance postings still exist.');
+    }
+
+    const activeAcademicEntries = await countNonVoidAcademicEntries(
+      registration?.academicSummary?.entryIds
+    );
+    if (activeAcademicEntries > 0) {
+      throw new Error('Cannot delete this draft because active academic ledger entries still exist.');
+    }
+
+    const orgScope = toPublicId(activeOrgId) || toPublicId(registration?.orgId);
+    const termDependentCount = await schoolRepositories.studentTermRegistrations.countActiveByProgramRegistrationId(
+      registrationId,
+      { orgId: orgScope }
+    );
+    if (termDependentCount > 0) {
+      const dependentPreview = await schoolRepositories.studentTermRegistrations.findActiveByProgramRegistrationId(
+        registrationId,
+        { orgId: orgScope, limit: 5 }
+      );
+      const examples = formatDependentTermExamples(dependentPreview);
+      throw new Error(
+        `Cannot delete this draft because term registrations exist for it (${termDependentCount}). ` +
+        `Remove the term registrations first. ${examples ? `Examples: ${examples}` : ''}`
+      );
+    }
+
+    const studentId = String(registration?.studentId || '').trim();
+    const programId = String(registration?.programId || '').trim();
+    const classDependentCount = await schoolRepositories.classEnrollmentPeriods.countBlockingByStudentAndProgram(
+      studentId,
+      programId,
+      { orgId: orgScope }
+    );
+    if (classDependentCount > 0) {
+      const classDependentPreview = await schoolRepositories.classEnrollmentPeriods.findBlockingByStudentAndProgram(
+        studentId,
+        programId,
+        { orgId: orgScope, limit: 5 }
+      );
+      const classExamples = formatDependentClassEnrollmentExamples(classDependentPreview);
+      throw new Error(
+        `Cannot delete this draft because class enrollments exist under this program (${classDependentCount}). ` +
+        `Remove class enrollments first. ${classExamples ? `Examples: ${classExamples}` : ''}`
+      );
+    }
+
+    const withdrawals = await withdrawalRepository.list({
+      query: { page: 1, limit: 5, programRegistrationId__eq: registrationId },
+      scope: { canViewAll: true }
+    });
+    if (Array.isArray(withdrawals) && withdrawals.length) {
+      throw new Error('Cannot delete this draft because withdrawal records reference it.');
+    }
+  },
+
+  async deleteDraftProgramRegistration(registrationId, { reqUser, activeOrgId, options = {} } = {}) {
+    const normalizedId = toPublicId(registrationId);
+    if (!normalizedId) throw new Error('Registration id is required.');
+
+    const registration = await this.getProgramRegistrationInOrgOrThrow(normalizedId, activeOrgId);
+    await this.assertProgramDraftDeletionAllowed(registration, { reqUser, activeOrgId });
+    await schoolRepositories.studentProgramRegistrations.deleteDraftRegistration(normalizedId, options);
+    recordTransactionOperation(options, {
+      type: 'delete',
+      entityType: 'studentProgramRegistrations',
+      id: normalizedId
+    });
+    return { registrationId: normalizedId };
+  },
+
   async assertTermDraftDeletionAllowed(registration, { reqUser, activeOrgId } = {}) {
     const registrationId = toPublicId(registration?.id);
     if (!registrationId) throw new Error('Term registration not found.');

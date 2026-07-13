@@ -883,7 +883,15 @@ exports.rollbackRegistration = async (req, res) => {
     const registration = await registrationIntegrityService.getProgramRegistrationInOrgOrThrow(registrationId, activeOrgId);
     const currentStatus = String(registration.status || '').toLowerCase();
     if (currentStatus === 'draft') {
-      const payloadOut = { status: 'success', message: 'Registration is already in draft.' };
+      await registrationIntegrityService.deleteDraftProgramRegistration(registrationId, {
+        reqUser: req.user,
+        activeOrgId
+      });
+      const payloadOut = {
+        status: 'success',
+        message: 'Draft program registration deleted.',
+        redirectTo: '/school/programs/registrations'
+      };
       idempotencyGuardService.completeGuard(guardKey, payloadOut);
       return res.json(payloadOut);
     }

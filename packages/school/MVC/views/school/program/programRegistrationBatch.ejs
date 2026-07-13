@@ -486,6 +486,7 @@
     const academicVoided = Number(model.academic?.voided || 0);
     const note = String(model.note || '').trim() || '-';
     const canApprove = Boolean(model.canApprove);
+    const canDeleteDraft = Boolean(model.canDeleteDraft);
     const canRollback = Boolean(model.canRollback);
     const termRegistrationsCount = Number(model.termRegistrationsCount || 0);
     const classEnrollmentsCount = Number(model.classEnrollmentsCount || 0);
@@ -497,15 +498,20 @@
         '<button type="button" class="btn btn-sm btn-success rounded-pill shadow-sm px-3" data-approve-registration="' + escapeHtml(registrationId) + '" data-approve-student="' + escapeHtml(studentName) + '">' +
         '<i class="bi bi-check2-circle me-1"></i>Approve &amp; Post</button>';
     }
+    if (canManageRegistrations && canDeleteDraft) {
+      actionsHtml +=
+        '<button type="button" class="btn btn-sm btn-danger rounded-pill px-3" data-delete-draft-registration="' + escapeHtml(registrationId) + '" data-delete-draft-student="' + escapeHtml(studentName) + '">' +
+        '<i class="bi bi-trash me-1"></i>Delete Draft</button>';
+    }
     if (canManageRegistrations && canRollback) {
       actionsHtml +=
         '<button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" data-rollback-registration="' + escapeHtml(registrationId) + '" data-rollback-student="' + escapeHtml(studentName) + '">' +
-        '<i class="bi bi-arrow-counterclockwise me-1"></i>' + (recordStatus.toLowerCase() === 'draft' ? 'Cancel Draft' : 'Rollback') + '</button>';
+        '<i class="bi bi-arrow-counterclockwise me-1"></i>Rollback</button>';
     } else if (canManageRegistrations && (termRegistrationsCount > 0 || classEnrollmentsCount > 0)) {
       const blockers = [];
       if (termRegistrationsCount > 0) blockers.push('term registrations');
       if (classEnrollmentsCount > 0) blockers.push('class enrollments');
-      actionsHtml += '<span class="text-muted small">Rollback blocked (' + blockers.join(' and ') + ' exist)</span>';
+      actionsHtml += '<span class="text-muted small">' + (recordStatus.toLowerCase() === 'draft' ? 'Delete draft blocked' : 'Rollback blocked') + ' (' + blockers.join(' and ') + ' exist)</span>';
     } else if (canManageRegistrations) {
       actionsHtml += '<span class="text-muted small">No action</span>';
     }
@@ -567,7 +573,8 @@
       },
       note: String(document.getElementById('inp_note')?.value || '').trim(),
       canApprove: true,
-      canRollback: true,
+      canDeleteDraft: true,
+      canRollback: false,
       termRegistrationsCount: 0,
       classEnrollmentsCount: 0
     };
@@ -582,6 +589,72 @@
     }
     rowEl.innerHTML = buildRecentRegistrationRowHtml(draftModel);
     bindRecentActionButtons(rowEl);
+  }
+
+  async function handleDeleteDraftButtonClick(btn) {
+    const registrationId = String(btn?.getAttribute('data-delete-draft-registration') || '').trim();
+    const studentName = String(btn?.getAttribute('data-delete-draft-student') || registrationId).trim();
+    if (!registrationId || !btn) return;
+
+    let confirmed = false;
+    if (typeof window.showMessageModal === 'function') {
+      const result = await window.showMessageModal({
+        title: 'Delete Draft?',
+        icon: 'warning',
+        message: 'Permanently delete draft registration for <b>' + escapeHtml(studentName) + '</b>?<br><br>This will permanently delete the draft registration.',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Delete Draft', class: 'btn-danger' }
+        ]
+      });
+      confirmed = result === 'Delete Draft';
+    } else {
+      confirmed = window.confirm('Permanently delete draft registration for ' + studentName + '?');
+    }
+    if (!confirmed) return;
+
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Deleting...';
+    try {
+      const body = new URLSearchParams({ note: 'Draft deleted from Student Program Registration page' });
+      const response = await fetch('/school/programs/register-students/rollback/' + encodeURIComponent(registrationId), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: body.toString()
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Delete Draft In Progress', replayTitle: 'Delete Draft Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status === 'error') throw new Error(result.message || 'Delete draft failed.');
+      await showMsg({
+        title: 'Draft Deleted',
+        icon: 'success',
+        message: result.message || 'Draft program registration deleted.',
+        buttons: [{ text: 'OK', class: 'btn-success' }]
+      });
+      const rowEl = findRecentRegistrationRow(registrationId);
+      if (rowEl) rowEl.remove();
+      const tbody = document.getElementById('recentRegistrationsTbody');
+      if (tbody && !tbody.querySelector('tr[data-registration-row]')) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No recent registrations yet.</td></tr>';
+      }
+    } catch (error) {
+      await showMsg({
+        title: 'Delete Draft Error',
+        icon: 'error',
+        message: error.message || 'Delete draft failed.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
   }
 
   async function handleRollbackButtonClick(btn) {
@@ -709,6 +782,11 @@
 
   function bindRecentActionButtons(scope) {
     const root = scope && scope.querySelectorAll ? scope : document;
+    root.querySelectorAll('button[data-delete-draft-registration]').forEach(function (btn) {
+      if (btn.dataset.boundDeleteDraft === '1') return;
+      btn.dataset.boundDeleteDraft = '1';
+      btn.addEventListener('click', function () { handleDeleteDraftButtonClick(btn); });
+    });
     root.querySelectorAll('button[data-rollback-registration]').forEach(function (btn) {
       if (btn.dataset.boundRollback === '1') return;
       btn.dataset.boundRollback = '1';

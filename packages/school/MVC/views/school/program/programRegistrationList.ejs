@@ -88,20 +88,28 @@
                     <i class="bi bi-check2-circle me-2"></i>Approve & Post
                   </button>
                 <% } %>
+                <% if (canManageRegistrations && item.canDeleteDraft) { %>
+                  <button
+                    type="button"
+                    class="btn btn-danger btn-sm delete-draft-btn"
+                    data-id="<%= item.id %>"
+                    data-name="<%= item.studentName || item.studentId %>">
+                    <i class="bi bi-trash me-2"></i>Delete Draft
+                  </button>
+                <% } %>
                 <% if (canManageRegistrations && item.canRollback) { %>
                   <button
                     type="button"
                     class="btn btn-danger btn-sm rollback-btn"
                     data-id="<%= item.id %>"
                     data-name="<%= item.studentName || item.studentId %>">
-                    <i class="bi bi-arrow-counterclockwise me-2"></i>
-                    <%= String(item.status || '').toLowerCase() === 'draft' ? 'Cancel Draft' : 'Move Back to Draft' %>
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Move Back to Draft
                   </button>
-                <% } else if (canManageRegistrations && !item.canRollback && ['registered', 'draft', 'error'].includes(String(item.status || '').toLowerCase()) && (item.termRegistrationsCount || item.classEnrollmentsCount)) { %>
+                <% } else if (canManageRegistrations && !item.canDeleteDraft && !item.canRollback && ['registered', 'draft', 'error'].includes(String(item.status || '').toLowerCase()) && (item.termRegistrationsCount || item.classEnrollmentsCount)) { %>
                   <% const listRollbackBlockers = []; %>
                   <% if (item.termRegistrationsCount) listRollbackBlockers.push('term registrations'); %>
                   <% if (item.classEnrollmentsCount) listRollbackBlockers.push('class enrollments'); %>
-                  <span class="text-muted small d-block ps-1">Move back to draft is blocked (<%= listRollbackBlockers.join(' and ') %> exist)</span>
+                  <span class="text-muted small d-block ps-1"><%= String(item.status || '').toLowerCase() === 'draft' ? 'Delete draft is blocked' : 'Move back to draft is blocked' %> (<%= listRollbackBlockers.join(' and ') %> exist)</span>
                 <% } %>
               </div>
             </div>
@@ -242,6 +250,64 @@
     }
     hint.textContent = isWarning ? 'Moved back to draft with issues' : 'Moved back to draft';
   }
+
+  document.querySelectorAll('.delete-draft-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const id = String(btn.getAttribute('data-id') || '').trim();
+      const name = String(btn.getAttribute('data-name') || id).trim();
+      if (!id) return;
+      const confirmed = typeof window.showMessageModal === 'function'
+        ? (await window.showMessageModal({
+            title: 'Delete Draft Program Registration?',
+            icon: 'warning',
+            message: 'Permanently delete draft registration for <b>' + String(name || '').replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; }) + '</b>?<br><br>This will permanently delete the draft registration.',
+            buttons: [
+              { text: 'Cancel', class: 'btn-secondary' },
+              { text: 'Delete Draft', class: 'btn-danger' }
+            ]
+          })) === 'Delete Draft'
+        : window.confirm('Permanently delete draft registration for ' + name + '?');
+      if (!confirmed) return;
+
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Deleting...';
+      try {
+        const body = new URLSearchParams({ note: 'Draft deleted from Program Registrations list' });
+        const response = await fetch('/school/programs/register-students/rollback/' + encodeURIComponent(id), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: body.toString()
+        });
+        const result = await response.json();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Delete Draft In Progress', replayTitle: 'Delete Draft Already Processed' })
+          : { stop: false };
+        if (guarded.stop) return;
+        if (result.status === 'error') throw new Error(result.message || 'Delete draft failed.');
+        await showMsg({
+          title: 'Draft Deleted',
+          icon: 'success',
+          message: result.message || 'Draft program registration deleted.',
+          buttons: [{ text: 'OK', class: 'btn-success' }]
+        });
+        window.location.reload();
+      } catch (error) {
+        await showMsg({
+          title: 'Delete Draft Error',
+          icon: 'error',
+          message: error.message || 'Delete draft failed.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    });
+  });
 
   document.querySelectorAll('.rollback-btn').forEach(function (btn) {
     btn.addEventListener('click', async function () {
