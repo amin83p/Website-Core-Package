@@ -49,6 +49,7 @@ const schoolIdentityLookupService = require('../../services/school/schoolIdentit
 const schoolRepositories = require('../../repositories/school');
 const classCycleLinkResolutionService = require('../../services/school/classCycleLinkResolutionService');
 const classDeletePreparationService = require('../../services/school/classDeletePreparationService');
+const classDeleteCascadeService = require('../../services/school/classDeleteCascadeService');
 const classStorageIntegrityService = require('../../services/school/classStorageIntegrityService');
 const classFolderPaths = require('../../services/school/classFolderPaths');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -2781,7 +2782,8 @@ async function postClassStorageIntegrityApplyApi(req, res) {
     guardKey = idempotencyGuardService.createGuardKey([
       'class_storage_integrity_apply',
       activeOrgId,
-      mode
+      mode,
+      selected
     ]);
     const guardResult = idempotencyGuardService.beginGuard({
       key: guardKey,
@@ -2797,11 +2799,16 @@ async function postClassStorageIntegrityApplyApi(req, res) {
       selected
     });
     const scan = await classStorageIntegrityService.scanClassStorageIntegrity(activeOrgId, req.user);
+    const applyErrors = Array.isArray(result?.errors) ? result.errors : [];
+    const deletedCount = Object.values(result?.deleted || {}).reduce((sum, count) => sum + Number(count || 0), 0);
+    const skippedCount = Object.values(result?.skipped || {}).reduce((sum, count) => sum + Number(count || 0), 0);
     const payloadOut = {
-      status: 'success',
+      status: applyErrors.length && !deletedCount ? 'error' : 'success',
       message: mode === 'safe_fixes'
         ? 'Safe fixes applied.'
-        : 'Selected orphan records processed.',
+        : (applyErrors.length
+          ? `Processed with ${applyErrors.length} issue(s). Deleted ${deletedCount}, skipped ${skippedCount}.`
+          : `Deleted ${deletedCount} selected record(s).`),
       data: result,
       scan
     };
@@ -2915,6 +2922,15 @@ async function deleteClass(req, res) {
     });
 
     await classCycleLinkResolutionService.clearInboundCycleReferencesForClassDelete(classId, req.user);
+
+    const cascadeResult = await classDeleteCascadeService.cascadeDeleteClassSessionAssets(
+      classId,
+      req.user,
+      classData?.orgId || activeOrgId
+    );
+    if (cascadeResult.errors.length) {
+      throw new Error(`Could not remove session student cases before class delete: ${cascadeResult.errors.slice(0, 5).join('; ')}`);
+    }
 
     await schoolDataService.deleteData('classes', req.params.id, req.user);
     const folderCleanup = await cleanupClassRelatedFolders(classData);

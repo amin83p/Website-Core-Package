@@ -329,3 +329,387 @@ test('classController delegates folder cleanup to classFolderPaths helper', () =
   assert.match(controller, /classFolderPaths/);
   assert.match(controller, /deleteClassFolderTargets/);
 });
+
+const DANGLING_STUB_DEFAULTS = {
+  reportAssignments: () => [],
+  reportInstances: () => [],
+  sessionStudentCases: () => [],
+  examAllocations: () => [],
+  examAssignments: () => [],
+  examTemplates: () => [],
+  examRevisions: () => []
+};
+
+function stubScanEnvironment({
+  classRowsByOrg = { [ORG_1]: [{ id: LIVE_CLASS, orgId: ORG_1, title: 'Live Class' }] },
+  otherFetches = {},
+  sessionsByClass = {},
+  originals = {}
+} = {}) {
+  const mergedFetches = { ...DANGLING_STUB_DEFAULTS, ...otherFetches };
+  originals.fetchData = originals.fetchData ?? schoolDataService.fetchData;
+  originals.getClassSessions = originals.getClassSessions ?? schoolDataService.getClassSessions;
+  originals.scanOrphanFolders = originals.scanOrphanFolders ?? classFolderPaths.scanOrphanClassFolders;
+  originals.scanMissing = originals.scanMissing ?? classFolderPaths.scanMissingFoldersForLiveClasses;
+  originals.ledgerPreview = originals.ledgerPreview ?? registrationIntegrityService.previewOrphanedClassEnrollmentLedgerForOrg;
+
+  schoolDataService.fetchData = stubFetchForOrgClasses(classRowsByOrg, mergedFetches);
+  schoolDataService.getClassSessions = async (classId) => sessionsByClass[classId] || [];
+  classFolderPaths.scanOrphanClassFolders = async () => [];
+  classFolderPaths.scanMissingFoldersForLiveClasses = async () => [];
+  registrationIntegrityService.previewOrphanedClassEnrollmentLedgerForOrg = async () => [];
+
+  return originals;
+}
+
+function restoreScanEnvironment(originals = {}) {
+  if (originals.fetchData) schoolDataService.fetchData = originals.fetchData;
+  if (originals.getClassSessions) schoolDataService.getClassSessions = originals.getClassSessions;
+  if (originals.scanOrphanFolders) classFolderPaths.scanOrphanClassFolders = originals.scanOrphanFolders;
+  if (originals.scanMissing) classFolderPaths.scanMissingFoldersForLiveClasses = originals.scanMissing;
+  if (originals.ledgerPreview) {
+    registrationIntegrityService.previewOrphanedClassEnrollmentLedgerForOrg = originals.ledgerPreview;
+  }
+}
+
+test('storage integrity view includes Dangling Class References section', () => {
+  const view = read('MVC/views/school/class/classStorageIntegrity.ejs');
+  assert.match(view, /Dangling Class References \(live classes\)/);
+  assert.match(view, /renderDanglingRefs/);
+  assert.match(view, /danglingRefs\./);
+  assert.match(view, /dangling-select/);
+});
+
+test('classStorageIntegrityService exports dangling reference scanner', () => {
+  assert.equal(typeof classStorageIntegrityService.scanDanglingClassReferences, 'function');
+  assert.ok(Array.isArray(classStorageIntegrityService.DANGLING_REF_GROUPS));
+  assert.ok(classStorageIntegrityService.DANGLING_REF_GROUPS.some((group) => group.key === 'reportInstances'));
+});
+
+test('scanClassStorageIntegrity flags report instance with missing assignment as dangling safe_delete', async () => {
+  const originals = stubScanEnvironment({
+    otherFetches: {
+      reportInstances: () => ([{
+        id: 'RI/MISSING-ASSIGN',
+        orgId: ORG_1,
+        classId: LIVE_CLASS,
+        assignmentId: 'RA/DELETED',
+        status: 'draft'
+      }])
+    }
+  });
+
+  try {
+    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(ORG_1, REQ_USER);
+    const group = scan.danglingRefs.reportInstances;
+    assert.equal(group.count, 1);
+    assert.equal(group.rows[0].issueCode, 'missing_assignment');
+    assert.equal(group.rows[0].canSelect, true);
+    assert.equal(group.rows[0].severity, 'safe_delete');
+    assert.ok(scan.totals.selectableDeleteCount >= 1);
+  } finally {
+    restoreScanEnvironment(originals);
+  }
+});
+
+test('scanClassStorageIntegrity flags locked dangling report instance with missing assignment as safe_delete', async () => {
+  const originals = stubScanEnvironment({
+    otherFetches: {
+      reportInstances: () => ([{
+        id: 'RI/LOCKED',
+        orgId: ORG_1,
+        classId: LIVE_CLASS,
+        assignmentId: 'RA/DELETED',
+        status: 'locked'
+      }])
+    }
+  });
+
+  try {
+    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(ORG_1, REQ_USER);
+    const row = scan.danglingRefs.reportInstances.rows[0];
+    assert.equal(row.issueCode, 'missing_assignment');
+    assert.equal(row.severity, 'safe_delete');
+    assert.equal(row.canSelect, true);
+    assert.match(row.blockReason, /unlocked automatically/i);
+  } finally {
+    restoreScanEnvironment(originals);
+  }
+});
+
+test('scanClassStorageIntegrity flags archived report instance as dangling safe_delete', async () => {
+  const originals = stubScanEnvironment({
+    otherFetches: {
+      reportInstances: () => ([{
+        id: 'RI/ARCHIVED',
+        orgId: ORG_1,
+        classId: LIVE_CLASS,
+        assignmentId: 'RA/LIVE',
+        status: 'archived'
+      }]),
+      reportAssignments: () => ([{ id: 'RA/LIVE', orgId: ORG_1, classId: LIVE_CLASS }])
+    }
+  });
+
+  try {
+    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(ORG_1, REQ_USER);
+    const row = scan.danglingRefs.reportInstances.rows[0];
+    assert.equal(row.issueCode, 'archived_hidden');
+    assert.equal(row.severity, 'safe_delete');
+    assert.equal(row.canSelect, true);
+  } finally {
+    restoreScanEnvironment(originals);
+  }
+});
+
+test('scanClassStorageIntegrity flags report instance with empty assignmentId as dangling safe_delete', async () => {
+  const originals = stubScanEnvironment({
+    otherFetches: {
+      reportInstances: () => ([{
+        id: 'RI/NO-ASSIGN',
+        orgId: ORG_1,
+        classId: LIVE_CLASS,
+        assignmentId: '',
+        status: 'draft'
+      }])
+    }
+  });
+
+  try {
+    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(ORG_1, REQ_USER);
+    const row = scan.danglingRefs.reportInstances.rows[0];
+    assert.equal(row.issueCode, 'missing_assignment');
+    assert.equal(row.canSelect, true);
+  } finally {
+    restoreScanEnvironment(originals);
+  }
+});
+
+test('scanClassStorageIntegrity classifies session case on deleted class as db orphan safe_delete', async () => {
+  const originals = stubScanEnvironment({
+    classRowsByOrg: { [ORG_1]: [{ id: LIVE_CLASS, orgId: ORG_1, title: 'Live Class' }] },
+    otherFetches: {
+      sessionStudentCases: () => ([{
+        id: 'SSC/DELETED-CLASS',
+        orgId: ORG_1,
+        classId: DELETED_CLASS,
+        sessionId: 'SESSION/MISSING',
+        studentId: 'STU/1'
+      }])
+    }
+  });
+
+  try {
+    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(ORG_1, REQ_USER);
+    const row = scan.dbOrphans.sessionStudentCases.rows[0];
+    assert.equal(row.issueCode, 'missing_class');
+    assert.equal(row.severity, 'safe_delete');
+    assert.equal(row.canSelect, true);
+    assert.equal(row.href, '');
+    assert.match(row.blockReason, /cannot be opened/i);
+  } finally {
+    restoreScanEnvironment(originals);
+  }
+});
+
+test('applyClassStorageIntegrity delete_selected removes db orphan session student case', async () => {
+  const originals = stubScanEnvironment({
+    classRowsByOrg: { [ORG_1]: [{ id: LIVE_CLASS, orgId: ORG_1 }] },
+    otherFetches: {
+      sessionStudentCases: () => ([{
+        id: 'SSC/DELETE-ME',
+        orgId: ORG_1,
+        classId: DELETED_CLASS,
+        sessionId: 'SESSION/MISSING',
+        studentId: 'STU/1'
+      }])
+    }
+  });
+  originals.deleteData = schoolDataService.deleteData;
+  const deleted = [];
+  schoolDataService.deleteData = async (entityType, id, reqUser, context) => {
+    deleted.push({ entityType, id, context });
+    return { id };
+  };
+
+  try {
+    const result = await classStorageIntegrityService.applyClassStorageIntegrity({
+      orgId: ORG_1,
+      reqUser: REQ_USER,
+      mode: 'delete_selected',
+      selected: {
+        sessionStudentCases: ['SSC/DELETE-ME']
+      }
+    });
+    assert.equal(deleted.length, 1);
+    assert.equal(deleted[0].entityType, 'sessionStudentCases');
+    assert.equal(deleted[0].context.skipDeletionGuard, true);
+    assert.equal(result.deleted.sessionStudentCases, 1);
+  } finally {
+    restoreScanEnvironment(originals);
+    if (originals.deleteData) schoolDataService.deleteData = originals.deleteData;
+  }
+});
+
+test('scanClassStorageIntegrity flags session case with invalid sessionId as dangling safe_delete', async () => {
+  const originals = stubScanEnvironment({
+    otherFetches: {
+      sessionStudentCases: () => ([{
+        id: 'SSC/BAD-SESSION',
+        orgId: ORG_1,
+        classId: LIVE_CLASS,
+        sessionId: 'SESSION/MISSING',
+        studentId: 'STU/1'
+      }])
+    },
+    sessionsByClass: {
+      [LIVE_CLASS]: [{ sessionId: 'SESSION/LIVE' }]
+    }
+  });
+
+  try {
+    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(ORG_1, REQ_USER);
+    const row = scan.danglingRefs.sessionStudentCases.rows[0];
+    assert.equal(row.issueCode, 'missing_session');
+    assert.equal(row.severity, 'safe_delete');
+    assert.equal(row.canSelect, true);
+    assert.equal(row.href, '');
+    assert.match(row.blockReason, /cannot be opened/i);
+  } finally {
+    restoreScanEnvironment(originals);
+  }
+});
+
+test('scanClassStorageIntegrity flags exam assignment with missing allocation as dangling safe_delete', async () => {
+  const originals = stubScanEnvironment({
+    otherFetches: {
+      examAssignments: () => ([{
+        id: 'EA/MISSING-ALLOC',
+        orgId: ORG_1,
+        classId: LIVE_CLASS,
+        allocationId: 'EXALLOC/DELETED'
+      }])
+    }
+  });
+
+  try {
+    const scan = await classStorageIntegrityService.scanClassStorageIntegrity(ORG_1, REQ_USER);
+    const row = scan.danglingRefs.examAssignments.rows[0];
+    assert.equal(row.issueCode, 'missing_allocation');
+    assert.equal(row.severity, 'safe_delete');
+    assert.equal(row.canSelect, true);
+  } finally {
+    restoreScanEnvironment(originals);
+  }
+});
+
+test('applyClassStorageIntegrity delete_selected removes dangling report instance', async () => {
+  const originals = stubScanEnvironment({
+    otherFetches: {
+      reportInstances: () => ([{
+        id: 'RI/DELETE-ME',
+        orgId: ORG_1,
+        classId: LIVE_CLASS,
+        assignmentId: 'RA/DELETED',
+        status: 'draft'
+      }])
+    }
+  });
+  originals.getDataById = schoolDataService.getDataById;
+  originals.deleteData = schoolDataService.deleteData;
+
+  const deleted = [];
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'reportInstances' && id === 'RI/DELETE-ME') {
+      return {
+        id: 'RI/DELETE-ME',
+        orgId: ORG_1,
+        classId: LIVE_CLASS,
+        assignmentId: 'RA/DELETED',
+        status: 'draft'
+      };
+    }
+    return null;
+  };
+  schoolDataService.deleteData = async (entityType, id, reqUser, context) => {
+    deleted.push({ entityType, id, context });
+    return { id };
+  };
+
+  try {
+    const result = await classStorageIntegrityService.applyClassStorageIntegrity({
+      orgId: ORG_1,
+      reqUser: REQ_USER,
+      mode: 'delete_selected',
+      selected: {
+        danglingRefs: {
+          reportInstances: ['RI/DELETE-ME']
+        }
+      }
+    });
+    assert.equal(deleted.length, 1);
+    assert.equal(deleted[0].entityType, 'reportInstances');
+    assert.equal(deleted[0].id, 'RI/DELETE-ME');
+    assert.equal(deleted[0].context.skipDeletionGuard, true);
+    assert.equal(result.deleted['danglingRefs.reportInstances'], 1);
+  } finally {
+    restoreScanEnvironment(originals);
+    if (originals.getDataById) schoolDataService.getDataById = originals.getDataById;
+    if (originals.deleteData) schoolDataService.deleteData = originals.deleteData;
+  }
+});
+
+test('applyClassStorageIntegrity delete_selected removes archived dangling report instance', async () => {
+  const originals = stubScanEnvironment({
+    otherFetches: {
+      reportInstances: () => ([{
+        id: 'RI/ARCHIVED-DELETE',
+        orgId: ORG_1,
+        classId: LIVE_CLASS,
+        assignmentId: 'RA/LIVE',
+        status: 'archived'
+      }]),
+      reportAssignments: () => ([{ id: 'RA/LIVE', orgId: ORG_1, classId: LIVE_CLASS }])
+    }
+  });
+  originals.getDataById = schoolDataService.getDataById;
+  originals.deleteData = schoolDataService.deleteData;
+
+  const deleted = [];
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'reportInstances' && id === 'RI/ARCHIVED-DELETE') {
+      return {
+        id: 'RI/ARCHIVED-DELETE',
+        orgId: ORG_1,
+        classId: LIVE_CLASS,
+        assignmentId: 'RA/LIVE',
+        status: 'archived'
+      };
+    }
+    return null;
+  };
+  schoolDataService.deleteData = async (entityType, id, reqUser, context) => {
+    deleted.push({ entityType, id, context });
+    return { id };
+  };
+
+  try {
+    const result = await classStorageIntegrityService.applyClassStorageIntegrity({
+      orgId: ORG_1,
+      reqUser: REQ_USER,
+      mode: 'delete_selected',
+      selected: {
+        danglingRefs: {
+          reportInstances: ['RI/ARCHIVED-DELETE']
+        }
+      }
+    });
+    assert.equal(deleted.length, 1);
+    assert.equal(result.deleted['danglingRefs.reportInstances'], 1);
+    assert.equal(result.errors.length, 0);
+  } finally {
+    restoreScanEnvironment(originals);
+    if (originals.getDataById) schoolDataService.getDataById = originals.getDataById;
+    if (originals.deleteData) schoolDataService.deleteData = originals.deleteData;
+  }
+});

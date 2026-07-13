@@ -6,6 +6,7 @@
   const stalePointers = Array.isArray(scanData.cycleLinks?.stalePointers) ? scanData.cycleLinks.stalePointers : [];
   const ledgerOrphans = Array.isArray(scanData.ledger?.orphanEntries) ? scanData.ledger.orphanEntries : [];
   const dbOrphans = scanData.dbOrphans || {};
+  const danglingRefs = scanData.danglingRefs || {};
   const safeFix = scanData.safeFixPreview || {};
   const totals = scanData.totals || {};
   const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
@@ -23,7 +24,7 @@
   <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
     <div>
       <h1 class="page-heading size-md m-0"><i class="bi bi-hdd-network me-2"></i>Class Storage &amp; Integrity</h1>
-      <div class="text-muted mt-1">Scan orphan folders and database references for the active organization.</div>
+      <div class="text-muted mt-1">Scan orphan folders and database references for the active organization. Dangling references are records on <strong>live</strong> classes with broken parent links (often hidden from Reports or Exams lists).</div>
       <div class="small text-muted font-monospace mt-1">Org: <%= orgLabel %></div>
       <div class="small text-muted" id="integrityLastScan" <%= scanData.scannedAt ? '' : 'hidden' %>><% if (scanData.scannedAt) { %>Last scan: <%= scanData.scannedAt %><% } %></div>
     </div>
@@ -46,7 +47,7 @@
     <% } else if (!Number(totals.issueCount || 0)) { %>
       <div class="fw-semibold text-success"><i class="bi bi-check-circle me-1"></i>No integrity issues found for this organization.</div>
     <% } else { %>
-      <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i><%= totals.issueCount %> issue(s) found across folders, links, ledger, and database references.</div>
+      <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i><%= totals.issueCount %> issue(s) found across folders, links, ledger, database references, and dangling class references.</div>
       <div class="small mb-0 mt-1">Safe fixes: <%= safeFix.folderCount || 0 %> folder(s), <%= safeFix.staleLinkCount || 0 %> stale link(s), <%= safeFix.ledgerVoidCount || 0 %> ledger row(s).</div>
     <% } %>
   </div>
@@ -115,6 +116,67 @@
         </ul>
       <% } %>
     </div>
+  </div>
+
+  <h2 class="h5 mb-3" id="integrityDanglingRefsHeading">Dangling Class References (live classes)</h2>
+  <p class="small text-muted mb-3" id="integrityDanglingRefsIntro">Records on classes that still exist but reference deleted or missing parents. These are often hidden from Reports or Exams lists yet still block class delete.</p>
+  <div id="integrityDanglingRefs">
+  <% Object.keys(danglingRefs).forEach(function(groupKey) {
+    const group = danglingRefs[groupKey] || {};
+    const rows = Array.isArray(group.rows) ? group.rows : [];
+  %>
+    <div class="card border-0 shadow-sm mb-4" data-dangling-group="<%= groupKey %>">
+      <div class="card-header bg-white border-bottom py-3 fw-bold"><%= group.label || groupKey %> (<%= group.count || 0 %>)</div>
+      <div class="card-body p-0">
+        <% if (!hasScan) { %>
+          <div class="text-muted small p-3">Run a scan to populate this section.</div>
+        <% } else if (!rows.length) { %>
+          <div class="text-muted small p-3">No dangling records.</div>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3" style="width:40px;"></th>
+                  <th>Record</th>
+                  <th>Class</th>
+                  <th>Issue</th>
+                  <th>Severity</th>
+                  <th class="pe-3">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% rows.forEach(function(row) { %>
+                  <tr>
+                    <td class="ps-3">
+                      <% if (row.canSelect) { %>
+                        <input type="checkbox" class="form-check-input dangling-select" data-group="danglingRefs.<%= groupKey %>" value="<%= row.id %>">
+                      <% } %>
+                    </td>
+                    <td>
+                      <% if (row.href) { %>
+                        <a href="<%= row.href %>" target="_blank" rel="noopener noreferrer"><%= row.label || row.id %></a>
+                      <% } else { %>
+                        <%= row.label || row.id %>
+                      <% } %>
+                      <div class="small text-muted font-monospace"><%= row.id %></div>
+                    </td>
+                    <td class="small">
+                      <div><%= row.classTitle || row.classId %></div>
+                      <div class="font-monospace text-muted"><%= row.classId %></div>
+                    </td>
+                    <td class="small font-monospace"><%= row.issueCode || '' %></td>
+                    <td class="small severity-<%= row.severity === 'safe_delete' ? 'safe' : (row.severity === 'needs_rollback' ? 'rollback' : 'review') %>"><%= row.severity %></td>
+                    <td class="pe-3 small text-muted"><%= row.blockReason || '' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  <% }) %>
   </div>
 
   <div id="integrityDbOrphans">
@@ -292,20 +354,50 @@
     return payload;
   }
 
+  function countSelectedSessionCases(selected) {
+    let count = 0;
+    if (selected?.danglingRefs?.sessionStudentCases) {
+      count += selected.danglingRefs.sessionStudentCases.length;
+    }
+    if (Array.isArray(selected?.sessionStudentCases)) {
+      count += selected.sessionStudentCases.length;
+    }
+    return count;
+  }
+
   function collectSelected() {
-    const selected = {};
-    document.querySelectorAll('.orphan-select:checked').forEach((input) => {
+    const selected = { danglingRefs: {} };
+    document.querySelectorAll('.orphan-select:checked, .dangling-select:checked').forEach((input) => {
       const group = String(input.dataset.group || '').trim();
       const id = String(input.value || '').trim();
       if (!group || !id) return;
+      if (group.startsWith('danglingRefs.')) {
+        const subKey = group.slice('danglingRefs.'.length);
+        if (!selected.danglingRefs[subKey]) selected.danglingRefs[subKey] = [];
+        selected.danglingRefs[subKey].push(id);
+        return;
+      }
       if (!selected[group]) selected[group] = [];
       selected[group].push(id);
     });
+    if (!Object.keys(selected.danglingRefs).length) delete selected.danglingRefs;
     return selected;
   }
 
+  function countSelectedRows(selected) {
+    let count = 0;
+    for (const [key, rows] of Object.entries(selected || {})) {
+      if (key === 'danglingRefs' && rows && typeof rows === 'object') {
+        count += Object.values(rows).reduce((sum, ids) => sum + (Array.isArray(ids) ? ids.length : 0), 0);
+      } else if (Array.isArray(rows)) {
+        count += rows.length;
+      }
+    }
+    return count;
+  }
+
   function severityCssClass(severity) {
-    if (severity === 'safe_draft_delete') return 'safe';
+    if (severity === 'safe_draft_delete' || severity === 'safe_delete') return 'safe';
     if (severity === 'needs_rollback') return 'rollback';
     return 'review';
   }
@@ -330,7 +422,7 @@
     statusEl.style.background = 'rgba(255,193,7,0.08)';
     statusEl.innerHTML =
       '<div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i>'
-      + escapeHtml(issueCount) + ' issue(s) found across folders, links, ledger, and database references.</div>'
+      + escapeHtml(issueCount) + ' issue(s) found across folders, links, ledger, database references, and dangling class references.</div>'
       + '<div class="small mb-0 mt-1">Safe fixes: '
       + escapeHtml(safeFix.folderCount || 0) + ' folder(s), '
       + escapeHtml(safeFix.staleLinkCount || 0) + ' stale link(s), '
@@ -406,6 +498,57 @@
     )).join('');
 
     bodyEl.innerHTML = '<ul class="list-group list-group-flush">' + items + '</ul>';
+  }
+
+  function renderDanglingRefs(scanData) {
+    const container = document.getElementById('integrityDanglingRefs');
+    if (!container) return;
+
+    const danglingRefs = scanData.danglingRefs || {};
+    const groupKeys = Object.keys(danglingRefs);
+    if (!groupKeys.length) {
+      container.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = groupKeys.map((groupKey) => {
+      const group = danglingRefs[groupKey] || {};
+      const rows = Array.isArray(group.rows) ? group.rows : [];
+      const label = group.label || groupKey;
+      let bodyHtml;
+
+      if (!rows.length) {
+        bodyHtml = '<div class="text-muted small p-3">No dangling records.</div>';
+      } else {
+        const tableRows = rows.map((row) => {
+          const severityClass = severityCssClass(row.severity);
+          const recordHtml = row.href
+            ? '<a href="' + escapeHtml(row.href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(row.label || row.id) + '</a>'
+            : escapeHtml(row.label || row.id);
+          const checkboxHtml = row.canSelect
+            ? '<input type="checkbox" class="form-check-input dangling-select" data-group="danglingRefs.' + escapeHtml(groupKey) + '" value="' + escapeHtml(row.id) + '">'
+            : '';
+          return '<tr>'
+            + '<td class="ps-3">' + checkboxHtml + '</td>'
+            + '<td>' + recordHtml + '<div class="small text-muted font-monospace">' + escapeHtml(row.id) + '</div></td>'
+            + '<td class="small"><div>' + escapeHtml(row.classTitle || row.classId) + '</div>'
+            + '<div class="font-monospace text-muted">' + escapeHtml(row.classId) + '</div></td>'
+            + '<td class="small font-monospace">' + escapeHtml(row.issueCode || '') + '</td>'
+            + '<td class="small severity-' + severityClass + '">' + escapeHtml(row.severity) + '</td>'
+            + '<td class="pe-3 small text-muted">' + escapeHtml(row.blockReason || '') + '</td>'
+            + '</tr>';
+        }).join('');
+
+        bodyHtml =
+          '<div class="table-responsive"><table class="table table-sm mb-0">'
+          + '<thead class="table-light"><tr><th class="ps-3" style="width:40px;"></th><th>Record</th><th>Class</th><th>Issue</th><th>Severity</th><th class="pe-3">Note</th></tr></thead>'
+          + '<tbody>' + tableRows + '</tbody></table></div>';
+      }
+
+      return '<div class="card border-0 shadow-sm mb-4" data-dangling-group="' + escapeHtml(groupKey) + '">'
+        + '<div class="card-header bg-white border-bottom py-3 fw-bold">' + escapeHtml(label) + ' (' + escapeHtml(group.count || rows.length) + ')</div>'
+        + '<div class="card-body p-0">' + bodyHtml + '</div></div>';
+    }).join('');
   }
 
   function renderDbOrphans(scanData) {
@@ -502,6 +645,7 @@
     renderOrphanFolders(scanData);
     renderStaleLinks(scanData);
     renderLedgerOrphans(scanData);
+    renderDanglingRefs(scanData);
     renderDbOrphans(scanData);
     renderMissingDirs(scanData);
     updateActionButtons(scanData);
@@ -542,15 +686,22 @@
   async function applyMode(mode) {
     const selected = mode === 'delete_selected' ? collectSelected() : {};
     if (mode === 'delete_selected') {
-      const count = Object.values(selected).reduce((sum, rows) => sum + rows.length, 0);
+      const count = countSelectedRows(selected);
       if (!count) {
-        await showInfoModal('Nothing selected', 'warning', 'Select at least one deletable orphan record.');
+        await showInfoModal('Nothing selected', 'warning', 'Select at least one deletable orphan or dangling record.');
         return;
       }
       const confirmed = await confirmAction({
-        title: 'Delete selected orphans?',
+        title: 'Delete selected records?',
         icon: 'error',
-        message: 'Delete <b>' + count + '</b> selected orphan record(s)? This cannot be undone.',
+        message: (function () {
+          let text = 'Delete <b>' + count + '</b> selected orphan or dangling record(s)? This cannot be undone.';
+          const sessionCaseCount = countSelectedSessionCases(selected);
+          if (sessionCaseCount) {
+            text += '<br><br><b>Session student cases (' + sessionCaseCount + '):</b> these may reference deleted sessions or classes and cannot be opened. Removing them only deletes the orphaned database record.';
+          }
+          return text;
+        })(),
         confirmText: 'Delete Selected'
       });
       if (!confirmed) return;
@@ -567,7 +718,7 @@
     setActionButtonsDisabled(true);
     try {
       const busyNote = mode === 'delete_selected'
-        ? 'Deleting selected orphan records and rescanning…'
+        ? 'Deleting selected orphan and dangling records and rescanning…'
         : 'Applying safe fixes and rescanning…';
       busyToken = showBusy(mode === 'delete_selected' ? 'Deleting…' : 'Applying fixes…', busyNote);
 
@@ -587,11 +738,19 @@
       hideBusy(busyToken);
       busyToken = null;
       if (payload.scan) renderScanResults(payload.scan);
-      await showInfoModal(
-        mode === 'delete_selected' ? 'Delete complete' : 'Safe fixes applied',
-        'success',
-        payload.message || 'Operation completed. Results updated.'
-      );
+      const applyErrors = Array.isArray(payload?.data?.errors) ? payload.data.errors : [];
+      const icon = String(payload?.status || '').toLowerCase() === 'error' ? 'error' : (applyErrors.length ? 'warning' : 'success');
+      const title = mode === 'delete_selected'
+        ? (icon === 'error' ? 'Delete failed' : (applyErrors.length ? 'Delete completed with issues' : 'Delete complete'))
+        : (icon === 'error' ? 'Apply failed' : 'Safe fixes applied');
+      let message = payload.message || 'Operation completed. Results updated.';
+      if (applyErrors.length) {
+        message += '<br><br>' + applyErrors.slice(0, 8).map((entry) => escapeHtml(entry)).join('<br>');
+        if (applyErrors.length > 8) {
+          message += '<br>' + escapeHtml(`…and ${applyErrors.length - 8} more issue(s).`);
+        }
+      }
+      await showInfoModal(title, icon, message);
     } catch (error) {
       hideBusy(busyToken);
       if (!error.guarded) {

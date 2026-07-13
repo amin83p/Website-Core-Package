@@ -129,6 +129,68 @@
           </div>
         <% } %>
 
+        <% const referenceBlockers = (cycle.blockers || []).filter(function(blocker) {
+          return ['REPORT_INSTANCE', 'REPORT_ASSIGNMENT', 'EXAM_ALLOCATION', 'EXAM_ASSIGNMENT'].includes(blocker.code);
+        }); %>
+        <% if (referenceBlockers.length) { %>
+          <div class="mb-3">
+            <div class="fw-semibold small text-danger mb-2"><i class="bi bi-link-45deg me-1"></i>Linked records blocking delete (<%= cycle.referenceBlockerCount || referenceBlockers.length %>)</div>
+            <div class="small text-muted mb-2">Resolve reports and exams in their modules, or use <a href="/school/classes/storage-integrity" target="_blank" rel="noopener noreferrer">Class Storage &amp; Integrity</a> for orphaned references.</div>
+            <ul class="small mb-0">
+              <% referenceBlockers.forEach(function(blocker) { %>
+                <li>
+                  <strong><%= blocker.message || blocker.code %></strong>
+                  <% if (blocker.count) { %> (<%= blocker.count %>)<% } %>
+                  <% if (blocker.resolveHint) { %><div class="text-muted"><%= blocker.resolveHint %></div><% } %>
+                </li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+
+        <% const guardBlockers = (cycle.blockers || []).filter(function(blocker) {
+          return ['ACADEMIC_LEDGER', 'WITHDRAWAL', 'TIMESHEET_APPROVED_REF'].includes(blocker.code);
+        }); %>
+        <% if (guardBlockers.length) { %>
+          <div class="mb-3">
+            <div class="fw-semibold small text-danger mb-2"><i class="bi bi-shield-exclamation me-1"></i>Additional delete blockers (<%= cycle.guardBlockerCount || guardBlockers.length %>)</div>
+            <ul class="small mb-0">
+              <% guardBlockers.forEach(function(blocker) { %>
+                <li>
+                  <strong><%= blocker.message || blocker.code %></strong>
+                  <% if (blocker.count) { %> (<%= blocker.count %>)<% } %>
+                  <% if (blocker.resolveHint) { %><div class="text-muted"><%= blocker.resolveHint %></div><% } %>
+                </li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+
+        <% const cascade = cycle.cascadeAssets || {}; %>
+        <% if (cascade.hasCascadeAssets) { %>
+          <div class="mb-3">
+            <div class="fw-semibold small text-warning-emphasis mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Will be permanently deleted with this class</div>
+            <ul class="small mb-0">
+              <% if (cascade.sessionCount) { %>
+                <li><strong><%= cascade.sessionCount %></strong> session(s) including attendance, gradebooks, and uploaded session content</li>
+              <% } %>
+              <% if (cascade.sessionCaseCount) { %>
+                <li><strong><%= cascade.sessionCaseCount %></strong> session student case(s)</li>
+              <% } %>
+              <% if (cascade.gradebookActivityCount) { %>
+                <li><strong><%= cascade.gradebookActivityCount %></strong> gradebook activit<%= cascade.gradebookActivityCount === 1 ? 'y' : 'ies' %></li>
+              <% } %>
+              <% if (cascade.contentItemCount) { %>
+                <li><strong><%= cascade.contentItemCount %></strong> session content item(s) (HTML/file)</li>
+              <% } %>
+              <% if (cascade.hasUploadWorkspace) { %>
+                <li>Class workspace uploads and folders</li>
+              <% } %>
+            </ul>
+            <div class="small text-muted mt-2">Exam allocations shown in session content are separate records and must be resolved before delete if still present.</div>
+          </div>
+        <% } %>
+
         <div class="fw-semibold mb-2">Enrollments (<%= cycle.enrollmentCount || 0 %>)</div>
         <% if (!cycle.enrollments || !cycle.enrollments.length) { %>
           <div class="text-muted small mb-3">No enrollment periods on this class.</div>
@@ -208,7 +270,29 @@
   const targetClassId = String(page.dataset.targetClassId || '').trim();
   const actionStateId = '<%= asid %>';
   const returnToDelete = <%= returnToDelete ? 'true' : 'false' %>;
+  const targetCascadeAssets = <%- JSON.stringify((function () {
+    const cycles = Array.isArray(planData.chain) ? planData.chain : [];
+    const target = cycles.find(function (row) { return String(row.id || '') === String(targetClassId || ''); });
+    return target && target.cascadeAssets ? target.cascadeAssets : {};
+  })()) %>;
   const feedback = document.getElementById('prepActionFeedback');
+
+  function buildCascadeDeleteConfirmMessage(classTitle) {
+    const cascade = targetCascadeAssets && typeof targetCascadeAssets === 'object' ? targetCascadeAssets : {};
+    const lines = [
+      'Delete class "' + classTitle + '" permanently?',
+      '',
+      'This will also delete:'
+    ];
+    if (cascade.sessionCount) lines.push('- ' + cascade.sessionCount + ' session(s) with attendance, gradebooks, and uploaded content');
+    if (cascade.sessionCaseCount) lines.push('- ' + cascade.sessionCaseCount + ' session student case(s)');
+    if (cascade.gradebookActivityCount) lines.push('- ' + cascade.gradebookActivityCount + ' gradebook activit' + (cascade.gradebookActivityCount === 1 ? 'y' : 'ies'));
+    if (cascade.contentItemCount) lines.push('- ' + cascade.contentItemCount + ' session content item(s)');
+    if (cascade.hasUploadWorkspace) lines.push('- class workspace uploads');
+    if (lines.length === 3) lines.push('- embedded session data on this class');
+    lines.push('', 'Reports and exams must already be resolved. This cannot be undone.');
+    return lines.join('\n');
+  }
 
   function buildHeaders() {
     const headers = {
@@ -277,7 +361,7 @@
     button.addEventListener('click', () => {
       const classId = String(button.dataset.classId || '').trim();
       const title = String(button.dataset.classTitle || classId);
-      if (!window.confirm('Delete cycle class "' + title + '" now?')) return;
+      if (!window.confirm(buildCascadeDeleteConfirmMessage(title))) return;
       window.location.href = '/school/classes/delete/' + encodeURIComponent(classId);
     });
   });
@@ -285,7 +369,8 @@
   const btnDeleteTarget = document.getElementById('btnDeleteTargetClass');
   if (btnDeleteTarget && returnToDelete) {
     btnDeleteTarget.addEventListener('click', () => {
-      if (!window.confirm('Delete this class now?')) return;
+      const title = '<%= (target.title || targetClassId || "").replace(/'/g, "\\'") %>';
+      if (!window.confirm(buildCascadeDeleteConfirmMessage(title || targetClassId))) return;
       window.location.href = '/school/classes/delete/' + encodeURIComponent(targetClassId);
     });
   }

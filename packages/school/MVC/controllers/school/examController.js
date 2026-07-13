@@ -13,6 +13,7 @@ const schoolDataService = require('../../services/school/schoolDataService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const examValidationService = require('../../services/school/examValidationService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
+const classReferenceSyncService = require('../../services/school/classReferenceSyncService');
 const examTemplateModel = require('../../models/school/examTemplateModel');
 const examQuestionModel = require('../../models/school/examQuestionModel');
 const examAllocationModel = require('../../models/school/examAllocationModel');
@@ -1643,6 +1644,7 @@ async function cancelAllocation(req, res) {
     }
 
     const message = `Allocation cancelled. Assignment updates: cancelled ${cancelledAssignments}, preserved ${preservedAssignments}.`;
+    await classReferenceSyncService.notifyAfterExamMutation({ allocation, reqUser: req.user });
     if (isAjax(req)) {
       return res.json({
         status: 'success',
@@ -1956,6 +1958,7 @@ async function exemptAllocationStudents(req, res) {
       cancelledCount += 1;
     }
 
+    await classReferenceSyncService.notifyAfterExamMutation({ allocation, reqUser: req.user });
     if (isAjax(req)) {
       return res.json({
         status: 'success',
@@ -2473,6 +2476,7 @@ async function deleteAllocation(req, res) {
     }
     await schoolDataService.deleteData('examAllocations', allocation.id, req.user);
 
+    await classReferenceSyncService.notifyAfterExamMutation({ allocation, reqUser: req.user });
     const message = `Allocation deleted successfully. Removed ${Number(linkedAssignments?.length || 0)} cancelled assignment(s).`;
     if (isAjax(req)) {
       return res.json({

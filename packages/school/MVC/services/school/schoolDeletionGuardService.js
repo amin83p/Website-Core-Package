@@ -130,6 +130,14 @@ async function previewDelete({ entityKey, id, orgId, reqUser, context = {}, warn
     });
   }
 
+  if (normalizedKey === 'class' && blockers.length) {
+    preview.actions.push({
+      code: 'OPEN_STORAGE_INTEGRITY',
+      label: 'Open Class Storage & Integrity',
+      href: '/school/classes/storage-integrity'
+    });
+  }
+
   return preview;
 }
 

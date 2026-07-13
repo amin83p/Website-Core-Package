@@ -15,6 +15,7 @@ const reportAssignmentBulkRowService = require('../../services/school/reportAssi
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
+const classReferenceSyncService = require('../../services/school/classReferenceSyncService');
 const { getPrefillValue } = require('../../services/school/reportPrefillKeyUtils');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const reportTemplateModel = require('../../models/school/reportTemplateModel');
@@ -843,6 +844,17 @@ async function saveAssignment(req, res) {
 
     if (isEdit) {
       await schoolDataService.updateData('reportAssignments', id, basePayload, req.user);
+      await classReferenceSyncService.cleanupReportInstancesForRemovedTargetRows({
+        assignmentId: id,
+        previousAssignment: existing,
+        nextAssignment: { ...existing, ...basePayload, id },
+        reqUser: req.user
+      });
+      await classReferenceSyncService.notifyClassReferencesChanged({
+        classId,
+        reason: `report_assignment_saved:${id}`,
+        reqUser: req.user
+      });
     } else {
       await schoolDataService.addData('reportAssignments', basePayload, req.user);
 
@@ -869,6 +881,7 @@ async function deleteAssignment(req, res) {
     const assignment = await schoolDataService.getDataById('reportAssignments', req.params.id, req.user);
     if (!assignment) throw new Error('Assignment not found.');
     await schoolDataService.deleteData('reportAssignments', req.params.id, req.user);
+    await classReferenceSyncService.notifyAfterReportDelete({ record: assignment, reqUser: req.user });
     if (isAjax(req)) return res.json({ status: 'success', message: 'Assignment deleted.' });
     res.redirect('/school/reports/assignments');
   } catch (error) {
@@ -900,6 +913,7 @@ async function deleteInstance(req, res) {
     const instance = await schoolDataService.getDataById('reportInstances', req.params.id, req.user);
     if (!instance) throw new Error('Report instance not found.');
     await schoolDataService.deleteData('reportInstances', req.params.id, req.user);
+    await classReferenceSyncService.notifyAfterReportDelete({ record: instance, reqUser: req.user });
     if (isAjax(req)) return res.json({ status: 'success', message: 'Report instance deleted.' });
     res.redirect('/school/reports/instances');
   } catch (error) {

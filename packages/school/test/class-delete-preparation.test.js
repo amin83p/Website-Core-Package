@@ -153,6 +153,62 @@ test('assessEnrollmentDeleteEligibility allows carry-forward delete', async () =
   }
 });
 
+test('assertClassDeleteAllowed blocks class with exam reference blockers but not session cases', async () => {
+  const schoolDeletionGuardService = require('../MVC/services/school/schoolDeletionGuardService');
+  const originalGetById = schoolDataService.getDataById;
+  const originalFetch = schoolDataService.fetchData;
+  const originalSessions = schoolDataService.getClassSessions;
+  const originalPreview = schoolDeletionGuardService.previewDelete;
+
+  const classId = 'CLASS/WITH-REFS';
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes' && id === classId) {
+      return { id: classId, orgId: ORG_ID, title: 'Class With Refs', nextClassId: '' };
+    }
+    return null;
+  };
+  schoolDataService.fetchData = async (entityType, query) => {
+    if (entityType === 'sessionStudentCases') {
+      return [{ id: 'SSC/1', classId, orgId: ORG_ID }];
+    }
+    return [];
+  };
+  schoolDataService.getClassSessions = async () => ([{
+    sessionId: 'SESSION/1',
+    gradebooks: [{ id: 'GB/1' }],
+    contentItems: [{ id: 'CNT/1', type: 'html', title: 'Notes' }]
+  }]);
+  schoolDeletionGuardService.previewDelete = async () => ({
+    canDelete: false,
+    blockers: [
+      { code: 'SESSION_CASE', message: 'Session Student Cases', count: 2 },
+      { code: 'EXAM_ALLOCATION', message: 'Exam Allocations', count: 1 }
+    ]
+  });
+
+  try {
+    const plan = await classDeletePreparationService.buildDeletePreparationPlan(classId, REQ_USER);
+    const cycle = plan.chain.find((row) => row.id === classId);
+    assert.equal(cycle.referenceBlockerCount, 1);
+    assert.equal(cycle.cascadeAssets.sessionCaseCount, 1);
+    assert.equal(cycle.cascadeAssets.hasCascadeAssets, true);
+    assert.equal(cycle.canDeleteClass, false);
+
+    await assert.rejects(
+      () => classDeletePreparationService.assertClassDeleteAllowed(classId, REQ_USER),
+      (error) => error.name === 'ClassDeleteNotAllowedError'
+        && error.code === 'CLASS_REFERENCE_BLOCKERS'
+        && error.blockers.length === 1
+        && error.blockers[0].code === 'EXAM_ALLOCATION'
+    );
+  } finally {
+    schoolDataService.getDataById = originalGetById;
+    schoolDataService.fetchData = originalFetch;
+    schoolDataService.getClassSessions = originalSessions;
+    schoolDeletionGuardService.previewDelete = originalPreview;
+  }
+});
+
 test('assertClassDeleteAllowed blocks middle cycle while downstream exists', async () => {
   const originalGetById = schoolDataService.getDataById;
   const originalFetch = schoolDataService.fetchData;
@@ -180,6 +236,13 @@ test('assertClassDeleteAllowed blocks middle cycle while downstream exists', asy
     schoolDataService.fetchData = originalFetch;
     schoolDataService.getClassSessions = originalSessions;
   }
+});
+
+test('delete preparation view includes cascade delete warning section', () => {
+  const view = read('MVC/views/school/class/classDeletePreparation.ejs');
+  assert.match(view, /Will be permanently deleted with this class/);
+  assert.match(view, /buildCascadeDeleteConfirmMessage/);
+  assert.match(view, /cascadeAssets/);
 });
 
 test('delete preparation href used in deletion guard samples', () => {

@@ -2,7 +2,22 @@ const schoolDataService = require('./schoolDataService');
 const schoolDependencyService = require('./schoolDependencyService');
 const classEnrollmentDeleteService = require('./classEnrollmentDeleteService');
 const classDeletePreparationHrefs = require('./classDeletePreparationHrefs');
+const schoolDeletionGuardService = require('./schoolDeletionGuardService');
+const classFolderPaths = require('./classFolderPaths');
 const { requireCoreModule } = require('./schoolCoreContracts');
+
+const CLASS_REFERENCE_BLOCKER_CODES = new Set([
+  'REPORT_INSTANCE',
+  'REPORT_ASSIGNMENT',
+  'EXAM_ALLOCATION',
+  'EXAM_ASSIGNMENT'
+]);
+
+const CLASS_GUARD_BLOCKER_CODES = new Set([
+  'ACADEMIC_LEDGER',
+  'WITHDRAWAL',
+  'TIMESHEET_APPROVED_REF'
+]);
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const MAX_CHAIN_DEPTH = 50;
@@ -113,6 +128,64 @@ async function listLockedSessionsForClass(classId, reqUser) {
   }));
 }
 
+async function summarizeClassCascadeAssets(classRow, reqUser) {
+  const classId = toPublicId(classRow?.id);
+  const sessions = await schoolDataService.getClassSessions(classId, reqUser);
+  const sessionList = Array.isArray(sessions) ? sessions : [];
+
+  const caseRows = await schoolDataService.fetchData(
+    'sessionStudentCases',
+    { page: 1, classId__eq: classId },
+    reqUser
+  );
+
+  let gradebookActivityCount = 0;
+  let contentItemCount = 0;
+  let sessionsWithAttendance = 0;
+  for (const session of sessionList) {
+    const gradebooks = Array.isArray(session?.gradebooks) ? session.gradebooks : [];
+    gradebookActivityCount += gradebooks.length;
+    const contentItems = Array.isArray(session?.contentItems) ? session.contentItems : [];
+    contentItemCount += contentItems.length;
+    const roster = Array.isArray(session?.roster) ? session.roster : [];
+    if (roster.some((row) => String(row?.attendanceStatus || row?.attendance || '').trim())) {
+      sessionsWithAttendance += 1;
+    }
+  }
+
+  const uploadTargets = classFolderPaths.buildUploadTargetsForClass(classRow);
+  let hasUploadWorkspace = uploadTargets.length > 0;
+  if (classId && classFolderPaths.getClassStorageBasePath) {
+    try {
+      const fs = require('fs').promises;
+      const path = require('path');
+      const legacyPath = path.join(classFolderPaths.getClassStorageBasePath(), classId);
+      // eslint-disable-next-line no-await-in-loop
+      await fs.access(legacyPath);
+      hasUploadWorkspace = true;
+    } catch (_) {
+      // keep uploadTargets-based hint
+    }
+  }
+
+  const sessionCaseCount = (Array.isArray(caseRows) ? caseRows : []).length;
+  const hasCascadeAssets = sessionList.length > 0
+    || sessionCaseCount > 0
+    || gradebookActivityCount > 0
+    || contentItemCount > 0
+    || hasUploadWorkspace;
+
+  return {
+    sessionCount: sessionList.length,
+    sessionCaseCount,
+    gradebookActivityCount,
+    contentItemCount,
+    sessionsWithAttendance,
+    hasUploadWorkspace,
+    hasCascadeAssets
+  };
+}
+
 async function summarizeCycleForPreparation(classRow, reqUser) {
   const classId = toPublicId(classRow?.id);
   const enrollmentRows = await schoolDataService.fetchData(
@@ -188,10 +261,50 @@ async function summarizeCycleForPreparation(classRow, reqUser) {
     });
   }
 
+  const orgId = toPublicId(classRow?.orgId) || toPublicId(reqUser?.activeOrgId);
+  const cascadeAssets = await summarizeClassCascadeAssets(classRow, reqUser);
+  if (orgId) {
+    try {
+      const deletePreview = await schoolDeletionGuardService.previewDelete({
+        entityKey: 'class',
+        id: classId,
+        orgId,
+        reqUser
+      });
+      for (const blocker of deletePreview?.blockers || []) {
+        if (CLASS_REFERENCE_BLOCKER_CODES.has(blocker.code)) {
+          blockers.push({
+            code: blocker.code,
+            message: blocker.message || blocker.label || blocker.code,
+            count: blocker.count,
+            resolveHint: blocker.resolveHint,
+            samples: blocker.samples || [],
+            storageIntegrityHref: '/school/classes/storage-integrity'
+          });
+          continue;
+        }
+        if (CLASS_GUARD_BLOCKER_CODES.has(blocker.code)) {
+          blockers.push({
+            code: blocker.code,
+            message: blocker.message || blocker.label || blocker.code,
+            count: blocker.count,
+            resolveHint: blocker.resolveHint,
+            samples: blocker.samples || []
+          });
+        }
+      }
+    } catch (_) {
+      // If preview fails, keep existing preparation blockers only.
+    }
+  }
+
+  const referenceBlockerCount = blockers.filter((row) => CLASS_REFERENCE_BLOCKER_CODES.has(row.code)).length;
+  const guardBlockerCount = blockers.filter((row) => CLASS_GUARD_BLOCKER_CODES.has(row.code)).length;
   const hasDownstream = Boolean(downstreamClass);
   const enrollmentCount = enrollments.length;
+
   const ready = !hasDownstream && !lockedSessions.length && enrollmentCount === 0
-    && undeletableEnrollments.length === 0;
+    && undeletableEnrollments.length === 0 && referenceBlockerCount === 0 && guardBlockerCount === 0;
 
   let status = 'in_progress';
   if (ready) status = 'ready';
@@ -208,6 +321,9 @@ async function summarizeCycleForPreparation(classRow, reqUser) {
     lockedSessionCount: lockedSessions.length,
     lockedSessions,
     enrollmentCount,
+    referenceBlockerCount,
+    guardBlockerCount,
+    cascadeAssets,
     enrollments,
     blockers,
     canDeleteClass: ready
@@ -286,6 +402,18 @@ async function assertClassDeleteAllowed(classId, reqUser) {
     });
   }
 
+  const referenceBlockers = (targetCycle.blockers || []).filter((row) => CLASS_REFERENCE_BLOCKER_CODES.has(row.code));
+  if (referenceBlockers.length) {
+    throw new ClassDeleteNotAllowedError(
+      'Resolve report and exam references before deleting this class. Use Class Storage & Integrity or the linked sections.',
+      {
+        code: 'CLASS_REFERENCE_BLOCKERS',
+        preparationHref: plan.preparationHref,
+        blockers: referenceBlockers
+      }
+    );
+  }
+
   if (blockers.length) {
     throw new ClassDeleteNotAllowedError(blockers[0].message, {
       code: blockers[0].code,
@@ -302,6 +430,7 @@ module.exports = {
   buildCycleChainFromClass,
   buildDeletePreparationPlan,
   summarizeCycleForPreparation,
+  summarizeClassCascadeAssets,
   assertClassDeleteAllowed,
   ClassDeleteNotAllowedError
 };
