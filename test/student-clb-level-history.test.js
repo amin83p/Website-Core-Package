@@ -28,6 +28,29 @@ function baseStudentInput(overrides = {}) {
 }
 
 
+test('sanitizeStudentInput accepts an optional trimmed Custom Student ID', () => {
+  const populated = studentModel.sanitizeStudentInput(baseStudentInput({ customStudentId: '  SCHOOL-42  ' }));
+  const blank = studentModel.sanitizeStudentInput(baseStudentInput({ customStudentId: '   ' }));
+
+  assert.equal(populated.customStudentId, 'SCHOOL-42');
+  assert.equal(blank.customStudentId, '');
+});
+
+test('Custom Student ID remains separate from the immutable student record id', () => {
+  const modelSource = read('packages/school/MVC/models/school/studentModel.js');
+  const controllerSource = read('packages/school/MVC/controllers/school/studentController.js');
+  const formSource = read('packages/school/MVC/views/school/student/studentForm.ejs');
+  const listSource = read('packages/school/MVC/views/school/student/studentList.ejs');
+
+  assert.match(modelSource, /customStudentId: cleanId\(input\.customStudentId, \{ max: 40, allowEmpty: true \}\)/);
+  assert.match(modelSource, /Custom Student ID is already assigned within this organization/);
+  assert.doesNotMatch(controllerSource, /payload\.id = req\.body\.studentId/);
+  assert.match(controllerSource, /customStudentId: String\(req\.body\.customStudentId \|\| ''\)\.trim\(\)/);
+  assert.match(formSource, /name="customStudentId"[^>]*value="<%= s\.customStudentId \|\| \(isEdit \? s\.id : ''\) %>"/);
+  assert.match(formSource, /System Record ID/);
+  assert.match(listSource, /item\.customStudentId \|\| item\.id/);
+});
+
 test('sanitizeStudentInput accepts valid CLB history and sorts newest first', () => {
   const out = studentModel.sanitizeStudentInput(baseStudentInput({
     clbLevelHistory: [

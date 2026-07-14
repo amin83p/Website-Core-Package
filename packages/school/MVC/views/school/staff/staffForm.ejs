@@ -61,9 +61,7 @@
                     <input type="hidden" name="personId" id="inp_personId" value="<%= s.personId || '' %>" required>
                     <input type="text" id="inp_personName" class="form-control size-md bg-white border-primary fw-bold" placeholder="Search Person Directory..." value="<%= personName || '' %>" readonly required>
                     <button type="button" class="btn btn-primary" id="btnPickPerson" <%= isEdit ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
-                    <% if (canEditLinkedPerson) { %>
-                    <button type="button" class="btn btn-outline-primary" id="btnEditPersonProfile" data-link-type="<%= linkedPersonLinkType || 'staff' %>" data-link-id="<%= linkedPersonLinkId || '' %>" title="Edit person profile"><i class="bi bi-pencil-square"></i></button>
-                    <% } %>
+                    <button type="button" class="btn <%= canEditLinkedPerson ? 'btn-outline-primary' : 'btn-outline-secondary' %>" id="btnEditPersonProfile" data-link-type="<%= linkedPersonLinkType || 'staff' %>" data-link-id="<%= linkedPersonLinkId || '' %>" data-can-edit-person="<%= canEditLinkedPerson ? 'true' : 'false' %>" title="<%= canEditLinkedPerson ? 'Edit person profile' : 'You do not have permission to edit this person account' %>"><i class="bi <%= canEditLinkedPerson ? 'bi-pencil-square' : 'bi-lock' %>"></i></button>
                   </div>
                 </div>
                 <div class="col-md-4 mb-3">
@@ -694,6 +692,13 @@
     const btnEditPerson = document.getElementById('btnEditPersonProfile');
     if (btnEditPerson && window.SchoolPersonProfileModal) {
       btnEditPerson.addEventListener('click', () => {
+        if (btnEditPerson.dataset.canEditPerson !== 'true') {
+          showMsg({
+            title: 'Permission Required',
+            message: 'You do not have permission to edit this person account.'
+          });
+          return;
+        }
         const personId = document.getElementById('inp_personId')?.value?.trim();
         if (!personId) return;
         window.SchoolPersonProfileModal.open({

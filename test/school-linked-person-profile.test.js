@@ -214,5 +214,10 @@ test('identity routes and forms expose linked person profile integration', () =>
   assert.match(studentForm, /include\('\.\.\/partials\/personProfileEditModal'\)/);
   assert.match(teacherForm, /btnEditPersonProfile/);
   assert.match(staffForm, /btnEditPersonProfile/);
+  for (const form of [studentForm, teacherForm, staffForm]) {
+    assert.match(form, /data-can-edit-person="<%= canEditLinkedPerson \? 'true' : 'false' %>"/);
+    assert.match(form, /You do not have permission to edit this person account\./);
+    assert.match(form, /if \(btnEditPerson\.dataset\.canEditPerson !== 'true'\) \{[\s\S]*?showMsg\([\s\S]*?return;[\s\S]*?SchoolPersonProfileModal\.open/);
+  }
   assert.match(read('public/scripts/schoolPersonProfileModal.js'), /SchoolPersonProfileModal/);
 });

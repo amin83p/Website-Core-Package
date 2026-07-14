@@ -569,6 +569,7 @@ exports.listStudents = async (req, res) => {
             : visibleStudents.filter((student) => {
                 const haystack = [
                     student.id,
+                    student.customStudentId,
                     student.personId,
                     student.firstName,
                     student.lastName,
@@ -747,6 +748,7 @@ exports.saveStudent1 = async (req, res) => {
 
         const payload = {
             personId: req.body.personId.trim(),
+            customStudentId: String(req.body.customStudentId || '').trim(),
             localId: (req.body.localId || '').trim(),
             countryOfOrigin: req.body.countryOfOrigin || '',
             
@@ -777,7 +779,6 @@ exports.saveStudent1 = async (req, res) => {
         }
 
         if (!payload.personId) throw new Error("A valid Person must be selected.");
-        if (!id && req.body.studentId) payload.id = req.body.studentId.trim();
 
         if (id) {
             await dataService.updateData('students', id, payload, req.user);
@@ -886,6 +887,7 @@ exports.saveStudent = async (req, res) => {
 
         const payload = {
             personId,
+            customStudentId: String(req.body.customStudentId || '').trim(),
             localId: (req.body.localId || '').trim(),
             orgId: existingStudent?.orgId ? String(existingStudent.orgId) : String(activeOrgId),
             countryOfOrigin: req.body.countryOfOrigin || '',
@@ -924,7 +926,6 @@ exports.saveStudent = async (req, res) => {
         }
 
         if (!payload.personId) throw new Error("A valid Person must be selected.");
-        if (!id && req.body.studentId) payload.id = req.body.studentId.trim();
         if (!id && !payload.selfFund && !payload.funderAccountId) {
             throw new Error('Please select funding mode: enable Self-funded, or choose a Funder Account.');
         }

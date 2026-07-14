@@ -698,7 +698,7 @@ const schoolRepositories = {
     create: studentModel.addStudent,
     update: studentModel.updateStudent,
     remove: studentModel.deleteStudent,
-    defaultSearchFields: ['id', 'personId', 'studentCode', 'status'],
+    defaultSearchFields: ['id', 'customStudentId', 'personId', 'studentCode', 'status'],
     assignmentScopeKind: 'personId'
   }),
   programs: createSchoolRepository({

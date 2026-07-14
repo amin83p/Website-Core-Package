@@ -37,7 +37,7 @@
         <tr>
           <td class="ps-4">
               <div class="fw-bold text-primary"><%= item.firstName %> <%= item.lastName %></div>
-              <div class="small text-muted font-monospace"><i class="bi bi-person-badge me-1"></i><%= item.id %></div>
+              <div class="small text-muted font-monospace"><i class="bi bi-person-badge me-1"></i><%= item.customStudentId || item.id %></div>
           </td>
           <td class="small text-muted">
               <div><i class="bi bi-envelope me-1"></i><%= item.email %></div>

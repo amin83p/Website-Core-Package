@@ -145,6 +145,7 @@ function sanitizeStudentInput(input, { isUpdate = false } = {}) {
         // identifiers
         orgId: String(orgId),
         personId: String(personId),
+        customStudentId: cleanId(input.customStudentId, { max: 40, allowEmpty: true }),
 
         // fields
         localId: cleanString(input.localId, { max: 80, allowEmpty: true }),
@@ -213,6 +214,13 @@ async function addStudent(data, options = {}) {
             throw new Error('This person is already admitted as a student.');
         }
 
+        if (sanitized.customStudentId && all.some((student) =>
+            String(student.orgId) === String(sanitized.orgId) &&
+            String(student.customStudentId || student.id || '').toLowerCase() === String(sanitized.customStudentId).toLowerCase()
+        )) {
+            throw new Error('Custom Student ID is already assigned within this organization.');
+        }
+
         // Ensure ID is unique
         const existingIds = new Set(all.map(s => String(s.id)));
         const finalId = sanitized.id ? String(sanitized.id) : generateStudentId(existingIds);
@@ -255,6 +263,14 @@ async function updateStudent(id, data, options = {}) {
         }
         if (existing.personId && String(sanitized.personId) !== String(existing.personId)) {
             throw new Error('Security Violation: personId mismatch.');
+        }
+
+        if (sanitized.customStudentId && all.some((student, studentIndex) =>
+            studentIndex !== index &&
+            String(student.orgId) === String(existing.orgId) &&
+            String(student.customStudentId || student.id || '').toLowerCase() === String(sanitized.customStudentId).toLowerCase()
+        )) {
+            throw new Error('Custom Student ID is already assigned within this organization.');
         }
 
         // Keep immutable fields
