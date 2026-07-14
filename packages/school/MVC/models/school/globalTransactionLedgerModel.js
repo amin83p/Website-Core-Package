@@ -597,6 +597,19 @@ async function clearTransactionsByOrg(orgId) {
   });
 }
 
+async function removeTransactionById(id) {
+  return queueWrite(async () => {
+    const targetId = String(id || '').trim();
+    if (!targetId) throw new Error('Transaction id is required.');
+    const all = await getAllTransactions();
+    const index = all.findIndex((tx) => String(tx?.id || '') === targetId);
+    if (index === -1) throw new Error('Global transaction not found.');
+    const [removed] = all.splice(index, 1);
+    await fs.writeFile(dataPath, JSON.stringify(all, null, 2));
+    return removed;
+  });
+}
+
 module.exports = {
   getAllTransactions,
   getTransactionById,
@@ -612,6 +625,7 @@ module.exports = {
   COMMON_MEMO_PLACEHOLDERS,
   MEMO_PLACEHOLDERS_BY_ROLE,
   clearTransactionsByOrg,
+  removeTransactionById,
   TX_STATUSES: Object.freeze([...TX_STATUSES]),
   TX_TYPES: Object.freeze([...TX_TYPES]),
   TX_DIRECTIONS: Object.freeze([...TX_DIRECTIONS]),

@@ -621,6 +621,9 @@
       },
       {
         "id": "445561"
+      },
+      {
+        "id": "445582"
       }
     ],
     "related": [],
@@ -2452,6 +2455,49 @@
     "message": "",
     "minimumAccessRequirement": 1,
     "name": "SCHOOL_SAMPLE_DATA",
+    "navigatorSection": false,
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "related": [],
+    "subsections": [],
+    "trackState": true
+  },
+  {
+    "id": "445582",
+    "active": true,
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-07-13T23:32:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-07-13T23:32:00.000Z"
+    },
+    "category": "SCHOOL",
+    "dashboardDisplay": true,
+    "description": "Browse school collections and selectively hard-delete records for test cleanup.",
+    "homeURL": "/school/data-maintenance",
+    "inactiveMessage": "",
+    "mainDashboardDisplay": false,
+    "message": "",
+    "minimumAccessRequirement": 1,
+    "name": "SCHOOL_DATA_MAINTENANCE",
     "navigatorSection": false,
     "operations": [
       {

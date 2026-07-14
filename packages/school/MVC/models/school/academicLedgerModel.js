@@ -282,6 +282,19 @@ async function clearEntriesByOrg(orgId) {
   });
 }
 
+async function removeEntryById(id) {
+  return queueWrite(async () => {
+    const targetId = toPublicId(id);
+    if (!targetId) throw new Error('Academic ledger entry id is required.');
+    const all = await getAllEntries();
+    const index = all.findIndex((entry) => idsEqual(entry?.id, targetId));
+    if (index === -1) throw new Error('Academic ledger entry not found.');
+    const [removed] = all.splice(index, 1);
+    await fs.writeFile(dataPath, JSON.stringify(all, null, 2));
+    return removed;
+  });
+}
+
 module.exports = {
   ENTRY_TYPES: Object.freeze([...ENTRY_TYPES]),
   ENTRY_STATUSES: Object.freeze([...ENTRY_STATUSES]),
@@ -290,7 +303,8 @@ module.exports = {
   addEntry,
   addEntries,
   updateEntryStatus,
-  clearEntriesByOrg
+  clearEntriesByOrg,
+  removeEntryById
 };
 
 

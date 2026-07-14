@@ -204,6 +204,9 @@
         },
         {
           "id": "445561"
+        },
+        {
+          "id": "445582"
         }
       ],
       "related": [],
@@ -1816,6 +1819,44 @@
       "adoptExisting": true
     },
     {
+      "id": "445582",
+      "name": "SCHOOL_DATA_MAINTENANCE",
+      "category": "SCHOOL",
+      "description": "Browse school collections and selectively hard-delete records for test cleanup.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/data-maintenance",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
       "id": "938980",
       "name": "SCHOOL_SCHEDULES",
       "category": "SCHOOL",
@@ -3220,6 +3261,18 @@
       "adoptExisting": true
     },
     {
+      "id": "SYM_SYSTEM_200",
+      "name": "SCHOOL_DATA_MAINTENANCE",
+      "type": "class",
+      "value": "bi bi-database-gear",
+      "tags": [
+        "SCHOOL_DATA_MAINTENANCE",
+        "445582"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
       "id": "SYM_SYSTEM_035",
       "name": "SCHOOL_SCHEDULES",
       "type": "class",
@@ -3818,6 +3871,19 @@
         },
         {
           "sectionId": "445561",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445582",
           "adminAccess": false,
           "operations": [
             {
@@ -5134,6 +5200,19 @@
           ]
         },
         {
+          "sectionId": "445582",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
           "sectionId": "445563",
           "adminAccess": false,
           "operations": [
@@ -6351,6 +6430,19 @@
         },
         {
           "sectionId": "445561",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445582",
           "adminAccess": false,
           "operations": [
             {

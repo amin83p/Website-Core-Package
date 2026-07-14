@@ -1642,6 +1642,23 @@
     "value": "bi bi-database-fill"
   },
   {
+    "id": "SYM_SYSTEM_200",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-07-13T23:32:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-07-13T23:32:00.000Z"
+    },
+    "name": "SCHOOL_DATA_MAINTENANCE",
+    "orgId": "SYSTEM",
+    "tags": [
+      "SCHOOL_DATA_MAINTENANCE",
+      "445582"
+    ],
+    "type": "class",
+    "value": "bi bi-database-gear"
+  },
+  {
     "id": "SYM_SYSTEM_043",
     "audit": {
       "createUser": "ROOT_001",

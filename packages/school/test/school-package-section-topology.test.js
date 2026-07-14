@@ -7,6 +7,7 @@ const ROOT = path.resolve(__dirname, '../../..');
 const MANIFEST_PATH = path.join(ROOT, 'packages/school/package.manifest.json');
 
 const SAMPLE_DATA_ID = '445561';
+const DATA_MAINTENANCE_ID = '445582';
 const MASTER_HUB_ID = '445577';
 
 function readManifest() {
@@ -36,6 +37,7 @@ test('school manifest places sample data under SCHOOL_ACADEMIA only', () => {
 
   assert.equal(schoolSubs.includes(SAMPLE_DATA_ID), false, 'SCHOOL should not list School Sample Data');
   assert.equal(academiaSubs.includes(SAMPLE_DATA_ID), true, 'SCHOOL_ACADEMIA should list School Sample Data');
+  assert.equal(academiaSubs.includes(DATA_MAINTENANCE_ID), true, 'SCHOOL_ACADEMIA should list School Data Maintenance');
 });
 
 test('school manifest links master academia hub under SCHOOL root', () => {

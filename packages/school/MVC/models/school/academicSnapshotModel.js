@@ -70,11 +70,25 @@ async function clearSnapshotsByOrg(orgId) {
   });
 }
 
+async function removeSnapshotById(id) {
+  return queueWrite(async () => {
+    const targetId = String(id || '').trim();
+    if (!targetId) throw new Error('Academic snapshot id is required.');
+    const all = await getAllSnapshots();
+    const index = all.findIndex((row) => String(row?.id || '') === targetId);
+    if (index === -1) throw new Error('Academic snapshot not found.');
+    const [removed] = all.splice(index, 1);
+    await fs.writeFile(dataPath, JSON.stringify(all, null, 2));
+    return removed;
+  });
+}
+
 module.exports = {
   getAllSnapshots,
   getSnapshotByStudentProgram,
   upsertSnapshot,
-  clearSnapshotsByOrg
+  clearSnapshotsByOrg,
+  removeSnapshotById
 };
 
 

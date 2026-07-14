@@ -395,6 +395,23 @@ async function purgeMongoDocumentByResolvedId(collectionName, targetId, label, b
   return normalizeMongoDocument(existingRaw);
 }
 
+function attachMaintenancePurgeById(repository, { collectionName, label, jsonRemove }) {
+  if (!repository || typeof repository !== 'object') return;
+  repository.maintenancePurgeById = async (id, options = {}) => {
+    const normalizedId = toPublicId(id);
+    if (!normalizedId) throw new Error(`${label} id is required.`);
+    return runByRepositoryBackend(options, {
+      json: async () => {
+        if (typeof jsonRemove !== 'function') {
+          throw new Error(`Maintenance purge is not supported for ${label}.`);
+        }
+        return jsonRemove(normalizedId);
+      },
+      mongo: async () => purgeMongoDocumentByResolvedId(collectionName, normalizedId, label)
+    }, `school.${label}.maintenancePurgeById`);
+  };
+}
+
 function normalizeDateOnlyToken(value) {
   const token = String(value || '').trim();
   if (!token) return '';
@@ -2040,6 +2057,38 @@ schoolRepositories.academicSnapshots.clearByOrg = async (orgId, options = {}) =>
     }
   }, 'school.academicSnapshots.clearByOrg');
 };
+
+attachMaintenancePurgeById(schoolRepositories.globalTransactions, {
+  collectionName: 'schoolGlobalTransactions',
+  label: 'globalTransactions',
+  jsonRemove: (id) => globalTransactionLedgerModel.removeTransactionById(id)
+});
+
+attachMaintenancePurgeById(schoolRepositories.academicLedger, {
+  collectionName: 'schoolAcademicLedger',
+  label: 'academicLedger',
+  jsonRemove: (id) => academicLedgerModel.removeEntryById(id)
+});
+
+attachMaintenancePurgeById(schoolRepositories.academicSnapshots, {
+  collectionName: 'schoolAcademicSnapshots',
+  label: 'academicSnapshots',
+  jsonRemove: (id) => academicSnapshotModel.removeSnapshotById(id)
+});
+
+attachMaintenancePurgeById(schoolRepositories.timesheets, {
+  collectionName: 'schoolTimesheets',
+  label: 'timesheets',
+  jsonRemove: (id) => timesheetModel.removeTimesheetById(id)
+});
+
+schoolRepositories.studentProgramRegistrations.maintenancePurgeById = async (id, options = {}) => (
+  schoolRepositories.studentProgramRegistrations.deleteDraftRegistration(id, options)
+);
+
+schoolRepositories.studentTermRegistrations.maintenancePurgeById = async (id, options = {}) => (
+  schoolRepositories.studentTermRegistrations.deleteDraftRegistration(id, options)
+);
 
 schoolRepositories.classes.clearEnrollmentsByOrg = async (orgId, options = {}) => {
   const targetOrgId = toPublicId(orgId);

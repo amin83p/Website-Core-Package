@@ -428,11 +428,25 @@ async function clearByOrg(orgId, options = {}) {
     });
 }
 
+async function removeTimesheetById(id) {
+    return queueWrite(async () => {
+        const targetId = toPublicId(id);
+        if (!targetId) throw new Error('Timesheet id is required.');
+        const all = await getAllTimesheets();
+        const index = all.findIndex((t) => idsEqual(t?.id, targetId));
+        if (index === -1) throw new Error('Timesheet not found.');
+        const [removed] = all.splice(index, 1);
+        await fs.writeFile(dataPath, JSON.stringify(all, null, 2));
+        return removed;
+    });
+}
+
 module.exports = {
     getAllTimesheets,
     getTimesheetById,
     saveTimesheet,
     clearByOrg,
+    removeTimesheetById,
     sanitizeTimesheetPayload,
     sanitizeSubmissionSnapshot,
     sanitizeSnapshotEntry,

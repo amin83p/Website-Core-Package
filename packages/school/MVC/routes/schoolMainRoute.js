@@ -42,6 +42,7 @@ router.use('/accounts', require('./schoolAccountRoutes'));
 router.use('/transactions', require('./transactionsManagerRoutes'));
 router.use('/academic-ledger', require('./academicLedgerRoutes'));
 router.use('/sample-data', require('./sampleDataRoutes'));
+router.use('/data-maintenance', require('./schoolDataMaintenanceRoutes'));
 router.use('/departments', require('./departmentRoutes'));
 router.use('/activities', require('./activityRoutes'));
 router.use('/subjects', require('./subjectRoutes'));

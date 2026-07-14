@@ -74,6 +74,15 @@ const ROUTE_CATALOG = [
     locked: false
   },
   {
+    id: 'heavy_data_maintenance',
+    label: 'School Data Maintenance',
+    method: '*',
+    matchType: 'prefix',
+    path: '/school/data-maintenance',
+    defaultGroup: 'heavy',
+    locked: false
+  },
+  {
     id: 'picker_search_q',
     label: 'Search Endpoints With q',
     method: 'GET',

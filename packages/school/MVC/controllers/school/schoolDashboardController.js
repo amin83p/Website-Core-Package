@@ -18,6 +18,7 @@ const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/transactions(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TRANSACTIONS },
     { pattern: /^\/school\/academic-ledger(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_ACADEMIC_LEDGER },
     { pattern: /^\/school\/sample-data(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SAMPLE_DATA },
+    { pattern: /^\/school\/data-maintenance(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_DATA_MAINTENANCE },
     { pattern: /^\/school\/students(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_STUDENTS },
     { pattern: /^\/school\/teachers(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TEACHERS },
     { pattern: /^\/school\/staff(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_STAFF },
@@ -198,6 +199,16 @@ async function showDashboard(req, res) {
                 href: '/school/academic-ledger',
                 buttonLabel: 'View Academic Ledger',
                 icon: 'bi-journal-medical',
+                subtleClass: 'bg-danger-subtle text-danger',
+                buttonClass: 'btn btn-danger'
+            },
+            {
+                priority: 998,
+                title: 'Data Maintenance',
+                description: 'Browse school collections and selectively hard-delete records for test cleanup.',
+                href: '/school/data-maintenance',
+                buttonLabel: 'Open Data Maintenance',
+                icon: 'bi-database-gear',
                 subtleClass: 'bg-danger-subtle text-danger',
                 buttonClass: 'btn btn-danger'
             },
