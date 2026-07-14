@@ -11,7 +11,11 @@ const {
 } = require('../../services/school/schoolPeopleDuplicateGuardService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolLinkedPersonProfileService = require('../../services/school/schoolLinkedPersonProfileService');
+const personDenormalizedNameSyncService = require('../../services/school/personDenormalizedNameSyncService');
+const schoolRoleSystemIdMigrationService = require('../../services/school/schoolRoleSystemIdMigrationService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
+const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
@@ -805,7 +809,22 @@ exports.saveTeacher = async (req, res) => {
 
     await txContext.commit({ flow: 'teacher_save', teacherId: toPublicId(id) });
 
-    const payloadOut = { status: 'success', message: 'Teacher saved successfully.' };
+    let nameSync = null;
+    if (id) {
+      nameSync = await personDenormalizedNameSyncService.syncPersonDisplayNameForRoleUpdate({
+        personId: payload.personId,
+        activeOrgId: payload.orgId,
+        reqUser: req.user
+      });
+    }
+
+    const syncErrors = Number(nameSync?.updated?.errors || 0);
+    const payloadOut = {
+      status: 'success',
+      partial: syncErrors > 0,
+      message: syncErrors > 0 ? 'Teacher saved, but related name synchronization completed with warnings.' : 'Teacher saved successfully.',
+      nameSync
+    };
     if (isAjax(req)) {
       const result = { ...payloadOut };
       if (!id && createdTeacherAccount) {
@@ -841,6 +860,50 @@ exports.saveTeacher = async (req, res) => {
     };
     if (isAjax(req)) return res.status(statusCode).json(responsePayload);
     res.status(statusCode).render('error', { title: 'Error', error, message: error.message, user: req.user, statusCode });
+  }
+};
+
+async function assertCanChangeTeacherSystemId(req) {
+  const allowed = await adminChekersService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_TEACHERS } });
+  if (!allowed) { const error = new Error('Only administrators can change a Teacher System Record ID.'); error.status = 403; throw error; }
+}
+
+exports.previewTeacherSystemIdChange = async (req, res) => {
+  try {
+    await assertCanChangeTeacherSystemId(req);
+    const data = await schoolRoleSystemIdMigrationService.previewRoleSystemId({ roleType: 'teacher', oldId: toPublicId(req.params.id), orgId: getActiveOrgIdOrThrow(req.user) });
+    const capability = await schoolRoleSystemIdMigrationService.getMigrationCapability();
+    return res.json({ status: 'success', data: { ...data, ...capability }, actionStateId: req.actionStateId || '' });
+  } catch (error) { return res.status(error.status || 400).json({ status: 'error', message: error.message }); }
+};
+
+exports.generateTeacherSystemId = async (req, res) => {
+  try {
+    await assertCanChangeTeacherSystemId(req);
+    await schoolRoleSystemIdMigrationService.previewRoleSystemId({ roleType: 'teacher', oldId: toPublicId(req.params.id), orgId: getActiveOrgIdOrThrow(req.user) });
+    const id = await schoolRoleSystemIdMigrationService.generateRoleSystemId('teacher');
+    return res.json({ status: 'success', data: { id }, actionStateId: req.actionStateId || '' });
+  } catch (error) { return res.status(error.status || 400).json({ status: 'error', message: error.message }); }
+};
+
+exports.changeTeacherSystemId = async (req, res) => {
+  let guardKey = '';
+  try {
+    await assertCanChangeTeacherSystemId(req);
+    const oldId = toPublicId(req.params.id);
+    const newId = String(req.body?.newId || '').trim();
+    if (String(req.body?.confirmationId || '').trim() !== newId) throw new Error('Confirmation must exactly match the replacement System Record ID.');
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    guardKey = idempotencyGuardService.createGuardKey(['teacher_system_id_change', orgId, oldId, newId]);
+    const guardResult = idempotencyGuardService.beginGuard({ key: guardKey, runningTtlMs: 180000, replayTtlMs: 20000 });
+    if (sendGuardedResponse(req, res, guardResult, 'Teacher System Record ID migration is already in progress.')) return;
+    const result = await schoolRoleSystemIdMigrationService.migrateRoleSystemId({ roleType: 'teacher', oldId, newId, orgId, actor: toPublicId(req.user?.id) || String(req.user?.username || 'system') });
+    const payload = { status: 'success', message: 'Teacher System Record ID updated successfully.', data: result, redirectTo: result.redirectTo };
+    idempotencyGuardService.completeGuard(guardKey, payload);
+    return res.json(payload);
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    return res.status(error.status || 400).json({ status: 'error', message: error.message, migrationId: error.migrationId || '', rollbackStatus: error.rollbackStatus || '' });
   }
 };
 

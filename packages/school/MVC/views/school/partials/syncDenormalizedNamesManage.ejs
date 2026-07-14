@@ -33,23 +33,31 @@
         '<div class="progress" role="progressbar" aria-label="Sync progress" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">',
         '<div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>',
         '</div>',
-        '<div class="small text-muted mt-2">Updating class sessions, instructors, cases, activities, tasks, and leave records where saved names still reference old person labels.</div>'
+        '<div class="small text-muted mt-2">Updating School Accounts, class sessions, instructors, cases, activities, current tasks, and current leave records where saved names still reference old person labels.</div>'
       ].join('');
     }
 
     function buildSummaryHtml(data) {
       const updated = data && data.updated ? data.updated : {};
+      const scanned = data && data.scanned ? data.scanned : {};
       return [
-        '<div class="mb-2"><b>Done.</b> Saved names for <b>', escapeHtml(sectionLabel), '</b> were synced from the Persons directory.</div>',
+        '<div class="mb-2"><b>Done.</b> Saved names for Teachers, Students, and Staff were synced from the Persons directory.</div>',
         '<div class="small">',
+        'Teachers scanned: <b>', Number(scanned.teachers || 0), '</b><br>',
+        'Students scanned: <b>', Number(scanned.students || 0), '</b><br>',
+        'Staff scanned: <b>', Number(scanned.staff || 0), '</b><br>',
+        'Linked accounts found: <b>', Number(scanned.linkedAccounts || 0), '</b><br>',
+        'Unique people: <b>', Number(scanned.uniquePeople || 0), '</b><br>',
         'People processed: <b>', Number(data?.peopleProcessed || 0), '</b><br>',
         'Classes touched: <b>', Number(updated.classes || 0), '</b><br>',
         'Sessions updated: <b>', Number(updated.sessions || 0), '</b><br>',
         'Instructors updated: <b>', Number(updated.instructors || 0), '</b><br>',
         'Session issues updated: <b>', Number(updated.sessionStudentCases || 0), '</b><br>',
         'Activities updated: <b>', Number(updated.activities || 0), '</b><br>',
+        'School Accounts updated: <b>', Number(updated.schoolAccounts || 0), '</b><br>',
         'Tasks updated: <b>', Number(updated.tasks || 0), '</b><br>',
         'Leave requests updated: <b>', Number(updated.leaveRequests || 0), '</b><br>',
+        'Skipped records: <b>', Number(updated.skipped || 0), '</b><br>',
         'Errors: <b>', Number(updated.errors || 0), '</b>',
         '</div>'
       ].join('');
@@ -58,13 +66,13 @@
     if (!btn) return;
 
     btn.addEventListener('click', async function () {
-      const confirmMsg = 'Sync saved ' + sectionLabel.toLowerCase() + ' names from the Persons directory for the active organization?';
+      const confirmMsg = 'Sync saved names for all Teachers, Students, and Staff from the Persons directory for the active organization?';
       let confirmed = false;
       if (typeof window.showMessageModal === 'function') {
         const answer = await window.showMessageModal({
           title: 'Sync saved names?',
           icon: 'warning',
-          message: escapeHtml(confirmMsg) + '<br><br>This refreshes denormalized names in class sessions, instructors, session issues, activities, tasks, and leave records.',
+          message: escapeHtml(confirmMsg) + '<br><br>This integrated operation refreshes linked School Accounts and live denormalized names across all three sections.',
           buttons: [
             { text: 'Cancel', class: 'btn-secondary btn-md' },
             { text: 'Sync Names', class: 'btn-success btn-md' }
@@ -85,7 +93,7 @@
           window.showMessageModal({
             title: 'Syncing saved names…',
             icon: 'info',
-            message: buildProgressModalHtml('Checking ' + sectionLabel.toLowerCase() + ' records and updating saved name fields…'),
+            message: buildProgressModalHtml('Checking Teachers, Students, and Staff and updating saved name fields…'),
             buttons: []
           });
         }
@@ -112,9 +120,13 @@
         const summaryHtml = buildSummaryHtml(payload.data || {});
         if (typeof window.showMessageModal === 'function') {
           await window.showMessageModal({
-            title: 'Sync completed',
-            icon: 'success',
-            message: summaryHtml,
+            title: payload.partial ? 'Sync completed with warnings' : 'Sync completed',
+            icon: payload.partial ? 'warning' : 'success',
+            message: summaryHtml + (payload.partial && Array.isArray(payload.data?.errorDetails) && payload.data.errorDetails.length
+              ? '<hr><div class="small text-danger"><b>Errors:</b><br>' + payload.data.errorDetails.slice(0, 10).map(function (row) {
+                  return escapeHtml((row.collection || 'record') + (row.id ? ':' + row.id : '') + ' - ' + (row.message || 'Update failed'));
+                }).join('<br>') + '</div>'
+              : ''),
             buttons: [{ text: 'OK', class: 'btn-success btn-md' }]
           });
         } else {

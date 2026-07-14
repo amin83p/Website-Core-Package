@@ -15,10 +15,21 @@ function emptySummary() {
     instructors: 0,
     sessionStudentCases: 0,
     activities: 0,
+    schoolAccounts: 0,
     tasks: 0,
     leaveRequests: 0,
+    skipped: 0,
     errors: 0
   };
+}
+
+function recordSyncError(summary, errorDetails, collection, id, error) {
+  summary.errors += 1;
+  errorDetails.push({
+    collection: String(collection || 'unknown'),
+    id: toPublicId(id),
+    message: String(error?.message || error || 'Name synchronization failed.')
+  });
 }
 
 function mergeSummary(target, source) {
@@ -65,57 +76,130 @@ function sliceName(value, max = 180) {
   return String(value || '').trim().slice(0, max);
 }
 
+function pickSchoolAccountNameSuffix(account, fallback = '') {
+  const name = String(account?.name || '').trim();
+  for (const suffix of ['Self-Funded Student', 'Funded Student', 'Teacher', 'Staff', 'Student']) {
+    if (name.toLowerCase().endsWith(`(${suffix.toLowerCase()})`)) return suffix;
+  }
+  return String(fallback || '').trim();
+}
+
+async function syncSchoolAccountNames({ personId, displayName, activeOrgId, summary, errorDetails, reqUser } = {}) {
+  const orgFilter = activeOrgId ? { orgId__eq: activeOrgId } : {};
+  let students;
+  let teachers;
+  let staff;
+  let accounts;
+  try {
+    [students, teachers, staff, accounts] = await Promise.all([
+      schoolDataService.fetchData('students', orgFilter, reqUser),
+      schoolDataService.fetchData('teachers', orgFilter, reqUser),
+      schoolDataService.fetchData('staff', orgFilter, reqUser),
+      schoolDataService.fetchData('schoolAccounts', orgFilter, reqUser)
+    ]);
+  } catch (error) {
+    recordSyncError(summary, errorDetails, 'schoolAccounts', '', error);
+    console.error('personDenormalizedNameSyncService.schoolAccounts load failed:', error?.message || error);
+    return;
+  }
+  const accountsById = new Map((Array.isArray(accounts) ? accounts : []).map((row) => [toPublicId(row?.id), row]));
+  const linked = [];
+
+  function collect(rows, accountField, fallback) {
+    for (const row of Array.isArray(rows) ? rows : []) {
+      if (!idsEqual(row?.personId, personId)) continue;
+      if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) continue;
+      const accountId = toPublicId(row?.[accountField]);
+      if (accountId) linked.push({ accountId, fallback });
+    }
+  }
+
+  collect(students, 'studentAccountId', 'Student');
+  collect(teachers, 'teacherAccountId', 'Teacher');
+  collect(staff, 'staffAccountId', 'Staff');
+
+  const seen = new Set();
+  for (const item of linked) {
+    if (seen.has(item.accountId)) continue;
+    seen.add(item.accountId);
+    const account = accountsById.get(item.accountId);
+    if (!account) {
+      summary.skipped += 1;
+      continue;
+    }
+    if (activeOrgId && account?.orgId && !idsEqual(account.orgId, activeOrgId)) {
+      summary.skipped += 1;
+      continue;
+    }
+    const suffix = pickSchoolAccountNameSuffix(account, item.fallback);
+    const desiredName = suffix ? `${displayName} (${suffix})` : displayName;
+    if (String(account.name || '').trim() === desiredName) continue;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await schoolDataService.updateData('schoolAccounts', item.accountId, { name: desiredName }, reqUser);
+      summary.schoolAccounts += 1;
+    } catch (error) {
+      recordSyncError(summary, errorDetails, 'schoolAccounts', item.accountId, error);
+      console.error('personDenormalizedNameSyncService.schoolAccounts update failed:', item.accountId, error?.message || error);
+    }
+  }
+}
+
 async function syncClassSessionAndInstructorNames({
   personId,
   displayName,
   aliasIds,
   activeOrgId,
-  summary
+  summary,
+  errorDetails,
+  reqUser
 } = {}) {
   const orgFilter = activeOrgId ? { orgId__eq: activeOrgId } : {};
-  const classes = await schoolDataService.fetchData('classes', orgFilter, SYSTEM_READ_USER);
+  const classes = await schoolDataService.fetchData('classes', orgFilter, reqUser);
   const touchedClassIds = new Set();
 
   for (const classRow of Array.isArray(classes) ? classes : []) {
     const classId = toPublicId(classRow?.id);
     if (!classId) continue;
+    try {
+      let instructorsChanged = false;
+      let instructorUpdateCount = 0;
+      const instructors = Array.isArray(classRow?.instructors) ? classRow.instructors.map((row) => ({ ...row })) : [];
+      instructors.forEach((instructor) => {
+        if (!matchesPersonRef(instructor?.personId, personId, aliasIds)) return;
+        const nextName = sliceName(displayName);
+        if (String(instructor?.name || '').trim() === nextName) return;
+        instructor.name = nextName;
+        instructorsChanged = true;
+        instructorUpdateCount += 1;
+      });
 
-    let instructorsChanged = false;
-    const instructors = Array.isArray(classRow?.instructors) ? classRow.instructors.map((row) => ({ ...row })) : [];
-    instructors.forEach((instructor) => {
-      if (!matchesPersonRef(instructor?.personId, personId, aliasIds)) return;
-      const nextName = sliceName(displayName);
-      if (String(instructor?.name || '').trim() === nextName) return;
-      instructor.name = nextName;
-      instructorsChanged = true;
-      summary.instructors += 1;
-    });
+      const sessions = await schoolDataService.getClassSessions(classId, reqUser);
+      let sessionsChanged = false;
+      let sessionUpdateCount = 0;
+      const nextSessions = (Array.isArray(sessions) ? sessions : []).map((session) => {
+        const row = session && typeof session === 'object' ? { ...session } : {};
+        if (!matchesPersonRef(row?.delivery?.deliveredBy, personId, aliasIds)) return row;
+        if (!row.delivery || typeof row.delivery !== 'object') row.delivery = {};
+        const nextName = sliceName(displayName);
+        if (String(row.delivery.deliveredByName || '').trim() === nextName) return row;
+        row.delivery = { ...row.delivery, deliveredByName: nextName };
+        sessionsChanged = true;
+        sessionUpdateCount += 1;
+        return row;
+      });
 
-    const sessions = await schoolDataService.getClassSessions(classId, SYSTEM_READ_USER);
-    let sessionsChanged = false;
-    const nextSessions = (Array.isArray(sessions) ? sessions : []).map((session) => {
-      const row = session && typeof session === 'object' ? { ...session } : {};
-      if (!matchesPersonRef(row?.delivery?.deliveredBy, personId, aliasIds)) return row;
-      if (!row.delivery || typeof row.delivery !== 'object') row.delivery = {};
-      const nextName = sliceName(displayName);
-      if (String(row.delivery.deliveredByName || '').trim() === nextName) return row;
-      row.delivery = { ...row.delivery, deliveredByName: nextName };
-      sessionsChanged = true;
-      summary.sessions += 1;
-      return row;
-    });
-
-    if (sessionsChanged) {
-      await schoolDataService.saveClassSessions(classId, nextSessions, SYSTEM_READ_USER);
-    }
-
-    if (instructorsChanged) {
-      await schoolDataService.updateData('classes', classId, { instructors }, SYSTEM_READ_USER);
-    }
-
-    if (sessionsChanged || instructorsChanged) {
-      touchedClassIds.add(classId);
-      summary.classes += 1;
+      if (sessionsChanged) await schoolDataService.saveClassSessions(classId, nextSessions, reqUser);
+      if (instructorsChanged) await schoolDataService.updateData('classes', classId, { instructors }, reqUser);
+      if (sessionsChanged || instructorsChanged) {
+        touchedClassIds.add(classId);
+        summary.classes += 1;
+        summary.sessions += sessionUpdateCount;
+        summary.instructors += instructorUpdateCount;
+      }
+    } catch (error) {
+      recordSyncError(summary, errorDetails, 'classes', classId, error);
+      console.error('personDenormalizedNameSyncService.classes update failed:', classId, error?.message || error);
     }
   }
 
@@ -124,13 +208,13 @@ async function syncClassSessionAndInstructorNames({
       // eslint-disable-next-line no-await-in-loop
       await indexService.rebuildIndexesForClass(classId);
     } catch (error) {
-      summary.errors += 1;
+      recordSyncError(summary, errorDetails, 'classIndexes', classId, error);
       console.error('personDenormalizedNameSyncService.rebuildIndexesForClass failed:', classId, error?.message || error);
     }
   }
 }
 
-async function syncSessionStudentCaseNames({ personId, displayName, aliasIds, activeOrgId, summary } = {}) {
+async function syncSessionStudentCaseNames({ personId, displayName, aliasIds, activeOrgId, summary, errorDetails } = {}) {
   const rows = await schoolRepositories.sessionStudentCases.list({
     query: {},
     scope: { canViewAll: true }
@@ -152,13 +236,13 @@ async function syncSessionStudentCaseNames({ personId, displayName, aliasIds, ac
       await schoolRepositories.sessionStudentCases.update(row.id, { ...row, ...updates }, { scope: { canViewAll: true } });
       summary.sessionStudentCases += 1;
     } catch (error) {
-      summary.errors += 1;
+      recordSyncError(summary, errorDetails, 'sessionStudentCases', row?.id, error);
       console.error('personDenormalizedNameSyncService.sessionStudentCases update failed:', row?.id, error?.message || error);
     }
   }
 }
 
-async function syncActivityAssigneeNames({ personId, displayName, aliasIds, activeOrgId, summary } = {}) {
+async function syncActivityAssigneeNames({ personId, displayName, aliasIds, activeOrgId, summary, errorDetails } = {}) {
   const rows = await schoolRepositories.activities.list({
     query: {},
     scope: { canViewAll: true }
@@ -185,10 +269,14 @@ async function syncActivityAssigneeNames({ personId, displayName, aliasIds, acti
       await schoolRepositories.activities.update(activity.id, { ...activity, entries }, { scope: { canViewAll: true } });
       summary.activities += 1;
     } catch (error) {
-      summary.errors += 1;
+      recordSyncError(summary, errorDetails, 'activities', activity?.id, error);
       console.error('personDenormalizedNameSyncService.activities update failed:', activity?.id, error?.message || error);
     }
   }
+}
+
+function isLiveTaskStatus(status) {
+  return !['completed', 'resolved', 'cancelled', 'canceled', 'closed', 'void', 'archived'].includes(String(status || '').trim().toLowerCase());
 }
 
 function patchTaskPersonNames(task, personId, aliasIds, displayName) {
@@ -196,45 +284,24 @@ function patchTaskPersonNames(task, personId, aliasIds, displayName) {
   const nextName = sliceName(displayName, 160);
   const next = { ...task };
 
-  if (matchesPersonRef(next.assignedPersonId, personId, aliasIds) && String(next.assignedPersonName || '').trim() !== nextName) {
+  if (isLiveTaskStatus(next.status) && matchesPersonRef(next.assignedPersonId, personId, aliasIds) && String(next.assignedPersonName || '').trim() !== nextName) {
     next.assignedPersonName = nextName;
     changed = true;
   }
 
-  next.lifecycle = (Array.isArray(next.lifecycle) ? next.lifecycle : []).map((event) => {
-    const row = { ...event };
-    let eventChanged = false;
-    if (matchesPersonRef(row.personId, personId, aliasIds) && String(row.personName || '').trim() !== nextName) {
-      row.personName = nextName;
-      eventChanged = true;
-    }
-    if (matchesPersonRef(row.targetPersonId, personId, aliasIds) && String(row.targetPersonName || '').trim() !== nextName) {
-      row.targetPersonName = nextName;
-      eventChanged = true;
-    }
-    if (eventChanged) changed = true;
-    return row;
-  });
-
   next.tasks = (Array.isArray(next.tasks) ? next.tasks : []).map((assignment) => {
     const row = { ...assignment };
-    if (matchesPersonRef(row.assignedPersonId, personId, aliasIds) && String(row.assignedPersonName || '').trim() !== nextName) {
+    if (isLiveTaskStatus(row.status) && matchesPersonRef(row.assignedPersonId, personId, aliasIds) && String(row.assignedPersonName || '').trim() !== nextName) {
       changed = true;
       row.assignedPersonName = nextName;
     }
-    row.assignmentHistory = (Array.isArray(row.assignmentHistory) ? row.assignmentHistory : []).map((entry) => {
-      if (!matchesPersonRef(entry?.assignedPersonId, personId, aliasIds)) return entry;
-      if (String(entry?.assignedPersonName || '').trim() === nextName) return entry;
-      changed = true;
-      return { ...entry, assignedPersonName: nextName };
-    });
     return row;
   });
 
   return changed ? next : null;
 }
 
-async function syncTaskPersonNames({ personId, displayName, aliasIds, activeOrgId, summary } = {}) {
+async function syncTaskPersonNames({ personId, displayName, aliasIds, activeOrgId, summary, errorDetails } = {}) {
   const rows = await schoolRepositories.tasks.list({
     query: {},
     scope: { canViewAll: true }
@@ -249,7 +316,7 @@ async function syncTaskPersonNames({ personId, displayName, aliasIds, activeOrgI
       await schoolRepositories.tasks.update(task.id, patched, { scope: { canViewAll: true } });
       summary.tasks += 1;
     } catch (error) {
-      summary.errors += 1;
+      recordSyncError(summary, errorDetails, 'tasks', task?.id, error);
       console.error('personDenormalizedNameSyncService.tasks update failed:', task?.id, error?.message || error);
     }
   }
@@ -265,16 +332,8 @@ function patchLeaveRequestNames(row, personId, aliasIds, displayName) {
     changed = true;
   }
 
-  if (next.lastApprovedSnapshot && typeof next.lastApprovedSnapshot === 'object') {
-    const snapshot = { ...next.lastApprovedSnapshot };
-    if (matchesPersonRef(snapshot.requesterPersonId, personId, aliasIds) && String(snapshot.requesterName || '').trim() !== nextName) {
-      snapshot.requesterName = nextName;
-      next.lastApprovedSnapshot = snapshot;
-      changed = true;
-    }
-  }
-
   next.sessionResolutions = (Array.isArray(next.sessionResolutions) ? next.sessionResolutions : []).map((resolution) => {
+    if (String(resolution?.resolvedAt || '').trim()) return resolution;
     if (!matchesPersonRef(resolution?.substituteTeacherId, personId, aliasIds)) return resolution;
     if (String(resolution?.substituteTeacherName || '').trim() === nextName) return resolution;
     changed = true;
@@ -284,7 +343,7 @@ function patchLeaveRequestNames(row, personId, aliasIds, displayName) {
   return changed ? next : null;
 }
 
-async function syncLeaveRequestNames({ personId, displayName, aliasIds, activeOrgId, summary } = {}) {
+async function syncLeaveRequestNames({ personId, displayName, aliasIds, activeOrgId, summary, errorDetails } = {}) {
   const rows = await schoolRepositories.leaveRequests.list({
     query: {},
     scope: { canViewAll: true }
@@ -299,7 +358,7 @@ async function syncLeaveRequestNames({ personId, displayName, aliasIds, activeOr
       await schoolRepositories.leaveRequests.update(row.id, patched, { scope: { canViewAll: true } });
       summary.leaveRequests += 1;
     } catch (error) {
-      summary.errors += 1;
+      recordSyncError(summary, errorDetails, 'leaveRequests', row?.id, error);
       console.error('personDenormalizedNameSyncService.leaveRequests update failed:', row?.id, error?.message || error);
     }
   }
@@ -319,26 +378,62 @@ async function syncPersonDisplayName({
 
   const aliasIds = await buildPersonAliasIds({ personId: normalizedPersonId, activeOrgId, reqUser });
   const summary = emptySummary();
+  const errorDetails = [];
   const context = {
     personId: normalizedPersonId,
     displayName: normalizedName,
     aliasIds,
     activeOrgId,
-    summary
+    summary,
+    errorDetails,
+    reqUser
   };
 
-  await syncClassSessionAndInstructorNames(context);
-  await syncSessionStudentCaseNames(context);
-  await syncActivityAssigneeNames(context);
-  await syncTaskPersonNames(context);
-  await syncLeaveRequestNames(context);
+  const steps = [
+    ['classes', syncClassSessionAndInstructorNames],
+    ['sessionStudentCases', syncSessionStudentCaseNames],
+    ['activities', syncActivityAssigneeNames],
+    ['schoolAccounts', syncSchoolAccountNames],
+    ['tasks', syncTaskPersonNames],
+    ['leaveRequests', syncLeaveRequestNames]
+  ];
+  for (const [collection, synchronizer] of steps) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await synchronizer(context);
+    } catch (error) {
+      recordSyncError(summary, errorDetails, collection, '', error);
+      console.error('personDenormalizedNameSyncService.' + collection + ' sync failed:', error?.message || error);
+    }
+  }
 
   return {
     personId: normalizedPersonId,
     displayName: normalizedName,
     aliasIds,
-    updated: summary
+    updated: summary,
+    errorDetails
   };
+}
+
+async function syncPersonDisplayNameForRoleUpdate({ personId, activeOrgId, reqUser } = {}) {
+  const normalizedPersonId = toPublicId(personId);
+  if (!normalizedPersonId) return null;
+  try {
+    const person = await schoolPersonAccessService.getPersonById({ reqUser, personId: normalizedPersonId });
+    const displayName = schoolPersonAccessService.formatPersonName(person, normalizedPersonId);
+    return await syncPersonDisplayName({
+      personId: normalizedPersonId,
+      displayName,
+      activeOrgId,
+      reqUser
+    });
+  } catch (error) {
+    const updated = emptySummary();
+    const errorDetails = [];
+    recordSyncError(updated, errorDetails, 'persons', normalizedPersonId, error);
+    return { personId: normalizedPersonId, displayName: '', aliasIds: [], updated, errorDetails, partial: true };
+  }
 }
 
 async function syncDenormalizedNamesForOrg({ activeOrgId, reqUser, personId = '', linkType = '' } = {}) {
@@ -351,20 +446,9 @@ async function syncDenormalizedNamesForOrg({ activeOrgId, reqUser, personId = ''
     schoolDataService.fetchData('students', { orgId__eq: orgId }, reqUser || SYSTEM_READ_USER).catch(() => [])
   ]);
 
-  const buckets = {
-    teacher: teachers,
-    staff,
-    student: students
-  };
-
   const personIds = new Set();
   if (targetPersonId) {
     personIds.add(targetPersonId);
-  } else if (buckets[normalizedLinkType]) {
-    (Array.isArray(buckets[normalizedLinkType]) ? buckets[normalizedLinkType] : []).forEach((row) => {
-      const id = toPublicId(row?.personId);
-      if (id) personIds.add(id);
-    });
   } else {
     [teachers, staff, students].forEach((rows) => {
       (Array.isArray(rows) ? rows : []).forEach((row) => {
@@ -381,6 +465,7 @@ async function syncDenormalizedNamesForOrg({ activeOrgId, reqUser, personId = ''
 
   const totals = emptySummary();
   const people = [];
+  const errorDetails = [];
 
   for (const id of personIds) {
     const person = personById.get(id);
@@ -393,6 +478,7 @@ async function syncDenormalizedNamesForOrg({ activeOrgId, reqUser, personId = ''
       reqUser
     });
     mergeSummary(totals, result.updated);
+    errorDetails.push(...(Array.isArray(result.errorDetails) ? result.errorDetails.map((detail) => ({ personId: id, ...detail })) : []));
     people.push({
       personId: id,
       displayName,
@@ -402,16 +488,35 @@ async function syncDenormalizedNamesForOrg({ activeOrgId, reqUser, personId = ''
 
   return {
     orgId,
-    linkType: normalizedLinkType || 'all',
+    linkType: targetPersonId ? (normalizedLinkType || 'person') : 'all',
+    scanned: {
+      teachers: Array.isArray(teachers) ? teachers.length : 0,
+      students: Array.isArray(students) ? students.length : 0,
+      staff: Array.isArray(staff) ? staff.length : 0,
+      linkedAccounts: new Set([].concat(
+        (Array.isArray(teachers) ? teachers : []).map((row) => toPublicId(row?.teacherAccountId)),
+        (Array.isArray(students) ? students : []).map((row) => toPublicId(row?.studentAccountId)),
+        (Array.isArray(staff) ? staff : []).map((row) => toPublicId(row?.staffAccountId))
+      ).filter(Boolean)).size,
+      uniquePeople: personIds.size
+    },
     peopleProcessed: people.length,
     people,
-    updated: totals
+    updated: totals,
+    partial: totals.errors > 0,
+    errorDetails
   };
+}
+
+async function syncAllSchoolPeopleSavedNamesForOrg({ activeOrgId, reqUser } = {}) {
+  return syncDenormalizedNamesForOrg({ activeOrgId, reqUser, personId: '', linkType: 'all' });
 }
 
 module.exports = {
   buildPersonAliasIds,
   matchesPersonRef,
   syncPersonDisplayName,
+  syncPersonDisplayNameForRoleUpdate,
+  syncAllSchoolPeopleSavedNamesForOrg,
   syncDenormalizedNamesForOrg
 };

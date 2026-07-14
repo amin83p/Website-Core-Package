@@ -6,7 +6,7 @@
   ],
   manageBtns: [
     `<a href="/school/teachers/archived" class="btn btn-outline-warning btn-md mb-2"><i class="bi bi-arrow-counterclockwise me-1"></i> Recover Archived</a>`,
-    '<button type="button" class="btn btn-outline-success btn-md mb-2" id="btnSyncTeacherDenormalizedNames"><i class="bi bi-arrow-repeat me-1"></i> Sync Saved Names</button>'
+    '<button type="button" class="btn btn-outline-success btn-md mb-2" id="btnSyncTeacherDenormalizedNames"><i class="bi bi-arrow-repeat me-1"></i> Sync All Saved Names</button>'
   ]
 }) %>
 
@@ -68,6 +68,7 @@
               </button>
               <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
                 <a href="/school/teachers/edit/<%= item.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <button type="button" class="btn btn-outline-warning btn-sm change-role-system-id-btn" data-role-type="teacher" data-id="<%= item.id %>"><i class="bi bi-arrow-repeat me-2"></i>Change System Record ID</button>
                 <button class="btn btn-outline-secondary btn-sm archive-btn" data-id="<%= item.id %>"><i class="bi bi-archive me-2"></i>Archive</button>
                 <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>"><i class="bi bi-trash me-2"></i>Delete</button>
               </div>
@@ -82,9 +83,10 @@
 <span id="urlRef" data-id="school/teachers" hidden></span>
 <%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/teachers' }) %>
 <%- include('partials/tablePages-end') %>
-<%- include('../partials/syncDenormalizedNamesManage', {
+<%- include('school/partials/syncDenormalizedNamesManage', {
   syncDenormalizedLinkType: 'teacher',
   syncDenormalizedSectionLabel: 'Teachers',
   syncDenormalizedButtonId: 'btnSyncTeacherDenormalizedNames',
   actionStateId
 }) %>
+<%- include('school/partials/roleSystemIdMigration', { systemIdRoleType: 'teacher', systemIdRoleLabel: 'Teacher', systemIdBasePath: '/school/teachers', systemIdPrefix: 'TCH', actionStateId }) %>

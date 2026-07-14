@@ -1,0 +1,88 @@
+<%
+  const roleIdType = String(systemIdRoleType || '').trim().toLowerCase();
+  const roleIdLabel = String(systemIdRoleLabel || '').trim();
+  const roleIdBasePath = String(systemIdBasePath || '').trim();
+  const roleIdPrefix = String(systemIdPrefix || '').trim();
+  const roleIdActionState = String(typeof actionStateId !== 'undefined' ? actionStateId : '').trim();
+  const roleModalId = `change${roleIdLabel}SystemIdModal`;
+%>
+<div class="modal fade" id="<%= roleModalId %>" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title fw-bold">Change <%= roleIdLabel %> System Record ID</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div id="roleSystemIdError" class="alert alert-danger d-none"></div>
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label fw-bold">Current System Record ID</label><input id="roleSystemIdCurrent" class="form-control font-monospace" readonly></div>
+        <div class="col-md-6"><label class="form-label fw-bold">Replacement System Record ID</label><div class="input-group"><input id="roleSystemIdNew" class="form-control font-monospace" maxlength="8"><button type="button" class="btn btn-outline-primary" id="roleSystemIdGenerate">Generate ID</button></div></div>
+      </div>
+      <div class="mt-4"><h6 class="fw-bold">Affected records</h6><div id="roleSystemIdImpact" class="text-muted">Loading impact preview...</div></div>
+      <div class="mt-3"><label class="form-label fw-bold">Confirm replacement ID</label><input id="roleSystemIdConfirmation" class="form-control font-monospace" placeholder="Type the replacement ID exactly"></div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-warning" id="roleSystemIdSubmit">Change System Record ID</button></div>
+  </div></div>
+</div>
+<script>
+(function () {
+  const config = <%- JSON.stringify({ roleIdType, roleIdLabel, roleIdBasePath, roleIdPrefix, roleModalId, roleIdActionState }) %>;
+  let currentActionStateId = config.roleIdActionState;
+  const modalEl = document.getElementById(config.roleModalId);
+  if (!modalEl) return;
+  document.body.appendChild(modalEl);
+  const currentEl = modalEl.querySelector('#roleSystemIdCurrent');
+  const newEl = modalEl.querySelector('#roleSystemIdNew');
+  const confirmEl = modalEl.querySelector('#roleSystemIdConfirmation');
+  const impactEl = modalEl.querySelector('#roleSystemIdImpact');
+  const errorEl = modalEl.querySelector('#roleSystemIdError');
+  const generateBtn = modalEl.querySelector('#roleSystemIdGenerate');
+  const submitBtn = modalEl.querySelector('#roleSystemIdSubmit');
+  let modal = null;
+
+  function showError(message) {
+    const text = String(message || 'Unable to change the System Record ID.').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    errorEl.textContent = text;
+    errorEl.classList.remove('d-none');
+    if (typeof window.showMessageModal === 'function') window.showMessageModal({ title: 'Operation Failed', icon: 'error', message: text, buttons: [{ text: 'OK', class: 'btn-danger btn-md' }] });
+  }
+  function setBusy(busy) { generateBtn.disabled = busy; submitBtn.disabled = busy; newEl.disabled = busy; confirmEl.disabled = busy; }
+  function hideWaiting(token) {
+    if (typeof window.hideLoading !== 'function') return;
+    if (token) window.hideLoading(token);
+    else window.hideLoading({ force: true });
+  }
+  async function readResponse(response) { const payload = await response.json().catch(() => ({ status: 'error', message: 'Invalid server response.' })); if (!response.ok || payload.status !== 'success') throw new Error(payload.message || 'Operation failed.'); return payload; }
+  function renderImpact(data) {
+    const rows = Object.entries(data?.counts || {}).filter(([, count]) => Number(count || 0) > 0);
+    impactEl.innerHTML = rows.length ? '<ul class="mb-1">' + rows.map(([key, count]) => '<li>' + String(key).replace(/([A-Z])/g, ' $1') + ': <b>' + Number(count) + '</b></li>').join('') + '</ul><div class="fw-bold">Total updates: ' + Number(data?.totalUpdates || 0) + '</div>' : '<span class="text-muted">Only the role record requires updating.</span>';
+  }
+
+  document.querySelectorAll('.change-role-system-id-btn[data-role-type="' + config.roleIdType + '"]').forEach((button) => button.addEventListener('click', async function () {
+    errorEl.classList.add('d-none'); currentEl.value = button.dataset.id || ''; newEl.value = ''; confirmEl.value = ''; impactEl.textContent = 'Loading impact preview...';
+    if (!window.bootstrap?.Modal) return showError('The modal component is unavailable. Refresh the page and try again.');
+    modal = window.bootstrap.Modal.getOrCreateInstance(modalEl); modal.show(); setBusy(true);
+    try { const payload = await readResponse(await fetch(config.roleIdBasePath + '/' + encodeURIComponent(currentEl.value) + '/system-id-impact', { headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' } })); currentActionStateId = payload.actionStateId || currentActionStateId; renderImpact(payload.data); }
+    catch (error) { showError(error.message); }
+    finally { setBusy(false); }
+  }));
+
+  generateBtn.addEventListener('click', async function () {
+    setBusy(true); errorEl.classList.add('d-none');
+    try { const payload = await readResponse(await fetch(config.roleIdBasePath + '/' + encodeURIComponent(currentEl.value) + '/system-id-generate', { headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' } })); currentActionStateId = payload.actionStateId || currentActionStateId; newEl.value = payload.data.id; confirmEl.value = ''; }
+    catch (error) { showError(error.message); }
+    finally { setBusy(false); }
+  });
+
+  submitBtn.addEventListener('click', async function () {
+    const newId = String(newEl.value || '').trim(); const confirmationId = String(confirmEl.value || '').trim();
+    if (!new RegExp('^' + config.roleIdPrefix + '\\d{5}$').test(newId)) return showError('Use the ' + config.roleIdPrefix + '##### System Record ID format.');
+    if (confirmationId !== newId) return showError('Confirmation must exactly match the replacement System Record ID.');
+    setBusy(true); errorEl.classList.add('d-none');
+    const loading = typeof window.showLoading === 'function' ? window.showLoading({ title: 'Changing ' + config.roleIdLabel + ' System Record ID', message: 'Updating references and verifying the migration. Please wait...' }) : null;
+    try {
+      const payload = await readResponse(await fetch(config.roleIdBasePath + '/' + encodeURIComponent(currentEl.value) + '/change-system-id', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-AJAX-Request': 'true' }, body: JSON.stringify({ newId, confirmationId, actionStateId: currentActionStateId }) }));
+      hideWaiting(loading);
+      if (typeof window.showMessageModal === 'function') await window.showMessageModal({ title: 'System Record ID Updated', icon: 'success', message: payload.message || 'System Record ID updated successfully.', buttons: [{ text: 'OK', class: 'btn-success btn-md' }] });
+      window.location.assign(payload.redirectTo || config.roleIdBasePath);
+    } catch (error) { hideWaiting(loading); showError(error.message); setBusy(false); }
+  });
+})();
+</script>

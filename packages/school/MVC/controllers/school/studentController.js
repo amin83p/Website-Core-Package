@@ -30,6 +30,7 @@ const {
 } = require('../../services/school/schoolPeopleDuplicateGuardService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolLinkedPersonProfileService = require('../../services/school/schoolLinkedPersonProfileService');
+const personDenormalizedNameSyncService = require('../../services/school/personDenormalizedNameSyncService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const studentSystemIdMigrationService = require('../../services/school/studentSystemIdMigrationService');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
@@ -1019,7 +1020,22 @@ exports.saveStudent = async (req, res) => {
 
         await txContext.commit({ flow: 'student_save', studentId: toPublicId(id) });
 
-        const payloadOut = { status: 'success', message: 'Student saved successfully.' };
+        let nameSync = null;
+        if (id) {
+            nameSync = await personDenormalizedNameSyncService.syncPersonDisplayNameForRoleUpdate({
+                personId: payload.personId,
+                activeOrgId: payload.orgId,
+                reqUser: req.user
+            });
+        }
+
+        const syncErrors = Number(nameSync?.updated?.errors || 0);
+        const payloadOut = {
+            status: 'success',
+            partial: syncErrors > 0,
+            message: syncErrors > 0 ? 'Student saved, but related name synchronization completed with warnings.' : 'Student saved successfully.',
+            nameSync
+        };
         if (isAjax(req)) {
             const result = { ...payloadOut };
             if (!id && createdStudentAccount) {

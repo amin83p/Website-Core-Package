@@ -26,6 +26,10 @@ router.get('/api/eligible-persons',
   trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
   ctrl.listEligiblePersons);
 
+router.get('/:id/system-id-impact', requireAccess(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE), trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }), ctrl.previewTeacherSystemIdChange);
+router.get('/:id/system-id-generate', requireAccess(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE), trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }), ctrl.generateTeacherSystemId);
+router.post('/:id/change-system-id', requireAccess(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE), trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, { requireToken: true, keepActive: true }), ctrl.changeTeacherSystemId);
+
 router.post('/recover/:id',
   requireAccess(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, { requireToken: true }),
