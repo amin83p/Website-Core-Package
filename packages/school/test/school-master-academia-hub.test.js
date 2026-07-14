@@ -30,3 +30,32 @@ test('master hub exposes academic ledger workspace section', () => {
   assert.match(service, /key === 'academic-ledger'/);
   assert.match(service, /SECTIONS\.SCHOOL_ACADEMIC_LEDGER/);
 });
+
+test('master hub people search only submits from Search or Enter', () => {
+  const view = read('MVC/views/school/masterAcademiaHub.ejs');
+
+  assert.match(view, /id="schoolMasterHubSearchButton"/);
+  assert.match(view, /els\.search\.addEventListener\('keydown'/);
+  assert.match(view, /event\.key !== 'Enter'/);
+  assert.match(view, /els\.searchButton\.addEventListener\('click'/);
+  assert.doesNotMatch(view, /els\.search\.addEventListener\('input'/);
+  assert.doesNotMatch(view, /window\.setTimeout\(searchCurrent,\s*280\)/);
+  assert.match(view, /opts\.append === true[\s\S]*state\.lastSearch/);
+});
+
+test('master hub people results expose role-aware current-month schedule actions and student overview', () => {
+  const view = read('MVC/views/school/masterAcademiaHub.ejs');
+  const service = read('MVC/services/school/schoolMasterAcademiaHubService.js');
+
+  assert.match(service, /label: 'Student Overview Ledger'/);
+  assert.match(service, /academic-ledger\/student-overview\/\$\{encodedStudentId\}/);
+  assert.match(service, /command: 'person-current-month-schedule'/);
+  assert.match(service, /personId: normalizeText\(row\?\.personId\)/);
+  assert.match(service, /role: normalizeText\(moduleConfig\.singular\)\.toLowerCase\(\)/);
+  assert.match(view, /function openPersonCurrentMonthSchedule\(personInput\)/);
+  assert.match(view, /openWorkspaceSection\('schedule'\)/);
+  assert.match(view, /hubScheduleState\.persons\.find/);
+  assert.match(view, /person\.selectedRole = role/);
+  assert.match(view, /setHubScheduleRange\('month'\)/);
+  assert.match(view, /await loadHubSchedulePerson\(person\)/);
+});

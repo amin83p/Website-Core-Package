@@ -980,10 +980,15 @@
           <div class="hub-sidebar-content">
             <div class="mb-3">
               <label for="schoolMasterHubSearch" class="form-label fw-semibold">Search selected list</label>
-              <input type="search"
-                     id="schoolMasterHubSearch"
-                     class="form-control"
-                     placeholder="Search name, email, phone, ID, status, or department">
+              <div class="input-group">
+                <input type="search"
+                       id="schoolMasterHubSearch"
+                       class="form-control"
+                       placeholder="Search name, email, phone, ID, status, or department">
+                <button type="button" class="btn btn-primary" id="schoolMasterHubSearchButton">
+                  <i class="bi bi-search me-1"></i> Search
+                </button>
+              </div>
             </div>
             <div id="schoolMasterHubStatus" class="alert alert-info d-none" role="status"></div>
             <div id="schoolMasterHubList"></div>
@@ -1077,6 +1082,7 @@
     list: document.getElementById('schoolMasterHubList'),
     status: document.getElementById('schoolMasterHubStatus'),
     search: document.getElementById('schoolMasterHubSearch'),
+    searchButton: document.getElementById('schoolMasterHubSearchButton'),
     refreshCurrent: document.getElementById('schoolMasterHubRefreshCurrent'),
     openDirectory: document.getElementById('schoolMasterHubOpenDirectory'),
     collapseSidebar: document.getElementById('schoolMasterHubCollapseSidebar'),
@@ -7064,6 +7070,7 @@
 
   function setLoading(isLoading, type) {
     state.loading = isLoading;
+    if (els.searchButton) els.searchButton.disabled = isLoading;
     root.querySelectorAll('[data-hub-refresh]').forEach(function (btn) {
       btn.classList.toggle('disabled', isLoading);
     });
@@ -7122,6 +7129,18 @@
     const body = rows.map(function (row, idx) {
       const actions = Array.isArray(row.actions) ? row.actions : [];
       const actionLinks = actions.map(function (action) {
+        if (action.command === 'person-current-month-schedule') {
+          return [
+            '<button type="button" class="btn btn-outline-' + escapeHtml(action.tone || 'info') + ' btn-sm" data-hub-person-action="person-current-month-schedule"',
+            ' data-record-id="' + escapeHtml(action.recordId || row.id || '') + '"',
+            ' data-person-id="' + escapeHtml(action.personId || row.personId || '') + '"',
+            ' data-person-name="' + escapeHtml(action.personName || row.name || '') + '"',
+            ' data-person-role="' + escapeHtml(action.role || '') + '"',
+            ' data-person-role-label="' + escapeHtml(action.roleLabel || '') + '">',
+            '<i class="' + escapeHtml(action.icon || 'bi bi-calendar-month') + ' me-1"></i>' + escapeHtml(action.label || 'Current Month Schedule'),
+            '</button>'
+          ].join('');
+        }
         return [
           '<a class="btn btn-outline-' + escapeHtml(action.tone || 'secondary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener">',
           '<i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open'),
@@ -7193,6 +7212,71 @@
         btn.innerHTML = expanded ? '<i class="bi bi-chevron-up"></i>' : '<i class="bi bi-chevron-down"></i>';
       });
     });
+    els.list.querySelectorAll('[data-hub-person-action="person-current-month-schedule"]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        btn.disabled = true;
+        try {
+          await openPersonCurrentMonthSchedule({
+            recordId: btn.getAttribute('data-record-id') || '',
+            personId: btn.getAttribute('data-person-id') || '',
+            personName: btn.getAttribute('data-person-name') || '',
+            role: btn.getAttribute('data-person-role') || '',
+            roleLabel: btn.getAttribute('data-person-role-label') || ''
+          });
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  async function openPersonCurrentMonthSchedule(personInput) {
+    const personId = String(personInput?.personId || '').trim();
+    const role = String(personInput?.role || '').trim().toLowerCase();
+    const roleLabel = String(personInput?.roleLabel || role || 'School Person').trim();
+    if (!personId) {
+      await showHubMessage({
+        title: 'Current Month Schedule',
+        icon: 'warning',
+        message: 'This ' + roleLabel.toLowerCase() + ' is not linked to a person record, so their schedule cannot be loaded.'
+      });
+      return;
+    }
+
+    openWorkspaceSection('schedule');
+    if (workspaceState.currentSection !== 'schedule' || !document.getElementById('hubScheduleStartDate')) {
+      await showHubMessage({
+        title: 'Current Month Schedule',
+        icon: 'warning',
+        message: 'The Schedule workspace is busy or unavailable. Please try again.'
+      });
+      return;
+    }
+    let person = hubScheduleState.persons.find(function (item) { return item.id === personId; });
+    if (!person) {
+      person = {
+        id: personId,
+        recordId: String(personInput?.recordId || '').trim(),
+        name: String(personInput?.personName || personId).trim(),
+        availableRoles: [{ key: role, label: roleLabel }],
+        selectedRole: role
+      };
+      hubScheduleState.persons.push(person);
+    } else {
+      person.recordId = String(personInput?.recordId || person.recordId || '').trim();
+      person.name = String(personInput?.personName || person.name || personId).trim();
+      if (!(Array.isArray(person.availableRoles) && person.availableRoles.some(function (item) { return item?.key === role; }))) {
+        person.availableRoles = (Array.isArray(person.availableRoles) ? person.availableRoles : []).concat({ key: role, label: roleLabel });
+      }
+      person.selectedRole = role;
+    }
+
+    hubScheduleState.activePersonId = personId;
+    setHubScheduleRange('month');
+    await loadHubSchedulePerson(person);
+    if (els.workspace && typeof els.workspace.scrollIntoView === 'function') {
+      els.workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   function updateHeader(result) {
@@ -7208,8 +7292,10 @@
   async function searchCurrent(options) {
     if (!state.currentType || state.loading) return;
     const opts = options || {};
-    const term = String((els.search && els.search.value) || '').trim();
-    state.lastSearch = term;
+    const term = opts.append === true
+      ? String(state.lastSearch || '').trim()
+      : String((els.search && els.search.value) || '').trim();
+    if (opts.append !== true) state.lastSearch = term;
     syncActiveTab();
 
     if (term.length < 2) {
@@ -7263,11 +7349,16 @@
     }
   }
 
-  let searchTimer = null;
   if (els.search) {
-    els.search.addEventListener('input', function () {
-      window.clearTimeout(searchTimer);
-      searchTimer = window.setTimeout(searchCurrent, 280);
+    els.search.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      searchCurrent();
+    });
+  }
+  if (els.searchButton) {
+    els.searchButton.addEventListener('click', function () {
+      searchCurrent();
     });
   }
 
@@ -7312,6 +7403,7 @@
       if (event.target && event.target.closest('[data-hub-refresh]')) return;
       state.currentType = tab.getAttribute('data-hub-tab') || state.currentType;
       state.page = 1;
+      state.lastSearch = '';
       state.loadedRows = [];
       state.pagination = null;
       if (els.search) els.search.value = '';

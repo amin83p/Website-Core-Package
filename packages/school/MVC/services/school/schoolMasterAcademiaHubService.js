@@ -128,6 +128,17 @@ function enrichRows(moduleConfig, rows, personById, departments) {
       directoryUrl: `${moduleConfig.directoryUrl}/edit/${encodeURIComponent(normalizeText(row?.id))}`,
       actions: [
         {
+          label: 'Current Month Schedule',
+          icon: 'bi bi-calendar-month',
+          tone: 'info',
+          command: 'person-current-month-schedule',
+          recordId: normalizeText(row?.id),
+          personId: normalizeText(row?.personId),
+          personName: buildPersonName(person),
+          role: normalizeText(moduleConfig.singular).toLowerCase(),
+          roleLabel: normalizeText(moduleConfig.singular)
+        },
+        {
           label: 'Edit',
           icon: 'bi bi-pencil-square',
           tone: 'secondary',
@@ -149,11 +160,21 @@ function enrichRows(moduleConfig, rows, personById, departments) {
     };
 
     if (moduleConfig.type === 'students') {
+      const encodedStudentId = encodeURIComponent(normalizeText(row?.id));
       return {
         ...base,
         status: normalizeText(row?.academicStatus || 'Active'),
         detail: normalizeText(row?.feeCategory || row?.studentAccountId || '-'),
-        detailLabel: 'Fee / Account'
+        detailLabel: 'Fee / Account',
+        actions: [
+          {
+            label: 'Student Overview Ledger',
+            icon: 'bi bi-journal-bookmark-fill',
+            tone: 'primary',
+            href: `/school/academic-ledger/student-overview/${encodedStudentId}`
+          },
+          ...base.actions
+        ]
       };
     }
 
