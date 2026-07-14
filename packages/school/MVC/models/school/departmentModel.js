@@ -57,6 +57,7 @@ function assertUniqueInOrg(all, candidate, { excludeId = null } = {}) {
     const candidateName = normalizeName(candidate.name);
 
     const duplicateCode = all.some((d) => {
+      if (String(d.status || '').toLowerCase() === 'void') return false;
         if (excludeId && String(d.id) === String(excludeId)) return false;
         return String(d.orgId || '') === candidateOrgId &&
             normalizeCode(d.code) === candidateCode;
@@ -64,6 +65,7 @@ function assertUniqueInOrg(all, candidate, { excludeId = null } = {}) {
     if (duplicateCode) throw new Error('Department code already exists in this organization.');
 
     const duplicateName = all.some((d) => {
+      if (String(d.status || '').toLowerCase() === 'void') return false;
         if (excludeId && String(d.id) === String(excludeId)) return false;
         return String(d.orgId || '') === candidateOrgId &&
             normalizeName(d.name) === candidateName;

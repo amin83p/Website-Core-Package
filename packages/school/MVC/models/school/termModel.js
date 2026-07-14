@@ -9,7 +9,8 @@ if (!fsSync.existsSync(dataPath)) {
   fsSync.writeFileSync(dataPath, '[]');
 }
 
-const TERM_STATUSES = new Set(['draft', 'planned', 'active', 'started', 'finished', 'cancelled', 'archived']);
+const TERM_STATUSES = new Set(['draft', 'planned', 'active', 'started', 'finished', 'cancelled', 'archived', 'void']);
+const { applyVoidMetadata } = require('./voidRecordMetadata');
 
 const OPTIONAL_DATE_FIELDS = [
   'registrationOpenDate',
@@ -121,7 +122,7 @@ function sanitizeTermInput(input, { isUpdate = false } = {}) {
     out.id = cleanId(input.id, { max: 40, allowEmpty: false });
   }
 
-  return out;
+  return applyVoidMetadata(out, input);
 }
 
 function generateTermId(existingIds) {
@@ -153,12 +154,14 @@ function assertUniqueInOrg(list, candidate, { excludeId = null } = {}) {
   const candidateName = normalizeTermName(candidate.name);
 
   const duplicateCode = list.some((item) => {
+    if (String(item.status || '').toLowerCase() === 'void') return false;
     if (excludeId && String(item.id) === String(excludeId)) return false;
     return String(item.orgId || '') === candidateOrgId && String(item.code || '').trim().toUpperCase() === candidateCode;
   });
   if (duplicateCode) throw new Error('Term code already exists in this organization.');
 
   const duplicateName = list.some((item) => {
+    if (String(item.status || '').toLowerCase() === 'void') return false;
     if (excludeId && String(item.id) === String(excludeId)) return false;
     return String(item.orgId || '') === candidateOrgId && normalizeTermName(item.name) === candidateName;
   });

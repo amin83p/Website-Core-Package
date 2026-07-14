@@ -447,6 +447,33 @@ exports.resetWorkSessionAssigneeCompletion = async (req, res) => {
   }
 };
 
+exports.deleteWorkSession = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const activity = await schoolDataService.getDataById('activities', req.params.activityId, req.user);
+    if (!activity) throw new Error('Activity not found.');
+    assertOrgAccess(activity, orgId);
+    const entries = Array.isArray(activity.entries) ? activity.entries : [];
+    const entry = entries.find((row) => idsEqual(row?.id || row?.entryId, req.params.entryId));
+    if (!entry) throw new Error('Work session not found.');
+    const hasLock = entry.locked === true || (entry.assignees || []).some((row) => row?.locked === true);
+    if (hasLock) throw new Error('This work session is locked by an approved timesheet and cannot be deleted.');
+    const remaining = entries.filter((row) => !idsEqual(row?.id || row?.entryId, req.params.entryId));
+    await schoolDataService.updateData('activities', activity.id, {
+      ...activity,
+      entries: remaining,
+      allowEmptyEntries: true
+    }, req.user);
+    return res.json({
+      status: 'success', operation: 'physical-delete', entityType: 'activityWorkSession',
+      id: String(req.params.entryId || ''), deletedCounts: { activityWorkSessions: 1 }
+    });
+  } catch (error) {
+    logWorkSessionMutationError('delete', error, req);
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
 exports.eligiblePersons = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);

@@ -40,7 +40,7 @@ function getVerificationBadgeClass(status) {
 }
 
 function isActiveRegistrationStatus(status) {
-  return !['withdrawn', 'cancelled', 'completed', 'rolled_back'].includes(String(status || '').toLowerCase());
+  return !['withdrawn', 'cancelled', 'completed', 'rolled_back', 'void'].includes(String(status || '').toLowerCase());
 }
 
 function isApprovedProgramRegistrationStatus(status) {

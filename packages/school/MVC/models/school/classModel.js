@@ -309,6 +309,7 @@ function assertUniqueInOrg(list, candidate, { excludeId = null } = {}) {
   const candidateTitle = normalizeClassTitle(candidate.title);
 
   const duplicateTitle = list.some((c) => {
+    if (String(c.status || '').toLowerCase() === 'void') return false;
     if (excludeId && String(c.id) === String(excludeId)) return false;
     return String(c.orgId || '') === candidateOrgId &&
       normalizeClassTitle(c.title) === candidateTitle;

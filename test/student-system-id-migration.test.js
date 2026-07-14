@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const service = require('../packages/school/MVC/services/school/studentSystemIdMigrationService');
+const { generateStudentSystemIdCandidate } = require('../packages/school/MVC/services/school/studentSystemIdGenerator');
 const ROOT = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
@@ -59,8 +60,20 @@ test('transformRows leaves other organizations and person-based values unchanged
 
 test('generated student System Record IDs use normal STU format and avoid collisions', () => {
   const id = service.generateCandidate(new Set(['STU12345']));
-  assert.match(id, /^STU(?:\d{5}|\d{13})$/);
+  assert.match(id, /^STU\d{5}$/);
   assert.notEqual(id, 'STU12345');
+});
+
+test('student admission and System Record ID migration use the same generator', () => {
+  const id = generateStudentSystemIdCandidate(new Set(['STU12345']));
+  const model = read('packages/school/MVC/models/school/studentModel.js');
+  const repository = read('packages/school/MVC/repositories/school/index.js');
+  const migration = read('packages/school/MVC/services/school/studentSystemIdMigrationService.js');
+
+  assert.match(id, /^STU\d{5}$/);
+  assert.match(model, /generateStudentSystemIdCandidate\(existingIds\)/);
+  assert.match(repository, /generateMongoCreateId:[\s\S]*?generateStudentSystemIdCandidate/);
+  assert.match(migration, /generateCandidate = generateStudentSystemIdCandidate/);
 });
 
 test('routes, controller, and directory expose guarded migration flow', () => {
@@ -68,8 +81,8 @@ test('routes, controller, and directory expose guarded migration flow', () => {
   const controller = read('packages/school/MVC/controllers/school/studentController.js');
   const view = read('packages/school/MVC/views/school/student/studentList.ejs');
   const mongo = read('MVC/infrastructure/mongo/mongoConnection.js');
-  assert.match(routes, /system-id\/generate/);
   assert.match(routes, /:id\/system-id-impact/);
+  assert.match(routes, /:id\/system-id-generate/);
   assert.match(routes, /:id\/change-system-id/);
   assert.match(controller, /Only administrators can change a student System Record ID/);
   assert.match(controller, /isAdminForRequestAsync\([\s\S]*?SECTIONS\.SCHOOL_STUDENTS,[\s\S]*?OPERATIONS\.UPDATE/);
@@ -79,7 +92,34 @@ test('routes, controller, and directory expose guarded migration flow', () => {
   assert.match(view, /document\.body\.appendChild\(modalEl\)/);
   assert.match(view, /changeSystemIdImpact/);
   assert.match(view, /Custom Student ID is not changed/);
+  assert.match(view, /Security Validation Failed/);
+  assert.match(view, /formatMessageMarkup/);
+  assert.match(view, /encodeURIComponent\(currentEl\.value\) \+ '\/system-id-generate'/);
+  assert.doesNotMatch(view, /\/school\/students\/system-id\/generate/);
   assert.match(mongo, /withMongoTransaction/);
+  assert.match(mongo, /getMongoTransactionCapability/);
+  assert.match(view, /Standalone MongoDB detected/);
+  assert.match(view, /showLoading/);
+  assert.match(routes, /system-id-migrations\/:migrationId\/recover/);
+});
+
+test('standalone Mongo migration uses journaled compare-and-swap rollback', () => {
+  const source = read('packages/school/MVC/services/school/studentSystemIdMigrationService.js');
+  assert.match(source, /transactionMode: 'compensating'/);
+  assert.match(source, /schoolStudentSystemIdMigrationJournals/);
+  assert.match(source, /schoolStudentSystemIdMigrationBackups/);
+  assert.match(source, /replacementFilter\(backup\.before\)/);
+  assert.match(source, /rollbackStandaloneMigration/);
+  assert.match(source, /recovery_required/);
+  assert.match(source, /getMongoTransactionCapability/);
+});
+
+test('School writes honor the distributed Student ID migration lock', () => {
+  const dataService = read('packages/school/MVC/services/school/schoolDataService.js');
+  const lockService = read('packages/school/MVC/services/school/studentSystemIdMigrationLockService.js');
+  assert.match(dataService, /studentSystemIdMigrationLockService\.assertWriteAllowed/);
+  assert.match(lockService, /expiresAt: \{ \$gt: new Date\(\) \}/);
+  assert.match(lockService, /STUDENT_ID_MIGRATION_IN_PROGRESS/);
 });
 
 test('JSON migration implementation stages backups, verifies, and restores on failure', () => {

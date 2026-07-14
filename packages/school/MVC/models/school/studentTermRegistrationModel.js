@@ -11,7 +11,8 @@ if (!fsSync.existsSync(dataPath)) {
   fsSync.writeFileSync(dataPath, '[]');
 }
 
-const REGISTRATION_STATUSES = new Set(['draft', 'registered', 'withdrawn', 'cancelled', 'completed', 'error', 'rolled_back']);
+const REGISTRATION_STATUSES = new Set(['draft', 'registered', 'withdrawn', 'cancelled', 'completed', 'error', 'rolled_back', 'void']);
+const { applyVoidMetadata } = require('./voidRecordMetadata');
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -80,7 +81,7 @@ function sanitizeRegistrationInput(input, { isUpdate = false } = {}) {
     out.id = cleanId(input.id, { max: 64, allowEmpty: false });
   }
 
-  return out;
+  return applyVoidMetadata(out, input);
 }
 
 function generateId(existingIds) {
@@ -124,7 +125,7 @@ async function addRegistration(data, options = {}) {
       idsEqual(row?.studentId || '', sanitized?.studentId) &&
       idsEqual(row?.programId || '', sanitized?.programId) &&
       idsEqual(row?.termId || '', sanitized?.termId) &&
-      !['withdrawn', 'cancelled', 'completed', 'rolled_back'].includes(String(row.status || '').toLowerCase())
+      !['withdrawn', 'cancelled', 'completed', 'rolled_back', 'void'].includes(String(row.status || '').toLowerCase())
     );
     if (activeDuplicate) {
       throw new Error('Student already has an active registration in this term for the selected program.');

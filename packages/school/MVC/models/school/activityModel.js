@@ -5,7 +5,8 @@ const { requireCoreModule, resolveCoreRoot } = require('../../services/school/sc
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/activities.json');
-const ACTIVITY_STATUSES = new Set(['draft', 'posted', 'cancelled']);
+const ACTIVITY_STATUSES = new Set(['draft', 'posted', 'cancelled', 'void']);
+const { applyVoidMetadata } = require('./voidRecordMetadata');
 const ATTENDANCE_STATUSES = new Set(['attended', 'absent', 'excused']);
 const COMPLETION_STATUSES = new Set(['pending', 'completed']);
 const EVALUATION_TYPES = new Set(['attendance', 'completion']);
@@ -340,8 +341,8 @@ function sanitizeActivityPayload(input = {}) {
   const entriesSource = parseJsonArray(input.entries, 'Activity entries');
   const rawEntries = entriesSource.length
     ? entriesSource
-    : [buildLegacyActivityEntry(input, { activityPaid: paid })];
-  if (!rawEntries.length) throw new Error('At least one activity session is required.');
+    : (input.allowEmptyEntries === true ? [] : [buildLegacyActivityEntry(input, { activityPaid: paid })]);
+  if (!rawEntries.length && input.allowEmptyEntries !== true) throw new Error('At least one activity session is required.');
   const entries = rawEntries.map((entry, index) => sanitizeActivityEntry(entry, { activityPaid: paid, index }));
   const activityExcludedSet = new Set(excludedPersonIds);
   const sanitizedEntries = entries.map((entry) => ({
@@ -349,10 +350,12 @@ function sanitizeActivityPayload(input = {}) {
     excludedPersonIds: parsePersonIdArray(entry.excludedPersonIds || [], 'Work session excluded persons')
       .filter((personId) => !activityExcludedSet.has(personId))
   }));
-  const firstEntry = sanitizedEntries[0];
+  const firstEntry = sanitizedEntries[0] || {
+    date: '', startTime: '', endTime: '', durationHours: 0
+  };
   const attendees = flattenActivityAssignees(sanitizedEntries);
   const totalDurationHours = Number(sanitizedEntries.reduce((sum, entry) => sum + (Number(entry.durationHours) || 0), 0).toFixed(2));
-  return {
+  return applyVoidMetadata({
     orgId,
     title,
     categoryId,
@@ -374,7 +377,7 @@ function sanitizeActivityPayload(input = {}) {
     notes: cleanString(input.notes, { max: 1200, allowEmpty: true }),
     attendees,
     entries: sanitizedEntries
-  };
+  }, input);
 }
 
 async function getAllActivities() {
@@ -491,4 +494,3 @@ module.exports = {
   resolveActivityScopeAllowedSet,
   resolveEntryEligibleSet
 };
-

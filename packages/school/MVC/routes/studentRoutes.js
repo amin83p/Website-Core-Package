@@ -54,7 +54,7 @@ router.delete('/:id/attachments/:attId',
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE_FILE, { requireToken: true }),
   ctrl.deleteAttachment);
 
-router.get('/system-id/generate',
+router.get('/:id/system-id-generate',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.generateStudentSystemId);
@@ -63,6 +63,11 @@ router.get('/:id/system-id-impact',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.previewStudentSystemIdChange);
+
+router.post('/system-id-migrations/:migrationId/recover',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }),
+  ctrl.recoverStudentSystemIdMigration);
 
 router.post('/:id/change-system-id',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),

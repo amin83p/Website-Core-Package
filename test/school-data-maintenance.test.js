@@ -244,7 +244,7 @@ test('deleteSelectedRows cascades class session assets before remove', async () 
   }, originals);
 
   setRequireStub('../packages/school/MVC/services/school/schoolDataService', {
-    getDataById: async () => ({ id: 'CLS-1', orgId: 'ORG-1', title: 'Math' })
+    getDataById: async () => ({ id: 'CLS-1', orgId: 'ORG-1', title: 'Math', status: 'void' })
   }, originals);
 
   setRequireStub('../packages/school/MVC/services/school/classDeleteCascadeService', {
@@ -372,11 +372,18 @@ test('data maintenance exposes a protected, text-only JSON record viewer', () =>
   assert.ok(view.includes('deleteModal = getMaintenanceModal(deleteConfirmModalEl)'));
   assert.ok(view.includes('clearAllModal = getMaintenanceModal(clearAllConfirmModalEl)'));
   assert.ok(view.includes('window.showMessageModal'));
+  assert.ok(view.includes('window.requestProtectedAction'));
+  assert.ok(view.includes('hideModalBeforeAdminVerification(deleteModal, deleteConfirmModalEl)'));
+  assert.ok(view.includes('hideModalBeforeAdminVerification(clearAllModal, clearAllConfirmModalEl)'));
+  assert.equal(view.includes('window.ensureAdminVerification'), false);
   assert.ok(view.includes('let actionStateId'));
   assert.ok(view.includes('if (payload.actionStateId) actionStateId'));
   assert.ok(view.includes('formatMessageMarkup(rawMessage)'));
   assert.ok(view.includes('loadRowsWithWaiting'));
   assert.ok(view.includes('window.showLoading'));
+  assert.ok(view.includes('Deleting Selected Records'));
+  assert.ok(view.includes('deleteLoadingToken'));
+  assert.ok(view.includes('clearLoadingToken'));
   assert.ok(view.includes('recordJsonCodeEl.textContent = state.displayedJson'));
   assert.ok(view.includes('JSON.stringify(payload.record, null, 2)'));
   assert.ok(view.includes('navigator.clipboard.writeText(state.displayedJson)'));

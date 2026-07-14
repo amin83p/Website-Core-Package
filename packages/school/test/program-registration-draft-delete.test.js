@@ -117,19 +117,19 @@ test('assertProgramDraftDeletionAllowed rejects drafts with dependent term regis
   }
 });
 
-test('deleteDraftProgramRegistration removes draft via repository deleteDraftRegistration', async () => {
+test('deleteDraftProgramRegistration voids the draft through repository update', async () => {
   const originalGetByIdInOrg = schoolRepositories.studentProgramRegistrations.getByIdInOrg;
   const originalGetById = schoolRepositories.studentProgramRegistrations.getById;
   const originalCount = schoolRepositories.studentTermRegistrations.countActiveByProgramRegistrationId;
   const originalClassCount = schoolRepositories.classEnrollmentPeriods.countBlockingByStudentAndProgram;
   const originalWithdrawalList = withdrawalRepository.list;
-  const originalDeleteDraft = schoolRepositories.studentProgramRegistrations.deleteDraftRegistration;
+  const originalUpdate = schoolRepositories.studentProgramRegistrations.update;
   const originalFindReversal = schoolRepositories.globalTransactions.findReversalByTransactionId;
   const originalGetTx = schoolRepositories.globalTransactions.getById;
   const originalGetLedger = schoolRepositories.academicLedger.getById;
 
   const registration = buildDraftRegistration();
-  let deletedId = '';
+  let updatedPayload = null;
 
   schoolRepositories.studentProgramRegistrations.getByIdInOrg = async () => registration;
   schoolRepositories.studentProgramRegistrations.getById = async () => registration;
@@ -139,9 +139,9 @@ test('deleteDraftProgramRegistration removes draft via repository deleteDraftReg
   schoolRepositories.globalTransactions.findReversalByTransactionId = async () => null;
   schoolRepositories.globalTransactions.getById = async () => null;
   schoolRepositories.academicLedger.getById = async () => null;
-  schoolRepositories.studentProgramRegistrations.deleteDraftRegistration = async (id) => {
-    deletedId = id;
-    return { id, deleted: true };
+  schoolRepositories.studentProgramRegistrations.update = async (id, payload) => {
+    updatedPayload = { id, payload };
+    return payload;
   };
 
   try {
@@ -150,7 +150,11 @@ test('deleteDraftProgramRegistration removes draft via repository deleteDraftReg
       reqUser: { id: 'USR-1' }
     });
     assert.equal(result.registrationId, PROGRAM_REG_ID);
-    assert.equal(deletedId, PROGRAM_REG_ID);
+    assert.equal(result.operation, 'void');
+    assert.equal(updatedPayload.id, PROGRAM_REG_ID);
+    assert.equal(updatedPayload.payload.status, 'void');
+    assert.equal(updatedPayload.payload.statusBeforeVoid, 'draft');
+    assert.equal(updatedPayload.payload.voidedBy, 'USR-1');
   } finally {
     schoolRepositories.studentProgramRegistrations.getByIdInOrg = originalGetByIdInOrg;
     schoolRepositories.studentProgramRegistrations.getById = originalGetById;
@@ -160,7 +164,7 @@ test('deleteDraftProgramRegistration removes draft via repository deleteDraftReg
     schoolRepositories.globalTransactions.findReversalByTransactionId = originalFindReversal;
     schoolRepositories.globalTransactions.getById = originalGetTx;
     schoolRepositories.academicLedger.getById = originalGetLedger;
-    schoolRepositories.studentProgramRegistrations.deleteDraftRegistration = originalDeleteDraft;
+    schoolRepositories.studentProgramRegistrations.update = originalUpdate;
   }
 });
 
@@ -170,17 +174,18 @@ test('programRegistrationController rollback route deletes drafts instead of no-
     'utf8'
   );
   assert.match(source, /deleteDraftProgramRegistration/);
-  assert.match(source, /Draft program registration deleted/);
+  assert.match(source, /Draft program registration voided/);
   assert.doesNotMatch(source, /Registration is already in draft/);
   assert.match(source, /rollbackProgramRegistrationSideEffects/);
 });
 
-test('registrationIntegrityService deletes program drafts through repository deleteDraftRegistration', () => {
+test('registrationIntegrityService voids program drafts through repository update', () => {
   const source = fs.readFileSync(
     path.join(__dirname, '../MVC/services/school/registrationIntegrityService.js'),
     'utf8'
   );
-  assert.match(source, /studentProgramRegistrations\.deleteDraftRegistration/);
+  assert.match(source, /studentProgramRegistrations\.update/);
+  assert.match(source, /buildVoidPatch/);
   assert.match(source, /assertProgramDraftDeletionAllowed/);
   assert.match(source, /deleteDraftProgramRegistration/);
 });

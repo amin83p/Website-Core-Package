@@ -2470,18 +2470,53 @@ async function deleteAllocation(req, res) {
       throw new Error('All linked assignments must be cancelled before deleting allocation.');
     }
 
+    let removedAttempts = 0;
+    let removedAnswers = 0;
+    const removedAnswerIds = new Set();
     for (const assignment of (linkedAssignments || [])) {
       // eslint-disable-next-line no-await-in-loop
-      await schoolDataService.deleteData('examAssignments', assignment.id, req.user);
+      const attempts = await schoolDataService.fetchData('examAttempts', { assignmentId__eq: assignment.id, page: 1, limit: 10000 }, req.user);
+      for (const attempt of (attempts || [])) {
+        // eslint-disable-next-line no-await-in-loop
+        const answers = await schoolDataService.fetchData('examAnswers', { attemptId__eq: attempt.id, page: 1, limit: 10000 }, req.user);
+        for (const answer of (answers || [])) {
+          // eslint-disable-next-line no-await-in-loop
+          await schoolDataService.deleteData('examAnswers', answer.id, req.user, { skipDeletionGuard: true });
+          removedAnswerIds.add(String(answer.id));
+          removedAnswers += 1;
+        }
+        // eslint-disable-next-line no-await-in-loop
+        await schoolDataService.deleteData('examAttempts', attempt.id, req.user, { skipDeletionGuard: true });
+        removedAttempts += 1;
+      }
+      // Remove any legacy/orphan answer rows linked directly to the assignment.
+      // eslint-disable-next-line no-await-in-loop
+      const directAnswers = await schoolDataService.fetchData('examAnswers', { assignmentId__eq: assignment.id, page: 1, limit: 10000 }, req.user);
+      for (const answer of (directAnswers || [])) {
+        if (removedAnswerIds.has(String(answer.id))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await schoolDataService.deleteData('examAnswers', answer.id, req.user, { skipDeletionGuard: true });
+        removedAnswerIds.add(String(answer.id));
+        removedAnswers += 1;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await schoolDataService.deleteData('examAssignments', assignment.id, req.user, { skipDeletionGuard: true });
     }
-    await schoolDataService.deleteData('examAllocations', allocation.id, req.user);
+    await schoolDataService.deleteData('examAllocations', allocation.id, req.user, { skipDeletionGuard: true });
 
     await classReferenceSyncService.notifyAfterExamMutation({ allocation, reqUser: req.user });
     const message = `Allocation deleted successfully. Removed ${Number(linkedAssignments?.length || 0)} cancelled assignment(s).`;
     if (isAjax(req)) {
       return res.json({
         status: 'success',
-        message
+        message,
+        operation: 'physical-delete',
+        deletedCounts: {
+          examAllocations: 1,
+          examAssignments: Number(linkedAssignments?.length || 0),
+          examAttempts: removedAttempts,
+          examAnswers: removedAnswers
+        }
       });
     }
     return res.redirect('/school/exams/allocations?deleted=1');

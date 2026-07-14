@@ -2915,33 +2915,14 @@ async function deleteClass(req, res) {
       throw prepError;
     }
 
-    await registrationIntegrityService.reconcileOrphanedClassEnrollmentLedgerForClass({
-      classId,
-      reqUser: req.user,
-      reason: `Reconciled orphaned class enrollment ledger before deleting class ${classId}.`
-    });
-
-    await classCycleLinkResolutionService.clearInboundCycleReferencesForClassDelete(classId, req.user);
-
-    const cascadeResult = await classDeleteCascadeService.cascadeDeleteClassSessionAssets(
-      classId,
-      req.user,
-      classData?.orgId || activeOrgId
-    );
-    if (cascadeResult.errors.length) {
-      throw new Error(`Could not remove session student cases before class delete: ${cascadeResult.errors.slice(0, 5).join('; ')}`);
-    }
-
     await schoolDataService.deleteData('classes', req.params.id, req.user);
-    const folderCleanup = await cleanupClassRelatedFolders(classData);
     await indexService.rebuildIndexesForClass(req.params.id);
-    const warningCount = Array.isArray(folderCleanup?.failed) ? folderCleanup.failed.length : 0;
     const payloadOut = {
-        status: warningCount ? 'warning' : 'success',
-        message: warningCount
-            ? 'Class deleted. Some related folders could not be removed.'
-            : 'Class deleted. Related folders removed.',
-        folderCleanup
+        status: 'success',
+        operation: 'void',
+        previousStatus: String(classData?.status || 'active'),
+        newStatus: 'void',
+        message: 'Class voided. Its stored workspace and history were preserved.'
     };
     idempotencyGuardService.completeGuard(guardKey, payloadOut);
     if (isAjax(req)) return res.json(payloadOut);
@@ -3634,6 +3615,49 @@ async function deleteSessionStudentCase(req, res) {
     }
 }
 
+async function deleteClassSession(req, res) {
+  try {
+    const classId = toPublicId(req.params.id);
+    const sessionId = toPublicId(req.params.sessionId);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    const sessions = await schoolDataService.getClassSessions(classId, req.user);
+    const target = (Array.isArray(sessions) ? sessions : []).find((row) => idsEqual(row?.sessionId || row?.id, sessionId));
+    if (!target) throw new Error('Session not found.');
+
+    const preview = await schoolDeletionGuardService.previewDelete({
+      entityKey: 'session', id: sessionId, orgId: classData.orgId, reqUser: req.user, context: { classId }
+    });
+    const cascadeCodes = new Set(['REPORT_INSTANCE', 'REPORT_ASSIGNMENT', 'SESSION_CASE']);
+    const protectedBlockers = (preview.blockers || []).filter((row) => !cascadeCodes.has(row.code));
+    if (protectedBlockers.length) {
+      throw new schoolDeletionGuardService.DeleteBlockedError({ ...preview, blockers: protectedBlockers, canDelete: false });
+    }
+
+    const [cases, instances, assignments] = await Promise.all([
+      schoolDataService.fetchData('sessionStudentCases', { classId__eq: classId, sessionId__eq: sessionId, page: 1, limit: 10000 }, req.user),
+      schoolDataService.fetchData('reportInstances', { classId__eq: classId, sessionId__eq: sessionId, page: 1, limit: 10000 }, req.user),
+      schoolDataService.fetchData('reportAssignments', { classId__eq: classId, sessionId__eq: sessionId, page: 1, limit: 10000 }, req.user)
+    ]);
+    for (const row of [...(cases || []), ...(instances || [])]) {
+      const entityType = (cases || []).includes(row) ? 'sessionStudentCases' : 'reportInstances';
+      // eslint-disable-next-line no-await-in-loop
+      await schoolDataService.deleteData(entityType, row.id, req.user, { skipDeletionGuard: true });
+    }
+    for (const row of (assignments || [])) {
+      // eslint-disable-next-line no-await-in-loop
+      await schoolDataService.deleteData('reportAssignments', row.id, req.user, { skipDeletionGuard: true });
+    }
+    const remaining = sessions.filter((row) => !idsEqual(row?.sessionId || row?.id, sessionId));
+    await schoolDataService.saveClassSessions(classId, remaining, req.user);
+    return res.json({
+      status: 'success', operation: 'physical-delete', entityType: 'classSession', id: sessionId,
+      deletedCounts: { classSessions: 1, sessionStudentCases: cases.length, reportInstances: instances.length, reportAssignments: assignments.length }
+    });
+  } catch (error) {
+    return schoolDeletionGuardService.handleDeleteError(req, res, error);
+  }
+}
+
 async function uploadSessionFile(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -4314,7 +4338,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase,
+  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveConductRatingScaleSettings,
   setSessionLock,
   showFinalGradesPage,

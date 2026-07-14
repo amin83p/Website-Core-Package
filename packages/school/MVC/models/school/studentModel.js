@@ -5,6 +5,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue'); 
 const { FEE_CATEGORIES, FEE_CATEGORY_SET } = require('./feeCategoryCatalog');
+const { generateStudentSystemIdCandidate } = require('../../services/school/studentSystemIdGenerator');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/students.json');
 
@@ -177,16 +178,6 @@ function sanitizeStudentInput(input, { isUpdate = false } = {}) {
     return out;
 }
 
-function generateStudentId(existingIdsSet) {
-    // Generate stable-ish ID like STU12345 and ensure uniqueness.
-    for (let i = 0; i < 50; i++) {
-        const candidate = `STU${Math.floor(10000 + Math.random() * 90000)}`;
-        if (!existingIdsSet.has(candidate)) return candidate;
-    }
-    // Extremely unlikely fallback
-    return `STU${Date.now()}`;
-}
-
 async function getAllStudents() {
     try {
         const data = await fs.readFile(dataPath, 'utf8');
@@ -223,7 +214,7 @@ async function addStudent(data, options = {}) {
 
         // Ensure ID is unique
         const existingIds = new Set(all.map(s => String(s.id)));
-        const finalId = sanitized.id ? String(sanitized.id) : generateStudentId(existingIds);
+        const finalId = sanitized.id ? String(sanitized.id) : generateStudentSystemIdCandidate(existingIds);
         if (existingIds.has(finalId)) throw new Error('Student id already exists.');
 
         const newStudent = {

@@ -2790,7 +2790,7 @@ function resolveTermIdFromClassEnrollmentSnapshot(period, classData) {
 
 function isInactiveSchoolRegistrationStatus(status) {
     const normalized = String(status || '').trim().toLowerCase();
-    return ['withdrawn', 'cancelled', 'completed', 'rolled_back'].includes(normalized);
+    return ['withdrawn', 'cancelled', 'completed', 'rolled_back', 'void'].includes(normalized);
 }
 
 /**
@@ -3306,7 +3306,13 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
         });
       }
       await schoolDataService.deleteData('classEnrollmentPeriods', periodId, req.user);
-      const payloadOut = { status: 'success', message: 'Draft enrollment deleted before posting.' };
+      const payloadOut = {
+        status: 'success',
+        operation: 'void',
+        previousStatus: currentStatus,
+        newStatus: 'void',
+        message: 'Draft enrollment voided.'
+      };
       idempotencyGuardService.completeGuard(guardKey, payloadOut);
       return res.json(payloadOut);
     }

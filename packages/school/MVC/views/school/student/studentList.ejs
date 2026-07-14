@@ -136,14 +136,46 @@ function initializeChangeStudentSystemIdModal() {
   const submitBtn = document.getElementById('changeSystemIdSubmit');
   let actionStateId = <%- JSON.stringify(actionStateId || '').replace(/</g, '\u003c') %>;
 
-  function showError(message) {
-    alertEl.textContent = String(message || 'Unable to change the System Record ID.');
+  function formatMessageMarkup(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/&lt;b&gt;/gi, '<b>')
+      .replace(/&lt;\/b&gt;/gi, '</b>')
+      .replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+  }
+  function isSecurityMessage(message) {
+    return /security violation|session validation failed|action state token/i.test(String(message || ''));
+  }
+  async function showError(message, { useMessageModal = false } = {}) {
+    alertEl.innerHTML = formatMessageMarkup(message || 'Unable to change the System Record ID.');
     alertEl.classList.remove('d-none');
+    if (!useMessageModal || typeof window.showMessageModal !== 'function') return;
+    const shouldRestore = modalEl.classList.contains('show');
+    if (shouldRestore) {
+      await new Promise((resolve) => {
+        modalEl.addEventListener('hidden.bs.modal', resolve, { once: true });
+        modal.hide();
+      });
+    }
+    await window.showMessageModal({
+      title: isSecurityMessage(message) ? 'Security Validation Failed' : 'Operation Failed',
+      icon: 'error',
+      message: formatMessageMarkup(message || 'Unable to change the System Record ID.'),
+      buttons: [{ text: 'OK', class: 'btn-danger', value: true }]
+    });
+    if (shouldRestore) modal.show();
   }
   function clearError() { alertEl.classList.add('d-none'); alertEl.textContent = ''; }
   async function readJson(response) {
     const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.status === 'error') throw new Error(result.message || 'Request failed.');
+    if (!response.ok || result.status === 'error') {
+      const error = new Error(result.message || 'Request failed.');
+      error.migrationId = result.migrationId || '';
+      error.rollbackStatus = result.rollbackStatus || '';
+      throw error;
+    }
     return result;
   }
   function renderImpact(data) {
@@ -152,6 +184,16 @@ function initializeChangeStudentSystemIdModal() {
       ? '<div class="list-group">' + rows.map((row) => '<div class="list-group-item d-flex justify-content-between"><span>' + String(row.label || row.key) + '</span><span class="badge bg-primary">' + Number(row.count || 0) + '</span></div>').join('') + '</div><div class="mt-2 fw-bold">Total references: ' + Number(data.totalUpdates || 0) + '</div>'
       : '<div class="text-muted">Only the student record will be updated.</div>';
   }
+  const originalRenderImpact = renderImpact;
+  renderImpact = function renderImpactWithMode(data) {
+    originalRenderImpact(data);
+    if (data?.transactionMode === 'compensating') {
+      const notice = document.createElement('div');
+      notice.className = 'alert alert-info py-2 mb-2';
+      notice.textContent = 'Standalone MongoDB detected. The migration will use protected rollback mode.';
+      impactEl.prepend(notice);
+    }
+  };
   document.querySelectorAll('.change-system-id-btn').forEach((button) => {
     button.addEventListener('click', async () => {
       clearError();
@@ -167,18 +209,18 @@ function initializeChangeStudentSystemIdModal() {
         if (result.actionStateId) actionStateId = result.actionStateId;
         renderImpact(result.data);
         submitBtn.disabled = false;
-      } catch (error) { showError(error.message); impactEl.textContent = 'Impact preview unavailable.'; }
+      } catch (error) { await showError(error.message, { useMessageModal: true }); impactEl.textContent = 'Impact preview unavailable.'; }
     });
   });
   document.getElementById('changeSystemIdGenerate').addEventListener('click', async () => {
     clearError();
     try {
-      const result = await readJson(await fetch('/school/students/system-id/generate', { headers: { Accept: 'application/json', 'X-Ajax-Request': 'true' } }));
+      const result = await readJson(await fetch('/school/students/' + encodeURIComponent(currentEl.value) + '/system-id-generate', { headers: { Accept: 'application/json', 'X-Ajax-Request': 'true' } }));
       if (result.actionStateId) actionStateId = result.actionStateId;
       newEl.value = result.data?.id || '';
       confirmationEl.value = '';
       newEl.focus();
-    } catch (error) { showError(error.message); }
+    } catch (error) { await showError(error.message, { useMessageModal: true }); }
   });
   submitBtn.addEventListener('click', async () => {
     clearError();
@@ -187,13 +229,21 @@ function initializeChangeStudentSystemIdModal() {
     if (!newId || !/^[A-Za-z0-9_-]{1,40}$/.test(newId)) return showError('Enter a valid 1-40 character System Record ID using letters, numbers, underscores, or hyphens.');
     if (confirmationId !== newId) return showError('Confirmation must exactly match the replacement System Record ID.');
     submitBtn.disabled = true;
+    const waitingToken = typeof window.showLoading === 'function'
+      ? window.showLoading({ title: 'Changing Student System Record ID', message: 'Updating references and verifying the migration. Please wait...' })
+      : null;
     try {
       const result = await readJson(await fetch('/school/students/' + encodeURIComponent(currentEl.value) + '/change-system-id', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Ajax-Request': 'true' },
         body: JSON.stringify({ newId, confirmationId, actionStateId })
       }));
       window.location.href = result.redirectTo || result.data?.redirectTo || '/school/students';
-    } catch (error) { showError(error.message); submitBtn.disabled = false; }
+    } catch (error) {
+      await showError(error.message, { useMessageModal: true });
+      submitBtn.disabled = false;
+    } finally {
+      if (waitingToken && typeof window.hideLoading === 'function') window.hideLoading(waitingToken);
+    }
   });
 }
 

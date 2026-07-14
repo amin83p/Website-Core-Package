@@ -42,7 +42,7 @@ async function attachSessionProgressToEnrollmentPeriodRows(periodRows, classData
     const consumedSessionCount = summary ? Number(summary.consumedCount || 0) : null;
     const reservedSessionCount = effectiveTargetSessionCount && summary ? Number(summary.reservedCount || 0) : null;
     const periodStatus = String(row?.status || '').trim().toLowerCase();
-    const terminalStatus = ['withdrawn', 'cancelled', 'completed', 'archived'].includes(periodStatus);
+    const terminalStatus = ['withdrawn', 'cancelled', 'completed', 'archived', 'void'].includes(periodStatus);
     const targetReached = effectiveTargetSessionCount
       && consumedSessionCount !== null
       && consumedSessionCount >= effectiveTargetSessionCount;

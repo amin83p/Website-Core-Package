@@ -176,6 +176,7 @@ function assertUniqueInOrg(allSubjects, candidate, { excludeId = null } = {}) {
 
   if (candidateCode) {
     const duplicateCode = allSubjects.some((s) => {
+      if (String(s.status || '').toLowerCase() === 'void') return false;
       if (excludeId && String(s.id) === String(excludeId)) return false;
       return String(s.orgId || '') === candidateOrgId && normalizeCode(s.code) === candidateCode;
     });
@@ -183,6 +184,7 @@ function assertUniqueInOrg(allSubjects, candidate, { excludeId = null } = {}) {
   }
 
   const duplicateTitle = allSubjects.some((s) => {
+    if (String(s.status || '').toLowerCase() === 'void') return false;
     if (excludeId && String(s.id) === String(excludeId)) return false;
     return String(s.orgId || '') === candidateOrgId && normalizeTitle(s.title) === candidateTitle;
   });

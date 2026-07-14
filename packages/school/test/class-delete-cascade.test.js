@@ -90,13 +90,15 @@ test('delete preparation allows class ready when only session cases remain', asy
   }
 });
 
-test('classController deleteClass invokes cascade service before class delete', () => {
+test('classController voids class without cascading physical session assets', () => {
   const controller = read('MVC/controllers/school/classController.js');
-  assert.match(controller, /classDeleteCascadeService/);
-  assert.match(controller, /cascadeDeleteClassSessionAssets/);
+  const deleteBody = controller.slice(controller.indexOf('async function deleteClass'), controller.indexOf('async function checkConflicts'));
+  assert.match(deleteBody, /operation: 'void'/);
+  assert.doesNotMatch(deleteBody, /cascadeDeleteClassSessionAssets/);
+  assert.doesNotMatch(deleteBody, /cleanupClassRelatedFolders/);
 });
 
-test('school deletion registry marks session cases as cascade_with_class', () => {
+test('school deletion registry marks session cases as physical children', () => {
   const source = read('MVC/services/school/schoolDeletionRuleRegistry.js');
-  assert.match(source, /code: 'SESSION_CASE'[\s\S]*childPolicy: 'cascade_with_class'/);
+  assert.match(source, /code: 'SESSION_CASE'[\s\S]*childPolicy: 'physical_child'/);
 });

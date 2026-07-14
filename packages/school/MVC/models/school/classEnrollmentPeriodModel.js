@@ -20,8 +20,10 @@ const PERIOD_STATUSES = new Set([
   'withdrawn',
   'cancelled',
   'archived',
+  'void',
   'error'
 ]);
+const { applyVoidMetadata } = require('./voidRecordMetadata');
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -197,7 +199,7 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
     out.id = cleanId(input.id, { max: 80, allowEmpty: false });
   }
 
-  return out;
+  return applyVoidMetadata(out, input);
 }
 
 function generateId(existingIds) {

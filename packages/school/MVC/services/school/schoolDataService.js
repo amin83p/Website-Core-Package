@@ -12,6 +12,9 @@ const classEnrollmentPeriodService = require('./classEnrollmentPeriodService');
 const classCycleService = require('./classCycleService');
 const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyService');
 const examBuilderService = require('./examBuilderService');
+const { isVoidPolicy } = require('./schoolDeletionPolicyRegistry');
+const { buildVoidPatch, isVoidRecord } = require('../../models/school/voidRecordMetadata');
+const studentSystemIdMigrationLockService = require('./studentSystemIdMigrationLockService');
 
 function getDeletionGuardDeps() {
   const schoolDeletionGuardService = require('./schoolDeletionGuardService');
@@ -181,8 +184,13 @@ const schoolDataService = {
     const config = resolveEntityConfig(entityType);
     if (!config) throw new Error(`Unknown school entity type: ${entityType}`);
 
+    const rawQuery = (query && typeof query === 'object') ? query : {};
+    const hasStatusFilter = Object.keys(rawQuery).some((key) => key === 'status' || key.startsWith('status__'));
+    const scopedQuery = isVoidPolicy(entityType) && accessContext?.includeVoided !== true && !hasStatusFilter
+      ? { ...rawQuery, status__ne: 'void' }
+      : rawQuery;
     return await config.repository.list({
-      query: normalizeQueryOptions(query),
+      query: normalizeQueryOptions(scopedQuery),
       scope: await buildEntityScopeForRequest(entityType, requestingUser, accessContext)
     });
   },
@@ -190,6 +198,11 @@ const schoolDataService = {
   addData: async (entityType, data, requestingUser, options = {}) => {
     const config = resolveEntityConfig(entityType);
     if (!config) throw new Error(`Unknown school entity type for add: ${entityType}`);
+    await studentSystemIdMigrationLockService.assertWriteAllowed(
+      entityType,
+      data?.orgId || requestingUser?.activeOrgId,
+      options
+    );
     const result = await config.repository.create(data, { ...options, requestingUser });
     recordTransactionOperation(options, {
       type: 'create',
@@ -202,6 +215,18 @@ const schoolDataService = {
   updateData: async (entityType, id, data, requestingUser, options = {}) => {
     const config = resolveEntityConfig(entityType);
     if (!config) throw new Error(`Unknown school entity type for update: ${entityType}`);
+    const currentForLock = await config.repository.getById(id, options);
+    await studentSystemIdMigrationLockService.assertWriteAllowed(
+      entityType,
+      currentForLock?.orgId || data?.orgId || requestingUser?.activeOrgId,
+      options
+    );
+    if (isVoidPolicy(entityType) && options.allowVoidMutation !== true) {
+      const current = await config.repository.getById(id, options);
+      if (current && isVoidRecord(current)) {
+        throw new Error('This record is void and cannot be edited. Restore it before making changes.');
+      }
+    }
     const result = await config.repository.update(id, data, { ...options, requestingUser });
     recordTransactionOperation(options, {
       type: 'update',
@@ -244,15 +269,22 @@ const schoolDataService = {
     if (normalizedType === 'academicSnapshots') {
       throw new Error('Academic snapshots are derived records and cannot be deleted here.');
     }
-    if (normalizedType === 'studentProgramRegistrations') {
-      throw new Error('Student program registrations cannot be deleted from this service.');
-    }
-    if (normalizedType === 'studentTermRegistrations') {
-      throw new Error('Student term registrations cannot be deleted from this service.');
-    }
-
     const config = resolveEntityConfig(entityType);
     if (!config) throw new Error(`Unknown school entity type for delete: ${entityType}`);
+
+    const currentForLock = await config.repository.getById(id, options);
+    await studentSystemIdMigrationLockService.assertWriteAllowed(
+      normalizedType,
+      currentForLock?.orgId || requestingUser?.activeOrgId,
+      options
+    );
+
+    let voidTarget = null;
+    if (isVoidPolicy(normalizedType)) {
+      voidTarget = await schoolDataService.getDataById(normalizedType, id, requestingUser, options.accessContext || {});
+      if (!voidTarget) throw new Error('Record not found.');
+      if (isVoidRecord(voidTarget)) return voidTarget;
+    }
 
     const { schoolDeletionGuardService, resolveEntityKeyFromRepositoryKey } = getDeletionGuardDeps();
     const entityKey = resolveEntityKeyFromRepositoryKey(normalizedType);
@@ -267,12 +299,41 @@ const schoolDataService = {
       });
     }
 
-    const result = await config.repository.remove(id, options);
+    let result;
+    if (isVoidPolicy(normalizedType)) {
+      result = await config.repository.update(id, buildVoidPatch(
+        voidTarget,
+        requestingUser,
+        options.voidReason || options.reason || 'Deleted by user'
+      ), { ...options, requestingUser });
+    } else {
+      result = await config.repository.remove(id, options);
+    }
     recordTransactionOperation(options, {
-      type: 'delete',
+      type: isVoidPolicy(normalizedType) ? 'void' : 'delete',
       entityType: String(entityType || ''),
       id: toPublicId(id)
     });
+    return result;
+  },
+
+  restoreData: async (entityType, id, requestingUser, options = {}) => {
+    const normalizedType = String(entityType || '').trim();
+    if (!isVoidPolicy(normalizedType)) throw new Error('This record type does not support restore.');
+    const config = resolveEntityConfig(normalizedType);
+    if (!config) throw new Error(`Unknown school entity type for restore: ${entityType}`);
+    const current = await schoolDataService.getDataById(normalizedType, id, requestingUser, options.accessContext || {});
+    if (!current) throw new Error('Record not found.');
+    if (!isVoidRecord(current)) return current;
+    const restoredStatus = String(options.status || current.statusBeforeVoid || 'active').trim().toLowerCase();
+    if (!restoredStatus || restoredStatus === 'void') throw new Error('A valid restored status is required.');
+    const result = await config.repository.update(id, {
+      ...current,
+      status: restoredStatus,
+      clearVoidMetadata: true,
+      voidedAt: '', voidedBy: '', voidReason: '', statusBeforeVoid: ''
+    }, { ...options, requestingUser });
+    recordTransactionOperation(options, { type: 'restore', entityType: normalizedType, id: toPublicId(id) });
     return result;
   },
 

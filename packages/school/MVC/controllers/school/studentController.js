@@ -1174,15 +1174,36 @@ exports.previewStudentSystemIdChange = async (req, res) => {
         await assertCanChangeStudentSystemId(req);
         const orgId = getActiveOrgIdOrThrow(req.user);
         const preview = await studentSystemIdMigrationService.previewStudentSystemId(req.params.id, orgId);
-        return res.json({ status: 'success', data: preview, actionStateId: req.actionStateId || '' });
+        const capability = await studentSystemIdMigrationService.getStudentSystemIdMigrationCapability();
+        return res.json({ status: 'success', data: { ...preview, ...capability }, actionStateId: req.actionStateId || '' });
     } catch (error) {
-        return res.status(error.status || 400).json({ status: 'error', message: error.message });
+        return res.status(error.status || 400).json({ status: 'error', message: error.message, migrationId: error.migrationId || '', rollbackStatus: error.rollbackStatus || '' });
+    }
+};
+
+exports.recoverStudentSystemIdMigration = async (req, res) => {
+    try {
+        await assertCanChangeStudentSystemId(req);
+        const result = await studentSystemIdMigrationService.recoverStudentSystemIdMigration(
+            req.params.migrationId,
+            toPublicId(req.user?.id) || String(req.user?.username || 'system')
+        );
+        return res.json({ status: 'success', message: 'Student System Record ID migration recovery completed.', data: result });
+    } catch (error) {
+        return res.status(error.status || 400).json({
+            status: 'error',
+            message: error.message,
+            migrationId: error.migrationId || '',
+            rollbackStatus: error.rollbackStatus || ''
+        });
     }
 };
 
 exports.generateStudentSystemId = async (req, res) => {
     try {
         await assertCanChangeStudentSystemId(req);
+        const orgId = getActiveOrgIdOrThrow(req.user);
+        await studentSystemIdMigrationService.previewStudentSystemId(req.params.id, orgId);
         const id = await studentSystemIdMigrationService.generateStudentSystemId();
         return res.json({ status: 'success', data: { id }, actionStateId: req.actionStateId || '' });
     } catch (error) {
@@ -1215,7 +1236,12 @@ exports.changeStudentSystemId = async (req, res) => {
     } catch (error) {
         if (guardKey) idempotencyGuardService.failGuard(guardKey);
         console.error('[STUDENT_SYSTEM_ID_CHANGE]', error);
-        return res.status(error.status || 400).json({ status: 'error', message: error.message });
+        return res.status(error.status || 400).json({
+            status: 'error',
+            message: error.message,
+            migrationId: error.migrationId || '',
+            rollbackStatus: error.rollbackStatus || ''
+        });
     }
 };
 
@@ -1461,4 +1487,3 @@ exports.recoverStudent = async (req, res) => {
         res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
     }
 };
-

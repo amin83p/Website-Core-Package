@@ -1791,7 +1791,10 @@ exports.rollbackRegistration = async (req, res) => {
       });
       const payloadOut = {
         status: 'success',
-        message: 'Draft term registration deleted.',
+        operation: 'void',
+        previousStatus: 'draft',
+        newStatus: 'void',
+        message: 'Draft term registration voided.',
         redirectTo: '/school/programs/term-registrations'
       };
       idempotencyGuardService.completeGuard(guardKey, payloadOut);

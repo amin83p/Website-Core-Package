@@ -119,6 +119,18 @@ async function withMongoTransaction(operation, options = {}) {
   }
 }
 
+async function getMongoTransactionCapability() {
+  if (!mongoDb) throw new Error('MongoDB is not connected yet. Call connectMongo() first.');
+  const hello = await mongoDb.admin().command({ hello: 1 });
+  const isMongos = String(hello?.msg || '').toLowerCase() === 'isdbgrid';
+  const isReplicaSet = Boolean(String(hello?.setName || '').trim());
+  return {
+    supported: isMongos || isReplicaSet,
+    topology: isMongos ? 'mongos' : (isReplicaSet ? 'replicaSet' : 'standalone'),
+    setName: String(hello?.setName || '').trim()
+  };
+}
+
 async function pingMongo() {
   if (!mongoDb) return false;
   await mongoDb.command({ ping: 1 });
@@ -142,6 +154,7 @@ module.exports = {
   pingMongo,
   getMongoDbOrNull,
   getMongoCollection,
+  getMongoTransactionCapability,
   withMongoTransaction,
   resolveMongoConnectionConfig
 };

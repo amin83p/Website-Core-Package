@@ -266,11 +266,31 @@
       if (token && typeof window.hideLoading === 'function') window.hideLoading(token);
     }
   }
+  function hideModalBeforeAdminVerification(modalInstance, modalEl) {
+    if (!modalInstance || !modalEl || !modalEl.classList.contains('show')) return Promise.resolve();
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        modalEl.removeEventListener('hidden.bs.modal', finish);
+        resolve();
+      };
+      modalEl.addEventListener('hidden.bs.modal', finish, { once: true });
+      modalInstance.hide();
+      window.setTimeout(finish, 500);
+    });
+  }
   async function ensureAdminVerification() {
-    if (typeof window.ensureAdminVerification === 'function') {
-      return window.ensureAdminVerification();
+    if (typeof window.requestProtectedAction !== 'function') {
+      throw new Error('Admin verification system is not loaded. Please refresh the page and try again.');
     }
+    await window.requestProtectedAction();
     return true;
+  }
+
+  function isAdminVerificationCancelled(error) {
+    return error?.code === 'ADMIN_VERIFICATION_CANCELLED';
   }
 
   function getActiveCatalogEntry() {
@@ -582,9 +602,26 @@
 
   async function executeDelete() {
     if (!state.pendingDeleteIds.length || !state.activeEntityType) return;
-    const verified = await ensureAdminVerification();
-    if (!verified) return;
+    await hideModalBeforeAdminVerification(deleteModal, deleteConfirmModalEl);
+    try {
+      const verified = await ensureAdminVerification();
+      if (!verified) {
+        deleteModal?.show();
+        return;
+      }
+    } catch (error) {
+      deleteModal?.show();
+      throw error;
+    }
 
+    const deleteLoadingToken = typeof window.showLoading === 'function'
+      ? window.showLoading({
+          title: 'Deleting Selected Records',
+          note: 'Please wait while records are deleted and the collection is refreshed...',
+          operation: 'School Data Maintenance'
+        })
+      : null;
+    try {
     const response = await fetch(`/school/data-maintenance/api/${encodeURIComponent(state.activeEntityType)}/delete`, {
       method: 'POST',
       headers: {
@@ -612,6 +649,11 @@
     showOperationResult('success', payload.message || 'Delete completed.', detail);
     await loadSummary(false);
     await loadRows();
+    } finally {
+      if (deleteLoadingToken && typeof window.hideLoading === 'function') {
+        window.hideLoading(deleteLoadingToken);
+      }
+    }
   }
 
   function openClearAllModal() {
@@ -631,9 +673,26 @@
   async function executeClearAll() {
     const entry = getActiveCatalogEntry();
     if (!entry?.supportsClearAll || !state.activeEntityType) return;
-    const verified = await ensureAdminVerification();
-    if (!verified) return;
+    await hideModalBeforeAdminVerification(clearAllModal, clearAllConfirmModalEl);
+    try {
+      const verified = await ensureAdminVerification();
+      if (!verified) {
+        clearAllModal?.show();
+        return;
+      }
+    } catch (error) {
+      clearAllModal?.show();
+      throw error;
+    }
 
+    const clearLoadingToken = typeof window.showLoading === 'function'
+      ? window.showLoading({
+          title: 'Clearing Collection',
+          note: 'Please wait while records are removed and the collection is refreshed...',
+          operation: 'School Data Maintenance'
+        })
+      : null;
+    try {
     const response = await fetch(`/school/data-maintenance/api/${encodeURIComponent(state.activeEntityType)}/clear-all`, {
       method: 'POST',
       headers: {
@@ -653,6 +712,11 @@
     showOperationResult('success', payload.message || 'Collection cleared.');
     await loadSummary(false);
     await loadRows();
+    } finally {
+      if (clearLoadingToken && typeof window.hideLoading === 'function') {
+        window.hideLoading(clearLoadingToken);
+      }
+    }
   }
 
   chkSelectAllRowsEl?.addEventListener('change', () => {
@@ -684,7 +748,10 @@
   });
 
   btnConfirmDeleteEl?.addEventListener('click', () => {
-    executeDelete().catch((error) => showOperationResult('error', error.message));
+    executeDelete().catch((error) => {
+      if (isAdminVerificationCancelled(error)) return;
+      showOperationResult('error', error.message);
+    });
   });
 
   clearAllConfirmInputEl?.addEventListener('input', () => {
@@ -692,7 +759,10 @@
   });
 
   btnConfirmClearAllEl?.addEventListener('click', () => {
-    executeClearAll().catch((error) => showOperationResult('error', error.message));
+    executeClearAll().catch((error) => {
+      if (isAdminVerificationCancelled(error)) return;
+      showOperationResult('error', error.message);
+    });
   });
 
   rowSearchInputEl?.addEventListener('change', () => {

@@ -39,6 +39,7 @@ const taskRoutingRuleModel = require('../../models/school/taskRoutingRuleModel')
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const { SCOPE_MODES } = require('../../services/school/schoolDataScopeBuilder');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
+const { generateStudentSystemIdCandidate } = require('../../services/school/studentSystemIdGenerator');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { getEntityQueryExecutor } = requireCoreModule('MVC/models/queryExecutionBridge');
@@ -455,6 +456,7 @@ function createSchoolRepository(config) {
   const mongoRemoveUnsupported = config.mongoRemoveUnsupported === true;
   const mongoRemoveMessage = String(config.mongoRemoveMessage || 'Delete operation is not supported.');
   const assignmentScopeKind = String(config.assignmentScopeKind || 'personId').trim() || 'personId';
+  const generateMongoCreateId = config.generateMongoCreateId;
 
   async function runLocalList(plan = {}, options = {}) {
     const query = plan?.query || {};
@@ -595,14 +597,18 @@ function createSchoolRepository(config) {
             for (const raw of stampedData) {
               const payload = { ...(raw || {}) };
               // eslint-disable-next-line no-await-in-loop
-              payload.id = await generateUniqueStringId(collection, payload.id);
+              payload.id = typeof generateMongoCreateId === 'function'
+                ? await generateMongoCreateId(collection, payload)
+                : await generateUniqueStringId(collection, payload.id);
               payloads.push(payload);
             }
             if (payloads.length) await collection.insertMany(payloads);
             return payloads.map((row) => normalizeMongoDocument(row)).filter(Boolean);
           }
           const payload = { ...(stampedData || {}) };
-          payload.id = await generateUniqueStringId(collection, payload.id);
+          payload.id = typeof generateMongoCreateId === 'function'
+            ? await generateMongoCreateId(collection, payload)
+            : await generateUniqueStringId(collection, payload.id);
           await collection.insertOne(payload);
           return normalizeMongoDocument(payload);
         }
@@ -698,6 +704,10 @@ const schoolRepositories = {
     create: studentModel.addStudent,
     update: studentModel.updateStudent,
     remove: studentModel.deleteStudent,
+    generateMongoCreateId: async (collection) => {
+      const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
+      return generateStudentSystemIdCandidate(new Set(rows.map((row) => String(row.id || ''))));
+    },
     defaultSearchFields: ['id', 'customStudentId', 'personId', 'studentCode', 'status'],
     assignmentScopeKind: 'personId'
   }),

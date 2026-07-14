@@ -4,11 +4,21 @@ const crypto = require('crypto');
 const { requireCoreModule, resolveCoreRoot } = require('./schoolCoreModuleResolver');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { runByRepositoryBackend } = requireCoreModule('MVC/repositories/backend/repositoryBackendSelector');
-const { getMongoCollection, withMongoTransaction } = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');
+const {
+  getMongoCollection,
+  withMongoTransaction,
+  getMongoTransactionCapability
+} = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');
+const { LOCK_COLLECTION } = require('./studentSystemIdMigrationLockService');
+const { generateStudentSystemIdCandidate } = require('./studentSystemIdGenerator');
 
 const ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const DATA_DIR = path.join(resolveCoreRoot(), 'data/school');
 const AUDIT_FILE = 'studentSystemIdMigrations.json';
+const MONGO_AUDIT_COLLECTION = 'schoolStudentSystemIdMigrations';
+const MONGO_JOURNAL_COLLECTION = 'schoolStudentSystemIdMigrationJournals';
+const MONGO_BACKUP_COLLECTION = 'schoolStudentSystemIdMigrationBackups';
+const LOCK_TTL_MS = 5 * 60 * 1000;
 
 const REFERENCE_REGISTRY = Object.freeze([
   { key: 'students', file: 'students.json', collection: 'schoolStudents', label: 'Students' },
@@ -128,13 +138,7 @@ function countReferences(key, rows, targetId, orgId = '') {
   return transformRows(key, rows, targetId, '__COUNT_ONLY__', orgId).count;
 }
 
-function generateCandidate(existingIds = new Set()) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const id = 'STU' + Math.floor(10000 + Math.random() * 90000);
-    if (!existingIds.has(id)) return id;
-  }
-  return 'STU' + Date.now();
-}
+const generateCandidate = generateStudentSystemIdCandidate;
 
 async function readJsonRows(file) {
   try {
@@ -265,7 +269,7 @@ async function migrateJson(oldId, newId, orgId, actor) {
   });
 }
 
-async function migrateMongo(oldId, newId, orgId, actor) {
+async function migrateMongoNative(oldId, newId, orgId, actor, topology = 'replicaSet') {
   return withMongoTransaction(async (session) => {
     const datasets = await loadMongoDatasets(session);
     assertPreflight(datasets, oldId, newId, orgId);
@@ -281,14 +285,249 @@ async function migrateMongo(oldId, newId, orgId, actor) {
         await getMongoCollection(entry.collection).replaceOne({ _id: original[index]._id }, replacement, { session });
       }
     }
-    const audit = { id: 'SSID-' + Date.now() + '-' + crypto.randomBytes(6).toString('hex'), oldId, newId, orgId, actor, backend: 'mongo', counts: impact.counts, totalUpdates: impact.totalUpdates, status: 'success', createdAt: new Date().toISOString() };
-    await getMongoCollection('schoolStudentSystemIdMigrations').insertOne(audit, { session });
+    const audit = { id: 'SSID-' + Date.now() + '-' + crypto.randomBytes(6).toString('hex'), oldId, newId, orgId, actor, backend: 'mongo', topology, transactionMode: 'native', rollbackStatus: 'not_required', counts: impact.counts, totalUpdates: impact.totalUpdates, status: 'success', createdAt: new Date().toISOString() };
+    await getMongoCollection(MONGO_AUDIT_COLLECTION).insertOne(audit, { session });
     const verified = await loadMongoDatasets(session);
     const remaining = buildImpact(verified, oldId, orgId);
     const newStudents = verified.students.filter((row) => idsEqual(row.id, newId) && idsEqual(row.orgId, orgId));
     if (remaining.totalUpdates !== 0 || newStudents.length !== 1) throw new Error('Post-migration verification failed.');
-    return { oldId, newId, ...impact, auditId: audit.id, redirectTo: '/school/students/edit/' + encodeURIComponent(newId) };
+    return { oldId, newId, ...impact, auditId: audit.id, migrationId: audit.id, transactionMode: 'native', rollbackStatus: 'not_required', redirectTo: '/school/students/edit/' + encodeURIComponent(newId) };
   });
+}
+
+function comparableDocument(value) {
+  return JSON.stringify(value, (_key, item) => {
+    if (item && typeof item.toHexString === 'function') return item.toHexString();
+    return item;
+  });
+}
+
+function documentsEqual(left, right) {
+  return comparableDocument(left) === comparableDocument(right);
+}
+
+function replacementFilter(document = {}) {
+  const { _id, ...body } = document;
+  return { _id, ...body };
+}
+
+async function acquireMongoMigrationLock({ migrationId, oldId, newId, orgId, actor }) {
+  const locks = getMongoCollection(LOCK_COLLECTION);
+  const lockId = orgId + ':' + oldId;
+  const now = new Date();
+  await locks.deleteOne({ _id: lockId, expiresAt: { $lte: now } });
+  try {
+    await locks.insertOne({
+      _id: lockId, migrationId, oldId, newId, orgId, actor,
+      createdAt: now,
+      expiresAt: new Date(now.getTime() + LOCK_TTL_MS)
+    });
+  } catch (error) {
+    if (Number(error?.code) === 11000) {
+      const lockError = new Error('A Student System Record ID migration is already in progress for this student.');
+      lockError.code = 'STUDENT_ID_MIGRATION_IN_PROGRESS';
+      lockError.status = 409;
+      throw lockError;
+    }
+    throw error;
+  }
+  return { lockId, migrationId };
+}
+
+async function releaseMongoMigrationLock(lock = {}) {
+  if (!lock.lockId || !lock.migrationId) return;
+  await getMongoCollection(LOCK_COLLECTION).deleteOne({ _id: lock.lockId, migrationId: lock.migrationId });
+}
+
+async function refreshMongoMigrationLock(lock = {}) {
+  if (!lock.lockId || !lock.migrationId) return;
+  const result = await getMongoCollection(LOCK_COLLECTION).updateOne(
+    { _id: lock.lockId, migrationId: lock.migrationId },
+    { $set: { expiresAt: new Date(Date.now() + LOCK_TTL_MS), heartbeatAt: new Date() } }
+  );
+  if (result.matchedCount !== 1) throw new Error('The Student System Record ID migration lock was lost.');
+}
+
+async function rollbackStandaloneMigration(journal) {
+  const migrationId = String(journal?.id || journal?.migrationId || '').trim();
+  const backups = await getMongoCollection(MONGO_BACKUP_COLLECTION)
+    .find({ migrationId }).sort({ sequence: -1 }).toArray();
+  const failures = [];
+  let restored = 0;
+  await getMongoCollection(MONGO_JOURNAL_COLLECTION).updateOne(
+    { id: migrationId },
+    { $set: { status: 'rolling_back', rollbackStartedAt: new Date().toISOString() } }
+  );
+  for (const backup of backups) {
+    const collection = getMongoCollection(backup.collection);
+    // eslint-disable-next-line no-await-in-loop
+    const current = await collection.findOne({ _id: backup.sourceId });
+    if (documentsEqual(current, backup.before)) continue;
+    if (!documentsEqual(current, backup.after)) {
+      failures.push(`${backup.collection}:${String(backup.sourceId)}`);
+      continue;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    const result = await collection.replaceOne(replacementFilter(backup.after), backup.before);
+    if (result.matchedCount !== 1) failures.push(`${backup.collection}:${String(backup.sourceId)}`);
+    else restored += 1;
+  }
+  for (const backup of backups) {
+    // eslint-disable-next-line no-await-in-loop
+    const restoredDocument = await getMongoCollection(backup.collection).findOne({ _id: backup.sourceId });
+    if (!documentsEqual(restoredDocument, backup.before)) {
+      const key = `${backup.collection}:${String(backup.sourceId)}`;
+      if (!failures.includes(key)) failures.push(key);
+    }
+  }
+  const rollbackStatus = failures.length ? 'recovery_required' : 'completed';
+  await getMongoCollection(MONGO_JOURNAL_COLLECTION).updateOne(
+    { id: migrationId },
+    { $set: { status: failures.length ? 'recovery_required' : 'rolled_back', rollbackStatus, rollbackFailures: failures, restoredCount: restored, completedAt: new Date().toISOString() } }
+  );
+  if (!failures.length) await getMongoCollection(MONGO_BACKUP_COLLECTION).deleteMany({ migrationId });
+  return { rollbackStatus, failures, restored };
+}
+
+async function recoverInterruptedMongoMigration({ oldId, newId, orgId }) {
+  const journal = await getMongoCollection(MONGO_JOURNAL_COLLECTION).findOne({
+    orgId,
+    status: { $in: ['prepared', 'applying', 'verifying', 'rolling_back', 'recovery_required'] },
+    $or: [{ oldId }, { newId: oldId }, { oldId: newId }, { newId }]
+  });
+  if (!journal) return null;
+  const recovery = await rollbackStandaloneMigration(journal);
+  if (recovery.rollbackStatus !== 'completed') {
+    const error = new Error(`A previous Student System Record ID migration requires administrator recovery. Migration ID: ${journal.id}.`);
+    error.code = 'STUDENT_ID_MIGRATION_RECOVERY_REQUIRED';
+    error.status = 409;
+    error.migrationId = journal.id;
+    error.rollbackStatus = recovery.rollbackStatus;
+    throw error;
+  }
+  return { migrationId: journal.id, ...recovery };
+}
+
+async function migrateMongoStandalone(oldId, newId, orgId, actor) {
+  const migrationId = 'SSID-' + Date.now() + '-' + crypto.randomBytes(6).toString('hex');
+  let lock = null;
+  let journal = null;
+  let successAuditInserted = false;
+  try {
+    lock = await acquireMongoMigrationLock({ migrationId, oldId, newId, orgId, actor });
+    await recoverInterruptedMongoMigration({ oldId, newId, orgId });
+    const datasets = await loadMongoDatasets();
+    assertPreflight(datasets, oldId, newId, orgId);
+    const impact = buildImpact(datasets, oldId, orgId);
+    const backups = [];
+    let sequence = 0;
+    for (const entry of REFERENCE_REGISTRY) {
+      const original = datasets[entry.key] || [];
+      const transformed = transformRows(entry.key, original, oldId, newId, orgId);
+      for (let index = 0; index < original.length; index += 1) {
+        if (documentsEqual(original[index], transformed.rows[index])) continue;
+        backups.push({
+          _id: migrationId + ':' + String(sequence), migrationId, sequence,
+          key: entry.key, collection: entry.collection, sourceId: original[index]._id,
+          before: original[index], after: { ...transformed.rows[index], _id: original[index]._id }
+        });
+        sequence += 1;
+      }
+    }
+    journal = {
+      id: migrationId, oldId, newId, orgId, actor, backend: 'mongo', topology: 'standalone',
+      transactionMode: 'compensating', status: 'prepared', rollbackStatus: 'not_started',
+      counts: impact.counts, totalUpdates: impact.totalUpdates, backupCount: backups.length,
+      createdAt: new Date().toISOString()
+    };
+    await getMongoCollection(MONGO_JOURNAL_COLLECTION).insertOne(journal);
+    if (backups.length) await getMongoCollection(MONGO_BACKUP_COLLECTION).insertMany(backups);
+    await getMongoCollection(MONGO_JOURNAL_COLLECTION).updateOne({ id: migrationId }, { $set: { status: 'applying', startedAt: new Date().toISOString() } });
+    for (const backup of backups) {
+      // eslint-disable-next-line no-await-in-loop
+      await refreshMongoMigrationLock(lock);
+      // eslint-disable-next-line no-await-in-loop
+      const result = await getMongoCollection(backup.collection).replaceOne(replacementFilter(backup.before), backup.after);
+      if (result.matchedCount !== 1) throw new Error(`A concurrent update was detected in ${backup.collection}; migration was stopped.`);
+    }
+    await getMongoCollection(MONGO_JOURNAL_COLLECTION).updateOne({ id: migrationId }, { $set: { status: 'verifying' } });
+    const verified = await loadMongoDatasets();
+    const remaining = buildImpact(verified, oldId, orgId);
+    const newStudents = verified.students.filter((row) => idsEqual(row.id, newId) && idsEqual(row.orgId, orgId));
+    if (remaining.totalUpdates !== 0 || newStudents.length !== 1) throw new Error('Post-migration verification failed.');
+    const audit = { ...journal, status: 'success', rollbackStatus: 'not_required', verified: true, completedAt: new Date().toISOString() };
+    await getMongoCollection(MONGO_AUDIT_COLLECTION).insertOne(audit);
+    successAuditInserted = true;
+    await getMongoCollection(MONGO_JOURNAL_COLLECTION).updateOne({ id: migrationId }, { $set: { status: 'success', rollbackStatus: 'not_required', verified: true, completedAt: audit.completedAt } });
+    await getMongoCollection(MONGO_BACKUP_COLLECTION).deleteMany({ migrationId });
+    return { oldId, newId, ...impact, auditId: migrationId, migrationId, transactionMode: 'compensating', rollbackStatus: 'not_required', topology: 'standalone', redirectTo: '/school/students/edit/' + encodeURIComponent(newId) };
+  } catch (error) {
+    if (!journal) throw error;
+    let rollback = { rollbackStatus: 'not_started', failures: [] };
+    if (journal) rollback = await rollbackStandaloneMigration(journal).catch((rollbackError) => ({ rollbackStatus: 'recovery_required', failures: [rollbackError.message] }));
+    if (successAuditInserted) await getMongoCollection(MONGO_AUDIT_COLLECTION).deleteOne({ id: migrationId }).catch(() => {});
+    const message = rollback.rollbackStatus === 'completed'
+      ? 'The Student System Record ID migration failed, but all changes were restored.'
+      : `The Student System Record ID migration could not be safely completed. Administrator recovery is required${migrationId ? ` (Migration ID: ${migrationId})` : ''}.`;
+    const wrapped = new Error(message);
+    wrapped.code = rollback.rollbackStatus === 'completed' ? 'STUDENT_ID_MIGRATION_ROLLED_BACK' : 'STUDENT_ID_MIGRATION_RECOVERY_REQUIRED';
+    wrapped.status = 409;
+    wrapped.migrationId = migrationId;
+    wrapped.rollbackStatus = rollback.rollbackStatus;
+    wrapped.cause = error;
+    throw wrapped;
+  } finally {
+    await releaseMongoMigrationLock(lock).catch(() => {});
+  }
+}
+
+async function migrateMongo(oldId, newId, orgId, actor) {
+  const capability = await getMongoTransactionCapability();
+  if (capability.supported) {
+    try {
+      return await migrateMongoNative(oldId, newId, orgId, actor, capability.topology);
+    } catch (error) {
+      const unsupportedTransaction = /Transaction numbers are only allowed on a replica set member or mongos|transactions are not supported/i.test(String(error?.message || ''));
+      if (!unsupportedTransaction) throw error;
+      return migrateMongoStandalone(oldId, newId, orgId, actor);
+    }
+  }
+  return migrateMongoStandalone(oldId, newId, orgId, actor);
+}
+
+async function getStudentSystemIdMigrationCapability(options = {}) {
+  return runByRepositoryBackend(options, {
+    json: async () => ({ topology: 'json', transactionMode: 'file-rollback' }),
+    mongo: async () => {
+      const capability = await getMongoTransactionCapability();
+      return { topology: capability.topology, transactionMode: capability.supported ? 'native' : 'compensating' };
+    }
+  }, 'school.studentSystemId.capability');
+}
+
+async function recoverStudentSystemIdMigration(migrationIdInput, actor = '', options = {}) {
+  const migrationId = String(migrationIdInput || '').trim();
+  if (!migrationId) throw new Error('Migration ID is required.');
+  return runByRepositoryBackend(options, {
+    json: async () => { throw new Error('JSON migrations recover automatically from file backups.'); },
+    mongo: async () => {
+      const journal = await getMongoCollection(MONGO_JOURNAL_COLLECTION).findOne({ id: migrationId });
+      if (!journal) throw new Error('Migration recovery journal not found.');
+      let lock = null;
+      try {
+        lock = await acquireMongoMigrationLock({ ...journal, migrationId, actor: actor || journal.actor });
+        const result = await rollbackStandaloneMigration(journal);
+        if (result.rollbackStatus !== 'completed') {
+          const error = new Error(`Migration ${migrationId} still requires administrator recovery.`);
+          error.status = 409;
+          throw error;
+        }
+        return { status: 'recovered', migrationId, rollbackStatus: result.rollbackStatus, restoredCount: result.restored };
+      } finally {
+        await releaseMongoMigrationLock(lock).catch(() => {});
+      }
+    }
+  }, 'school.studentSystemId.recover');
 }
 
 async function recordFailureAudit({ oldId, newId, orgId, actor, message }, options = {}) {
@@ -331,5 +570,10 @@ module.exports = {
   generateCandidate,
   previewStudentSystemId,
   generateStudentSystemId,
-  migrateStudentSystemId
+  migrateStudentSystemId,
+  getStudentSystemIdMigrationCapability,
+  recoverStudentSystemIdMigration,
+  migrateMongoStandalone,
+  migrateMongoNative,
+  rollbackStandaloneMigration
 };

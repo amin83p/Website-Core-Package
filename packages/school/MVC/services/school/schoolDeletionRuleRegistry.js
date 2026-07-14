@@ -758,7 +758,7 @@ const ENTITY_DEFINITIONS = Object.freeze({
   program: {
     entityKey: 'program',
     repositoryKey: 'programs',
-    deleteMode: 'hard',
+    deleteMode: 'void',
     labelFields: ['name', 'code', 'title'],
     fieldRules: [
       { type: 'fieldMatch', code: 'PROGRAM_REGISTRATION', entityType: 'studentProgramRegistrations', field: 'programId', label: 'Student Program Registrations', section: 'registrations', childPolicy: 'immutable_child', resolveHint: 'Complete withdrawal workflows instead of deleting registrations.' },
@@ -784,7 +784,7 @@ const ENTITY_DEFINITIONS = Object.freeze({
   department: {
     entityKey: 'department',
     repositoryKey: 'departments',
-    deleteMode: 'hard',
+    deleteMode: 'void',
     labelFields: ['name', 'code'],
     fieldRules: [
       { type: 'fieldMatch', code: 'PROGRAM', entityType: 'programs', field: 'departmentId', label: 'Programs', section: 'programs', sectionHref: SECTION_HREFS.programs },
@@ -801,7 +801,7 @@ const ENTITY_DEFINITIONS = Object.freeze({
   subject: {
     entityKey: 'subject',
     repositoryKey: 'subjects',
-    deleteMode: 'hard',
+    deleteMode: 'void',
     labelFields: ['name', 'code', 'title'],
     fieldRules: [
       { type: 'fieldMatch', code: 'PRIOR_SUBJECT_CREDIT', entityType: 'studentProgramPriorSubjects', field: 'subjectId', label: 'Prior Subject Credits', section: 'registrations' },
@@ -828,7 +828,7 @@ const ENTITY_DEFINITIONS = Object.freeze({
   term: {
     entityKey: 'term',
     repositoryKey: 'terms',
-    deleteMode: 'hard',
+    deleteMode: 'void',
     labelFields: ['name', 'code', 'title'],
     fieldRules: [
       { type: 'fieldMatch', code: 'TERM_REGISTRATION', entityType: 'studentTermRegistrations', field: 'termId', label: 'Student Term Registrations', section: 'registrations', childPolicy: 'immutable_child' },
@@ -863,18 +863,35 @@ const ENTITY_DEFINITIONS = Object.freeze({
   class: {
     entityKey: 'class',
     repositoryKey: 'classes',
-    deleteMode: 'hard',
+    deleteMode: 'void',
     labelFields: ['title', 'name', 'code'],
     fieldRules: [
       { type: 'fieldMatch', code: 'REPORT_ASSIGNMENT', entityType: 'reportAssignments', field: 'classId', label: 'Report Assignments', section: 'reports', sectionHref: SECTION_HREFS.reports.assignment },
       { type: 'fieldMatch', code: 'REPORT_INSTANCE', entityType: 'reportInstances', field: 'classId', label: 'Report Instances', section: 'reports', sectionHref: SECTION_HREFS.reports.instance },
       { type: 'fieldMatch', code: 'ENROLLMENT_PERIOD', entityType: 'classEnrollmentPeriods', field: 'classId', label: 'Class Enrollment Periods', section: 'enrollments', sectionHref: SECTION_HREFS.enrollments, resolveHint: 'Open delete preparation to remove enrollments before deleting this class.', actionHref: (ctx) => SECTION_HREFS.deletePreparation(ctx?.id), actionLabel: DELETE_PREPARATION_ACTION_LABEL },
-      { type: 'fieldMatch', code: 'SESSION_CASE', entityType: 'sessionStudentCases', field: 'classId', label: 'Session Student Cases', section: 'cases', childPolicy: 'cascade_with_class', sectionHref: (row) => SECTION_HREFS.cases(row?.classId, row?.sessionId) },
+      { type: 'fieldMatch', code: 'SESSION_CASE', entityType: 'sessionStudentCases', field: 'classId', label: 'Session Student Cases', section: 'cases', childPolicy: 'physical_child', sectionHref: (row) => SECTION_HREFS.cases(row?.classId, row?.sessionId) },
       { type: 'fieldMatch', code: 'EXAM_ALLOCATION', entityType: 'examAllocations', field: 'classId', label: 'Exam Allocations', section: 'exams', sectionHref: SECTION_HREFS.exams.allocation },
       { type: 'fieldMatch', code: 'EXAM_ASSIGNMENT', entityType: 'examAssignments', field: 'classId', label: 'Exam Assignments', section: 'exams', sectionHref: SECTION_HREFS.exams.assignment },
       { type: 'fieldMatch', code: 'ACADEMIC_LEDGER', entityType: 'academicLedger', field: 'classId', label: 'Academic Ledger', section: 'academicLedger', childPolicy: 'immutable_child', sectionHref: (row) => SECTION_HREFS.academicLedger(row) }
     ],
     customScanners: [
+      async (ctx) => {
+        const sessions = await schoolDataService.getClassSessions(ctx.id, ctx.reqUser);
+        const rows = Array.isArray(sessions) ? sessions : [];
+        if (!rows.length) return null;
+        return buildBlocker({
+          code: 'CLASS_SESSION',
+          label: 'Class Sessions',
+          count: rows.length,
+          samples: rows.slice(0, MAX_SAMPLES).map((row) => ({
+            id: toPublicId(row?.sessionId || row?.id),
+            label: String(row?.date || row?.sessionId || row?.id || '').trim(),
+            href: SECTION_HREFS.sessions(ctx.id, row?.sessionId || row?.id)
+          })),
+          resolveHint: 'Physically delete class sessions before voiding this class.',
+          section: 'sessions'
+        });
+      },
       async (ctx) => scanClassDownstreamCycle(ctx.id, ctx.reqUser, {
         code: 'CLASS_DOWNSTREAM_CYCLE',
         label: 'Downstream rolling cycle',
@@ -1021,10 +1038,25 @@ const ENTITY_DEFINITIONS = Object.freeze({
   activity: {
     entityKey: 'activity',
     repositoryKey: 'activities',
-    deleteMode: 'hard',
+    deleteMode: 'void',
     labelFields: ['title', 'name'],
     fieldRules: [],
     customScanners: [
+      async (ctx) => {
+        const entries = Array.isArray(ctx.record?.entries) ? ctx.record.entries : [];
+        if (!entries.length) return null;
+        return buildBlocker({
+          code: 'ACTIVITY_WORK_SESSION',
+          label: 'Activity Work Sessions',
+          count: entries.length,
+          samples: entries.slice(0, MAX_SAMPLES).map((row) => ({
+            id: recordId(row),
+            label: String(row?.title || row?.date || row?.id || '').trim()
+          })),
+          resolveHint: 'Physically delete work sessions before voiding this activity.',
+          section: 'activities'
+        });
+      },
       async (ctx) => {
         if (!ctx.record) return null;
         return scanActivityTimesheetLock(ctx.record, {
@@ -1292,7 +1324,7 @@ const ENTITY_DEFINITIONS = Object.freeze({
   classEnrollmentPeriod: {
     entityKey: 'classEnrollmentPeriod',
     repositoryKey: 'classEnrollmentPeriods',
-    deleteMode: 'hard',
+    deleteMode: 'void',
     labelFields: ['studentId', 'classId', 'status'],
     fieldRules: [],
     customScanners: [

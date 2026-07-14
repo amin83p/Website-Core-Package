@@ -54,6 +54,7 @@ function resolveDeletePolicy(def = {}, blockers = []) {
   if (def.deleteMode === 'immutable') return 'immutable';
   if (def.deleteMode === 'archive_only') return 'archive_only';
   if (def.deleteMode === 'purge_only') return 'purge_only';
+  if (def.deleteMode === 'void') return 'void';
   const hasImmutableChild = blockers.some((row) => row.childPolicy === 'immutable_child');
   if (hasImmutableChild) return 'blocked_immutable_children';
   return 'deletable';

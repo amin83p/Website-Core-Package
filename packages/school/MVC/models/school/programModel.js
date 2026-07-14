@@ -14,7 +14,8 @@ if (!fsSync.existsSync(dataPath)) {
   fsSync.writeFileSync(dataPath, '[]');
 }
 
-const PROGRAM_STATUSES = new Set(['draft', 'active', 'inactive', 'archived']);
+const PROGRAM_STATUSES = new Set(['draft', 'active', 'inactive', 'archived', 'void']);
+const { applyVoidMetadata } = require('./voidRecordMetadata');
 const FEE_FREQUENCIES = new Set(['one_time', 'daily', 'weekly', 'monthly', 'term', 'yearly']);
 const SUBJECT_TYPES = ['main', 'essential', 'optional'];
 const PROGRAM_TERM_SNAPSHOT_FIELDS = [...OPTIONAL_DATE_FIELDS];
@@ -486,7 +487,7 @@ function sanitizeProgramInput(input, { isUpdate = false } = {}) {
     out.id = cleanId(input.id, { max: 40, allowEmpty: false });
   }
 
-  return out;
+  return applyVoidMetadata(out, input);
 }
 
 function generateProgramId(existingIds) {
@@ -517,14 +518,14 @@ async function addProgram(data) {
     const all = await getAllPrograms();
     const sanitized = sanitizeProgramInput(data, { isUpdate: false });
 
-    const duplicateName = all.some((p) =>
+    const duplicateName = all.some((p) => String(p.status || '').toLowerCase() !== 'void' &&
       String(p.orgId || '') === String(sanitized.orgId) &&
       normalizeProgramName(p.name) === normalizeProgramName(sanitized.name)
     );
     if (duplicateName) throw new Error('Program name already exists in this organization.');
 
     if (sanitized.code) {
-      const duplicateCode = all.some((p) =>
+      const duplicateCode = all.some((p) => String(p.status || '').toLowerCase() !== 'void' &&
         String(p.orgId) === String(sanitized.orgId) &&
         String(p.code || '').toUpperCase() === String(sanitized.code).toUpperCase()
       );
@@ -563,7 +564,7 @@ async function updateProgram(id, data) {
       throw new Error('Security Violation: orgId mismatch.');
     }
 
-    const duplicateName = all.some((p, i) =>
+    const duplicateName = all.some((p, i) => String(p.status || '').toLowerCase() !== 'void' &&
       i !== index &&
       String(p.orgId || '') === String(existing.orgId || sanitized.orgId) &&
       normalizeProgramName(p.name) === normalizeProgramName(sanitized.name)
@@ -571,7 +572,7 @@ async function updateProgram(id, data) {
     if (duplicateName) throw new Error('Program name already exists in this organization.');
 
     if (sanitized.code) {
-      const duplicateCode = all.some((p, i) =>
+      const duplicateCode = all.some((p, i) => String(p.status || '').toLowerCase() !== 'void' &&
         i !== index &&
         String(p.orgId) === String(existing.orgId) &&
         String(p.code || '').toUpperCase() === String(sanitized.code).toUpperCase()

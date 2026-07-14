@@ -490,6 +490,10 @@ router.delete('/:id/sessions/:sessionId/cases/:caseId',
     keepActive: true
   }),
   classCtrl.deleteSessionStudentCase);
+router.delete('/:id/sessions/:sessionId',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
+  classCtrl.deleteClassSession);
 router.post('/:id/sessions/:sessionId/gradebooks/save',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),

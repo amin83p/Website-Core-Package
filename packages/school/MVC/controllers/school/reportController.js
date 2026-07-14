@@ -880,9 +880,28 @@ async function deleteAssignment(req, res) {
     await reportIntegrityService.assertAssignmentAccessible(req.params.id, req.user);
     const assignment = await schoolDataService.getDataById('reportAssignments', req.params.id, req.user);
     if (!assignment) throw new Error('Assignment not found.');
-    await schoolDataService.deleteData('reportAssignments', req.params.id, req.user);
+    const instances = await schoolDataService.fetchData('reportInstances', {
+      assignmentId__eq: assignment.id,
+      page: 1,
+      limit: 10000
+    }, req.user);
+    for (const instance of (Array.isArray(instances) ? instances : [])) {
+      // Preserve existing lock/approval protection before removing owned instances.
+      // eslint-disable-next-line no-await-in-loop
+      await reportIntegrityService.assertInstanceDeletable(instance.id, req.user);
+    }
+    for (const instance of (Array.isArray(instances) ? instances : [])) {
+      // eslint-disable-next-line no-await-in-loop
+      await schoolDataService.deleteData('reportInstances', instance.id, req.user, { skipDeletionGuard: true });
+    }
+    await schoolDataService.deleteData('reportAssignments', req.params.id, req.user, { skipDeletionGuard: true });
     await classReferenceSyncService.notifyAfterReportDelete({ record: assignment, reqUser: req.user });
-    if (isAjax(req)) return res.json({ status: 'success', message: 'Assignment deleted.' });
+    if (isAjax(req)) return res.json({
+      status: 'success',
+      operation: 'physical-delete',
+      deletedCounts: { reportAssignments: 1, reportInstances: instances.length },
+      message: `Assignment and ${instances.length} owned report instance(s) deleted.`
+    });
     res.redirect('/school/reports/assignments');
   } catch (error) {
     return schoolDeletionGuardService.handleDeleteError(req, res, error);

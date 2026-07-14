@@ -130,6 +130,10 @@ router.post('/:activityId/work-sessions/:entryId/pending',
     allowSectionTokenFallback: true
   }),
   ctrl.resetWorkSessionAssigneeCompletion);
+router.delete('/:activityId/work-sessions/:entryId',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
+  ctrl.deleteWorkSession);
 
 module.exports = router;
 

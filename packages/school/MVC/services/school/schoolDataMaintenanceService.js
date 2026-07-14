@@ -2,6 +2,7 @@ const schoolDataService = require('./schoolDataService');
 const schoolRepositories = require('../../repositories/school');
 const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
 const classDeleteCascadeService = require('./classDeleteCascadeService');
+const { isVoidPolicy } = require('./schoolDeletionPolicyRegistry');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { getActiveDataBackendMode } = requireCoreModule('MVC/infrastructure/runtime/dataBackendRuntime');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -67,7 +68,7 @@ async function listOrgRows(entityType, orgId, reqUser, query = {}) {
     page: query.page || 1,
     limit: query.limit || 50,
     ...(query.search ? { search: query.search } : {})
-  }, reqUser);
+  }, reqUser, { includeVoided: true });
 }
 
 async function countOrgRows(entityType, orgId, reqUser) {
@@ -236,6 +237,9 @@ function classifyRowForDelete(entityType, row, catalogEntry = null) {
   }
   if (entityType === 'academicLedger' && String(row?.status || '').trim().toLowerCase() !== 'void') {
     return { canDelete: false, reason: 'Only void academic ledger entries can be permanently deleted. Void this entry first.' };
+  }
+  if (isVoidPolicy(entityType) && String(row?.status || '').trim().toLowerCase() !== 'void') {
+    return { canDelete: false, reason: 'Only void records can be permanently purged. Void this record from its School screen first.' };
   }
   return { canDelete: true, reason: '' };
 }

@@ -10,13 +10,14 @@ const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyS
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { buildVoidPatch } = require('../../models/school/voidRecordMetadata');
 
 function normalizeStatus(status) {
   return String(status || '').trim().toLowerCase();
 }
 
 function isInactiveRegistrationStatus(status) {
-  return ['withdrawn', 'cancelled', 'completed', 'rolled_back'].includes(normalizeStatus(status));
+  return ['withdrawn', 'cancelled', 'completed', 'rolled_back', 'void'].includes(normalizeStatus(status));
 }
 
 function isApprovedProgramRegistrationStatus(status) {
@@ -1454,13 +1455,17 @@ const registrationIntegrityService = {
 
     const registration = await this.getProgramRegistrationInOrgOrThrow(normalizedId, activeOrgId);
     await this.assertProgramDraftDeletionAllowed(registration, { reqUser, activeOrgId });
-    await schoolRepositories.studentProgramRegistrations.deleteDraftRegistration(normalizedId, options);
+    const updated = await schoolRepositories.studentProgramRegistrations.update(
+      normalizedId,
+      buildVoidPatch(registration, reqUser, options.voidReason || 'Draft registration deleted by user'),
+      options
+    );
     recordTransactionOperation(options, {
-      type: 'delete',
+      type: 'void',
       entityType: 'studentProgramRegistrations',
       id: normalizedId
     });
-    return { registrationId: normalizedId };
+    return { registrationId: normalizedId, operation: 'void', registration: updated };
   },
 
   async assertTermDraftDeletionAllowed(registration, { reqUser, activeOrgId } = {}) {
@@ -1518,13 +1523,17 @@ const registrationIntegrityService = {
 
     const registration = await this.getTermRegistrationInOrgOrThrow(normalizedId, activeOrgId);
     await this.assertTermDraftDeletionAllowed(registration, { reqUser, activeOrgId });
-    await schoolRepositories.studentTermRegistrations.deleteDraftRegistration(normalizedId, options);
+    const updated = await schoolRepositories.studentTermRegistrations.update(
+      normalizedId,
+      buildVoidPatch(registration, reqUser, options.voidReason || 'Draft registration deleted by user'),
+      options
+    );
     recordTransactionOperation(options, {
-      type: 'delete',
+      type: 'void',
       entityType: 'studentTermRegistrations',
       id: normalizedId
     });
-    return { registrationId: normalizedId };
+    return { registrationId: normalizedId, operation: 'void', registration: updated };
   },
 
   discoverRollingClassEnrollmentLedgerEntryIds,
