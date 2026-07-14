@@ -2445,6 +2445,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderConductBulkLegend();
 
     let studentCasesState = <%- jsonForScript(Array.isArray(sessionStudentCases) ? sessionStudentCases : []) %>;
+    const canDeleteStudentCases = <%- jsonForScript(typeof canDeleteStudentCases !== 'undefined' && Boolean(canDeleteStudentCases)) %>;
     let sessionReportInstancesState = <%- jsonForScript(Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : []) %>;
     const requestedStudentCaseId = new URLSearchParams(window.location.search || '').get('caseId') || '';
     let requestedStudentCaseHandled = false;
@@ -2536,6 +2537,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="btn-group btn-group-sm">
                             <button type="button" class="btn btn-outline-primary btn-edit-student-case" data-case-id="${scEscapeHtml(row.id)}"><i class="bi bi-pencil-square me-1"></i>Edit</button>
                             ${canResolve ? `<button type="button" class="btn btn-outline-success btn-status-student-case" data-case-id="${scEscapeHtml(row.id)}" data-status="resolved"><i class="bi bi-check2-circle me-1"></i>Resolve</button>` : `<button type="button" class="btn btn-outline-warning btn-status-student-case" data-case-id="${scEscapeHtml(row.id)}" data-status="reopened"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>`}
+                            ${canDeleteStudentCases ? `<button type="button" class="btn btn-outline-danger btn-delete-student-case" data-case-id="${scEscapeHtml(row.id)}"><i class="bi bi-trash me-1"></i>Delete</button>` : ''}
                         </div>
                     </td>
                 </tr>`;
@@ -3003,6 +3005,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function confirmStudentCaseDelete(row) {
+        const studentName = String(row?.studentName || row?.studentPersonId || 'this student').trim();
+        if (typeof window.showMessageModal === 'function') {
+            const selected = await window.showMessageModal({
+                title: 'Delete Student Case',
+                icon: 'warning',
+                message: `Permanently delete the student case for <strong>${scEscapeHtml(studentName)}</strong>? This action cannot be undone.`,
+                buttons: [
+                    { text: 'Cancel', class: 'btn-secondary' },
+                    { text: 'Delete', class: 'btn-danger' }
+                ]
+            });
+            return selected === 'Delete';
+        }
+        return window.confirm(`Permanently delete the student case for ${studentName}? This action cannot be undone.`);
+    }
+
+    async function deleteStudentCase(caseId) {
+        const row = getStudentCaseById(caseId);
+        if (!row || !(await confirmStudentCaseDelete(row))) return;
+        showStudentCaseBusy('Deleting Case', 'Removing the student case and its linked task...');
+        try {
+            const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases/${encodeURIComponent(caseId)}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'x-ajax-request': 'true', 'Accept': 'application/json' },
+                body: JSON.stringify({ actionStateId })
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to delete student case.');
+            await refreshStudentCases();
+            hideStudentCaseBusy();
+            return showStudentCaseMessage('Case Deleted', result.message || 'Student case deleted.', 'success');
+        } catch (error) {
+            hideStudentCaseBusy();
+            throw error;
+        }
+    }
+
     document.getElementById('studentCaseCategory')?.addEventListener('change', (event) => {
         renderStudentCaseDetailOptions(event.target.value, '');
     });
@@ -3028,6 +3068,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statusBtn) {
             updateStudentCaseStatus(statusBtn.dataset.caseId, statusBtn.dataset.status).catch((error) => {
                 showStudentCaseMessage('Update Failed', error.message, 'error');
+            });
+            return;
+        }
+        const deleteBtn = event.target.closest('.btn-delete-student-case');
+        if (deleteBtn) {
+            deleteStudentCase(deleteBtn.dataset.caseId).catch((error) => {
+                showStudentCaseMessage('Delete Failed', error.message, 'error');
             });
         }
     });

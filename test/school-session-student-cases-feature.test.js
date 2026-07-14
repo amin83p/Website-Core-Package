@@ -22,12 +22,18 @@ test('school manifest declares session student cases data entity', () => {
 
 test('class routes expose session student case endpoints under SCHOOL_SESSIONS', () => {
   const src = read('packages/school/MVC/routes/classRoutes.js');
+  const controller = read('packages/school/MVC/controllers/school/classController.js');
   assert.match(src, /\/:id\/sessions\/:sessionId\/cases/);
-  assert.match(src, /ctrl\.listSessionStudentCases/);
-  assert.match(src, /ctrl\.saveSessionStudentCase/);
-  assert.match(src, /ctrl\.updateSessionStudentCaseStatus/);
+  assert.match(src, /classCtrl\.listSessionStudentCases/);
+  assert.match(src, /classCtrl\.saveSessionStudentCase/);
+  assert.match(src, /classCtrl\.updateSessionStudentCaseStatus/);
+  assert.match(src, /router\.delete\('\/:id\/sessions\/:sessionId\/cases\/:caseId'/);
+  assert.match(src, /classCtrl\.deleteSessionStudentCase/);
   assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.READ_ALL\)/);
   assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.UPDATE\)/);
+  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.DELETE\)/);
+  assert.match(controller, /Only administrators can delete student cases/);
+  assert.match(controller, /sessionStudentCaseService\.deleteCase/);
 });
 
 test('session manager renders student cases tab, modal, and avoids attendance duplicate fields', () => {
@@ -48,10 +54,59 @@ test('session manager renders student cases tab, modal, and avoids attendance du
   assert.match(src, /studentCaseDetailPresets.*addEventListener\('change'/s);
   assert.match(src, /function collectStudentCaseDetailsValue\(\)[\s\S]*?getElementById\('studentCaseDetails'\)/);
   assert.match(src, /Issue Required/);
+  assert.match(src, /canDeleteStudentCases/);
+  assert.match(src, /btn-delete-student-case/);
+  assert.match(src, /method: 'DELETE'/);
+  assert.match(src, /function confirmStudentCaseDelete\(row\)/);
   assert.doesNotMatch(src, /id="studentCaseSummary"/);
   assert.doesNotMatch(src, /studentCaseLate/i);
   assert.doesNotMatch(src, /studentCaseAbsent/i);
   assert.doesNotMatch(src, /studentCaseEarly/i);
+});
+
+test('session student case delete removes its source task and scoped case record', async () => {
+  const originals = {
+    getById: schoolRepositories.sessionStudentCases.getById,
+    remove: schoolRepositories.sessionStudentCases.remove,
+    deleteSourceTask: taskService.deleteSourceTask
+  };
+  const user = { id: 'ADM-1', activeOrgId: '900000', roles: ['admin'] };
+  let removedId = '';
+  let deletedTask = null;
+  try {
+    schoolRepositories.sessionStudentCases.getById = async () => ({
+      id: 'SSC-1',
+      orgId: '900000',
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      studentPersonId: 'STU-1',
+      studentName: 'Student One'
+    });
+    schoolRepositories.sessionStudentCases.remove = async (id) => {
+      removedId = id;
+      return true;
+    };
+    taskService.deleteSourceTask = async (payload) => {
+      deletedTask = payload;
+      return true;
+    };
+
+    const deleted = await sessionStudentCaseService.deleteCase({
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      caseId: 'SSC-1',
+      reqUser: user
+    });
+
+    assert.equal(deleted.id, 'SSC-1');
+    assert.equal(removedId, 'SSC-1');
+    assert.equal(deletedTask.sourceType, 'student_session_case');
+    assert.equal(deletedTask.sourceId, 'SSC-1');
+  } finally {
+    schoolRepositories.sessionStudentCases.getById = originals.getById;
+    schoolRepositories.sessionStudentCases.remove = originals.remove;
+    taskService.deleteSourceTask = originals.deleteSourceTask;
+  }
 });
 
 test('session student case service creates and resolves source tasks', async () => {

@@ -493,6 +493,33 @@ async function updateStatus({ classId, sessionId, caseId, status, note = '', req
   return saved;
 }
 
+async function deleteCase({ classId, sessionId, caseId, reqUser }) {
+  const existing = await schoolRepositories.sessionStudentCases.getById(caseId, normalizeScope(reqUser));
+  if (!existing) {
+    const error = new Error('Student case not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+  if (!idsEqual(existing.classId, classId) || !idsEqual(existing.sessionId, sessionId)) {
+    const error = new Error('Student case does not belong to this session.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  await taskService.deleteSourceTask({
+    orgId: existing.orgId,
+    sourceType: 'student_session_case',
+    sourceId: existing.id
+  }, reqUser);
+  await schoolRepositories.sessionStudentCases.remove(existing.id, normalizeScope(reqUser));
+
+  return {
+    id: toPublicId(existing.id),
+    studentPersonId: toPublicId(existing.studentPersonId),
+    studentName: cleanString(existing.studentName || existing.studentPersonId || '', 180)
+  };
+}
+
 module.exports = {
   listCasesForSession,
   listSessionCaseSummaries,
@@ -500,6 +527,7 @@ module.exports = {
   summarizeSessionCases,
   saveCase,
   updateStatus,
+  deleteCase,
   _private: {
     caseTaskPayload,
     findRosterStudent,

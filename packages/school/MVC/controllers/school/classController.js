@@ -3249,6 +3249,12 @@ async function manageSession(req, res) {
             OPERATIONS.UPDATE,
             { section: { id: SECTIONS.SCHOOL_CLASSES } }
         );
+        const canDeleteStudentCases = await adminChekersService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_SESSIONS,
+            OPERATIONS.DELETE,
+            { section: { id: SECTIONS.SCHOOL_SESSIONS } }
+        );
         
         const isReadOnly = isSessionLocked && !canOverride;
 
@@ -3449,6 +3455,7 @@ async function manageSession(req, res) {
             isReadOnly,
             canEditSessionMetadata: canOverride,
             canManageConductRatingScale: canOverride,
+            canDeleteStudentCases,
             attendanceMatrixPolicyResolved,
             conductRatingScaleResolved,
             sessionStudentCases,
@@ -3599,6 +3606,31 @@ async function updateSessionStudentCaseStatus(req, res) {
         return res.json({ status: 'success', message: 'Student case updated.', case: saved });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function deleteSessionStudentCase(req, res) {
+    try {
+        const { id: classId, sessionId, caseId } = req.params;
+        const isAdmin = await adminChekersService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_SESSIONS,
+            OPERATIONS.DELETE,
+            { section: { id: SECTIONS.SCHOOL_SESSIONS } }
+        );
+        if (!isAdmin) {
+            return res.status(403).json({ status: 'error', message: 'Only administrators can delete student cases.' });
+        }
+        await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
+        const deleted = await sessionStudentCaseService.deleteCase({
+            classId,
+            sessionId,
+            caseId,
+            reqUser: req.user
+        });
+        return res.json({ status: 'success', message: 'Student case deleted.', deleted });
+    } catch (error) {
+        return res.status(error.statusCode || 400).json({ status: 'error', message: error.message });
     }
 }
 
@@ -4282,7 +4314,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus,
+  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase,
   saveConductRatingScaleSettings,
   setSessionLock,
   showFinalGradesPage,

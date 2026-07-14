@@ -483,6 +483,13 @@ router.post('/:id/sessions/:sessionId/cases/:caseId/status',
     allowInactiveTokenFallback: true
   }),
   classCtrl.updateSessionStudentCaseStatus);
+router.delete('/:id/sessions/:sessionId/cases/:caseId',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, {
+    requireToken: false,
+    keepActive: true
+  }),
+  classCtrl.deleteSessionStudentCase);
 router.post('/:id/sessions/:sessionId/gradebooks/save',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),
