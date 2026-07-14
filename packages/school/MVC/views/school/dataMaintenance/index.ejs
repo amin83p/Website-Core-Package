@@ -76,7 +76,8 @@
                   <th>ID</th>
                   <th>Label</th>
                   <th>Status</th>
-                  <th class="pe-3">Updated</th>
+                  <th>Updated</th>
+                  <th class="pe-3 text-end">Actions</th>
                 </tr>
               </thead>
               <tbody id="rowsTableBody"></tbody>
@@ -138,10 +139,33 @@
   </div>
 </div>
 
+<div class="modal fade" id="recordJsonModal" tabindex="-1" aria-labelledby="recordJsonModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="recordJsonModalLabel"><i class="bi bi-braces me-2"></i>Record JSON</h5>
+          <div class="small text-muted"><span id="recordJsonCollection"></span> <span class="font-monospace" id="recordJsonId"></span></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger d-none" id="recordJsonError" role="alert"></div>
+        <div class="text-muted py-4 text-center d-none" id="recordJsonLoading"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading record...</div>
+        <pre class="bg-dark text-light rounded p-3 mb-0 overflow-auto d-none" id="recordJsonPre" style="max-height:65vh;"><code id="recordJsonCode"></code></pre>
+      </div>
+      <div class="modal-footer">
+        <span class="small text-muted me-auto" id="recordJsonCopyStatus" role="status"></span>
+        <button type="button" class="btn btn-outline-primary" id="btnCopyRecordJson" disabled><i class="bi bi-clipboard me-1"></i>Copy JSON</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 <script>
 (() => {
   const pageEl = document.querySelector('.data-maintenance-page');
-  const actionStateId = String(pageEl?.dataset?.actionStateId || '').trim();
+  let actionStateId = String(pageEl?.dataset?.actionStateId || '').trim();
   const collectionNavEl = document.getElementById('collectionNav');
   const activeCollectionLabelEl = document.getElementById('activeCollectionLabel');
   const activeCollectionMetaEl = document.getElementById('activeCollectionMeta');
@@ -169,15 +193,18 @@
   const clearAllSummaryEl = document.getElementById('clearAllSummary');
   const clearAllConfirmInputEl = document.getElementById('clearAllConfirmInput');
   const btnConfirmClearAllEl = document.getElementById('btnConfirmClearAll');
+  const recordJsonModalEl = document.getElementById('recordJsonModal');
+  const recordJsonCollectionEl = document.getElementById('recordJsonCollection');
+  const recordJsonIdEl = document.getElementById('recordJsonId');
+  const recordJsonErrorEl = document.getElementById('recordJsonError');
+  const recordJsonLoadingEl = document.getElementById('recordJsonLoading');
+  const recordJsonPreEl = document.getElementById('recordJsonPre');
+  const recordJsonCodeEl = document.getElementById('recordJsonCode');
+  const recordJsonCopyStatusEl = document.getElementById('recordJsonCopyStatus');
+  const btnCopyRecordJsonEl = document.getElementById('btnCopyRecordJson');
 
   let deleteModal = null;
   let clearAllModal = null;
-  if (deleteConfirmModalEl && window.bootstrap && window.bootstrap.Modal) {
-    deleteModal = window.bootstrap.Modal.getOrCreateInstance(deleteConfirmModalEl);
-  }
-  if (clearAllConfirmModalEl && window.bootstrap && window.bootstrap.Modal) {
-    clearAllModal = window.bootstrap.Modal.getOrCreateInstance(clearAllConfirmModalEl);
-  }
 
   const state = {
     summary: null,
@@ -188,7 +215,9 @@
     rows: [],
     total: 0,
     selectedIds: new Set(),
-    pendingDeleteIds: []
+    pendingDeleteIds: [],
+    jsonRequestSequence: 0,
+    displayedJson: ''
   };
 
   function escapeHtml(value) {
@@ -197,6 +226,15 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function formatMessageMarkup(value) {
+    return escapeHtml(value)
+      .replaceAll('&lt;b&gt;', '<b>')
+      .replaceAll('&lt;/b&gt;', '</b>')
+      .replaceAll('&lt;br&gt;', '<br>')
+      .replaceAll('&lt;br/&gt;', '<br>')
+      .replaceAll('&lt;br /&gt;', '<br>');
   }
 
   function showOperationResult(kind, message, detailsHtml = '') {
@@ -209,8 +247,25 @@
     operationResultEl.className = `alert border ${styles[kind] || 'border-secondary'}`;
     operationResultEl.innerHTML = `<div class="fw-semibold">${escapeHtml(message)}</div>${detailsHtml ? `<div class="small mt-2">${detailsHtml}</div>` : ''}`;
     operationResultEl.hidden = false;
+    if (kind === 'error' && typeof window.showMessageModal === 'function') {
+      const rawMessage = String(message || 'The operation failed.');
+      window.showMessageModal({
+        title: /security violation/i.test(rawMessage) ? 'Security Validation Failed' : 'Operation Failed',
+        icon: 'error',
+        message: formatMessageMarkup(rawMessage),
+        buttons: [{ text: 'OK', class: 'btn-danger', value: true }]
+      });
+    }
   }
 
+  async function runWithWaiting(options, work) {
+    const token = typeof window.showLoading === 'function' ? window.showLoading(options || {}) : null;
+    try {
+      return await work();
+    } finally {
+      if (token && typeof window.hideLoading === 'function') window.hideLoading(token);
+    }
+  }
   async function ensureAdminVerification() {
     if (typeof window.ensureAdminVerification === 'function') {
       return window.ensureAdminVerification();
@@ -274,7 +329,7 @@
         state.selectedIds = new Set();
         rowSearchInputEl.value = '';
         renderCollectionNav();
-        loadRows();
+        loadRowsWithWaiting();
       });
     });
   }
@@ -299,7 +354,7 @@
     rowsPagerEl.hidden = false;
 
     if (!state.rows.length) {
-      rowsTableBodyEl.innerHTML = `<tr><td colspan="5" class="text-muted small p-3">No records found for this organization.</td></tr>`;
+      rowsTableBodyEl.innerHTML = `<tr><td colspan="6" class="text-muted small p-3">No records found for this organization.</td></tr>`;
     } else {
       rowsTableBodyEl.innerHTML = state.rows.map((row) => {
         const checked = state.selectedIds.has(row.id) ? ' checked' : '';
@@ -310,7 +365,8 @@
           <td class="font-monospace small">${escapeHtml(row.id)}</td>
           <td>${escapeHtml(row.label || '')}${row.protected ? ' <span class="badge bg-secondary">protected</span>' : ''}</td>
           <td>${escapeHtml(row.status || '')}</td>
-          <td class="pe-3 small text-muted">${escapeHtml(row.updatedAt || '')}</td>
+          <td class="small text-muted">${escapeHtml(row.updatedAt || '')}</td>
+          <td class="pe-3 text-end"><button type="button" class="btn btn-outline-primary btn-sm btn-view-json" data-id="${escapeHtml(row.id)}" title="View JSON"><i class="bi bi-eye me-1"></i>JSON</button></td>
         </tr>`;
       }).join('');
     }
@@ -334,6 +390,11 @@
       });
     });
 
+    rowsTableBodyEl.querySelectorAll('.btn-view-json').forEach((button) => {
+      button.addEventListener('click', () => {
+        openRecordJson(button).catch((error) => showOperationResult('error', error.message));
+      });
+    });
     const selectable = state.rows.filter((row) => row.deletable);
     chkSelectAllRowsEl.checked = selectable.length > 0 && selectable.every((row) => state.selectedIds.has(row.id));
     updateActionButtons();
@@ -393,6 +454,92 @@
     renderRowsTable();
   }
 
+  function getMaintenanceModal(modalEl) {
+    if (!modalEl || !window.bootstrap?.Modal) return null;
+    if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+    return window.bootstrap.Modal.getOrCreateInstance(modalEl);
+  }
+  function getRecordJsonModal() {
+    if (!recordJsonModalEl || !window.bootstrap?.Modal) return null;
+    if (recordJsonModalEl.parentElement !== document.body) document.body.appendChild(recordJsonModalEl);
+    return window.bootstrap.Modal.getOrCreateInstance(recordJsonModalEl);
+  }
+
+  function setRecordJsonState(stateName, message = '') {
+    recordJsonLoadingEl.classList.toggle('d-none', stateName !== 'loading');
+    recordJsonErrorEl.classList.toggle('d-none', stateName !== 'error');
+    recordJsonPreEl.classList.toggle('d-none', stateName !== 'ready');
+    recordJsonErrorEl.textContent = stateName === 'error' ? message : '';
+    btnCopyRecordJsonEl.disabled = stateName !== 'ready';
+  }
+
+  async function openRecordJson(button) {
+    const entityType = state.activeEntityType;
+    const id = String(button?.dataset?.id || '').trim();
+    if (!entityType || !id) return;
+    const modal = getRecordJsonModal();
+    if (!modal) {
+      showOperationResult('error', 'The JSON viewer could not be initialized.');
+      return;
+    }
+
+    const requestSequence = ++state.jsonRequestSequence;
+    button.disabled = true;
+    state.displayedJson = '';
+    recordJsonCollectionEl.textContent = getActiveCatalogEntry()?.label || entityType;
+    recordJsonIdEl.textContent = id;
+    recordJsonCodeEl.textContent = '';
+    recordJsonCopyStatusEl.textContent = '';
+    setRecordJsonState('loading');
+    modal.show();
+
+    try {
+      const endpoint = '/school/data-maintenance/api/' + encodeURIComponent(entityType) + '/rows/' + encodeURIComponent(id);
+      const response = await runWithWaiting({
+        title: 'Loading Record',
+        note: 'Retrieving the selected row data...',
+        operation: 'School Data Maintenance'
+      }, () => fetch(endpoint, { headers: { 'X-AJAX-Request': 'true' } }));
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status !== 'success') throw new Error(payload.message || 'Could not load record JSON.');
+      if (requestSequence !== state.jsonRequestSequence) return;
+      state.displayedJson = JSON.stringify(payload.record, null, 2);
+      recordJsonCollectionEl.textContent = payload.collectionLabel || entityType;
+      recordJsonIdEl.textContent = payload.id || id;
+      recordJsonCodeEl.textContent = state.displayedJson;
+      setRecordJsonState('ready');
+    } catch (error) {
+      if (requestSequence !== state.jsonRequestSequence) return;
+      setRecordJsonState('error', error.message || 'Could not load record JSON.');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function copyDisplayedJson() {
+    if (!state.displayedJson) return;
+    try {
+      await navigator.clipboard.writeText(state.displayedJson);
+      recordJsonCopyStatusEl.textContent = 'JSON copied.';
+    } catch (_error) {
+      recordJsonCopyStatusEl.textContent = 'Copy failed. Select the JSON and copy it manually.';
+    }
+  }
+  function loadRowsWithWaiting() {
+    return runWithWaiting({
+      title: 'Loading Collection',
+      note: 'Retrieving records for the selected collection...',
+      operation: 'School Data Maintenance'
+    }, () => loadRows());
+  }
+
+  function loadSummaryWithWaiting(selectFirst = false) {
+    return runWithWaiting({
+      title: 'Loading Data Maintenance',
+      note: 'Retrieving collection information...',
+      operation: 'School Data Maintenance'
+    }, () => loadSummary(selectFirst));
+  }
   async function openDeleteModal() {
     const ids = [...state.selectedIds];
     if (!ids.length || !state.activeEntityType) return;
@@ -411,6 +558,7 @@
       return;
     }
 
+    if (payload.actionStateId) actionStateId = String(payload.actionStateId);
     const preview = payload.preview || {};
     state.pendingDeleteIds = (preview.items || []).filter((item) => item.status === 'ready').map((item) => item.id);
     deletePreviewSummaryEl.textContent = `${preview.readyCount || 0} ready, ${preview.skippedCount || 0} skipped in ${preview.catalogLabel || state.activeEntityType}.`;
@@ -424,7 +572,12 @@
 
     deleteConfirmInputEl.value = '';
     btnConfirmDeleteEl.disabled = true;
-    deleteModal?.show();
+    deleteModal = getMaintenanceModal(deleteConfirmModalEl);
+    if (!deleteModal) {
+      showOperationResult('error', 'The delete confirmation modal could not be initialized.');
+      return;
+    }
+    deleteModal.show();
   }
 
   async function executeDelete() {
@@ -467,7 +620,12 @@
     clearAllSummaryEl.textContent = `This will clear all ${entry.count || 0} row(s) in ${entry.label} for the active organization.`;
     clearAllConfirmInputEl.value = '';
     btnConfirmClearAllEl.disabled = true;
-    clearAllModal?.show();
+    clearAllModal = getMaintenanceModal(clearAllConfirmModalEl);
+    if (!clearAllModal) {
+      showOperationResult('error', 'The clear-all confirmation modal could not be initialized.');
+      return;
+    }
+    clearAllModal.show();
   }
 
   async function executeClearAll() {
@@ -498,6 +656,11 @@
   }
 
   chkSelectAllRowsEl?.addEventListener('change', () => {
+    rowsTableBodyEl.querySelectorAll('.btn-view-json').forEach((button) => {
+      button.addEventListener('click', () => {
+        openRecordJson(button).catch((error) => showOperationResult('error', error.message));
+      });
+    });
     const selectable = state.rows.filter((row) => row.deletable);
     if (chkSelectAllRowsEl.checked) {
       selectable.forEach((row) => state.selectedIds.add(row.id));
@@ -507,6 +670,9 @@
     renderRowsTable();
   });
 
+  btnCopyRecordJsonEl?.addEventListener('click', () => {
+    copyDisplayedJson();
+  });
   btnDeleteSelectedEl?.addEventListener('click', () => {
     openDeleteModal().catch((error) => showOperationResult('error', error.message));
   });
@@ -532,27 +698,27 @@
   rowSearchInputEl?.addEventListener('change', () => {
     state.search = rowSearchInputEl.value.trim();
     state.page = 1;
-    loadRows().catch((error) => showOperationResult('error', error.message));
+    loadRowsWithWaiting().catch((error) => showOperationResult('error', error.message));
   });
 
   btnPrevPageEl?.addEventListener('click', () => {
     if (state.page <= 1) return;
     state.page -= 1;
-    loadRows().catch((error) => showOperationResult('error', error.message));
+    loadRowsWithWaiting().catch((error) => showOperationResult('error', error.message));
   });
 
   btnNextPageEl?.addEventListener('click', () => {
     const end = state.page * state.limit;
     if (end >= state.total) return;
     state.page += 1;
-    loadRows().catch((error) => showOperationResult('error', error.message));
+    loadRowsWithWaiting().catch((error) => showOperationResult('error', error.message));
   });
 
   btnRefreshSummaryEl?.addEventListener('click', () => {
-    loadSummary(false).catch((error) => showOperationResult('error', error.message));
+    loadSummaryWithWaiting(false).catch((error) => showOperationResult('error', error.message));
   });
 
-  loadSummary(true).catch((error) => {
+  loadSummaryWithWaiting(true).catch((error) => {
     renderCollectionNavError(error.message);
     showOperationResult('error', error.message);
   });

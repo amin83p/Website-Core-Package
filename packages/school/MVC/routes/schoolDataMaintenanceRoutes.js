@@ -29,20 +29,32 @@ router.get('/api/:entityType/rows',
   trackActionState(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE),
   ctrl.listRows);
 
-router.post('/api/:entityType/delete-preview',
+router.get('/api/:entityType/rows/:id',
   requireAccess(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE),
+  ctrl.getRowJson);
+router.post('/api/:entityType/delete-preview',
+  requireAccess(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
   ctrl.previewDelete);
 
 router.post('/api/:entityType/delete',
   requireAccess(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE),
-  trackActionState(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   adminApproval,
   ctrl.deleteSelected);
 
 router.post('/api/:entityType/clear-all',
   requireAccess(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE),
-  trackActionState(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   adminApproval,
   ctrl.clearAll);
 

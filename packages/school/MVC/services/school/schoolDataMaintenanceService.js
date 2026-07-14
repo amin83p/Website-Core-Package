@@ -108,15 +108,11 @@ function normalizeTableRow(entityType, row = {}, catalogEntry = null) {
     }
   });
 
-  if (entry?.protectHeadAccounts && isHeadSchoolAccount(row)) {
+  const classification = classifyRowForDelete(entityType, row, entry);
+  if (!classification.canDelete) {
     output.protected = true;
     output.deletable = false;
-    output.protectionReason = 'Head account is protected.';
-  }
-
-  if (entry?.listOnly) {
-    output.deletable = false;
-    output.protectionReason = 'Delete is not supported for this collection.';
+    output.protectionReason = classification.reason || 'Delete is not supported for this record.';
   }
 
   return output;
@@ -217,6 +213,18 @@ async function getRowForMaintenance(entityType, id, orgId, reqUser) {
   return row;
 }
 
+async function getCollectionRow({ entityType, id, orgId, reqUser } = {}) {
+  const catalogEntry = getCatalogEntry(entityType);
+  if (!catalogEntry) return null;
+  const record = await getRowForMaintenance(entityType, id, orgId, reqUser);
+  if (!record) return null;
+  return {
+    entityType,
+    collectionLabel: catalogEntry.label,
+    id: toPublicId(record.id),
+    record
+  };
+}
 function classifyRowForDelete(entityType, row, catalogEntry = null) {
   const entry = catalogEntry || getCatalogEntry(entityType);
   if (!entry) return { canDelete: false, reason: 'Unknown collection.' };
@@ -225,6 +233,9 @@ function classifyRowForDelete(entityType, row, catalogEntry = null) {
   }
   if (entry.protectHeadAccounts && isHeadSchoolAccount(row)) {
     return { canDelete: false, reason: 'Head account is protected.' };
+  }
+  if (entityType === 'academicLedger' && String(row?.status || '').trim().toLowerCase() !== 'void') {
+    return { canDelete: false, reason: 'Only void academic ledger entries can be permanently deleted. Void this entry first.' };
   }
   return { canDelete: true, reason: '' };
 }
@@ -395,6 +406,7 @@ async function clearCollectionForOrg({ entityType, orgId }) {
 module.exports = {
   buildCollectionSummaries,
   listCollectionRows,
+  getCollectionRow,
   buildDeletePreview,
   deleteSelectedRows,
   clearCollectionForOrg,

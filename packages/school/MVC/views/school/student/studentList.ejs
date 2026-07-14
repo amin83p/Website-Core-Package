@@ -68,6 +68,9 @@
               </button>
               <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
                 <a href="/school/students/edit/<%= item.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <% if (canChangeStudentSystemId) { %>
+                <button type="button" class="btn btn-outline-warning btn-sm change-system-id-btn" data-id="<%= item.id %>" data-name="<%= item.name || ((item.firstName || '') + ' ' + (item.lastName || '')).trim() %>"><i class="bi bi-arrow-repeat me-2"></i>Change System Record ID</button>
+                <% } %>
                 <button class="btn btn-outline-secondary btn-sm archive-btn" data-id="<%= item.id %>"><i class="bi bi-archive me-2"></i>Archive</button>
                 <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>"><i class="bi bi-trash me-2"></i>Delete</button>
               </div>
@@ -79,6 +82,29 @@
   </table>
 </div>
 
+<div class="modal fade" id="changeStudentSystemIdModal" tabindex="-1" aria-labelledby="changeStudentSystemIdModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="changeStudentSystemIdModalLabel"><i class="bi bi-arrow-repeat me-2"></i>Change Student System Record ID</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning"><strong>High-impact migration:</strong> this updates the student key in all linked School records. Custom Student ID is not changed.</div>
+        <div id="changeSystemIdAlert" class="alert alert-danger d-none"></div>
+        <div class="mb-3"><div class="small text-muted">Student</div><div class="fw-bold" id="changeSystemIdStudentName"></div></div>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label fw-bold">Current System Record ID</label><input id="changeSystemIdCurrent" class="form-control font-monospace" readonly></div>
+          <div class="col-md-6"><label class="form-label fw-bold">Replacement System Record ID</label><div class="input-group"><input id="changeSystemIdNew" class="form-control font-monospace" maxlength="40" pattern="[A-Za-z0-9_-]+"><button type="button" class="btn btn-outline-primary" id="changeSystemIdGenerate">Generate ID</button></div></div>
+        </div>
+        <div class="mt-4"><h6 class="fw-bold">Affected records</h6><div id="changeSystemIdImpact" class="text-muted">Loading impact preview...</div></div>
+        <div class="mt-3"><label class="form-label fw-bold">Confirm replacement ID</label><input id="changeSystemIdConfirmation" class="form-control font-monospace" placeholder="Type the replacement ID exactly"><div class="form-text">This must exactly match the replacement ID.</div></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-warning" id="changeSystemIdSubmit">Change System Record ID</button></div>
+    </div>
+  </div>
+</div>
+
 <span id="urlRef" data-id="school/students" hidden></span>
 <%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/students' }) %>
 <%- include('partials/tablePages-end') %>
@@ -88,3 +114,92 @@
   syncDenormalizedButtonId: 'btnSyncStudentDenormalizedNames',
   actionStateId
 }) %>
+
+<script>
+function initializeChangeStudentSystemIdModal() {
+  const modalEl = document.getElementById('changeStudentSystemIdModal');
+  if (!modalEl) return;
+  // Keep the modal outside page containers that establish their own stacking
+  // context, otherwise Bootstrap's body-level backdrop can cover the dialog.
+  if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+  const modalApi = window.bootstrap && window.bootstrap.Modal;
+  if (!modalApi) {
+    console.error('[Students] Bootstrap Modal is unavailable; the Change System Record ID modal cannot be initialized.');
+    return;
+  }
+  const modal = modalApi.getOrCreateInstance(modalEl);
+  const alertEl = document.getElementById('changeSystemIdAlert');
+  const currentEl = document.getElementById('changeSystemIdCurrent');
+  const newEl = document.getElementById('changeSystemIdNew');
+  const confirmationEl = document.getElementById('changeSystemIdConfirmation');
+  const impactEl = document.getElementById('changeSystemIdImpact');
+  const submitBtn = document.getElementById('changeSystemIdSubmit');
+  let actionStateId = <%- JSON.stringify(actionStateId || '').replace(/</g, '\u003c') %>;
+
+  function showError(message) {
+    alertEl.textContent = String(message || 'Unable to change the System Record ID.');
+    alertEl.classList.remove('d-none');
+  }
+  function clearError() { alertEl.classList.add('d-none'); alertEl.textContent = ''; }
+  async function readJson(response) {
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.status === 'error') throw new Error(result.message || 'Request failed.');
+    return result;
+  }
+  function renderImpact(data) {
+    const rows = Array.isArray(data?.collections) ? data.collections.filter((row) => Number(row.count) > 0) : [];
+    impactEl.innerHTML = rows.length
+      ? '<div class="list-group">' + rows.map((row) => '<div class="list-group-item d-flex justify-content-between"><span>' + String(row.label || row.key) + '</span><span class="badge bg-primary">' + Number(row.count || 0) + '</span></div>').join('') + '</div><div class="mt-2 fw-bold">Total references: ' + Number(data.totalUpdates || 0) + '</div>'
+      : '<div class="text-muted">Only the student record will be updated.</div>';
+  }
+  document.querySelectorAll('.change-system-id-btn').forEach((button) => {
+    button.addEventListener('click', async () => {
+      clearError();
+      currentEl.value = button.dataset.id || '';
+      newEl.value = '';
+      confirmationEl.value = '';
+      document.getElementById('changeSystemIdStudentName').textContent = button.dataset.name || button.dataset.id || 'Student';
+      impactEl.textContent = 'Loading impact preview...';
+      submitBtn.disabled = true;
+      modal.show();
+      try {
+        const result = await readJson(await fetch('/school/students/' + encodeURIComponent(currentEl.value) + '/system-id-impact', { headers: { Accept: 'application/json', 'X-Ajax-Request': 'true' } }));
+        if (result.actionStateId) actionStateId = result.actionStateId;
+        renderImpact(result.data);
+        submitBtn.disabled = false;
+      } catch (error) { showError(error.message); impactEl.textContent = 'Impact preview unavailable.'; }
+    });
+  });
+  document.getElementById('changeSystemIdGenerate').addEventListener('click', async () => {
+    clearError();
+    try {
+      const result = await readJson(await fetch('/school/students/system-id/generate', { headers: { Accept: 'application/json', 'X-Ajax-Request': 'true' } }));
+      if (result.actionStateId) actionStateId = result.actionStateId;
+      newEl.value = result.data?.id || '';
+      confirmationEl.value = '';
+      newEl.focus();
+    } catch (error) { showError(error.message); }
+  });
+  submitBtn.addEventListener('click', async () => {
+    clearError();
+    const newId = newEl.value.trim();
+    const confirmationId = confirmationEl.value.trim();
+    if (!newId || !/^[A-Za-z0-9_-]{1,40}$/.test(newId)) return showError('Enter a valid 1-40 character System Record ID using letters, numbers, underscores, or hyphens.');
+    if (confirmationId !== newId) return showError('Confirmation must exactly match the replacement System Record ID.');
+    submitBtn.disabled = true;
+    try {
+      const result = await readJson(await fetch('/school/students/' + encodeURIComponent(currentEl.value) + '/change-system-id', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Ajax-Request': 'true' },
+        body: JSON.stringify({ newId, confirmationId, actionStateId })
+      }));
+      window.location.href = result.redirectTo || result.data?.redirectTo || '/school/students';
+    } catch (error) { showError(error.message); submitBtn.disabled = false; }
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeChangeStudentSystemIdModal, { once: true });
+} else {
+  initializeChangeStudentSystemIdModal();
+}
+</script>

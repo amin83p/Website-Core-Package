@@ -46,7 +46,9 @@ test('Custom Student ID remains separate from the immutable student record id', 
   assert.match(modelSource, /Custom Student ID is already assigned within this organization/);
   assert.doesNotMatch(controllerSource, /payload\.id = req\.body\.studentId/);
   assert.match(controllerSource, /customStudentId: String\(req\.body\.customStudentId \|\| ''\)\.trim\(\)/);
-  assert.match(formSource, /name="customStudentId"[^>]*value="<%= s\.customStudentId \|\| \(isEdit \? s\.id : ''\) %>"/);
+  assert.match(formSource, /Object\.prototype\.hasOwnProperty\.call\(s, 'customStudentId'\)/);
+  assert.match(formSource, /hasCustomStudentId \? \(s\.customStudentId \|\| ''\) : \(isEdit \? s\.id : ''\)/);
+  assert.match(formSource, /name="customStudentId"[^>]*value="<%= customStudentIdValue %>"/);
   assert.match(formSource, /System Record ID/);
   assert.match(listSource, /item\.customStudentId \|\| item\.id/);
 });

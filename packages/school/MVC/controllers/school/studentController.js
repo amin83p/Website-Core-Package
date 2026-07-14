@@ -31,11 +31,26 @@ const {
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolLinkedPersonProfileService = require('../../services/school/schoolLinkedPersonProfileService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
+const studentSystemIdMigrationService = require('../../services/school/studentSystemIdMigrationService');
+const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { ACADEMIC_STATUSES } = require('../../models/school/studentModel');
 const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
 
 function routeAccess(req) {
     return dataService.buildRouteAccessContext(req);
+}
+
+async function canChangeStudentSystemIdForUser(reqUser) {
+    return Boolean(await adminChekersService.isAdminForRequestAsync(
+        reqUser,
+        SECTIONS.SCHOOL_STUDENTS,
+        OPERATIONS.UPDATE,
+        {
+            orgId: reqUser?.activeOrgId,
+            section: { id: SECTIONS.SCHOOL_STUDENTS, category: 'SCHOOL' }
+        }
+    ));
 }
 
 function getActiveOrgIdOrThrow(reqUser) {
@@ -531,6 +546,7 @@ exports.listStudents = async (req, res) => {
         const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
         if (query.q === searchDefaultKeyword) query.q = '';
         const canCreateStudents = await canCreateOrgScopedItem(req.user, { scopeLabel: 'students' });
+        const canChangeStudentSystemId = await canChangeStudentSystemIdForUser(req.user);
         const searchTerm = String(query.q || '').trim().toLowerCase();
         const fetchQuery = { ...query };
         delete fetchQuery.q;
@@ -594,6 +610,7 @@ exports.listStudents = async (req, res) => {
             tableName: 'Students_Directory',
             newUrl: 'school/students',
             newLabel: canCreateStudents ? 'Admit Student' : null,
+            canChangeStudentSystemId,
             data,
             searchableFields,
             includeModal: true,
@@ -1141,6 +1158,64 @@ exports.deleteAttachment = async (req, res) => {
         if (guardKey) idempotencyGuardService.failGuard(guardKey);
         if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
         return res.status(400).send(error.message);
+    }
+};
+
+async function assertCanChangeStudentSystemId(req) {
+    const allowed = await canChangeStudentSystemIdForUser(req.user);
+    if (allowed) return;
+    const error = new Error('Only administrators can change a student System Record ID.');
+    error.status = 403;
+    throw error;
+}
+
+exports.previewStudentSystemIdChange = async (req, res) => {
+    try {
+        await assertCanChangeStudentSystemId(req);
+        const orgId = getActiveOrgIdOrThrow(req.user);
+        const preview = await studentSystemIdMigrationService.previewStudentSystemId(req.params.id, orgId);
+        return res.json({ status: 'success', data: preview, actionStateId: req.actionStateId || '' });
+    } catch (error) {
+        return res.status(error.status || 400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.generateStudentSystemId = async (req, res) => {
+    try {
+        await assertCanChangeStudentSystemId(req);
+        const id = await studentSystemIdMigrationService.generateStudentSystemId();
+        return res.json({ status: 'success', data: { id }, actionStateId: req.actionStateId || '' });
+    } catch (error) {
+        return res.status(error.status || 400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.changeStudentSystemId = async (req, res) => {
+    let guardKey = '';
+    try {
+        await assertCanChangeStudentSystemId(req);
+        const orgId = getActiveOrgIdOrThrow(req.user);
+        const oldId = toPublicId(req.params.id);
+        const newId = String(req.body?.newId || '').trim();
+        if (String(req.body?.confirmationId || '').trim() !== newId) {
+            throw new Error('Confirmation must exactly match the replacement System Record ID.');
+        }
+        guardKey = idempotencyGuardService.createGuardKey(['student_system_id_change', orgId, oldId, newId]);
+        const guardResult = idempotencyGuardService.beginGuard({ key: guardKey, runningTtlMs: 180000, replayTtlMs: 20000 });
+        if (sendGuardedResponse(req, res, guardResult, 'Student System Record ID migration is already in progress.')) return;
+        const result = await studentSystemIdMigrationService.migrateStudentSystemId({
+            oldId,
+            newId,
+            orgId,
+            actor: toPublicId(req.user?.id) || String(req.user?.username || 'system')
+        });
+        const payload = { status: 'success', message: 'Student System Record ID updated successfully.', data: result, redirectTo: result.redirectTo };
+        idempotencyGuardService.completeGuard(guardKey, payload);
+        return res.json(payload);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        console.error('[STUDENT_SYSTEM_ID_CHANGE]', error);
+        return res.status(error.status || 400).json({ status: 'error', message: error.message });
     }
 };
 

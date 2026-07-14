@@ -1,6 +1,8 @@
 <%
   const s = student || {};
   const isEdit = !!s.id;
+  const hasCustomStudentId = Object.prototype.hasOwnProperty.call(s, 'customStudentId');
+  const customStudentIdValue = hasCustomStudentId ? (s.customStudentId || '') : (isEdit ? s.id : '');
   const routeId = (s.id || s.personId || '');
 
   // actionStateId is injected by actionState middleware/controller (anti-tamper token)
@@ -198,7 +200,7 @@
                <div class="row">
                   <div class="col-md-4 mb-3">
                      <label class="form-label fw-bold">Custom Student ID</label>
-                     <input type="text" name="customStudentId" class="form-control size-md font-monospace" maxlength="40" placeholder="Optional organization-specific ID" value="<%= s.customStudentId || (isEdit ? s.id : '') %>">
+                     <input type="text" name="customStudentId" class="form-control size-md font-monospace" maxlength="40" placeholder="Optional organization-specific ID" value="<%= customStudentIdValue %>">
                      <div class="form-text">Editable identifier used for student-facing display and search.</div>
                   </div>
                   <% if (isEdit) { %>

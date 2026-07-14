@@ -76,6 +76,7 @@ exports.showPage = async (req, res) => {
 
     res.render('school/dataMaintenance/index', {
       title: 'School Data Maintenance',
+      includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId,
       activeOrgId: orgMeta.activeOrgId,
@@ -121,6 +122,23 @@ exports.listRows = async (req, res) => {
   }
 };
 
+exports.getRowJson = async (req, res) => {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const payload = await schoolDataMaintenanceService.getCollectionRow({
+      entityType: String(req.params.entityType || '').trim(),
+      id: String(req.params.id || '').trim(),
+      orgId: activeOrgId,
+      reqUser: req.user
+    });
+    if (!payload) {
+      return res.status(404).json({ status: 'error', message: 'Record not found in the active organization.' });
+    }
+    return res.json({ status: 'success', ...payload });
+  } catch (_error) {
+    return res.status(404).json({ status: 'error', message: 'Record not found in the active organization.' });
+  }
+};
 exports.previewDelete = async (req, res) => {
   try {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
@@ -132,7 +150,7 @@ exports.previewDelete = async (req, res) => {
       ids,
       reqUser: req.user
     });
-    return res.json({ status: 'success', preview });
+    return res.json({ status: 'success', preview, actionStateId: req.actionStateId || '' });
   } catch (error) {
     const message = String(error?.message || 'Could not build delete preview.');
     return res.status(400).json({ status: 'error', message });

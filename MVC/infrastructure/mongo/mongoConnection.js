@@ -104,6 +104,21 @@ function getMongoCollection(name) {
   return mongoDb.collection(collectionName);
 }
 
+async function withMongoTransaction(operation, options = {}) {
+  if (typeof operation !== 'function') throw new Error('Mongo transaction operation must be a function.');
+  if (!mongoClient) throw new Error('MongoDB is not connected yet. Call connectMongo() first.');
+  const session = mongoClient.startSession();
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      result = await operation(session);
+    }, options.transactionOptions || {});
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
 async function pingMongo() {
   if (!mongoDb) return false;
   await mongoDb.command({ ping: 1 });
@@ -127,5 +142,6 @@ module.exports = {
   pingMongo,
   getMongoDbOrNull,
   getMongoCollection,
+  withMongoTransaction,
   resolveMongoConnectionConfig
 };
