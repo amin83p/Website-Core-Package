@@ -60,13 +60,15 @@ test('sanitizeStudentInput accepts valid CLB history and sorts newest first', ()
         id: 'clb_old',
         recordedAt: '2026-01-01',
         goal: { listening: '5', speaking: '5', reading: '4', writing: '4' },
-        current: { listening: '4+', speaking: '4+', reading: '3+', writing: '3+' }
+        current: { listening: '4+', speaking: '4+', reading: '3+', writing: '3+' },
+        result: { listening: ' 4 ', speaking: '4', reading: '3', writing: '3' }
       },
       {
         id: 'clb_new',
         recordedAt: '2026-07-08',
         goal: { listening: '7-8', speaking: '7-8', reading: '6', writing: '6' },
-        current: { listening: '7+', speaking: '7+', reading: '6-', writing: '5+' }
+        current: { listening: '7+', speaking: '7+', reading: '6-', writing: '5+' },
+        result: { listening: '7', speaking: '7', reading: '6', writing: '5' }
       }
     ]
   }));
@@ -75,6 +77,26 @@ test('sanitizeStudentInput accepts valid CLB history and sorts newest first', ()
   assert.equal(out.clbLevelHistory[0].id, 'clb_new');
   assert.equal(out.clbLevelHistory[0].goal.listening, '7-8');
   assert.equal(out.clbLevelHistory[0].current.writing, '5+');
+  assert.equal(out.clbLevelHistory[0].result.reading, '6');
+  assert.equal(out.clbLevelHistory[1].result.listening, '4');
+});
+
+test('sanitizeStudentInput keeps legacy CLB entries without results backward compatible', () => {
+  const out = studentModel.sanitizeStudentInput(baseStudentInput({
+    clbLevelHistory: [{
+      id: 'legacy',
+      recordedAt: '2025-12-01',
+      goal: { listening: '5' },
+      current: { listening: '4' }
+    }]
+  }));
+
+  assert.deepEqual(out.clbLevelHistory[0].result, {
+    listening: '',
+    speaking: '',
+    reading: '',
+    writing: ''
+  });
 });
 
 test('sanitizeStudentInput rejects invalid CLB recordedAt', () => {
@@ -91,15 +113,16 @@ test('sanitizeStudentInput defaults missing CLB history to empty array', () => {
 test('getLatestClbLevelEntry returns newest dated entry', () => {
   const latest = reportService.getLatestClbLevelEntry({
     clbLevelHistory: [
-      { id: 'a', recordedAt: '2026-01-01', goal: { listening: '5' }, current: { listening: '4+' } },
-      { id: 'b', recordedAt: '2026-07-08', goal: { listening: '7-8' }, current: { listening: '7+' } }
+      { id: 'a', recordedAt: '2026-01-01', goal: { listening: '5' }, current: { listening: '4+' }, result: { listening: '4' } },
+      { id: 'b', recordedAt: '2026-07-08', goal: { listening: '7-8' }, current: { listening: '7+' }, result: { listening: '7' } }
     ]
   });
   assert.equal(latest.id, 'b');
   assert.equal(latest.goal.listening, '7-8');
+  assert.equal(latest.result.listening, '7');
 });
 
-test('buildPrefillSnapshot exposes latest CLB goal and current keys', async () => {
+test('buildPrefillSnapshot exposes latest CLB goal, current, result, and date keys', async () => {
   const assignment = {
     id: 'ASN-CLB',
     orgId: '900000',
@@ -144,13 +167,21 @@ test('buildPrefillSnapshot exposes latest CLB goal and current keys', async () =
             id: 'old',
             recordedAt: '2026-01-01',
             goal: { listening: '5', speaking: '5', reading: '5', writing: '5' },
-            current: { listening: '4+', speaking: '4+', reading: '4+', writing: '4+' }
+            current: { listening: '4+', speaking: '4+', reading: '4+', writing: '4+' },
+            result: { listening: '4', speaking: '4', reading: '4', writing: '4' }
           },
           {
             id: 'new',
             recordedAt: '2026-07-08',
             goal: { listening: '7-8', speaking: '7-8', reading: '6', writing: '6' },
-            current: { listening: '7+', speaking: '7+', reading: '6-', writing: '5+' }
+            current: { listening: '7+', speaking: '7+', reading: '6-', writing: '5+' },
+            result: { listening: '7', speaking: '7', reading: '6', writing: '5' }
+          },
+          {
+            id: 'legacy',
+            recordedAt: '2025-09-01',
+            goal: { listening: '4' },
+            current: { listening: '3+' }
           }
         ]
       }];
@@ -184,6 +215,59 @@ test('buildPrefillSnapshot exposes latest CLB goal and current keys', async () =
     assert.equal(snapshot.CLB_current_speaking, '7+');
     assert.equal(snapshot.CLB_current_reading, '6-');
     assert.equal(snapshot.CLB_current_writing, '5+');
+    assert.equal(snapshot.CLB_latest_recorded_at, '2026-07-08');
+    assert.equal(snapshot.CLB_result_listening, '7');
+    assert.equal(snapshot.CLB_result_speaking, '7');
+    assert.equal(snapshot.CLB_result_reading, '6');
+    assert.equal(snapshot.CLB_result_writing, '5');
+
+    const collections = await reportService.buildReportDocxCollections({
+      instance: {
+        classId: 'CLASS-CLB',
+        sessionId: 'SES-CLB',
+        sessionDate: '2026-07-08',
+        studentId: 'STUDENT-CLB'
+      },
+      assignment: { ...assignment, reportScope: 'each_student' },
+      reqUser: { id: 'USER-1', activeOrgId: '900000' }
+    });
+    assert.equal(collections.student_clb_entries.length, 3);
+    assert.equal(collections.student_clb_entries[0].student_full_name, 'Sam Student');
+    assert.equal(collections.student_clb_entries[0].clb_entry_id, 'new');
+    assert.equal(collections.student_clb_entries[0].clb_entry_no, 1);
+    assert.equal(collections.student_clb_entries[0].clb_is_latest, true);
+    assert.deepEqual({
+      goalListening: collections.student_clb_entries[0].clb_goal_listening,
+      goalSpeaking: collections.student_clb_entries[0].clb_goal_speaking,
+      goalReading: collections.student_clb_entries[0].clb_goal_reading,
+      goalWriting: collections.student_clb_entries[0].clb_goal_writing,
+      currentListening: collections.student_clb_entries[0].clb_current_listening,
+      currentSpeaking: collections.student_clb_entries[0].clb_current_speaking,
+      currentReading: collections.student_clb_entries[0].clb_current_reading,
+      currentWriting: collections.student_clb_entries[0].clb_current_writing,
+      resultListening: collections.student_clb_entries[0].clb_result_listening,
+      resultSpeaking: collections.student_clb_entries[0].clb_result_speaking,
+      resultReading: collections.student_clb_entries[0].clb_result_reading,
+      resultWriting: collections.student_clb_entries[0].clb_result_writing
+    }, {
+      goalListening: '7-8',
+      goalSpeaking: '7-8',
+      goalReading: '6',
+      goalWriting: '6',
+      currentListening: '7+',
+      currentSpeaking: '7+',
+      currentReading: '6-',
+      currentWriting: '5+',
+      resultListening: '7',
+      resultSpeaking: '7',
+      resultReading: '6',
+      resultWriting: '5'
+    });
+    assert.equal(collections.student_clb_entries[1].clb_entry_id, 'old');
+    assert.equal(collections.student_clb_entries[1].clb_entry_no, 2);
+    assert.equal(collections.student_clb_entries[1].clb_is_latest, false);
+    assert.equal(collections.student_clb_entries[2].clb_entry_id, 'legacy');
+    assert.equal(collections.student_clb_entries[2].clb_result_listening, '');
   } finally {
     schoolDataService.getDataById = originals.getDataById;
     schoolDataService.getClassSessions = originals.getClassSessions;
@@ -203,10 +287,19 @@ test('student controller parses clbLevelHistory on save', () => {
 
 test('student form includes CLB history UI and hidden JSON field', () => {
   const source = read('packages/school/MVC/views/school/student/studentForm.ejs');
+  const reportTemplateSource = read('packages/school/MVC/views/school/report/templateForm.ejs');
   assert.match(source, /hid_clbLevelHistory/);
   assert.match(source, /__INIT_CLB_LEVEL_HISTORY__/);
   assert.match(source, /btnAddClbEntry/);
   assert.match(source, /renderClbHistoryTable/);
   assert.match(source, /syncClbHiddenField/);
   assert.match(source, /Current CLB Level/);
+  assert.match(source, /CLB Result/);
+  assert.match(source, /inp_clb_result_listening/);
+  assert.match(source, /btn-edit-clb-entry/);
+  assert.match(source, /showClbEditorForEdit/);
+  assert.match(source, /editingClbEntryId/);
+  assert.match(source, /choice === true .*=== 'delete'/);
+  assert.doesNotMatch(source, /text: 'Delete'.*onClick/);
+  assert.match(reportTemplateSource, /student_clb_entries/);
 });

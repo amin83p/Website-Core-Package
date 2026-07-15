@@ -258,7 +258,7 @@
                    </button>
                  </div>
                  <div class="card-body">
-                   <p class="small text-muted mb-3">Track CLB goals and current levels over time. Each entry includes a goal row and a current-level row across Listening, Speaking, Reading, and Writing.</p>
+                   <p class="small text-muted mb-3">Track CLB goals, current levels, and results over time. Each dated entry keeps all three rows together across Listening, Speaking, Reading, and Writing.</p>
                    <div id="clbHistoryEmpty" class="text-muted small text-center py-3 border rounded bg-light">No CLB entries yet. Click <strong>Add CLB Entry</strong> to record the first assessment.</div>
                    <div id="clbHistoryWrap" class="d-none">
                      <div class="table-responsive">
@@ -315,6 +315,13 @@
                              <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_current_speaking" placeholder="e.g. 7+" maxlength="20"></td>
                              <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_current_reading" placeholder="e.g. 6-" maxlength="20"></td>
                              <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_current_writing" placeholder="e.g. 5+" maxlength="20"></td>
+                           </tr>
+                           <tr>
+                             <td class="fw-bold small">CLB Result</td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_result_listening" placeholder="e.g. 7" maxlength="20"></td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_result_speaking" placeholder="e.g. 7" maxlength="20"></td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_result_reading" placeholder="e.g. 6" maxlength="20"></td>
+                             <td><input type="text" class="form-control form-control-sm clb-editor-input" id="inp_clb_result_writing" placeholder="e.g. 6" maxlength="20"></td>
                            </tr>
                          </tbody>
                        </table>
@@ -505,7 +512,12 @@
   const studentRouteId = window.__STUDENT_ROUTE_ID__ || '';
   let existingAttachments = Array.isArray(window.__INIT_STUDENT_ATTACHMENTS__) ? window.__INIT_STUDENT_ATTACHMENTS__ : [];
   const CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
-  let clbLevelHistory = Array.isArray(window.__INIT_CLB_LEVEL_HISTORY__) ? window.__INIT_CLB_LEVEL_HISTORY__ : [];
+  const CLB_VALUE_GROUPS = ['goal', 'current', 'result'];
+  let clbLevelHistory = (Array.isArray(window.__INIT_CLB_LEVEL_HISTORY__) ? window.__INIT_CLB_LEVEL_HISTORY__ : [])
+    .map((entry, index) => ({
+      ...(entry && typeof entry === 'object' ? entry : {}),
+      id: String(entry?.id || '').trim() || createClbEntryId(index)
+    }));
   const hidClbLevelHistory = document.getElementById('hid_clbLevelHistory');
   const clbHistoryEmpty = document.getElementById('clbHistoryEmpty');
   const clbHistoryWrap = document.getElementById('clbHistoryWrap');
@@ -514,7 +526,9 @@
   const btnAddClbEntry = document.getElementById('btnAddClbEntry');
   const btnCancelClbEntry = document.getElementById('btnCancelClbEntry');
   const btnSaveClbEntry = document.getElementById('btnSaveClbEntry');
+  const clbEntryEditorTitle = clbEntryEditor?.querySelector('h6') || null;
   const inpClbRecordedAt = document.getElementById('inp_clbRecordedAt');
+  let editingClbEntryId = '';
   let newFileObjectUrls = [];
   let currentWizardStep = 0;
   let newPersonEmails = [{ type: 'primary', email: '', isPrimary: true }];
@@ -913,6 +927,14 @@
     hidAttachments.value = JSON.stringify(existingAttachments || []);
   }
 
+  function createClbEntryId(index = 0) {
+    return `clb_${Date.now()}_${Number(index) || 0}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function getClbEditorInput(group, skill) {
+    return document.getElementById(`inp_clb_${group}_${skill}`);
+  }
+
   function sortClbHistory(entries) {
     return [...(Array.isArray(entries) ? entries : [])].sort((a, b) => {
       const dateCmp = String(b?.recordedAt || '').localeCompare(String(a?.recordedAt || ''));
@@ -952,22 +974,36 @@
       const entryId = String(entry?.id || '');
       const goalCells = CLB_SKILLS.map((skill) => `<td>${renderClbCell(entry?.goal?.[skill])}</td>`).join('');
       const currentCells = CLB_SKILLS.map((skill) => `<td>${renderClbCell(entry?.current?.[skill])}</td>`).join('');
+      const resultCells = CLB_SKILLS.map((skill) => `<td>${renderClbCell(entry?.result?.[skill])}</td>`).join('');
       clbHistoryTbody.innerHTML += `
         <tr>
-          <td rowspan="2" class="align-middle fw-semibold">${safeHtml(entry?.recordedAt || '')}</td>
+          <td rowspan="3" class="align-middle fw-semibold">${safeHtml(entry?.recordedAt || '')}</td>
           <td class="fw-bold small">CLB Goal</td>
           ${goalCells}
-          <td rowspan="2" class="text-end align-middle">
-            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-clb-entry" data-entry-id="${safeHtml(entryId)}" title="Remove entry">
-              <i class="bi bi-trash"></i>
-            </button>
+          <td rowspan="3" class="text-end align-middle">
+            <div class="d-flex flex-column gap-1 align-items-end">
+              <button type="button" class="btn btn-sm btn-outline-primary btn-edit-clb-entry" data-entry-id="${safeHtml(entryId)}" title="Edit entry">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-danger btn-remove-clb-entry" data-entry-id="${safeHtml(entryId)}" title="Remove entry">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
           </td>
         </tr>
         <tr>
           <td class="fw-bold small">Current CLB Level</td>
           ${currentCells}
         </tr>
+        <tr>
+          <td class="fw-bold small">CLB Result</td>
+          ${resultCells}
+        </tr>
       `;
+    });
+
+    clbHistoryTbody.querySelectorAll('.btn-edit-clb-entry').forEach((btn) => {
+      btn.addEventListener('click', () => showClbEditorForEdit(btn.getAttribute('data-entry-id') || ''));
     });
 
     clbHistoryTbody.querySelectorAll('.btn-remove-clb-entry').forEach((btn) => {
@@ -976,6 +1012,7 @@
         const confirmed = await confirmDelete('Remove this CLB entry from the student profile?');
         if (!confirmed) return;
         clbLevelHistory = clbLevelHistory.filter((row) => String(row?.id || '') !== entryId);
+        if (editingClbEntryId === entryId) hideClbEditor();
         renderClbHistoryTable();
       });
     });
@@ -985,45 +1022,82 @@
 
   function clearClbEditor() {
     if (inpClbRecordedAt) inpClbRecordedAt.value = new Date().toISOString().slice(0, 10);
-    CLB_SKILLS.forEach((skill) => {
-      const goalInput = document.getElementById(`inp_clb_goal_${skill}`);
-      const currentInput = document.getElementById(`inp_clb_current_${skill}`);
-      if (goalInput) goalInput.value = '';
-      if (currentInput) currentInput.value = '';
+    CLB_VALUE_GROUPS.forEach((group) => {
+      CLB_SKILLS.forEach((skill) => {
+        const input = getClbEditorInput(group, skill);
+        if (input) input.value = '';
+      });
     });
   }
 
+  function resetClbEditorMode() {
+    editingClbEntryId = '';
+    if (clbEntryEditorTitle) clbEntryEditorTitle.textContent = 'New CLB Entry';
+    if (btnSaveClbEntry) btnSaveClbEntry.textContent = 'Save CLB Entry';
+  }
+
   function showClbEditor() {
+    resetClbEditorMode();
     clearClbEditor();
+    if (clbEntryEditor) clbEntryEditor.classList.remove('d-none');
+  }
+
+  function showClbEditorForEdit(entryId) {
+    const entry = clbLevelHistory.find((row) => String(row?.id || '') === String(entryId || ''));
+    if (!entry) return;
+    clearClbEditor();
+    editingClbEntryId = String(entry.id || '');
+    if (inpClbRecordedAt) inpClbRecordedAt.value = String(entry.recordedAt || '');
+    CLB_VALUE_GROUPS.forEach((group) => {
+      CLB_SKILLS.forEach((skill) => {
+        const input = getClbEditorInput(group, skill);
+        if (input) input.value = String(entry?.[group]?.[skill] || '');
+      });
+    });
+    if (clbEntryEditorTitle) clbEntryEditorTitle.textContent = 'Edit CLB Entry';
+    if (btnSaveClbEntry) btnSaveClbEntry.textContent = 'Update CLB Entry';
     if (clbEntryEditor) clbEntryEditor.classList.remove('d-none');
   }
 
   function hideClbEditor() {
     if (clbEntryEditor) clbEntryEditor.classList.add('d-none');
+    resetClbEditorMode();
+    clearClbEditor();
   }
 
   function collectClbEditorEntry() {
     const recordedAt = String(inpClbRecordedAt?.value || '').trim();
     if (!recordedAt) throw new Error('Recorded date is required for a CLB entry.');
-    const goal = {};
-    const current = {};
-    CLB_SKILLS.forEach((skill) => {
-      goal[skill] = String(document.getElementById(`inp_clb_goal_${skill}`)?.value || '').trim();
-      current[skill] = String(document.getElementById(`inp_clb_current_${skill}`)?.value || '').trim();
+    const values = { goal: {}, current: {}, result: {} };
+    CLB_VALUE_GROUPS.forEach((group) => {
+      CLB_SKILLS.forEach((skill) => {
+        values[group][skill] = String(getClbEditorInput(group, skill)?.value || '').trim();
+      });
     });
-    const hasAnyValue = CLB_SKILLS.some((skill) => goal[skill] || current[skill]);
-    if (!hasAnyValue) throw new Error('Enter at least one CLB goal or current level value.');
+    const labels = { goal: 'CLB Goal', current: 'Current CLB Level', result: 'CLB Result' };
+    CLB_VALUE_GROUPS.forEach((group) => {
+      if (!CLB_SKILLS.some((skill) => values[group][skill])) {
+        throw new Error(`Enter at least one value for ${labels[group]}.`);
+      }
+    });
     return {
-      id: `clb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      id: editingClbEntryId || createClbEntryId(clbLevelHistory.length),
       recordedAt,
-      goal,
-      current
+      goal: values.goal,
+      current: values.current,
+      result: values.result
     };
   }
 
   function saveClbEntryFromEditor() {
     const entry = collectClbEditorEntry();
-    clbLevelHistory.push(entry);
+    if (editingClbEntryId) {
+      const index = clbLevelHistory.findIndex((row) => String(row?.id || '') === editingClbEntryId);
+      if (index < 0) throw new Error('The CLB entry being edited is no longer available.');
+      clbLevelHistory[index] = entry;
+    } else {
+      clbLevelHistory.push(entry);
+    }
     renderClbHistoryTable();
     hideClbEditor();
   }
@@ -1048,32 +1122,27 @@
     renderClbHistoryTable();
   }
 
-  // Robust confirm helper that works with showMessageModal if present.
-  // We do NOT rely on the modal's return value (different implementations return different shapes).
+  // The shared modal resolves with the clicked button text; other deployments may return button values.
   async function confirmDelete(htmlMessage) {
     if (typeof showMessageModal !== 'function') {
-      // fall back to native confirm (plain text)
       const plain = String(htmlMessage || '').replace(/<[^>]*>/g, '');
       return confirm(plain);
     }
 
-    return await new Promise((resolve) => {
-      let resolved = false;
-      try {
-        showMessageModal({
-          title: 'Confirm',
-          icon: 'warning',
-          message: htmlMessage,
-          buttons: [
-            { text: 'Cancel', class: 'btn-secondary', onClick: () => { if (!resolved) { resolved = true; resolve(false); } } },
-            { text: 'Delete', class: 'btn-danger', onClick: () => { if (!resolved) { resolved = true; resolve(true); } } }
-          ]
-        });
-      } catch (e) {
-        // As a last resort, don't block the UI.
-        resolve(false);
-      }
-    });
+    try {
+      const choice = await showMessageModal({
+        title: 'Confirm',
+        icon: 'warning',
+        message: htmlMessage,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary', value: false },
+          { text: 'Delete', class: 'btn-danger', value: true }
+        ]
+      });
+      return choice === true || String(choice || '').trim().toLowerCase() === 'delete';
+    } catch (_) {
+      return false;
+    }
   }
 
   async function deleteAttachment(attKey) {

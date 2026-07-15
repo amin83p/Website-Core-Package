@@ -107,7 +107,8 @@ function cleanClbLevelHistory(value) {
             id,
             recordedAt,
             goal: cleanClbSkillLevels(entry.goal),
-            current: cleanClbSkillLevels(entry.current)
+            current: cleanClbSkillLevels(entry.current),
+            result: cleanClbSkillLevels(entry.result)
         };
     });
 

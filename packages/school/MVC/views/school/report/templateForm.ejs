@@ -383,6 +383,16 @@
               </button>
             </div>
           </div>
+          <div class="col-lg-6">
+            <div class="border rounded p-3 h-100">
+              <div class="fw-bold mb-2">Student CLB Entries</div>
+              <pre class="small bg-light border rounded p-2 mb-2 text-wrap"><code>{{#student_clb_entries}}{{student_full_name}} {{clb_recorded_at}} {{clb_result_listening}}{{/student_clb_entries}}</code></pre>
+              <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key" data-copy-token="{{#student_clb_entries}}{{student_full_name}} {{clb_recorded_at}} {{clb_result_listening}}{{/student_clb_entries}}">
+                <i class="bi bi-copy me-1"></i>Copy Example
+              </button>
+              <div class="small text-muted mt-2">Rows include entry identity, latest-entry flag, and all goal, current, and result skill values.</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

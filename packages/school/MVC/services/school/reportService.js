@@ -157,7 +157,12 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'CLB_current_listening', label: 'CLB Current Listening', description: 'Latest current CLB level for listening from student profile history.' }),
     Object.freeze({ key: 'CLB_current_speaking', label: 'CLB Current Speaking', description: 'Latest current CLB level for speaking from student profile history.' }),
     Object.freeze({ key: 'CLB_current_reading', label: 'CLB Current Reading', description: 'Latest current CLB level for reading from student profile history.' }),
-    Object.freeze({ key: 'CLB_current_writing', label: 'CLB Current Writing', description: 'Latest current CLB level for writing from student profile history.' })
+    Object.freeze({ key: 'CLB_current_writing', label: 'CLB Current Writing', description: 'Latest current CLB level for writing from student profile history.' }),
+    Object.freeze({ key: 'CLB_latest_recorded_at', label: 'CLB Latest Recorded Date', description: 'Recorded date of the latest CLB history entry.' }),
+    Object.freeze({ key: 'CLB_result_listening', label: 'CLB Result Listening', description: 'Latest CLB result for listening from student profile history.' }),
+    Object.freeze({ key: 'CLB_result_speaking', label: 'CLB Result Speaking', description: 'Latest CLB result for speaking from student profile history.' }),
+    Object.freeze({ key: 'CLB_result_reading', label: 'CLB Result Reading', description: 'Latest CLB result for reading from student profile history.' }),
+    Object.freeze({ key: 'CLB_result_writing', label: 'CLB Result Writing', description: 'Latest CLB result for writing from student profile history.' })
   ]),
   gradebookPeriodStudent: Object.freeze([
     Object.freeze({ key: 'student_gradebook_period_activity_count', label: 'Student Gradebook Period Activities', description: 'Include-in-grade activities in period where student not absent and has a score.' }),
@@ -1348,22 +1353,57 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
     });
   });
 
+  const studentClbEntries = [];
+  studentContexts.forEach((context, studentIndex) => {
+    const studentRow = studentRows[studentIndex] || {};
+    getSortedClbLevelHistory(context.studentRecord).forEach((entry, entryIndex) => {
+      studentClbEntries.push({
+        row_no: studentClbEntries.length + 1,
+        student_no: studentIndex + 1,
+        clb_entry_no: entryIndex + 1,
+        student_id: context.personId,
+        student_person_id: context.personId,
+        student_full_name: studentRow.student_full_name || context.personId,
+        student_display_name: studentRow.student_display_name || studentRow.student_full_name || context.personId,
+        clb_entry_id: String(entry?.id || ''),
+        clb_recorded_at: String(entry?.recordedAt || ''),
+        clb_is_latest: entryIndex === 0,
+        clb_goal_listening: String(entry?.goal?.listening || ''),
+        clb_goal_speaking: String(entry?.goal?.speaking || ''),
+        clb_goal_reading: String(entry?.goal?.reading || ''),
+        clb_goal_writing: String(entry?.goal?.writing || ''),
+        clb_current_listening: String(entry?.current?.listening || ''),
+        clb_current_speaking: String(entry?.current?.speaking || ''),
+        clb_current_reading: String(entry?.current?.reading || ''),
+        clb_current_writing: String(entry?.current?.writing || ''),
+        clb_result_listening: String(entry?.result?.listening || ''),
+        clb_result_speaking: String(entry?.result?.speaking || ''),
+        clb_result_reading: String(entry?.result?.reading || ''),
+        clb_result_writing: String(entry?.result?.writing || '')
+      });
+    });
+  });
+
   return {
     students: studentRows,
     attendance_sessions: sessionRows,
     student_attendance_rows: attendanceRows,
-    gradebook_skill_rows: gradebookSkillRows
+    gradebook_skill_rows: gradebookSkillRows,
+    student_clb_entries: studentClbEntries
   };
 }
 
-function getLatestClbLevelEntry(studentRecord = {}) {
+function getSortedClbLevelHistory(studentRecord = {}) {
   const history = Array.isArray(studentRecord?.clbLevelHistory) ? studentRecord.clbLevelHistory : [];
-  if (!history.length) return null;
-  const sorted = [...history].sort((a, b) => {
+  return [...history].sort((a, b) => {
     const dateCmp = String(b?.recordedAt || '').localeCompare(String(a?.recordedAt || ''));
     if (dateCmp !== 0) return dateCmp;
     return String(b?.id || '').localeCompare(String(a?.id || ''));
   });
+}
+
+function getLatestClbLevelEntry(studentRecord = {}) {
+  const sorted = getSortedClbLevelHistory(studentRecord);
   return sorted[0] || null;
 }
 
@@ -1529,6 +1569,11 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     CLB_current_speaking: String(latestClbLevelEntry?.current?.speaking || ''),
     CLB_current_reading: String(latestClbLevelEntry?.current?.reading || ''),
     CLB_current_writing: String(latestClbLevelEntry?.current?.writing || ''),
+    CLB_latest_recorded_at: String(latestClbLevelEntry?.recordedAt || ''),
+    CLB_result_listening: String(latestClbLevelEntry?.result?.listening || ''),
+    CLB_result_speaking: String(latestClbLevelEntry?.result?.speaking || ''),
+    CLB_result_reading: String(latestClbLevelEntry?.result?.reading || ''),
+    CLB_result_writing: String(latestClbLevelEntry?.result?.writing || ''),
     class_attendance_total: primaryAttendance.total,
     class_attendance_present: primaryAttendance.present,
     class_attendance_late: primaryAttendance.late,
