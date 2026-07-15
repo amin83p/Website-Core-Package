@@ -14,6 +14,7 @@ const schoolLinkedPersonProfileService = require('../../services/school/schoolLi
 const personDenormalizedNameSyncService = require('../../services/school/personDenormalizedNameSyncService');
 const schoolRoleSystemIdMigrationService = require('../../services/school/schoolRoleSystemIdMigrationService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
+const schoolPersonAttachmentService = require('../../services/school/schoolPersonAttachmentService');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
@@ -44,6 +45,17 @@ async function assertCreateOrgContextOrThrow(reqUser) {
 function assertTeacherOrgAccess(teacher, activeOrgId, reqUser) {
   assertOrgAccess(teacher, activeOrgId, reqUser, { orgField: 'orgId', allowSystemBypass: true });
 }
+
+const teacherAttachmentHandlers = schoolPersonAttachmentService.createAttachmentHandlers({
+  entityType: 'teachers',
+  recordLabel: 'Teacher',
+  routeBase: '/school/teachers',
+  getActiveOrgIdOrThrow,
+  assertRecordOrgAccess: assertTeacherOrgAccess
+});
+
+exports.downloadAttachment = teacherAttachmentHandlers.downloadAttachment;
+exports.deleteAttachment = teacherAttachmentHandlers.deleteAttachment;
 
 function toBoolean(v) {
   return v === true || v === 'true' || v === 'on' || v === 1 || v === '1';
@@ -673,7 +685,11 @@ exports.saveTeacher = async (req, res) => {
       'teacher_save',
       String(activeOrgId || '').trim(),
       String(id || '').trim(),
-      req.body || {}
+      req.body || {},
+      (Array.isArray(req.files) ? req.files : []).map((file) => ({
+        name: String(file?.originalname || ''),
+        size: Number(file?.size || 0)
+      }))
     ]);
     const guardResult = idempotencyGuardService.beginGuard({
       key: guardKey,
@@ -715,6 +731,11 @@ exports.saveTeacher = async (req, res) => {
       });
     }
 
+    const attachments = schoolPersonAttachmentService.buildAttachmentsFromRequest(
+      req,
+      existingTeacher?.attachments
+    );
+
     const payload = {
       personId,
       orgId: existingTeacher?.orgId ? String(existingTeacher.orgId) : String(activeOrgId),
@@ -732,7 +753,8 @@ exports.saveTeacher = async (req, res) => {
       instructionalMode: String(req.body.instructionalMode || '').trim(),
       teachingFocus: String(req.body.teachingFocus || '').trim(),
       maxWeeklyHours: String(req.body.maxWeeklyHours || '').trim(),
-      notes: String(req.body.notes || '').trim()
+      notes: String(req.body.notes || '').trim(),
+      attachments
     };
 
     if (!payload.personId) throw new Error('A valid Person must be selected.');

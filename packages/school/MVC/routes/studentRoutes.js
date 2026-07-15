@@ -51,7 +51,10 @@ router.get('/:id/attachments/:attId/download',
 
 router.delete('/:id/attachments/:attId',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE_FILE),
-  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE_FILE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE_FILE, {
+    requireToken: true,
+    allowOperationTokenFallback: true
+  }),
   ctrl.deleteAttachment);
 
 router.get('/:id/system-id-generate',

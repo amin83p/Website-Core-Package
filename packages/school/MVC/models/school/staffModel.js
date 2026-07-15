@@ -52,6 +52,35 @@ function cleanMoney(v, { allowEmpty = true } = {}) {
   return Number(n.toFixed(2));
 }
 
+function cleanAttachmentSize(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const size = Number(value);
+  if (!Number.isFinite(size) || size < 0 || size > 200 * 1024 * 1024) {
+    throw new Error('Attachment size is out of range.');
+  }
+  return size;
+}
+
+function cleanAttachments(value) {
+  if (value === undefined || value === null || value === '') return [];
+  if (!Array.isArray(value)) throw new Error('attachments must be an array.');
+  if (value.length > 200) throw new Error('Too many attachments.');
+
+  return value.map((attachment) => {
+    if (!isPlainObject(attachment)) throw new Error('Invalid attachment object.');
+    return {
+      id: cleanId(attachment.id, { max: 64, allowEmpty: true }) || undefined,
+      originalName: cleanString(attachment.originalName, { max: 255, allowEmpty: true }),
+      filename: cleanString(attachment.filename, { max: 255, allowEmpty: true }),
+      path: cleanString(attachment.path, { max: 4096, allowEmpty: true }).replace(/\\/g, '/'),
+      url: cleanString(attachment.url, { max: 2048, allowEmpty: true }),
+      size: cleanAttachmentSize(attachment.size),
+      uploadDate: cleanString(attachment.uploadDate, { max: 40, allowEmpty: true }),
+      comment: cleanString(attachment.comment, { max: 500, allowEmpty: true })
+    };
+  });
+}
+
 function buildRangeStart(value) {
   return value || '0001-01-01';
 }
@@ -141,7 +170,8 @@ function sanitizeStaffInput(input, { isUpdate = false } = {}) {
     status,
     workLocation: cleanString(input.workLocation, { max: 160, allowEmpty: true }),
     responsibilities: cleanString(input.responsibilities, { max: 1200, allowEmpty: true }),
-    notes: cleanString(input.notes, { max: 5000, allowEmpty: true })
+    notes: cleanString(input.notes, { max: 5000, allowEmpty: true }),
+    attachments: cleanAttachments(input.attachments)
   };
 
   if (!isUpdate && input.id) out.id = cleanId(input.id, { max: 50, allowEmpty: false });
@@ -209,7 +239,10 @@ async function updateStaff(id, data, options = {}) {
       {
         ...data,
         orgId: existing.orgId || data?.orgId,
-        personId: existing.personId || data?.personId
+        personId: existing.personId || data?.personId,
+        attachments: Object.prototype.hasOwnProperty.call(data || {}, 'attachments')
+          ? data.attachments
+          : existing.attachments
       },
       { isUpdate: true }
     );

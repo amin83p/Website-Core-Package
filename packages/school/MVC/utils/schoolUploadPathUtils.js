@@ -44,6 +44,18 @@ function buildStudentCategory(context = {}) {
   });
 }
 
+function buildTeacherCategory(context = {}) {
+  return resolveUploadFolder('school.teachers', {
+    personId: sanitizeFolderToken(context.personId || context.teacherId || context.itemId, 'person_unsaved')
+  });
+}
+
+function buildStaffCategory(context = {}) {
+  return resolveUploadFolder('school.staff', {
+    personId: sanitizeFolderToken(context.personId || context.staffId || context.itemId, 'person_unsaved')
+  });
+}
+
 function buildReportTemplatesCategory() {
   return resolveUploadFolder('school.reportTemplates');
 }
@@ -78,6 +90,8 @@ module.exports = {
   sanitizeFolderToken,
   joinUploadParts,
   buildStudentCategory,
+  buildTeacherCategory,
+  buildStaffCategory,
   buildReportTemplatesCategory,
   buildExamMediaCategory,
   buildClassWorkspaceCategory,

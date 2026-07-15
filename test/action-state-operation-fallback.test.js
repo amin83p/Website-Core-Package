@@ -245,6 +245,64 @@ test('action-state middleware keeps strict operation validation unless route opt
   assert.match(res.payload.message, /does not belong to this operation/);
 });
 
+test('operation-token fallback still requires a client token', async () => {
+  let logCalls = 0;
+  dataService.logActionStateAttempt = async () => {
+    logCalls += 1;
+    return { id: 'UNEXPECTED-TOKEN', targetKey: 'S-1', attemptCount: 1 };
+  };
+
+  const req = createReq();
+  req.body = {};
+  const res = createRes();
+  let nextCalled = false;
+  const middleware = trackActionState(SECTIONS.TASKS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true
+  });
+
+  await middleware(req, res, () => {
+    nextCalled = true;
+  });
+
+  assert.equal(nextCalled, false);
+  assert.equal(logCalls, 0);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.payload.status, 'error');
+  assert.match(res.payload.message, /Missing Action State Token/);
+});
+
+for (const validationError of [
+  'Security Violation: User mismatch.',
+  'Action State Token does not belong to this section.'
+]) {
+  test(`operation-token fallback rejects ${validationError}`, async () => {
+    let logCalls = 0;
+    dataService.logActionStateAttempt = async () => {
+      logCalls += 1;
+      throw new Error(validationError);
+    };
+
+    const req = createReq();
+    const res = createRes();
+    let nextCalled = false;
+    const middleware = trackActionState(SECTIONS.TASKS, OPERATIONS.UPDATE, {
+      requireToken: true,
+      allowOperationTokenFallback: true
+    });
+
+    await middleware(req, res, () => {
+      nextCalled = true;
+    });
+
+    assert.equal(nextCalled, false);
+    assert.equal(logCalls, 1);
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.payload.status, 'error');
+    assert.match(res.payload.message, new RegExp(validationError.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  });
+}
+
 test('action-state middleware can mint runtime state after target-token mismatch when route opts in', async () => {
   const calls = [];
   dataService.logActionStateAttempt = async (userId, sectionId, operationId, targetKey, limits, forceId, context) => {

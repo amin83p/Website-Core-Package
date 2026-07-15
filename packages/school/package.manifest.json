@@ -2134,6 +2134,18 @@
           "sessionAttempts": 5,
           "sessionTime": 15,
           "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "355444",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
         }
       ],
       "subsections": [],
@@ -2199,6 +2211,18 @@
         },
         {
           "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "355444",
           "sessionAttempts": 5,
           "sessionTime": 15,
           "active": true
@@ -2347,6 +2371,18 @@
         },
         {
           "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "355444",
           "sessionAttempts": 5,
           "sessionTime": 15,
           "active": true
@@ -7313,6 +7349,28 @@
       "group": "School Uploads",
       "label": "School Student Attachments",
       "defaultTemplate": "students/{personId}",
+      "placeholders": [
+        "personId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "school.teachers",
+      "packageName": "SCHOOL",
+      "group": "School Uploads",
+      "label": "School Teacher Attachments",
+      "defaultTemplate": "teachers/{personId}",
+      "placeholders": [
+        "personId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "school.staff",
+      "packageName": "SCHOOL",
+      "group": "School Uploads",
+      "label": "School Staff Attachments",
+      "defaultTemplate": "staff/{personId}",
       "placeholders": [
         "personId"
       ],

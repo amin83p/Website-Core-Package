@@ -14,8 +14,9 @@
   </div>
 
   <div class="form-container wide" style="max-width: 1300px;">
-    <form id="teacherForm" action="<%= isEdit ? '/school/teachers/edit/' + routeId : '/school/teachers/new' %>" method="POST">
+    <form id="teacherForm" action="<%= (isEdit ? '/school/teachers/edit/' + routeId : '/school/teachers/new') + (asid ? ('?actionStateId=' + encodeURIComponent(asid)) : '') %>" method="POST" enctype="multipart/form-data">
       <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
+      <input type="hidden" name="attachments" id="hid_attachments" value="[]">
       <input type="hidden" name="newPersonEmails" id="hid_newPersonEmails" value="[]">
       <input type="hidden" name="newPersonPhones" id="hid_newPersonPhones" value="[]">
       <input type="hidden" name="newPersonAddresses" id="hid_newPersonAddresses" value="[]">
@@ -30,6 +31,7 @@
         <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-person" type="button">Step 1: Person</button></li>
         <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-profile" type="button">Step 2: Profile</button></li>
         <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-work" type="button">Step 3: Teaching</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-files" type="button">Step 4: Files</button></li>
       </ul>
 
       <div class="card border-0 shadow-sm mb-4">
@@ -262,6 +264,12 @@
               </div>
             </div>
           </div>
+          <%- include('../partials/personAttachments', {
+            attachmentInitialRows: t.attachments || [],
+            attachmentRouteBase: '/school/teachers',
+            attachmentRecordId: routeId,
+            attachmentRecordLabel: 'Teacher'
+          }) %>
         </div>
       </div>
 
@@ -791,12 +799,25 @@
 
         syncNewPersonHiddenState();
         syncCompensationHiddenState();
+        window.schoolPersonAttachments?.sync();
 
-        const data = new URLSearchParams(new FormData(form));
-        const response = await fetch(form.action, {
+        const data = new FormData();
+        Array.from(form.elements).forEach((element) => {
+          if (!element?.name || element.disabled || element.type === 'file') return;
+          if ((element.type === 'checkbox' || element.type === 'radio') && !element.checked) return;
+          data.append(element.name, element.value ?? '');
+        });
+        const fileInput = window.schoolPersonAttachments?.getFileInput();
+        Array.from(fileInput?.files || []).forEach((file) => data.append('files', file));
+
+        const token = document.getElementById('hid_actionStateId')?.value || '';
+        const submitUrl = token && !/[?&]actionStateId=/.test(String(form.action || ''))
+          ? String(form.action || '') + (String(form.action || '').includes('?') ? '&' : '?') + 'actionStateId=' + encodeURIComponent(token)
+          : form.action;
+        const response = await fetch(submitUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
-          body: data.toString()
+          headers: { 'X-AJAX-Request': 'true' },
+          body: data
         });
 
         const contentType = response.headers.get('content-type') || '';

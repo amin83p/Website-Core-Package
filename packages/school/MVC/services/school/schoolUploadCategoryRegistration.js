@@ -23,6 +23,18 @@ function registerSchoolUploadCategoryResolvers() {
     })
   ));
 
+  uploadCategoryResolverService.registerUploadCategoryResolver('school-teachers', ({ req = {} } = {}) => (
+    schoolUploadPathUtils.buildTeacherCategory({
+      personId: req.body?.personId || req.params?.personId || req.params?.id
+    })
+  ));
+
+  uploadCategoryResolverService.registerUploadCategoryResolver('school-staff', ({ req = {} } = {}) => (
+    schoolUploadPathUtils.buildStaffCategory({
+      personId: req.body?.personId || req.params?.personId || req.params?.id
+    })
+  ));
+
   uploadCategoryResolverService.registerUploadCategoryResolver('school-reports', () => (
     schoolUploadPathUtils.buildReportTemplatesCategory()
   ));

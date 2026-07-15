@@ -14,6 +14,7 @@ const schoolLinkedPersonProfileService = require('../../services/school/schoolLi
 const personDenormalizedNameSyncService = require('../../services/school/personDenormalizedNameSyncService');
 const schoolRoleSystemIdMigrationService = require('../../services/school/schoolRoleSystemIdMigrationService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
+const schoolPersonAttachmentService = require('../../services/school/schoolPersonAttachmentService');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
@@ -44,6 +45,17 @@ async function assertCreateOrgContextOrThrow(reqUser) {
 function assertStaffOrgAccess(staff, activeOrgId, reqUser) {
   assertOrgAccess(staff, activeOrgId, reqUser, { orgField: 'orgId', allowSystemBypass: true });
 }
+
+const staffAttachmentHandlers = schoolPersonAttachmentService.createAttachmentHandlers({
+  entityType: 'staff',
+  recordLabel: 'Staff',
+  routeBase: '/school/staff',
+  getActiveOrgIdOrThrow,
+  assertRecordOrgAccess: assertStaffOrgAccess
+});
+
+exports.downloadAttachment = staffAttachmentHandlers.downloadAttachment;
+exports.deleteAttachment = staffAttachmentHandlers.deleteAttachment;
 
 function toBoolean(v) {
   return v === true || v === 'true' || v === 'on' || v === 1 || v === '1';
@@ -668,7 +680,11 @@ exports.saveStaff = async (req, res) => {
       'staff_save',
       String(activeOrgId || '').trim(),
       String(id || '').trim(),
-      req.body || {}
+      req.body || {},
+      (Array.isArray(req.files) ? req.files : []).map((file) => ({
+        name: String(file?.originalname || ''),
+        size: Number(file?.size || 0)
+      }))
     ]);
     const guardResult = idempotencyGuardService.beginGuard({
       key: guardKey,
@@ -710,6 +726,11 @@ exports.saveStaff = async (req, res) => {
       });
     }
 
+    const attachments = schoolPersonAttachmentService.buildAttachmentsFromRequest(
+      req,
+      existingStaff?.attachments
+    );
+
     const payload = {
       personId,
       orgId: existingStaff?.orgId ? String(existingStaff.orgId) : String(activeOrgId),
@@ -725,7 +746,8 @@ exports.saveStaff = async (req, res) => {
       status: String(req.body.status || 'Active').trim(),
       workLocation: String(req.body.workLocation || '').trim(),
       responsibilities: String(req.body.responsibilities || '').trim(),
-      notes: String(req.body.notes || '').trim()
+      notes: String(req.body.notes || '').trim(),
+      attachments
     };
 
     if (!payload.personId) throw new Error('A valid Person must be selected.');

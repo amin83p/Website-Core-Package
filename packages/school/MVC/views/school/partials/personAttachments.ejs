@@ -1,0 +1,258 @@
+<%
+  const attachmentRows = Array.isArray(attachmentInitialRows) ? attachmentInitialRows : [];
+  const attachmentConfigJson = JSON.stringify({
+    routeBase: String(attachmentRouteBase || ''),
+    recordId: String(attachmentRecordId || ''),
+    recordLabel: String(attachmentRecordLabel || 'record')
+  }).replace(/</g, '\\u003c');
+  const attachmentRowsJson = JSON.stringify(attachmentRows).replace(/</g, '\\u003c');
+%>
+
+<div class="tab-pane fade" id="tab-files">
+  <div class="alert alert-light border shadow-sm">
+    <h6 class="fw-bold mb-2"><i class="bi bi-paperclip me-2"></i>Attached Documents</h6>
+    <p class="small text-muted mb-3">
+      Upload documents associated with this <%= String(attachmentRecordLabel || 'record').toLowerCase() %>.
+      <span class="fw-bold">Max 5 files per save.</span> Add a short comment per file to find it faster later.
+    </p>
+
+    <div id="existingAttachmentsWrap" class="mt-2 d-none">
+      <div class="fw-bold mb-2">Existing Attachments</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th style="width: 30%;">File</th>
+              <th style="width: 45%;">Comment</th>
+              <th style="width: 25%;" class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="existingAttachmentsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="fileUploadBox" class="p-4 border border-primary border-2 border-dashed rounded text-center bg-light mt-3" style="cursor: pointer;">
+      <i class="bi bi-cloud-arrow-up fs-2 text-primary mb-2"></i>
+      <p class="mb-1 fw-bold">Click to Browse or Drag files here</p>
+      <p class="small text-muted mb-0" id="fileCountText">No files selected</p>
+    </div>
+
+    <input type="file" id="fileInput" name="files" multiple class="d-none">
+
+    <div id="newFilesWrap" class="mt-3 d-none">
+      <div class="fw-bold mb-2">New Uploads (add a comment per file)</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th style="width: 35%;">File</th>
+              <th style="width: 55%;">Comment</th>
+              <th style="width: 10%;" class="text-end"></th>
+            </tr>
+          </thead>
+          <tbody id="newFilesTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="personAttachmentConfig"><%- attachmentConfigJson %></script>
+<script type="application/json" id="personAttachmentRows"><%- attachmentRowsJson %></script>
+<script>
+(function () {
+  const MAX_FILES = 5;
+  const config = JSON.parse(document.getElementById('personAttachmentConfig')?.textContent || '{}');
+  const initialRows = JSON.parse(document.getElementById('personAttachmentRows')?.textContent || '[]');
+  const hidden = document.getElementById('hid_attachments');
+  const fileInput = document.getElementById('fileInput');
+  const uploadBox = document.getElementById('fileUploadBox');
+  const fileCountText = document.getElementById('fileCountText');
+  const existingWrap = document.getElementById('existingAttachmentsWrap');
+  const existingTbody = document.getElementById('existingAttachmentsTbody');
+  const newWrap = document.getElementById('newFilesWrap');
+  const newTbody = document.getElementById('newFilesTbody');
+  let existingAttachments = Array.isArray(initialRows) ? initialRows : [];
+  let objectUrls = [];
+
+  function safeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    })[char]);
+  }
+
+  function formatBytes(value) {
+    const bytes = Number(value || 0);
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function sync() {
+    if (hidden) hidden.value = JSON.stringify(existingAttachments || []);
+  }
+
+  function clearObjectUrls() {
+    objectUrls.forEach((url) => {
+      try { window.URL.revokeObjectURL(url); } catch (_) {}
+    });
+    objectUrls = [];
+  }
+
+  function showMessage(options) {
+    if (typeof showMessageModal === 'function') return showMessageModal(options);
+    alert(String(options?.message || '').replace(/<[^>]*>/g, ''));
+    return Promise.resolve();
+  }
+
+  async function confirmDelete(message) {
+    if (typeof showMessageModal !== 'function') {
+      return confirm(String(message || '').replace(/<[^>]*>/g, ''));
+    }
+    try {
+      const choice = await showMessageModal({
+        title: 'Confirm',
+        icon: 'warning',
+        message,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary', value: false },
+          { text: 'Delete', class: 'btn-danger', value: true }
+        ]
+      });
+      return choice === true || String(choice || '').trim().toLowerCase() === 'delete';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function deleteAttachment(key) {
+    const actionStateId = document.getElementById('hid_actionStateId')?.value || '';
+    const url = `${config.routeBase}/${encodeURIComponent(config.recordId)}/attachments/${encodeURIComponent(key)}?actionStateId=${encodeURIComponent(actionStateId)}`;
+    const response = await fetch(url, { method: 'DELETE', headers: { 'X-AJAX-Request': 'true' } });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result || result.status !== 'success') {
+      throw new Error(result?.message || `Delete failed (HTTP ${response.status})`);
+    }
+    existingAttachments = Array.isArray(result.attachments) ? result.attachments : [];
+    renderExisting();
+  }
+
+  function renderExisting() {
+    if (!config.recordId || !existingAttachments.length) {
+      existingWrap?.classList.add('d-none');
+      if (existingTbody) existingTbody.innerHTML = '';
+      sync();
+      return;
+    }
+
+    existingWrap?.classList.remove('d-none');
+    existingTbody.innerHTML = existingAttachments.map((attachment, index) => {
+      const key = attachment.id || index;
+      const downloadUrl = `${config.routeBase}/${encodeURIComponent(config.recordId)}/attachments/${encodeURIComponent(key)}/download`;
+      return `<tr>
+        <td><div class="fw-bold">${safeHtml(attachment.originalName || attachment.filename || '(file)')}</div><div class="text-muted small">${safeHtml(formatBytes(attachment.size))}</div></td>
+        <td><input type="text" class="form-control form-control-sm" value="${safeHtml(attachment.comment || '')}" placeholder="Describe this file..." data-existing-index="${index}"></td>
+        <td class="text-end"><div class="d-flex gap-2 justify-content-end">
+          <a class="btn btn-outline-primary btn-sm" href="${downloadUrl}"><i class="bi bi-download me-1"></i>Download</a>
+          <button type="button" class="btn btn-outline-danger btn-sm" data-delete-att="${safeHtml(key)}"><i class="bi bi-trash me-1"></i>Delete</button>
+        </div></td>
+      </tr>`;
+    }).join('');
+
+    existingTbody.querySelectorAll('input[data-existing-index]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const index = Number(input.dataset.existingIndex);
+        if (existingAttachments[index]) existingAttachments[index].comment = input.value || '';
+        sync();
+      });
+    });
+
+    existingTbody.querySelectorAll('button[data-delete-att]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const key = button.dataset.deleteAtt;
+        const attachment = existingAttachments.find((row) => String(row?.id) === String(key));
+        const label = attachment?.originalName || attachment?.filename || 'this file';
+        const approved = await confirmDelete(
+          `Delete <b>"${safeHtml(label)}"</b>?<br>This will remove it from the ${safeHtml(config.recordLabel.toLowerCase())} record and delete the file from disk.<br><b>No undo will be available for this operation.</b>`
+        );
+        if (!approved) return;
+        button.disabled = true;
+        try {
+          await deleteAttachment(key);
+          await showMessage({ title: 'Deleted', icon: 'success', message: 'Attachment deleted.', buttons: [{ text: 'OK', class: 'btn-success' }] });
+        } catch (error) {
+          button.disabled = false;
+          await showMessage({ title: 'Error', icon: 'error', message: error.message || 'Failed to delete attachment.', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+        }
+      });
+    });
+    sync();
+  }
+
+  function renderNewFiles() {
+    const files = Array.from(fileInput?.files || []);
+    clearObjectUrls();
+    if (!files.length) {
+      newWrap?.classList.add('d-none');
+      if (newTbody) newTbody.innerHTML = '';
+      if (fileCountText) fileCountText.innerText = 'No files selected';
+      uploadBox?.classList.remove('bg-success', 'bg-opacity-10', 'border-success');
+      return;
+    }
+
+    newWrap?.classList.remove('d-none');
+    if (fileCountText) fileCountText.innerHTML = `<span class="text-success fw-bold">${files.length} file(s) selected ready for upload.</span>`;
+    uploadBox?.classList.add('bg-success', 'bg-opacity-10', 'border-success');
+    newTbody.innerHTML = files.map((file, index) => {
+      let downloadUrl = '';
+      try { downloadUrl = window.URL.createObjectURL(file); } catch (_) {}
+      if (downloadUrl) objectUrls.push(downloadUrl);
+      return `<tr>
+        <td><div class="fw-bold">${safeHtml(file.name)}</div><div class="text-muted small">${safeHtml(formatBytes(file.size))}</div></td>
+        <td><input type="text" class="form-control form-control-sm" name="newFileComments" placeholder="Comment for this file..."></td>
+        <td class="text-end"><div class="d-inline-flex gap-1">
+          ${downloadUrl ? `<a href="${safeHtml(downloadUrl)}" download="${safeHtml(file.name)}" class="btn btn-outline-primary btn-sm" title="Download"><i class="bi bi-download"></i></a>` : ''}
+          <button type="button" class="btn btn-outline-danger btn-sm" data-remove-new="${index}"><i class="bi bi-x-lg"></i></button>
+        </div></td>
+      </tr>`;
+    }).join('');
+
+    newTbody.querySelectorAll('button[data-remove-new]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const removeIndex = Number(button.dataset.removeNew);
+        const transfer = new DataTransfer();
+        files.forEach((file, index) => { if (index !== removeIndex) transfer.items.add(file); });
+        fileInput.files = transfer.files;
+        renderNewFiles();
+      });
+    });
+  }
+
+  function acceptFiles(files) {
+    const selected = Array.from(files || []);
+    const transfer = new DataTransfer();
+    selected.slice(0, MAX_FILES).forEach((file) => transfer.items.add(file));
+    fileInput.files = transfer.files;
+    if (selected.length > MAX_FILES) {
+      showMessage({ title: 'Too many files', icon: 'warning', message: `You can upload up to ${MAX_FILES} files. Extra files were ignored.`, buttons: [{ text: 'OK', class: 'btn-warning' }] });
+    }
+    renderNewFiles();
+  }
+
+  uploadBox?.addEventListener('click', () => fileInput?.click());
+  uploadBox?.addEventListener('dragover', (event) => { event.preventDefault(); uploadBox.classList.add('border-success'); });
+  uploadBox?.addEventListener('dragleave', () => uploadBox.classList.remove('border-success'));
+  uploadBox?.addEventListener('drop', (event) => {
+    event.preventDefault();
+    uploadBox.classList.remove('border-success');
+    acceptFiles(event.dataTransfer?.files);
+  });
+  fileInput?.addEventListener('change', () => acceptFiles(fileInput.files));
+  window.addEventListener('beforeunload', clearObjectUrls);
+
+  window.schoolPersonAttachments = { sync, getFileInput: () => fileInput };
+  renderExisting();
+})();
+</script>
