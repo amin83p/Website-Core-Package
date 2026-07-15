@@ -1,8 +1,9 @@
 <%
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
-  const eachStudentScope = String(assignment?.reportScope || '').trim().toLowerCase() === 'each_student';
+  const reportScopeToken = String(assignment?.reportScope || '').trim().toLowerCase();
+  const studentTargetedScope = reportScopeToken === 'each_student' || reportScopeToken === 'selected_students';
   const orderedFieldsList = fields;
-  const hasSharedFields = eachStudentScope && fields.some((f) => f?.sharedAcrossStudents === true);
+  const hasSharedFields = studentTargetedScope && fields.some((f) => f?.sharedAcrossStudents === true);
   const validation = (typeof validationSummary !== 'undefined' && validationSummary && typeof validationSummary === 'object')
     ? validationSummary
     : { errors: [], warnings: [], issuesByField: {} };

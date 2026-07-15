@@ -83,6 +83,16 @@ function mapRowToDto(row = {}, assignmentMap = new Map()) {
     : 'class';
   const studentId = toPublicId(row?.studentId);
   const teacherId = toPublicId(row?.teacherId);
+  const assignmentId = toPublicId(row?.assignmentId) || '';
+  const assignmentRowId = String(row?.assignmentRowId || '').trim();
+  const studentTargeted = scope === 'each_student' || scope === 'selected_students';
+  const matrixParams = new URLSearchParams();
+  if (assignmentRowId) matrixParams.set('assignmentRowId', assignmentRowId);
+  if (teacherId) matrixParams.set('teacherId', teacherId);
+  const matrixHref = studentTargeted && assignmentId
+    ? `/school/reports/instances/matrix/${encodeURIComponent(assignmentId)}?${matrixParams.toString()}`
+    : '';
+  const matrixGroupKey = [assignmentId, assignmentRowId, teacherId, toPublicId(row?.templateId)].join('|');
 
   return {
     id: String(row?.id || ''),
@@ -95,10 +105,13 @@ function mapRowToDto(row = {}, assignmentMap = new Map()) {
     status,
     statusLabel: status,
     scopeLabel: reportAssignmentSessionUtils.scopeDisplayLabel(scope),
+    scope,
     href: buildInstanceHref(row),
+    matrixHref,
+    matrixGroupKey,
     actionLabel: isPending ? 'Start' : 'Open V2',
-    assignmentId: toPublicId(row?.assignmentId) || '',
-    assignmentRowId: String(row?.assignmentRowId || '').trim(),
+    assignmentId,
+    assignmentRowId,
     statusBadgeClass: formatInstanceStatusBadgeClass(status, isPending)
   };
 }

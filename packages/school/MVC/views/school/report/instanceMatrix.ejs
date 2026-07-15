@@ -1,0 +1,363 @@
+<%
+  const sharedFields = Array.isArray(matrix?.sharedFields) ? matrix.sharedFields : [];
+  const commonFields = Array.isArray(matrix?.commonFields) ? matrix.commonFields : [];
+  const tableFields = Array.isArray(matrix?.tableFields) ? matrix.tableFields : [];
+  const rows = Array.isArray(matrix?.rows) ? matrix.rows : [];
+  const progress = matrix?.progress || { total: rows.length, submitted: 0, drafts: 0, pending: rows.length };
+  const statusBadgeClass = (status) => {
+    const token = String(status || '').toLowerCase();
+    if (token === 'submitted') return 'bg-success';
+    if (token === 'locked') return 'bg-dark';
+    if (token === 'draft') return 'bg-warning text-dark';
+    return 'bg-info-subtle text-info-emphasis border';
+  };
+%>
+<style>
+  .report-matrix-page .matrix-summary-card { min-width: 115px; }
+  .report-matrix-page .matrix-table-wrap { max-height: calc(100vh - 250px); overflow: auto; }
+  .report-matrix-page .matrix-table { width: max-content; min-width: 100%; }
+  .report-matrix-page .matrix-table th { position: sticky; top: 0; z-index: 4; min-width: 190px; vertical-align: middle; }
+  .report-matrix-page .matrix-table th.matrix-student-col,
+  .report-matrix-page .matrix-table td.matrix-student-col {
+    position: sticky;
+    left: 0;
+    min-width: 230px;
+    max-width: 280px;
+    z-index: 3;
+    background: var(--bs-body-bg);
+    box-shadow: 3px 0 5px rgba(0, 0, 0, 0.06);
+  }
+  .report-matrix-page .matrix-table th.matrix-student-col { z-index: 6; background: var(--bs-light); }
+  .report-matrix-page .matrix-table th.matrix-actions-col { min-width: 235px; }
+  .report-matrix-page .matrix-table textarea { min-width: 260px; resize: vertical; }
+  .report-matrix-page .matrix-table input[type="text"],
+  .report-matrix-page .matrix-table input[type="number"],
+  .report-matrix-page .matrix-table input[type="date"],
+  .report-matrix-page .matrix-table select { min-width: 180px; }
+  .report-matrix-page .matrix-help-icon { border: 0; background: transparent; color: var(--bs-secondary-color); padding: 0 .2rem; }
+  .report-matrix-page .matrix-help-icon:hover,
+  .report-matrix-page .matrix-help-icon:focus-visible { color: var(--bs-primary); }
+  .report-matrix-page .matrix-row-dirty .matrix-student-name::after { content: " • Unsaved"; color: var(--bs-warning-text-emphasis); font-size: .75rem; }
+</style>
+
+<div class="sections-page report-matrix-page">
+  <input type="hidden" name="actionStateId" id="reportMatrixActionStateId" value="<%= actionStateId || '' %>">
+  <script type="application/json" id="reportMatrixData"><%- JSON.stringify(matrix || {}).replace(/</g, '\\u003c') %></script>
+
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;">Fill Reports</h1>
+      <h5 class="fw-bold text-primary mt-2 mb-1"><%= matrix.templateTitle %></h5>
+      <div class="text-muted small">
+        <strong><%= matrix.className || matrix.classId %></strong>
+        <span class="mx-1">|</span>
+        Session <strong><%= matrix.sessionDate || '-' %></strong>
+        <span class="mx-1">|</span>
+        Teacher <strong><%= matrix.teacherName || matrix.teacherId %></strong>
+      </div>
+      <div class="text-muted small mt-1">Report period: <strong><%= matrix.reportStartDate || '-' %></strong> to <strong><%= matrix.reportDueDate || '-' %></strong></div>
+    </div>
+    <div class="d-flex gap-2">
+      <% if (matrix.classId && matrix.sessionId) { %>
+        <a href="/school/classes/<%= encodeURIComponent(matrix.classId) %>/sessions/<%= encodeURIComponent(matrix.sessionId) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Session</a>
+      <% } %>
+      <a href="/school/reports/instances" class="btn btn-outline-primary btn-sm"><i class="bi bi-list-check me-1"></i>Instances</a>
+    </div>
+  </div>
+
+  <div id="reportMatrixAlert" class="alert d-none" role="alert"></div>
+
+  <div class="d-flex flex-wrap gap-2 mb-4">
+    <div class="card border-0 shadow-sm matrix-summary-card"><div class="card-body py-2"><div class="small text-muted">Students</div><div class="fs-5 fw-bold" data-progress-key="total"><%= progress.total %></div></div></div>
+    <div class="card border-0 shadow-sm matrix-summary-card"><div class="card-body py-2"><div class="small text-muted">Submitted</div><div class="fs-5 fw-bold text-success" data-progress-key="submitted"><%= progress.submitted %></div></div></div>
+    <div class="card border-0 shadow-sm matrix-summary-card"><div class="card-body py-2"><div class="small text-muted">Drafts</div><div class="fs-5 fw-bold text-warning" data-progress-key="drafts"><%= progress.drafts %></div></div></div>
+    <div class="card border-0 shadow-sm matrix-summary-card"><div class="card-body py-2"><div class="small text-muted">Not started</div><div class="fs-5 fw-bold text-info" data-progress-key="pending"><%= progress.pending %></div></div></div>
+  </div>
+
+  <% if (sharedFields.length || commonFields.length) { %>
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white py-3">
+        <h5 class="m-0 fw-bold"><i class="bi bi-people me-2 text-primary"></i>Common report fields</h5>
+        <div class="small text-muted mt-1">Shared values are saved once and used by every student report in this assignment.</div>
+      </div>
+      <div class="card-body">
+        <% if (sharedFields.some((field) => field.hasConflictingInitialValues)) { %>
+          <div class="alert alert-warning small">
+            One or more unsaved shared fields produced different student prefills. They are blank so the teacher can choose the common value explicitly.
+          </div>
+        <% } %>
+        <div class="row g-3">
+          <% [...commonFields, ...sharedFields].forEach((field) => { %>
+            <% const isSharedEditable = field.sharedAcrossStudents && !field.readOnly; %>
+            <% const value = field.value === undefined || field.value === null ? '' : field.value; %>
+            <div class="col-12 col-md-6 col-xl-4">
+              <label class="form-label fw-bold">
+                <%= field.label %>
+                <% if (field.helpText) { %><button type="button" class="matrix-help-icon" data-bs-toggle="tooltip" title="<%= field.helpText %>" aria-label="Information for <%= field.label %>"><i class="bi bi-info-circle"></i></button><% } %>
+                <% if (field.required) { %><span class="text-danger" title="Required" aria-label="Required">*</span><% } %>
+                <% if (field.sharedAcrossStudents) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %>
+                <% if (field.readOnly) { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } %>
+              </label>
+              <% if (field.type === 'textarea') { %>
+                <textarea class="form-control <%= isSharedEditable ? 'js-matrix-shared-field' : '' %>" rows="3" data-field-id="<%= field.id %>" placeholder="<%= field.placeholder || '' %>" <%= isSharedEditable ? '' : 'readonly' %>><%= value %></textarea>
+              <% } else if (field.type === 'select') { %>
+                <select class="form-select <%= isSharedEditable ? 'js-matrix-shared-field' : '' %>" data-field-id="<%= field.id %>" <%= isSharedEditable ? '' : 'disabled' %>>
+                  <option value="">Select...</option>
+                  <% field.options.forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %>
+                </select>
+              <% } else if (field.type === 'checkbox') { %>
+                <div class="form-check border rounded p-2 ps-5">
+                  <input type="checkbox" class="form-check-input <%= isSharedEditable ? 'js-matrix-shared-field' : '' %>" data-field-id="<%= field.id %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= isSharedEditable ? '' : 'disabled' %>>
+                  <label class="form-check-label">Checked</label>
+                </div>
+              <% } else { %>
+                <input type="<%= field.type === 'number' || field.type === 'date' ? field.type : 'text' %>" class="form-control <%= isSharedEditable ? 'js-matrix-shared-field' : '' %>" data-field-id="<%= field.id %>" value="<%= value %>" placeholder="<%= field.placeholder || '' %>" <%= isSharedEditable ? '' : 'readonly' %>>
+              <% } %>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div>
+        <h5 class="m-0 fw-bold"><i class="bi bi-table me-2 text-primary"></i>Student reports</h5>
+        <div class="small text-muted mt-1">Save or submit each student independently. Scroll horizontally to see every report field.</div>
+      </div>
+      <span class="badge bg-light text-dark border"><%= tableFields.length %> student-specific field(s)</span>
+    </div>
+    <div class="matrix-table-wrap">
+      <table class="table table-bordered table-hover align-middle mb-0 matrix-table" id="reportMatrixTable">
+        <thead class="table-light">
+          <tr>
+            <th class="matrix-student-col ps-3">Student</th>
+            <% tableFields.forEach((field) => { %>
+              <th>
+                <span><%= field.label %></span>
+                <% if (field.helpText) { %><button type="button" class="matrix-help-icon" data-bs-toggle="tooltip" title="<%= field.helpText %>" aria-label="Information for <%= field.label %>"><i class="bi bi-info-circle"></i></button><% } %>
+                <% if (field.required) { %><span class="text-danger" title="Required" aria-label="Required">*</span><% } %>
+                <% if (field.readOnly) { %><span class="badge bg-light text-secondary border d-block mt-1" style="width:max-content;">View only<%= field.calculated ? ' / calculated' : '' %></span><% } %>
+              </th>
+            <% }); %>
+            <th class="matrix-actions-col text-end pe-3">Status and actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach((row) => { %>
+            <tr data-student-id="<%= row.studentId %>" class="<%= row.locked ? 'table-secondary' : '' %>">
+              <td class="matrix-student-col ps-3">
+                <div class="fw-bold matrix-student-name"><%= row.studentName %></div>
+                <div class="small text-muted font-monospace"><%= row.studentId %></div>
+              </td>
+              <% tableFields.forEach((field) => { %>
+                <% const value = row.answers?.[field.id] === undefined || row.answers?.[field.id] === null ? '' : row.answers[field.id]; %>
+                <% const disabled = row.locked || field.readOnly; %>
+                <td data-matrix-cell="<%= field.id %>">
+                  <% if (field.type === 'textarea') { %>
+                    <textarea class="form-control form-control-sm js-matrix-row-field" rows="3" data-field-id="<%= field.id %>" placeholder="<%= field.placeholder || '' %>" <%= disabled ? 'readonly' : '' %>><%= value %></textarea>
+                  <% } else if (field.type === 'select') { %>
+                    <select class="form-select form-select-sm js-matrix-row-field" data-field-id="<%= field.id %>" <%= disabled ? 'disabled' : '' %>>
+                      <option value="">Select...</option>
+                      <% field.options.forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %>
+                    </select>
+                  <% } else if (field.type === 'checkbox') { %>
+                    <div class="form-check d-flex justify-content-center">
+                      <input type="checkbox" class="form-check-input js-matrix-row-field" data-field-id="<%= field.id %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %>>
+                    </div>
+                  <% } else { %>
+                    <input type="<%= field.type === 'number' || field.type === 'date' ? field.type : 'text' %>" class="form-control form-control-sm js-matrix-row-field" data-field-id="<%= field.id %>" value="<%= value %>" placeholder="<%= field.placeholder || '' %>" <%= disabled ? 'readonly' : '' %>>
+                  <% } %>
+                </td>
+              <% }); %>
+              <td class="text-end pe-3">
+                <div class="d-flex flex-column align-items-end gap-2">
+                  <span class="badge text-capitalize js-matrix-status <%= statusBadgeClass(row.status) %>"><%= row.status %></span>
+                  <div class="btn-group btn-group-sm">
+                    <a href="<%= row.editHref || '#' %>" class="btn btn-outline-secondary js-matrix-open <%= row.editHref ? '' : 'd-none' %>" target="_blank" rel="noopener noreferrer" title="Open individual report"><i class="bi bi-box-arrow-up-right"></i></a>
+                    <button type="button" class="btn btn-outline-primary js-matrix-save" data-action="save" <%= row.locked ? 'disabled' : '' %>><i class="bi bi-save me-1"></i>Save Draft</button>
+                    <button type="button" class="btn btn-success js-matrix-save" data-action="submit" <%= row.locked ? 'disabled' : '' %>><i class="bi bi-send-check me-1"></i>Submit</button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+          <% if (!rows.length) { %><tr><td colspan="<%= tableFields.length + 2 %>" class="text-center text-muted py-5">No students are targeted by this assignment.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const dataEl = document.getElementById('reportMatrixData');
+    const alertEl = document.getElementById('reportMatrixAlert');
+    let matrixState = JSON.parse(dataEl?.textContent || '{}');
+    const dirtyStudents = new Set();
+    let sharedDirty = false;
+
+    function initializeTooltips() {
+      if (typeof bootstrap === 'undefined' || !bootstrap?.Tooltip) return;
+      document.querySelectorAll('.report-matrix-page [data-bs-toggle="tooltip"]').forEach((el) => {
+        if (!bootstrap.Tooltip.getInstance(el)) new bootstrap.Tooltip(el);
+      });
+    }
+
+    function showAlert(message, kind) {
+      if (!alertEl) return;
+      alertEl.className = `alert alert-${kind || 'info'}`;
+      alertEl.textContent = String(message || '');
+      alertEl.classList.toggle('d-none', !message);
+      if (message) alertEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function readControl(control) {
+      if (!control) return '';
+      if (control.type === 'checkbox') return control.checked;
+      if (control.type === 'number') {
+        if (control.value === '') return '';
+        const value = Number(control.value);
+        return Number.isFinite(value) ? value : control.value;
+      }
+      return control.value;
+    }
+
+    function writeControl(control, value) {
+      if (!control) return;
+      if (control.type === 'checkbox') control.checked = value === true || String(value).toLowerCase() === 'true';
+      else control.value = value === undefined || value === null ? '' : String(value);
+    }
+
+    function collectControls(container, selector) {
+      const out = {};
+      container.querySelectorAll(selector).forEach((control) => {
+        const fieldId = String(control.dataset.fieldId || '').trim();
+        if (fieldId) out[fieldId] = readControl(control);
+      });
+      return out;
+    }
+
+    function badgeClass(status) {
+      const token = String(status || '').toLowerCase();
+      if (token === 'submitted') return 'badge text-capitalize js-matrix-status bg-success';
+      if (token === 'locked') return 'badge text-capitalize js-matrix-status bg-dark';
+      if (token === 'draft') return 'badge text-capitalize js-matrix-status bg-warning text-dark';
+      return 'badge text-capitalize js-matrix-status bg-info-subtle text-info-emphasis border';
+    }
+
+    function applyMatrixState(nextMatrix, savedStudentId) {
+      if (!nextMatrix || typeof nextMatrix !== 'object') return;
+      matrixState = nextMatrix;
+      (nextMatrix.sharedFields || []).forEach((field) => {
+        writeControl(document.querySelector(`.js-matrix-shared-field[data-field-id="${CSS.escape(field.id)}"]`), field.value);
+      });
+      (nextMatrix.commonFields || []).forEach((field) => {
+        writeControl(document.querySelector(`[data-field-id="${CSS.escape(field.id)}"]:not(.js-matrix-row-field)`), field.value);
+      });
+      const fieldMap = new Map((nextMatrix.tableFields || []).map((field) => [String(field.id), field]));
+      (nextMatrix.rows || []).forEach((rowState) => {
+        const row = document.querySelector(`tr[data-student-id="${CSS.escape(String(rowState.studentId))}"]`);
+        if (!row) return;
+        row.querySelectorAll('.js-matrix-row-field').forEach((control) => {
+          const field = fieldMap.get(String(control.dataset.fieldId || ''));
+          if (!field) return;
+          if (String(rowState.studentId) === String(savedStudentId) || field.readOnly || field.calculated) {
+            writeControl(control, rowState.answers?.[field.id]);
+          }
+        });
+        const status = row.querySelector('.js-matrix-status');
+        if (status) {
+          status.className = badgeClass(rowState.status);
+          status.textContent = rowState.status;
+        }
+        const openLink = row.querySelector('.js-matrix-open');
+        if (openLink && rowState.editHref) {
+          openLink.href = rowState.editHref;
+          openLink.classList.remove('d-none');
+        }
+        row.querySelectorAll('.js-matrix-save').forEach((button) => { button.disabled = Boolean(rowState.locked); });
+        row.classList.toggle('table-secondary', Boolean(rowState.locked));
+      });
+      Object.entries(nextMatrix.progress || {}).forEach(([key, value]) => {
+        const target = document.querySelector(`[data-progress-key="${CSS.escape(key)}"]`);
+        if (target) target.textContent = String(value);
+      });
+    }
+
+    async function saveRow(button) {
+      const row = button.closest('tr[data-student-id]');
+      if (!row) return;
+      const studentId = String(row.dataset.studentId || '');
+      const submitAction = String(button.dataset.action || 'save');
+      const actionButtons = Array.from(row.querySelectorAll('.js-matrix-save'));
+      actionButtons.forEach((item) => { item.disabled = true; });
+      showAlert('', 'info');
+      const loadingToken = typeof window.showLoading === 'function'
+        ? window.showLoading(submitAction === 'submit' ? 'Submitting student report...' : 'Saving student report...')
+        : null;
+      try {
+        const response = await fetch(`/school/reports/instances/matrix/${encodeURIComponent(matrixState.assignmentId)}/save-row`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'x-ajax-request': 'true',
+            'x-action-state-id': String(document.getElementById('reportMatrixActionStateId')?.value || '')
+          },
+          body: JSON.stringify({
+            assignmentRowId: matrixState.assignmentRowId,
+            teacherId: matrixState.teacherId,
+            studentId,
+            submitAction,
+            answers: collectControls(row, '.js-matrix-row-field'),
+            sharedAnswers: collectControls(document, '.js-matrix-shared-field'),
+            actionStateId: String(document.getElementById('reportMatrixActionStateId')?.value || '')
+          })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Unable to save this report row.');
+        applyMatrixState(result.matrix, studentId);
+        dirtyStudents.delete(studentId);
+        row.classList.remove('matrix-row-dirty');
+        sharedDirty = false;
+        showAlert(result.message || 'Report saved.', 'success');
+      } catch (error) {
+        showAlert(error.message, 'danger');
+      } finally {
+        const latest = (matrixState.rows || []).find((item) => String(item.studentId) === studentId);
+        actionButtons.forEach((item) => { item.disabled = Boolean(latest?.locked); });
+        if (typeof window.hideLoading === 'function') window.hideLoading(loadingToken || { force: true });
+      }
+    }
+
+    document.querySelectorAll('.js-matrix-row-field').forEach((control) => {
+      control.addEventListener('change', () => {
+        const row = control.closest('tr[data-student-id]');
+        if (!row) return;
+        dirtyStudents.add(String(row.dataset.studentId || ''));
+        row.classList.add('matrix-row-dirty');
+      });
+      control.addEventListener('input', () => {
+        const row = control.closest('tr[data-student-id]');
+        if (!row) return;
+        dirtyStudents.add(String(row.dataset.studentId || ''));
+        row.classList.add('matrix-row-dirty');
+      });
+    });
+    document.querySelectorAll('.js-matrix-shared-field').forEach((control) => {
+      control.addEventListener('change', () => { sharedDirty = true; });
+      control.addEventListener('input', () => { sharedDirty = true; });
+    });
+    document.querySelectorAll('.js-matrix-save').forEach((button) => {
+      button.addEventListener('click', () => saveRow(button));
+    });
+    window.addEventListener('beforeunload', (event) => {
+      if (!sharedDirty && dirtyStudents.size === 0) return;
+      event.preventDefault();
+      event.returnValue = '';
+    });
+    initializeTooltips();
+  })();
+</script>

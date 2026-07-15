@@ -113,6 +113,63 @@ async function requireReportInstanceEditorAccess(req, res, next) {
   }
 }
 
+async function requireReportMatrixEditorAccess(req, res, next) {
+  try {
+    if (!req.user) return res.status(401).json({ status: 'error', message: 'Authentication required before access check.' });
+    if (adminAuthorityService.isSuperAdmin(req.user) || req.adminContext?.isSuperAdmin) {
+      req.accessLimits = {};
+      req.adminContext = req.adminContext || adminAuthorityService.resolveAdminAuthority({
+        user: req.user,
+        sectionId: REPORT_INSTANCE_SECTION,
+        operationId: OPERATIONS.UPDATE
+      });
+      res.locals.adminContext = req.adminContext;
+      return next();
+    }
+
+    const updateEvaluation = await accessService.evaluateAccess({
+      user: req.user,
+      sectionId: REPORT_INSTANCE_SECTION,
+      operationId: OPERATIONS.UPDATE,
+      ipAddress: req.ip
+    });
+    if (updateEvaluation?.allowed) {
+      attachAccessEvaluation(req, res, updateEvaluation);
+      return next();
+    }
+
+    const createEvaluation = await accessService.evaluateAccess({
+      user: req.user,
+      sectionId: REPORT_INSTANCE_SECTION,
+      operationId: OPERATIONS.CREATE,
+      ipAddress: req.ip
+    });
+    if (!createEvaluation?.allowed) {
+      return sendReportInstanceAccessRequired(req, res, updateEvaluation?.reason || createEvaluation?.reason);
+    }
+
+    const input = req.method === 'GET' ? (req.query || {}) : (req.body || {});
+    const resolved = await reportIntegrityService.resolveStartInstanceContext({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: input.assignmentRowId || input.rowId || '',
+      reqUser: req.user,
+      requestedTeacherId: input.teacherId || '',
+      fallbackTeacherId: req.user?.personId || req.user?.id || '',
+      requestedStudentId: input.studentId || ''
+    });
+    const viewerPersonId = toPublicId(req.user?.personId || req.user?.id || '');
+    if (!viewerPersonId || !idsEqual(resolved.teacherId, viewerPersonId)) {
+      return sendReportInstanceAccessRequired(req, res, 'Only the assigned teacher or a report instance editor can use this report matrix.');
+    }
+
+    attachAccessEvaluation(req, res, createEvaluation);
+    req.reportInstanceParticipantAccess = true;
+    return next();
+  } catch (error) {
+    return sendReportInstanceAccessRequired(req, res, error?.message || 'Report matrix access is required.');
+  }
+}
+
 router.get('/',
   requireAccess(REPORT_NAV_SECTION, OPERATIONS.READ_ALL),
   trackActionState(REPORT_NAV_SECTION, OPERATIONS.READ_ALL),
@@ -231,6 +288,20 @@ router.get('/person-reports',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
   ctrl.listPersonReports);
+
+router.get('/instances/matrix/:assignmentId',
+  requireReportMatrixEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  ctrl.showReportMatrix);
+
+router.post('/instances/matrix/:assignmentId/save-row',
+  requireReportMatrixEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.saveReportMatrixRow);
 
 router.get('/instances/start/:assignmentId',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),

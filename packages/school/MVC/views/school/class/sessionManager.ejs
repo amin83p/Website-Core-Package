@@ -1454,7 +1454,7 @@
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
                         <div>
                             <h5 class="m-0 fw-bold text-primary"><i class="bi bi-clipboard-check me-2"></i>Report instances</h5>
-                            <div class="small text-muted mt-1">Concrete report instances for this session (one row per student or class target). Use <strong>Open V2</strong> or <strong>Start</strong> to fill out reports. Admin users can assign a new report directly from this panel.</div>
+                            <div class="small text-muted mt-1">Reports are grouped by template and assigned teacher. Use <strong>Fill Reports</strong> for the student matrix, or open an individual report when needed.</div>
                         </div>
                         <div class="d-flex flex-wrap gap-2 flex-shrink-0">
                             <% if (canAssignSessionReports) { %>
@@ -2553,24 +2553,47 @@ document.addEventListener('DOMContentLoaded', () => {
             syncPendingReportsHint();
             return;
         }
-        body.innerHTML = rows.map((row) => {
-            const statusLabel = String(row.statusLabel || row.status || 'draft');
-            const badgeClass = String(row.statusBadgeClass || 'bg-warning text-dark');
-            const actionLabel = String(row.actionLabel || (row.isPending ? 'Start' : 'Open V2'));
-            const href = String(row.href || '#');
-            const studentSub = row.studentId
-                ? `<div class="small text-muted font-monospace">${scEscapeHtml(row.studentId)}</div>`
-                : '';
-            return `
-                <tr data-report-instance-id="${scEscapeHtml(row.id)}">
-                    <td class="ps-4 fw-semibold">${scEscapeHtml(row.templateTitle)}</td>
-                    <td>${scEscapeHtml(row.studentName)}${studentSub}</td>
-                    <td>${scEscapeHtml(row.teacherName)}</td>
-                    <td><span class="badge ${badgeClass} text-capitalize">${scEscapeHtml(statusLabel)}</span></td>
-                    <td class="pe-4 text-end">
-                        <a href="${scEscapeHtml(href)}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</a>
+        const groups = new Map();
+        rows.forEach((row) => {
+            const key = String(row.matrixGroupKey || [row.assignmentId, row.assignmentRowId, row.teacherId, row.templateTitle].join('|'));
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(row);
+        });
+        body.innerHTML = Array.from(groups.values()).map((groupRows) => {
+            const first = groupRows[0] || {};
+            const matrixHref = String(first.matrixHref || '');
+            const groupHeader = `
+                <tr class="table-primary-subtle border-top">
+                    <td colspan="5" class="px-4 py-3">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div>
+                                <div class="fw-bold text-primary">${scEscapeHtml(first.templateTitle || 'Report')}</div>
+                                <div class="small text-muted">${scEscapeHtml(first.teacherName || '-')} · ${groupRows.length} student target(s) · ${scEscapeHtml(first.scopeLabel || '')}</div>
+                            </div>
+                            ${matrixHref ? `<a href="${scEscapeHtml(matrixHref)}" class="btn btn-sm btn-primary"><i class="bi bi-table me-1"></i>Fill Reports</a>` : ''}
+                        </div>
                     </td>
                 </tr>`;
+            const instanceRows = groupRows.map((row) => {
+                const statusLabel = String(row.statusLabel || row.status || 'draft');
+                const badgeClass = String(row.statusBadgeClass || 'bg-warning text-dark');
+                const actionLabel = String(row.actionLabel || (row.isPending ? 'Start' : 'Open V2'));
+                const href = String(row.href || '#');
+                const studentSub = row.studentId
+                    ? `<div class="small text-muted font-monospace">${scEscapeHtml(row.studentId)}</div>`
+                    : '';
+                return `
+                    <tr data-report-instance-id="${scEscapeHtml(row.id)}">
+                        <td class="ps-4"><span class="text-muted small">Individual report</span></td>
+                        <td class="fw-semibold">${scEscapeHtml(row.studentName)}${studentSub}</td>
+                        <td>${scEscapeHtml(row.teacherName)}</td>
+                        <td><span class="badge ${badgeClass} text-capitalize">${scEscapeHtml(statusLabel)}</span></td>
+                        <td class="pe-4 text-end">
+                            <a href="${scEscapeHtml(href)}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</a>
+                        </td>
+                    </tr>`;
+            }).join('');
+            return groupHeader + instanceRows;
         }).join('');
         syncPendingReportsHint();
     }

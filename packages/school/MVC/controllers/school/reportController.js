@@ -13,6 +13,8 @@ const reportIntegrityService = require('../../services/school/reportIntegritySer
 const reportViewService = require('../../services/school/reportViewService');
 const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
+const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
+const reportMatrixService = require('../../services/school/reportMatrixService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const classReferenceSyncService = require('../../services/school/classReferenceSyncService');
@@ -1255,81 +1257,15 @@ async function saveInstance(req, res) {
       reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
     );
 
-    const mergedBeforeSave = reportService.mergeTemplateData(template, instance, effectiveAssignment);
-    const parsedAnswers = reportViewService.buildInstanceAnswers(template, req.body, mergedBeforeSave);
-    const recomputedBeforeSave = reportService.recomputeCalculatedAnswers({
+    const saveResult = await reportInstanceSaveService.persistInstanceAnswers({
+      instance,
       template,
-      mergedAnswers: parsedAnswers.answers,
-      prefill: instance?.prefillSnapshot || {}
+      assignment: effectiveAssignment,
+      body: req.body,
+      submitAction: req.body?.submitAction,
+      reqUser: req.user
     });
-    const fullAnswers = recomputedBeforeSave.answers;
-    const { studentAnswers, sharedAnswers } = reportService.partitionInstanceSave(template, effectiveAssignment, fullAnswers);
-    const nextStatus = reportViewService.resolveInstanceNextStatus(instance, req.body.submitAction);
-
-    const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
-    const sharedFieldIds = fields
-      .filter((f) => {
-        const type = String(f?.type || '').trim().toLowerCase();
-        const visualOnly = type === 'section' || type === 'subheader' || type === 'row_break';
-        return !visualOnly && f?.sharedAcrossStudents === true;
-      })
-      .map((f) => f.id);
-    const eachStudent = String(effectiveAssignment?.reportScope || '').trim().toLowerCase() === 'each_student';
-    const nextShared = {};
-    if (eachStudent && sharedFieldIds.length > 0) {
-      sharedFieldIds.forEach((fid) => {
-        nextShared[fid] = sharedAnswers[fid];
-      });
-    }
-
-    const assignmentForValidation = eachStudent
-      ? {
-          ...(assignment || {}),
-          sharedAnswers: {
-          ...((effectiveAssignment?.sharedAnswers && typeof effectiveAssignment.sharedAnswers === 'object') ? effectiveAssignment.sharedAnswers : {}),
-            ...sharedAnswers
-          }
-        }
-      : effectiveAssignment;
-    const mergedForValidation = reportService.mergeTemplateData(
-      template,
-      {
-        ...(instance || {}),
-        answers: studentAnswers,
-        prefillSnapshot: instance?.prefillSnapshot || {}
-      },
-      assignmentForValidation
-    );
-    const validationSummary = reportRuleEngineService.evaluateTemplateValidations({
-      template,
-      mergedAnswers: mergedForValidation,
-      prefill: instance?.prefillSnapshot || {},
-      extraIssues: parsedAnswers.issues
-    });
-    const isSubmitAction = String(req.body?.submitAction || '').trim().toLowerCase() === 'submit';
-    if (isSubmitAction && validationSummary.hasBlockingErrors) {
-      const firstError = validationSummary.errors[0];
-      const message = validationSummary.errors.length > 1
-        ? `${firstError.message} (+${validationSummary.errors.length - 1} more validation error(s)).`
-        : firstError.message;
-      throw new Error(message);
-    }
-
-    if (eachStudent && sharedFieldIds.length > 0 && effectiveAssignment?.id) {
-      await schoolDataService.updateData('reportAssignments', effectiveAssignment.id, {
-        sharedAnswers: nextShared
-      }, req.user);
-    }
-
-    await schoolDataService.updateData('reportInstances', instance.id, {
-      answers: studentAnswers,
-      status: nextStatus,
-      audit: {
-        lastUpdateUser: req.user?.id || '',
-        lastUpdateDateTime: new Date().toISOString(),
-        submittedAt: nextStatus === 'submitted' ? (instance.audit?.submittedAt || new Date().toISOString()) : instance.audit?.submittedAt
-      }
-    }, req.user);
+    const validationSummary = saveResult.validationSummary;
 
     const payloadOut = {
       status: 'success',
@@ -1346,6 +1282,83 @@ async function saveInstance(req, res) {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+async function showReportMatrix(req, res) {
+  try {
+    const matrix = await reportMatrixService.buildMatrixContext({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: req.query.assignmentRowId || req.query.rowId || '',
+      teacherId: req.query.teacherId || '',
+      reqUser: req.user
+    });
+    return res.render('school/report/instanceMatrix', {
+      title: `Fill Reports: ${matrix.templateTitle}`,
+      matrix,
+      includeModal: true,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    return res.status(400).render('error', {
+      title: 'Unable to Open Report Matrix',
+      message: error.message,
+      user: req.user
+    });
+  }
+}
+
+async function saveReportMatrixRow(req, res) {
+  let guardKey = '';
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    guardKey = idempotencyGuardService.createGuardKey([
+      'report_matrix_row_save',
+      activeOrgId,
+      String(req.params.assignmentId || '').trim(),
+      String(body.assignmentRowId || '').trim(),
+      String(body.teacherId || '').trim(),
+      String(body.studentId || '').trim(),
+      String(body.submitAction || 'save').trim(),
+      body.answers || {},
+      body.sharedAnswers || {}
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 120000,
+      replayTtlMs: 15000
+    });
+    if (sendGuardedResponse(res, guardResult, 'This report row save is already in progress. Please wait.')) return;
+
+    const result = await reportMatrixService.saveMatrixRow({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: body.assignmentRowId || '',
+      teacherId: body.teacherId || '',
+      studentId: body.studentId || '',
+      submitAction: body.submitAction || 'save',
+      answers: body.answers && typeof body.answers === 'object' ? body.answers : {},
+      sharedAnswers: body.sharedAnswers && typeof body.sharedAnswers === 'object' ? body.sharedAnswers : {},
+      reqUser: req.user
+    });
+    const payloadOut = {
+      status: 'success',
+      message: result.status === 'submitted' ? 'Report submitted successfully.' : 'Report draft saved successfully.',
+      instanceId: result.instanceId,
+      reportStatus: result.status,
+      validation: result.validation,
+      matrix: result.matrix
+    };
+    idempotencyGuardService.completeGuard(guardKey, payloadOut);
+    return res.json(payloadOut);
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    return res.status(400).json({
+      status: 'error',
+      message: error.message,
+      validation: error.validationSummary || null
+    });
   }
 }
 
@@ -1641,6 +1654,8 @@ module.exports = {
   startInstance,
   showInstanceEditor,
   showInstanceEditorV2,
+  showReportMatrix,
+  saveReportMatrixRow,
   saveInstance,
   previewInstancePrefillRefresh,
   applyInstancePrefillRefresh,

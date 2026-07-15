@@ -1590,7 +1590,7 @@ function mergeTemplateData(template, instance, assignment = null) {
   const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object' ? instance.prefillSnapshot : {};
   const answers = instance?.answers && typeof instance.answers === 'object' ? instance.answers : {};
   const sharedRaw = assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object' ? assignment.sharedAnswers : {};
-  const eachStudent = String(assignment?.reportScope || '').trim().toLowerCase() === 'each_student';
+  const studentTargeted = isStudentTargetedScope(assignment?.reportScope);
 
   const merged = { ...prefill, ...answers };
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
@@ -1607,7 +1607,7 @@ function mergeTemplateData(template, instance, assignment = null) {
         return;
       }
     }
-    const useShared = eachStudent && field.sharedAcrossStudents === true;
+    const useShared = studentTargeted && field.sharedAcrossStudents === true;
     if (useShared) {
       if (Object.prototype.hasOwnProperty.call(sharedRaw, field.id)) {
         merged[field.id] = sharedRaw[field.id];
@@ -1637,11 +1637,11 @@ function mergeTemplateData(template, instance, assignment = null) {
 
 /**
  * Split full template answers for persistence: shared field values live on the assignment
- * when reportScope is each_student; otherwise all values stay on the instance.
+ * for student-targeted scopes; class-scope values stay on the instance.
  */
 function partitionInstanceSave(template, assignment, fullAnswers) {
   const scope = String(assignment?.reportScope || '').trim().toLowerCase();
-  const eachStudent = scope === 'each_student';
+  const studentTargeted = isStudentTargetedScope(scope);
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
   const studentAnswers = {};
   const sharedAnswers = {};
@@ -1649,7 +1649,7 @@ function partitionInstanceSave(template, assignment, fullAnswers) {
   fields.forEach((field) => {
     if (isVisualOnlyField(field) || !field?.id) return;
     const val = fullAnswers[field.id];
-    if (eachStudent && field.sharedAcrossStudents === true) {
+    if (studentTargeted && field.sharedAcrossStudents === true) {
       sharedAnswers[field.id] = val;
     } else {
       studentAnswers[field.id] = val;
@@ -1657,6 +1657,11 @@ function partitionInstanceSave(template, assignment, fullAnswers) {
   });
 
   return { studentAnswers, sharedAnswers };
+}
+
+function isStudentTargetedScope(scopeRaw) {
+  const scope = String(scopeRaw || '').trim().toLowerCase();
+  return scope === 'each_student' || scope === 'selected_students';
 }
 
 function buildPlaceholderPayloadDetailed(template, instance, assignment = null) {
@@ -1764,6 +1769,7 @@ module.exports = {
   // Runs dependency-aware calculated fields on merged answers.
   recomputeCalculatedAnswers: reportRuleEngineService.recomputeCalculatedAnswers,
   mergeTemplateData,
+  isStudentTargetedScope,
   partitionInstanceSave,
   buildPlaceholderPayloadDetailed,
   buildPlaceholderPayload,
