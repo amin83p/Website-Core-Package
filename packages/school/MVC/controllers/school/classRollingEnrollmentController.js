@@ -28,6 +28,8 @@ const programRegistrationDraftService = require('../../services/school/programRe
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
+const registrationFinanceLifecycleService = require('../../services/school/registrationFinanceLifecycleService');
+const registrationStatusLifecycleService = require('../../services/school/registrationStatusLifecycleService');
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
@@ -2611,17 +2613,28 @@ async function createClassEnrollmentWithTransactions(req, res) {
 
     const pendingGapBatch = parsePendingGapBatchFromBody(req.body);
     const pendingStagedSessions = parsePendingStagedSessionsFromBody(req.body);
+    const draftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+      draftPeriod.transactionSummary,
+      finalDraftState.items,
+      {
+        registrationType: 'class',
+        registrationId: draftPeriodId,
+        orgId: classData.orgId
+      },
+      { requestingUser: req.user }
+    );
     const updatedDraft = await schoolDataService.updateClassEnrollmentPeriod(draftPeriodId, {
       status: 'draft',
       notes: enrollmentPayload.notes || `Draft rolling enrollment for class ${classData.id}.`,
       transactionSummary: {
+        ...draftFinance.summary,
         mode: 'chargeable',
         currency,
         totalAmount: roundMoney(finalDraftState.totalAmount || 0),
         transactionCount: finalDraftState.previewRows.length,
-        draftTransactionItems: finalDraftState.items,
+        draftTransactionItems: draftFinance.items,
         draftPreviewRows: finalDraftState.previewRows,
-        postedTransactionIds: [],
+        draftTransactionIds: draftFinance.transactionIds,
         draftSavedAt: new Date().toISOString(),
         note: 'Draft generated before posting.',
         pendingGapBatch: pendingGapBatch || null,
@@ -2638,7 +2651,7 @@ async function createClassEnrollmentWithTransactions(req, res) {
         period: updatedDraft || draftPeriod,
         draft: {
           draftPreviewRows: finalDraftState.previewRows,
-          draftTransactionItems: finalDraftState.items,
+          draftTransactionItems: draftFinance.items,
           totalAmount: roundMoney(finalDraftState.totalAmount || 0)
         }
       }
@@ -2705,9 +2718,18 @@ async function saveClassEnrollmentDraft(req, res) {
     const nextStartDate = String(req.body?.startDate || period?.startDate || '').trim();
     if (!nextStartDate) throw new Error('startDate is required.');
     const nextEndDate = String(req.body?.endDate || period?.endDate || '').trim();
-    const nextStatusRaw = String(req.body?.status || 'draft').trim().toLowerCase();
-    const nextStatus = ['draft', 'planned', 'active'].includes(nextStatusRaw) ? nextStatusRaw : 'draft';
+    const nextStatus = 'draft';
     const currency = String(finalDraftState.previewRows[0]?.currency || 'CAD').trim().toUpperCase() || 'CAD';
+    const draftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+      period.transactionSummary,
+      finalDraftState.items,
+      {
+        registrationType: 'class',
+        registrationId: periodId,
+        orgId: classData.orgId
+      },
+      { requestingUser: req.user }
+    );
 
     const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate: nextStartDate,
@@ -2721,15 +2743,14 @@ async function saveClassEnrollmentDraft(req, res) {
       sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || period?.sessionCountPolicy),
       notes: String(req.body?.notes || period?.notes || '').trim(),
       transactionSummary: {
+        ...draftFinance.summary,
         mode: 'chargeable',
         currency,
         totalAmount: roundMoney(finalDraftState.totalAmount || 0),
         transactionCount: finalDraftState.previewRows.length,
-        draftTransactionItems: finalDraftState.items,
+        draftTransactionItems: draftFinance.items,
         draftPreviewRows: finalDraftState.previewRows,
-        postedTransactionIds: Array.isArray(period?.transactionSummary?.postedTransactionIds)
-          ? period.transactionSummary.postedTransactionIds
-          : [],
+        draftTransactionIds: draftFinance.transactionIds,
         draftSavedAt: new Date().toISOString(),
         postedAt: String(period?.transactionSummary?.postedAt || '').trim(),
         note: String(req.body?.draftNote || '').trim()
@@ -2856,7 +2877,8 @@ async function tryPostAcademicLedgerForRollingClassEnrollment({
     classData,
     student,
     effectiveDate = '',
-    note = ''
+    note = '',
+    postingCycle = null
 }) {
     const periodId = String(period?.id || '').trim();
     const base = { periodId };
@@ -2904,7 +2926,11 @@ async function tryPostAcademicLedgerForRollingClassEnrollment({
             creditsAttempted: null,
             effectiveDate: eff,
             note: String(note || '').trim(),
-            source: {
+            source: postingCycle ? registrationFinanceLifecycleService.scopeAcademicSource({
+                module: 'school_class_enrollment',
+                eventId: `CEP-${period.id}-rolling`,
+                idempotencyKey: `rolling|cep|${period.id}|class_enrolled`
+            }, postingCycle) : {
                 module: 'school_class_enrollment',
                 eventId: `CEP-${period.id}-rolling`,
                 idempotencyKey: `rolling|cep|${period.id}|class_enrolled`
@@ -3007,11 +3033,15 @@ async function syncAcademicLedgerForEnrollmentPeriod(req, res) {
 
 async function approveClassEnrollmentDraft(req, res) {
   let guardKey = '';
+  let approvalPeriod = null;
+  let approvalPostingCycleState = null;
+  let approvalPostedTransactionIds = [];
   try {
     const periodId = toPublicId(req.params?.periodId || req.body?.periodId || '');
     if (!periodId) throw new Error('periodId is required.');
     const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
     if (!period) throw new Error('Enrollment period not found.');
+    approvalPeriod = period;
 
     const { classData } = await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
@@ -3065,12 +3095,31 @@ async function approveClassEnrollmentDraft(req, res) {
       externalReference: String(req.body?.authorizationRef || period?.authorizationRef || '').trim(),
       requestUser: req.user
     });
+    const approvalDraftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+      period.transactionSummary,
+      finalDraftState.items,
+      {
+        registrationType: 'class',
+        registrationId: periodId,
+        orgId: classData.orgId
+      },
+      { requestingUser: req.user }
+    );
+    approvalPostingCycleState = {
+      summary: approvalDraftFinance.summary,
+      cycle: approvalDraftFinance.cycle
+    };
+    const cycleScopedItems = approvalDraftFinance.items;
 
-    const postedTransactions = await schoolDataService.addData('globalTransactions', finalDraftState.items, req.user);
+    const postedTransactions = await registrationFinanceLifecycleService.postCycleTransactions(
+      cycleScopedItems,
+      { requestingUser: req.user }
+    );
     const postedRows = Array.isArray(postedTransactions) ? postedTransactions : [postedTransactions];
     const postedTransactionIds = postedRows
       .map((row) => toPublicId(row?.id || ''))
       .filter(Boolean);
+    approvalPostedTransactionIds = postedTransactionIds;
     const currency = String(finalDraftState.previewRows[0]?.currency || 'CAD').trim().toUpperCase() || 'CAD';
 
     let inferredLedgerProgramId = resolveProgramIdFromClassEnrollmentSnapshot(period, classData);
@@ -3092,7 +3141,7 @@ async function approveClassEnrollmentDraft(req, res) {
     const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate: String(req.body?.startDate || period?.startDate || '').trim(),
       endDate: String(req.body?.endDate || period?.endDate || '').trim(),
-      status: String(req.body?.status || 'active').trim().toLowerCase() || 'active',
+      status: 'active',
       programId: programIdToStore,
       termId: termIdToStore,
       funderType: String(req.body?.funderType || period?.funderType || '').trim(),
@@ -3105,12 +3154,13 @@ async function approveClassEnrollmentDraft(req, res) {
         ? rollingEnrollmentSessionAlignmentService.parsePlannedNaSessionIdsFromBody(req.body)
         : rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(period?.plannedNotApplicableSessionIds),
       notes: String(req.body?.notes || period?.notes || '').trim(),
-      transactionSummary: {
+      transactionSummary: registrationFinanceLifecycleService.updatePostingCycle({
+        ...approvalPostingCycleState.summary,
         mode: 'chargeable',
         currency,
         totalAmount: roundMoney(finalDraftState.totalAmount || 0),
         transactionCount: finalDraftState.previewRows.length,
-        draftTransactionItems: finalDraftState.items,
+        draftTransactionItems: cycleScopedItems,
         draftPreviewRows: finalDraftState.previewRows,
         postedTransactionIds,
         postedAt: new Date().toISOString(),
@@ -3119,7 +3169,14 @@ async function approveClassEnrollmentDraft(req, res) {
         pendingGapBatch: null,
         pendingStagedSessions: null,
         extendCycleEndDate: false
-      }
+      }, approvalPostingCycleState.cycle.cycleNo, {
+        status: 'posted',
+        postedAt: new Date().toISOString(),
+        transactionIds: postedTransactionIds,
+        reversalIds: [],
+        unresolvedTransactionIds: [],
+        issues: []
+      }, { registrationType: 'class', registrationId: periodId })
     }, req.user);
 
     const periodForLedger = updated || period;
@@ -3138,8 +3195,10 @@ async function approveClassEnrollmentDraft(req, res) {
       classData: classAfterApprove,
       student,
       effectiveDate: String(req.body?.startDate || periodForLedger?.startDate || '').trim(),
-      note: String(req.body?.notes || periodForLedger?.notes || '').trim()
+      note: String(req.body?.notes || periodForLedger?.notes || '').trim(),
+      postingCycle: approvalPostingCycleState.cycle
     });
+    if (academicLedger?.status === 'error') throw new Error(academicLedger.message || 'Academic ledger post failed.');
 
     await materializeEnrollmentPlannedNa({
       classData: classAfterApprove,
@@ -3161,6 +3220,52 @@ async function approveClassEnrollmentDraft(req, res) {
     idempotencyGuardService.completeGuard(guardKey, payloadOut);
     return res.json(payloadOut);
   } catch (error) {
+    if (approvalPeriod && approvalPostingCycleState && approvalPostedTransactionIds.length) {
+      try {
+        const academicEntryIds = await registrationIntegrityService.discoverRollingClassEnrollmentLedgerEntryIds({
+          periodId: approvalPeriod.id,
+          classId: approvalPeriod.classId,
+          studentId: approvalPeriod.studentId,
+          reqUser: req.user
+        });
+        const academicRollback = await registrationIntegrityService.rollbackRegistrationSideEffects({
+          registrationId: approvalPeriod.id,
+          transactionIds: [],
+          academicEntryIds,
+          reqUser: req.user,
+          reason: `Class enrollment approval failed for ${approvalPeriod.id}. ${error.message}`,
+          reverseEventPrefix: 'CLSENRREV'
+        });
+        const financeRollback = await registrationFinanceLifecycleService.returnPostedSummaryToDraft(
+          approvalPostingCycleState.summary,
+          {
+            registrationType: 'class',
+            registrationId: approvalPeriod.id,
+            orgId: approvalPeriod.orgId,
+            transactionIds: approvalPostedTransactionIds,
+            reason: `Class enrollment approval failed for ${approvalPeriod.id}. ${error.message}`
+          },
+          { requestingUser: req.user }
+        );
+        const rollbackIssues = [
+          ...(academicRollback.issues || []),
+          ...(financeRollback.issues || [])
+        ];
+        const rollbackSucceeded = rollbackIssues.length === 0;
+        const transactionSummary = {
+          ...financeRollback.summary,
+          reconciliationIssues: rollbackIssues,
+          unresolvedTransactionIds: rollbackSucceeded ? [] : approvalPostedTransactionIds
+        };
+        await schoolDataService.updateClassEnrollmentPeriod(approvalPeriod.id, {
+          status: rollbackSucceeded ? 'draft' : 'error',
+          transactionSummary,
+          reasonEnd: [approvalPeriod.reasonEnd, `Approval failed: ${error.message}`].filter(Boolean).join(' | ')
+        }, req.user);
+      } catch (rollbackError) {
+        error.message = `${error.message} Rollback also failed: ${rollbackError.message}`;
+      }
+    }
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
     return res.status(400).json({ status: 'error', message: error.message });
   }
@@ -3196,6 +3301,10 @@ async function editClassEnrollmentPeriod(req, res) {
     const status = ['draft', 'planned', 'active', 'completed', 'withdrawn', 'cancelled', 'archived', 'error'].includes(statusInput)
       ? statusInput
       : String(periodRow?.status || 'active').trim().toLowerCase();
+    const currentStatus = String(periodRow?.status || '').trim().toLowerCase();
+    if (status !== currentStatus) {
+      throw new Error('Registration status cannot be changed from the general edit action. Use the registration status workflow.');
+    }
     const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(
       req.body?.targetSessionCount !== undefined ? req.body?.targetSessionCount : periodRow?.targetSessionCount
     );
@@ -3248,7 +3357,12 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
     const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
     assertRollingWorkflowEnabledForClass(req, classData);
 
-    const eligibility = await classEnrollmentDeleteService.assessEnrollmentDeleteEligibility(periodRow, classData, req.user);
+    const eligibility = await classEnrollmentDeleteService.assessEnrollmentDeleteEligibility(
+      periodRow,
+      classData,
+      req.user,
+      { allowPostedRollback: true }
+    );
     if (!eligibility.canDelete) {
       const payload = {
         status: 'error',
@@ -3295,8 +3409,25 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
       reqUser: req.user
     });
     if (currentStatus === 'draft' || !postedTransactionIds.length) {
+      const financeSettlement = await registrationFinanceLifecycleService.settleSummaryForVoid(
+        periodRow.transactionSummary,
+        {
+          registrationType: 'class',
+          registrationId: periodId,
+          orgId: classData.orgId,
+          reason: `Class enrollment draft deleted for period ${periodId}.`
+          ,options: { requestingUser: req.user }
+        }
+      );
+      if (financeSettlement.issues.length) {
+        await schoolDataService.updateClassEnrollmentPeriod(periodId, {
+          status: 'draft',
+          transactionSummary: financeSettlement.summary
+        }, req.user);
+        throw new Error(`Cannot delete this draft because financial reconciliation failed: ${financeSettlement.issues.join(' | ')}`);
+      }
       if (academicEntryIds.length) {
-        await registrationIntegrityService.rollbackRegistrationSideEffects({
+        const academicRollback = await registrationIntegrityService.rollbackRegistrationSideEffects({
           registrationId: periodId,
           transactionIds: [],
           academicEntryIds,
@@ -3304,8 +3435,13 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
           reason: `Class enrollment draft deleted for period ${periodId}.`,
           reverseEventPrefix: 'CLSENRREV'
         });
+        if (academicRollback.issues.length) {
+          throw new Error(`Cannot delete this draft because academic reconciliation failed: ${academicRollback.issues.join(' | ')}`);
+        }
       }
-      await schoolDataService.deleteData('classEnrollmentPeriods', periodId, req.user);
+      const voidPatch = buildVoidPatch(periodRow, req.user, 'Draft class enrollment deleted by user');
+      voidPatch.transactionSummary = financeSettlement.summary;
+      await schoolDataService.updateClassEnrollmentPeriod(periodId, voidPatch, req.user);
       const payloadOut = {
         status: 'success',
         operation: 'void',
@@ -3317,38 +3453,44 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
       return res.json(payloadOut);
     }
 
-    const rollback = await registrationIntegrityService.rollbackRegistrationSideEffects({
+    const academicRollback = await registrationIntegrityService.rollbackRegistrationSideEffects({
       registrationId: periodId,
-      transactionIds: postedTransactionIds,
+      transactionIds: [],
       academicEntryIds,
       reqUser: req.user,
       reason: `Class enrollment rollback requested for ${periodId}.`,
       reverseEventPrefix: 'CLSENRREV'
     });
-    const rollbackSucceeded = Array.isArray(rollback?.issues) && rollback.issues.length === 0;
-
-    const reversalIds = Array.isArray(rollback?.reversalIds) ? rollback.reversalIds.map((id) => toPublicId(id)).filter(Boolean) : [];
+    const financeRollback = await registrationFinanceLifecycleService.returnPostedSummaryToDraft(
+      periodRow.transactionSummary,
+      {
+        registrationType: 'class',
+        registrationId: periodId,
+        orgId: classData.orgId,
+        transactionIds: postedTransactionIds,
+        reason: `Class enrollment rollback requested for ${periodId}.`
+      },
+      { requestingUser: req.user }
+    );
+    const rollbackIssues = [
+      ...(academicRollback?.issues || []),
+      ...(financeRollback?.issues || [])
+    ];
+    const rollbackSucceeded = rollbackIssues.length === 0;
     // Return the enrollment to an editable draft after undoing posting side-effects.
     // Users can then fix mistakes and re-post, or delete the draft.
     const nextStatus = rollbackSucceeded ? 'draft' : 'error';
     const existingReasonEnd = String(periodRow?.reasonEnd || '').trim();
     const rollbackNote = rollbackSucceeded
       ? 'Rolled back posted transactions; returned to draft.'
-      : `Rollback issues: ${(rollback?.issues || []).join(' | ')}`;
-
+      : `Rollback issues: ${rollbackIssues.join(' | ')}`;
     const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       status: nextStatus,
       // Drafts should be editable; clear endDate so users can adjust.
       endDate: '',
       reasonEnd: [existingReasonEnd, rollbackNote].filter(Boolean).join(' | '),
       transactionSummary: {
-        ...(periodRow?.transactionSummary || {}),
-        // Keep original posted IDs for audit/statement traceability.
-        postedTransactionIds: postedTransactionIds,
-        reversalIds: Array.from(new Set([
-          ...(Array.isArray(periodRow?.transactionSummary?.reversalIds) ? periodRow.transactionSummary.reversalIds : []),
-          ...reversalIds
-        ])),
+        ...financeRollback.summary,
         postedAt: '',
         rollbackAt: new Date().toISOString()
       }
@@ -3358,7 +3500,7 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
       status: rollbackSucceeded ? 'success' : 'warning',
       message: rollbackSucceeded
         ? 'Posted enrollment was rolled back and returned to draft.'
-        : `Rollback completed with issues: ${(rollback?.issues || []).join(' | ')}`,
+        : `Rollback completed with issues: ${rollbackIssues.join(' | ')}`,
       data: updated || null
     };
     idempotencyGuardService.completeGuard(guardKey, payloadOut);
@@ -3468,47 +3610,9 @@ async function createClassEnrollmentPeriod(req, res) {
 }
 
 async function closeClassEnrollmentPeriod(req, res) {
-  let guardKey = '';
   try {
-    const periodId = toPublicId(req.params?.periodId || req.body?.periodId || '');
-    if (!periodId) throw new Error('periodId is required.');
-    const periodRow = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
-    if (!periodRow) throw new Error('Enrollment period not found.');
-    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
-    assertRollingWorkflowEnabledForClass(req, classData);
-
-    guardKey = idempotencyGuardService.createGuardKey([
-        'class_enrollment_period_close',
-        String(classData?.orgId || '').trim(),
-        String(classData?.id || '').trim(),
-        periodId,
-        {
-            endDate: String(req.body?.endDate || '').trim(),
-            status: String(req.body?.status || '').trim().toLowerCase()
-        }
-    ]);
-    const guardResult = idempotencyGuardService.beginGuard({
-        key: guardKey,
-        runningTtlMs: 90000,
-        replayTtlMs: 12000
-    });
-    if (sendGuardedResponse(req, res, guardResult, 'Enrollment period close is already in progress. Please wait.')) return;
-
-    const updated = await schoolDataService.closeClassEnrollmentPeriod(periodId, {
-      endDate: String(req.body?.endDate || '').trim(),
-      status: String(req.body?.status || '').trim(),
-      reasonEnd: String(req.body?.reasonEnd || '').trim()
-    }, req.user);
-
-    const payloadOut = {
-      status: 'success',
-      message: 'Enrollment period closed.',
-      data: updated
-    };
-    idempotencyGuardService.completeGuard(guardKey, payloadOut);
-    return res.json(payloadOut);
+    throw new Error('Use the registration status preview and apply workflow to close an enrollment period.');
   } catch (error) {
-    if (guardKey) idempotencyGuardService.failGuard(guardKey);
     return res.status(400).json({ status: 'error', message: error.message });
   }
 }
@@ -3544,7 +3648,7 @@ async function reopenClassEnrollmentPeriod(req, res) {
     const result = await schoolDataService.reopenClassEnrollmentPeriodViaNewPeriod(periodId, {
       startDate: String(req.body?.startDate || '').trim(),
       endDate: String(req.body?.endDate || '').trim(),
-      status: String(req.body?.status || '').trim(),
+      status: 'draft',
       funderType: String(req.body?.funderType || '').trim(),
       funderId: String(req.body?.funderId || '').trim(),
       authorizationRef: String(req.body?.authorizationRef || '').trim(),
@@ -3554,9 +3658,69 @@ async function reopenClassEnrollmentPeriod(req, res) {
       allowOverlap: parseBoolean(req.body?.allowOverlap, false)
     }, req.user);
 
+    const newPeriod = result?.newPeriod || null;
+    const newPeriodId = toPublicId(newPeriod?.id || '');
+    if (!newPeriodId) throw new Error('The new draft enrollment period was not created.');
+    const student = await schoolDataService.getDataById('students', newPeriod.studentId, req.user);
+    if (!student) throw new Error('Student not found for the new enrollment draft.');
+    const draft = await buildClassEnrollmentTransactionDraft({
+      classData,
+      student,
+      startDate: newPeriod.startDate,
+      externalReference: newPeriod.authorizationRef,
+      reqUser: req.user,
+      programIdForPosting: toPublicId(newPeriod.programId || '')
+    });
+
+    let savedDraft = newPeriod;
+    if (draft.isChargeable) {
+      const draftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+        newPeriod.transactionSummary,
+        draft.draftTransactionItems,
+        {
+          registrationType: 'class',
+          registrationId: newPeriodId,
+          orgId: classData.orgId
+        },
+        { requestingUser: req.user }
+      );
+      const currency = String(draft.draftPreviewRows[0]?.currency || draft.classFeeRule?.currency || 'CAD').trim().toUpperCase() || 'CAD';
+      savedDraft = await schoolDataService.updateClassEnrollmentPeriod(newPeriodId, {
+        status: 'draft',
+        transactionSummary: {
+          ...draftFinance.summary,
+          mode: 'chargeable',
+          currency,
+          totalAmount: roundMoney(draft.totalAmount || 0),
+          transactionCount: draft.draftPreviewRows.length,
+          draftTransactionItems: draftFinance.items,
+          draftPreviewRows: draft.draftPreviewRows,
+          draftTransactionIds: draftFinance.transactionIds,
+          draftSavedAt: new Date().toISOString(),
+          note: `Draft generated for re-entry from period ${periodId}.`
+        }
+      }, req.user);
+    } else {
+      savedDraft = await schoolDataService.updateClassEnrollmentPeriod(newPeriodId, {
+        status: 'draft',
+        transactionSummary: {
+          mode: 'no_charge',
+          currency: 'CAD',
+          totalAmount: 0,
+          transactionCount: 0,
+          draftTransactionItems: [],
+          draftPreviewRows: [],
+          draftTransactionIds: [],
+          draftSavedAt: new Date().toISOString(),
+          note: `No-charge re-entry draft generated from period ${periodId}.`
+        }
+      }, req.user);
+    }
+    result.newPeriod = savedDraft || newPeriod;
+
     const payloadOut = {
       status: 'success',
-      message: 'Enrollment period reopened with a new period.',
+      message: 'A new enrollment draft was created. Review and approve it to activate the new period and post its charges.',
       data: result
     };
     idempotencyGuardService.completeGuard(guardKey, payloadOut);
@@ -3870,6 +4034,56 @@ async function saveEnrollmentCompletionDecision(req, res) {
     }
 }
 
+async function previewClassEnrollmentStatusTransition(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId);
+    const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!period) throw new Error('Enrollment period not found.');
+    await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    const preview = await registrationStatusLifecycleService.previewTransition({
+      registrationType: 'class',
+      registrationId: periodId,
+      targetStatus: req.body?.targetStatus,
+      effectiveDate: req.body?.effectiveDate,
+      reason: req.body?.reason,
+      orgId: getActiveOrgIdOrThrow(req.user)
+    }, { requestingUser: req.user });
+    return res.status(preview.canApply ? 200 : 409).json({
+      status: preview.canApply ? 'success' : 'blocked',
+      message: preview.canApply
+        ? 'Status transition preview is ready.'
+        : 'Resolve the listed child registrations or financial issues before continuing.',
+      preview
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message, preview: error.preview || null });
+  }
+}
+
+async function applyClassEnrollmentStatusTransition(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId);
+    const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!period) throw new Error('Enrollment period not found.');
+    await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    const result = await registrationStatusLifecycleService.applyTransition({
+      registrationType: 'class',
+      registrationId: periodId,
+      targetStatus: req.body?.targetStatus,
+      effectiveDate: req.body?.effectiveDate,
+      reason: req.body?.reason,
+      orgId: getActiveOrgIdOrThrow(req.user)
+    }, { requestingUser: req.user });
+    return res.json({ status: 'success', message: `Enrollment changed to ${result.targetStatus}.`, result });
+  } catch (error) {
+    return res.status(error.preview?.blockers?.length ? 409 : 400).json({
+      status: 'error',
+      message: error.message,
+      preview: error.preview || null
+    });
+  }
+}
+
 module.exports = {
   showRollingEnrollmentPage,
   showCycleRolloverWizard,
@@ -3896,6 +4110,8 @@ module.exports = {
   splitClassEnrollmentPeriodsForCycleBoundary,
   showEnrollmentOutcomesPage,
   saveEnrollmentCompletionDecision,
+  previewClassEnrollmentStatusTransition,
+  applyClassEnrollmentStatusTransition,
   postEnrollmentSessionAlignment,
   postPreviewBatchSessions,
   postEnrollmentGapConflictReview,

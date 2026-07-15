@@ -11,6 +11,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { buildVoidPatch } = require('../../models/school/voidRecordMetadata');
+const registrationFinanceLifecycleService = require('./registrationFinanceLifecycleService');
 
 function normalizeStatus(status) {
   return String(status || '').trim().toLowerCase();
@@ -76,22 +77,6 @@ function asIdArray(value) {
     .filter(Boolean)));
 }
 
-async function countUnresolvedPostedTransactions(transactionIds = []) {
-  const ids = asIdArray(transactionIds);
-  if (!ids.length) return 0;
-
-  let count = 0;
-  for (const txId of ids) {
-    const reversal = await schoolRepositories.globalTransactions.findReversalByTransactionId(txId);
-    if (reversal) continue;
-    const transaction = await schoolRepositories.globalTransactions.getById(txId);
-    if (transaction && normalizeStatus(transaction.status) === 'posted') {
-      count += 1;
-    }
-  }
-  return count;
-}
-
 async function countNonVoidAcademicEntries(entryIds = []) {
   const ids = asIdArray(entryIds);
   if (!ids.length) return 0;
@@ -122,8 +107,10 @@ function entryMatchesRollingClassEnrollmentLedger(row, { periodId = '', classId 
   const eventId = String(row?.source?.eventId || '').trim();
 
   if (normalizedPeriodId) {
-    if (key === rollingClassEnrolledIdempotencyKey(normalizedPeriodId)) return true;
-    if (eventId === `CEP-${normalizedPeriodId}-rolling`) return true;
+    const baseKey = rollingClassEnrolledIdempotencyKey(normalizedPeriodId);
+    const baseEventId = `CEP-${normalizedPeriodId}-rolling`;
+    if (key === baseKey || key.endsWith(`|${baseKey}`)) return true;
+    if (eventId === baseEventId || eventId.endsWith(`-${baseEventId}`)) return true;
     return false;
   }
 
@@ -176,7 +163,7 @@ async function reconcileOrphanedClassEnrollmentLedgerForClass({
 
   for (const row of candidates) {
     const key = String(row?.source?.idempotencyKey || '').trim();
-    const periodMatch = key.match(/^rolling\|cep\|([^|]+)\|class_enrolled$/);
+    const periodMatch = key.match(/(?:^|\|)rolling\|cep\|([^|]+)\|class_enrolled$/);
     const periodId = periodMatch ? toPublicId(periodMatch[1]) : '';
     let keepEntry = false;
 
@@ -1182,39 +1169,24 @@ const registrationIntegrityService = {
     }
 
     if (txIds.length) {
-      for (const txId of txIds) {
-        const existingReverse = await schoolRepositories.globalTransactions.findReversalByTransactionId(txId);
-        if (existingReverse) {
-          reversalIds.push(String(existingReverse.id || ''));
-          continue;
-        }
-        const original = await schoolRepositories.globalTransactions.getById(txId);
-        if (!original) {
-          issues.push(`Financial transaction ${txId} was not found for rollback.`);
-          continue;
-        }
-        if (String(original.status || '').toLowerCase() !== 'posted') {
-          issues.push(`Financial transaction ${txId} is not posted and could not be reversed.`);
-          continue;
-        }
-        try {
-          const reversed = await schoolRepositories.globalTransactions.reverseTransaction(txId, {
-            eventId: `${reverseEventPrefix}-${registrationId}-${reversalIds.length + 1}`,
-            idempotencyKey: `${idempotencyPrefix}-${registrationId}-${txId}`,
-            memo: `Rollback of ${memoLabel} ${registrationId}`,
-            internalNote: reason
-          }, options);
-          reversalIds.push(String(reversed.id || ''));
-          recordTransactionOperation(options, {
-            type: 'create',
-            entityType: 'globalTransactions',
-            id: toPublicId(reversed?.id),
-            operation: 'reverse'
-          });
-        } catch (error) {
-          issues.push(`Failed to reverse financial transaction ${txId}: ${error.message}`);
-        }
-      }
+      void reverseEventPrefix;
+      void idempotencyPrefix;
+      void memoLabel;
+      const financeRollback = await registrationFinanceLifecycleService.reconcileTransactions({
+        transactionIds: txIds,
+        registrationId,
+        reason,
+        createMissing: true,
+        options
+      });
+      reversalIds.push(...financeRollback.reversalIds);
+      issues.push(...financeRollback.issues);
+      financeRollback.reversalIds.forEach((reversalId) => recordTransactionOperation(options, {
+        type: 'create',
+        entityType: 'globalTransactions',
+        id: toPublicId(reversalId),
+        operation: 'reverse_or_reuse'
+      }));
     }
 
     if (entryIds.length) {
@@ -1389,13 +1361,6 @@ const registrationIntegrityService = {
       throw new Error('Only draft program registrations can be deleted.');
     }
 
-    const activePostedTransactions = await countUnresolvedPostedTransactions(
-      registration?.transactionSummary?.transactionIds
-    );
-    if (activePostedTransactions > 0) {
-      throw new Error('Cannot delete this draft because active finance postings still exist.');
-    }
-
     const activeAcademicEntries = await countNonVoidAcademicEntries(
       registration?.academicSummary?.entryIds
     );
@@ -1455,9 +1420,28 @@ const registrationIntegrityService = {
 
     const registration = await this.getProgramRegistrationInOrgOrThrow(normalizedId, activeOrgId);
     await this.assertProgramDraftDeletionAllowed(registration, { reqUser, activeOrgId });
+    const financeSettlement = await registrationFinanceLifecycleService.settleSummaryForVoid(
+      registration.transactionSummary,
+      {
+        registrationType: 'program',
+        registrationId: normalizedId,
+        orgId: registration.orgId,
+        reason: options.voidReason || 'Draft program registration deleted by user',
+        options: { ...options, requestingUser: reqUser }
+      }
+    );
+    if (financeSettlement.issues.length) {
+      await schoolRepositories.studentProgramRegistrations.update(normalizedId, {
+        ...registration,
+        transactionSummary: financeSettlement.summary
+      }, options);
+      throw new Error(`Cannot delete this draft because financial reconciliation failed: ${financeSettlement.issues.join(' | ')}`);
+    }
+    const voidPatch = buildVoidPatch(registration, reqUser, options.voidReason || 'Draft registration deleted by user');
+    voidPatch.transactionSummary = financeSettlement.summary;
     const updated = await schoolRepositories.studentProgramRegistrations.update(
       normalizedId,
-      buildVoidPatch(registration, reqUser, options.voidReason || 'Draft registration deleted by user'),
+      voidPatch,
       options
     );
     recordTransactionOperation(options, {
@@ -1475,13 +1459,6 @@ const registrationIntegrityService = {
     const status = normalizeStatus(registration.status);
     if (status !== 'draft') {
       throw new Error('Only draft term registrations can be deleted.');
-    }
-
-    const activePostedTransactions = await countUnresolvedPostedTransactions(
-      registration?.transactionSummary?.transactionIds
-    );
-    if (activePostedTransactions > 0) {
-      throw new Error('Cannot delete this draft because active finance postings still exist. Move the registration back to draft instead.');
     }
 
     const activeAcademicEntries = await countNonVoidAcademicEntries(
@@ -1523,9 +1500,28 @@ const registrationIntegrityService = {
 
     const registration = await this.getTermRegistrationInOrgOrThrow(normalizedId, activeOrgId);
     await this.assertTermDraftDeletionAllowed(registration, { reqUser, activeOrgId });
+    const financeSettlement = await registrationFinanceLifecycleService.settleSummaryForVoid(
+      registration.transactionSummary,
+      {
+        registrationType: 'term',
+        registrationId: normalizedId,
+        orgId: registration.orgId,
+        reason: options.voidReason || 'Draft term registration deleted by user',
+        options: { ...options, requestingUser: reqUser }
+      }
+    );
+    if (financeSettlement.issues.length) {
+      await schoolRepositories.studentTermRegistrations.update(normalizedId, {
+        ...registration,
+        transactionSummary: financeSettlement.summary
+      }, options);
+      throw new Error(`Cannot delete this draft because financial reconciliation failed: ${financeSettlement.issues.join(' | ')}`);
+    }
+    const voidPatch = buildVoidPatch(registration, reqUser, options.voidReason || 'Draft registration deleted by user');
+    voidPatch.transactionSummary = financeSettlement.summary;
     const updated = await schoolRepositories.studentTermRegistrations.update(
       normalizedId,
-      buildVoidPatch(registration, reqUser, options.voidReason || 'Draft registration deleted by user'),
+      voidPatch,
       options
     );
     recordTransactionOperation(options, {

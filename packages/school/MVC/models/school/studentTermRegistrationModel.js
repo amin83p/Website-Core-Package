@@ -13,6 +13,7 @@ if (!fsSync.existsSync(dataPath)) {
 
 const REGISTRATION_STATUSES = new Set(['draft', 'registered', 'withdrawn', 'cancelled', 'completed', 'error', 'rolled_back', 'void']);
 const { applyVoidMetadata } = require('./voidRecordMetadata');
+const { normalizeTransactionSummary } = require('./registrationTransactionSummary');
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -71,7 +72,10 @@ function sanitizeRegistrationInput(input, { isUpdate = false } = {}) {
     creditSummary: isPlainObject(input.creditSummary) ? input.creditSummary : {},
     classSummary: isPlainObject(input.classSummary) ? input.classSummary : {},
     validationSummary: isPlainObject(input.validationSummary) ? input.validationSummary : {},
-    transactionSummary: isPlainObject(input.transactionSummary) ? input.transactionSummary : {},
+    transactionSummary: normalizeTransactionSummary(input.transactionSummary, {
+      registrationType: 'term',
+      registrationId: input.id
+    }),
     academicSummary: isPlainObject(input.academicSummary) ? input.academicSummary : {},
     classEnrollmentSummary,
     rosterSummary: classEnrollmentSummary

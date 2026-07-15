@@ -13,6 +13,7 @@ if (!fsSync.existsSync(dataPath)) {
 
 const REGISTRATION_STATUSES = new Set(['draft', 'registered', 'withdrawn', 'cancelled', 'completed', 'error', 'rolled_back', 'void']);
 const { applyVoidMetadata } = require('./voidRecordMetadata');
+const { normalizeTransactionSummary } = require('./registrationTransactionSummary');
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -62,7 +63,10 @@ function sanitizeRegistrationInput(input, { isUpdate = false } = {}) {
     status,
     feeCategorySnapshot: cleanString(input.feeCategorySnapshot, { max: 80, allowEmpty: true }),
     note: cleanString(input.note, { max: 2000, allowEmpty: true }),
-    transactionSummary: isPlainObject(input.transactionSummary) ? input.transactionSummary : {},
+    transactionSummary: normalizeTransactionSummary(input.transactionSummary, {
+      registrationType: 'program',
+      registrationId: input.id
+    }),
     academicSummary: isPlainObject(input.academicSummary) ? input.academicSummary : {}
   };
 

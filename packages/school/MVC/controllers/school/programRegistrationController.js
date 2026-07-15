@@ -6,6 +6,8 @@ const { createTransactionContext } = requireCoreModule('MVC/services/transaction
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
+const registrationFinanceLifecycleService = require('../../services/school/registrationFinanceLifecycleService');
+const registrationStatusLifecycleService = require('../../services/school/registrationStatusLifecycleService');
 const programRegistrationViewService = require('../../services/school/programRegistrationViewService');
 const { PROGRAM_REGISTRATION_LIST_SEARCHABLE_FIELDS } = programRegistrationViewService;
 const programRegistrationDraftService = require('../../services/school/programRegistrationDraftService');
@@ -506,7 +508,7 @@ exports.applyBatchRegistration = async (req, res) => {
         try {
           const draftItems = programRegistrationDraftService.normalizeDraftTransactionItems(preview.transactionItems || []);
           const draftPreviewRows = programRegistrationDraftService.buildDraftPreviewRowsFromItems(draftItems);
-          const created = await dataService.addData('studentProgramRegistrations', {
+          let created = await dataService.addData('studentProgramRegistrations', {
             orgId: program.orgId,
             studentId: preview.studentId,
             personId: preview.personId,
@@ -530,6 +532,30 @@ exports.applyBatchRegistration = async (req, res) => {
               entryCount: 0,
               entryIds: [],
               voidedEntryIds: []
+            }
+          }, req.user);
+          const draftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+            created.transactionSummary,
+            draftItems,
+            {
+              registrationType: 'program',
+              registrationId: created.id,
+              orgId: created.orgId,
+              reason: 'Program registration draft saved.'
+            },
+            { requestingUser: req.user }
+          );
+          created = await dataService.updateData('studentProgramRegistrations', created.id, {
+            status: 'draft',
+            transactionSummary: {
+              ...draftFinance.summary,
+              previewCount: draftPreviewRows.length,
+              postedCount: 0,
+              totalAmount: programRegistrationDraftService.roundMoney(draftPreviewRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)),
+              externalReference: req.body.externalReference || '',
+              draftTransactionItems: draftFinance.items,
+              draftPreviewRows,
+              draftSavedAt: new Date().toISOString()
             }
           }, req.user);
 
@@ -610,17 +636,29 @@ exports.updateDraftTransactions = async (req, res) => {
         activeOrgId
       });
 
+      const draftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+        registration.transactionSummary,
+        draftState.items,
+        {
+          registrationType: 'program',
+          registrationId: registration.id,
+          orgId: registration.orgId,
+          currentDraftTransactionIds: registration?.transactionSummary?.draftTransactionIds,
+          reason: 'Program registration draft transactions updated.'
+        },
+        { requestingUser: req.user }
+      );
       const updated = await dataService.updateData('studentProgramRegistrations', registration.id, {
         status: 'draft',
         registrationDate: registration.registrationDate,
         feeCategorySnapshot: registration.feeCategorySnapshot,
         note: note ? appendNote(registration.note, note) : registration.note,
         transactionSummary: {
-          ...(registration.transactionSummary || {}),
+          ...draftFinance.summary,
           previewCount: draftState.previewRows.length,
           totalAmount: draftState.totalAmount,
           postedCount: Number(registration?.transactionSummary?.postedCount || 0),
-          draftTransactionItems: draftState.items,
+          draftTransactionItems: draftFinance.items,
           draftPreviewRows: draftState.previewRows,
           draftSavedAt: new Date().toISOString()
         },
@@ -700,7 +738,7 @@ exports.approveRegistration = async (req, res) => {
       reqUser: req.user,
       activeOrgId
     });
-    const finalItems = draftState.items.map((item) => ({
+    const approvalDraftItems = draftState.items.map((item) => ({
       ...(item || {}),
       externalReference: externalReference || String(item?.externalReference || registration.id || ''),
       metadata: {
@@ -708,6 +746,21 @@ exports.approveRegistration = async (req, res) => {
         programRegistrationId: toPublicId(registration.id)
       }
     }));
+    const approvalDraftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+      registration.transactionSummary,
+      approvalDraftItems,
+      {
+        registrationType: 'program',
+        registrationId: registration.id,
+        orgId: activeOrgId
+      },
+      { transactionContext: txContext, requestingUser: req.user }
+    );
+    const postingCycleState = {
+      summary: approvalDraftFinance.summary,
+      cycle: approvalDraftFinance.cycle
+    };
+    const finalItems = approvalDraftFinance.items;
     const finalPreviewRows = draftState.previewRows;
     const totalAmount = draftState.totalAmount;
 
@@ -715,21 +768,29 @@ exports.approveRegistration = async (req, res) => {
     const academicEntries = [];
     try {
       if (finalItems.length) {
-        const postedTransactions = await dataService.addData('globalTransactions', finalItems, req.user, { transactionContext: txContext });
+        const postedTransactions = await registrationFinanceLifecycleService.postCycleTransactions(
+          finalItems,
+          { transactionContext: txContext, requestingUser: req.user }
+        );
         createdTransactions.push(...(Array.isArray(postedTransactions) ? postedTransactions : [postedTransactions]).filter(Boolean));
       }
 
-      const postedAcademicEntries = await academicLedgerService.postProgramRegistration({
-        reqUser: req.user,
-        student,
-        program,
-        effectiveDate: registration.registrationDate,
-        note: note || registration.note || '',
-        source: {
-          eventId: `SPR-${registration.id}`,
-          idempotencyKey: `SPR|${registration.id}|academic`
-        },
-        options: { transactionContext: txContext }
+      const academicSource = registrationFinanceLifecycleService.scopeAcademicSource({
+        eventId: `SPR-${registration.id}`,
+        idempotencyKey: `SPR|${registration.id}|academic`
+      }, postingCycleState.cycle);
+      const postedAcademicEntries = await registrationFinanceLifecycleService.postAcademicEntriesIdempotently({
+        source: academicSource,
+        options: { transactionContext: txContext },
+        post: () => academicLedgerService.postProgramRegistration({
+          reqUser: req.user,
+          student,
+          program,
+          effectiveDate: registration.registrationDate,
+          note: note || registration.note || '',
+          source: academicSource,
+          options: { transactionContext: txContext }
+        })
       });
       academicEntries.push(...(Array.isArray(postedAcademicEntries) ? postedAcademicEntries : [postedAcademicEntries]).filter(Boolean));
 
@@ -741,19 +802,24 @@ exports.approveRegistration = async (req, res) => {
           registrationDate: registration.registrationDate,
           feeCategorySnapshot: registration.feeCategorySnapshot,
           note: note ? appendNote(registration.note, note) : registration.note,
-          transactionSummary: {
-            ...(registration.transactionSummary || {}),
+          transactionSummary: registrationFinanceLifecycleService.updatePostingCycle({
+            ...postingCycleState.summary,
             previewCount: finalPreviewRows.length,
             postedCount: createdTransactions.length,
             totalAmount,
             externalReference: externalReference || String(registration?.transactionSummary?.externalReference || ''),
-            transactionIds: createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
-            reversalIds: asIdArray(registration?.transactionSummary?.reversalIds),
             draftTransactionItems: finalItems,
             draftPreviewRows: finalPreviewRows,
             approvedAt: new Date().toISOString(),
             approvedBy: toPublicId(req.user?.id) || String(req.user?.username || 'system')
-          },
+          }, postingCycleState.cycle.cycleNo, {
+            status: 'posted',
+            postedAt: new Date().toISOString(),
+            transactionIds: createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
+            reversalIds: [],
+            unresolvedTransactionIds: [],
+            issues: []
+          }, { registrationType: 'program', registrationId: registration.id }),
           academicSummary: {
             ...(registration.academicSummary || {}),
             entryCount: academicEntries.length,
@@ -780,7 +846,7 @@ exports.approveRegistration = async (req, res) => {
     } catch (approvalError) {
       const rollbackResult = await registrationIntegrityService.rollbackProgramRegistrationSideEffects({
         registrationId: registration.id,
-        transactionIds: createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
+        transactionIds: [],
         academicEntryIds: academicEntries.map((row) => toPublicId(row.id)).filter(Boolean),
         reqUser: req.user,
         studentId: registration.studentId,
@@ -788,7 +854,34 @@ exports.approveRegistration = async (req, res) => {
         reason: `Approval failed for ${registration.id}. ${approvalError.message}`,
         options: { transactionContext: txContext }
       });
-      const rollbackSucceeded = rollbackResult.issues.length === 0;
+      let financialRollback = null;
+      const financialIssues = [];
+      try {
+        financialRollback = await registrationFinanceLifecycleService.returnPostedSummaryToDraft(
+          registrationFinanceLifecycleService.updatePostingCycle(
+            postingCycleState.summary,
+            postingCycleState.cycle.cycleNo,
+            {
+              status: 'posted',
+              postedAt: new Date().toISOString(),
+              transactionIds: createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean)
+            },
+            { registrationType: 'program', registrationId: registration.id }
+          ),
+          {
+            registrationType: 'program',
+            registrationId: registration.id,
+            orgId: registration.orgId,
+            transactionIds: createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
+            reason: `Approval failed for ${registration.id}. ${approvalError.message}`
+          },
+          { requestingUser: req.user, transactionContext: txContext }
+        );
+      } catch (financeError) {
+        financialIssues.push(financeError.message);
+      }
+      const combinedIssues = [...rollbackResult.issues, ...financialIssues];
+      const rollbackSucceeded = combinedIssues.length === 0;
       const nextStatus = rollbackSucceeded ? 'draft' : 'error';
 
       await dataService.updateData(
@@ -800,18 +893,21 @@ exports.approveRegistration = async (req, res) => {
           feeCategorySnapshot: registration.feeCategorySnapshot,
           note: buildRollbackNote(registration.note, approvalError.message, rollbackResult.issues),
           transactionSummary: {
-            ...(registration.transactionSummary || {}),
+            ...(financialRollback?.summary || postingCycleState.summary),
             previewCount: finalPreviewRows.length,
             totalAmount,
             postedCount: 0,
-            transactionIds: [],
-            reversalIds: rollbackResult.reversalIds,
             draftTransactionItems: finalItems,
             draftPreviewRows: finalPreviewRows,
+            draftTransactionIds: financialRollback?.transactionIds || createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
+            transactionIds: [],
+            postedTransactionIds: [],
+            reconciliationIssues: combinedIssues,
+            unresolvedTransactionIds: rollbackSucceeded ? [] : createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
             lastApprovalAttempt: {
               attemptedAt: new Date().toISOString(),
               error: String(approvalError.message || ''),
-              rollbackIssues: rollbackResult.issues
+              rollbackIssues: combinedIssues
             }
           },
           academicSummary: {
@@ -835,8 +931,8 @@ exports.approveRegistration = async (req, res) => {
       return res.status(400).json({
         status: rollbackSucceeded ? 'warning' : 'error',
         message: rollbackSucceeded
-          ? `Approval failed and all side effects were rolled back. Draft remains open. ${approvalError.message}`
-          : buildRollbackNote('', approvalError.message, rollbackResult.issues),
+          ? `Approval failed and all side effects returned to draft. Draft remains open. ${approvalError.message}`
+          : buildRollbackNote('', approvalError.message, combinedIssues),
         registrationId: registration.id
       });
     }
@@ -906,7 +1002,7 @@ exports.rollbackRegistration = async (req, res) => {
 
     const rollbackResult = await registrationIntegrityService.rollbackProgramRegistrationSideEffects({
       registrationId: registration.id,
-      transactionIds: registration?.transactionSummary?.transactionIds,
+      transactionIds: [],
       academicEntryIds: registration?.academicSummary?.entryIds,
       reqUser: req.user,
       studentId: registration.studentId,
@@ -914,9 +1010,31 @@ exports.rollbackRegistration = async (req, res) => {
       reason: note || `Manual rollback of program registration ${registration.id}`,
       options: { transactionContext: txContext }
     });
-
-    const rollbackSucceeded = rollbackResult.issues.length === 0;
+    let financeRollback = null;
+    const financeIssues = [];
+    try {
+      financeRollback = await registrationFinanceLifecycleService.returnPostedSummaryToDraft(
+        registration.transactionSummary,
+        {
+          registrationType: 'program',
+          registrationId: registration.id,
+          orgId: registration.orgId,
+          transactionIds: registration?.transactionSummary?.transactionIds,
+          reason: note || `Manual rollback of program registration ${registration.id}`
+        },
+        { requestingUser: req.user, transactionContext: txContext }
+      );
+    } catch (financeError) {
+      financeIssues.push(financeError.message);
+    }
+    const combinedIssues = [...rollbackResult.issues, ...financeIssues];
+    const rollbackSucceeded = combinedIssues.length === 0;
     const nextStatus = rollbackSucceeded ? 'draft' : 'error';
+    const rolledBackFinanceSummary = financeRollback?.summary ||
+      registrationFinanceLifecycleService.normalizeTransactionSummary(
+        registration.transactionSummary,
+        { registrationType: 'program', registrationId: registration.id }
+      );
     await dataService.updateData(
       'studentProgramRegistrations',
       registration.id,
@@ -926,15 +1044,17 @@ exports.rollbackRegistration = async (req, res) => {
         feeCategorySnapshot: registration.feeCategorySnapshot,
         note: buildRollbackNote(registration.note, note || 'Registration moved back to draft.', rollbackResult.issues),
         transactionSummary: {
-          ...(registration.transactionSummary || {}),
+          ...rolledBackFinanceSummary,
           postedCount: 0,
+          draftTransactionIds: financeRollback?.transactionIds || rolledBackFinanceSummary.draftTransactionIds,
+          transactionIds: [],
+          postedTransactionIds: [],
           approvedAt: '',
           approvedBy: '',
           lastRollbackAt: new Date().toISOString(),
-          reversalIds: Array.from(new Set([
-            ...asIdArray(registration?.transactionSummary?.reversalIds),
-            ...rollbackResult.reversalIds
-          ]))
+          reversalIds: rolledBackFinanceSummary.reversalIds,
+          reconciliationIssues: combinedIssues,
+          unresolvedTransactionIds: rollbackSucceeded ? [] : asIdArray(registration?.transactionSummary?.transactionIds)
         },
         academicSummary: {
           ...(registration.academicSummary || {}),
@@ -951,12 +1071,12 @@ exports.rollbackRegistration = async (req, res) => {
 
     await txContext.commit({ registrationId: toPublicId(registration.id), flow: 'program_manual_rollback' });
     const payloadOut = {
-      status: rollbackResult.issues.length ? 'warning' : 'success',
-      message: rollbackResult.issues.length
-        ? `Rollback completed with issues: ${rollbackResult.issues.join(' ')}`
-        : 'Registration moved back to draft. Posted side effects were reversed.',
+      status: combinedIssues.length ? 'warning' : 'success',
+      message: combinedIssues.length
+        ? `Rollback completed with issues: ${combinedIssues.join(' ')}`
+        : 'Registration and its financial transactions moved back to draft.',
       rollback: {
-        reversalCount: rollbackResult.reversalIds.length,
+        returnedToDraftCount: financeRollback?.transactionIds?.length || 0,
         voidedEntryCount: rollbackResult.voidedEntryIds.length
       }
     };
@@ -968,5 +1088,47 @@ exports.rollbackRegistration = async (req, res) => {
       await txContext.rollback({ flow: 'program_manual_rollback', reason: error.message || 'Rollback failed' });
     }
     return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.previewStatusTransition = async (req, res) => {
+  try {
+    const preview = await registrationStatusLifecycleService.previewTransition({
+      registrationType: 'program',
+      registrationId: req.params.id,
+      targetStatus: req.body?.targetStatus,
+      effectiveDate: req.body?.effectiveDate,
+      reason: req.body?.reason,
+      orgId: getActiveOrgIdOrThrow(req.user)
+    }, { requestingUser: req.user });
+    return res.status(preview.canApply ? 200 : 409).json({
+      status: preview.canApply ? 'success' : 'blocked',
+      message: preview.canApply
+        ? 'Status transition preview is ready.'
+        : 'Resolve the listed child registrations or financial issues before continuing.',
+      preview
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message, preview: error.preview || null });
+  }
+};
+
+exports.applyStatusTransition = async (req, res) => {
+  try {
+    const result = await registrationStatusLifecycleService.applyTransition({
+      registrationType: 'program',
+      registrationId: req.params.id,
+      targetStatus: req.body?.targetStatus,
+      effectiveDate: req.body?.effectiveDate,
+      reason: req.body?.reason,
+      orgId: getActiveOrgIdOrThrow(req.user)
+    }, { requestingUser: req.user });
+    return res.json({ status: 'success', message: `Registration changed to ${result.targetStatus}.`, result });
+  } catch (error) {
+    return res.status(error.preview?.blockers?.length ? 409 : 400).json({
+      status: 'error',
+      message: error.message,
+      preview: error.preview || null
+    });
   }
 };

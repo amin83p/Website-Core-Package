@@ -132,6 +132,20 @@ router.post('/register-students/rollback/:id',
   trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE, { requireToken: false }),
   programRegistrationCtrl.rollbackRegistration);
 
+router.post('/registrations/:id/status/preview',
+  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
+  programRegistrationCtrl.previewStatusTransition);
+
+router.post('/registrations/:id/status/apply',
+  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    keepActive: true
+  }),
+  programRegistrationCtrl.applyStatusTransition);
+
 router.get('/register-terms/program-registrations',
   requireAccess(SECTIONS.SCHOOL_TERM_REGISTRATIONS, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_TERM_REGISTRATIONS, OPERATIONS.CREATE, { keepActive: true }),
@@ -221,6 +235,20 @@ router.post('/register-terms/rollback/:id',
   requireAccess(SECTIONS.SCHOOL_TERM_REGISTRATIONS, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_TERM_REGISTRATIONS, OPERATIONS.CREATE, { requireToken: false }),
   termRegistrationCtrl.rollbackRegistration);
+
+router.post('/term-registrations/:id/status/preview',
+  requireAccess(SECTIONS.SCHOOL_TERM_REGISTRATIONS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_TERM_REGISTRATIONS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
+  termRegistrationCtrl.previewStatusTransition);
+
+router.post('/term-registrations/:id/status/apply',
+  requireAccess(SECTIONS.SCHOOL_TERM_REGISTRATIONS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_TERM_REGISTRATIONS, OPERATIONS.CREATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    keepActive: true
+  }),
+  termRegistrationCtrl.applyStatusTransition);
 
 router.get('/new',
   requireAccess(SECTIONS.SCHOOL_PROGRAMS, OPERATIONS.CREATE),

@@ -375,6 +375,23 @@ router.post('/api/enrollment-periods/:periodId/close',
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.closeClassEnrollmentPeriod);
 
+router.post('/api/enrollment-periods/:periodId/status/preview',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, {
+    ...rollingEnrollmentMutationActionState,
+    requireToken: false
+  }),
+  rollingCtrl.previewClassEnrollmentStatusTransition);
+
+router.post('/api/enrollment-periods/:periodId/status/apply',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true
+  }),
+  rollingCtrl.applyClassEnrollmentStatusTransition);
+
 router.post('/api/enrollment-periods/:periodId/reopen',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),

@@ -5,6 +5,7 @@ const withdrawalPolicyService = require('./withdrawalPolicyService');
 const classWithdrawalService = require('./classWithdrawalService');
 const withdrawalSettlementService = require('./withdrawalSettlementService');
 const withdrawalRepository = require('../../../repositories/school/withdrawalRepository');
+const registrationFinanceLifecycleService = require('../registrationFinanceLifecycleService');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function roundMoney(value) {
@@ -378,18 +379,15 @@ async function executeTermWithdrawal({
   }
 
   try {
-    await schoolRepositories.studentTermRegistrations.update(termRegistrationId, {
-      status: 'withdrawn',
-      withdrawalId: withdrawalRecord.id,
-      withdrawalDate: preview.effectiveDate,
-      withdrawalReason: reason
-    });
-  } catch (error) {
-    errors.push(`Failed to update term registration status: ${error.message}`);
-  }
-
-  try {
-    await schoolRepositories.academicLedger.create({
+    const source = {
+      module: 'school_withdrawal',
+      eventType: 'term_withdrawal',
+      eventId: `WDR-TERM-${withdrawalRecord.id}`,
+      idempotencyKey: `WDR|TERM|${withdrawalRecord.id}|${termRegistrationId}`
+    };
+    await registrationFinanceLifecycleService.postAcademicEntriesIdempotently({
+      source,
+      post: () => schoolRepositories.academicLedger.create({
       orgId: student.orgId,
       studentId: preview.studentId,
       personId: student.personId || '',
@@ -399,12 +397,8 @@ async function executeTermWithdrawal({
       programId: preview.programId,
       termId: preview.termId,
       note: `Term withdrawal: ${reason || 'other'}`,
-      source: {
-        module: 'school_withdrawal',
-        eventType: 'term_withdrawal',
-        eventId: `WDR-TERM-${withdrawalRecord.id}`,
-        idempotencyKey: `WDR|TERM|${withdrawalRecord.id}|${termRegistrationId}`
-      }
+        source
+      })
     });
   } catch (error) {
     errors.push(`Failed to create academic ledger entry: ${error.message}`);
@@ -433,6 +427,27 @@ async function executeTermWithdrawal({
       });
     } catch (error) {
       errors.push(`Failed to settle financial transactions: ${error.message}`);
+    }
+  }
+
+  const requestedRefundAmount = Number(preview?.financialImpact?.termFeeRefund || 0);
+  if (!settlementSkipped && requestedRefundAmount > 0 &&
+      Math.abs(Number(settlementResult.settledRefundAmount || 0) - requestedRefundAmount) > 0.009) {
+    errors.push(
+      `Financial settlement is incomplete. Requested ${requestedRefundAmount.toFixed(2)}, settled ${Number(settlementResult.settledRefundAmount || 0).toFixed(2)}.`
+    );
+  }
+
+  if (!errors.length) {
+    try {
+      await schoolRepositories.studentTermRegistrations.update(termRegistrationId, {
+        status: 'withdrawn',
+        withdrawalId: withdrawalRecord.id,
+        withdrawalDate: preview.effectiveDate,
+        withdrawalReason: reason
+      });
+    } catch (error) {
+      errors.push(`Failed to update term registration status: ${error.message}`);
     }
   }
 

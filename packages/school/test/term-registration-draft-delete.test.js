@@ -37,29 +37,65 @@ test('assertTermDraftDeletionAllowed rejects non-draft registrations', async () 
   );
 });
 
-test('assertTermDraftDeletionAllowed rejects drafts with active posted finance', async () => {
-  const originalFindReversal = schoolRepositories.globalTransactions.findReversalByTransactionId;
-  const originalGetTx = schoolRepositories.globalTransactions.getById;
-  const originalGetLedger = schoolRepositories.academicLedger.getById;
-
-  schoolRepositories.globalTransactions.findReversalByTransactionId = async () => null;
-  schoolRepositories.globalTransactions.getById = async () => ({ id: 'TX-1', status: 'posted' });
+test('deleteDraftTermRegistration returns unexpected posted charges to draft and voids the same ids', async () => {
+  const originals = {
+    getByIdInOrg: schoolRepositories.studentTermRegistrations.getByIdInOrg,
+    getById: schoolRepositories.studentTermRegistrations.getById,
+    update: schoolRepositories.studentTermRegistrations.update,
+    discover: classEnrollmentReadService.discoverClassEnrollmentRowsByRegistrationId,
+    withdrawalList: withdrawalRepository.list,
+    transactionList: schoolRepositories.globalTransactions.list,
+    transactionGet: schoolRepositories.globalTransactions.getById,
+    transition: schoolRepositories.globalTransactions.transitionRegistrationTransactions,
+    ledgerGet: schoolRepositories.academicLedger.getById
+  };
+  const registration = buildDraftRegistration({ transactionSummary: { transactionIds: ['TX-1'], postedCount: 0 } });
+  const transitions = [];
+  let saved = null;
+  schoolRepositories.studentTermRegistrations.getByIdInOrg = async () => registration;
+  schoolRepositories.studentTermRegistrations.getById = async () => registration;
+  schoolRepositories.studentTermRegistrations.update = async (_id, payload) => { saved = payload; return payload; };
+  classEnrollmentReadService.discoverClassEnrollmentRowsByRegistrationId = async () => ({ rows: [] });
+  withdrawalRepository.list = async () => [];
+  schoolRepositories.globalTransactions.list = async () => [];
+  schoolRepositories.globalTransactions.getById = async () => ({
+    id: 'TX-1', orgId: ORG_ID, status: 'posted',
+    transactionType: 'charge',
+    amount: { value: 100, currency: 'CAD', direction: 'debit' },
+    balanceEffect: 100,
+    metadata: {
+      accountId: 'ACC-1',
+      registrationType: 'term',
+      registrationId: TERM_REG_ID
+    }
+  });
+  schoolRepositories.globalTransactions.transitionRegistrationTransactions = async (input) => {
+    transitions.push({ fromStatus: input.fromStatus, toStatus: input.toStatus, ids: input.transactionIds });
+    return input.transactionIds.map((id) => ({ id, status: input.toStatus }));
+  };
   schoolRepositories.academicLedger.getById = async () => null;
-
   try {
-    await assert.rejects(
-      () => registrationIntegrityService.assertTermDraftDeletionAllowed(
-        buildDraftRegistration({
-          transactionSummary: { transactionIds: ['TX-1'], postedCount: 0 }
-        }),
-        { activeOrgId: ORG_ID }
-      ),
-      /active finance postings still exist/
-    );
+    await registrationIntegrityService.deleteDraftTermRegistration(TERM_REG_ID, {
+      activeOrgId: ORG_ID, reqUser: { id: 'USR-1' }
+    });
+    assert.deepEqual(transitions, [
+      { fromStatus: 'posted', toStatus: 'draft', ids: ['TX-1'] },
+      { fromStatus: 'draft', toStatus: 'voided', ids: ['TX-1'] }
+    ]);
+    assert.equal(saved.status, 'void');
+    assert.deepEqual(saved.transactionSummary.transactionIds, []);
+    assert.deepEqual(saved.transactionSummary.draftTransactionIds, []);
+    assert.deepEqual(saved.transactionSummary.reversalIds, []);
   } finally {
-    schoolRepositories.globalTransactions.findReversalByTransactionId = originalFindReversal;
-    schoolRepositories.globalTransactions.getById = originalGetTx;
-    schoolRepositories.academicLedger.getById = originalGetLedger;
+    schoolRepositories.studentTermRegistrations.getByIdInOrg = originals.getByIdInOrg;
+    schoolRepositories.studentTermRegistrations.getById = originals.getById;
+    schoolRepositories.studentTermRegistrations.update = originals.update;
+    classEnrollmentReadService.discoverClassEnrollmentRowsByRegistrationId = originals.discover;
+    withdrawalRepository.list = originals.withdrawalList;
+    schoolRepositories.globalTransactions.list = originals.transactionList;
+    schoolRepositories.globalTransactions.getById = originals.transactionGet;
+    schoolRepositories.globalTransactions.transitionRegistrationTransactions = originals.transition;
+    schoolRepositories.academicLedger.getById = originals.ledgerGet;
   }
 });
 

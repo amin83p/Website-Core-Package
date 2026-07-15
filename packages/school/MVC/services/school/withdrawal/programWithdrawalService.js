@@ -5,6 +5,7 @@ const withdrawalPolicyService = require('./withdrawalPolicyService');
 const termWithdrawalService = require('./termWithdrawalService');
 const withdrawalSettlementService = require('./withdrawalSettlementService');
 const withdrawalRepository = require('../../../repositories/school/withdrawalRepository');
+const registrationFinanceLifecycleService = require('../registrationFinanceLifecycleService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function roundMoney(value) {
@@ -446,18 +447,15 @@ async function executeProgramWithdrawal({
   }
 
   try {
-    await schoolRepositories.studentProgramRegistrations.update(programRegistrationId, {
-      status: 'withdrawn',
-      withdrawalId: withdrawalRecord.id,
-      withdrawalDate: preview.effectiveDate,
-      withdrawalReason: reason
-    });
-  } catch (error) {
-    errors.push(`Failed to update program registration status: ${error.message}`);
-  }
-
-  try {
-    await schoolRepositories.academicLedger.create({
+    const source = {
+      module: 'school_withdrawal',
+      eventType: 'program_withdrawal',
+      eventId: `WDR-PROGRAM-${withdrawalRecord.id}`,
+      idempotencyKey: `WDR|PROGRAM|${withdrawalRecord.id}|${programRegistrationId}`
+    };
+    await registrationFinanceLifecycleService.postAcademicEntriesIdempotently({
+      source,
+      post: () => schoolRepositories.academicLedger.create({
       orgId: student.orgId,
       studentId: preview.studentId,
       personId: student.personId || '',
@@ -467,12 +465,8 @@ async function executeProgramWithdrawal({
       programId: preview.programId,
       programRegistrationId,
       note: `Program withdrawal: ${reason || 'other'}`,
-      source: {
-        module: 'school_withdrawal',
-        eventType: 'program_withdrawal',
-        eventId: `WDR-PROGRAM-${withdrawalRecord.id}`,
-        idempotencyKey: `WDR|PROGRAM|${withdrawalRecord.id}|${programRegistrationId}`
-      }
+        source
+      })
     });
   } catch (error) {
     errors.push(`Failed to create academic ledger entry: ${error.message}`);
@@ -512,6 +506,27 @@ async function executeProgramWithdrawal({
     }
   } catch (error) {
     errors.push(`Failed to settle financial transactions: ${error.message}`);
+  }
+
+  const requestedRefundAmount = Number(preview?.financialImpact?.programFeeRefund || 0);
+  if (requestedRefundAmount > 0 &&
+      Math.abs(Number(settlementResult.settledRefundAmount || 0) - requestedRefundAmount) > 0.009) {
+    errors.push(
+      `Financial settlement is incomplete. Requested ${requestedRefundAmount.toFixed(2)}, settled ${Number(settlementResult.settledRefundAmount || 0).toFixed(2)}.`
+    );
+  }
+
+  if (!errors.length) {
+    try {
+      await schoolRepositories.studentProgramRegistrations.update(programRegistrationId, {
+        status: 'withdrawn',
+        withdrawalId: withdrawalRecord.id,
+        withdrawalDate: preview.effectiveDate,
+        withdrawalReason: reason
+      });
+    } catch (error) {
+      errors.push(`Failed to update program registration status: ${error.message}`);
+    }
   }
 
   const finalWarnings = Array.from(new Set([

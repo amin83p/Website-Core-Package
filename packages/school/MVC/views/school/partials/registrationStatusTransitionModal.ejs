@@ -1,0 +1,124 @@
+<div class="modal fade" id="registrationStatusModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Registration Status Change</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="status_target">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Effective Date *</label>
+            <input type="date" class="form-control" id="status_effectiveDate">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Reason *</label>
+            <input type="text" class="form-control" id="status_reason" maxlength="1000">
+          </div>
+        </div>
+        <div id="status_preview" class="alert alert-light border mt-3 mb-0">
+          Preview the change before applying it.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btnPreviewStatus">Preview</button>
+        <button type="button" class="btn btn-danger btn-sm" id="btnApplyStatus" disabled>Apply Confirmed Change</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const modalEl = document.getElementById('registrationStatusModal');
+  if (!modalEl || !window.bootstrap) return;
+  const modal = new window.bootstrap.Modal(modalEl);
+  const registrationId = <%- JSON.stringify(String(registrationStatusRegistrationId || '')) %>;
+  const endpointBase = <%- JSON.stringify(String(registrationStatusEndpointBase || '')) %>;
+  const actionStateId = String(document.getElementById('hid_actionStateId')?.value || '').trim();
+  const previewEl = document.getElementById('status_preview');
+  const applyBtn = document.getElementById('btnApplyStatus');
+  let approvedPreview = null;
+
+  async function requestStatus(path, body) {
+    const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+    if (actionStateId) headers['X-Action-State-Id'] = actionStateId;
+    const response = await fetch(path, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...body, actionStateId })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || String(result.status || '').toLowerCase() === 'error') {
+      const error = new Error(result.message || 'Status change failed.');
+      error.preview = result.preview || null;
+      throw error;
+    }
+    return result;
+  }
+
+  function resetPreview(button) {
+    approvedPreview = null;
+    applyBtn.disabled = true;
+    document.getElementById('status_target').value = String(button?.dataset?.targetStatus || '');
+    document.getElementById('status_effectiveDate').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('status_reason').value = '';
+    previewEl.className = 'alert alert-light border mt-3 mb-0';
+    previewEl.textContent = 'Preview the change before applying it.';
+    modal.show();
+  }
+
+  document.querySelectorAll('.btn-registration-status').forEach((button) => {
+    button.addEventListener('click', () => resetPreview(button));
+  });
+
+  document.getElementById('btnPreviewStatus')?.addEventListener('click', async () => {
+    const payload = {
+      targetStatus: String(document.getElementById('status_target')?.value || '').trim(),
+      effectiveDate: String(document.getElementById('status_effectiveDate')?.value || '').trim(),
+      reason: String(document.getElementById('status_reason')?.value || '').trim()
+    };
+    if (!payload.effectiveDate || !payload.reason) {
+      previewEl.className = 'alert alert-warning mt-3 mb-0';
+      previewEl.textContent = 'Effective date and reason are required.';
+      return;
+    }
+
+    try {
+      const result = await requestStatus(endpointBase + '/preview', payload);
+      const preview = result.preview || {};
+      approvedPreview = payload;
+      applyBtn.disabled = false;
+      previewEl.className = 'alert alert-info mt-3 mb-0';
+      previewEl.textContent = payload.targetStatus === 'cancelled'
+        ? 'Cancellation will reverse ' + (preview.sourceTransactions || []).length +
+          ' charge transaction(s), total ' + Number(preview.adjustmentTotal || 0).toFixed(2) +
+          '. Payments and unrelated transactions will not change.'
+        : 'Completion will leave posted financial transactions unchanged.';
+    } catch (error) {
+      approvedPreview = null;
+      applyBtn.disabled = true;
+      const blockers = Array.isArray(error.preview?.blockers) ? error.preview.blockers : [];
+      previewEl.className = 'alert alert-danger mt-3 mb-0';
+      previewEl.textContent = blockers.length
+        ? 'Blocked by ' + blockers.length + ' active child registration(s). Resolve them first.'
+        : error.message;
+    }
+  });
+
+  applyBtn?.addEventListener('click', async () => {
+    if (!approvedPreview) return;
+    applyBtn.disabled = true;
+    try {
+      await requestStatus(endpointBase + '/apply', approvedPreview);
+      window.location.reload();
+    } catch (error) {
+      previewEl.className = 'alert alert-danger mt-3 mb-0';
+      previewEl.textContent = error.message;
+      applyBtn.disabled = false;
+    }
+  });
+})();
+</script>

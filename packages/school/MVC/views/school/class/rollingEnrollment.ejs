@@ -549,17 +549,21 @@
           <select id="close_status" class="form-select">
             <option value="completed" selected>Completed</option>
             <option value="cancelled">Cancelled</option>
-            <option value="withdrawn">Withdrawn</option>
+            <option value="archived">Archived</option>
           </select>
         </div>
         <div>
-          <label class="form-label">Reason End</label>
+          <label class="form-label">Reason *</label>
           <textarea id="close_reasonEnd" class="form-control" rows="2"></textarea>
+        </div>
+        <div id="close_statusPreview" class="alert alert-light border mt-3 mb-0">
+          Preview the financial effect before applying the status change.
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-filled btn-danger btn-sm" id="btn_confirmClosePeriod">Close Period</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_previewClosePeriod">Preview</button>
+        <button type="button" class="btn btn-filled btn-danger btn-sm" id="btn_confirmClosePeriod" disabled>Apply Confirmed Change</button>
       </div>
     </div>
   </div>
@@ -585,11 +589,8 @@
         </div>
         <div class="mb-2">
           <label class="form-label">Status</label>
-          <select id="reentry_status" class="form-select">
-            <option value="active" selected>Active</option>
-            <option value="planned">Planned</option>
-            <option value="draft">Draft</option>
-          </select>
+          <input id="reentry_status" class="form-control" value="Draft" readonly>
+          <div class="form-text">The new period must be reviewed and approved before its charges are posted.</div>
         </div>
         <div class="mb-2">
           <label class="form-label">Funder Type</label>
@@ -1015,6 +1016,7 @@
   const priorCreditRepairModal = createModalController(priorCreditRepairModalEl);
   const enrollmentSessionListModal = createModalController(enrollmentSessionListModalEl);
   const addButton = qs('btn_addPeriod');
+  let approvedCloseStatusPayload = null;
 
   function formatResolvedRegistrationLabel(resolved = {}) {
     const label = String(resolved?.label || '').trim();
@@ -3109,6 +3111,19 @@
       const badgeClass = status === 'active' ? 'bg-success'
         : (status === 'planned' ? 'bg-primary' : (status === 'draft' ? 'bg-warning text-dark' : 'bg-secondary'));
       const canClose = isOpenStatus(status);
+      const canArchive = ['completed', 'withdrawn', 'cancelled'].includes(status);
+      const canReenter = ['completed', 'withdrawn', 'cancelled', 'archived'].includes(status);
+      const transactionSummary = row?.transactionSummary && typeof row.transactionSummary === 'object'
+        ? row.transactionSummary
+        : {};
+      const postingCycles = Array.isArray(transactionSummary.postingCycles) ? transactionSummary.postingCycles : [];
+      const activePostingCycle = postingCycles.find((cycle) => Number(cycle?.cycleNo || 0) === Number(transactionSummary.activePostingCycleNo || 0))
+        || postingCycles[postingCycles.length - 1]
+        || null;
+      const financialStatus = (transactionSummary.unresolvedTransactionIds || []).length
+        || (transactionSummary.reconciliationIssues || []).length
+        ? 'unresolved'
+        : String(activePostingCycle?.status || ((transactionSummary.draftTransactionIds || []).length ? 'draft' : 'none')).trim().toLowerCase();
       const canReviewDraft = status === 'draft' && Array.isArray(row?.transactionSummary?.draftPreviewRows) && row.transactionSummary.draftPreviewRows.length > 0;
       const hasPostedTransactions = status !== 'draft'
         && Array.isArray(row?.transactionSummary?.postedTransactionIds)
@@ -3144,7 +3159,10 @@
           <td class="text-center">${consumedSessionCount !== null ? htmlEscape(String(consumedSessionCount)) : '<span class="text-muted">-</span>'}</td>
           <td class="text-center">${remainingSessionCount !== null ? htmlEscape(String(remainingSessionCount)) : '<span class="text-muted">-</span>'}</td>
           <td>${completionHtml}</td>
-          <td class="text-center"><span class="badge ${badgeClass}">${htmlEscape(status || '-')}</span></td>
+          <td class="text-center">
+            <span class="badge ${badgeClass}">${htmlEscape(status || '-')}</span>
+            <div class="x-small text-muted mt-1">Finance: ${htmlEscape(financialStatus)}</div>
+          </td>
           <td>${htmlEscape(funderLabel)}</td>
           <td>${htmlEscape(String(row?.authorizationRef || '-'))}</td>
           <td class="text-end table-actions pe-4">
@@ -3155,8 +3173,9 @@
               <div class="rolling-row-actions-menu d-none" data-period-id="${htmlEscape(String(row?.id || ''))}">
                 <button type="button" class="btn btn-outline-primary btn-sm btn-row-edit" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-pencil-square me-1"></i>Edit</button>
                 ${canReviewDraft ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-review-draft" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-text me-1"></i>Review Draft</button>` : ''}
-                <button type="button" class="btn btn-outline-secondary btn-sm btn-row-reentry" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-repeat me-1"></i>Next</button>
+                ${canReenter ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-reentry" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-repeat me-1"></i>Next</button>` : ''}
                 ${canClose ? `<button type="button" class="btn btn-outline-danger btn-sm btn-row-close" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-x-circle me-1"></i>Close</button>` : ''}
+                ${canArchive ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-archive" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-archive me-1"></i>Archive</button>` : ''}
                 ${canSyncAcademicLedger ? `<button type="button" class="btn btn-outline-info btn-sm btn-row-sync-ledger" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-bookmark me-1"></i>Sync academic ledger</button>` : ''}
                 <button type="button" class="btn btn-outline-danger btn-sm btn-row-remove" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-trash me-1"></i>${removeLabel}</button>
               </div>
@@ -3293,36 +3312,78 @@
     }
   }
 
-  function openCloseModal(periodId) {
+  function openCloseModal(periodId, targetStatus = 'completed') {
     const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
     if (!row || !closeModal) return;
+    approvedCloseStatusPayload = null;
     qs('close_periodId').value = String(row.id || '');
-    qs('close_endDate').value = String(row.endDate || '').trim();
-    qs('close_status').value = 'completed';
+    qs('close_endDate').value = String(row.endDate || '').trim() || new Date().toISOString().slice(0, 10);
+    qs('close_status').value = targetStatus;
     qs('close_reasonEnd').value = '';
+    qs('btn_confirmClosePeriod').disabled = true;
+    qs('close_statusPreview').className = 'alert alert-light border mt-3 mb-0';
+    qs('close_statusPreview').textContent = 'Preview the financial effect before applying the status change.';
     closeModal.show();
+  }
+
+  function readCloseStatusPayload() {
+    return {
+      targetStatus: String(qs('close_status')?.value || 'completed').trim().toLowerCase(),
+      effectiveDate: String(qs('close_endDate')?.value || '').trim(),
+      reason: String(qs('close_reasonEnd')?.value || '').trim()
+    };
+  }
+
+  async function previewClosePeriod() {
+    const periodId = String(qs('close_periodId')?.value || '').trim();
+    const payload = readCloseStatusPayload();
+    if (!periodId || !payload.effectiveDate || !payload.reason) {
+      await showMsg('Missing Fields', 'warning', 'Period, effective date, and reason are required.');
+      return;
+    }
+    try {
+      showBusy('Preparing status preview...');
+      const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/status/preview`, 'POST', payload);
+      if (!result) return;
+      approvedCloseStatusPayload = payload;
+      qs('btn_confirmClosePeriod').disabled = false;
+      const preview = result.preview || {};
+      qs('close_statusPreview').className = 'alert alert-info mt-3 mb-0';
+      qs('close_statusPreview').textContent = payload.targetStatus === 'cancelled'
+        ? 'Cancellation will reverse ' + (preview.sourceTransactions || []).length +
+          ' charge transaction(s), total ' + Number(preview.adjustmentTotal || 0).toFixed(2) +
+          '. Payments will remain unchanged.'
+        : (payload.targetStatus === 'archived'
+          ? 'Archival will leave financial transactions unchanged.'
+          : 'Completion will leave financial transactions unchanged.');
+    } catch (error) {
+      approvedCloseStatusPayload = null;
+      qs('btn_confirmClosePeriod').disabled = true;
+      qs('close_statusPreview').className = 'alert alert-danger mt-3 mb-0';
+      qs('close_statusPreview').textContent = error.message || 'Unable to prepare status preview.';
+    } finally {
+      hideBusy();
+    }
   }
 
   async function submitClosePeriod() {
     const periodId = String(qs('close_periodId')?.value || '').trim();
-    const endDate = String(qs('close_endDate')?.value || '').trim();
-    if (!periodId || !endDate) {
-      await showMsg('Missing Fields', 'warning', 'Period and End Date are required.');
+    const payload = readCloseStatusPayload();
+    if (!approvedCloseStatusPayload || JSON.stringify(payload) !== JSON.stringify(approvedCloseStatusPayload)) {
+      await showMsg('Preview Required', 'warning', 'Preview the current status, date, and reason before applying.');
+      qs('btn_confirmClosePeriod').disabled = true;
       return;
     }
     try {
-      showBusy('Closing period...');
-      const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/close`, 'POST', {
-        endDate,
-        status: String(qs('close_status')?.value || 'completed').trim(),
-        reasonEnd: String(qs('close_reasonEnd')?.value || '').trim()
-      });
+      showBusy('Applying status change...');
+      const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/status/apply`, 'POST', payload);
       if (!result) return;
       closeModal.hide();
-      await showMsg('Closed', 'success', result.message || 'Enrollment period closed.');
+      await showMsg('Status Updated', 'success', result.message || 'Enrollment status updated.');
       await loadRows();
     } catch (error) {
-      await showMsg('Close Failed', 'error', error.message || 'Unable to close enrollment period.');
+      await showMsg('Status Change Failed', 'error', error.message || 'Unable to update enrollment status.');
+      qs('btn_confirmClosePeriod').disabled = false;
     } finally {
       hideBusy();
     }
@@ -3335,7 +3396,7 @@
     qs('reentry_sourceLabel').textContent = `${row.studentLabel || row.studentId || ''} | Source: ${row.startDate || '?'} -> ${row.endDate || 'Open'}`;
     qs('reentry_startDate').value = oneDayAfter(row.endDate) || '';
     qs('reentry_endDate').value = '';
-    qs('reentry_status').value = 'active';
+    qs('reentry_status').value = 'Draft';
     qs('reentry_funderType').value = String(row.funderType || '');
     qs('reentry_funderId').value = String(row.funderId || '');
     qs('reentry_authorizationRef').value = String(row.authorizationRef || '');
@@ -3370,7 +3431,7 @@
       const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/reopen`, 'POST', {
         startDate,
         endDate: String(qs('reentry_endDate')?.value || '').trim(),
-        status: String(qs('reentry_status')?.value || 'active').trim(),
+        status: 'draft',
         funderType: String(qs('reentry_funderType')?.value || '').trim(),
         funderId: String(qs('reentry_funderId')?.value || '').trim(),
         authorizationRef: String(qs('reentry_authorizationRef')?.value || '').trim(),
@@ -3706,6 +3767,13 @@
       return;
     }
 
+    const archiveBtn = event.target.closest('.btn-row-archive');
+    if (archiveBtn) {
+      closeAllActionMenus();
+      openCloseModal(archiveBtn.getAttribute('data-period-id'), 'archived');
+      return;
+    }
+
     const reviewBtn = event.target.closest('.btn-row-review-draft');
     if (reviewBtn) {
       closeAllActionMenus();
@@ -3804,6 +3872,7 @@
     if (enrollWizardStep === 'addSessions' || pendingStagedSessions.length) captureGapFormDraft();
   });
   qs('btn_confirmClosePeriod')?.addEventListener('click', submitClosePeriod);
+  qs('btn_previewClosePeriod')?.addEventListener('click', previewClosePeriod);
   qs('btn_confirmReentry')?.addEventListener('click', submitReentry);
   qs('btn_confirmEditPeriod')?.addEventListener('click', submitEditPeriod);
   qs('btn_confirmChargeEnrollment')?.addEventListener('click', submitChargeableEnrollment);

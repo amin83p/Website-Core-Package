@@ -3,6 +3,8 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
+const registrationFinanceLifecycleService = require('../../services/school/registrationFinanceLifecycleService');
+const registrationStatusLifecycleService = require('../../services/school/registrationStatusLifecycleService');
 const termRegistrationViewService = require('../../services/school/termRegistrationViewService');
 const programRegistrationDraftService = require('../../services/school/programRegistrationDraftService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
@@ -973,7 +975,7 @@ exports.applyBatchRegistration = async (req, res) => {
 
         const studentPreview = row.preview;
         const expectedAcademicEntryCount = countExpectedAcademicEntries(studentPreview);
-        const registration = await dataService.addData('studentTermRegistrations', {
+        let registration = await dataService.addData('studentTermRegistrations', {
           orgId: activeOrgId,
           studentId: studentPreview.student.id,
           personId: studentPreview.student.personId,
@@ -1027,6 +1029,31 @@ exports.applyBatchRegistration = async (req, res) => {
             rows: [],
             removedRows: [],
             expectedRosterCount: studentPreview.classSelections.length
+          }
+        }, req.user);
+        const termDraftItems = Array.isArray(studentPreview.financeSummary.termTransactionItems) ? studentPreview.financeSummary.termTransactionItems : [];
+        const classDraftItems = Array.isArray(studentPreview.financeSummary.classTransactionItems) ? studentPreview.financeSummary.classTransactionItems : [];
+        const draftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+          registration.transactionSummary,
+          [...termDraftItems, ...classDraftItems],
+          {
+            registrationType: 'term',
+            registrationId: registration.id,
+            orgId: registration.orgId,
+            reason: 'Term registration draft saved.'
+          },
+          { requestingUser: req.user }
+        );
+        registration = await dataService.updateData('studentTermRegistrations', registration.id, {
+          status: 'draft',
+          transactionSummary: {
+            ...(registration.transactionSummary || {}),
+            ...draftFinance.summary,
+            draftTransactionIds: draftFinance.transactionIds,
+            draftTermTransactionItems: draftFinance.items.slice(0, termDraftItems.length),
+            draftClassTransactionItems: draftFinance.items.slice(termDraftItems.length),
+            transactionIds: [],
+            postedTransactionIds: []
           }
         }, req.user);
 
@@ -1206,7 +1233,7 @@ exports.applyRegistration = async (req, res) => {
       if (!student || !term) throw new Error('Student, program, or term could not be loaded during apply.');
 
       const expectedAcademicEntryCount = countExpectedAcademicEntries(preview);
-      const registration = await dataService.addData('studentTermRegistrations', {
+      let registration = await dataService.addData('studentTermRegistrations', {
         orgId: program.orgId,
         studentId: preview.student.id,
         personId: preview.student.personId,
@@ -1312,6 +1339,18 @@ exports.updateDraftTransactions = async (req, res) => {
         reqUser: req.user,
         activeOrgId
       });
+      const draftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+        registration.transactionSummary,
+        [...draftState.termItems, ...draftState.classItems],
+        {
+          registrationType: 'term',
+          registrationId: registration.id,
+          orgId: registration.orgId,
+          currentDraftTransactionIds: registration?.transactionSummary?.draftTransactionIds,
+          reason: 'Term registration draft transactions updated.'
+        },
+        { requestingUser: req.user }
+      );
 
       const updated = await dataService.updateData(
         'studentTermRegistrations',
@@ -1326,7 +1365,7 @@ exports.updateDraftTransactions = async (req, res) => {
           classSummary: registration.classSummary || {},
           validationSummary: registration.validationSummary || {},
           transactionSummary: {
-            ...(registration.transactionSummary || {}),
+            ...draftFinance.summary,
             previewCount: draftState.draftPreviewRows.length,
             termPreviewCount: draftState.termPreviewRows.length,
             classPreviewCount: draftState.classPreviewRows.length,
@@ -1335,8 +1374,8 @@ exports.updateDraftTransactions = async (req, res) => {
             classTransactionTotal: draftState.classTotal,
             classFeeTotal: draftState.classTotal,
             grandTotal: draftState.grandTotal,
-            draftTermTransactionItems: draftState.termItems,
-            draftClassTransactionItems: draftState.classItems,
+            draftTermTransactionItems: draftFinance.items.slice(0, draftState.termItems.length),
+            draftClassTransactionItems: draftFinance.items.slice(draftState.termItems.length),
             draftTermTransactionPreview: draftState.termPreviewRows,
             draftClassTransactionPreview: draftState.classPreviewRows,
             draftSavedAt: new Date().toISOString()
@@ -1453,59 +1492,107 @@ exports.approveRegistration = async (req, res) => {
       fallbackTermItems: preview?.financeSummary?.termTransactionItems || [],
       fallbackClassItems: preview?.financeSummary?.classTransactionItems || []
     });
+    const termItemCount = finalDraftState.termItems.length;
+    const approvalDraftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+      registration.transactionSummary,
+      [...finalDraftState.termItems, ...finalDraftState.classItems],
+      {
+        registrationType: 'term',
+        registrationId: registration.id,
+        orgId: activeOrgId
+      },
+      { transactionContext: txContext, requestingUser: req.user }
+    );
+    const postingCycleState = {
+      summary: approvalDraftFinance.summary,
+      cycle: approvalDraftFinance.cycle
+    };
+    const cycleScopedTermItems = approvalDraftFinance.items.slice(0, termItemCount);
+    const cycleScopedClassItems = approvalDraftFinance.items.slice(termItemCount);
     try {
-      if (Array.isArray(finalDraftState.termItems) && finalDraftState.termItems.length) {
-        const postedTransactions = await dataService.addData(
-          'globalTransactions',
-          finalDraftState.termItems,
-          req.user,
-          { transactionContext: txContext }
+      if (cycleScopedTermItems.length) {
+        const postedTransactions = await registrationFinanceLifecycleService.postCycleTransactions(
+          cycleScopedTermItems,
+          { transactionContext: txContext, requestingUser: req.user }
         );
         createdTransactions.push(...(Array.isArray(postedTransactions) ? postedTransactions : [postedTransactions]).filter(Boolean));
       }
-      if (Array.isArray(finalDraftState.classItems) && finalDraftState.classItems.length) {
-        const postedClassTransactions = await dataService.addData(
-          'globalTransactions',
-          finalDraftState.classItems,
-          req.user,
-          { transactionContext: txContext }
+      if (cycleScopedClassItems.length) {
+        const postedClassTransactions = await registrationFinanceLifecycleService.postCycleTransactions(
+          cycleScopedClassItems,
+          { transactionContext: txContext, requestingUser: req.user }
         );
         createdTransactions.push(...(Array.isArray(postedClassTransactions) ? postedClassTransactions : [postedClassTransactions]).filter(Boolean));
       }
 
-      const postedTermEntry = await academicLedgerService.postTermRegistration({
-        reqUser: req.user,
-        student,
-        program,
-        term,
-        effectiveDate,
-        note: effectiveNote,
-        source: {
-          eventId: `STR-${registration.id}-TERM`,
-          idempotencyKey: `STR|${registration.id}|term`
-        },
-        options: { transactionContext: txContext }
+      const termAcademicSource = registrationFinanceLifecycleService.scopeAcademicSource({
+        eventId: `STR-${registration.id}-TERM`,
+        idempotencyKey: `STR|${registration.id}|term`
+      }, postingCycleState.cycle);
+      const postedTermEntry = await registrationFinanceLifecycleService.postAcademicEntriesIdempotently({
+        source: termAcademicSource,
+        options: { transactionContext: txContext },
+        post: () => academicLedgerService.postTermRegistration({
+          reqUser: req.user,
+          student,
+          program,
+          term,
+          effectiveDate,
+          note: effectiveNote,
+          source: termAcademicSource,
+          options: { transactionContext: txContext }
+        })
       });
+      const termDraftItems = Array.isArray(preview.financeSummary.termTransactionItems) ? preview.financeSummary.termTransactionItems : [];
+      const classDraftItems = Array.isArray(preview.financeSummary.classTransactionItems) ? preview.financeSummary.classTransactionItems : [];
+      const draftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
+        registration.transactionSummary,
+        [...termDraftItems, ...classDraftItems],
+        {
+          registrationType: 'term',
+          registrationId: registration.id,
+          orgId: registration.orgId,
+          reason: 'Term registration draft saved.'
+        },
+        { requestingUser: req.user }
+      );
+      registration = await dataService.updateData('studentTermRegistrations', registration.id, {
+        status: 'draft',
+        transactionSummary: {
+          ...(registration.transactionSummary || {}),
+          ...draftFinance.summary,
+          draftTransactionIds: draftFinance.transactionIds,
+          draftTermTransactionItems: draftFinance.items.slice(0, termDraftItems.length),
+          draftClassTransactionItems: draftFinance.items.slice(termDraftItems.length),
+          transactionIds: [],
+          postedTransactionIds: []
+        }
+      }, req.user);
       academicEntries.push(...(Array.isArray(postedTermEntry) ? postedTermEntry : [postedTermEntry]).filter(Boolean));
 
       for (const classPreview of preview.classSelections) {
         for (const subjectId of asIdArray(classPreview.subjectIds)) {
-          const postedClassEntries = await academicLedgerService.postClassEnrollment({
-            reqUser: req.user,
-            student,
-            program,
-            termId,
-            classItem: { id: classPreview.classId, title: classPreview.classTitle },
-            subjectId,
-            subjectType: '',
-            creditsAttempted: null,
-            effectiveDate,
-            note: effectiveNote,
-            source: {
-              eventId: `STR-${registration.id}-${classPreview.classId}-${subjectId}`,
-              idempotencyKey: `STR|${registration.id}|${classPreview.classId}|${subjectId}`
-            },
-            options: { transactionContext: txContext }
+          const classAcademicSource = registrationFinanceLifecycleService.scopeAcademicSource({
+            eventId: `STR-${registration.id}-${classPreview.classId}-${subjectId}`,
+            idempotencyKey: `STR|${registration.id}|${classPreview.classId}|${subjectId}`
+          }, postingCycleState.cycle);
+          const postedClassEntries = await registrationFinanceLifecycleService.postAcademicEntriesIdempotently({
+            source: classAcademicSource,
+            options: { transactionContext: txContext },
+            post: () => academicLedgerService.postClassEnrollment({
+              reqUser: req.user,
+              student,
+              program,
+              termId,
+              classItem: { id: classPreview.classId, title: classPreview.classTitle },
+              subjectId,
+              subjectType: '',
+              creditsAttempted: null,
+              effectiveDate,
+              note: effectiveNote,
+              source: classAcademicSource,
+              options: { transactionContext: txContext }
+            })
           });
           academicEntries.push(...(Array.isArray(postedClassEntries) ? postedClassEntries : [postedClassEntries]).filter(Boolean));
         }
@@ -1544,7 +1631,8 @@ exports.approveRegistration = async (req, res) => {
             issues: preview.issues,
             warnings: preview.warnings
           },
-          transactionSummary: {
+          transactionSummary: registrationFinanceLifecycleService.updatePostingCycle({
+            ...postingCycleState.summary,
             previewCount: finalDraftState.draftPreviewRows.length,
             termPreviewCount: finalDraftState.termPreviewRows.length,
             classPreviewCount: finalDraftState.classPreviewRows.length,
@@ -1553,16 +1641,21 @@ exports.approveRegistration = async (req, res) => {
             classTransactionTotal: finalDraftState.classTotal,
             classFeeTotal: finalDraftState.classTotal,
             grandTotal: finalDraftState.grandTotal,
-            transactionIds: createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
-            reversalIds: [],
-            draftTermTransactionItems: finalDraftState.termItems,
-            draftClassTransactionItems: finalDraftState.classItems,
+            draftTermTransactionItems: cycleScopedTermItems,
+            draftClassTransactionItems: cycleScopedClassItems,
             draftTermTransactionPreview: finalDraftState.termPreviewRows,
             draftClassTransactionPreview: finalDraftState.classPreviewRows,
             externalReference,
             approvedAt: new Date().toISOString(),
             approvedBy: toPublicId(req.user?.id) || String(req.user?.username || 'system')
-          },
+          }, postingCycleState.cycle.cycleNo, {
+            status: 'posted',
+            postedAt: new Date().toISOString(),
+            transactionIds: createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
+            reversalIds: [],
+            unresolvedTransactionIds: [],
+            issues: []
+          }, { registrationType: 'term', registrationId: registration.id }),
           academicSummary: {
             entryCount: academicEntries.length,
             expectedEntryCount: countExpectedAcademicEntries(preview),
@@ -1598,7 +1691,7 @@ exports.approveRegistration = async (req, res) => {
     } catch (approvalError) {
       const rollbackResult = await registrationIntegrityService.rollbackTermRegistrationSideEffects({
         registrationId: registration.id,
-        transactionIds: createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
+        transactionIds: [],
         academicEntryIds: academicEntries.map((row) => toPublicId(row.id)).filter(Boolean),
         classEnrollmentEntries,
         reqUser: req.user,
@@ -1607,8 +1700,34 @@ exports.approveRegistration = async (req, res) => {
         reason: `Term registration draft approval ${registration.id} failed and was rolled back. ${approvalError.message}`,
         options: { transactionContext: txContext }
       });
-
-      const rollbackSucceeded = rollbackResult.issues.length === 0;
+      let financialRollback = null;
+      const financialIssues = [];
+      try {
+        financialRollback = await registrationFinanceLifecycleService.returnPostedSummaryToDraft(
+          registrationFinanceLifecycleService.updatePostingCycle(
+            postingCycleState.summary,
+            postingCycleState.cycle.cycleNo,
+            {
+              status: 'posted',
+              postedAt: new Date().toISOString(),
+              transactionIds: createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean)
+            },
+            { registrationType: 'term', registrationId: registration.id }
+          ),
+          {
+            registrationType: 'term',
+            registrationId: registration.id,
+            orgId: registration.orgId,
+            transactionIds: createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
+            reason: `Term registration approval failed for ${registration.id}. ${approvalError.message}`
+          },
+          { requestingUser: req.user, transactionContext: txContext }
+        );
+      } catch (financeError) {
+        financialIssues.push(financeError.message);
+      }
+      const combinedIssues = [...rollbackResult.issues, ...financialIssues];
+      const rollbackSucceeded = combinedIssues.length === 0;
       const nextStatus = rollbackSucceeded ? 'draft' : 'error';
 
       await dataService.updateData(
@@ -1631,6 +1750,7 @@ exports.approveRegistration = async (req, res) => {
             warnings: preview.warnings
           },
           transactionSummary: {
+            ...(financialRollback?.summary || postingCycleState.summary),
             previewCount: finalDraftState.draftPreviewRows.length,
             termPreviewCount: finalDraftState.termPreviewRows.length,
             classPreviewCount: finalDraftState.classPreviewRows.length,
@@ -1639,17 +1759,20 @@ exports.approveRegistration = async (req, res) => {
             classTransactionTotal: finalDraftState.classTotal,
             classFeeTotal: finalDraftState.classTotal,
             grandTotal: finalDraftState.grandTotal,
+            draftTermTransactionItems: cycleScopedTermItems,
+            draftClassTransactionItems: cycleScopedClassItems,
+            draftTransactionIds: financialRollback?.transactionIds || createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
             transactionIds: [],
-            reversalIds: rollbackResult.reversalIds,
-            draftTermTransactionItems: finalDraftState.termItems,
-            draftClassTransactionItems: finalDraftState.classItems,
+            postedTransactionIds: [],
+            reconciliationIssues: combinedIssues,
+            unresolvedTransactionIds: rollbackSucceeded ? [] : createdTransactions.map((row) => toPublicId(row.id)).filter(Boolean),
             draftTermTransactionPreview: finalDraftState.termPreviewRows,
             draftClassTransactionPreview: finalDraftState.classPreviewRows,
             externalReference,
             lastApprovalAttempt: {
               attemptedAt: new Date().toISOString(),
               error: String(approvalError.message || ''),
-              rollbackIssues: rollbackResult.issues
+              rollbackIssues: combinedIssues
             }
           },
           academicSummary: {
@@ -1683,8 +1806,8 @@ exports.approveRegistration = async (req, res) => {
       return res.status(400).json({
         status: rollbackSucceeded ? 'warning' : 'error',
         message: rollbackSucceeded
-          ? `Draft approval failed and all side effects were rolled back. Draft remains open. ${approvalError.message}`
-          : buildRollbackNote('', approvalError.message, rollbackResult.issues),
+          ? `Draft approval failed and all side effects returned to draft. Draft remains open. ${approvalError.message}`
+          : buildRollbackNote('', approvalError.message, combinedIssues),
         registrationId: registration.id
       });
     }
@@ -1806,7 +1929,7 @@ exports.rollbackRegistration = async (req, res) => {
 
     const rollbackResult = await registrationIntegrityService.rollbackTermRegistrationSideEffects({
       registrationId: registration.id,
-      transactionIds: registration?.transactionSummary?.transactionIds,
+      transactionIds: [],
       academicEntryIds: registration?.academicSummary?.entryIds,
       classEnrollmentEntries: registration?.classEnrollmentSummary?.rows || registration?.rosterSummary?.rows,
       reqUser: req.user,
@@ -1815,9 +1938,31 @@ exports.rollbackRegistration = async (req, res) => {
       reason: note || `Manual rollback of term registration ${registration.id}`,
       options: { transactionContext: txContext }
     });
-
-    const rollbackSucceeded = rollbackResult.issues.length === 0;
+    let financeRollback = null;
+    const financeIssues = [];
+    try {
+      financeRollback = await registrationFinanceLifecycleService.returnPostedSummaryToDraft(
+        registration.transactionSummary,
+        {
+          registrationType: 'term',
+          registrationId: registration.id,
+          orgId: registration.orgId,
+          transactionIds: registration?.transactionSummary?.transactionIds,
+          reason: note || `Manual rollback of term registration ${registration.id}`
+        },
+        { requestingUser: req.user, transactionContext: txContext }
+      );
+    } catch (financeError) {
+      financeIssues.push(financeError.message);
+    }
+    const combinedIssues = [...rollbackResult.issues, ...financeIssues];
+    const rollbackSucceeded = combinedIssues.length === 0;
     const nextStatus = rollbackSucceeded ? 'draft' : 'error';
+    const rolledBackFinanceSummary = financeRollback?.summary ||
+      registrationFinanceLifecycleService.normalizeTransactionSummary(
+        registration.transactionSummary,
+        { registrationType: 'term', registrationId: registration.id }
+      );
     await dataService.updateData(
       'studentTermRegistrations',
       registration.id,
@@ -1831,16 +1976,17 @@ exports.rollbackRegistration = async (req, res) => {
         classSummary: registration.classSummary || {},
         validationSummary: registration.validationSummary || {},
         transactionSummary: {
-          ...(registration.transactionSummary || {}),
+          ...rolledBackFinanceSummary,
           postedCount: 0,
+          draftTransactionIds: financeRollback?.transactionIds || rolledBackFinanceSummary.draftTransactionIds,
           transactionIds: [],
+          postedTransactionIds: [],
           approvedAt: '',
           approvedBy: '',
           lastRollbackAt: new Date().toISOString(),
-          reversalIds: Array.from(new Set([
-            ...asIdArray(registration?.transactionSummary?.reversalIds),
-            ...rollbackResult.reversalIds
-          ]))
+          reversalIds: rolledBackFinanceSummary.reversalIds,
+          reconciliationIssues: combinedIssues,
+          unresolvedTransactionIds: rollbackSucceeded ? [] : asIdArray(registration?.transactionSummary?.transactionIds)
         },
         academicSummary: {
           ...(registration.academicSummary || {}),
@@ -1867,12 +2013,12 @@ exports.rollbackRegistration = async (req, res) => {
     await txContext.commit({ registrationId: toPublicId(registration.id), flow: 'term_manual_rollback' });
 
     const payloadOut = {
-      status: rollbackResult.issues.length ? 'warning' : 'success',
-      message: rollbackResult.issues.length
-        ? `Rollback completed with issues: ${rollbackResult.issues.join(' ')}`
-        : 'Registration moved back to draft. Posted side effects were reversed.',
+      status: combinedIssues.length ? 'warning' : 'success',
+      message: combinedIssues.length
+        ? `Rollback completed with issues: ${combinedIssues.join(' ')}`
+        : 'Registration and its financial transactions moved back to draft.',
       rollback: {
-        reversalCount: rollbackResult.reversalIds.length,
+        returnedToDraftCount: financeRollback?.transactionIds?.length || 0,
         voidedEntryCount: rollbackResult.voidedEntryIds.length,
         classEnrollmentRemovalCount: rollbackResult.removedClassEnrollmentEntries.length,
         rosterRemovalCount: rollbackResult.removedClassEnrollmentEntries.length
@@ -1886,5 +2032,47 @@ exports.rollbackRegistration = async (req, res) => {
       await txContext.rollback({ flow: 'term_manual_rollback', reason: error.message || 'Rollback failed' });
     }
     return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.previewStatusTransition = async (req, res) => {
+  try {
+    const preview = await registrationStatusLifecycleService.previewTransition({
+      registrationType: 'term',
+      registrationId: req.params.id,
+      targetStatus: req.body?.targetStatus,
+      effectiveDate: req.body?.effectiveDate,
+      reason: req.body?.reason,
+      orgId: getActiveOrgIdOrThrow(req.user)
+    }, { requestingUser: req.user });
+    return res.status(preview.canApply ? 200 : 409).json({
+      status: preview.canApply ? 'success' : 'blocked',
+      message: preview.canApply
+        ? 'Status transition preview is ready.'
+        : 'Resolve the listed child registrations or financial issues before continuing.',
+      preview
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message, preview: error.preview || null });
+  }
+};
+
+exports.applyStatusTransition = async (req, res) => {
+  try {
+    const result = await registrationStatusLifecycleService.applyTransition({
+      registrationType: 'term',
+      registrationId: req.params.id,
+      targetStatus: req.body?.targetStatus,
+      effectiveDate: req.body?.effectiveDate,
+      reason: req.body?.reason,
+      orgId: getActiveOrgIdOrThrow(req.user)
+    }, { requestingUser: req.user });
+    return res.json({ status: 'success', message: `Registration changed to ${result.targetStatus}.`, result });
+  } catch (error) {
+    return res.status(error.preview?.blockers?.length ? 409 : 400).json({
+      status: 'error',
+      message: error.message,
+      preview: error.preview || null
+    });
   }
 };

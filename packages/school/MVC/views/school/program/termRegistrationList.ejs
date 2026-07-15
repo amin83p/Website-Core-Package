@@ -13,8 +13,8 @@
 <%- include('partials/tablePages-search', {
   placeholder: 'Search term registrations...',
   fields: [
-    { name: 'status', label: 'Record Status', type: 'select', options: ['draft', 'registered', 'rolled_back', 'error', 'withdrawn', 'cancelled', 'completed'] },
-    { name: 'verificationStatus', label: 'Verification', type: 'select', options: ['verified', 'partial', 'rolled_back', 'failed', 'pending'] }
+    { name: 'status', label: 'Record Status', type: 'select', options: ['draft', 'registered', 'rolled_back', 'error', 'withdrawn', 'cancelled', 'completed', 'void'] },
+    { name: 'verificationStatus', label: 'Verification', type: 'select', options: ['verified', 'partial', 'draft', 'reversed', 'voided', 'failed', 'pending'] }
   ]
 }) %>
 

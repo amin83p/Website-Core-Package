@@ -364,6 +364,247 @@ function canTransition(fromStatus, toStatus) {
   return transitions[fromStatus] ? transitions[fromStatus].has(toStatus) : false;
 }
 
+const REGISTRATION_STATUS_TRANSITIONS = new Set([
+  'draft:posted',
+  'posted:draft',
+  'draft:voided'
+]);
+
+function normalizeRegistrationTransitionInput(input = {}) {
+  const transactionIds = Array.from(new Set((Array.isArray(input.transactionIds) ? input.transactionIds : [])
+    .map((value) => cleanId(value, { max: 120, allowEmpty: true }))
+    .filter(Boolean)));
+  const registrationType = cleanString(input.registrationType, { max: 20, allowEmpty: false }).toLowerCase();
+  const registrationId = cleanId(input.registrationId, { max: 80, allowEmpty: false });
+  const orgId = cleanId(input.orgId, { max: 80, allowEmpty: false });
+  const fromStatus = cleanString(input.fromStatus, { max: 30, allowEmpty: false }).toLowerCase();
+  const toStatus = cleanString(input.toStatus, { max: 30, allowEmpty: false }).toLowerCase();
+  if (!transactionIds.length) throw new Error('At least one transaction id is required.');
+  if (!['program', 'term', 'class'].includes(registrationType)) throw new Error('Invalid registration type.');
+  if (!registrationId || !orgId) throw new Error('Registration and organization are required.');
+  if (!REGISTRATION_STATUS_TRANSITIONS.has(fromStatus + ':' + toStatus)) {
+    throw new Error('Registration transaction transition ' + fromStatus + ' to ' + toStatus + ' is not allowed.');
+  }
+  return {
+    transactionIds,
+    registrationType,
+    registrationId,
+    orgId,
+    fromStatus,
+    toStatus,
+    actor: cleanString(input.actor, { max: 120, allowEmpty: true }),
+    reason: cleanString(input.reason, { max: 1000, allowEmpty: true }),
+    cycleNo: Math.max(0, Number.parseInt(String(input.cycleNo || 0), 10) || 0),
+    transitionedAt: cleanDateISO(input.transitionedAt, { allowEmpty: true, withTime: true }) || new Date().toISOString()
+  };
+}
+
+function buildRegistrationStatusHistoryEntry(transaction, transition) {
+  const entry = {
+    fromStatus: transition.fromStatus,
+    toStatus: transition.toStatus,
+    at: transition.transitionedAt,
+    by: transition.actor,
+    reason: transition.reason,
+    postingCycleNo: transition.cycleNo
+  };
+  if (transition.fromStatus === 'posted') {
+    entry.postedSnapshot = {
+      postedAt: String(transaction.postedAt || ''),
+      effectiveDate: String(transaction.effectiveDate || ''),
+      amount: { ...(transaction.amount || {}) },
+      balanceEffect: Number(transaction.balanceEffect || 0),
+      fee: { ...(transaction.fee || {}) },
+      account: {
+        id: String(transaction?.metadata?.accountId || ''),
+        code: String(transaction?.metadata?.accountCode || ''),
+        name: String(transaction?.metadata?.accountName || '')
+      },
+      source: { ...(transaction.source || {}) }
+    };
+  }
+  return entry;
+}
+
+function validateLegacyRegistrationExpectation(transaction, expectation = {}, context = {}) {
+  const issues = [];
+  const expectedAmount = expectation?.amount && typeof expectation.amount === 'object' ? expectation.amount : {};
+  const expectedParty = expectation?.party && typeof expectation.party === 'object' ? expectation.party : {};
+  const expectedMetadata = expectation?.metadata && typeof expectation.metadata === 'object' ? expectation.metadata : {};
+  const required = {
+    orgId: cleanId(expectation.orgId, { max: 80, allowEmpty: true }) || '',
+    studentId: cleanId(expectedParty.studentId, { max: 80, allowEmpty: true }) || '',
+    programId: cleanId(expectedParty.programId, { max: 80, allowEmpty: true }) || '',
+    accountId: cleanId(expectedMetadata.accountId, { max: 80, allowEmpty: true }) || '',
+    currency: cleanString(expectedAmount.currency, { max: 3, allowEmpty: true }).toUpperCase(),
+    direction: cleanString(expectedAmount.direction, { max: 10, allowEmpty: true }).toLowerCase(),
+    amount: Number(expectedAmount.value)
+  };
+  if (!required.orgId || !required.studentId || !required.programId || !required.accountId ||
+      !required.currency || !required.direction || !Number.isFinite(required.amount)) {
+    return ['Legacy registration ownership cannot be verified because the stored financial line is incomplete.'];
+  }
+  if (!idsEqual(transaction.orgId, required.orgId) || !idsEqual(transaction.orgId, context.orgId)) {
+    issues.push('organization');
+  }
+  if (!idsEqual(transaction?.party?.studentId, required.studentId)) issues.push('student');
+  if (!idsEqual(transaction?.party?.programId, required.programId)) issues.push('program');
+  if (!idsEqual(transaction?.metadata?.accountId, required.accountId)) issues.push('account');
+  if (Number(transaction?.amount?.value) !== required.amount) issues.push('amount');
+  if (String(transaction?.amount?.currency || '').toUpperCase() !== required.currency) issues.push('currency');
+  if (String(transaction?.amount?.direction || '').toLowerCase() !== required.direction) issues.push('direction');
+  return issues.length
+    ? [`Legacy registration ownership verification failed for ${transaction.id}: ${issues.join(', ')} mismatch.`]
+    : [];
+}
+
+function applyRegistrationOwnershipBackfill(transaction, input = {}) {
+  const registrationType = cleanString(input.registrationType, { max: 20, allowEmpty: false }).toLowerCase();
+  const registrationId = cleanId(input.registrationId, { max: 80, allowEmpty: false });
+  const orgId = cleanId(input.orgId, { max: 80, allowEmpty: false });
+  if (!['program', 'term', 'class'].includes(registrationType) || !registrationId || !orgId) {
+    throw new Error('Registration ownership backfill context is incomplete.');
+  }
+  if (!idsEqual(transaction?.orgId, orgId)) throw new Error(`Transaction ${transaction?.id || ''} is outside the registration organization.`);
+  if (String(transaction?.transactionType || '').toLowerCase() !== 'charge') {
+    throw new Error(`Transaction ${transaction?.id || ''} is not a registration charge.`);
+  }
+  const existingType = String(transaction?.metadata?.registrationType || '').trim().toLowerCase();
+  const existingId = cleanId(transaction?.metadata?.registrationId, { max: 80, allowEmpty: true }) || '';
+  if (existingType || existingId) {
+    if (existingType !== registrationType || !idsEqual(existingId, registrationId)) {
+      throw new Error(`Transaction ${transaction?.id || ''} belongs to another registration.`);
+    }
+    return transaction;
+  }
+  const issues = validateLegacyRegistrationExpectation(transaction, input.expectation, { orgId });
+  if (issues.length) throw new Error(issues.join(' '));
+  const now = new Date().toISOString();
+  return {
+    ...transaction,
+    metadata: {
+      ...(transaction.metadata || {}),
+      registrationType,
+      registrationId,
+      draftLineId: String(input?.expectation?.metadata?.draftLineId || transaction.id || ''),
+      registrationLifecycle: {
+        ...(transaction?.metadata?.registrationLifecycle || {}),
+        registrationType,
+        registrationId,
+        draftLineId: String(input?.expectation?.metadata?.draftLineId || transaction.id || ''),
+        currentPostingCycleNo: Number(input.cycleNo || 0),
+        statusHistory: Array.isArray(transaction?.metadata?.registrationLifecycle?.statusHistory)
+          ? transaction.metadata.registrationLifecycle.statusHistory
+          : [],
+        ownershipBackfilledAt: now,
+        ownershipBackfilledBy: cleanString(input.actor, { max: 120, allowEmpty: true })
+      }
+    },
+    audit: {
+      ...(transaction.audit || {}),
+      lastUpdateDateTime: now
+    }
+  };
+}
+
+function transitionRegistrationTransactionRow(transaction, transition) {
+  if (!idsEqual(transaction?.orgId, transition.orgId)) {
+    throw new Error('Transaction ' + String(transaction?.id || '') + ' is outside the registration organization.');
+  }
+  if (String(transaction?.transactionType || '').toLowerCase() !== 'charge') {
+    throw new Error('Transaction ' + String(transaction?.id || '') + ' is not a registration charge.');
+  }
+  if (!idsEqual(transaction?.metadata?.registrationId, transition.registrationId) ||
+      String(transaction?.metadata?.registrationType || '').toLowerCase() !== transition.registrationType) {
+    throw new Error('Transaction ' + String(transaction?.id || '') + ' does not belong to this registration.');
+  }
+  const currentStatus = String(transaction?.status || '').toLowerCase();
+  if (currentStatus === transition.toStatus) return transaction;
+  if (currentStatus !== transition.fromStatus) {
+    throw new Error('Transaction ' + String(transaction?.id || '') + ' is ' + (currentStatus || 'unknown') + ', expected ' + transition.fromStatus + '.');
+  }
+
+  const existingLifecycle = transaction?.metadata?.registrationLifecycle &&
+    typeof transaction.metadata.registrationLifecycle === 'object' &&
+    !Array.isArray(transaction.metadata.registrationLifecycle)
+    ? transaction.metadata.registrationLifecycle
+    : {};
+  const history = Array.isArray(existingLifecycle.statusHistory)
+    ? existingLifecycle.statusHistory.slice(-99)
+    : [];
+  history.push(buildRegistrationStatusHistoryEntry(transaction, transition));
+
+  return {
+    ...transaction,
+    status: transition.toStatus,
+    postedAt: transition.toStatus === 'posted' ? transition.transitionedAt : '',
+    hold: cleanHold(null, transition.toStatus),
+    metadata: {
+      ...(transaction.metadata || {}),
+      registrationType: transition.registrationType,
+      registrationId: transition.registrationId,
+      postingCycleNo: transition.cycleNo || Number(transaction?.metadata?.postingCycleNo || 0),
+      registrationLifecycle: {
+        ...existingLifecycle,
+        registrationType: transition.registrationType,
+        registrationId: transition.registrationId,
+        draftLineId: String(existingLifecycle.draftLineId || transaction?.metadata?.draftLineId || transaction.id || ''),
+        currentPostingCycleNo: transition.cycleNo || Number(existingLifecycle.currentPostingCycleNo || 0),
+        statusHistory: history,
+        voidedAt: transition.toStatus === 'voided' ? transition.transitionedAt : String(existingLifecycle.voidedAt || '')
+      }
+    },
+    audit: {
+      ...(transaction.audit || {}),
+      lastUpdateDateTime: transition.transitionedAt
+    }
+  };
+}
+
+async function transitionRegistrationTransactions(input = {}, options = {}) {
+  void options;
+  return queueWrite(async () => {
+    const transition = normalizeRegistrationTransitionInput(input);
+    const all = await getAllTransactions();
+    const indexById = new Map(all.map((row, index) => [String(row?.id || ''), index]));
+    const rows = transition.transactionIds.map((id) => {
+      const index = indexById.get(String(id));
+      if (index === undefined) throw new Error('Transaction ' + id + ' was not found.');
+      return { index, row: transitionRegistrationTransactionRow(all[index], transition) };
+    });
+    rows.forEach(({ index, row }) => { all[index] = row; });
+    await fs.writeFile(dataPath, JSON.stringify(all, null, 2));
+    return rows.map(({ row }) => row);
+  });
+}
+
+async function backfillRegistrationTransactionOwnership(input = {}, options = {}) {
+  void options;
+  return queueWrite(async () => {
+    const transactionIds = Array.from(new Set((Array.isArray(input.transactionIds) ? input.transactionIds : [])
+      .map((value) => cleanId(value, { max: 120, allowEmpty: true }))
+      .filter(Boolean)));
+    if (!transactionIds.length) return [];
+    const expectations = input.expectations && typeof input.expectations === 'object' ? input.expectations : {};
+    const all = await getAllTransactions();
+    const indexById = new Map(all.map((row, index) => [String(row?.id || ''), index]));
+    const rows = transactionIds.map((id) => {
+      const index = indexById.get(String(id));
+      if (index === undefined) throw new Error(`Transaction ${id} was not found.`);
+      return {
+        index,
+        row: applyRegistrationOwnershipBackfill(all[index], {
+          ...input,
+          expectation: expectations[id]
+        })
+      };
+    });
+    rows.forEach(({ index, row }) => { all[index] = row; });
+    await fs.writeFile(dataPath, JSON.stringify(all, null, 2));
+    return rows.map(({ row }) => row);
+  });
+}
+
 async function getAllTransactions() {
   try {
     const data = await fs.readFile(dataPath, 'utf8');
@@ -617,6 +858,12 @@ module.exports = {
   addTransactionsBatch,
   updateTransaction,
   updateTransactionStatus,
+  transitionRegistrationTransactions,
+  backfillRegistrationTransactionOwnership,
+  applyRegistrationOwnershipBackfill,
+  validateLegacyRegistrationExpectation,
+  normalizeRegistrationTransitionInput,
+  transitionRegistrationTransactionRow,
   addTransactionComment,
   reverseTransaction,
   resolveMemoTemplate,

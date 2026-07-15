@@ -4,6 +4,7 @@ const schoolRepositories = require('../../repositories/school');
 const academicSnapshotService = require('./academicSnapshotService');
 const programTransactionService = require('./programTransactionService');
 const programRegistrationDraftService = require('./programRegistrationDraftService');
+const { normalizeTransactionSummary } = require('../../models/school/registrationTransactionSummary');
 const registrationIntegrityService = require('./registrationIntegrityService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
@@ -34,9 +35,23 @@ function matchesSearch(haystacks, query) {
 function getVerificationBadgeClass(status) {
   if (status === 'verified') return 'bg-success';
   if (status === 'partial') return 'bg-warning text-dark';
-  if (status === 'rolled_back') return 'bg-secondary';
+  if (['rolled_back', 'reversed', 'voided'].includes(status)) return 'bg-secondary';
+  if (status === 'draft') return 'bg-info text-dark';
   if (status === 'failed') return 'bg-danger';
   return 'bg-info text-dark';
+}
+
+function resolveFinanceLifecycleState(registrationStatus, activeCycle, postingCycles, unresolvedTransactionIds) {
+  const normalizedRegistrationStatus = String(registrationStatus || '').trim().toLowerCase();
+  const cycleStatus = String(activeCycle?.status || '').trim().toLowerCase();
+  const hasErrors = unresolvedTransactionIds.length > 0
+    || postingCycles.some((row) => ['error', 'reversal_error', 'reversing'].includes(String(row.status || '').trim().toLowerCase()));
+  if (hasErrors) return 'unresolved';
+  if (normalizedRegistrationStatus === 'void' || cycleStatus === 'voided') return 'voided';
+  if (cycleStatus === 'reversed') return 'reversed';
+  if (['draft', 'posting', 'returned_to_draft'].includes(cycleStatus)) return 'draft';
+  if (cycleStatus === 'posted') return 'posted';
+  return 'none';
 }
 
 function isActiveRegistrationStatus(status) {
@@ -374,13 +389,27 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
       const program = programMap.get(toPublicId(registration.programId)) || null;
       const term = termMap.get(toPublicId(registration.termId)) || null;
 
-      const transactionIds = asIdArray(registration?.transactionSummary?.transactionIds);
-      const reversalIds = asIdArray(registration?.transactionSummary?.reversalIds);
+      const normalizedFinance = normalizeTransactionSummary(registration?.transactionSummary, {
+        registrationType: 'term', registrationId: registration.id
+      });
+      const postingCycles = normalizedFinance.postingCycles.map((cycle) => ({
+        ...cycle,
+        transactionIds: asIdArray([
+          ...cycle.transactionIds,
+          ...cycle.reversalIds.map((id) => transactionMap.get(id)?.reversalOfTransactionId)
+        ])
+      }));
+      const activeCycle = postingCycles.find((row) => row.cycleNo === normalizedFinance.activePostingCycleNo)
+        || postingCycles[postingCycles.length - 1];
+      const currentTransactionIds = asIdArray(activeCycle?.transactionIds || normalizedFinance.transactionIds);
+      const transactionIds = asIdArray(postingCycles.flatMap((row) => row.transactionIds));
+      const reversalIds = asIdArray(postingCycles.flatMap((row) => row.reversalIds));
+      const unresolvedTransactionIds = asIdArray(postingCycles.flatMap((row) => row.unresolvedTransactionIds));
       const academicEntryIds = asIdArray(registration?.academicSummary?.entryIds);
       const voidedEntryIds = asIdArray(registration?.academicSummary?.voidedEntryIds);
 
       const financeExpected = Math.max(
-        transactionIds.length,
+        currentTransactionIds.length,
         Number(registration?.transactionSummary?.postedCount || 0),
         Number(registration?.transactionSummary?.previewCount || 0)
       );
@@ -389,20 +418,32 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
         Number(registration?.academicSummary?.entryCount || 0),
         Number(registration?.academicSummary?.expectedEntryCount || 0)
       );
-      const postedTransactions = transactionIds.filter((id) => String(transactionMap.get(id)?.status || '').toLowerCase() === 'posted').length;
-      const reversedTransactions = reversalIds.filter((id) => transactionMap.has(id)).length;
+      const postedTransactions = currentTransactionIds.filter((id) => String(transactionMap.get(id)?.status || '').toLowerCase() === 'posted').length;
+      const draftTransactions = currentTransactionIds.filter((id) => String(transactionMap.get(id)?.status || '').toLowerCase() === 'draft').length;
+      const voidedTransactions = currentTransactionIds.filter((id) => String(transactionMap.get(id)?.status || '').toLowerCase() === 'voided').length;
+      const reversedTransactions = reversalIds.filter((id) => String(transactionMap.get(id)?.status || '').toLowerCase() === 'posted').length;
       const postedAcademicEntries = academicEntryIds.filter((id) => String(academicMap.get(id)?.status || '').toLowerCase() === 'posted').length;
       const voidedAcademicEntries = voidedEntryIds.filter((id) => String(academicMap.get(id)?.status || '').toLowerCase() === 'void').length;
+      const financeState = resolveFinanceLifecycleState(
+        registration.status,
+        activeCycle,
+        postingCycles,
+        unresolvedTransactionIds
+      );
 
       let verificationStatus = 'pending';
-      if (String(registration.status || '').toLowerCase() === 'registered') {
+      if (financeState === 'unresolved' || String(registration.status || '').toLowerCase() === 'error') {
+        verificationStatus = 'failed';
+      } else if (['registered', 'completed'].includes(String(registration.status || '').toLowerCase())) {
         verificationStatus = postedTransactions === financeExpected && postedAcademicEntries === academicExpected
           ? 'verified'
           : 'partial';
-      } else if (String(registration.status || '').toLowerCase() === 'rolled_back') {
-        verificationStatus = 'rolled_back';
-      } else if (String(registration.status || '').toLowerCase() === 'error') {
-        verificationStatus = 'failed';
+      } else if (financeState === 'draft') {
+        verificationStatus = 'draft';
+      } else if (financeState === 'voided') {
+        verificationStatus = 'voided';
+      } else if (financeState === 'reversed') {
+        verificationStatus = 'reversed';
       }
 
       return {
@@ -422,9 +463,15 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
         selectedCredits: Number(registration?.creditSummary?.selectedCredits || 0),
         note: registration.note || '',
         finance: {
+          state: financeState,
+          activeCycleStatus: String(activeCycle?.status || ''),
           expected: financeExpected,
           posted: postedTransactions,
+          draft: draftTransactions,
           reversed: reversedTransactions,
+          voided: voidedTransactions,
+          cycleCount: postingCycles.length,
+          unresolved: unresolvedTransactionIds.length,
           totalAmount: Number(registration?.transactionSummary?.termTransactionTotal || 0)
         },
         academic: {
@@ -433,11 +480,13 @@ async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, 
           voided: voidedAcademicEntries
         },
         statusBadgeClass: getVerificationBadgeClass(verificationStatus),
-        canApprove: String(registration.status || '').toLowerCase() === 'draft',
+        canApprove: String(registration.status || '').toLowerCase() === 'draft' && unresolvedTransactionIds.length === 0,
         canDeleteDraft: String(registration.status || '').toLowerCase() === 'draft',
         canRollback: ['registered', 'error'].includes(String(registration.status || '').toLowerCase()),
         transactionIds,
         reversalIds,
+        postingCycles,
+        unresolvedTransactionIds,
         academicEntryIds,
         voidedEntryIds
       };
@@ -468,9 +517,10 @@ async function buildRegistrationDetail(reqUser, activeOrgId, registrationId) {
 
   const transactionMap = new Map(allTransactions.map((row) => [toPublicId(row.id), row]));
   const academicMap = new Map(allEntries.map((row) => [toPublicId(row.id), row]));
-  const postedTransactions = summary.transactionIds
+  const recordedTransactions = summary.transactionIds
     .map((id) => transactionMap.get(toPublicId(id)))
     .filter(Boolean);
+  const recordedTransactionIds = new Set(recordedTransactions.map((row) => toPublicId(row.id)));
   const draftTermItems = Array.isArray(record?.transactionSummary?.draftTermTransactionItems)
     ? record.transactionSummary.draftTermTransactionItems
     : [];
@@ -479,7 +529,10 @@ async function buildRegistrationDetail(reqUser, activeOrgId, registrationId) {
     : [];
   const combinedDraftItems = draftTermItems.concat(draftClassItems);
   const pendingDraftTransactions = combinedDraftItems
-    .filter(Boolean)
+    .filter((row) => {
+      const materializedId = toPublicId(row?.metadata?.globalTransactionId);
+      return !materializedId || !recordedTransactionIds.has(materializedId);
+    })
     .map((row, index) => ({
       ...row,
       id: String(row?.id || row?.source?.eventId || row?.source?.idempotencyKey || `DRAFT-TX-${index + 1}`),
@@ -487,14 +540,15 @@ async function buildRegistrationDetail(reqUser, activeOrgId, registrationId) {
       __isPendingDraft: true
     }));
   const draftPreviewRows = programRegistrationDraftService.buildDraftPreviewRowsFromItems(combinedDraftItems);
-  const financialTransactions = postedTransactions
+  const financialTransactions = recordedTransactions
     .map((row) => ({ ...row, __isPendingDraft: false }))
     .concat(pendingDraftTransactions);
 
   return {
     ...summary,
     record,
-    postedTransactions,
+    postedTransactions: recordedTransactions.filter((row) => String(row.status || '').trim().toLowerCase() === 'posted'),
+    currentTransactions: recordedTransactions,
     pendingDraftTransactions,
     draftPreviewRows,
     financialTransactions,

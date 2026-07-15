@@ -5,6 +5,7 @@ const academicLedgerService = require('../academicLedgerService');
 const withdrawalPolicyService = require('./withdrawalPolicyService');
 const withdrawalSettlementService = require('./withdrawalSettlementService');
 const withdrawalRepository = require('../../../repositories/school/withdrawalRepository');
+const registrationFinanceLifecycleService = require('../registrationFinanceLifecycleService');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function roundMoney(value) {
@@ -298,24 +299,16 @@ async function executeClassWithdrawal({
   const removedEnrollments = [];
 
   try {
-    if (String(enrollment?.enrollmentId || '').trim()) {
-      await schoolDataService.closeClassEnrollmentPeriod(String(enrollment.enrollmentId).trim(), {
-        status: 'withdrawn',
-        endDate: effectiveDate || withdrawalPolicyService.todayISO(),
-        reasonEnd: reason || 'class_withdrawal'
-      }, reqUser, options);
-      removedEnrollments.push({
-        classId,
-        enrollmentId: enrollment.enrollmentId
-      });
-    }
-  } catch (error) {
-    errors.push(`Failed to close class enrollment period: ${error.message}`);
-  }
-
-  try {
     if (preview.academicImpact.gradeAssigned) {
-      const academicEntry = await schoolRepositories.academicLedger.create({
+      const source = {
+        module: 'school_withdrawal',
+        eventType: 'class_withdrawal',
+        eventId: `WDR-CLASS-${withdrawalRecord.id}`,
+        idempotencyKey: `WDR|CLASS|${withdrawalRecord.id}|${classId}|${enrollment.enrollmentId || ''}`
+      };
+      const academicEntries = await registrationFinanceLifecycleService.postAcademicEntriesIdempotently({
+        source,
+        post: () => schoolRepositories.academicLedger.create({
         orgId: student.orgId,
         studentId,
         personId: student.personId || '',
@@ -325,14 +318,10 @@ async function executeClassWithdrawal({
         classId,
         termRegistrationId: termRegistrationId || '',
         note: `Class withdrawal: ${reason || 'other'}`,
-        source: {
-          module: 'school_withdrawal',
-          eventType: 'class_withdrawal',
-          eventId: `WDR-CLASS-${withdrawalRecord.id}`,
-          idempotencyKey: `WDR|CLASS|${withdrawalRecord.id}|${classId}|${enrollment.enrollmentId || ''}`
-        }
+          source
+        })
       });
-      academicEntryIds.push(academicEntry.id);
+      academicEntryIds.push(...academicEntries.map((row) => row.id).filter(Boolean));
     }
   } catch (error) {
     errors.push(`Failed to create academic record: ${error.message}`);
@@ -368,6 +357,32 @@ async function executeClassWithdrawal({
       });
     } catch (error) {
       errors.push(`Failed to settle financial transactions: ${error.message}`);
+    }
+  }
+
+  const requestedRefundAmount = Number(preview?.financialImpact?.refundAmount || 0);
+  if (!settlementSkipped && requestedRefundAmount > 0 &&
+      Math.abs(Number(settlementResult.settledRefundAmount || 0) - requestedRefundAmount) > 0.009) {
+    errors.push(
+      `Financial settlement is incomplete. Requested ${requestedRefundAmount.toFixed(2)}, settled ${Number(settlementResult.settledRefundAmount || 0).toFixed(2)}.`
+    );
+  }
+
+  if (!errors.length) {
+    try {
+      if (String(enrollment?.enrollmentId || '').trim()) {
+        await schoolDataService.closeClassEnrollmentPeriod(String(enrollment.enrollmentId).trim(), {
+          status: 'withdrawn',
+          endDate: effectiveDate || withdrawalPolicyService.todayISO(),
+          reasonEnd: reason || 'class_withdrawal'
+        }, reqUser, options);
+        removedEnrollments.push({
+          classId,
+          enrollmentId: enrollment.enrollmentId
+        });
+      }
+    } catch (error) {
+      errors.push(`Failed to close class enrollment period: ${error.message}`);
     }
   }
 

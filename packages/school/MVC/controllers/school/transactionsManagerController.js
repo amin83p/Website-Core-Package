@@ -75,7 +75,7 @@ function normalizeStatementFilters(query) {
   const includeReversalsRaw = String(query.includeReversals || '').trim().toLowerCase();
   const includeReversals = includeReversalsRaw
     ? (includeReversalsRaw === '1' || includeReversalsRaw === 'true')
-    : true;
+    : false;
 
   return {
     accountIds,

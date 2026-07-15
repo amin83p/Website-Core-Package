@@ -33,6 +33,7 @@ const studentProgramRegistrationModel = require('../../models/school/studentProg
 const studentProgramPriorSubjectModel = require('../../models/school/studentProgramPriorSubjectModel');
 const studentTermRegistrationModel = require('../../models/school/studentTermRegistrationModel');
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
+const { normalizeTransactionSummary } = require('../../models/school/registrationTransactionSummary');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const taskModel = require('../../models/school/taskModel');
 const taskRoutingRuleModel = require('../../models/school/taskRoutingRuleModel');
@@ -45,7 +46,11 @@ const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { getEntityQueryExecutor } = requireCoreModule('MVC/models/queryExecutionBridge');
 const { assertQueryableCrudRepository } = requireCoreModule('MVC/repositories/contracts/crudRepositoryContract');
 const { runByRepositoryBackend } = requireCoreModule('MVC/repositories/backend/repositoryBackendSelector');
-const { getMongoCollection } = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');
+const {
+  getMongoCollection,
+  withMongoTransaction,
+  getMongoTransactionCapability
+} = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');
 const {
   buildMongoFilterFromQuery,
   buildMongoSortFromQuery,
@@ -457,6 +462,7 @@ function createSchoolRepository(config) {
   const mongoRemoveMessage = String(config.mongoRemoveMessage || 'Delete operation is not supported.');
   const assignmentScopeKind = String(config.assignmentScopeKind || 'personId').trim() || 'personId';
   const generateMongoCreateId = config.generateMongoCreateId;
+  const normalizePayload = config.normalizePayload;
 
   async function runLocalList(plan = {}, options = {}) {
     const query = plan?.query || {};
@@ -583,16 +589,17 @@ function createSchoolRepository(config) {
     },
 
     async create(data, options = {}) {
+      const normalizedData = typeof normalizePayload === 'function' ? normalizePayload(data, '') : data;
       return runByRepositoryBackend(options, {
         json: async () => {
           if (typeof create !== 'function') throw new Error('Create operation is not supported.');
-          return create(stampCreateOwnershipPayload(data, options), options);
+          return create(stampCreateOwnershipPayload(normalizedData, options), options);
         },
         mongo: async () => {
           if (typeof create !== 'function') throw new Error('Create operation is not supported.');
           const collection = getMongoCollection(collectionName);
-          const stampedData = stampCreateOwnershipPayload(data, options);
-          if (Array.isArray(data)) {
+          const stampedData = stampCreateOwnershipPayload(normalizedData, options);
+          if (Array.isArray(normalizedData)) {
             const payloads = [];
             for (const raw of stampedData) {
               const payload = { ...(raw || {}) };
@@ -616,17 +623,18 @@ function createSchoolRepository(config) {
     },
 
     async update(id, data, options = {}) {
+      const normalizedData = typeof normalizePayload === 'function' ? normalizePayload(data, id) : data;
       return runByRepositoryBackend(options, {
         json: async () => {
           if (typeof update !== 'function') throw new Error('Update operation is not supported.');
-          return update(id, stampUpdateAuditPayload(data, options), options);
+          return update(id, stampUpdateAuditPayload(normalizedData, options), options);
         },
         mongo: async () => {
           if (typeof update !== 'function') throw new Error('Update operation is not supported.');
           const collection = getMongoCollection(collectionName);
           const existing = await collection.findOne(resolveMongoIdFilter(id));
           if (!existing) throw new Error('Record not found');
-          const incoming = stampUpdateAuditPayload(data, options);
+          const incoming = stampUpdateAuditPayload(normalizedData, options);
           const merged = preserveExistingOwnershipFields(deepMerge(existing, incoming || {}), existing);
           merged.id = toPublicId(existing?.id || existing?._id);
           const { _id, ...toSet } = merged;
@@ -1061,6 +1069,12 @@ const schoolRepositories = {
     remove: async () => {
       throw new Error('Student program registrations cannot be deleted from this service.');
     },
+    normalizePayload: (payload, id) => Object.prototype.hasOwnProperty.call(payload || {}, 'transactionSummary') ? ({
+      ...(payload || {}),
+      transactionSummary: normalizeTransactionSummary(payload.transactionSummary, {
+        registrationType: 'program', registrationId: id || payload?.id
+      })
+    }) : payload,
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'Student program registrations cannot be deleted from this service.',
     defaultSearchFields: ['id', 'orgId', 'studentId', 'personId', 'programId', 'status', 'registrationDate']
@@ -1075,6 +1089,12 @@ const schoolRepositories = {
     remove: async () => {
       throw new Error('Student term registrations cannot be deleted from this service.');
     },
+    normalizePayload: (payload, id) => Object.prototype.hasOwnProperty.call(payload || {}, 'transactionSummary') ? ({
+      ...(payload || {}),
+      transactionSummary: normalizeTransactionSummary(payload.transactionSummary, {
+        registrationType: 'term', registrationId: id || payload?.id
+      })
+    }) : payload,
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'Student term registrations cannot be deleted from this service.',
     defaultSearchFields: ['id', 'orgId', 'studentId', 'personId', 'programId', 'termId', 'status', 'registrationDate']
@@ -1106,6 +1126,12 @@ const schoolRepositories = {
     create: classEnrollmentPeriodModel.addEnrollmentPeriod,
     update: classEnrollmentPeriodModel.updateEnrollmentPeriod,
     remove: classEnrollmentPeriodModel.deleteEnrollmentPeriod,
+    normalizePayload: (payload, id) => Object.prototype.hasOwnProperty.call(payload || {}, 'transactionSummary') ? ({
+      ...(payload || {}),
+      transactionSummary: normalizeTransactionSummary(payload.transactionSummary, {
+        registrationType: 'class', registrationId: id || payload?.id
+      })
+    }) : payload,
     defaultSearchFields: [
       'id',
       'orgId',
@@ -1285,6 +1311,119 @@ schoolRepositories.globalTransactions.findReversalByTransactionId = async (trans
     scope: { canViewAll: true }
   });
   return rows[0] || null;
+};
+
+schoolRepositories.globalTransactions.transitionRegistrationTransactions = async (input = {}, options = {}) => {
+  return runByRepositoryBackend(options, {
+    json: async () => globalTransactionLedgerModel.transitionRegistrationTransactions(input, options),
+    mongo: async () => {
+      const transition = globalTransactionLedgerModel.normalizeRegistrationTransitionInput(input);
+      const applyTransition = async (session = null) => {
+        const collection = getMongoCollection('schoolGlobalTransactions');
+        const rawRows = [];
+        for (const transactionId of transition.transactionIds) {
+          // eslint-disable-next-line no-await-in-loop
+          const row = await collection.findOne(resolveMongoIdFilter(transactionId), session ? { session } : {});
+          if (!row) throw new Error('Transaction ' + transactionId + ' was not found.');
+          rawRows.push(row);
+        }
+        const transitioned = rawRows.map((raw) => {
+          const normalized = normalizeMongoDocument(raw);
+          return {
+            raw,
+            row: globalTransactionLedgerModel.transitionRegistrationTransactionRow(normalized, transition)
+          };
+        });
+
+        for (const entry of transitioned) {
+          if (String(entry.raw.status || '').trim().toLowerCase() === transition.toStatus) {
+            continue;
+          }
+          const { _id, ...replacement } = entry.row;
+          const filter = {
+            _id: entry.raw._id,
+            status: transition.fromStatus,
+            orgId: transition.orgId,
+            'metadata.registrationType': transition.registrationType,
+            'metadata.registrationId': transition.registrationId
+          };
+          // eslint-disable-next-line no-await-in-loop
+          const result = await collection.replaceOne(
+            filter,
+            { ...replacement, _id: entry.raw._id },
+            session ? { session } : {}
+          );
+          if (Number(result?.modifiedCount || 0) !== 1) {
+            throw new Error('Transaction ' + String(entry.row.id || '') + ' changed concurrently; no lifecycle update was applied.');
+          }
+        }
+        return transitioned.map((entry) => entry.row);
+      };
+
+      const capability = await getMongoTransactionCapability();
+      if (capability.supported) return withMongoTransaction((session) => applyTransition(session));
+      return applyTransition(null);
+    }
+  }, 'school.globalTransactions.transitionRegistrationTransactions');
+};
+
+schoolRepositories.globalTransactions.backfillRegistrationTransactionOwnership = async (input = {}, options = {}) => {
+  return runByRepositoryBackend(options, {
+    json: async () => globalTransactionLedgerModel.backfillRegistrationTransactionOwnership(input, options),
+    mongo: async () => {
+      const transactionIds = Array.from(new Set((Array.isArray(input.transactionIds) ? input.transactionIds : [])
+        .map((id) => toPublicId(id))
+        .filter(Boolean)));
+      if (!transactionIds.length) return [];
+      const expectations = input.expectations && typeof input.expectations === 'object' ? input.expectations : {};
+      const applyBackfill = async (session = null) => {
+        const collection = getMongoCollection('schoolGlobalTransactions');
+        const rows = [];
+        for (const transactionId of transactionIds) {
+          // eslint-disable-next-line no-await-in-loop
+          const raw = await collection.findOne(resolveMongoIdFilter(transactionId), session ? { session } : {});
+          if (!raw) throw new Error(`Transaction ${transactionId} was not found.`);
+          const normalized = normalizeMongoDocument(raw);
+          const updated = globalTransactionLedgerModel.applyRegistrationOwnershipBackfill(normalized, {
+            ...input,
+            expectation: expectations[transactionId]
+          });
+          const alreadyOwned = String(normalized?.metadata?.registrationType || '').toLowerCase() ===
+              String(input.registrationType || '').toLowerCase() &&
+            idsEqual(normalized?.metadata?.registrationId, input.registrationId);
+          if (!alreadyOwned) {
+            const { _id, ...replacement } = updated;
+            // eslint-disable-next-line no-await-in-loop
+            const result = await collection.replaceOne({
+              _id: raw._id,
+              orgId: input.orgId,
+              status: normalized.status,
+              $and: [
+                { $or: [
+                  { 'metadata.registrationType': { $exists: false } },
+                  { 'metadata.registrationType': '' },
+                  { 'metadata.registrationType': null }
+                ] },
+                { $or: [
+                  { 'metadata.registrationId': { $exists: false } },
+                  { 'metadata.registrationId': '' },
+                  { 'metadata.registrationId': null }
+                ] }
+              ]
+            }, { ...replacement, _id: raw._id }, session ? { session } : {});
+            if (Number(result?.modifiedCount || 0) !== 1) {
+              throw new Error(`Transaction ${transactionId} changed concurrently; ownership was not backfilled.`);
+            }
+          }
+          rows.push(updated);
+        }
+        return rows;
+      };
+      const capability = await getMongoTransactionCapability();
+      if (capability.supported) return withMongoTransaction((session) => applyBackfill(session));
+      return applyBackfill(null);
+    }
+  }, 'school.globalTransactions.backfillRegistrationTransactionOwnership');
 };
 
 schoolRepositories.globalTransactions.reverseTransaction = async (transactionId, payload = {}, options = {}) => {

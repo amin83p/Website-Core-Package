@@ -8,6 +8,7 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const TERMINAL_STATUSES = new Set(['cancelled', 'archived', 'error']);
 const OPEN_STATUSES = new Set(['draft', 'planned', 'active']);
+const REENTRY_SOURCE_STATUSES = new Set(['completed', 'withdrawn', 'cancelled', 'archived']);
 
 let dependencies = {
   repositories: schoolRepositories,
@@ -351,18 +352,11 @@ async function reopenViaNewPeriod(periodId, input = {}, requestingUser = null, o
   if (!normalizedPeriodId) throw new Error('periodId is required.');
   const existing = await dependencies.repositories.classEnrollmentPeriods.getById(normalizedPeriodId, options);
   if (!existing) throw new Error('Enrollment period not found.');
+  if (!REENTRY_SOURCE_STATUSES.has(normalizeStatus(existing.status))) {
+    throw new Error('Re-entry requires a terminal enrollment period. Complete, withdraw, or cancel the current period first.');
+  }
 
   const desiredStartDate = normalizeDateOnly(input.startDate) || addDays(normalizeDateOnly(existing.endDate) || new Date().toISOString().slice(0, 10), 1);
-  let closedPeriod = null;
-  if (OPEN_STATUSES.has(normalizeStatus(existing.status))) {
-    const closeAt = dayBefore(desiredStartDate);
-    const safeCloseAt = closeAt < normalizeDateOnly(existing.startDate) ? normalizeDateOnly(existing.startDate) : closeAt;
-    closedPeriod = await closePeriod(normalizedPeriodId, {
-      endDate: safeCloseAt,
-      status: 'completed',
-      reasonEnd: String(input.closeReason || 'Closed automatically before reopening via new period.').trim()
-    }, requestingUser, options);
-  }
 
   const created = await createPeriod({
     orgId: existing.orgId,
@@ -370,7 +364,7 @@ async function reopenViaNewPeriod(periodId, input = {}, requestingUser = null, o
     studentId: existing.studentId,
     startDate: desiredStartDate,
     endDate: normalizeDateOnly(input.endDate),
-    status: normalizeStatus(input.status, 'active'),
+    status: 'draft',
     programId: toPublicId(existing.programId),
     termId: toPublicId(existing.termId),
     programRegistrationId: toPublicId(input.programRegistrationId || existing.programRegistrationId),
@@ -389,7 +383,7 @@ async function reopenViaNewPeriod(periodId, input = {}, requestingUser = null, o
   }, requestingUser, options);
 
   return {
-    closedPeriod,
+    closedPeriod: null,
     newPeriod: created.period,
     overlapCheck: created.overlapCheck,
     reentryCheck: created.reentryCheck

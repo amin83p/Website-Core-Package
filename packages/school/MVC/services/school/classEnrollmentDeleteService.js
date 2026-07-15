@@ -171,7 +171,7 @@ function buildPostedTransactionBlocker(period) {
   };
 }
 
-async function assessEnrollmentDeleteEligibility(period, classRow, reqUser) {
+async function assessEnrollmentDeleteEligibility(period, classRow, reqUser, { allowPostedRollback = false } = {}) {
   const origin = classifyEnrollmentPeriod(period);
   const periodId = toPublicId(period?.id);
   const warnings = [];
@@ -194,7 +194,7 @@ async function assessEnrollmentDeleteEligibility(period, classRow, reqUser) {
     };
   }
 
-  const postedBlocker = buildPostedTransactionBlocker(period);
+  const postedBlocker = allowPostedRollback ? null : buildPostedTransactionBlocker(period);
   if (postedBlocker) {
     return {
       canDelete: false,

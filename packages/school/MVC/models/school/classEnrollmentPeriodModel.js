@@ -24,6 +24,7 @@ const PERIOD_STATUSES = new Set([
   'error'
 ]);
 const { applyVoidMetadata } = require('./voidRecordMetadata');
+const { normalizeTransactionSummary } = require('./registrationTransactionSummary');
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -34,21 +35,33 @@ function sanitizePricing(value) {
   return { ...value };
 }
 
-function sanitizeTransactionSummary(value) {
+function sanitizeTransactionSummary(value, registrationId = '') {
   if (!isPlainObject(value)) return {};
   const raw = value;
+  const normalized = normalizeTransactionSummary(raw, {
+    registrationType: 'class',
+    registrationId
+  });
   const totalAmount = Number(raw.totalAmount);
   const transactionCount = Number(raw.transactionCount);
   return {
+    ...normalized,
     mode: cleanString(raw.mode, { max: 30, allowEmpty: true }).toLowerCase() || '',
     currency: (cleanString(raw.currency, { max: 3, allowEmpty: true }) || 'CAD').toUpperCase(),
     totalAmount: Number.isFinite(totalAmount) ? Number(totalAmount.toFixed(2)) : 0,
     transactionCount: Number.isFinite(transactionCount) ? Math.max(0, Math.floor(transactionCount)) : 0,
     draftTransactionItems: Array.isArray(raw.draftTransactionItems) ? raw.draftTransactionItems : [],
     draftPreviewRows: Array.isArray(raw.draftPreviewRows) ? raw.draftPreviewRows : [],
-    postedTransactionIds: Array.isArray(raw.postedTransactionIds)
-      ? raw.postedTransactionIds.map((id) => cleanId(id, { max: 120, allowEmpty: true })).filter(Boolean)
-      : [],
+    draftTransactionIds: normalized.draftTransactionIds,
+    transactionIds: normalized.transactionIds,
+    postedTransactionIds: normalized.postedTransactionIds,
+    reversalIds: normalized.reversalIds,
+    postingCycles: normalized.postingCycles,
+    activePostingCycleNo: normalized.activePostingCycleNo,
+    nextPostingCycleNo: normalized.nextPostingCycleNo,
+    reconciliationIssues: normalized.reconciliationIssues,
+    unresolvedTransactionIds: normalized.unresolvedTransactionIds,
+    pendingTransition: normalized.pendingTransition,
     draftSavedAt: cleanString(raw.draftSavedAt, { max: 40, allowEmpty: true }),
     postedAt: cleanString(raw.postedAt, { max: 40, allowEmpty: true }),
     note: cleanString(raw.note, { max: 500, allowEmpty: true }),
@@ -189,7 +202,7 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
       });
       return out.slice(0, 200);
     })(),
-    transactionSummary: sanitizeTransactionSummary(input.transactionSummary),
+    transactionSummary: sanitizeTransactionSummary(input.transactionSummary, input.id),
     sequenceNo,
     createdBy: createdBy || '',
     updatedBy: updatedBy || ''

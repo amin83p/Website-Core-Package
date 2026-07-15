@@ -45,7 +45,14 @@
           <hr>
 
           <div class="small text-muted mb-1">Finance Verification</div>
-          <div class="fw-bold mb-3">Posted <%= registration.finance.posted %> / <%= registration.finance.expected %>, Reversed <%= registration.finance.reversed %></div>
+          <div class="fw-bold text-capitalize"><%= registration.finance.state || 'none' %></div>
+          <div class="small mb-3">
+            Posted <%= registration.finance.posted %> / <%= registration.finance.expected %>,
+            Draft <%= registration.finance.draft || 0 %>,
+            Reversed <%= registration.finance.reversed %>,
+            Voided <%= registration.finance.voided || 0 %>,
+            Unresolved <%= registration.finance.unresolved || 0 %>
+          </div>
 
           <div class="small text-muted mb-1">Academic Verification</div>
           <div class="fw-bold mb-3">Posted <%= registration.academic.posted %> / <%= registration.academic.expected %>, Voided <%= registration.academic.voided %></div>
@@ -78,6 +85,13 @@
               <% } %>
               <% if (registration.termRegistrationsCount) { %> Remove the term registrations first.<% } %>
               <% if (registration.classEnrollmentsCount) { %> Withdraw or rollback class enrollments under this program first.<% } %>
+            </div>
+          <% } %>
+
+          <% if (canManageRegistrations && String(registration.status || '').toLowerCase() === 'registered') { %>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <button type="button" class="btn btn-outline-danger btn-sm btn-registration-status" data-target-status="cancelled">Cancel Registration</button>
+              <button type="button" class="btn btn-outline-success btn-sm btn-registration-status" data-target-status="completed">Complete Registration</button>
             </div>
           <% } %>
         </div>
@@ -266,9 +280,35 @@
                       <% if (tx.__isPendingDraft) { %>
                         <span class="badge bg-warning text-dark">Draft (Not Posted)</span>
                       <% } else { %>
-                        <span class="badge <%= tx.status === 'posted' ? 'bg-success' : 'bg-secondary' %>"><%= tx.status || '-' %></span>
+                        <span class="badge <%= tx.status === 'posted' ? 'bg-success' : (tx.status === 'draft' ? 'bg-info text-dark' : 'bg-secondary') %>"><%= tx.status || '-' %></span>
                       <% } %>
                     </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <div class="fw-bold mb-3">Financial Posting History</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Cycle</th><th>Status</th><th>Transactions</th><th>Reversals</th><th>Unresolved</th><th>Updated</th></tr></thead>
+              <tbody>
+                <% if (!(registration.postingCycles || []).length) { %>
+                  <tr><td colspan="6" class="text-center text-muted py-3">No financial posting cycles recorded.</td></tr>
+                <% } %>
+                <% (registration.postingCycles || []).forEach(function (cycle) { %>
+                  <tr>
+                    <td><span class="font-monospace"><%= cycle.cycleId || cycle.cycleNo || '-' %></span></td>
+                    <td><span class="badge <%= cycle.status === 'posted' ? 'bg-success' : (['error', 'reversal_error'].includes(cycle.status) ? 'bg-danger' : 'bg-secondary') %>"><%= cycle.status || '-' %></span></td>
+                    <td><%= (cycle.transactionIds || []).length %></td>
+                    <td><%= (cycle.reversalIds || []).length %></td>
+                    <td><%= (cycle.unresolvedTransactionIds || []).length %></td>
+                    <td><%= cycle.postedAt || cycle.returnedToDraftAt || cycle.reversedAt || cycle.voidedAt || '-' %></td>
                   </tr>
                 <% }) %>
               </tbody>
@@ -358,6 +398,10 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
+<%- include('../partials/registrationStatusTransitionModal', {
+  registrationStatusRegistrationId: registration.id,
+  registrationStatusEndpointBase: '/school/programs/registrations/' + encodeURIComponent(registration.id) + '/status'
+}) %>
 
 <script>
 (function () {
