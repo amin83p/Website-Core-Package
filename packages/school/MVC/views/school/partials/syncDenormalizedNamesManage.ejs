@@ -64,8 +64,20 @@
     }
 
     if (!btn) return;
+    btn.dataset.noWait = 'true';
 
-    btn.addEventListener('click', async function () {
+    function restoreSyncButton(originalHtml) {
+      if (window.appWaiting && typeof window.appWaiting.clear === 'function') {
+        window.appWaiting.clear(btn);
+      }
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+
+    btn.addEventListener('click', async function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      const original = btn.innerHTML;
       const confirmMsg = 'Sync saved names for all Teachers, Students, and Staff from the Persons directory for the active organization?';
       let confirmed = false;
       if (typeof window.showMessageModal === 'function') {
@@ -82,10 +94,15 @@
       } else {
         confirmed = window.confirm(confirmMsg);
       }
-      if (!confirmed) return;
+      if (!confirmed) {
+        restoreSyncButton(original);
+        return;
+      }
 
+      if (window.appWaiting && typeof window.appWaiting.clear === 'function') {
+        window.appWaiting.clear(btn);
+      }
       btn.disabled = true;
-      const original = btn.innerHTML;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Syncing...';
 
       try {
@@ -144,8 +161,7 @@
           alert(err?.message || String(err));
         }
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = original;
+        restoreSyncButton(original);
       }
     });
   })();
