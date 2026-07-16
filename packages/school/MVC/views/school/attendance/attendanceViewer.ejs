@@ -193,6 +193,7 @@
                     <div class="text-muted small" id="det_date">Date</div>
                     <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_lock_notice">This session is locked. Attendance cannot be changed unless an administrator unlocks it or overrides the lock.</p>
                     <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_makeup_notice">This session requires a make-up session. Attendance and roster notes cannot be changed here. Create or open the make-up session instead.</p>
+                    <p class="text-secondary small mb-0 mt-2 d-none" id="cell_modal_enrollment_notice">This student was not enrolled for this session date. Attendance and roster details are read-only.</p>
                 </div>
 
                 <fieldset id="fieldset_cell_attendance" class="border-0 p-0 m-0 mb-4">
@@ -662,9 +663,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (rec.status === 'absent') { icon = '<i class="bi bi-x-circle-fill status-absent"></i>'; tooltip = 'Absent'; }
                     else if (rec.status === 'not_applicable') {
                         icon = '<i class="bi bi-dash-circle-fill status-na"></i>';
-                        tooltip = rec.applicability === 'approved_leave'
+                        tooltip = rec.withinEnrollmentWindow === false
+                            ? 'N/A - not enrolled for this session'
+                            : (rec.applicability === 'approved_leave'
                             ? 'N/A - approved leave'
-                            : (rec.applicability === 'makeup_required' ? 'N/A - make-up session required' : 'N/A');
+                            : (rec.applicability === 'makeup_required' ? 'N/A - make-up session required' : 'N/A'));
                     }
 
                     // UPDATED: Badge now strictly checks the comments array (ignores general teacherNotes)
@@ -1438,13 +1441,19 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
 
     const locked = record.sessionLocked === true;
     const makeupRequired = record.applicability === 'makeup_required';
+    const outsideEnrollmentWindow = record.withinEnrollmentWindow === false;
     const canEdit = window.CAN_EDIT_ATTENDANCE_ROSTER === true;
     const canOverride = window.CAN_OVERRIDE_SESSION_LOCK === true;
-    const allowEdit = canEdit && !makeupRequired && (!locked || canOverride);
+    const allowEdit = canEdit && !outsideEnrollmentWindow && !makeupRequired && (!locked || canOverride);
     const fs = document.getElementById('fieldset_cell_attendance');
     if (fs) fs.disabled = !allowEdit;
     const lockNotice = document.getElementById('cell_modal_lock_notice');
     const makeupNotice = document.getElementById('cell_modal_makeup_notice');
+    const enrollmentNotice = document.getElementById('cell_modal_enrollment_notice');
+    if (enrollmentNotice) {
+        if (outsideEnrollmentWindow) enrollmentNotice.classList.remove('d-none');
+        else enrollmentNotice.classList.add('d-none');
+    }
     if (makeupNotice) {
         if (makeupRequired && canEdit) makeupNotice.classList.remove('d-none');
         else makeupNotice.classList.add('d-none');

@@ -2,29 +2,45 @@
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Registration Status Change</h5>
+        <div>
+          <h5 class="modal-title mb-1" id="status_modalTitle">Registration Status Change</h5>
+          <div class="small text-muted"><span class="fw-semibold" id="status_stepNumber">Step 1 of 2</span> <span id="status_stepLabel">Enter details</span></div>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="status_target">
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label">Effective Date *</label>
-            <input type="date" class="form-control" id="status_effectiveDate">
+        <section id="status_stepDetails">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Effective Date *</label>
+              <input type="date" class="form-control" id="status_effectiveDate">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Reason *</label>
+              <input type="text" class="form-control" id="status_reason" maxlength="1000">
+            </div>
           </div>
-          <div class="col-md-8">
-            <label class="form-label">Reason *</label>
-            <input type="text" class="form-control" id="status_reason" maxlength="1000">
+          <div id="status_feedback" class="alert alert-light border mt-3 mb-0" role="status">
+            Enter the details, then preview the effect before confirming this change.
           </div>
-        </div>
-        <div id="status_preview" class="alert alert-light border mt-3 mb-0">
-          Preview the change before applying it.
-        </div>
+        </section>
+        <section id="status_stepReview" class="d-none" aria-live="polite">
+          <div class="alert alert-info mb-3">Review the preview below. Confirming this change cannot be undone from this dialog.</div>
+          <dl class="row small mb-3">
+            <dt class="col-sm-4 text-muted">Effective Date</dt>
+            <dd class="col-sm-8 mb-2" id="status_reviewEffectiveDate">-</dd>
+            <dt class="col-sm-4 text-muted">Reason</dt>
+            <dd class="col-sm-8 mb-0" id="status_reviewReason">-</dd>
+          </dl>
+          <div id="status_preview" class="alert alert-light border mb-0"></div>
+        </section>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="btnPreviewStatus">Preview</button>
-        <button type="button" class="btn btn-danger btn-sm" id="btnApplyStatus" disabled>Apply Confirmed Change</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btnBackStatus">Back to Details</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnPreviewStatus">Preview Change</button>
+        <button type="button" class="btn btn-danger btn-sm d-none" id="btnApplyStatus" disabled>Confirm Change</button>
       </div>
     </div>
   </div>
@@ -32,93 +48,185 @@
 
 <script>
 (function () {
-  const modalEl = document.getElementById('registrationStatusModal');
-  if (!modalEl || !window.bootstrap) return;
-  const modal = new window.bootstrap.Modal(modalEl);
-  const registrationId = <%- JSON.stringify(String(registrationStatusRegistrationId || '')) %>;
-  const endpointBase = <%- JSON.stringify(String(registrationStatusEndpointBase || '')) %>;
-  const actionStateId = String(document.getElementById('hid_actionStateId')?.value || '').trim();
-  const previewEl = document.getElementById('status_preview');
-  const applyBtn = document.getElementById('btnApplyStatus');
-  let approvedPreview = null;
+  function initializeRegistrationStatusTransitionModal() {
+    const modalEl = document.getElementById('registrationStatusModal');
+    const ModalApi = window.bootstrap?.Modal;
+    if (!modalEl || !ModalApi || modalEl.dataset.statusTransitionInitialized === '1') return;
+    const modal = typeof ModalApi.getOrCreateInstance === 'function'
+      ? ModalApi.getOrCreateInstance(modalEl)
+      : new ModalApi(modalEl);
+    modalEl.dataset.statusTransitionInitialized = '1';
+    const registrationId = <%- JSON.stringify(String(registrationStatusRegistrationId || '')) %>;
+    const endpointBase = <%- JSON.stringify(String(registrationStatusEndpointBase || '')) %>;
+    const actionStateId = String(document.getElementById('hid_actionStateId')?.value || '').trim();
+    const detailsStep = document.getElementById('status_stepDetails');
+    const reviewStep = document.getElementById('status_stepReview');
+    const feedbackEl = document.getElementById('status_feedback');
+    const previewEl = document.getElementById('status_preview');
+    const titleEl = document.getElementById('status_modalTitle');
+    const stepNumberEl = document.getElementById('status_stepNumber');
+    const stepLabelEl = document.getElementById('status_stepLabel');
+    const reviewEffectiveDateEl = document.getElementById('status_reviewEffectiveDate');
+    const reviewReasonEl = document.getElementById('status_reviewReason');
+    const previewBtn = document.getElementById('btnPreviewStatus');
+    const backBtn = document.getElementById('btnBackStatus');
+    const applyBtn = document.getElementById('btnApplyStatus');
+    let approvedPreview = null;
+    let previewInProgress = false;
 
-  async function requestStatus(path, body) {
-    const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
-    if (actionStateId) headers['X-Action-State-Id'] = actionStateId;
-    const response = await fetch(path, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ ...body, actionStateId })
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || String(result.status || '').toLowerCase() === 'error') {
-      const error = new Error(result.message || 'Status change failed.');
-      error.preview = result.preview || null;
-      throw error;
-    }
-    return result;
-  }
-
-  function resetPreview(button) {
-    approvedPreview = null;
-    applyBtn.disabled = true;
-    document.getElementById('status_target').value = String(button?.dataset?.targetStatus || '');
-    document.getElementById('status_effectiveDate').value = new Date().toISOString().slice(0, 10);
-    document.getElementById('status_reason').value = '';
-    previewEl.className = 'alert alert-light border mt-3 mb-0';
-    previewEl.textContent = 'Preview the change before applying it.';
-    modal.show();
-  }
-
-  document.querySelectorAll('.btn-registration-status').forEach((button) => {
-    button.addEventListener('click', () => resetPreview(button));
-  });
-
-  document.getElementById('btnPreviewStatus')?.addEventListener('click', async () => {
-    const payload = {
-      targetStatus: String(document.getElementById('status_target')?.value || '').trim(),
-      effectiveDate: String(document.getElementById('status_effectiveDate')?.value || '').trim(),
-      reason: String(document.getElementById('status_reason')?.value || '').trim()
-    };
-    if (!payload.effectiveDate || !payload.reason) {
-      previewEl.className = 'alert alert-warning mt-3 mb-0';
-      previewEl.textContent = 'Effective date and reason are required.';
-      return;
+    function isCancellation() {
+      return String(document.getElementById('status_target')?.value || '').trim().toLowerCase() === 'cancelled';
     }
 
-    try {
-      const result = await requestStatus(endpointBase + '/preview', payload);
-      const preview = result.preview || {};
-      approvedPreview = payload;
-      applyBtn.disabled = false;
-      previewEl.className = 'alert alert-info mt-3 mb-0';
-      previewEl.textContent = payload.targetStatus === 'cancelled'
-        ? 'Cancellation will reverse ' + (preview.sourceTransactions || []).length +
-          ' charge transaction(s), total ' + Number(preview.adjustmentTotal || 0).toFixed(2) +
-          '. Payments and unrelated transactions will not change.'
-        : 'Completion will leave posted financial transactions unchanged.';
-    } catch (error) {
+    function statusCopy() {
+      return isCancellation()
+        ? { title: 'Cancel Registration', action: 'Cancellation', preview: 'Preview Cancellation', apply: 'Cancel Registration', buttonClass: 'btn-danger' }
+        : { title: 'Complete Registration', action: 'Completion', preview: 'Preview Completion', apply: 'Complete Registration', buttonClass: 'btn-success' };
+    }
+
+    function setFeedback(style, message) {
+      if (!feedbackEl) return;
+      feedbackEl.className = 'alert alert-' + style + ' mt-3 mb-0';
+      feedbackEl.textContent = message;
+    }
+
+    function showStep(review) {
+      const copy = statusCopy();
+      detailsStep?.classList.toggle('d-none', review);
+      reviewStep?.classList.toggle('d-none', !review);
+      backBtn?.classList.toggle('d-none', !review);
+      previewBtn?.classList.toggle('d-none', review);
+      applyBtn?.classList.toggle('d-none', !review);
+      if (titleEl) titleEl.textContent = copy.title;
+      if (stepNumberEl) stepNumberEl.textContent = review ? 'Step 2 of 2' : 'Step 1 of 2';
+      if (stepLabelEl) stepLabelEl.textContent = review ? 'Review and confirm' : 'Enter details';
+      if (previewBtn) previewBtn.textContent = copy.preview;
+      if (applyBtn) {
+        applyBtn.textContent = copy.apply;
+        applyBtn.className = 'btn ' + copy.buttonClass + ' btn-sm' + (review ? '' : ' d-none');
+      }
+    }
+
+    function setPreviewBusy(isBusy) {
+      previewInProgress = isBusy;
+      if (!previewBtn) return;
+      previewBtn.disabled = isBusy;
+      if (isBusy) {
+        previewBtn.setAttribute('aria-busy', 'true');
+        previewBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Previewing...';
+      } else {
+        previewBtn.removeAttribute('aria-busy');
+        previewBtn.textContent = statusCopy().preview;
+      }
+    }
+
+    async function requestStatus(path, body) {
+      const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+      if (actionStateId) headers['X-Action-State-Id'] = actionStateId;
+      const response = await fetch(path, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...body, actionStateId })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || String(result.status || '').toLowerCase() === 'error') {
+        const error = new Error(result.message || 'Status change failed.');
+        error.preview = result.preview || null;
+        throw error;
+      }
+      return result;
+    }
+
+    function resetPreview(button) {
       approvedPreview = null;
       applyBtn.disabled = true;
-      const blockers = Array.isArray(error.preview?.blockers) ? error.preview.blockers : [];
-      previewEl.className = 'alert alert-danger mt-3 mb-0';
-      previewEl.textContent = blockers.length
-        ? 'Blocked by ' + blockers.length + ' active child registration(s). Resolve them first.'
-        : error.message;
+      document.getElementById('status_target').value = String(button?.dataset?.targetStatus || '');
+      document.getElementById('status_effectiveDate').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('status_reason').value = '';
+      previewEl.className = 'alert alert-light border mb-0';
+      previewEl.textContent = '';
+      showStep(false);
+      setFeedback('light border', 'Enter the details, then preview the effect before confirming this ' + statusCopy().action.toLowerCase() + '.');
+      modal.show();
     }
-  });
 
-  applyBtn?.addEventListener('click', async () => {
-    if (!approvedPreview) return;
-    applyBtn.disabled = true;
-    try {
-      await requestStatus(endpointBase + '/apply', approvedPreview);
-      window.location.reload();
-    } catch (error) {
-      previewEl.className = 'alert alert-danger mt-3 mb-0';
-      previewEl.textContent = error.message;
-      applyBtn.disabled = false;
-    }
-  });
+    document.querySelectorAll('.btn-registration-status').forEach((button) => {
+      button.addEventListener('click', () => resetPreview(button));
+    });
+
+    previewBtn?.addEventListener('click', async () => {
+      if (previewInProgress) return;
+      const payload = {
+        targetStatus: String(document.getElementById('status_target')?.value || '').trim(),
+        effectiveDate: String(document.getElementById('status_effectiveDate')?.value || '').trim(),
+        reason: String(document.getElementById('status_reason')?.value || '').trim()
+      };
+      if (!payload.effectiveDate || !payload.reason) {
+        setFeedback('warning', 'Effective date and reason are required before previewing this change.');
+        return;
+      }
+
+      const copy = statusCopy();
+      const loadingToken = typeof window.showLoading === 'function'
+        ? window.showLoading({
+          title: 'Previewing ' + copy.action,
+          note: 'Please wait while the registration and financial impacts are checked.',
+          operation: 'Registration Status Preview'
+        })
+        : '';
+      setPreviewBusy(true);
+      try {
+        const result = await requestStatus(endpointBase + '/preview', payload);
+        const preview = result.preview || {};
+        approvedPreview = payload;
+        applyBtn.disabled = false;
+        if (reviewEffectiveDateEl) reviewEffectiveDateEl.textContent = payload.effectiveDate;
+        if (reviewReasonEl) reviewReasonEl.textContent = payload.reason;
+        previewEl.className = 'alert alert-info mb-0';
+        previewEl.textContent = payload.targetStatus === 'cancelled'
+          ? 'Cancellation will reverse ' + (preview.sourceTransactions || []).length +
+            ' charge transaction(s), total ' + Number(preview.adjustmentTotal || 0).toFixed(2) +
+            '. Payments and unrelated transactions will not change.'
+          : 'Completion will leave posted financial transactions unchanged.';
+        showStep(true);
+      } catch (error) {
+        approvedPreview = null;
+        applyBtn.disabled = true;
+        const blockers = Array.isArray(error.preview?.blockers) ? error.preview.blockers : [];
+        setFeedback('danger', blockers.length
+          ? 'Blocked by ' + blockers.length + ' active child registration(s). Resolve them first.'
+          : error.message);
+      } finally {
+        setPreviewBusy(false);
+        if (loadingToken && typeof window.hideLoading === 'function') window.hideLoading(loadingToken);
+      }
+    });
+
+    backBtn?.addEventListener('click', () => {
+      approvedPreview = null;
+      applyBtn.disabled = true;
+      showStep(false);
+      setFeedback('info', 'Review or edit the details, then preview the change again before confirming it.');
+    });
+
+    applyBtn?.addEventListener('click', async () => {
+      if (!approvedPreview) return;
+      applyBtn.disabled = true;
+      try {
+        await requestStatus(endpointBase + '/apply', approvedPreview);
+        window.location.reload();
+      } catch (error) {
+        previewEl.className = 'alert alert-danger mb-0';
+        previewEl.textContent = error.message;
+        applyBtn.disabled = false;
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeRegistrationStatusTransitionModal, { once: true });
+  } else {
+    initializeRegistrationStatusTransitionModal();
+  }
 })();
 </script>

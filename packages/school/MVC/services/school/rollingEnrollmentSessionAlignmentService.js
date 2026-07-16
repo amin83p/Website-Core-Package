@@ -613,38 +613,13 @@ function assertEnrollmentSessionAlignmentForCreate({
   plannedNaSessionIds = []
 } = {}) {
   void classData;
+  void plannedNaSessionIds;
   const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(payload.targetSessionCount);
   const enforced = isTargetSessionCountEnforced(targetSessionCount);
   const result = { ...payload, enforceSessionCount: enforced, targetSessionCount };
 
-  if (!enforced) {
-    return result;
-  }
-
-  const endDate = normalizeDateOnly(payload.endDate);
-
-  if (!endDate) {
-    throw new Error('End date is required when a target session count is set on this enrollment.');
-  }
-
-  if (payload.alignmentStatus === 'insufficient_sessions') {
-    const need = payload.effectiveTarget || payload.targetSessionCount || 0;
-    throw new Error(`Not enough countable sessions between ${payload.startDate} and ${payload.endDate}. Need ${need}, found ${payload.availableCount}.`);
-  }
-
-  if (payload.alignmentStatus === 'overage_requires_na') {
-    const validation = validatePlannedNaSelection({
-      countableSessions: payload.countableSessions,
-      targetSessionCount: payload.targetSessionCount,
-      plannedNaSessionIds
-    });
-    if (!validation.valid) {
-      throw new Error(validation.message || 'Invalid N/A session selection.');
-    }
-  } else if (plannedNaSessionIds.length) {
-    throw new Error('N/A session selection is only required when enrolling for fewer sessions than exist in the date window.');
-  }
-
+  // A target-session enrollment is completed by recorded attendance after its
+  // start date, not by reserving a fixed schedule window at creation time.
   return result;
 }
 

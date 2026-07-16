@@ -20,6 +20,7 @@ const COUNTED_ATTENDANCE_STATUSES = new Set([
   attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
 ]);
 const SESSION_COUNT_POLICY = 'all_non_na';
+const TARGET_SESSION_COMPLETION_REASON = 'target_session_count_reached';
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -80,14 +81,6 @@ function getRosterRecord(session = {}, personId = '') {
   return (Array.isArray(session.roster) ? session.roster : []).find((row) => idsEqual(row?.personId, target)) || null;
 }
 
-function isSessionFinalizedForCounting(session = {}) {
-  const status = cleanText(session.status).toLowerCase();
-  return session.locked === true
-    || String(session.locked || '').toLowerCase() === 'true'
-    || session.completed === true
-    || ['completed', 'complete', 'closed', 'done', 'finalized'].includes(status);
-}
-
 function periodStatusAllowed(period = {}, allowedStatuses = OPEN_OR_HISTORICAL_STATUSES) {
   const status = cleanText(period.status).toLowerCase();
   const statusSet = allowedStatuses instanceof Set
@@ -96,9 +89,30 @@ function periodStatusAllowed(period = {}, allowedStatuses = OPEN_OR_HISTORICAL_S
   return statusSet.has(status);
 }
 
+function hasTargetSessionCount(period = {}) {
+  return normalizeTargetSessionCount(period.targetSessionCount) > 0;
+}
+
+function isAutomaticallyCompletedTargetPeriod(period = {}) {
+  return hasTargetSessionCount(period)
+    && cleanText(period.status).toLowerCase() === 'completed'
+    && cleanText(period.completionReason) === TARGET_SESSION_COMPLETION_REASON;
+}
+
 function periodEffectiveEndDate(period = {}) {
+  const targetSessionEnrollment = hasTargetSessionCount(period);
   const endDate = normalizeDateOnly(period.endDate) || '9999-12-31';
   const completionDate = normalizeDateOnly(period.completionDate);
+  const status = cleanText(period.status).toLowerCase();
+
+  // A target-session enrollment runs from its start date until the target is
+  // reached. A manually entered end date remains informational until the
+  // target is removed.
+  if (targetSessionEnrollment) {
+    if (completionDate) return completionDate;
+    if (OPEN_STATUSES.has(status)) return '9999-12-31';
+  }
+
   if (!completionDate) return endDate;
   return completionDate < endDate ? completionDate : endDate;
 }
@@ -106,9 +120,13 @@ function periodEffectiveEndDate(period = {}) {
 function periodCoversSession(period = {}, session = {}, options = {}) {
   const date = getSessionDate(session);
   const start = normalizeDateOnly(period.startDate);
-  const end = options.honorCompletion === false
-    ? (normalizeDateOnly(period.endDate) || '9999-12-31')
-    : periodEffectiveEndDate(period);
+  const ignoreAutomaticTargetCompletion = options.ignoreAutomaticTargetCompletion === true
+    && isAutomaticallyCompletedTargetPeriod(period);
+  const end = ignoreAutomaticTargetCompletion
+    ? '9999-12-31'
+    : (options.honorCompletion === false
+      ? (hasTargetSessionCount(period) ? '9999-12-31' : (normalizeDateOnly(period.endDate) || '9999-12-31'))
+      : periodEffectiveEndDate(period));
   return Boolean(date && start && start <= date && end >= date);
 }
 
@@ -143,6 +161,57 @@ function resolveStudentPersonId(period = {}, studentToPersonMap) {
   return toPublicId(studentToPersonMap.get(studentId) || '');
 }
 
+/**
+ * Resolves whether a person is inside at least one rolling-enrollment window
+ * for a particular session. This is intentionally independent of attendance,
+ * leave, and session-cap state: it protects the enrollment date boundary.
+ */
+function resolveRollingEnrollmentWindowForPerson({
+  periodRows = [],
+  studentToPersonMap = new Map(),
+  personId = '',
+  session = {},
+  activeOrgId = '',
+  allowedStatuses = OPEN_OR_HISTORICAL_STATUSES
+} = {}) {
+  const targetPersonId = toPublicId(personId);
+  const sessionDate = getSessionDate(session);
+  const personMap = normalizeStudentToPersonMap(studentToPersonMap);
+  const statusSet = allowedStatuses instanceof Set
+    ? allowedStatuses
+    : new Set(Array.isArray(allowedStatuses) ? allowedStatuses : []);
+
+  if (!targetPersonId || !sessionDate) {
+    return {
+      withinEnrollmentWindow: false,
+      reason: sessionDate ? 'student_not_enrolled' : 'session_date_missing',
+      periodId: ''
+    };
+  }
+
+  const matchingPeriod = (Array.isArray(periodRows) ? periodRows : [])
+    .filter((period) => {
+      if (activeOrgId && !idsEqual(period?.orgId, activeOrgId)) return false;
+      if (!periodStatusAllowed(period, statusSet)) return false;
+      return idsEqual(resolveStudentPersonId(period, personMap), targetPersonId);
+    })
+    .find((period) => periodCoversSession(period, session, { honorCompletion: true }));
+
+  if (!matchingPeriod) {
+    return {
+      withinEnrollmentWindow: false,
+      reason: 'student_not_enrolled',
+      periodId: ''
+    };
+  }
+
+  return {
+    withinEnrollmentWindow: true,
+    reason: '',
+    periodId: toPublicId(matchingPeriod.id)
+  };
+}
+
 function mergeState(existing, next) {
   if (!existing) return next;
   if (next.expected && !existing.expected) return next;
@@ -157,7 +226,8 @@ function resolveRollingEnrollmentApplicability({
   activeOrgId = '',
   allowedStatuses = OPEN_OR_HISTORICAL_STATUSES,
   approvedLeaveKeys = new Set(),
-  forceNotApplicableSessionKeys = new Set()
+  forceNotApplicableSessionKeys = new Set(),
+  ignoreAutomaticTargetCompletion = false
 } = {}) {
   const sessionRows = normalizeSessionRows(sessions);
   const personMap = normalizeStudentToPersonMap(studentToPersonMap);
@@ -183,17 +253,19 @@ function resolveRollingEnrollmentApplicability({
       personIds.add(personId);
       const periodId = toPublicId(period.id);
       const targetSessionCount = normalizeTargetSessionCount(period.targetSessionCount);
-      let usedSlots = 0;
       let consumedCount = 0;
       let reservedCount = 0;
       let completionCandidate = null;
 
       sessionRows.forEach(({ session, sessionId, date }) => {
-        if (!periodCoversSession(period, session, { honorCompletion: true })) return;
+        if (!periodCoversSession(period, session, {
+          honorCompletion: true,
+          ignoreAutomaticTargetCompletion
+        })) return;
         const key = buildApplicabilityKey(personId, session, sessionId);
         const rosterRecord = getRosterRecord(session, personId);
         const attendance = rosterRecord
-          ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
+          ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
           : '';
         const hasApprovedLeave = approvedLeaveKeys.has(key);
         const forceNotApplicable = forceNotApplicableSessionKeys.has(sessionId) || forceNotApplicableSessionKeys.has(date);
@@ -212,7 +284,7 @@ function resolveRollingEnrollmentApplicability({
           return;
         }
 
-        if (targetSessionCount && usedSlots >= targetSessionCount) {
+        if (targetSessionCount && consumedCount >= targetSessionCount) {
           const next = {
             expected: false,
             reason: 'session_cap_reached',
@@ -225,17 +297,13 @@ function resolveRollingEnrollmentApplicability({
           return;
         }
 
-        const hasCountedAttendance = rosterRecord && COUNTED_ATTENDANCE_STATUSES.has(attendance);
-        const finalizedMissing = !rosterRecord && isSessionFinalizedForCounting(session);
-        const counted = hasCountedAttendance || finalizedMissing;
+        const counted = rosterRecord && COUNTED_ATTENDANCE_STATUSES.has(attendance);
         if (counted) {
           consumedCount += 1;
           completionCandidate = { sessionId, date };
         } else if (targetSessionCount) {
           reservedCount += 1;
         }
-        usedSlots += 1;
-
         const next = {
           expected: true,
           reason: targetSessionCount ? 'session_count' : 'date_window',
@@ -295,7 +363,8 @@ async function resolveRollingEnrollmentApplicabilityWithLeaves({
   orgId = '',
   reqUser,
   allowedStatuses = OPEN_OR_HISTORICAL_STATUSES,
-  forceNotApplicableSessionKeys = new Set()
+  forceNotApplicableSessionKeys = new Set(),
+  ignoreAutomaticTargetCompletion = false
 } = {}) {
   const personMap = normalizeStudentToPersonMap(studentToPersonMap);
   const candidatePersonIds = new Set();
@@ -316,13 +385,52 @@ async function resolveRollingEnrollmentApplicabilityWithLeaves({
     activeOrgId,
     allowedStatuses,
     approvedLeaveKeys,
-    forceNotApplicableSessionKeys
+    forceNotApplicableSessionKeys,
+    ignoreAutomaticTargetCompletion
   });
 }
 
 function getApplicabilityState(stateByKey, personId, session = {}, fallback = '') {
   if (!(stateByKey instanceof Map)) return null;
   return stateByKey.get(buildApplicabilityKey(personId, session, fallback)) || null;
+}
+
+function buildSessionCappedEnrollmentCompletionPatch(period = {}, summary = {}, updatedBy = '') {
+  const targetSessionCount = normalizeTargetSessionCount(period.targetSessionCount);
+  if (!targetSessionCount) return null;
+
+  const status = cleanText(period.status).toLowerCase();
+  const isOpen = OPEN_STATUSES.has(status);
+  const isAutoCompleted = isAutomaticallyCompletedTargetPeriod(period);
+  if (!isOpen && !isAutoCompleted) return null;
+
+  const completion = summary?.completionCandidate || null;
+  if (!completion && isAutoCompleted) {
+    return {
+      status: 'active',
+      completionDate: '',
+      completionSessionId: '',
+      completionReason: '',
+      updatedBy
+    };
+  }
+  if (!completion) return null;
+
+  const currentDate = normalizeDateOnly(period.completionDate);
+  const currentSessionId = toPublicId(period.completionSessionId);
+  const nextSessionId = toPublicId(completion.sessionId);
+  if (isAutoCompleted
+    && currentDate === completion.date
+    && currentSessionId === nextSessionId) {
+    return null;
+  }
+  return {
+    status: 'completed',
+    completionDate: completion.date,
+    completionSessionId: nextSessionId,
+    completionReason: TARGET_SESSION_COMPLETION_REASON,
+    updatedBy
+  };
 }
 
 async function recomputeSessionCappedEnrollmentCompletionsForClass({
@@ -346,28 +454,29 @@ async function recomputeSessionCappedEnrollmentCompletionsForClass({
   ]);
   const studentToPersonMap = normalizeStudentToPersonMap(effectiveStudents);
   const statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
+  const reconcilablePeriods = (Array.isArray(effectivePeriods) ? effectivePeriods : [])
+    .filter((period) => OPEN_STATUSES.has(cleanText(period.status).toLowerCase())
+      || isAutomaticallyCompletedTargetPeriod(period));
   const applicability = await resolveRollingEnrollmentApplicabilityWithLeaves({
     sessions,
-    periodRows: effectivePeriods,
+    periodRows: reconcilablePeriods,
     studentToPersonMap,
     activeOrgId: orgId,
     orgId,
     reqUser,
-    allowedStatuses: OPEN_STATUSES,
-    forceNotApplicableSessionKeys: sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, sessions)
+    allowedStatuses: new Set([...OPEN_STATUSES, 'completed']),
+    forceNotApplicableSessionKeys: sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, sessions),
+    ignoreAutomaticTargetCompletion: true
   });
   const updates = [];
   for (const [periodId, summary] of applicability.summariesByPeriodId.entries()) {
-    if (!summary.targetSessionCount || !summary.completionCandidate) continue;
-    const period = (Array.isArray(effectivePeriods) ? effectivePeriods : []).find((row) => idsEqual(row?.id, periodId));
-    if (!period || !OPEN_STATUSES.has(cleanText(period.status).toLowerCase())) continue;
-    const patch = {
-      status: 'completed',
-      completionDate: summary.completionCandidate.date,
-      completionSessionId: summary.completionCandidate.sessionId,
-      completionReason: 'target_session_count_reached',
-      updatedBy: toPublicId(reqUser?.id || reqUser?.username || '')
-    };
+    const period = reconcilablePeriods.find((row) => idsEqual(row?.id, periodId));
+    const patch = buildSessionCappedEnrollmentCompletionPatch(
+      period,
+      summary,
+      toPublicId(reqUser?.id || reqUser?.username || '')
+    );
+    if (!patch) continue;
     const updated = await schoolDataService.updateData('classEnrollmentPeriods', periodId, patch, reqUser);
     updates.push({ periodId, patch, updated });
   }
@@ -380,6 +489,7 @@ module.exports = {
   ROLLING_DISPLAY_PERIOD_STATUSES,
   OPEN_STATUSES,
   SESSION_COUNT_POLICY,
+  TARGET_SESSION_COMPLETION_REASON,
   normalizeDateOnly,
   normalizeTargetSessionCount,
   normalizeSessionCountPolicy,
@@ -388,8 +498,11 @@ module.exports = {
   buildApplicabilityKey,
   periodEffectiveEndDate,
   periodCoversSession,
+  isAutomaticallyCompletedTargetPeriod,
+  resolveRollingEnrollmentWindowForPerson,
   resolveRollingEnrollmentApplicability,
   resolveRollingEnrollmentApplicabilityWithLeaves,
   getApplicabilityState,
+  buildSessionCappedEnrollmentCompletionPatch,
   recomputeSessionCappedEnrollmentCompletionsForClass
 };

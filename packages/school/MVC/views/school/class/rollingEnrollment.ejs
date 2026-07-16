@@ -260,15 +260,15 @@
               <input type="date" id="inp_startDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
             </div>
             <div class="col-md-4">
-              <label class="form-label" id="lbl_endDate">End Date<span id="lbl_endDateRequired" class="d-none"> *</span></label>
+              <label class="form-label" id="lbl_endDate">End Date<span id="lbl_endDateTargetNote" class="text-muted fw-normal"></span></label>
               <input type="date" id="inp_endDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %>>
             </div>
             <div class="col-md-4" id="wrap_inp_targetSessionCount">
               <label class="form-label">Number of Sessions <span class="text-muted fw-normal">(optional)</span></label>
               <input type="number" id="inp_targetSessionCount" class="form-control" min="1" step="1" placeholder="e.g. 10">
-              <div class="form-text compact-help">Leave blank to enroll by date window only. N/A sessions do not count.</div>
+              <div class="form-text compact-help">Set a target to count recorded attendance after Start Date. Present, Late, Excused, and Absent count; N/A does not.</div>
               <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
-                <div class="form-text compact-help mb-0" id="hint_sessionAlignment">Set an end date to see how many countable sessions fall in the enrollment window.</div>
+                <div class="form-text compact-help mb-0" id="hint_sessionAlignment">Leave blank to enroll by date window. A session target stays open until recorded attendance reaches the target.</div>
                 <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 d-none" id="btn_viewEnrollmentSessions">View Sessions</button>
               </div>
             </div>
@@ -429,49 +429,71 @@
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-journal-plus me-1"></i>Register Student In Program</h5>
+        <div>
+          <h5 class="modal-title mb-1"><i class="bi bi-journal-plus me-1"></i>Register Student In Program</h5>
+          <div class="small text-muted"><span class="fw-semibold" id="shortcut_stepNumber">Step 1 of 4</span> <span id="shortcut_stepLabel">Registration details</span></div>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="shortcut_registrationId">
-        <div class="alert alert-info border small">
-          Create a program registration draft for this student, approve/finalize it, then retry Rolling Enrollment eligibility.
+        <div id="shortcut_stepFeedback" class="alert alert-info border small" role="status">
+          Enter the registration details, then preview fees and validation before saving a draft.
         </div>
-        <div class="mb-2">
-          <label class="form-label">Student</label>
-          <input type="text" id="shortcut_studentLabel" class="form-control bg-light" readonly>
-        </div>
-        <div class="row g-2">
-          <div class="col-md-7">
-            <label class="form-label">Allowed Program *</label>
-            <select id="shortcut_programId" class="form-select"></select>
+        <section id="shortcut_stepDetails">
+          <div class="mb-2">
+            <label class="form-label">Student</label>
+            <input type="text" id="shortcut_studentLabel" class="form-control bg-light" readonly>
           </div>
-          <div class="col-md-5">
-            <label class="form-label">Registration Date *</label>
-            <input type="date" id="shortcut_registrationDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
+          <div class="row g-2">
+            <div class="col-md-7">
+              <label class="form-label">Allowed Program *</label>
+              <select id="shortcut_programId" class="form-select"></select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Registration Date *</label>
+              <input type="date" id="shortcut_registrationDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">External Reference</label>
+              <input type="text" id="shortcut_externalReference" class="form-control" placeholder="Optional">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Note</label>
+              <input type="text" id="shortcut_note" class="form-control" placeholder="Optional">
+            </div>
           </div>
-          <div class="col-md-6">
-            <label class="form-label">External Reference</label>
-            <input type="text" id="shortcut_externalReference" class="form-control" placeholder="Optional">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Note</label>
-            <input type="text" id="shortcut_note" class="form-control" placeholder="Optional">
-          </div>
-        </div>
-        <div class="mt-3">
-          <div class="fw-semibold small mb-1">Preview / Result</div>
-          <div id="shortcut_previewPanel" class="border rounded bg-light p-2 small text-muted">
-            Choose a program and click Preview.
-          </div>
-        </div>
+        </section>
+        <section id="shortcut_stepPreview" class="d-none" aria-live="polite">
+          <div class="alert alert-light border small mb-3">Review the preview below before creating the draft. Use Back to change registration details.</div>
+          <dl class="row small mb-3">
+            <dt class="col-sm-4 text-muted">Student</dt>
+            <dd class="col-sm-8 mb-2" id="shortcut_reviewStudent">-</dd>
+            <dt class="col-sm-4 text-muted">Program</dt>
+            <dd class="col-sm-8 mb-2" id="shortcut_reviewProgram">-</dd>
+            <dt class="col-sm-4 text-muted">Registration Date</dt>
+            <dd class="col-sm-8 mb-0" id="shortcut_reviewDate">-</dd>
+          </dl>
+          <div class="fw-semibold small mb-1">Fee and validation preview</div>
+          <div id="shortcut_previewPanel" class="border rounded bg-light p-2 small text-muted">Choose a program and preview the registration.</div>
+        </section>
+        <section id="shortcut_stepDraft" class="d-none" aria-live="polite">
+          <div class="alert alert-info mb-3">The registration draft has been saved. Review it, then approve and finalize the registration.</div>
+          <div class="fw-semibold small mb-1">Draft registration</div>
+          <div id="shortcut_draftPanel" class="border rounded bg-light p-2 small text-muted">No draft registration has been saved.</div>
+        </section>
+        <section id="shortcut_stepFinalized" class="d-none" aria-live="polite">
+          <div class="alert alert-success mb-3">The program registration has been finalized. Retry eligibility when you are ready to continue Rolling Enrollment.</div>
+          <div id="shortcut_finalizePanel" class="border rounded bg-light p-2 small text-muted">Program registration finalized.</div>
+        </section>
       </div>
       <div class="modal-footer flex-wrap gap-2">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_shortcutPreview"><i class="bi bi-eye me-1"></i>Preview</button>
-        <button type="button" class="btn btn-primary btn-sm" id="btn_shortcutSaveDraft"><i class="bi bi-save me-1"></i>Save Draft</button>
-        <button type="button" class="btn btn-success btn-sm" id="btn_shortcutApprove" disabled><i class="bi bi-check2-circle me-1"></i>Approve &amp; Finalize</button>
-        <button type="button" class="btn btn-outline-success btn-sm" id="btn_shortcutRetry"><i class="bi bi-arrow-clockwise me-1"></i>Retry Enrollment</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btn_shortcutBack"><i class="bi bi-arrow-left me-1"></i>Back to Details</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn_shortcutPreview"><i class="bi bi-eye me-1"></i>Preview Registration</button>
+        <button type="button" class="btn btn-primary btn-sm d-none" id="btn_shortcutSaveDraft"><i class="bi bi-save me-1"></i>Save Draft &amp; Continue</button>
+        <button type="button" class="btn btn-success btn-sm d-none" id="btn_shortcutApprove" disabled><i class="bi bi-check2-circle me-1"></i>Approve &amp; Finalize</button>
+        <button type="button" class="btn btn-outline-success btn-sm d-none" id="btn_shortcutRetry"><i class="bi bi-arrow-clockwise me-1"></i>Retry Enrollment Eligibility</button>
       </div>
     </div>
   </div>
@@ -638,7 +660,7 @@
           <div class="col-md-6" id="wrap_edit_targetSessionCount">
             <label class="form-label">Number of Sessions <span class="text-muted fw-normal">(optional)</span></label>
             <input type="number" id="edit_targetSessionCount" class="form-control" min="1" step="1" placeholder="e.g. 10">
-            <div class="form-text compact-help">Leave blank to enroll by date window only. N/A sessions do not count.</div>
+            <div class="form-text compact-help">Set a target to count recorded attendance after Start Date. End Date is ignored while a target is set.</div>
           </div>
 
           <div class="col-md-6">
@@ -854,6 +876,8 @@
   let manualRows = [];
   let chargeActionInProgress = false;
   let shortcutActionInProgress = false;
+  let programShortcutStep = 'details';
+  let programShortcutPreview = null;
   let draftReviewMode = 'create';
   let lastRollingEligibility = null;
   let lastAlignmentResult = null;
@@ -883,7 +907,8 @@
 
   function applyTargetSessionCountUi() {
     const targetSet = hasTargetSessionCount();
-    qs('lbl_endDateRequired')?.classList.toggle('d-none', !targetSet);
+    const note = qs('lbl_endDateTargetNote');
+    if (note) note.textContent = targetSet ? ' (ignored when Number of Sessions is set)' : '';
   }
 
   function updateGapCycleExtendWarning() {
@@ -916,6 +941,65 @@
       return `Enrollment start date cannot be after the cycle end (${maxDate}).`;
     }
     return '';
+  }
+
+  function getEnrollmentDateInputIssue(input, label) {
+    if (!input?.validity || input.validity.valid) return '';
+    const safeLabel = String(label || 'date').toLowerCase();
+    if (input.validity.badInput) return `Enter a valid ${safeLabel}.`;
+    if (input.validity.rangeUnderflow || input.validity.rangeOverflow) {
+      return `Enter a ${safeLabel} within the allowed date range.`;
+    }
+    return `Enter a valid ${safeLabel}.`;
+  }
+
+  function setEnrollmentDateValidationState(invalidInput) {
+    [qs('inp_startDate'), qs('inp_endDate')].filter(Boolean).forEach((input) => {
+      const isInvalid = input === invalidInput;
+      input.classList.toggle('is-invalid', isInvalid);
+      if (isInvalid) input.setAttribute('aria-invalid', 'true');
+      else input.removeAttribute('aria-invalid');
+    });
+  }
+
+  function focusInvalidEnrollmentDateInput(input) {
+    if (!input) return;
+    // The message modal restores focus as it finishes closing. Wait until that
+    // restoration is complete, then put the user back in the invalid field.
+    window.setTimeout(() => {
+      if (input.isConnected && !input.disabled) input.focus();
+    }, 150);
+  }
+
+  function validateEnrollmentDatesAfterLeavingField(changedInput) {
+    const startInput = qs('inp_startDate');
+    const endInput = qs('inp_endDate');
+    const startDate = String(startInput?.value || '').trim();
+    const endDate = String(endInput?.value || '').trim();
+    const changedLabel = changedInput?.id === 'inp_endDate' ? 'end date' : 'start date';
+    const inputIssue = getEnrollmentDateInputIssue(changedInput, changedLabel);
+    if (inputIssue) return { message: inputIssue, input: changedInput };
+
+    const cycleDateIssue = validateCycleEnrollmentDates(startDate);
+    if (cycleDateIssue) return { message: cycleDateIssue, input: startInput };
+    if (startDate && endDate && endDate < startDate) {
+      return { message: 'Enrollment end date cannot be before the enrollment start date.', input: endInput };
+    }
+    return { message: '', input: null };
+  }
+
+  async function handleEnrollmentDateBlur(event) {
+    const changedInput = event?.currentTarget;
+    const validation = validateEnrollmentDatesAfterLeavingField(changedInput);
+    if (validation.message) {
+      setEnrollmentDateValidationState(validation.input);
+      await showMsg('Invalid enrollment date', 'warning', validation.message);
+      focusInvalidEnrollmentDateInput(validation.input);
+      return;
+    }
+    setEnrollmentDateValidationState(null);
+    refreshRollingEligibility();
+    scheduleAlignmentRefresh();
   }
 
   function validateCycleRegistrationDate(registrationDate) {
@@ -1249,6 +1333,7 @@
       const badge = status === 'ready' || status === 'draft' || status === 'success'
         ? 'bg-success'
         : (status === 'warning' ? 'bg-warning text-dark' : 'bg-danger');
+      const issueClass = status === 'warning' ? 'text-warning-emphasis' : 'text-danger';
       return ''
         + '<div class="border rounded p-2 bg-white mb-2">'
         +   '<div class="d-flex justify-content-between gap-2">'
@@ -1257,14 +1342,71 @@
         +   '</div>'
         +   '<div class="small text-muted">Fee Category: ' + htmlEscape(row?.feeCategory || '-') + ' | Account: <span class="font-monospace">' + htmlEscape(row?.studentAccountId || '-') + '</span></div>'
         +   '<div class="small text-muted">Total Fee: <span class="fw-semibold">' + htmlEscape(Number(row?.totalAmount || 0).toFixed(2)) + '</span> | Transactions: <span class="fw-semibold">' + htmlEscape(row?.transactionCount || 0) + '</span></div>'
-        +   (issues.length ? '<div class="text-danger small mt-1">' + issues.map((issue) => htmlEscape(issue)).join('<br>') + '</div>' : '')
-        +   (row?.message ? '<div class="small mt-1">' + htmlEscape(row.message) + '</div>' : '')
+        +   (row?.registrationId ? '<div class="small text-muted">Draft Registration: <span class="font-monospace">' + htmlEscape(row.registrationId) + '</span></div>' : '')
+        +   (issues.length ? '<div class="' + issueClass + ' small mt-1">' + issues.map((issue) => htmlEscape(issue)).join('<br>') + '</div>' : '')
+        +   (row?.message && !issues.length ? '<div class="small mt-1">' + htmlEscape(row.message) + '</div>' : '')
         + '</div>';
     }).join('');
   }
 
+  function setProgramRegistrationShortcutFeedback(style, message) {
+    const feedback = qs('shortcut_stepFeedback');
+    if (!feedback) return;
+    feedback.className = 'alert alert-' + style + ' border small';
+    feedback.textContent = String(message || '');
+  }
+
+  function isProgramRegistrationShortcutPreviewReady() {
+    const rows = Array.isArray(programShortcutPreview?.rows) ? programShortcutPreview.rows : [];
+    const status = String(rows[0]?.status || '').trim().toLowerCase();
+    return rows.length === 1 && ['ready', 'warning'].includes(status);
+  }
+
+  function setProgramRegistrationShortcutStep(step) {
+    const nextStep = ['details', 'preview', 'draft', 'finalized'].includes(step) ? step : 'details';
+    programShortcutStep = nextStep;
+    const copy = {
+      details: { number: 'Step 1 of 4', label: 'Registration details' },
+      preview: { number: 'Step 2 of 4', label: 'Review preview' },
+      draft: { number: 'Step 3 of 4', label: 'Review draft' },
+      finalized: { number: 'Step 4 of 4', label: 'Registration finalized' }
+    }[nextStep];
+    const isDetails = nextStep === 'details';
+    const isPreview = nextStep === 'preview';
+    const isDraft = nextStep === 'draft';
+    const isFinalized = nextStep === 'finalized';
+    qs('shortcut_stepNumber').textContent = copy.number;
+    qs('shortcut_stepLabel').textContent = copy.label;
+    qs('shortcut_stepDetails')?.classList.toggle('d-none', !isDetails);
+    qs('shortcut_stepPreview')?.classList.toggle('d-none', !isPreview);
+    qs('shortcut_stepDraft')?.classList.toggle('d-none', !isDraft);
+    qs('shortcut_stepFinalized')?.classList.toggle('d-none', !isFinalized);
+    qs('btn_shortcutBack')?.classList.toggle('d-none', !isPreview);
+    qs('btn_shortcutPreview')?.classList.toggle('d-none', !isDetails);
+    qs('btn_shortcutSaveDraft')?.classList.toggle('d-none', !isPreview);
+    qs('btn_shortcutApprove')?.classList.toggle('d-none', !isDraft);
+    qs('btn_shortcutRetry')?.classList.toggle('d-none', !isFinalized);
+    if (qs('btn_shortcutSaveDraft')) qs('btn_shortcutSaveDraft').disabled = !isProgramRegistrationShortcutPreviewReady();
+    if (qs('btn_shortcutApprove')) {
+      qs('btn_shortcutApprove').disabled = !String(qs('shortcut_registrationId')?.value || '').trim();
+    }
+  }
+
+  function renderProgramRegistrationShortcutReview(payload) {
+    const selectedOption = qs('shortcut_programId')?.selectedOptions?.[0];
+    if (qs('shortcut_reviewStudent')) qs('shortcut_reviewStudent').textContent = String(qs('shortcut_studentLabel')?.value || payload?.studentIds?.[0] || '-');
+    if (qs('shortcut_reviewProgram')) qs('shortcut_reviewProgram').textContent = String(selectedOption?.textContent || payload?.programId || '-').trim();
+    if (qs('shortcut_reviewDate')) qs('shortcut_reviewDate').textContent = String(payload?.effectiveDate || '-');
+  }
+
+  function resetProgramRegistrationShortcutPreview() {
+    programShortcutPreview = null;
+    if (qs('shortcut_previewPanel')) qs('shortcut_previewPanel').innerHTML = 'Choose a program and preview the registration.';
+  }
+
   function resetProgramRegistrationShortcutModal() {
     const student = getSelectedShortcutStudent();
+    programShortcutPreview = null;
     if (qs('shortcut_registrationId')) qs('shortcut_registrationId').value = '';
     if (qs('shortcut_studentLabel')) qs('shortcut_studentLabel').value = student.label || student.id || '';
     if (qs('shortcut_registrationDate')) {
@@ -1280,8 +1422,11 @@
       select.innerHTML = options.length ? options.join('') : '<option value="">No allowed programs</option>';
       select.disabled = options.length === 0;
     }
-    if (qs('shortcut_previewPanel')) qs('shortcut_previewPanel').innerHTML = 'Choose a program and click Preview.';
-    if (qs('btn_shortcutApprove')) qs('btn_shortcutApprove').disabled = true;
+    resetProgramRegistrationShortcutPreview();
+    if (qs('shortcut_draftPanel')) qs('shortcut_draftPanel').innerHTML = 'No draft registration has been saved.';
+    if (qs('shortcut_finalizePanel')) qs('shortcut_finalizePanel').innerHTML = 'Program registration finalized.';
+    setProgramRegistrationShortcutStep('details');
+    setProgramRegistrationShortcutFeedback('info', 'Enter the registration details, then preview fees and validation before saving a draft.');
   }
 
   function getProgramShortcutPayload() {
@@ -1327,10 +1472,23 @@
       showBusy('Previewing program registration...');
       const result = await requestJson('/school/classes/api/' + encodeURIComponent(classId) + '/rolling-program-registration/preview', 'POST', payload);
       if (!result) return;
-      const rows = Array.isArray(result.previews) ? result.previews : [];
+      const rows = Array.isArray(result.preview) ? result.preview : (Array.isArray(result.previews) ? result.previews : []);
       if (qs('shortcut_previewPanel')) qs('shortcut_previewPanel').innerHTML = renderShortcutPreviewHtml(rows, result.message);
+      programShortcutPreview = { payload, rows };
+      renderProgramRegistrationShortcutReview(payload);
+      setProgramRegistrationShortcutStep('preview');
+      const previewHasWarning = String(rows[0]?.status || '').trim().toLowerCase() === 'warning';
+      setProgramRegistrationShortcutFeedback(
+        isProgramRegistrationShortcutPreviewReady() ? (previewHasWarning ? 'warning' : 'success') : 'warning',
+        isProgramRegistrationShortcutPreviewReady()
+          ? (previewHasWarning
+            ? 'Review the warning, then save the registration draft to continue. The academic registration will still be recorded.'
+            : 'Review the preview, then save the registration draft to continue.')
+          : 'This registration cannot be saved until the preview issues are resolved. Return to details, make corrections, and preview again.'
+      );
     } catch (error) {
-      await showMsg('Preview Failed', 'error', error.message || 'Unable to preview program registration.');
+      resetProgramRegistrationShortcutPreview();
+      setProgramRegistrationShortcutFeedback('danger', error.message || 'Unable to preview program registration.');
     } finally {
       shortcutActionInProgress = false;
       hideBusy();
@@ -1338,31 +1496,40 @@
   }
 
   async function saveProgramRegistrationShortcutDraft() {
-    if (shortcutActionInProgress) return;
-    const payload = getProgramShortcutPayload();
-    if (!payload.programId || !payload.studentIds[0] || !payload.effectiveDate) {
-      await showMsg('Missing Fields', 'warning', 'Student, allowed program, and registration date are required.');
-      return;
-    }
-    const regDateIssue = validateCycleRegistrationDate(payload.effectiveDate);
-    if (regDateIssue) {
-      await showMsg('Date out of range', 'warning', regDateIssue);
+    if (shortcutActionInProgress || programShortcutStep !== 'preview') return;
+    const payload = programShortcutPreview?.payload;
+    if (!payload || !isProgramRegistrationShortcutPreviewReady()) {
+      setProgramRegistrationShortcutFeedback('warning', 'Preview a valid registration before saving the draft.');
       return;
     }
     shortcutActionInProgress = true;
     try {
       showBusy('Saving program registration draft...');
-      const result = await requestJson('/school/classes/api/' + encodeURIComponent(classId) + '/rolling-program-registration/apply', 'POST', payload);
+      const result = await requestJson(
+        '/school/classes/api/' + encodeURIComponent(classId) + '/rolling-program-registration/apply',
+        'POST',
+        payload,
+        { allowErrorResult: true }
+      );
       if (!result) return;
       const draft = (Array.isArray(result.results) ? result.results : []).find((row) => String(row?.status || '').toLowerCase() === 'draft');
       if (draft?.registrationId && qs('shortcut_registrationId')) {
         qs('shortcut_registrationId').value = String(draft.registrationId);
       }
       if (qs('shortcut_previewPanel')) qs('shortcut_previewPanel').innerHTML = renderShortcutPreviewHtml(result.results, result.message);
-      if (qs('btn_shortcutApprove')) qs('btn_shortcutApprove').disabled = !draft?.registrationId;
-      await showMsg('Draft Saved', result.status === 'warning' ? 'warning' : 'success', result.message || 'Program registration draft saved.');
+      if (qs('shortcut_draftPanel')) qs('shortcut_draftPanel').innerHTML = renderShortcutPreviewHtml(result.results, result.message);
+      if (String(result.status || '').toLowerCase() === 'error') {
+        setProgramRegistrationShortcutFeedback('danger', result.message || 'Unable to save program registration draft.');
+        return;
+      }
+      if (!draft?.registrationId) {
+        setProgramRegistrationShortcutFeedback('warning', result.message || 'The draft was not created. Review the result and try again.');
+        return;
+      }
+      setProgramRegistrationShortcutStep('draft');
+      setProgramRegistrationShortcutFeedback('info', result.message || 'Draft saved. Approve and finalize the registration to continue.');
     } catch (error) {
-      await showMsg('Draft Failed', 'error', error.message || 'Unable to save program registration draft.');
+      setProgramRegistrationShortcutFeedback('danger', error.message || 'Unable to save program registration draft.');
     } finally {
       shortcutActionInProgress = false;
       hideBusy();
@@ -1370,25 +1537,12 @@
   }
 
   async function approveProgramRegistrationShortcutDraft() {
-    if (shortcutActionInProgress) return;
+    if (shortcutActionInProgress || programShortcutStep !== 'draft') return;
     const registrationId = String(qs('shortcut_registrationId')?.value || '').trim();
     if (!registrationId) {
-      await showMsg('Missing Draft', 'warning', 'Save the draft before approving and finalizing it.');
+      setProgramRegistrationShortcutFeedback('warning', 'Save the draft before approving and finalizing it.');
       return;
     }
-    let confirmed = true;
-    if (typeof window.showMessageModal === 'function') {
-      confirmed = (await window.showMessageModal({
-        title: 'Approve Program Registration?',
-        icon: 'warning',
-        message: 'Approve and finalize this program registration now? This will post finance transactions and academic entries.',
-        buttons: [
-          { text: 'Cancel', class: 'btn-secondary' },
-          { text: 'Approve & Finalize', class: 'btn-success' }
-        ]
-      })) === 'Approve & Finalize';
-    }
-    if (!confirmed) return;
     shortcutActionInProgress = true;
     try {
       showBusy('Approving program registration...');
@@ -1396,10 +1550,35 @@
         note: String(qs('shortcut_note')?.value || 'Approved from Rolling Enrollment shortcut').trim()
       });
       if (!result) return;
-      await showMsg('Finalized', result.status === 'warning' ? 'warning' : 'success', result.message || 'Program registration finalized.');
-      await refreshRollingEligibility();
+      if (qs('shortcut_finalizePanel')) {
+        qs('shortcut_finalizePanel').innerHTML = '<div class="fw-semibold">' + htmlEscape(String(qs('shortcut_studentLabel')?.value || 'Student')) + '</div>'
+          + '<div class="small mt-1">' + htmlEscape(result.message || 'Program registration finalized.') + '</div>'
+          + '<div class="small text-muted mt-1">Registration: <span class="font-monospace">' + htmlEscape(registrationId) + '</span></div>';
+      }
+      setProgramRegistrationShortcutStep('finalized');
+      setProgramRegistrationShortcutFeedback('success', result.message || 'Program registration finalized. Retry eligibility when you are ready.');
     } catch (error) {
-      await showMsg('Approval Failed', 'error', error.message || 'Unable to approve program registration.');
+      setProgramRegistrationShortcutFeedback('danger', error.message || 'Unable to approve program registration.');
+    } finally {
+      shortcutActionInProgress = false;
+      hideBusy();
+    }
+  }
+
+  function returnToProgramRegistrationShortcutDetails() {
+    if (shortcutActionInProgress || programShortcutStep !== 'preview') return;
+    resetProgramRegistrationShortcutPreview();
+    setProgramRegistrationShortcutStep('details');
+    setProgramRegistrationShortcutFeedback('info', 'Update the details if needed, then preview the registration again before saving a draft.');
+  }
+
+  async function retryProgramRegistrationShortcutEligibility() {
+    if (shortcutActionInProgress || programShortcutStep !== 'finalized') return;
+    shortcutActionInProgress = true;
+    try {
+      showBusy('Refreshing Rolling Enrollment eligibility...');
+      await refreshRollingEligibility();
+      setProgramRegistrationShortcutFeedback('success', 'Eligibility was refreshed. Review the Program registration section, then continue Rolling Enrollment.');
     } finally {
       shortcutActionInProgress = false;
       hideBusy();
@@ -1601,7 +1780,7 @@
       authorizationRef: String(qs('inp_authorizationRef')?.value || '').trim(),
       reasonStart: String(qs('inp_reasonStart')?.value || '').trim(),
       sessionCountPolicy: 'all_non_na',
-      plannedNotApplicableSessionIds: Array.isArray(pendingPlannedNaSessionIds) ? pendingPlannedNaSessionIds.slice() : []
+      plannedNotApplicableSessionIds: []
     };
     if (hasTargetSessionCount()) {
       payload.targetSessionCount = String(qs('inp_targetSessionCount')?.value || '').trim();
@@ -1881,7 +2060,7 @@
     if (!alignment || alignment.alignmentStatus === 'no_end_date') {
       hint.className = 'form-text compact-help text-muted mb-0';
       hint.textContent = targetSet
-        ? 'Set start and end dates to count available sessions.'
+        ? 'Recorded attendance after the start date will count until the session target is reached. End Date is not used for a session target.'
         : 'Set an end date to see how many countable sessions fall in the enrollment window.';
       updateViewSessionsButton(null);
       syncEnrollmentWizardPrimaryButton();
@@ -1896,23 +2075,9 @@
       return;
     }
     const target = Number(alignment.targetSessionCount || alignment.effectiveTarget || 0);
-    if (alignment.alignmentStatus === 'insufficient_sessions') {
-      hint.className = 'form-text compact-help text-danger mb-0';
-      hint.textContent = `Only ${available} countable session(s) in this window${target ? `; need ${target}` : ''}. Use Next to add sessions.`;
-      updateViewSessionsButton(alignment);
-      syncEnrollmentWizardPrimaryButton();
-      return;
-    }
-    if (alignment.alignmentStatus === 'overage_requires_na') {
-      hint.className = 'form-text compact-help text-warning mb-0';
-      hint.textContent = `${available} countable sessions in window. Use Next to select ${alignment.requiredNaCount} as N/A for ${target}.`;
-      updateViewSessionsButton(alignment);
-      syncEnrollmentWizardPrimaryButton();
-      return;
-    }
     hint.className = 'form-text compact-help text-success mb-0';
-    hint.textContent = `${available} countable session(s) in this window.`;
-    updateViewSessionsButton(alignment);
+    hint.textContent = `Target: ${target || normalizeTargetSessionCountValue(qs('inp_targetSessionCount')?.value)} recorded attendance session(s) after the start date. N/A sessions do not count.`;
+    updateViewSessionsButton(null);
     syncEnrollmentWizardPrimaryButton();
   }
 
@@ -2166,26 +2331,10 @@
     if (!hasTargetSessionCount()) {
       return { ok: true, alignment: lastAlignmentResult, nextStep: null };
     }
-    const alignment = await runAlignmentRefresh({ showSpinner: true });
-    if (!alignment) return { ok: false, alignment: null, nextStep: null };
-    const endDate = String(qs('inp_endDate')?.value || '').trim();
     const targetSessionCount = String(qs('inp_targetSessionCount')?.value || '').trim();
-    if (!endDate || !targetSessionCount) {
-      await showMsg('Session count required', 'warning', 'End date and Number of Sessions are required when you set a target session count.');
-      return { ok: false, alignment, nextStep: null };
-    }
-    if (alignment.alignmentStatus === 'insufficient_sessions') {
-      return { ok: false, alignment, nextStep: 'addSessions' };
-    }
-    if (alignment.alignmentStatus === 'overage_requires_na') {
-      const required = Number(alignment.requiredNaCount || 0);
-      if (pendingPlannedNaSessionIds.length !== required) {
-        return { ok: false, alignment, nextStep: 'markNa' };
-      }
-    } else {
-      pendingPlannedNaSessionIds = [];
-    }
-    return { ok: true, alignment, nextStep: null };
+    if (!targetSessionCount) return { ok: false, alignment: lastAlignmentResult, nextStep: null };
+    pendingPlannedNaSessionIds = [];
+    return { ok: true, alignment: lastAlignmentResult, nextStep: null };
   }
 
   function applyScheduleDefaultsToGapForm(defaults = {}) {
@@ -3054,7 +3203,7 @@
     });
   }
 
-  async function requestJson(url, method = 'GET', payload = null) {
+  async function requestJson(url, method = 'GET', payload = null, { allowErrorResult = false } = {}) {
     const upperMethod = String(method || 'GET').toUpperCase();
     const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(upperMethod);
     const normalizedPayload = (payload && typeof payload === 'object') ? { ...payload } : payload;
@@ -3089,7 +3238,7 @@
       });
       if (wrapped.stop) return null;
     }
-    if (!response.ok || String(result.status || '').toLowerCase() === 'error') {
+    if (!response.ok || (!allowErrorResult && String(result.status || '').toLowerCase() === 'error')) {
       throw new Error(result?.message || 'Request failed.');
     }
     return result;
@@ -3154,7 +3303,7 @@
             <div class="x-small text-muted font-monospace">${htmlEscape(studentId)}</div>
           </td>
           <td>${htmlEscape(String(row?.startDate || '-'))}</td>
-          <td>${htmlEscape(String(row?.endDate || 'Open'))}</td>
+          <td>${explicitTargetSessionCount ? '<span class="text-muted">Target-based</span>' : htmlEscape(String(row?.endDate || 'Open'))}</td>
           <td class="text-center">${displayTargetSessionCount !== null ? htmlEscape(String(displayTargetSessionCount)) : '<span class="text-muted">-</span>'}</td>
           <td class="text-center">${consumedSessionCount !== null ? htmlEscape(String(consumedSessionCount)) : '<span class="text-muted">-</span>'}</td>
           <td class="text-center">${remainingSessionCount !== null ? htmlEscape(String(remainingSessionCount)) : '<span class="text-muted">-</span>'}</td>
@@ -3812,9 +3961,10 @@
   qs('btn_addPeriod')?.addEventListener('click', addPeriod);
   qs('btn_enrollWizardBack')?.addEventListener('click', goEnrollmentWizardBack);
   qs('btn_shortcutPreview')?.addEventListener('click', previewProgramRegistrationShortcut);
+  qs('btn_shortcutBack')?.addEventListener('click', returnToProgramRegistrationShortcutDetails);
   qs('btn_shortcutSaveDraft')?.addEventListener('click', saveProgramRegistrationShortcutDraft);
   qs('btn_shortcutApprove')?.addEventListener('click', approveProgramRegistrationShortcutDraft);
-  qs('btn_shortcutRetry')?.addEventListener('click', refreshRollingEligibility);
+  qs('btn_shortcutRetry')?.addEventListener('click', retryProgramRegistrationShortcutEligibility);
   qs('btn_priorRepairSave')?.addEventListener('click', savePriorCreditRepair);
   qs('btn_priorRepairRetry')?.addEventListener('click', refreshRollingEligibility);
   qs('btn_priorRepairSelectAll')?.addEventListener('click', () => {
@@ -3823,14 +3973,8 @@
   qs('btn_priorRepairClearAll')?.addEventListener('click', () => {
     document.querySelectorAll('.prior-repair-subject').forEach((input) => { input.checked = false; });
   });
-  qs('inp_startDate')?.addEventListener('change', () => {
-    refreshRollingEligibility();
-    scheduleAlignmentRefresh();
-  });
-  qs('inp_endDate')?.addEventListener('change', () => {
-    refreshRollingEligibility();
-    scheduleAlignmentRefresh();
-  });
+  qs('inp_startDate')?.addEventListener('blur', handleEnrollmentDateBlur);
+  qs('inp_endDate')?.addEventListener('blur', handleEnrollmentDateBlur);
   qs('inp_targetSessionCount')?.addEventListener('input', (event) => {
     if (event?.target) event.target.dataset.userEdited = '1';
     pendingPlannedNaSessionIds = [];

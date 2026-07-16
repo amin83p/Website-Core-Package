@@ -2284,7 +2284,7 @@ schoolRepositories.studentProgramRegistrations.findByStudentAndProgram = async (
 
 function isInactiveRegistrationStatus(status) {
   const normalized = String(status || '').trim().toLowerCase();
-  return ['withdrawn', 'cancelled', 'completed', 'rolled_back'].includes(normalized);
+  return ['withdrawn', 'cancelled', 'completed', 'rolled_back', 'void'].includes(normalized);
 }
 
 schoolRepositories.studentProgramRegistrations.findActiveByStudentAndProgram = async (studentId, programId, options = {}) => {

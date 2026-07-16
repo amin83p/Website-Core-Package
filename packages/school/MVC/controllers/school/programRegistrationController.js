@@ -517,7 +517,12 @@ exports.applyBatchRegistration = async (req, res) => {
           results.push({
             studentId: preview.studentId,
             studentName: preview.studentName,
+            feeCategory: preview.feeCategory,
+            studentAccountId: preview.studentAccountId,
+            totalAmount: preview.totalAmount,
+            transactionCount: preview.transactionCount,
             status: 'error',
+            issues: preview.issues,
             message: preview.issues.join(' ')
           });
           continue;
@@ -586,11 +591,17 @@ exports.applyBatchRegistration = async (req, res) => {
             message: 'Draft saved. Review, edit transaction rows if needed, then approve to post.'
           });
         } catch (registrationError) {
+          const message = registrationError.message || 'Failed to save draft registration.';
           results.push({
             studentId: preview.studentId,
             studentName: preview.studentName,
+            feeCategory: preview.feeCategory,
+            studentAccountId: preview.studentAccountId,
+            totalAmount: preview.totalAmount,
+            transactionCount: preview.transactionCount,
             status: 'error',
-            message: registrationError.message || 'Failed to save draft registration.'
+            issues: [message],
+            message
           });
         }
       }

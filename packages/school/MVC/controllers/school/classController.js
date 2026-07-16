@@ -1235,6 +1235,40 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
     };
 }
 
+async function assertSessionRosterEnrollmentWindows({ classData, session, incomingRoster, reqUser }) {
+    if (getClassRegistrationModeKey(classData) !== 'rolling') return;
+    const rows = Array.isArray(incomingRoster) ? incomingRoster : [];
+    if (!rows.length) return;
+
+    const [periodRows, students] = await Promise.all([
+        schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, reqUser),
+        schoolDataService.fetchData('students', {}, reqUser)
+    ]);
+    const studentToPersonMap = new Map(
+        (Array.isArray(students) ? students : [])
+            .map((row) => [toPublicId(row?.id), cleanPersonId(row?.personId)])
+            .filter(([studentId, personId]) => Boolean(studentId && personId))
+    );
+    const activeOrgId = String(classData?.orgId || reqUser?.activeOrgId || '').trim();
+    const outsideWindow = rows.find((row) => {
+        const personId = cleanPersonId(row?.personId);
+        if (!personId) return false;
+        const enrollmentWindow = classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentWindowForPerson({
+            periodRows: Array.isArray(periodRows) ? periodRows : [],
+            studentToPersonMap,
+            personId,
+            session,
+            activeOrgId,
+            allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+        });
+        return enrollmentWindow.withinEnrollmentWindow !== true;
+    });
+    if (!outsideWindow) return;
+
+    const sessionDate = normalizeDateOnlyValue(session?.date) || 'this session date';
+    throw new Error(`Attendance cannot be updated because a roster student was not enrolled in the class on ${sessionDate}.`);
+}
+
 function findSessionInList(sessions, sessionId) {
     const list = Array.isArray(sessions) ? sessions : [];
     const index = list.findIndex((row) => idsEqual(row?.sessionId || row?.id, sessionId));
@@ -3968,6 +4002,18 @@ async function saveSession(req, res) {
             if (!Array.isArray(incomingRoster)) {
                 throw new Error('Invalid roster payload.');
             }
+            const sessionForAttendanceWindow = {
+                ...originalSession,
+                date: canOverride && req.body?.date !== undefined
+                    ? normalizeDateOnlyValue(req.body.date)
+                    : originalSession.date
+            };
+            await assertSessionRosterEnrollmentWindows({
+                classData,
+                session: sessionForAttendanceWindow,
+                incomingRoster,
+                reqUser: req.user
+            });
             const existingRoster = originalSession.roster || [];
             const orgPolicyLayerSave = await attendanceMatrixPolicyModel.getPolicyForOrg(
                 classData?.orgId || getActiveOrgIdOrThrow(req.user)

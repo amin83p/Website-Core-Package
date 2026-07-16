@@ -31,31 +31,27 @@ test('does not throw when no target session count is set and sessions are insuff
   assert.equal(result.alignmentStatus, 'insufficient_sessions');
 });
 
-test('throws when target is set and sessions are insufficient', () => {
-  assert.throws(
-    () => alignmentService.assertEnrollmentSessionAlignmentForCreate({
-      classData: rollingClass,
-      payload: basePayload,
-      plannedNaSessionIds: []
-    }),
-    /Not enough countable sessions/
-  );
+test('allows a target session enrollment before enough sessions are scheduled', () => {
+  const result = alignmentService.assertEnrollmentSessionAlignmentForCreate({
+    classData: rollingClass,
+    payload: basePayload,
+    plannedNaSessionIds: []
+  });
+  assert.equal(result.enforceSessionCount, true);
 });
 
-test('throws when target is set and end date is missing', () => {
-  assert.throws(
-    () => alignmentService.assertEnrollmentSessionAlignmentForCreate({
-      classData: rollingClass,
-      payload: {
-        ...basePayload,
-        endDate: '',
-        alignmentStatus: 'ok',
-        availableCount: 10
-      },
-      plannedNaSessionIds: []
-    }),
-    /End date is required/
-  );
+test('allows a target session enrollment without an end date', () => {
+  const result = alignmentService.assertEnrollmentSessionAlignmentForCreate({
+    classData: rollingClass,
+    payload: {
+      ...basePayload,
+      endDate: '',
+      alignmentStatus: 'no_end_date',
+      availableCount: 0
+    },
+    plannedNaSessionIds: []
+  });
+  assert.equal(result.enforceSessionCount, true);
 });
 
 test('allows enrollment when target is set and alignment is ok', () => {
@@ -72,12 +68,7 @@ test('allows enrollment when target is set and alignment is ok', () => {
   assert.equal(result.enforceSessionCount, true);
 });
 
-test('allows targeted enrollment when overage is resolved with planned N/A sessions', () => {
-  const countableSessions = [
-    { sessionId: 'SES_001' },
-    { sessionId: 'SES_002' },
-    { sessionId: 'SES_003' }
-  ];
+test('allows targeted enrollment without selecting scheduled sessions as N/A', () => {
   const result = alignmentService.assertEnrollmentSessionAlignmentForCreate({
     classData: rollingClass,
     payload: {
@@ -85,30 +76,26 @@ test('allows targeted enrollment when overage is resolved with planned N/A sessi
       targetSessionCount: 2,
       alignmentStatus: 'overage_requires_na',
       availableCount: 3,
-      countableSessions,
       requiredNaCount: 1
     },
-    plannedNaSessionIds: ['SES_003']
+    plannedNaSessionIds: []
   });
   assert.equal(result.alignmentStatus, 'overage_requires_na');
 });
 
-test('throws when targeted overage has invalid N/A selection', () => {
-  assert.throws(
-    () => alignmentService.assertEnrollmentSessionAlignmentForCreate({
-      classData: rollingClass,
-      payload: {
-        ...basePayload,
-        targetSessionCount: 1,
-        alignmentStatus: 'overage_requires_na',
-        availableCount: 2,
-        countableSessions: [{ sessionId: 'SES_001' }, { sessionId: 'SES_002' }],
-        requiredNaCount: 1
-      },
-      plannedNaSessionIds: []
-    }),
-    /Select exactly 1 session/
-  );
+test('does not use stale planned-N/A input to reject a target enrollment', () => {
+  const result = alignmentService.assertEnrollmentSessionAlignmentForCreate({
+    classData: rollingClass,
+    payload: {
+      ...basePayload,
+      targetSessionCount: 1,
+      alignmentStatus: 'overage_requires_na',
+      availableCount: 2,
+      requiredNaCount: 1
+    },
+    plannedNaSessionIds: ['SES_001']
+  });
+  assert.equal(result.enforceSessionCount, true);
 });
 
 test('isTargetSessionCountEnforced reads numeric target values', () => {

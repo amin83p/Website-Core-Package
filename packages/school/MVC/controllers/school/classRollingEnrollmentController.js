@@ -2094,6 +2094,19 @@ async function materializeEnrollmentPlannedNa({ classData, period, student, reqU
   });
 }
 
+async function refreshTargetSessionEnrollmentProgress({ classData, period, reqUser } = {}) {
+  if (!classData || !period) return [];
+  if (!classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(period.targetSessionCount)) return [];
+  if (String(period.status || '').trim().toLowerCase() !== 'active') return [];
+  const sessions = await schoolDataService.getClassSessions(classData.id, reqUser);
+  return classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass({
+    classData,
+    sessions,
+    reqUser,
+    activeOrgId: classData?.orgId || reqUser?.activeOrgId || ''
+  });
+}
+
 async function postEnrollmentSessionAlignment(req, res) {
   try {
     const classId = toPublicId(req.params?.classId || req.body?.classId || '');
@@ -2524,6 +2537,11 @@ async function createClassEnrollmentWithTransactions(req, res) {
             classData: classAfterCreate,
             period: createdPeriod,
             student,
+            reqUser: req.user
+          });
+          await refreshTargetSessionEnrollmentProgress({
+            classData: classAfterCreate,
+            period: createdPeriod,
             reqUser: req.user
           });
         }
@@ -3206,6 +3224,11 @@ async function approveClassEnrollmentDraft(req, res) {
       student,
       reqUser: req.user
     });
+    await refreshTargetSessionEnrollmentProgress({
+      classData: classAfterApprove,
+      period: periodForLedger,
+      reqUser: req.user
+    });
 
     const payloadOut = {
       status: 'success',
@@ -3333,6 +3356,11 @@ async function editClassEnrollmentPeriod(req, res) {
       targetSessionCount,
       sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || periodRow?.sessionCountPolicy)
     }, req.user);
+    await refreshTargetSessionEnrollmentProgress({
+      classData,
+      period: updated || { ...periodRow, startDate, endDate, status, targetSessionCount },
+      reqUser: req.user
+    });
 
     const payloadOut = {
       status: 'success',
@@ -3591,6 +3619,11 @@ async function createClassEnrollmentPeriod(req, res) {
         classData: classAfterCreate,
         period: createdPeriod,
         student: studentRow,
+        reqUser: req.user
+      });
+      await refreshTargetSessionEnrollmentProgress({
+        classData: classAfterCreate,
+        period: createdPeriod,
         reqUser: req.user
       });
     }
