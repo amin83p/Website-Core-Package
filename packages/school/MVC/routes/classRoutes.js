@@ -513,7 +513,7 @@ router.delete('/:id/sessions/:sessionId',
   classCtrl.deleteClassSession);
 router.post('/:id/sessions/:sessionId/gradebooks/save',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
   classCtrl.saveSessionGradebooks);
 router.post('/:id/sessions/:sessionId/lock',
   requireConductRatingScalePolicyAdmin(),
@@ -521,7 +521,7 @@ router.post('/:id/sessions/:sessionId/lock',
   classCtrl.setSessionLock);
 router.post('/:id/sessions/:sessionId/save',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
   classCtrl.saveSession);
 
 module.exports = router;

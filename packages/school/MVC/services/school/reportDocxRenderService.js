@@ -178,10 +178,42 @@ async function renderReportInstanceDocx({ template, instance, placeholders, coll
   };
 }
 
+
+function mergeReportInstanceDocxBuffers(buffers = []) {
+  const sourceBuffers = (Array.isArray(buffers) ? buffers : []).filter(Boolean);
+  if (!sourceBuffers.length) throw new Error('No rendered report documents were available to combine.');
+  const { PizZip } = getDocxDependencies();
+  const baseZip = new PizZip(sourceBuffers[0]);
+  const baseXml = baseZip.file('word/document.xml')?.asText();
+  if (!baseXml) throw new Error('Rendered DOCX is missing word/document.xml.');
+  const bodyStart = baseXml.indexOf('<w:body>');
+  const bodyEnd = baseXml.lastIndexOf('</w:body>');
+  if (bodyStart < 0 || bodyEnd < 0) throw new Error('Rendered DOCX has an invalid document body.');
+  let combinedBody = baseXml.slice(bodyStart + '<w:body>'.length, bodyEnd);
+  const sectMatch = combinedBody.match(/<w:sectPr[\s\S]*?<\/w:sectPr>/);
+  const sectPr = sectMatch ? sectMatch[0] : '';
+  if (sectPr) combinedBody = combinedBody.slice(0, combinedBody.lastIndexOf(sectPr));
+  for (let index = 1; index < sourceBuffers.length; index += 1) {
+    const zip = new PizZip(sourceBuffers[index]);
+    const xml = zip.file('word/document.xml')?.asText();
+    if (!xml) throw new Error('Rendered DOCX is missing word/document.xml.');
+    const start = xml.indexOf('<w:body>'); const end = xml.lastIndexOf('</w:body>');
+    if (start < 0 || end < 0) throw new Error('Rendered DOCX has an invalid document body.');
+    let body = xml.slice(start + '<w:body>'.length, end);
+    const ownSect = body.match(/<w:sectPr[\s\S]*?<\/w:sectPr>/);
+    if (ownSect) body = body.slice(0, body.lastIndexOf(ownSect[0]));
+    combinedBody += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>' + body;
+  }
+  combinedBody += sectPr;
+  baseZip.file('word/document.xml', baseXml.slice(0, bodyStart + '<w:body>'.length) + combinedBody + baseXml.slice(bodyEnd));
+  return baseZip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
+
 module.exports = {
   normalizeTokenKey,
   normalizeCollectionRows,
   buildRenderData,
   resolveTemplateFilePath,
-  renderReportInstanceDocx
+  renderReportInstanceDocx,
+  mergeReportInstanceDocxBuffers
 };

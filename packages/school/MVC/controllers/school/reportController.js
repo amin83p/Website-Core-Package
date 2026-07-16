@@ -1362,6 +1362,58 @@ async function saveReportMatrixRow(req, res) {
   }
 }
 
+async function saveReportMatrixRows(req, res) {
+  let guardKey = '';
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    guardKey = idempotencyGuardService.createGuardKey([
+      'report_matrix_bulk_save',
+      activeOrgId,
+      String(req.params.assignmentId || '').trim(),
+      String(body.assignmentRowId || '').trim(),
+      String(body.teacherId || '').trim(),
+      String(body.submitAction || 'save').trim(),
+      Array.isArray(body.rows) ? body.rows : [],
+      body.sharedAnswers || {}
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 120000,
+      replayTtlMs: 15000
+    });
+    if (sendGuardedResponse(res, guardResult, 'This report bulk save is already in progress. Please wait.')) return;
+
+    const result = await reportMatrixService.saveMatrixRows({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: body.assignmentRowId || '',
+      teacherId: body.teacherId || '',
+      rows: Array.isArray(body.rows) ? body.rows : [],
+      submitAction: body.submitAction || 'save',
+      sharedAnswers: body.sharedAnswers && typeof body.sharedAnswers === 'object' ? body.sharedAnswers : {},
+      reqUser: req.user
+    });
+    const summary = result.summary || { total: 0, succeeded: 0, failed: 0, skipped: 0 };
+    const actionLabel = String(body.submitAction || 'save').trim().toLowerCase() === 'submit' ? 'submitted' : 'saved';
+    const payloadOut = {
+      status: summary.failed > 0 ? 'partial' : 'success',
+      message: String(summary.succeeded) + ' report(s) ' + actionLabel + '; ' + String(summary.skipped) + ' locked row(s) skipped; ' + String(summary.failed) + ' row(s) failed.',
+      summary,
+      results: result.results,
+      matrix: result.matrix
+    };
+    idempotencyGuardService.completeGuard(guardKey, payloadOut);
+    return res.json(payloadOut);
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    return res.status(400).json({
+      status: 'error',
+      message: error.message,
+      validation: error.validationSummary || null
+    });
+  }
+}
+
 async function previewInstancePrefillRefresh(req, res) {
   try {
     const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(req.params.id, req.user);
@@ -1635,6 +1687,61 @@ async function exportInstance(req, res) {
   }
 }
 
+
+async function previewReportMatrixPrefill(req, res) {
+  try {
+    const preview = await reportMatrixService.buildMatrixPrefillPreview({ assignmentId: req.params.assignmentId, assignmentRowId: req.query.assignmentRowId || req.query.rowId || '', teacherId: req.query.teacherId || '', reqUser: req.user });
+    return res.json(preview);
+  } catch (error) { return res.status(400).json({ status: 'error', message: error.message }); }
+}
+
+async function applyReportMatrixPrefill(req, res) {
+  let guardKey = '';
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    guardKey = idempotencyGuardService.createGuardKey(['report_matrix_prefill_apply', activeOrgId, req.params.assignmentId, body.assignmentRowId || '', body.teacherId || '', body.updates || []]);
+    const guardResult = idempotencyGuardService.beginGuard({ key: guardKey, runningTtlMs: 120000, replayTtlMs: 15000 });
+    if (sendGuardedResponse(res, guardResult, 'This prefill update is already in progress. Please wait.')) return;
+    const result = await reportMatrixService.applyMatrixPrefill({ assignmentId: req.params.assignmentId, assignmentRowId: body.assignmentRowId || '', teacherId: body.teacherId || '', updates: Array.isArray(body.updates) ? body.updates : [], reqUser: req.user });
+    const payload = { status: result.summary.failed ? 'partial' : 'success', message: String(result.summary.succeeded) + ' student report(s) updated; ' + String(result.summary.skipped) + ' skipped.', summary: result.summary, results: result.results, matrix: result.matrix };
+    idempotencyGuardService.completeGuard(guardKey, payload);
+    return res.json(payload);
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function exportReportMatrix(req, res) {
+  try {
+    const payload = await reportMatrixService.buildMatrixExportPayload({ assignmentId: req.params.assignmentId, assignmentRowId: req.query.assignmentRowId || req.query.rowId || '', teacherId: req.query.teacherId || '', reqUser: req.user });
+    const format = String(req.query.format || 'json').trim().toLowerCase();
+    if (format !== 'docx') {
+      const output = JSON.stringify({ status: 'success', payload }, null, 2);
+      if (String(req.query.download || '') === '1') { res.setHeader('Content-Type', 'application/json'); res.setHeader('Content-Disposition', 'attachment; filename="report-matrix-' + payload.assignmentId + '-payload.json"'); return res.send(output); }
+      return res.json({ status: 'success', payload });
+    }
+    const [template, assignment] = await Promise.all([schoolDataService.getDataById('reportTemplates', payload.templateId, req.user), schoolDataService.getDataById('reportAssignments', payload.assignmentId, req.user)]);
+    if (!template?.docxTemplate?.path) throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
+    const effectiveAssignment = reportViewService.applyAssignmentRow(assignment, reportViewService.findAssignmentRow(assignment, payload.assignmentRowId));
+    const rendered = [];
+    for (const row of payload.rows) {
+      const instance = { id: row.instanceId || ('pending-' + row.studentId), assignmentId: payload.assignmentId, assignmentRowId: payload.assignmentRowId, templateId: payload.templateId, teacherId: payload.teacherId, studentId: row.studentId, status: row.status, answers: row.answers, prefillSnapshot: row.prefillSnapshot };
+      const placeholderBundle = reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
+      const collections = await reportService.buildReportDocxCollections({ template, instance, assignment: effectiveAssignment, reqUser: req.user });
+      rendered.push(await reportDocxRenderService.renderReportInstanceDocx({ template, instance, placeholders: placeholderBundle.placeholders, collections }));
+    }
+    const buffer = reportDocxRenderService.mergeReportInstanceDocxBuffers(rendered.map((item) => item.buffer));
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', 'attachment; filename="report-matrix-' + payload.assignmentId + '.docx"');
+    return res.send(buffer);
+  } catch (error) {
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    return res.status(400).render('error', { title: 'Report Matrix Export Error', message: error.message, user: req.user });
+  }
+}
+
 module.exports = {
   showHome,
   listTemplates,
@@ -1656,6 +1763,10 @@ module.exports = {
   showInstanceEditorV2,
   showReportMatrix,
   saveReportMatrixRow,
+  saveReportMatrixRows,
+  previewReportMatrixPrefill,
+  applyReportMatrixPrefill,
+  exportReportMatrix,
   saveInstance,
   previewInstancePrefillRefresh,
   applyInstancePrefillRefresh,

@@ -4,6 +4,11 @@
   const tableFields = Array.isArray(matrix?.tableFields) ? matrix.tableFields : [];
   const rows = Array.isArray(matrix?.rows) ? matrix.rows : [];
   const progress = matrix?.progress || { total: rows.length, submitted: 0, drafts: 0, pending: rows.length };
+  const fallbackSharedFields = sharedFields;
+  const sharedGroups = Array.isArray(matrix?.sharedGroups) && matrix.sharedGroups.length
+    ? matrix.sharedGroups
+    : (fallbackSharedFields.length ? [{ id: 'shared-default', label: 'Shared fields', fields: fallbackSharedFields }] : []);
+  const hasEditableRows = rows.some((row) => !row.locked);
   const statusBadgeClass = (status) => {
     const token = String(status || '').toLowerCase();
     if (token === 'submitted') return 'bg-success';
@@ -16,7 +21,8 @@
   .report-matrix-page .matrix-summary-card { min-width: 115px; }
   .report-matrix-page .matrix-table-wrap { max-height: calc(100vh - 250px); overflow: auto; }
   .report-matrix-page .matrix-table { width: max-content; min-width: 100%; }
-  .report-matrix-page .matrix-table th { position: sticky; top: 0; z-index: 4; min-width: 190px; vertical-align: middle; }
+  .report-matrix-page .matrix-table th { position: sticky; top: 0; z-index: 4; min-width: 110px; width: 130px; max-width: 160px; vertical-align: middle; }
+  .report-matrix-page .matrix-header-label { display: inline-block; white-space: normal; overflow-wrap: anywhere; line-height: 1.15; }
   .report-matrix-page .matrix-table th.matrix-student-col,
   .report-matrix-page .matrix-table td.matrix-student-col {
     position: sticky;
@@ -28,12 +34,11 @@
     box-shadow: 3px 0 5px rgba(0, 0, 0, 0.06);
   }
   .report-matrix-page .matrix-table th.matrix-student-col { z-index: 6; background: var(--bs-light); }
-  .report-matrix-page .matrix-table th.matrix-actions-col { min-width: 235px; }
-  .report-matrix-page .matrix-table textarea { min-width: 260px; resize: vertical; }
+  .report-matrix-page .matrix-table textarea { min-width: 180px; width: 100%; resize: vertical; }
   .report-matrix-page .matrix-table input[type="text"],
   .report-matrix-page .matrix-table input[type="number"],
   .report-matrix-page .matrix-table input[type="date"],
-  .report-matrix-page .matrix-table select { min-width: 180px; }
+  .report-matrix-page .matrix-table select { min-width: 130px; width: 100%; }
   .report-matrix-page .matrix-help-icon { border: 0; background: transparent; color: var(--bs-secondary-color); padding: 0 .2rem; }
   .report-matrix-page .matrix-help-icon:hover,
   .report-matrix-page .matrix-help-icon:focus-visible { color: var(--bs-primary); }
@@ -62,6 +67,9 @@
         <a href="/school/classes/<%= encodeURIComponent(matrix.classId) %>/sessions/<%= encodeURIComponent(matrix.sessionId) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Session</a>
       <% } %>
       <a href="/school/reports/instances" class="btn btn-outline-primary btn-sm"><i class="bi bi-list-check me-1"></i>Instances</a>
+      <button type="button" class="btn btn-outline-warning btn-sm" id="btnMatrixPrefillPreview"><i class="bi bi-arrow-repeat me-1"></i>Preview Prefill Updates</button>
+      <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=docx" class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</a>
+      <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=json&download=1" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
     </div>
   </div>
 
@@ -74,45 +82,36 @@
     <div class="card border-0 shadow-sm matrix-summary-card"><div class="card-body py-2"><div class="small text-muted">Not started</div><div class="fs-5 fw-bold text-info" data-progress-key="pending"><%= progress.pending %></div></div></div>
   </div>
 
-  <% if (sharedFields.length || commonFields.length) { %>
-    <div class="card border-0 shadow-sm mb-4">
-      <div class="card-header bg-white py-3">
-        <h5 class="m-0 fw-bold"><i class="bi bi-people me-2 text-primary"></i>Common report fields</h5>
-        <div class="small text-muted mt-1">Shared values are saved once and used by every student report in this assignment.</div>
-      </div>
-      <div class="card-body">
-        <% if (sharedFields.some((field) => field.hasConflictingInitialValues)) { %>
-          <div class="alert alert-warning small">
-            One or more unsaved shared fields produced different student prefills. They are blank so the teacher can choose the common value explicitly.
+  <% if (commonFields.length) { %>
+    <div class="card border-0 shadow-sm mb-4" id="reportMatrixCommonFields">
+      <div class="card-header bg-white py-3"><h5 class="m-0 fw-bold"><i class="bi bi-info-circle me-2 text-primary"></i>Common report values</h5><div class="small text-muted mt-1">These read-only values apply to every student.</div></div>
+      <div class="card-body"><div class="row g-3">
+        <% commonFields.forEach((field) => { const value = field.value === undefined || field.value === null ? '' : field.value; const col = field.fullPageWidth ? 'col-12' : 'col-12 col-md-6 col-xl-4'; %>
+          <div class="<%= col %>"><label class="form-label fw-bold"><%= field.label %> <span class="badge bg-light text-secondary border ms-1">View only</span></label>
+            <% if (field.type === 'textarea') { %><textarea class="form-control" rows="3" data-field-id="<%= field.id %>" readonly><%= value %></textarea>
+            <% } else { %><input type="<%= field.type === 'number' || field.type === 'date' ? field.type : 'text' %>" class="form-control" data-field-id="<%= field.id %>" value="<%= value %>" readonly><% } %>
           </div>
-        <% } %>
-        <div class="row g-3">
-          <% [...commonFields, ...sharedFields].forEach((field) => { %>
-            <% const isSharedEditable = field.sharedAcrossStudents && !field.readOnly; %>
-            <% const value = field.value === undefined || field.value === null ? '' : field.value; %>
-            <div class="col-12 col-md-6 col-xl-4">
-              <label class="form-label fw-bold">
-                <%= field.label %>
-                <% if (field.helpText) { %><button type="button" class="matrix-help-icon" data-bs-toggle="tooltip" title="<%= field.helpText %>" aria-label="Information for <%= field.label %>"><i class="bi bi-info-circle"></i></button><% } %>
-                <% if (field.required) { %><span class="text-danger" title="Required" aria-label="Required">*</span><% } %>
-                <% if (field.sharedAcrossStudents) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %>
-                <% if (field.readOnly) { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } %>
-              </label>
-              <% if (field.type === 'textarea') { %>
-                <textarea class="form-control <%= isSharedEditable ? 'js-matrix-shared-field' : '' %>" rows="3" data-field-id="<%= field.id %>" placeholder="<%= field.placeholder || '' %>" <%= isSharedEditable ? '' : 'readonly' %>><%= value %></textarea>
-              <% } else if (field.type === 'select') { %>
-                <select class="form-select <%= isSharedEditable ? 'js-matrix-shared-field' : '' %>" data-field-id="<%= field.id %>" <%= isSharedEditable ? '' : 'disabled' %>>
-                  <option value="">Select...</option>
-                  <% field.options.forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %>
-                </select>
-              <% } else if (field.type === 'checkbox') { %>
-                <div class="form-check border rounded p-2 ps-5">
-                  <input type="checkbox" class="form-check-input <%= isSharedEditable ? 'js-matrix-shared-field' : '' %>" data-field-id="<%= field.id %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= isSharedEditable ? '' : 'disabled' %>>
-                  <label class="form-check-label">Checked</label>
-                </div>
-              <% } else { %>
-                <input type="<%= field.type === 'number' || field.type === 'date' ? field.type : 'text' %>" class="form-control <%= isSharedEditable ? 'js-matrix-shared-field' : '' %>" data-field-id="<%= field.id %>" value="<%= value %>" placeholder="<%= field.placeholder || '' %>" <%= isSharedEditable ? '' : 'readonly' %>>
-              <% } %>
+        <% }); %>
+      </div></div>
+    </div>
+  <% } %>
+  <% if (sharedGroups.length) { %>
+    <div class="card border-0 shadow-sm mb-4" id="reportMatrixSharedFields">
+      <div class="card-header bg-white py-3"><h5 class="m-0 fw-bold"><i class="bi bi-people me-2 text-primary"></i>Shared report fields</h5><div class="small text-muted mt-1">Editable values are saved once and used by every student report.</div></div>
+      <div class="card-body">
+        <% if (sharedFields.some((field) => field.hasConflictingInitialValues)) { %><div class="alert alert-warning small">One or more shared fields have different initial values. Choose the common value explicitly.</div><% } %>
+        <div class="accordion" id="reportMatrixSharedSections">
+          <% sharedGroups.forEach((group, groupIndex) => { const collapseId = 'reportMatrixSharedGroup' + groupIndex; %>
+            <div class="accordion-item"><h2 class="accordion-header" id="<%= collapseId %>Heading"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#<%= collapseId %>" aria-expanded="true"><%= group.label %> <span class="badge bg-info-subtle text-info-emphasis border ms-2"><%= group.fields.length %> field(s)</span></button></h2>
+              <div id="<%= collapseId %>" class="accordion-collapse collapse show"><div class="accordion-body"><div class="row g-3">
+                <% (group.fields || []).forEach((field) => { const value = field.value === undefined || field.value === null ? '' : field.value; const col = field.fullPageWidth ? 'col-12' : 'col-12 col-md-6 col-xl-4'; %>
+                  <div class="<%= col %>"><label class="form-label fw-bold"><%= field.label %> <span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span></label>
+                    <% if (field.type === 'textarea') { %><textarea class="form-control js-matrix-shared-field" rows="3" data-field-id="<%= field.id %>"><%= value %></textarea>
+                    <% } else if (field.type === 'select') { %><select class="form-select js-matrix-shared-field" data-field-id="<%= field.id %>"><option value="">Select...</option><% (field.options || []).forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %></select>
+                    <% } else { %><input type="<%= field.type === 'number' || field.type === 'date' ? field.type : 'text' %>" class="form-control js-matrix-shared-field" data-field-id="<%= field.id %>" value="<%= value %>"><% } %>
+                  </div>
+                <% }); %>
+              </div></div></div>
             </div>
           <% }); %>
         </div>
@@ -124,7 +123,7 @@
     <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
       <div>
         <h5 class="m-0 fw-bold"><i class="bi bi-table me-2 text-primary"></i>Student reports</h5>
-        <div class="small text-muted mt-1">Save or submit each student independently. Scroll horizontally to see every report field.</div>
+        <div class="small text-muted mt-1">Use the buttons below to save or submit all editable student reports. Scroll horizontally to see every report field.</div>
       </div>
       <span class="badge bg-light text-dark border"><%= tableFields.length %> student-specific field(s)</span>
     </div>
@@ -135,13 +134,12 @@
             <th class="matrix-student-col ps-3">Student</th>
             <% tableFields.forEach((field) => { %>
               <th>
-                <span><%= field.label %></span>
+                <span class="matrix-header-label"><%= field.label %></span>
                 <% if (field.helpText) { %><button type="button" class="matrix-help-icon" data-bs-toggle="tooltip" title="<%= field.helpText %>" aria-label="Information for <%= field.label %>"><i class="bi bi-info-circle"></i></button><% } %>
                 <% if (field.required) { %><span class="text-danger" title="Required" aria-label="Required">*</span><% } %>
                 <% if (field.readOnly) { %><span class="badge bg-light text-secondary border d-block mt-1" style="width:max-content;">View only<%= field.calculated ? ' / calculated' : '' %></span><% } %>
               </th>
             <% }); %>
-            <th class="matrix-actions-col text-end pe-3">Status and actions</th>
           </tr>
         </thead>
         <tbody>
@@ -149,7 +147,10 @@
             <tr data-student-id="<%= row.studentId %>" class="<%= row.locked ? 'table-secondary' : '' %>">
               <td class="matrix-student-col ps-3">
                 <div class="fw-bold matrix-student-name"><%= row.studentName %></div>
-                <div class="small text-muted font-monospace"><%= row.studentId %></div>
+                <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+                  <span class="badge text-capitalize js-matrix-status <%= statusBadgeClass(row.status) %>"><%= row.status %></span>
+                  <a href="<%= row.editHref || '#' %>" class="btn btn-sm btn-outline-secondary js-matrix-open <%= row.editHref ? '' : 'd-none' %>" target="_blank" rel="noopener noreferrer" title="Open individual report"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>
+                </div>
               </td>
               <% tableFields.forEach((field) => { %>
                 <% const value = row.answers?.[field.id] === undefined || row.answers?.[field.id] === null ? '' : row.answers[field.id]; %>
@@ -171,23 +172,29 @@
                   <% } %>
                 </td>
               <% }); %>
-              <td class="text-end pe-3">
-                <div class="d-flex flex-column align-items-end gap-2">
-                  <span class="badge text-capitalize js-matrix-status <%= statusBadgeClass(row.status) %>"><%= row.status %></span>
-                  <div class="btn-group btn-group-sm">
-                    <a href="<%= row.editHref || '#' %>" class="btn btn-outline-secondary js-matrix-open <%= row.editHref ? '' : 'd-none' %>" target="_blank" rel="noopener noreferrer" title="Open individual report"><i class="bi bi-box-arrow-up-right"></i></a>
-                    <button type="button" class="btn btn-outline-primary js-matrix-save" data-action="save" <%= row.locked ? 'disabled' : '' %>><i class="bi bi-save me-1"></i>Save Draft</button>
-                    <button type="button" class="btn btn-success js-matrix-save" data-action="submit" <%= row.locked ? 'disabled' : '' %>><i class="bi bi-send-check me-1"></i>Submit</button>
-                  </div>
-                </div>
-              </td>
+
             </tr>
           <% }); %>
-          <% if (!rows.length) { %><tr><td colspan="<%= tableFields.length + 2 %>" class="text-center text-muted py-5">No students are targeted by this assignment.</td></tr><% } %>
+          <% if (!rows.length) { %><tr><td colspan="<%= tableFields.length + 1 %>" class="text-center text-muted py-5">No students are targeted by this assignment.</td></tr><% } %>
         </tbody>
       </table>
     </div>
+    <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="small text-muted" data-matrix-bulk-summary>Use the buttons to save or submit all editable student reports.</div>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-primary js-matrix-bulk-action" data-action="save" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-save me-1"></i>Save All Drafts</button>
+        <button type="button" class="btn btn-success js-matrix-bulk-action" data-action="submit" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-send-check me-1"></i>Submit All Reports</button>
+      </div>
+    </div>
   </div>
+</div>
+
+<div class="modal fade" id="reportMatrixPrefillModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-arrow-repeat me-2"></i>Preview Prefill Updates</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body"><div id="reportMatrixPrefillSummary" class="small text-muted mb-3">Loading...</div><div id="reportMatrixPrefillRows"></div></div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" id="btnApplyMatrixPrefill" disabled>Apply Selected Updates</button></div>
+  </div></div>
 </div>
 
 <script>
@@ -247,12 +254,16 @@
       return 'badge text-capitalize js-matrix-status bg-info-subtle text-info-emphasis border';
     }
 
-    function applyMatrixState(nextMatrix, savedStudentId) {
+    function applyMatrixState(nextMatrix, savedStudentId, options = {}) {
+      const preserveStudentIds = options.preserveStudentIds instanceof Set ? options.preserveStudentIds : new Set();
+      const preserveShared = options.preserveShared === true;
       if (!nextMatrix || typeof nextMatrix !== 'object') return;
       matrixState = nextMatrix;
-      (nextMatrix.sharedFields || []).forEach((field) => {
-        writeControl(document.querySelector(`.js-matrix-shared-field[data-field-id="${CSS.escape(field.id)}"]`), field.value);
-      });
+      if (!preserveShared) {
+        (nextMatrix.sharedFields || []).forEach((field) => {
+          writeControl(document.querySelector(`.js-matrix-shared-field[data-field-id="${CSS.escape(field.id)}"]`), field.value);
+        });
+      }
       (nextMatrix.commonFields || []).forEach((field) => {
         writeControl(document.querySelector(`[data-field-id="${CSS.escape(field.id)}"]:not(.js-matrix-row-field)`), field.value);
       });
@@ -263,7 +274,8 @@
         row.querySelectorAll('.js-matrix-row-field').forEach((control) => {
           const field = fieldMap.get(String(control.dataset.fieldId || ''));
           if (!field) return;
-          if (String(rowState.studentId) === String(savedStudentId) || field.readOnly || field.calculated) {
+          const rowId = String(rowState.studentId);
+          if (!preserveStudentIds.has(rowId) && (savedStudentId === undefined || savedStudentId === null || rowId === String(savedStudentId) || field.readOnly || field.calculated)) {
             writeControl(control, rowState.answers?.[field.id]);
           }
         });
@@ -277,7 +289,6 @@
           openLink.href = rowState.editHref;
           openLink.classList.remove('d-none');
         }
-        row.querySelectorAll('.js-matrix-save').forEach((button) => { button.disabled = Boolean(rowState.locked); });
         row.classList.toggle('table-secondary', Boolean(rowState.locked));
       });
       Object.entries(nextMatrix.progress || {}).forEach(([key, value]) => {
@@ -286,19 +297,25 @@
       });
     }
 
-    async function saveRow(button) {
-      const row = button.closest('tr[data-student-id]');
-      if (!row) return;
-      const studentId = String(row.dataset.studentId || '');
-      const submitAction = String(button.dataset.action || 'save');
-      const actionButtons = Array.from(row.querySelectorAll('.js-matrix-save'));
+    async function runBulkAction(button) {
+      const submitAction = String(button?.dataset.action || 'save').toLowerCase() === 'submit' ? 'submit' : 'save';
+      const rowStates = new Map((matrixState.rows || []).map((row) => [String(row.studentId), row]));
+      const editableRows = Array.from(document.querySelectorAll('tr[data-student-id]')).filter((row) => {
+        const state = rowStates.get(String(row.dataset.studentId || ''));
+        return state ? !state.locked : !row.classList.contains('table-secondary');
+      });
+      if (!editableRows.length) {
+        showAlert('There are no editable student reports to process.', 'info');
+        return;
+      }
+      const actionButtons = Array.from(document.querySelectorAll('.js-matrix-bulk-action'));
       actionButtons.forEach((item) => { item.disabled = true; });
       showAlert('', 'info');
       const loadingToken = typeof window.showLoading === 'function'
-        ? window.showLoading(submitAction === 'submit' ? 'Submitting student report...' : 'Saving student report...')
+        ? window.showLoading(submitAction === 'submit' ? 'Submitting student reports...' : 'Saving student reports...')
         : null;
       try {
-        const response = await fetch(`/school/reports/instances/matrix/${encodeURIComponent(matrixState.assignmentId)}/save-row`, {
+        const response = await fetch('/school/reports/instances/matrix/' + encodeURIComponent(matrixState.assignmentId) + '/save-all', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -309,28 +326,94 @@
           body: JSON.stringify({
             assignmentRowId: matrixState.assignmentRowId,
             teacherId: matrixState.teacherId,
-            studentId,
             submitAction,
-            answers: collectControls(row, '.js-matrix-row-field'),
+            rows: editableRows.map((row) => ({
+              studentId: String(row.dataset.studentId || ''),
+              answers: collectControls(row, '.js-matrix-row-field')
+            })),
             sharedAnswers: collectControls(document, '.js-matrix-shared-field'),
             actionStateId: String(document.getElementById('reportMatrixActionStateId')?.value || '')
           })
         });
         const result = await response.json().catch(() => ({}));
-        if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Unable to save this report row.');
-        applyMatrixState(result.matrix, studentId);
-        dirtyStudents.delete(studentId);
-        row.classList.remove('matrix-row-dirty');
-        sharedDirty = false;
-        showAlert(result.message || 'Report saved.', 'success');
+        if (!response.ok || !['success', 'partial'].includes(result.status)) {
+          throw new Error(result.message || 'Unable to process the report matrix.');
+        }
+        const failedIds = new Set((result.results || [])
+          .filter((item) => item.status === 'error')
+          .map((item) => String(item.studentId || '')));
+        applyMatrixState(result.matrix, null, { preserveStudentIds: failedIds, preserveShared: failedIds.size > 0 });
+        dirtyStudents.clear();
+        document.querySelectorAll('tr[data-student-id]').forEach((row) => row.classList.remove('matrix-row-dirty'));
+        failedIds.forEach((studentId) => {
+          dirtyStudents.add(studentId);
+          document.querySelector('tr[data-student-id="' + CSS.escape(studentId) + '"]')?.classList.add('matrix-row-dirty');
+        });
+        sharedDirty = failedIds.size > 0;
+        const detail = (result.results || [])
+          .filter((item) => item.status === 'error' && item.message)
+          .slice(0, 3)
+          .map((item) => String(item.studentId || '') + ': ' + item.message)
+          .join(' | ');
+        const message = [result.message || 'Report matrix processed.', detail].filter(Boolean).join(' ');
+        const summaryEl = document.querySelector('[data-matrix-bulk-summary]');
+        if (summaryEl) summaryEl.textContent = message;
+        showAlert(message, result.status === 'partial' ? 'warning' : 'success');
       } catch (error) {
         showAlert(error.message, 'danger');
       } finally {
-        const latest = (matrixState.rows || []).find((item) => String(item.studentId) === studentId);
-        actionButtons.forEach((item) => { item.disabled = Boolean(latest?.locked); });
+        const hasEditable = (matrixState.rows || []).some((row) => !row.locked);
+        actionButtons.forEach((item) => { item.disabled = !hasEditable; });
         if (typeof window.hideLoading === 'function') window.hideLoading(loadingToken || { force: true });
       }
     }
+
+    const prefillModal = document.getElementById('reportMatrixPrefillModal');
+    const prefillRowsEl = document.getElementById('reportMatrixPrefillRows');
+    const prefillSummaryEl = document.getElementById('reportMatrixPrefillSummary');
+    const applyPrefillButton = document.getElementById('btnApplyMatrixPrefill');
+    function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char])); }
+    function updatePrefillApplyState() { if (applyPrefillButton) applyPrefillButton.disabled = !prefillRowsEl?.querySelector('.js-matrix-prefill-key:checked'); }
+    function renderPrefillPreview(result) {
+      const students = Array.isArray(result?.students) ? result.students : [];
+      if (prefillSummaryEl) prefillSummaryEl.textContent = students.length ? (String(result.summary?.changed || 0) + ' student(s) have updates. Select individual prefill keys to apply.') : 'No student rows were found.';
+      if (!prefillRowsEl) return;
+      prefillRowsEl.innerHTML = students.map((student) => {
+        const disabled = student.locked || student.pending || !student.changes?.length;
+        const status = student.pending ? 'pending (no stored snapshot)' : (student.locked ? 'locked' : student.status);
+        const changes = (student.changes || []).map((change) => '<label class="d-flex gap-2 align-items-start border rounded p-2 mb-2"><input type="checkbox" class="form-check-input js-matrix-prefill-key mt-1" data-student-id="' + escapeHtml(student.studentId) + '" data-prefill-key="' + escapeHtml(change.prefillKey) + '" ' + (disabled ? 'disabled' : '') + '><span><strong>' + escapeHtml(change.prefillKey) + '</strong><br><span class="small text-muted">' + (change.fields || []).map((field) => escapeHtml(field.label) + ': ' + escapeHtml(field.currentValue) + ' ? ' + escapeHtml(field.newValue)).join('<br>') + '</span></span></label>').join('');
+        return '<div class="card mb-3"><div class="card-header py-2 d-flex justify-content-between"><strong>' + escapeHtml(student.studentName || student.studentId) + '</strong><span class="badge bg-light text-secondary border">' + escapeHtml(status) + '</span></div><div class="card-body py-2">' + (changes || '<span class="small text-muted">No applicable updates.</span>') + '</div></div>';
+      }).join('');
+      prefillRowsEl.querySelectorAll('.js-matrix-prefill-key').forEach((item) => item.addEventListener('change', updatePrefillApplyState));
+      updatePrefillApplyState();
+    }
+    async function loadPrefillPreview() {
+      if (prefillSummaryEl) prefillSummaryEl.textContent = 'Loading prefill updates...';
+      if (prefillRowsEl) prefillRowsEl.innerHTML = '';
+      if (typeof bootstrap !== 'undefined' && prefillModal) bootstrap.Modal.getOrCreateInstance(prefillModal).show();
+      try {
+        const response = await fetch('/school/reports/instances/matrix/' + encodeURIComponent(matrixState.assignmentId) + '/prefill-preview?assignmentRowId=' + encodeURIComponent(matrixState.assignmentRowId || '') + '&teacherId=' + encodeURIComponent(matrixState.teacherId || ''), { headers: { Accept: 'application/json', 'x-ajax-request': 'true' } });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Unable to preview prefill updates.');
+        renderPrefillPreview(result);
+      } catch (error) { if (prefillSummaryEl) prefillSummaryEl.textContent = error.message; }
+    }
+    async function applyPrefillUpdates() {
+      const updates = {};
+      prefillRowsEl?.querySelectorAll('.js-matrix-prefill-key:checked').forEach((item) => { const id = String(item.dataset.studentId || ''); (updates[id] ||= []).push(item.dataset.prefillKey); });
+      const body = { assignmentRowId: matrixState.assignmentRowId, teacherId: matrixState.teacherId, updates: Object.entries(updates).map(([studentId, prefillKeys]) => ({ studentId, prefillKeys })), actionStateId: String(document.getElementById('reportMatrixActionStateId')?.value || '') };
+      applyPrefillButton.disabled = true;
+      try {
+        const response = await fetch('/school/reports/instances/matrix/' + encodeURIComponent(matrixState.assignmentId) + '/prefill-apply', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-ajax-request': 'true', 'x-action-state-id': body.actionStateId }, body: JSON.stringify(body) });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !['success','partial'].includes(result.status)) throw new Error(result.message || 'Unable to apply prefill updates.');
+        if (typeof bootstrap !== 'undefined' && prefillModal) bootstrap.Modal.getOrCreateInstance(prefillModal).hide();
+        showAlert(result.message || 'Prefill updates applied.', result.status === 'partial' ? 'warning' : 'success');
+        if (result.matrix) applyMatrixState(result.matrix, null); else window.location.reload();
+      } catch (error) { showAlert(error.message, 'danger'); applyPrefillButton.disabled = false; }
+    }
+    document.getElementById('btnMatrixPrefillPreview')?.addEventListener('click', loadPrefillPreview);
+    applyPrefillButton?.addEventListener('click', applyPrefillUpdates);
 
     document.querySelectorAll('.js-matrix-row-field').forEach((control) => {
       control.addEventListener('change', () => {
@@ -350,8 +433,8 @@
       control.addEventListener('change', () => { sharedDirty = true; });
       control.addEventListener('input', () => { sharedDirty = true; });
     });
-    document.querySelectorAll('.js-matrix-save').forEach((button) => {
-      button.addEventListener('click', () => saveRow(button));
+    document.querySelectorAll('.js-matrix-bulk-action').forEach((button) => {
+      button.addEventListener('click', () => runBulkAction(button));
     });
     window.addEventListener('beforeunload', (event) => {
       if (!sharedDirty && dirtyStudents.size === 0) return;

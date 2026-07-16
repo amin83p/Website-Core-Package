@@ -4,6 +4,7 @@ const reportIntegrityService = require('./reportIntegrityService');
 const reportInstanceSaveService = require('./reportInstanceSaveService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { getPrefillValue } = require('./reportPrefillKeyUtils');
 
 const VISUAL_TYPES = new Set(['section', 'subheader', 'row_break']);
 const STUDENT_NAME_KEYS = new Set([
@@ -70,6 +71,8 @@ function toFieldDto(field = {}, extra = {}) {
     readOnly: isReadOnlyField(field),
     calculated: isCalculatedField(field),
     sharedAcrossStudents: field.sharedAcrossStudents === true,
+    fullPageWidth: field.fullPageWidth === true || String(field.fullPageWidth || '').toLowerCase() === 'true',
+    prefillKey: clean(field.prefillKey),
     placeholder: clean(field.placeholder),
     helpText: buildFieldHelpText(field),
     options: Array.isArray(field.options)
@@ -80,6 +83,32 @@ function toFieldDto(field = {}, extra = {}) {
       : [],
     ...extra
   };
+}
+
+function buildFieldSectionMap(template) {
+  const sectionMap = new Map();
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  let current = { id: 'shared-default', label: 'Shared fields' };
+  fields.forEach((field, index) => {
+    const type = clean(field?.type).toLowerCase();
+    if (type === 'section') {
+      current = {
+        id: clean(field.id) || `section-${index + 1}`,
+        label: clean(field.label) || 'Shared fields'
+      };
+      return;
+    }
+    if (type === 'subheader') {
+      const subheaderId = clean(field.id) || `subheader-${index + 1}`;
+      current = {
+        id: `${current.id}--${subheaderId}`,
+        label: [current.label, clean(field.label)].filter(Boolean).join(' / ') || 'Shared fields'
+      };
+      return;
+    }
+    if (field?.id && !isVisualField(field)) sectionMap.set(clean(field.id), current);
+  });
+  return sectionMap;
 }
 
 function findMatchingInstance(instances = [], { assignmentId, assignmentRowId, teacherId, studentId } = {}) {
@@ -134,8 +163,19 @@ async function buildStudentMatrixRow({ assignment, template, teacherId, studentI
   }
   const mergedAnswers = reportService.mergeTemplateData(template, effectiveInstance, assignment);
   const prefill = effectiveInstance.prefillSnapshot || {};
+  // Recompute once more from the values that will be rendered in the matrix.
+  // This keeps calculated, read-only student fields visible even when an older
+  // instance stored an empty/stale calculated answer.
+  const recalculated = reportService.recomputeCalculatedAnswers({
+    template,
+    mergedAnswers,
+    prefill
+  });
+  const renderedAnswers = recalculated && recalculated.answers && typeof recalculated.answers === 'object'
+    ? recalculated.answers
+    : mergedAnswers;
   const studentName = clean(
-    mergedAnswers.student_full_name
+    renderedAnswers.student_full_name
     || prefill.student_full_name
     || prefill.student_preferred_name
     || prefill.student_name
@@ -151,7 +191,7 @@ async function buildStudentMatrixRow({ assignment, template, teacherId, studentI
     isPending: !instanceId,
     status,
     locked: status === 'locked',
-    answers: mergedAnswers,
+    answers: renderedAnswers,
     editHref: instanceId ? `/school/reports/instances/edit-v2/${encodeURIComponent(instanceId)}` : ''
   };
 }
@@ -159,13 +199,27 @@ async function buildStudentMatrixRow({ assignment, template, teacherId, studentI
 function classifyMatrixFields(template, rows, assignment) {
   const fields = (Array.isArray(template?.schema?.fields) ? template.schema.fields : [])
     .filter((field) => field?.id && !isVisualField(field));
+  const sectionMap = buildFieldSectionMap(template);
+  const dtoExtras = (field) => {
+    const section = sectionMap.get(clean(field.id)) || { id: 'shared-default', label: 'Shared fields' };
+    return { sectionId: section.id, sectionLabel: section.label };
+  };
   const studentNameFields = fields.filter(isStudentNameField);
-  const sharedFields = fields.filter((field) => field.sharedAcrossStudents === true);
-  const consumed = new Set([...studentNameFields, ...sharedFields].map((field) => clean(field.id)));
-  const commonReadOnlyFields = [];
+  const sharedFields = fields.filter((field) => (
+    field.sharedAcrossStudents === true
+    && !isReadOnlyField(field)
+    && !isCalculatedField(field)
+  ));
+  const sharedReadOnlyFields = fields.filter((field) => (
+    field.sharedAcrossStudents === true
+    && isReadOnlyField(field)
+    && !isCalculatedField(field)
+  ));
+  const consumed = new Set([...studentNameFields, ...sharedFields, ...sharedReadOnlyFields].map((field) => clean(field.id)));
+  const commonReadOnlyFields = [...sharedReadOnlyFields];
 
   fields.forEach((field) => {
-    if (consumed.has(clean(field.id)) || !isReadOnlyField(field)) return;
+    if (consumed.has(clean(field.id)) || !isReadOnlyField(field) || isCalculatedField(field)) return;
     const values = rows.map((row) => row.answers?.[field.id]);
     if (valuesAreIdentical(values)) {
       commonReadOnlyFields.push(field);
@@ -181,21 +235,42 @@ function classifyMatrixFields(template, rows, assignment) {
     const rowValues = rows.map((row) => row.answers?.[field.id]);
     const identicalInitialValues = valuesAreIdentical(rowValues);
     return toFieldDto(field, {
+      ...dtoExtras(field),
       value: hasSavedValue ? sharedAnswers[field.id] : (identicalInitialValues ? rowValues[0] : ''),
       hasConflictingInitialValues: !hasSavedValue && !identicalInitialValues
     });
   });
 
   const commonFieldDtos = commonReadOnlyFields.map((field) => toFieldDto(field, {
-    value: rows[0]?.answers?.[field.id]
+    ...dtoExtras(field),
+    value: Object.prototype.hasOwnProperty.call(sharedAnswers, field.id)
+      ? sharedAnswers[field.id]
+      : rows[0]?.answers?.[field.id]
   }));
   const tableFields = fields
     .filter((field) => !consumed.has(clean(field.id)))
-    .map((field) => toFieldDto(field));
+    .map((field) => toFieldDto(field, dtoExtras(field)));
+
+  const fieldDtosById = new Map(sharedFieldDtos.map((field) => [field.id, field]));
+  const sharedGroups = [];
+  const groupsById = new Map();
+  fields.forEach((field) => {
+    const dto = fieldDtosById.get(clean(field.id));
+    if (!dto) return;
+    const groupId = dto.sectionId || 'shared-default';
+    let group = groupsById.get(groupId);
+    if (!group) {
+      group = { id: groupId, label: dto.sectionLabel || 'Shared fields', fields: [] };
+      groupsById.set(groupId, group);
+      sharedGroups.push(group);
+    }
+    group.fields.push(dto);
+  });
 
   return {
     sharedFields: sharedFieldDtos,
     commonFields: commonFieldDtos,
+    sharedGroups,
     tableFields,
     studentNameFieldIds: studentNameFields.map((field) => clean(field.id))
   };
@@ -278,11 +353,14 @@ async function saveMatrixRow({
   submitAction = 'save',
   answers = {},
   sharedAnswers = {},
-  reqUser
+  reqUser,
+  includeMatrix = true
 } = {}) {
   const resolved = await resolveMatrixBase({ assignmentId, assignmentRowId, teacherId, studentId, reqUser });
   const { assignment, assignmentRow, template, teacherId: resolvedTeacherId } = resolved;
-  const resolvedStudentId = resolved.targetStudentIds[0];
+  const resolvedStudentId = studentId && resolved.targetStudentIds.some((targetId) => idsEqual(targetId, studentId))
+    ? studentId
+    : resolved.targetStudentIds[0];
   const instances = await schoolDataService.fetchData('reportInstances', {
     assignmentId__eq: assignment.id,
     page: 1,
@@ -339,12 +417,14 @@ async function saveMatrixRow({
     submitAction,
     reqUser
   });
-  const matrix = await buildMatrixContext({
-    assignmentId: assignment.id,
-    assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
-    teacherId: resolvedTeacherId,
-    reqUser
-  });
+  const matrix = includeMatrix
+    ? await buildMatrixContext({
+        assignmentId: assignment.id,
+        assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
+        teacherId: resolvedTeacherId,
+        reqUser
+      })
+    : null;
 
   return {
     instanceId: toPublicId(result.updatedInstance?.id || instance.id),
@@ -354,6 +434,177 @@ async function saveMatrixRow({
   };
 }
 
+async function saveMatrixRows({
+  assignmentId,
+  assignmentRowId = '',
+  teacherId = '',
+  rows = [],
+  submitAction = 'save',
+  sharedAnswers = {},
+  reqUser
+} = {}) {
+  const resolved = await resolveMatrixBase({ assignmentId, assignmentRowId, teacherId, reqUser });
+  const { assignment, assignmentRow, teacherId: resolvedTeacherId, targetStudentIds } = resolved;
+  const instances = await schoolDataService.fetchData('reportInstances', {
+    assignmentId__eq: assignment.id,
+    page: 1,
+    limit: 10000
+  }, reqUser);
+  const requestedRows = Array.isArray(rows) ? rows : [];
+  const results = [];
+
+  for (const row of requestedRows) {
+    const studentId = clean(row?.studentId);
+    if (!studentId) continue;
+    const allowed = targetStudentIds.some((targetId) => idsEqual(targetId, studentId));
+    if (!allowed) {
+      results.push({ studentId, status: 'error', message: 'This student is not targeted by the report assignment.' });
+      continue;
+    }
+    const instance = findMatchingInstance(instances, {
+      assignmentId: assignment.id,
+      assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
+      teacherId: resolvedTeacherId,
+      studentId
+    });
+    if (instance && clean(instance.status).toLowerCase() === 'locked') {
+      results.push({ studentId, status: 'skipped', reportStatus: 'locked', message: 'Locked report instance was skipped.' });
+      continue;
+    }
+    try {
+      const saved = await saveMatrixRow({
+        assignmentId: assignment.id,
+        assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
+        teacherId: resolvedTeacherId,
+        studentId,
+        submitAction,
+        answers: row?.answers && typeof row.answers === 'object' ? row.answers : {},
+        sharedAnswers: sharedAnswers && typeof sharedAnswers === 'object' ? sharedAnswers : {},
+        reqUser,
+        includeMatrix: false
+      });
+      results.push({
+        studentId,
+        status: 'success',
+        reportStatus: saved.status,
+        instanceId: saved.instanceId,
+        validation: saved.validation
+      });
+    } catch (error) {
+      results.push({
+        studentId,
+        status: 'error',
+        message: error.message,
+        validation: error.validationSummary || null
+      });
+    }
+  }
+
+  const matrix = await buildMatrixContext({
+    assignmentId: assignment.id,
+    assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
+    teacherId: resolvedTeacherId,
+    reqUser
+  });
+  const summary = {
+    total: requestedRows.length,
+    succeeded: results.filter((result) => result.status === 'success').length,
+    failed: results.filter((result) => result.status === 'error').length,
+    skipped: results.filter((result) => result.status === 'skipped').length
+  };
+  return { results, summary, matrix };
+}
+
+
+function coerceMatrixPrefillValue(field, value) {
+  if (value === undefined || value === null) return '';
+  const type = clean(field?.type).toLowerCase();
+  if (type === 'number' || type === 'decimal' || type === 'currency') {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : value;
+  }
+  if (type === 'checkbox' || type === 'boolean') return value === true || String(value).toLowerCase() === 'true';
+  return value;
+}
+
+async function resolveMatrixData({ assignmentId, assignmentRowId = '', teacherId = '', reqUser } = {}) {
+  const resolved = await resolveMatrixBase({ assignmentId, assignmentRowId, teacherId, reqUser });
+  const { assignment, assignmentRow, template, teacherId: resolvedTeacherId, targetStudentIds } = resolved;
+  const instances = await schoolDataService.fetchData('reportInstances', { assignmentId__eq: assignment.id, page: 1, limit: 10000 }, reqUser);
+  const effectiveRowId = assignment.assignmentRowId || assignmentRow?.rowId || assignmentRowId || '';
+  return { ...resolved, assignmentRowId: effectiveRowId, resolvedTeacherId, instances, template, assignment, targetStudentIds };
+}
+
+async function buildMatrixPrefillPreview({ assignmentId, assignmentRowId = '', teacherId = '', reqUser } = {}) {
+  const source = await resolveMatrixData({ assignmentId, assignmentRowId, teacherId, reqUser });
+  const fields = (Array.isArray(source.template?.schema?.fields) ? source.template.schema.fields : [])
+    .filter((field) => field?.id && !isVisualField(field) && reportService.normalizePrefillKey(field?.prefillKey || ''));
+  const students = [];
+  for (const studentId of source.targetStudentIds) {
+    const instance = findMatchingInstance(source.instances, { assignmentId: source.assignment.id, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, studentId });
+    const row = await buildStudentMatrixRow({ assignment: source.assignment, template: source.template, teacherId: source.resolvedTeacherId, studentId, instance, reqUser });
+    if (!instance) {
+      students.push({ studentId: row.studentId, studentName: row.studentName, status: 'pending', locked: false, pending: true, changes: [] });
+      continue;
+    }
+    const oldPrefill = instance.prefillSnapshot && typeof instance.prefillSnapshot === 'object' ? instance.prefillSnapshot : {};
+    const refreshedPrefill = await reportService.buildPrefillSnapshot({ assignment: source.assignment, teacherId: source.resolvedTeacherId, studentId, reqUser });
+    const merged = reportService.mergeTemplateData(source.template, instance, source.assignment);
+    const changes = new Map();
+    for (const field of fields) {
+      const key = reportService.normalizePrefillKey(field.prefillKey || '');
+      const oldResolved = getPrefillValue(oldPrefill, key);
+      const newResolved = getPrefillValue(refreshedPrefill, key);
+      const oldValue = oldResolved.found ? oldResolved.value : undefined;
+      const newValue = newResolved.found ? newResolved.value : undefined;
+      if (stableValueToken(oldValue) === stableValueToken(newValue) || !newResolved.found) continue;
+      if (!changes.has(key)) changes.set(key, { prefillKey: key, oldRawValue: oldValue, newRawValue: newValue, fields: [] });
+      changes.get(key).fields.push({ fieldId: String(field.id), label: String(field.label || field.id), type: clean(field.type).toLowerCase(), oldValue: coerceMatrixPrefillValue(field, oldValue), newValue: coerceMatrixPrefillValue(field, newValue), currentValue: merged[field.id], oldRawValue: oldValue, newRawValue: newValue });
+    }
+    const status = clean(instance.status || 'draft').toLowerCase();
+    students.push({ studentId: row.studentId, studentName: row.studentName, status, locked: status === 'locked', pending: false, changes: Array.from(changes.values()) });
+  }
+  return { status: 'success', assignmentId: toPublicId(source.assignment.id), assignmentRowId: source.assignmentRowId, students, summary: { total: students.length, changed: students.filter((s) => s.changes.length).length, locked: students.filter((s) => s.locked).length, pending: students.filter((s) => s.pending).length } };
+}
+
+async function applyMatrixPrefill({ assignmentId, assignmentRowId = '', teacherId = '', updates = [], reqUser } = {}) {
+  const source = await resolveMatrixData({ assignmentId, assignmentRowId, teacherId, reqUser });
+  const preview = await buildMatrixPrefillPreview({ assignmentId, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, reqUser });
+  const requested = Array.isArray(updates) ? updates : [];
+  const results = [];
+  for (const update of requested) {
+    const studentId = clean(update?.studentId);
+    const instance = findMatchingInstance(source.instances, { assignmentId: source.assignment.id, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, studentId });
+    const previewStudent = preview.students.find((student) => idsEqual(student.studentId, studentId));
+    if (!instance || previewStudent?.locked) { results.push({ studentId, status: 'skipped', message: !instance ? 'Pending student has no stored snapshot.' : 'Locked report instance was skipped.' }); continue; }
+    const keys = new Set((Array.isArray(update?.prefillKeys) ? update.prefillKeys : []).map((key) => reportService.normalizePrefillKey(key)).filter(Boolean));
+    const changes = (previewStudent?.changes || []).filter((change) => keys.has(change.prefillKey));
+    if (!changes.length) { results.push({ studentId, status: 'skipped', message: 'No selected prefill changes remain.' }); continue; }
+    const nextPrefill = { ...(instance.prefillSnapshot || {}) };
+    const nextAnswers = { ...(instance.answers || {}) };
+    changes.forEach((change) => { nextPrefill[change.prefillKey] = change.newRawValue; (change.fields || []).forEach((field) => { nextAnswers[field.fieldId] = field.newValue; }); });
+    const merged = reportService.mergeTemplateData(source.template, { ...instance, prefillSnapshot: nextPrefill, answers: nextAnswers }, source.assignment);
+    const recalculated = reportService.recomputeCalculatedAnswers({ template: source.template, mergedAnswers: merged, prefill: nextPrefill });
+    (Array.isArray(source.template?.schema?.fields) ? source.template.schema.fields : []).filter((field) => isCalculatedField(field) && field.id).forEach((field) => { nextAnswers[field.id] = recalculated.answers[field.id]; });
+    await schoolDataService.updateData('reportInstances', instance.id, { prefillSnapshot: nextPrefill, answers: nextAnswers, audit: { lastUpdateUser: reqUser?.id || '', lastUpdateDateTime: new Date().toISOString(), prefillRefreshedAt: new Date().toISOString() } }, reqUser);
+    results.push({ studentId, status: 'success', appliedCount: changes.length });
+  }
+  const matrix = await buildMatrixContext({ assignmentId, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, reqUser });
+  return { results, matrix, summary: { total: requested.length, succeeded: results.filter((r) => r.status === 'success').length, skipped: results.filter((r) => r.status === 'skipped').length, failed: results.filter((r) => r.status === 'error').length } };
+}
+
+async function buildMatrixExportPayload({ assignmentId, assignmentRowId = '', teacherId = '', reqUser } = {}) {
+  const source = await resolveMatrixData({ assignmentId, assignmentRowId, teacherId, reqUser });
+  const matrix = await buildMatrixContext({ assignmentId, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, reqUser });
+  const rows = [];
+  for (const row of matrix.rows) {
+    const instance = findMatchingInstance(source.instances, { assignmentId: source.assignment.id, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, studentId: row.studentId });
+    const effective = instance || { id: '', status: 'pending', studentId: row.studentId, teacherId: source.resolvedTeacherId, answers: {}, prefillSnapshot: await reportService.buildPrefillSnapshot({ assignment: source.assignment, teacherId: source.resolvedTeacherId, studentId: row.studentId, reqUser }) };
+    rows.push({ studentId: row.studentId, studentName: row.studentName, status: row.status, locked: row.locked, pending: row.isPending, instanceId: row.instanceId, prefillSnapshot: effective.prefillSnapshot || {}, answers: effective.answers || {}, rawAnswers: effective.answers || {}, mergedAnswers: reportService.mergeTemplateData(source.template, effective, source.assignment) });
+  }
+  return { assignmentId: matrix.assignmentId, assignmentRowId: matrix.assignmentRowId, templateId: matrix.templateId, templateTitle: matrix.templateTitle, classId: matrix.classId, className: matrix.className, sessionId: matrix.sessionId, sessionDate: matrix.sessionDate, teacherId: matrix.teacherId, assignmentSharedAnswers: source.assignment.sharedAnswers || {}, sharedAnswers: source.assignment.sharedAnswers || {}, commonFields: matrix.commonFields, sharedFields: matrix.sharedFields, rows };
+}
+
 module.exports = {
   isVisualField,
   isCalculatedField,
@@ -361,10 +612,15 @@ module.exports = {
   isStudentNameField,
   valuesAreIdentical,
   buildFieldHelpText,
+  buildFieldSectionMap,
   findMatchingInstance,
   classifyMatrixFields,
   buildProgress,
   buildMatrixContext,
   matrixPayloadToFormBody,
-  saveMatrixRow
+  saveMatrixRow,
+  saveMatrixRows,
+  buildMatrixPrefillPreview,
+  applyMatrixPrefill,
+  buildMatrixExportPayload
 };

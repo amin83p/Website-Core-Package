@@ -67,6 +67,12 @@ test('session manager renders emoji conduct cells, bulk modal, and admin setting
   assert.match(source, /id="btnOpenConductBulkModal"/);
   assert.match(source, /id="conductBulkRatingModal"/);
   assert.match(source, /id="btnConductBulkSetAllSuperior"/);
+  assert.match(source, /conduct-set-all-level/);
+  assert.match(source, /data-code="Sat"/);
+  assert.match(source, /data-code="NI"/);
+  assert.match(source, /data-code="U"/);
+  assert.match(source, /conduct-column-emoji-btn/);
+  assert.match(source, /setConductColumnToLevel/);
   assert.match(source, /canManageConductRatingScaleFlag/);
   assert.match(source, /id="btnOpenConductScaleSettingsModal"/);
   assert.match(source, /id="conductScaleSettingsModal"/);

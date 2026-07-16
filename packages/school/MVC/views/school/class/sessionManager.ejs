@@ -1334,6 +1334,12 @@
                             <span class="badge bg-light text-dark border"><%= session.roster.length %> Students</span>
                         </div>
                     </div>
+                    <div id="conductTableWideActions" class="conduct-table-wide-actions d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-bottom bg-light-subtle" role="group" aria-label="Set all conduct ratings">
+                        <span class="small fw-semibold text-muted me-1">Set all:</span>
+                        <button type="button" class="btn btn-outline-secondary btn-sm conduct-set-all-level" data-code="Sat">Satisfactory</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm conduct-set-all-level" data-code="NI">Needs Improvement</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm conduct-set-all-level" data-code="U">Unsatisfactory</button>
+                    </div>
                     <div class="card-body p-0">
                         <div class="table-responsive" style="max-height: min(70vh, 700px); overflow-y: auto;">
                             <table class="table table-hover align-middle mb-0" id="conductTable">
@@ -1341,7 +1347,14 @@
                                     <tr>
                                         <th class="ps-4">Student Name</th>
                                         <% conductDimensions.forEach((dim) => { %>
-                                            <th class="text-center <%= dim.peClass %>"><%= dim.label %></th>
+                                            <th class="text-center <%= dim.peClass %>">
+                                                <div><%= dim.label %></div>
+                                                <div class="conduct-column-actions" role="group" aria-label="Set <%= dim.label %> for all students">
+                                                    <% conductScaleLevels.forEach((level) => { %>
+                                                        <button type="button" class="conduct-column-emoji-btn" data-dimension="<%= dim.key %>" data-code="<%= level.code %>" title="Set all <%= dim.label %> ratings to <%= level.label %>" <%- isReadOnly ? 'disabled' : '' %>><%= level.emoji %></button>
+                                                    <% }) %>
+                                                </div>
+                                            </th>
                                         <% }) %>
                                     </tr>
                                 </thead>
@@ -2352,9 +2365,25 @@ document.addEventListener('DOMContentLoaded', () => {
         root.querySelectorAll('.conduct-rating-cell').forEach((cell) => applyConductLevel(cell, superior.code));
     }
 
+    function setAllConductCellsToLevel(code, root = document) {
+        const level = levelByConductCode(code);
+        if (!level || sessionConductReadOnly) return;
+        root.querySelectorAll(".conduct-row .conduct-rating-cell").forEach((cell) => applyConductLevel(cell, level.code));
+    }
+
+    function setConductColumnToLevel(dimensionKey, code) {
+        const level = levelByConductCode(code);
+        if (!level || sessionConductReadOnly) return;
+        const selector = ".conduct-row .conduct-rating-cell[data-dimension="" + CSS.escape(String(dimensionKey || "")) + ""]";
+        document.querySelectorAll(selector).forEach((cell) => applyConductLevel(cell, level.code));
+    }
+
     function refreshConductScaleUi() {
         renderConductBulkLegend();
-        initAllConductRatingCells();
+        document.querySelectorAll(".conduct-set-all-level").forEach((button) => button.addEventListener("click", () => setAllConductCellsToLevel(button.dataset.code)));
+    document.querySelectorAll(".conduct-column-emoji-btn").forEach((button) => button.addEventListener("click", () => setConductColumnToLevel(button.dataset.dimension, button.dataset.code)));
+
+    initAllConductRatingCells();
         document.querySelectorAll('#conductScaleSettingsBody .conduct-scale-level-row').forEach((row, index) => {
             const level = getConductScaleLevels()[index];
             if (!level) return;

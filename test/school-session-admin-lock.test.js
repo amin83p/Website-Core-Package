@@ -46,6 +46,12 @@ test('class routes expose admin session lock endpoint', () => {
   assert.match(source, /trackActionState\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.UPDATE, sessionManagerMutationActionState\)/);
 });
 
+test('session manager save routes keep the action state active for repeat saves', () => {
+  const source = read('packages/school/MVC/routes/classRoutes.js');
+  assert.match(source, new RegExp("router\\.post\\('\\/:id\\/sessions\\/:sessionId\\/gradebooks\\/save'[\\s\\S]*?trackActionState\\(SECTIONS\\.SCHOOL_SESSIONS, OPERATIONS\\.UPDATE, sessionManagerMutationActionState\\)"));
+  assert.match(source, new RegExp("router\\.post\\('\\/:id\\/sessions\\/:sessionId\\/save'[\\s\\S]*?trackActionState\\(SECTIONS\\.SCHOOL_SESSIONS, OPERATIONS\\.UPDATE, sessionManagerMutationActionState\\)"));
+});
+
 test('session manager shows admin lock/unlock control for eligible admins', () => {
   const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
   assert.match(source, /canToggleSessionLock/);

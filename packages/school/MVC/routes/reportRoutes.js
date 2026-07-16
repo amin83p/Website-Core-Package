@@ -303,6 +303,30 @@ router.post('/instances/matrix/:assignmentId/save-row',
   }),
   ctrl.saveReportMatrixRow);
 
+router.post('/instances/matrix/:assignmentId/save-all',
+  requireReportMatrixEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.saveReportMatrixRows);
+
+router.get('/instances/matrix/:assignmentId/prefill-preview',
+  requireReportMatrixEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.previewReportMatrixPrefill);
+
+router.post('/instances/matrix/:assignmentId/prefill-apply',
+  requireReportMatrixEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true }),
+  ctrl.applyReportMatrixPrefill);
+
+router.get('/instances/matrix/:assignmentId/export',
+  requireReportMatrixEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
+  ctrl.exportReportMatrix);
+
 router.get('/instances/start/:assignmentId',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
