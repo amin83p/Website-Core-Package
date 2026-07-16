@@ -17,6 +17,7 @@ const settingService = require('../services/settingService');
 const appBrandingService = require('../services/appBrandingService');
 const userRepository = require('../repositories/userRepository');
 const microsoftAuthService = require('../services/microsoftAuthService');
+const microsoftPendingLoginService = require('../services/microsoftPendingLoginService');
 const adminCheckersService = require('../services/adminChekersService');
 const { normalizePhoneE164, validateSmsPhoneE164, maskPhone } = require('../utils/phoneUtils');
 
@@ -236,6 +237,34 @@ async function resolveUserByEmail(email = '') {
   return normalizeEmail(fallback?.email || '') === token ? fallback : null;
 }
 
+function userMatchesMicrosoftEmail(user, email = '') {
+  const token = normalizeEmail(email);
+  if (!token || !user) return false;
+  return [
+    user.email,
+    user.authProviders?.microsoft?.email
+  ].some((candidate) => normalizeEmail(candidate || '') === token);
+}
+
+async function resolvePendingMicrosoftUser(pending = {}) {
+  const providerEmail = normalizeEmail(pending.providerAccount?.email || '');
+  const storedUser = pending.userId
+    ? await dataService.getDataById('users', pending.userId, SYSTEM_CONTEXT).catch(() => null)
+    : null;
+
+  // Prefer the stored ID when it still represents the Microsoft-linked account.
+  if (storedUser && (!providerEmail || userMatchesMicrosoftEmail(storedUser, providerEmail))) {
+    return storedUser;
+  }
+
+  // The callback already validated this Microsoft email. Re-resolve it when
+  // the local ID is stale, virtual, or belongs to a different account record.
+  const resolvedByProviderEmail = providerEmail
+    ? await resolveUserByEmail(providerEmail).catch(() => null)
+    : null;
+  return resolvedByProviderEmail || storedUser;
+}
+
 async function resolveOrganizationName(orgId = '') {
   const token = cleanString(orgId, { max: 120, allowEmpty: true });
   if (!token) return '';
@@ -364,35 +393,55 @@ function buildSessionLimitPayload(sessionPayload = {}, provider = 'password') {
   };
 }
 
-async function storePendingMicrosoftLogin(req, user, providerAccount, sessionPayload = {}) {
-  if (!req.session) throw new Error('Login session is not available. Please try again.');
+async function storePendingMicrosoftLogin(req, res, user, providerAccount, sessionPayload = {}) {
   const now = Date.now();
-  req.session.pendingMicrosoftLogin = {
+  const pending = {
     userId: cleanString(user?.id, { max: 120, allowEmpty: true }) || '',
     providerAccount: sanitizeMicrosoftProviderAccount(providerAccount),
     sessionLimit: buildSessionLimitPayload(sessionPayload, 'microsoft'),
     createdAt: now,
     expiresAt: now + MICROSOFT_PENDING_LOGIN_TTL_MS
   };
-  await saveSession(req);
+  if (!pending.userId) throw new Error('Microsoft pending login requires a user ID.');
+
+  if (req.session) {
+    req.session.pendingMicrosoftLogin = pending;
+    await saveSession(req);
+  }
+  microsoftPendingLoginService.setCookie(res, pending, {
+    ttlMs: MICROSOFT_PENDING_LOGIN_TTL_MS,
+    secure: String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production'
+  });
 }
 
-async function clearPendingMicrosoftLogin(req) {
-  if (!req.session) return;
-  delete req.session.pendingMicrosoftLogin;
-  await saveSession(req);
+async function clearPendingMicrosoftLogin(req, res) {
+  microsoftPendingLoginService.clearCookie(res);
+  if (req.session) {
+    delete req.session.pendingMicrosoftLogin;
+    await saveSession(req);
+  }
 }
 
 function readPendingMicrosoftLogin(req) {
   const pending = req.session?.pendingMicrosoftLogin || null;
-  if (!pending || !pending.userId) return null;
-  if (Number(pending.expiresAt || 0) <= Date.now()) return null;
-  return pending;
+  if (pending?.userId && Number(pending.expiresAt || 0) > Date.now()) return pending;
+  return microsoftPendingLoginService.readCookie(req);
 }
 
-function resolvePendingMicrosoftSessionLimit(req) {
+async function resolvePendingMicrosoftSessionLimit(req) {
   const pending = readPendingMicrosoftLogin(req);
-  return pending?.sessionLimit || null;
+  if (!pending) return null;
+  if (pending.sessionLimit) return pending.sessionLimit;
+
+  const user = await resolvePendingMicrosoftUser(pending);
+  if (!user || !user.active || user.status !== 'active') return null;
+  const sessionCheck = await sessionService.checkLoginEligibility(user, user.primaryOrgId || 'SYSTEM');
+  if (sessionCheck.allowed) return null;
+  return buildSessionLimitPayload({
+    message: `Limit reached: ${sessionCheck.maxSessions} sessions.`,
+    maxSessions: sessionCheck.maxSessions,
+    activeSessions: sessionCheck.activeSessions || []
+  }, 'microsoft');
 }
 
 function resolveUserDashboardRedirectUrl(user) {
@@ -509,7 +558,7 @@ async function showLogin(req, res) {
   }
 
   const warningMessage = req.query.warning ? decodeURIComponent(req.query.warning) : null;
-  const microsoftSessionLimit = resolvePendingMicrosoftSessionLimit(req);
+  const microsoftSessionLimit = await resolvePendingMicrosoftSessionLimit(req);
 
   res.render('login/login', {
     title: 'Login',
@@ -541,7 +590,7 @@ async function microsoftCallback(req, res) {
     const user = await resolveUserByEmail(microsoftAccount.email);
 
     if (!user) {
-      await clearPendingMicrosoftLogin(req);
+      await clearPendingMicrosoftLogin(req, res);
       startupLogger.warn('AUTH', 'MICROSOFT_LOGIN_CALLBACK', 'Microsoft account has no matching local user.', {
         requestId: String(req.requestId || ''),
         email: maskEmailForLog(microsoftAccount.email)
@@ -550,7 +599,7 @@ async function microsoftCallback(req, res) {
     }
 
     if (!user.active || user.status !== 'active') {
-      await clearPendingMicrosoftLogin(req);
+      await clearPendingMicrosoftLogin(req, res);
       return redirectLoginWarning(res, 'Your website account is not active.');
     }
 
@@ -561,14 +610,14 @@ async function microsoftCallback(req, res) {
 
     if (!loginResult.success) {
       if (loginResult.payload?.status === 'session_limit_exceeded') {
-        await storePendingMicrosoftLogin(req, user, microsoftAccount, loginResult.payload);
+        await storePendingMicrosoftLogin(req, res, user, microsoftAccount, loginResult.payload);
         return res.redirect('/login?microsoftSessionLimit=1');
       }
-      await clearPendingMicrosoftLogin(req);
+      await clearPendingMicrosoftLogin(req, res);
       return redirectLoginWarning(res, loginResult.payload?.message || 'Session limit reached.');
     }
 
-    await clearPendingMicrosoftLogin(req);
+    await clearPendingMicrosoftLogin(req, res);
 
     startupLogger.success('AUTH', 'MICROSOFT_LOGIN_CALLBACK', 'Microsoft login completed successfully.', {
       requestId: String(req.requestId || ''),
@@ -578,7 +627,7 @@ async function microsoftCallback(req, res) {
     return res.redirect(loginResult.redirectUrl || '/dashboard');
   } catch (error) {
     try {
-      await clearPendingMicrosoftLogin(req);
+      await clearPendingMicrosoftLogin(req, res);
     } catch (_) {}
     startupLogger.warn('AUTH', 'MICROSOFT_LOGIN_CALLBACK', 'Microsoft login callback failed.', {
       requestId: String(req.requestId || ''),
@@ -638,7 +687,7 @@ async function login(req, res) {
       return res.status(loginResult.statusCode || 403).json(loginResult.payload);
     }
 
-    await clearPendingMicrosoftLogin(req);
+    await clearPendingMicrosoftLogin(req, res);
     return res.json({ status: 'success', message: 'Login successful', redirectUrl: loginResult.redirectUrl || '/dashboard' });
 
   } catch (error) {
@@ -661,9 +710,9 @@ async function forceLogin(req, res) {
                 return res.status(401).json({ status: 'error', message: 'Microsoft sign-in session expired. Please sign in with Microsoft again.' });
             }
 
-            const user = await dataService.getDataById('users', pending.userId, SYSTEM_CONTEXT);
+            const user = await resolvePendingMicrosoftUser(pending);
             if (!user || !user.active || user.status !== 'active') {
-                await clearPendingMicrosoftLogin(req);
+                await clearPendingMicrosoftLogin(req, res);
                 return res.status(401).json({ status: 'error', message: 'Your website account is not active.' });
             }
 
@@ -679,11 +728,11 @@ async function forceLogin(req, res) {
                 providerAccount: pending.providerAccount || null
             });
             if (!loginResult.success) {
-                await storePendingMicrosoftLogin(req, user, pending.providerAccount || {}, loginResult.payload || {});
+                await storePendingMicrosoftLogin(req, res, user, pending.providerAccount || {}, loginResult.payload || {});
                 return res.status(loginResult.statusCode || 403).json(loginResult.payload);
             }
 
-            await clearPendingMicrosoftLogin(req);
+            await clearPendingMicrosoftLogin(req, res);
             return res.json({ status: 'success', message: 'Session terminated. Microsoft login successful.', redirectUrl: loginResult.redirectUrl || '/dashboard' });
         }
 
@@ -711,7 +760,7 @@ async function forceLogin(req, res) {
             return res.status(loginResult.statusCode || 403).json(loginResult.payload);
         }
 
-        await clearPendingMicrosoftLogin(req);
+        await clearPendingMicrosoftLogin(req, res);
         return res.json({ status: 'success', message: 'Session terminated. Login successful.', redirectUrl: loginResult.redirectUrl || '/dashboard' });
 
     } catch (error) {
@@ -1407,6 +1456,7 @@ module.exports = {
   dashboard, 
   switchOrg,
   switchProfileMode,
+  resolvePendingMicrosoftUser,
   forceLogin,
   requestPasswordReset,
   startPasswordResetSms,

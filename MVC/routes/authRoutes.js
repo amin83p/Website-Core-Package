@@ -10,8 +10,17 @@ const svgCaptcha = require('svg-captcha');
 // 1. Define a Limiter (Hard block for spamming IPs)
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // Limit each IP to 20 login requests per window
+    max: 5, // Limit each IP to 5 credential login requests per window
     message: { status: 'error', message: 'Too many login attempts from this IP, please try again after 15 minutes' }
+});
+
+// Microsoft sign-in needs both a redirect start and a callback before a user can
+// resolve a session limit. Keep those protocol requests out of the credential
+// attempt bucket so the final /force-login request is not blocked by OAuth traffic.
+const microsoftLoginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { status: 'error', message: 'Too many Microsoft sign-in attempts from this IP, please try again after 15 minutes' }
 });
 
 const passwordResetRequestLimiter = rateLimit({
@@ -49,8 +58,8 @@ router.get('/captcha', (req, res) => {
 
 
 router.get('/login', ctrl.showLogin);
-router.get('/auth/microsoft', loginLimiter, ctrl.startMicrosoftLogin);
-router.get('/auth/microsoft/callback', loginLimiter, ctrl.microsoftCallback);
+router.get('/auth/microsoft', microsoftLoginLimiter, ctrl.startMicrosoftLogin);
+router.get('/auth/microsoft/callback', microsoftLoginLimiter, ctrl.microsoftCallback);
 router.get('/password-reset', ctrl.showPasswordReset);
 router.post('/login', loginLimiter, ctrl.login);
 router.post('/force-login', loginLimiter, ctrl.forceLogin);

@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (error) {
       console.error(error);
-      alert('System Error');
+      await showLoginFlowMessage('System error while processing the login request.');
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
@@ -310,29 +310,54 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+async function showLoginFlowMessage(message, title = 'Login Failed') {
+    const text = String(message || 'The login request could not be completed.');
+    if (typeof window.showMessageModal === 'function') {
+        await window.showMessageModal({
+            title,
+            icon: 'error',
+            message: text,
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+        return;
+    }
+    console.error(text);
+}
+
 window.killSessionAndLogin = async function(sessionId, authProvider = 'password') {
     const form = document.getElementById('loginForm');
     const username = form.querySelector('input[name="username"]').value;
     const password = form.querySelector('input[name="password"]').value;
     const btn = document.getElementById(getSessionButtonId(sessionId));
+    const originalButtonHtml = btn ? btn.innerHTML : '';
     if(btn) { btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; btn.disabled = true; }
 
     try {
         const res = await fetch('/force-login', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password, sessionIdToKill: sessionId, authProvider })
         });
-        const json = await res.json();
+        const json = await res.json().catch(() => ({ status: 'error', message: 'Request failed (' + res.status + ').' }));
         if (json.status === 'success') {
              window.location.href = json.redirectUrl || '/dashboard';
+             return;
         } else {
-             alert(json.message || 'Failed to terminate session.');
-             window.location.reload();
+             await showLoginFlowMessage(json.message || 'Failed to terminate session.');
+             if (res.status === 401 && String(authProvider).toLowerCase() === 'microsoft') {
+                 window.location.href = '/login';
+                 return;
+             }
         }
     } catch (err) {
         console.error(err);
-        alert('Network error.');
+        await showLoginFlowMessage('Network error while completing the login request.');
+    } finally {
+        if (btn) {
+            btn.innerHTML = originalButtonHtml;
+            btn.disabled = false;
+        }
     }
 };
 </script>

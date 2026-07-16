@@ -322,6 +322,9 @@ async function showDashboard(req, res) {
     // 2. Filter Sections
     let accessibleSections = await filterMainDashboardSections(req.user, allSections);
 
+    const singleSectionRedirect = resolveSingleMainDashboardRedirect(accessibleSections);
+    if (singleSectionRedirect) return res.redirect(302, singleSectionRedirect);
+
     // 3. Map Symbols
     accessibleSections = mapSymbolsToSections(accessibleSections, contextSymbols, req.user);
 
@@ -432,6 +435,27 @@ function buildSectionOpenUrl(section, hasChildren = false) {
     if (navToken) return `/dashboard/section-nav/${navToken}`;
   }
   return '/sections';
+}
+
+function normalizeDashboardPath(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const withoutQuery = raw.split(/[?#]/, 1)[0] || '';
+  const normalized = withoutQuery.replace(/\/+$/, '');
+  return normalized || '/';
+}
+
+function resolveSingleMainDashboardRedirect(accessibleSections = [], currentPath = '/dashboard') {
+  if (!Array.isArray(accessibleSections) || accessibleSections.length !== 1) return null;
+
+  const section = accessibleSections[0];
+  const hasChildren = Array.isArray(section?.subsections) && section.subsections.length > 0;
+  const target = buildSectionOpenUrl(section, hasChildren);
+  if (!target) return null;
+
+  // A misconfigured section must not create an endless /dashboard redirect.
+  if (normalizeDashboardPath(target) === normalizeDashboardPath(currentPath)) return null;
+  return target;
 }
 
 function buildStartMenuTreeNodes(accessibleSections) {
@@ -964,5 +988,8 @@ module.exports = {
   getAllAccessibleSections,
   getStartMenu,
   getDashboardSection,
-  mapSymbolsToSections
+  mapSymbolsToSections,
+  filterMainDashboardSections,
+  buildSectionOpenUrl,
+  resolveSingleMainDashboardRedirect
 };
