@@ -54,6 +54,18 @@ test('classes list includes Storage & Integrity maintenance button', () => {
   assert.match(view, /btn-outline-warning/);
 });
 
+test('Class Management displays the assigned teacher and labels the class field clearly', () => {
+  const listView = read('MVC/views/school/class/classes.ejs');
+  const formView = read('MVC/views/school/class/classForm.ejs');
+
+  assert.match(listView, /Assigned Teacher/);
+  assert.match(listView, /assignedInstructors/);
+  assert.match(listView, /primaryInstructor/);
+  assert.match(listView, /Not assigned/);
+  assert.match(formView, /Assigned Teacher/);
+  assert.match(formView, /inp_instructorId/);
+});
+
 test('storage integrity page uses message modals and loading overlay for scan/apply', () => {
   const view = read('MVC/views/school/class/classStorageIntegrity.ejs');
   const controller = read('MVC/controllers/school/classController.js');

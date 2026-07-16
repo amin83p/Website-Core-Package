@@ -34,6 +34,7 @@
         <th class="ps-4">Title / ID</th>
         <th>Organization</th>
         <th>Delivery Dept</th>
+        <th>Assigned Teacher</th>
         <th>Lifecycle</th>
         <th>Schedule</th>
         <th>Curriculum</th>
@@ -43,7 +44,7 @@
     </thead>
     <tbody>
       <% if(data.length === 0) { %>
-         <tr><td colspan="8" class="text-center py-4 text-muted">No classes found.</td></tr>
+         <tr><td colspan="9" class="text-center py-4 text-muted">No classes found.</td></tr>
       <% } %>
       
       <% data.forEach(item => { %>
@@ -64,6 +65,30 @@
 
           <td>
              <span class="badge bg-light text-dark border"><%= item.deliveryDepartmentName || item.deliveryDepartmentId || 'N/A' %></span>
+          </td>
+
+          <td>
+             <% const assignedInstructors = Array.isArray(item.instructors)
+               ? item.instructors.filter((instructor) =>
+                 instructor?.personId && String(instructor?.status || 'active').trim().toLowerCase() === 'active'
+               )
+               : []; %>
+             <% const primaryInstructor = assignedInstructors.find((instructor) =>
+               String(instructor?.role || '').trim().toLowerCase() === 'primary'
+             ) || assignedInstructors[0]; %>
+             <% if (primaryInstructor) { %>
+               <div class="d-flex align-items-center gap-2">
+                 <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center text-primary" style="width:32px;height:32px;">
+                   <i class="bi bi-person-workspace"></i>
+                 </div>
+                 <div>
+                   <div class="fw-bold text-dark small"><%= primaryInstructor.name || primaryInstructor.personId %></div>
+                   <div class="x-small text-muted"><%= String(primaryInstructor.role || 'Instructor').trim() || 'Instructor' %><% if (assignedInstructors.length > 1) { %> + <%= assignedInstructors.length - 1 %> more<% } %></div>
+                 </div>
+               </div>
+             <% } else { %>
+               <span class="text-muted small fst-italic">Not assigned</span>
+             <% } %>
           </td>
 
           <td>
