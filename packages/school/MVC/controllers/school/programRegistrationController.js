@@ -51,6 +51,19 @@ function roundMoney(value) {
   return Number(num.toFixed(2));
 }
 
+function resolveDraftRegistrationDate(value, fallbackDate) {
+  const submitted = String(value || '').trim();
+  if (!submitted) return String(fallbackDate || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(submitted)) {
+    throw new Error('Registration date must use YYYY-MM-DD.');
+  }
+  const parsed = new Date(submitted + 'T00:00:00.000Z');
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== submitted) {
+    throw new Error('Registration date is invalid.');
+  }
+  return submitted;
+}
+
 async function assertRollingClassProgramRegistrationDateOrThrow(req, effectiveDate) {
   const classId = toPublicId(req.body?.classId);
   if (!classId) return;
@@ -255,6 +268,7 @@ async function applyProgramDraftTransactionChanges({
   registration,
   editedRows = [],
   addedRows = [],
+  registrationDate,
   reqUser,
   activeOrgId
 }) {
@@ -306,7 +320,11 @@ async function applyProgramDraftTransactionChanges({
     }));
   });
 
-  const items = edited.items.concat(appendedManualItems);
+  const effectiveDate = String(registrationDate || registration?.registrationDate || '').trim();
+  const items = edited.items.concat(appendedManualItems).map((item) => ({
+    ...item,
+    effectiveDate
+  }));
   const previewRows = programRegistrationDraftService.buildDraftPreviewRowsFromItems(items);
   const totalAmount = roundMoney(previewRows.reduce((sum, row) => sum + Number(row.amount || 0), 0));
 
@@ -609,6 +627,7 @@ exports.updateDraftTransactions = async (req, res) => {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     const registrationId = String(req.params.id || '').trim();
     const note = String(req.body.note || '').trim();
+    const requestedRegistrationDate = String(req.body.registrationDate || '').trim();
     const editedRows = parseJsonSafe(req.body.editedRows, []);
     const addedRows = parseJsonSafe(req.body.addedRows, []);
     if (!registrationId) throw new Error('Registration id is required.');
@@ -617,7 +636,7 @@ exports.updateDraftTransactions = async (req, res) => {
       'program_draft_update',
       activeOrgId,
       registrationId,
-      { note, editedRows, addedRows }
+      { note, requestedRegistrationDate, editedRows, addedRows }
     ]);
     const guardResult = idempotencyGuardService.beginGuard({
       key: guardKey,
@@ -628,10 +647,12 @@ exports.updateDraftTransactions = async (req, res) => {
 
     try {
       const registration = await registrationIntegrityService.getProgramDraftForEditOrThrow(registrationId, activeOrgId);
+      const registrationDate = resolveDraftRegistrationDate(requestedRegistrationDate, registration.registrationDate);
       const draftState = await applyProgramDraftTransactionChanges({
         registration,
         editedRows,
         addedRows,
+        registrationDate,
         reqUser: req.user,
         activeOrgId
       });
@@ -650,7 +671,7 @@ exports.updateDraftTransactions = async (req, res) => {
       );
       const updated = await dataService.updateData('studentProgramRegistrations', registration.id, {
         status: 'draft',
-        registrationDate: registration.registrationDate,
+        registrationDate,
         feeCategorySnapshot: registration.feeCategorySnapshot,
         note: note ? appendNote(registration.note, note) : registration.note,
         transactionSummary: {
@@ -690,6 +711,7 @@ exports.approveRegistration = async (req, res) => {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     const registrationId = toPublicId(req.params.id);
     const note = String(req.body.note || '').trim();
+    const requestedRegistrationDate = String(req.body.registrationDate || '').trim();
     const editedRows = parseJsonSafe(req.body.editedRows, []);
     const addedRows = parseJsonSafe(req.body.addedRows, []);
     const externalReference = String(req.body.externalReference || '').trim();
@@ -698,7 +720,8 @@ exports.approveRegistration = async (req, res) => {
     guardKey = idempotencyGuardService.createGuardKey([
       'program_approve',
       activeOrgId,
-      registrationId
+      registrationId,
+      requestedRegistrationDate
     ]);
     const guardResult = idempotencyGuardService.beginGuard({
       key: guardKey,
@@ -714,6 +737,7 @@ exports.approveRegistration = async (req, res) => {
       idempotencyGuardService.completeGuard(guardKey, payloadOut);
       return res.json(payloadOut);
     }
+    const registrationDate = resolveDraftRegistrationDate(requestedRegistrationDate, registration.registrationDate);
 
     txContext = createTransactionContext({
       name: 'program_registration_approve',
@@ -735,6 +759,7 @@ exports.approveRegistration = async (req, res) => {
       registration,
       editedRows,
       addedRows,
+      registrationDate,
       reqUser: req.user,
       activeOrgId
     });
@@ -786,7 +811,7 @@ exports.approveRegistration = async (req, res) => {
           reqUser: req.user,
           student,
           program,
-          effectiveDate: registration.registrationDate,
+          effectiveDate: registrationDate,
           note: note || registration.note || '',
           source: academicSource,
           options: { transactionContext: txContext }
@@ -799,7 +824,7 @@ exports.approveRegistration = async (req, res) => {
         registration.id,
         {
           status: 'registered',
-          registrationDate: registration.registrationDate,
+          registrationDate,
           feeCategorySnapshot: registration.feeCategorySnapshot,
           note: note ? appendNote(registration.note, note) : registration.note,
           transactionSummary: registrationFinanceLifecycleService.updatePostingCycle({
@@ -889,7 +914,7 @@ exports.approveRegistration = async (req, res) => {
         registration.id,
         {
           status: nextStatus,
-          registrationDate: registration.registrationDate,
+          registrationDate,
           feeCategorySnapshot: registration.feeCategorySnapshot,
           note: buildRollbackNote(registration.note, approvalError.message, rollbackResult.issues),
           transactionSummary: {

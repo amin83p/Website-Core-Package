@@ -21,6 +21,14 @@ function getAccountId(transaction) {
   return toPublicId(transaction?.metadata?.accountId || transaction?.accountId || '');
 }
 
+function getDraftLineId(transaction) {
+  return String(
+    transaction?.metadata?.draftLineId ||
+    transaction?.metadata?.registrationLifecycle?.draftLineId ||
+    ''
+  ).trim();
+}
+
 function validateReversalPair(original, reversal) {
   const issues = [];
   if (!original) return ['Original transaction is missing.'];
@@ -75,7 +83,7 @@ function actorId(options = {}) {
   return toPublicId(user?.id) || String(user?.username || 'system').trim() || 'system';
 }
 
-function validateRegistrationTransactionShape(expected, existing, allowedStatuses = ['draft', 'posted']) {
+function validateRegistrationTransactionIdentity(expected, existing, allowedStatuses = ['draft', 'posted']) {
   const issues = [];
   if (!existing) return ['Registration transaction was not found.'];
   if (!allowedStatuses.includes(String(existing.status || '').toLowerCase())) {
@@ -87,6 +95,23 @@ function validateRegistrationTransactionShape(expected, existing, allowedStatuse
       String(existing?.metadata?.registrationType || '').toLowerCase() !== String(expected?.metadata?.registrationType || '').toLowerCase()) {
     issues.push(`Transaction ${existing.id} belongs to another registration.`);
   }
+  if (String(existing?.source?.idempotencyKey || '').trim() !== String(expected?.source?.idempotencyKey || '').trim()) {
+    issues.push(`Transaction ${existing.id} uses a different stable line key.`);
+  }
+  if (getDraftLineId(existing) !== getDraftLineId(expected)) {
+    issues.push(`Transaction ${existing.id} uses a different draft line id.`);
+  }
+  if (!idsEqual(existing?.party?.studentId, expected?.party?.studentId) ||
+      !idsEqual(existing?.party?.programId, expected?.party?.programId) ||
+      String(existing?.party?.feeCategory || '').trim() !== String(expected?.party?.feeCategory || '').trim()) {
+    issues.push(`Transaction ${existing.id} belongs to a different financial party.`);
+  }
+  return issues;
+}
+
+function validateRegistrationTransactionShape(expected, existing, allowedStatuses = ['draft', 'posted']) {
+  const issues = validateRegistrationTransactionIdentity(expected, existing, allowedStatuses);
+  if (!existing) return issues;
   if (getAccountId(existing) !== getAccountId(expected)) issues.push(`Transaction ${existing.id} uses a different account.`);
   if (roundMoney(existing?.amount?.value) !== roundMoney(expected?.amount?.value)) issues.push(`Transaction ${existing.id} uses a different amount.`);
   if (String(existing?.amount?.currency || '').toUpperCase() !== String(expected?.amount?.currency || '').toUpperCase()) {
@@ -189,7 +214,10 @@ async function syncDraftTransactions(items, context = {}, options = {}) {
   const cycle = context.cycle;
   if (!registrationId || !orgId || !cycle?.cycleId) throw new Error('Draft transaction registration context is incomplete.');
 
-  const expectedItems = scopePostingItems(items, { registrationType, registrationId, cycle });
+  const expectedItems = scopePostingItems(items, { registrationType, registrationId, cycle }).map((item) => ({
+    ...item,
+    balanceEffect: roundMoney(item?.amount?.value)
+  }));
   const resultByKey = new Map();
   const desiredIds = new Set();
   const missing = [];
@@ -200,7 +228,7 @@ async function syncDraftTransactions(items, context = {}, options = {}) {
       missing.push(item);
       continue;
     }
-    const issues = validateRegistrationTransactionShape(item, existing, ['draft']);
+    const issues = validateRegistrationTransactionIdentity(item, existing, ['draft']);
     if (issues.length) throw new Error(`Draft transaction validation failed: ${issues.join(' | ')}`);
     const updated = await schoolRepositories.globalTransactions.update(existing.id, {
       ...item,

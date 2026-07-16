@@ -140,6 +140,7 @@ test('postCycleTransactions reuses a matching posted row on same-cycle retry', a
     orgId: 'ORG-1', status: 'posted',
     transactionType: 'charge',
     source: { idempotencyKey: 'REGCYCLE|PROGRAM-SPR-1-C1|FEE|DR' },
+    party: { studentId: 'STU-1', programId: 'PRG-1', feeCategory: 'general' },
     amount: { value: 125.5, currency: 'CAD', direction: 'debit' },
     metadata: { accountId: 'ACC-1', registrationType: 'program', registrationId: 'SPR-1' }
   };
@@ -154,6 +155,113 @@ test('postCycleTransactions reuses a matching posted row on same-cycle retry', a
   } finally {
     schoolRepositories.globalTransactions.list = originalList;
     schoolRepositories.globalTransactions.create = originalCreate;
+  }
+});
+
+test('syncDraftTransactions updates an owned draft row when its amount changes', async () => {
+  const originalList = schoolRepositories.globalTransactions.list;
+  const originalCreate = schoolRepositories.globalTransactions.create;
+  const originalUpdate = schoolRepositories.globalTransactions.update;
+  const originalTransition = schoolRepositories.globalTransactions.transitionRegistrationTransactions;
+  const stableKey = 'REGTX|PROGRAM|SPR-1|LINE-1';
+  const existing = originalTransaction({
+    id: 'TX-EDIT-1',
+    status: 'draft',
+    postedAt: '',
+    source: {
+      module: 'school_program_registration',
+      eventType: 'program_registration_charge',
+      eventId: 'REGTX-PROGRAM-SPR-1-LINE-1',
+      idempotencyKey: stableKey
+    },
+    metadata: {
+      accountId: 'ACC-1',
+      registrationType: 'program',
+      registrationId: 'SPR-1',
+      draftLineId: 'LINE-1',
+      registrationLifecycle: { draftLineId: 'LINE-1', statusHistory: [] }
+    }
+  });
+  const desired = {
+    ...existing,
+    id: undefined,
+    amount: { ...existing.amount, value: 175.25 },
+    balanceEffect: existing.balanceEffect,
+    memo: 'Corrected draft amount'
+  };
+  let updatePayload = null;
+  let createCalls = 0;
+  schoolRepositories.globalTransactions.list = async () => [existing];
+  schoolRepositories.globalTransactions.create = async () => { createCalls += 1; return []; };
+  schoolRepositories.globalTransactions.update = async (id, payload) => {
+    updatePayload = payload;
+    return { ...existing, ...payload, id };
+  };
+  schoolRepositories.globalTransactions.transitionRegistrationTransactions = async () => {
+    throw new Error('No draft transaction should be voided.');
+  };
+  try {
+    const result = await financeLifecycle.syncDraftTransactions([desired], {
+      registrationType: 'program',
+      registrationId: 'SPR-1',
+      orgId: 'ORG-1',
+      currentDraftTransactionIds: ['TX-EDIT-1'],
+      cycle: { cycleNo: 1, cycleId: 'PROGRAM-SPR-1-C1' }
+    });
+    assert.equal(createCalls, 0);
+    assert.equal(updatePayload.amount.value, 175.25);
+    assert.equal(updatePayload.balanceEffect, 175.25);
+    assert.equal(result.rows[0].id, 'TX-EDIT-1');
+    assert.equal(result.rows[0].amount.value, 175.25);
+  } finally {
+    schoolRepositories.globalTransactions.list = originalList;
+    schoolRepositories.globalTransactions.create = originalCreate;
+    schoolRepositories.globalTransactions.update = originalUpdate;
+    schoolRepositories.globalTransactions.transitionRegistrationTransactions = originalTransition;
+  }
+});
+
+test('syncDraftTransactions still rejects a draft row owned by another registration', async () => {
+  const originalList = schoolRepositories.globalTransactions.list;
+  const originalUpdate = schoolRepositories.globalTransactions.update;
+  const stableKey = 'REGTX|PROGRAM|SPR-1|LINE-1';
+  const expected = originalTransaction({
+    status: 'draft',
+    postedAt: '',
+    source: {
+      module: 'school_program_registration',
+      eventType: 'program_registration_charge',
+      eventId: 'REGTX-PROGRAM-SPR-1-LINE-1',
+      idempotencyKey: stableKey
+    },
+    metadata: {
+      accountId: 'ACC-1',
+      registrationType: 'program',
+      registrationId: 'SPR-1',
+      draftLineId: 'LINE-1'
+    }
+  });
+  let updateCalls = 0;
+  schoolRepositories.globalTransactions.list = async () => [{
+    ...expected,
+    id: 'TX-WRONG-OWNER',
+    metadata: { ...expected.metadata, registrationId: 'SPR-OTHER' }
+  }];
+  schoolRepositories.globalTransactions.update = async () => { updateCalls += 1; };
+  try {
+    await assert.rejects(
+      financeLifecycle.syncDraftTransactions([expected], {
+        registrationType: 'program',
+        registrationId: 'SPR-1',
+        orgId: 'ORG-1',
+        cycle: { cycleNo: 1, cycleId: 'PROGRAM-SPR-1-C1' }
+      }),
+      /belongs to another registration/
+    );
+    assert.equal(updateCalls, 0);
+  } finally {
+    schoolRepositories.globalTransactions.list = originalList;
+    schoolRepositories.globalTransactions.update = originalUpdate;
   }
 });
 

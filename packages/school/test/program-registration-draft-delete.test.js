@@ -265,3 +265,23 @@ test('program registration views use Delete Draft copy for draft records', () =>
   assert.match(batch, /Delete Draft/);
   assert.doesNotMatch(batch, /Cancel Draft/);
 });
+
+test('draft program registrations can edit and persist their registration date', () => {
+  const controller = fs.readFileSync(
+    path.join(__dirname, '../MVC/controllers/school/programRegistrationController.js'),
+    'utf8'
+  );
+  const details = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/program/programRegistrationDetails.ejs'),
+    'utf8'
+  );
+
+  assert.match(details, /inp_draftRegistrationDate/);
+  assert.match(details, /body\.set\('registrationDate', registrationDate\)/);
+  assert.match(controller, /function resolveDraftRegistrationDate/);
+  assert.match(controller, /requestedRegistrationDate/);
+  assert.match(controller, /registrationDate,\n\s+reqUser: req\.user/);
+  assert.match(controller, /effectiveDate: registrationDate/);
+  assert.match(controller, /registrationDate,\n\s+feeCategorySnapshot:/);
+  assert.match(controller, /concat\(appendedManualItems\)\.map/);
+});

@@ -25,7 +25,13 @@
             <dt class="col-5 text-muted">Record Status</dt>
             <dd class="col-7"><%= String(registration.status || '').toLowerCase() === 'rolled_back' ? 'Moved back to draft' : registration.status %></dd>
             <dt class="col-5 text-muted">Date</dt>
-            <dd class="col-7"><%= registration.registrationDate || '-' %></dd>
+            <dd class="col-7">
+              <% if (canManageRegistrations && isDraftRecord) { %>
+                <input type="date" id="inp_draftRegistrationDate" class="form-control form-control-sm" value="<%= registration.registrationDate || '' %>" required>
+              <% } else { %>
+                <%= registration.registrationDate || '-' %>
+              <% } %>
+            </dd>
             <dt class="col-5 text-muted">Student</dt>
             <dd class="col-7">
               <div class="fw-bold"><%= registration.studentName || registration.studentId %></div>
@@ -738,6 +744,9 @@
       body.set('note', note || String(document.getElementById('inp_draftApprovalNote')?.value || '').trim());
       if (actionStateId) body.set('actionStateId', actionStateId);
       if (isDraftRecord && options?.includeDraftPayload !== false) {
+        const registrationDate = String(document.getElementById('inp_draftRegistrationDate')?.value || '').trim();
+        if (!registrationDate) throw new Error('Registration date is required for a draft.');
+        body.set('registrationDate', registrationDate);
         body.set('editedRows', JSON.stringify(collectEditedRows()));
         body.set('addedRows', JSON.stringify(collectAddedRows()));
       }
