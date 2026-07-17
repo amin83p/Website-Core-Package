@@ -1,5 +1,7 @@
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
-const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+function getSessionStatusPolicyService() {
+  return require('./sessionStatusPolicyService');
+}
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -453,6 +455,7 @@ async function recomputeSessionCappedEnrollmentCompletionsForClass({
       : schoolDataService.fetchData('students', {}, reqUser)
   ]);
   const studentToPersonMap = normalizeStudentToPersonMap(effectiveStudents);
+  const sessionStatusPolicyService = getSessionStatusPolicyService();
   const statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
   const reconcilablePeriods = (Array.isArray(effectivePeriods) ? effectivePeriods : [])
     .filter((period) => OPEN_STATUSES.has(cleanText(period.status).toLowerCase())
