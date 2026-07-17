@@ -176,6 +176,10 @@ function sanitizeField(rawField, index) {
     calculationDependencies: valueMode === 'calculated' ? calculationDependencies : [],
     hasBorder: visualOnly ? false : (rawField.hasBorder === true || String(rawField.hasBorder) === 'true'),
     backgroundColor: visualOnly ? '' : cleanHexColor(rawField.backgroundColor, { allowEmpty: true }),
+    exportTextCase: visualOnly
+      ? 'as_entered'
+      : reportRuleEngineService.normalizeExportTextCase(rawField.exportTextCase, { strict: true }),
+    docxAlias: visualOnly ? '' : cleanString(rawField.docxAlias, { max: 120, allowEmpty: true }),
     helpText: cleanString(rawField.helpText, { max: 400, allowEmpty: true }),
     placeholder: cleanString(rawField.placeholder, { max: 200, allowEmpty: true }),
     prefillKey: normalizePrefillKey(cleanString(rawField.prefillKey, { max: 120, allowEmpty: true })),
@@ -196,7 +200,9 @@ function sanitizeSchema(v) {
     return normalized;
   });
 
-  reportRuleEngineService.buildCalculatedFieldPlan({ schema: { fields } }, { strict: true });
+  reportRuleEngineService.ensureTemplateDocxAliases({ schema: { fields } });
+
+  reportRuleEngineService.validateCalculatedFieldExpressions({ schema: { fields } }, { strict: true });
 
   return {
     version: cleanInteger(raw.version, { min: 1, max: 1000, allowEmpty: true }) || 1,

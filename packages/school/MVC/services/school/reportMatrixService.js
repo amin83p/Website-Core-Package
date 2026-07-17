@@ -70,6 +70,17 @@ function toFieldDto(field = {}, extra = {}) {
     required: field.required === true,
     readOnly: isReadOnlyField(field),
     calculated: isCalculatedField(field),
+    valueMode: isCalculatedField(field) ? 'calculated' : 'manual',
+    calculationRule: field?.calculationRule && typeof field.calculationRule === 'object'
+      ? {
+          enabled: field.calculationRule.enabled === true || String(field.calculationRule.enabled || '').toLowerCase() === 'true',
+          expression: clean(field.calculationRule.expression),
+          onError: clean(field.calculationRule.onError || 'keep_last').toLowerCase() === 'empty' ? 'empty' : 'keep_last'
+        }
+      : { enabled: false, expression: '', onError: 'keep_last' },
+    calculationDependencies: Array.isArray(field?.calculationDependencies)
+      ? field.calculationDependencies.map(clean).filter(Boolean)
+      : [],
     sharedAcrossStudents: field.sharedAcrossStudents === true,
     fullPageWidth: field.fullPageWidth === true || String(field.fullPageWidth || '').toLowerCase() === 'true',
     prefillKey: clean(field.prefillKey),
@@ -83,6 +94,26 @@ function toFieldDto(field = {}, extra = {}) {
       : [],
     ...extra
   };
+}
+
+function buildCalculationPrefill(template, prefill = {}) {
+  const source = prefill && typeof prefill === 'object' ? prefill : {};
+  const keys = new Set();
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.filter(isCalculatedField).forEach((field) => {
+    const expression = clean(field?.calculationRule?.expression);
+    const pattern = /\bprefill\.([A-Za-z_][A-Za-z0-9_]*)\b/g;
+    let match = pattern.exec(expression);
+    while (match) {
+      keys.add(match[1]);
+      match = pattern.exec(expression);
+    }
+  });
+  const out = {};
+  keys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(source, key)) out[key] = source[key];
+  });
+  return out;
 }
 
 function buildFieldSectionMap(template) {
@@ -192,6 +223,7 @@ async function buildStudentMatrixRow({ assignment, template, teacherId, studentI
     status,
     locked: status === 'locked',
     answers: renderedAnswers,
+    calculationPrefill: buildCalculationPrefill(template, prefill),
     editHref: instanceId ? `/school/reports/instances/edit-v2/${encodeURIComponent(instanceId)}` : ''
   };
 }
@@ -515,6 +547,76 @@ async function saveMatrixRows({
   return { results, summary, matrix };
 }
 
+async function lockMatrixRows({
+  assignmentId,
+  assignmentRowId = '',
+  teacherId = '',
+  rows = [],
+  reqUser
+} = {}) {
+  const resolved = await resolveMatrixBase({ assignmentId, assignmentRowId, teacherId, reqUser });
+  const { assignment, assignmentRow, teacherId: resolvedTeacherId, targetStudentIds } = resolved;
+  const effectiveRowId = assignment.assignmentRowId || assignmentRow?.rowId || '';
+  const instances = await schoolDataService.fetchData('reportInstances', {
+    assignmentId__eq: assignment.id,
+    page: 1,
+    limit: 10000
+  }, reqUser);
+  const requestedRows = Array.isArray(rows) ? rows : [];
+  const results = [];
+
+  for (const row of requestedRows) {
+    const studentId = clean(row?.studentId);
+    if (!studentId) continue;
+    if (!targetStudentIds.some((targetId) => idsEqual(targetId, studentId))) {
+      results.push({ studentId, status: 'error', message: 'This student is not targeted by the report assignment.' });
+      continue;
+    }
+    const instance = findMatchingInstance(instances, {
+      assignmentId: assignment.id,
+      assignmentRowId: effectiveRowId,
+      teacherId: resolvedTeacherId,
+      studentId
+    });
+    if (!instance) {
+      results.push({ studentId, status: 'skipped', message: 'A pending report must be saved before it can be locked.' });
+      continue;
+    }
+    if (clean(instance.status).toLowerCase() === 'locked') {
+      results.push({ studentId, status: 'skipped', reportStatus: 'locked', instanceId: toPublicId(instance.id), message: 'Report instance is already locked.' });
+      continue;
+    }
+    try {
+      const now = new Date().toISOString();
+      await schoolDataService.updateData('reportInstances', instance.id, {
+        status: 'locked',
+        audit: {
+          lastUpdateUser: reqUser?.id || '',
+          lastUpdateDateTime: now,
+          lockedAt: instance.audit?.lockedAt || now
+        }
+      }, reqUser);
+      results.push({ studentId, status: 'success', reportStatus: 'locked', instanceId: toPublicId(instance.id) });
+    } catch (error) {
+      results.push({ studentId, status: 'error', message: error.message });
+    }
+  }
+
+  const matrix = await buildMatrixContext({
+    assignmentId: assignment.id,
+    assignmentRowId: effectiveRowId,
+    teacherId: resolvedTeacherId,
+    reqUser
+  });
+  const summary = {
+    total: requestedRows.length,
+    succeeded: results.filter((result) => result.status === 'success').length,
+    failed: results.filter((result) => result.status === 'error').length,
+    skipped: results.filter((result) => result.status === 'skipped').length
+  };
+  return { results, summary, matrix };
+}
+
 
 function coerceMatrixPrefillValue(field, value) {
   if (value === undefined || value === null) return '';
@@ -613,6 +715,7 @@ module.exports = {
   valuesAreIdentical,
   buildFieldHelpText,
   buildFieldSectionMap,
+  buildCalculationPrefill,
   findMatchingInstance,
   classifyMatrixFields,
   buildProgress,
@@ -620,6 +723,7 @@ module.exports = {
   matrixPayloadToFormBody,
   saveMatrixRow,
   saveMatrixRows,
+  lockMatrixRows,
   buildMatrixPrefillPreview,
   applyMatrixPrefill,
   buildMatrixExportPayload

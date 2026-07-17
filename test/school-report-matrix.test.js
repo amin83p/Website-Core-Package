@@ -195,8 +195,25 @@ test('matrix rows expose calculated read-only values', async () => {
       const matrix = await reportMatrixService.buildMatrixContext({ assignmentId: 'ASN-CALC', assignmentRowId: 'ROW-CALC', teacherId: 'TEACHER-1', reqUser: { id: 'USER-1', personId: 'TEACHER-1', activeOrgId: '900000' } });
       assert.equal(matrix.rows[0].answers.average, 85);
       assert.equal(matrix.tableFields.find((field) => field.id === 'average').calculated, true);
+      assert.equal(matrix.tableFields.find((field) => field.id === 'average').calculationRule.expression, '(num(answers.score_a)+num(answers.score_b))/2');
+      assert.deepEqual(matrix.tableFields.find((field) => field.id === 'average').calculationDependencies, ['score_a', 'score_b']);
+      assert.equal(Object.prototype.hasOwnProperty.call(matrix.rows[0], 'prefill'), false);
+      assert.deepEqual(matrix.rows[0].calculationPrefill, {});
     });
   });
+});
+
+test('matrix exposes only prefill keys directly required by calculated expressions', () => {
+  const template = { schema: { fields: [
+    { id: 'score', type: 'number' },
+    { id: 'weighted', type: 'number', valueMode: 'calculated', calculationRule: { enabled: true, expression: 'num(answers.score) + num(prefill.base_score)', onError: 'keep_last' }, calculationDependencies: ['score'] }
+  ] } };
+  const context = reportMatrixService.buildCalculationPrefill(template, {
+    base_score: 75,
+    student_email: 'private@example.com',
+    unrelated_value: 'hidden'
+  });
+  assert.deepEqual(context, { base_score: 75 });
 });
 
 test('shared persistence service updates assignment once for selected_students', async () => {
@@ -406,6 +423,49 @@ test('bulk matrix save processes editable rows, skips locked rows, and summarize
   });
 });
 
+test('bulk matrix lock uses Report Instance lock status and audit fields', async () => {
+  const assignment = {
+    id: 'ASN-1', assignmentRowId: 'ROW-1', orgId: '900000', classId: 'CLS-1', sessionId: 'SES-1',
+    sessionDate: '2026-07-14', reportScope: 'selected_students', templateId: 'TPL-1', sharedAnswers: {}
+  };
+  const template = { id: 'TPL-1', title: 'Progress', schema: { fields: [] } };
+  const instances = [
+    { id: 'INS-1', assignmentId: 'ASN-1', assignmentRowId: 'ROW-1', teacherId: 'TEACHER-1', studentId: 'STU-1', targetKey: 'student:STU-1', status: 'draft', answers: {}, prefillSnapshot: {} },
+    { id: 'INS-2', assignmentId: 'ASN-1', assignmentRowId: 'ROW-1', teacherId: 'TEACHER-1', studentId: 'STU-2', targetKey: 'student:STU-2', status: 'locked', answers: {}, prefillSnapshot: {} }
+  ];
+  const updates = [];
+  await withPatched(reportIntegrityService, {
+    resolveStartInstanceContext: async () => ({
+      assignment, assignmentRow: { rowId: 'ROW-1' }, template, classData: { id: 'CLS-1', title: 'Class A' },
+      teacherId: 'TEACHER-1', targetStudentIds: ['STU-1', 'STU-2', 'STU-3']
+    })
+  }, async () => {
+    await withPatched(schoolDataService, {
+      fetchData: async () => instances,
+      updateData: async (entityType, instanceId, payload) => {
+        updates.push({ entityType, instanceId, payload });
+        const instance = instances.find((item) => item.id === instanceId);
+        Object.assign(instance, payload);
+        return instance;
+      }
+    }, async () => {
+      const result = await reportMatrixService.lockMatrixRows({
+        assignmentId: 'ASN-1', assignmentRowId: 'ROW-1', teacherId: 'TEACHER-1',
+        rows: [{ studentId: 'STU-1' }, { studentId: 'STU-2' }, { studentId: 'STU-3' }],
+        reqUser: { id: 'USER-1', activeOrgId: '900000' }
+      });
+      assert.deepEqual(result.summary, { total: 3, succeeded: 1, failed: 0, skipped: 2 });
+      assert.equal(result.results.find((row) => row.studentId === 'STU-3').status, 'skipped');
+    });
+  });
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].entityType, 'reportInstances');
+  assert.equal(updates[0].instanceId, 'INS-1');
+  assert.equal(updates[0].payload.status, 'locked');
+  assert.equal(updates[0].payload.audit.lastUpdateUser, 'USER-1');
+  assert.ok(updates[0].payload.audit.lockedAt);
+});
+
 test('report matrix routes and UI expose bulk actions, grouping, and accessible field hints', () => {
   const routes = read('packages/school/MVC/routes/reportRoutes.js');
   const matrixView = read('packages/school/MVC/views/school/report/instanceMatrix.ejs');
@@ -414,6 +474,7 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(routes, /\/instances\/matrix\/:assignmentId/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/save-row/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/save-all/);
+  assert.match(read('packages/school/MVC/controllers/school/reportController.js'), /matrixAction === 'lock'[\s\S]*reportMatrixService\.lockMatrixRows/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/prefill-preview/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/prefill-apply/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/export/);
@@ -427,6 +488,12 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(matrixView, /reportMatrixSharedSections/);
   assert.match(matrixView, /js-matrix-bulk-action/);
   assert.match(matrixView, /Save All Drafts/);
+  assert.match(matrixView, /Lock All Reports/);
+  assert.match(matrixView, /function showReportMatrixMessage/);
+  assert.match(matrixView, /typeof showMessageModal === 'function'/);
+  assert.doesNotMatch(matrixView, /reportMatrixAlert/);
+  assert.doesNotMatch(matrixView, /data-matrix-bulk-summary/);
+  assert.ok(matrixView.indexOf('id="reportMatrixActions"') > matrixView.indexOf('id="reportMatrixStudentReports"'));
   assert.match(matrixView, /Preview Prefill Updates/);
   assert.match(matrixView, /Export DOCX/);
   assert.match(matrixView, /Export Payload/);
@@ -478,6 +545,7 @@ test('report matrix EJS renders supported controls and locked row state', async 
   assert.match(html, /option value="good" selected/);
   assert.match(html, /Save All Drafts/);
   assert.match(html, /Submit All Reports/);
+  assert.match(html, /Lock All Reports/);
   assert.match(html, /accordion-collapse collapse show/);
   assert.match(html, /class="col-12"/);
   assert.match(html, /data-prefill-key/);

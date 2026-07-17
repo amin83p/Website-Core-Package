@@ -734,6 +734,7 @@
   </div>
 </div>
 
+<%- include('partials/calculatedFieldsRuntime') %>
 <script>
   (function () {
     const btnClose = document.getElementById('btnCloseReportInstance');
@@ -1571,6 +1572,13 @@
     }
 
     function recomputeCalculatedAnswers(fields, mergedAnswers, prefill) {
+      if (window.SchoolReportCalculatedFields?.recomputeCalculatedAnswers) {
+        return window.SchoolReportCalculatedFields.recomputeCalculatedAnswers({
+          fields,
+          answers: mergedAnswers,
+          prefill
+        }).answers;
+      }
       const nextAnswers = mergedAnswers && typeof mergedAnswers === 'object' ? { ...mergedAnswers } : {};
       const prefillSafe = prefill && typeof prefill === 'object' ? prefill : {};
       const plan = buildCalculatedFieldPlan(fields);

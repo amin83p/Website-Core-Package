@@ -553,6 +553,9 @@ async function saveTemplate(req, res) {
       reqUser: req.user,
       uploadedFile: req.file
     });
+    reportRuleEngineService.ensureTemplateDocxAliases(payload);
+    reportRuleEngineService.validateCalculatedFieldExpressions(payload, { strict: true });
+    reportRuleEngineService.validateTemplateExportTextCases(payload);
     // Validate prefill keys against catalog whitelist before saving template
     // This prevents templates from referencing undefined/non-existent prefill values
     // Audit test (school.report.shared-fields.test.js) ensures all catalog keys are produced by buildPrefillSnapshot
@@ -1149,7 +1152,13 @@ async function buildInstanceEditorRenderContext(req) {
       }, req.user);
     }
   }
-  const mergedData = reportService.mergeTemplateData(template, latestInstance, effectiveAssignment);
+  const mergedBeforeCalculation = reportService.mergeTemplateData(template, latestInstance, effectiveAssignment);
+  const calculatedForRender = reportService.recomputeCalculatedAnswers({
+    template,
+    mergedAnswers: mergedBeforeCalculation,
+    prefill: latestInstance?.prefillSnapshot || {}
+  });
+  const mergedData = calculatedForRender.answers;
   const validationSummary = reportRuleEngineService.evaluateTemplateValidations({
     template,
     mergedAnswers: mergedData,
@@ -1384,20 +1393,31 @@ async function saveReportMatrixRows(req, res) {
     });
     if (sendGuardedResponse(res, guardResult, 'This report bulk save is already in progress. Please wait.')) return;
 
-    const result = await reportMatrixService.saveMatrixRows({
-      assignmentId: req.params.assignmentId,
-      assignmentRowId: body.assignmentRowId || '',
-      teacherId: body.teacherId || '',
-      rows: Array.isArray(body.rows) ? body.rows : [],
-      submitAction: body.submitAction || 'save',
-      sharedAnswers: body.sharedAnswers && typeof body.sharedAnswers === 'object' ? body.sharedAnswers : {},
-      reqUser: req.user
-    });
+    const requestedAction = String(body.submitAction || 'save').trim().toLowerCase();
+    const matrixAction = requestedAction === 'submit' ? 'submit' : (requestedAction === 'lock' ? 'lock' : 'save');
+    const operation = matrixAction === 'lock'
+      ? reportMatrixService.lockMatrixRows({
+          assignmentId: req.params.assignmentId,
+          assignmentRowId: body.assignmentRowId || '',
+          teacherId: body.teacherId || '',
+          rows: Array.isArray(body.rows) ? body.rows : [],
+          reqUser: req.user
+        })
+      : reportMatrixService.saveMatrixRows({
+          assignmentId: req.params.assignmentId,
+          assignmentRowId: body.assignmentRowId || '',
+          teacherId: body.teacherId || '',
+          rows: Array.isArray(body.rows) ? body.rows : [],
+          submitAction: matrixAction,
+          sharedAnswers: body.sharedAnswers && typeof body.sharedAnswers === 'object' ? body.sharedAnswers : {},
+          reqUser: req.user
+        });
+    const result = await operation;
     const summary = result.summary || { total: 0, succeeded: 0, failed: 0, skipped: 0 };
-    const actionLabel = String(body.submitAction || 'save').trim().toLowerCase() === 'submit' ? 'submitted' : 'saved';
+    const actionLabel = matrixAction === 'submit' ? 'submitted' : (matrixAction === 'lock' ? 'locked' : 'saved');
     const payloadOut = {
-      status: summary.failed > 0 ? 'partial' : 'success',
-      message: String(summary.succeeded) + ' report(s) ' + actionLabel + '; ' + String(summary.skipped) + ' locked row(s) skipped; ' + String(summary.failed) + ' row(s) failed.',
+      status: summary.failed > 0 || summary.skipped > 0 ? 'partial' : 'success',
+      message: String(summary.succeeded) + ' report(s) ' + actionLabel + '; ' + String(summary.skipped) + ' row(s) skipped; ' + String(summary.failed) + ' row(s) failed.',
       summary,
       results: result.results,
       matrix: result.matrix
@@ -1632,7 +1652,10 @@ async function exportInstance(req, res) {
       assignment,
       reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
     );
-    const placeholderBundle = reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
+    const format = String(req.query.format || 'json').trim().toLowerCase();
+    const placeholderBundle = format === 'docx'
+      ? reportService.buildDocxPlaceholderPayloadDetailed(template, instance, effectiveAssignment)
+      : reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
     const placeholders = placeholderBundle.placeholders;
     const collections = await reportService.buildReportDocxCollections({
       template,
@@ -1658,8 +1681,6 @@ async function exportInstance(req, res) {
       assignmentSharedAnswers: effectiveAssignment?.sharedAnswers || {},
       prefillSnapshot: instance.prefillSnapshot || {}
     };
-
-    const format = String(req.query.format || 'json').trim().toLowerCase();
 
     if (format === 'docx') {
       const rendered = await reportDocxRenderService.renderReportInstanceDocx({
@@ -1728,7 +1749,7 @@ async function exportReportMatrix(req, res) {
     const rendered = [];
     for (const row of payload.rows) {
       const instance = { id: row.instanceId || ('pending-' + row.studentId), assignmentId: payload.assignmentId, assignmentRowId: payload.assignmentRowId, templateId: payload.templateId, teacherId: payload.teacherId, studentId: row.studentId, status: row.status, answers: row.answers, prefillSnapshot: row.prefillSnapshot };
-      const placeholderBundle = reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
+      const placeholderBundle = reportService.buildDocxPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
       const collections = await reportService.buildReportDocxCollections({ template, instance, assignment: effectiveAssignment, reqUser: req.user });
       rendered.push(await reportDocxRenderService.renderReportInstanceDocx({ template, instance, placeholders: placeholderBundle.placeholders, collections }));
     }

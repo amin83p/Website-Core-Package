@@ -1709,7 +1709,7 @@ function isStudentTargetedScope(scopeRaw) {
   return scope === 'each_student' || scope === 'selected_students';
 }
 
-function buildPlaceholderPayloadDetailed(template, instance, assignment = null) {
+function buildPlaceholderPayloadDetailed(template, instance, assignment = null, { applyDocxValueCase = false } = {}) {
   const merged = mergeTemplateData(template, instance, assignment);
   const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
     ? template.placeholderMap
@@ -1737,7 +1737,15 @@ function buildPlaceholderPayloadDetailed(template, instance, assignment = null) 
       answers: merged,
       prefill
     });
-    out[token] = toPrintableValue(conversion.value);
+    const printableValue = toPrintableValue(conversion.value);
+    const exportedValue = applyDocxValueCase
+      ? reportRuleEngineService.applyExportTextCase(printableValue, field?.exportTextCase)
+      : printableValue;
+    out[token] = exportedValue;
+    const docxAlias = reportRuleEngineService.normalizeDocxAlias(field?.docxAlias);
+    if (applyDocxValueCase && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(docxAlias)) {
+      out[`{{${docxAlias}}}`] = exportedValue;
+    }
     if (conversion.diagnostic) {
       conversionDiagnostics.push({
         ...conversion.diagnostic,
@@ -1746,6 +1754,10 @@ function buildPlaceholderPayloadDetailed(template, instance, assignment = null) 
     }
   });
   return { placeholders: out, conversionDiagnostics };
+}
+
+function buildDocxPlaceholderPayloadDetailed(template, instance, assignment = null) {
+  return buildPlaceholderPayloadDetailed(template, instance, assignment, { applyDocxValueCase: true });
 }
 
 function buildPlaceholderPayload(template, instance, assignment = null) {
@@ -1817,6 +1829,7 @@ module.exports = {
   isStudentTargetedScope,
   partitionInstanceSave,
   buildPlaceholderPayloadDetailed,
+  buildDocxPlaceholderPayloadDetailed,
   buildPlaceholderPayload,
   buildReportDocxCollections,
   getPrefillCatalog,

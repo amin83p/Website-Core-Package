@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 const MAX_EXPRESSION_LENGTH = 240;
 const MAX_CALCULATION_EXPRESSION_LENGTH = 0; // 0 = no explicit length cap
 const VALID_SEVERITIES = new Set(['error', 'warning']);
@@ -5,6 +7,10 @@ const VALID_WHEN_VALUES = new Set(['always', 'if_has_value']);
 const VALID_CONVERSION_ON_ERROR = new Set(['use_raw', 'empty']);
 const VALID_VALUE_MODES = new Set(['manual', 'calculated']);
 const VALID_CALC_ON_ERROR = new Set(['keep_last', 'empty']);
+const VALID_EXPORT_TEXT_CASES = new Set(['as_entered', 'upper', 'lower', 'title']);
+const DOCX_ALIAS_PATTERN = /^[a-z][a-z0-9]{3}$/;
+const DOCX_ALIAS_FIRST_CHARS = 'abcdefghijklmnopqrstuvwxyz';
+const DOCX_ALIAS_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 function isVisualOnlyField(field) {
   const type = String(field?.type || '').trim().toLowerCase();
@@ -427,6 +433,127 @@ function evaluateSafeExpression(expression, context = {}) {
   return evalAst(ast, localContext);
 }
 
+function normalizeExportTextCase(rawMode, { strict = false } = {}) {
+  const rawText = rawMode === undefined || rawMode === null ? '' : String(rawMode).trim();
+  const token = (rawText || 'as_entered').toLowerCase();
+  if (VALID_EXPORT_TEXT_CASES.has(token)) return token;
+  if (strict) throw new Error(`Unsupported DOCX value case "${token}".`);
+  return 'as_entered';
+}
+
+function validateTemplateExportTextCases(template) {
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    if (isVisualOnlyField(field)) return;
+    try {
+      normalizeExportTextCase(field?.exportTextCase, { strict: true });
+    } catch (error) {
+      const label = String(field?.label || field?.id || 'Field').trim();
+      throw new Error(`Field "${label}" has an invalid DOCX value case: ${error.message}`);
+    }
+  });
+  return true;
+}
+
+function applyExportTextCase(value, rawMode) {
+  const mode = normalizeExportTextCase(rawMode);
+  if (mode === 'as_entered') return value;
+  const text = String(value ?? '');
+  if (mode === 'upper') return text.toLocaleUpperCase();
+  if (mode === 'lower') return text.toLocaleLowerCase();
+  const lower = text.toLocaleLowerCase();
+  return lower.replace(/\S+/gu, (word) => word.replace(/\p{L}/u, (letter) => letter.toLocaleUpperCase()));
+}
+
+function normalizeDocxAlias(rawAlias) {
+  return String(rawAlias || '').trim().toLowerCase();
+}
+
+function normalizeDocxTokenKey(rawToken) {
+  const token = String(rawToken || '').trim();
+  const match = token.match(/^\{\{\s*([^{}]+?)\s*\}\}$/);
+  return String(match?.[1] || token).trim().toLowerCase();
+}
+
+function generateDocxAlias(reserved = new Set()) {
+  const blocked = reserved instanceof Set ? reserved : new Set(reserved || []);
+  for (let attempt = 0; attempt < 10000; attempt += 1) {
+    const bytes = crypto.randomBytes(4);
+    const alias = DOCX_ALIAS_FIRST_CHARS[bytes[0] % DOCX_ALIAS_FIRST_CHARS.length]
+      + DOCX_ALIAS_CHARS[bytes[1] % DOCX_ALIAS_CHARS.length]
+      + DOCX_ALIAS_CHARS[bytes[2] % DOCX_ALIAS_CHARS.length]
+      + DOCX_ALIAS_CHARS[bytes[3] % DOCX_ALIAS_CHARS.length];
+    if (!blocked.has(alias)) return alias;
+  }
+  throw new Error('Unable to generate a unique DOCX shortcut for this template.');
+}
+
+function ensureTemplateDocxAliases(template) {
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
+    ? template.placeholderMap
+    : {};
+  const reserved = new Set();
+  fields.forEach((field) => {
+    const id = normalizeDocxTokenKey(field?.id);
+    const prefillKey = normalizeDocxTokenKey(field?.prefillKey);
+    if (id) reserved.add(id);
+    if (prefillKey) reserved.add(prefillKey);
+  });
+  Object.values(placeholderMap).forEach((token) => {
+    const key = normalizeDocxTokenKey(token);
+    if (key) reserved.add(key);
+  });
+
+  const used = new Set();
+  fields.forEach((field) => {
+    if (!field || typeof field !== 'object') return;
+    if (isVisualOnlyField(field)) {
+      field.docxAlias = '';
+      return;
+    }
+    let alias = normalizeDocxAlias(field.docxAlias);
+    const label = String(field?.label || field?.id || 'Field').trim();
+    if (alias) {
+      if (!DOCX_ALIAS_PATTERN.test(alias)) {
+        throw new Error(`Field "${label}" has an invalid DOCX shortcut. Expected one letter followed by three lowercase letters or numbers.`);
+      }
+      if (reserved.has(alias)) {
+        throw new Error(`Field "${label}" has a DOCX shortcut that conflicts with another placeholder token.`);
+      }
+      if (used.has(alias)) {
+        throw new Error(`Field "${label}" has a duplicate DOCX shortcut "${alias}".`);
+      }
+    } else {
+      alias = generateDocxAlias(new Set([...reserved, ...used]));
+    }
+    field.docxAlias = alias;
+    used.add(alias);
+  });
+  return template;
+}
+
+function validateExpressionSyntax(expression) {
+  parseExpressionAst(expression);
+  return true;
+}
+
+function validateCalculatedFieldExpressions(template, { strict = true } = {}) {
+  const plan = buildCalculatedFieldPlan(template, { strict });
+  plan.orderedIds.forEach((fieldId) => {
+    const field = plan.fieldMap.get(fieldId);
+    const rule = normalizeCalculationRule(field?.calculationRule || {});
+    if (!rule.enabled || !rule.expression) return;
+    try {
+      validateExpressionSyntax(rule.expression);
+    } catch (error) {
+      const label = String(field?.label || fieldId || 'Field').trim();
+      throw new Error(`Calculated field "${label}" has an invalid calculation expression: ${error.message}`);
+    }
+  });
+  return true;
+}
+
 function normalizeValidationRule(rawRule, index = 0) {
   const rule = rawRule && typeof rawRule === 'object' ? rawRule : {};
   const idRaw = String(rule.id || '').trim();
@@ -772,10 +899,18 @@ module.exports = {
   VALID_CONVERSION_ON_ERROR: Object.freeze([...VALID_CONVERSION_ON_ERROR]),
   VALID_VALUE_MODES: Object.freeze([...VALID_VALUE_MODES]),
   VALID_CALC_ON_ERROR: Object.freeze([...VALID_CALC_ON_ERROR]),
+  VALID_EXPORT_TEXT_CASES: Object.freeze([...VALID_EXPORT_TEXT_CASES]),
+  DOCX_ALIAS_PATTERN,
   HELPERS,
   hasValue,
   ensureExpressionText,
   normalizeValueMode,
+  normalizeExportTextCase,
+  validateTemplateExportTextCases,
+  applyExportTextCase,
+  normalizeDocxAlias,
+  generateDocxAlias,
+  ensureTemplateDocxAliases,
   normalizeCalculationDependencies,
   normalizeCalculationRule,
   isCalculatedField,
@@ -783,6 +918,8 @@ module.exports = {
   normalizeConversionRule,
   buildCalculatedFieldPlan,
   recomputeCalculatedAnswers,
+  validateExpressionSyntax,
+  validateCalculatedFieldExpressions,
   evaluateSafeExpression,
   evaluateFieldValidations,
   evaluateTemplateValidations,

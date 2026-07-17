@@ -462,13 +462,29 @@
               </select>
             </div>
 
-            <div class="col-md-6">
+            <div class="col-md-3">
               <label class="form-label fw-bold">Prefill Key</label>
               <input type="text" class="form-control" id="fieldEditorPrefill" list="prefillKeyOptions" maxlength="120" placeholder="teacher_name">
             </div>
-            <div class="col-md-6">
+            <div class="col-md-3">
               <label class="form-label fw-bold">Placeholder Token</label>
               <input type="text" class="form-control" id="fieldEditorPlaceholder" maxlength="180" placeholder="{{teacher_name}}">
+              <div class="form-text">For font size and styling, select the complete placeholder in Word and format it there.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold" for="fieldEditorDocxAlias">DOCX Shortcut</label>
+              <input type="text" class="form-control font-monospace" id="fieldEditorDocxAlias" maxlength="4" readonly>
+              <div class="form-text">System-generated. Both this shortcut and the full placeholder export the same value.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold" for="fieldEditorExportTextCase">DOCX Value Case</label>
+              <select class="form-select" id="fieldEditorExportTextCase">
+                <option value="as_entered">As entered</option>
+                <option value="upper">UPPERCASE</option>
+                <option value="lower">lowercase</option>
+                <option value="title">Title Case</option>
+              </select>
+              <div class="form-text">Changes only the mapped value in generated Word files.</div>
             </div>
 
             <div class="col-12" id="fieldEditorOptionsWrap">
@@ -669,6 +685,8 @@
     const fieldEditorPlaceholderInput = document.getElementById('fieldEditorPlaceholder');
     const fieldEditorOptionsWrap = document.getElementById('fieldEditorOptionsWrap');
     const fieldEditorOptionsInput = document.getElementById('fieldEditorOptions');
+    const fieldEditorDocxAliasInput = document.getElementById('fieldEditorDocxAlias');
+    const fieldEditorExportTextCaseInput = document.getElementById('fieldEditorExportTextCase');
     const fieldEditorHelpInput = document.getElementById('fieldEditorHelp');
     const fieldEditorValidationRulesInput = document.getElementById('fieldEditorValidationRules');
     const fieldEditorConversionEnabledInput = document.getElementById('fieldEditorConversionEnabled');
@@ -702,6 +720,10 @@
     const isEditMode = <%- JSON.stringify(isEdit) %>;
     const VALUE_MODES = Object.freeze({ MANUAL: 'manual', CALCULATED: 'calculated' });
     const CALC_ON_ERROR = Object.freeze({ KEEP_LAST: 'keep_last', EMPTY: 'empty' });
+    const EXPORT_TEXT_CASES = Object.freeze({ AS_ENTERED: 'as_entered', UPPER: 'upper', LOWER: 'lower', TITLE: 'title' });
+    const DOCX_ALIAS_PATTERN = /^[a-z][a-z0-9]{3}$/;
+    const DOCX_ALIAS_FIRST_CHARS = 'abcdefghijklmnopqrstuvwxyz';
+    const DOCX_ALIAS_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
     let editingIndex = -1;
     let dragIndex = -1;
     let fieldsState = [];
@@ -732,6 +754,8 @@
         calculationDependencies: [],
         hasBorder: false,
         backgroundColor: '',
+        exportTextCase: EXPORT_TEXT_CASES.AS_ENTERED,
+        docxAlias: generateUniqueDocxAlias(),
         options: [],
         validationRules: [],
         conversionRule: { enabled: false, expression: '', onError: 'use_raw' }
@@ -742,6 +766,71 @@
       const trimmed = String(rawValue || '').trim();
       if (!trimmed) return '';
       return /^#(?:[0-9A-Fa-f]{6})$/.test(trimmed) ? trimmed.toLowerCase() : '';
+    }
+
+    function normalizeExportTextCase(rawValue) {
+      const token = String(rawValue || EXPORT_TEXT_CASES.AS_ENTERED).trim().toLowerCase();
+      return Object.values(EXPORT_TEXT_CASES).includes(token) ? token : EXPORT_TEXT_CASES.AS_ENTERED;
+    }
+
+    function normalizeDocxAlias(rawValue) {
+      const alias = String(rawValue || '').trim().toLowerCase();
+      return DOCX_ALIAS_PATTERN.test(alias) ? alias : '';
+    }
+
+    function normalizeDocxTokenKey(rawValue) {
+      return String(rawValue || '')
+        .trim()
+        .replace(/^\{\{\s*/, '')
+        .replace(/\s*\}\}$/, '')
+        .trim()
+        .toLowerCase();
+    }
+
+    function collectReservedDocxTokens({ includeAliases = true } = {}) {
+      const reserved = new Set();
+      (Array.isArray(fieldsState) ? fieldsState : []).forEach((field) => {
+        [field?.id, field?.prefillKey, field?.placeholderToken].forEach((value) => {
+          const key = normalizeDocxTokenKey(value);
+          if (key) reserved.add(key);
+        });
+        if (includeAliases) {
+          const alias = normalizeDocxAlias(field?.docxAlias);
+          if (alias) reserved.add(alias);
+        }
+      });
+      return reserved;
+    }
+
+    function generateUniqueDocxAlias(additionalReserved = new Set()) {
+      const reserved = collectReservedDocxTokens();
+      (additionalReserved instanceof Set ? additionalReserved : new Set(additionalReserved || [])).forEach((value) => reserved.add(String(value || '').toLowerCase()));
+      for (let attempt = 0; attempt < 10000; attempt += 1) {
+        const randomValues = new Uint32Array(4);
+        if (window.crypto?.getRandomValues) window.crypto.getRandomValues(randomValues);
+        else randomValues.forEach((_, index) => { randomValues[index] = Math.floor(Math.random() * 0xFFFFFFFF); });
+        const alias = DOCX_ALIAS_FIRST_CHARS[randomValues[0] % DOCX_ALIAS_FIRST_CHARS.length]
+          + DOCX_ALIAS_CHARS[randomValues[1] % DOCX_ALIAS_CHARS.length]
+          + DOCX_ALIAS_CHARS[randomValues[2] % DOCX_ALIAS_CHARS.length]
+          + DOCX_ALIAS_CHARS[randomValues[3] % DOCX_ALIAS_CHARS.length];
+        if (!reserved.has(alias)) return alias;
+      }
+      throw new Error('Unable to generate a unique DOCX shortcut for this template.');
+    }
+
+    function ensureClientDocxAliases() {
+      const used = new Set();
+      const nonAliasReserved = collectReservedDocxTokens({ includeAliases: false });
+      (Array.isArray(fieldsState) ? fieldsState : []).forEach((field) => {
+        if (isVisualOnlyType(field?.type)) {
+          field.docxAlias = '';
+          return;
+        }
+        let alias = normalizeDocxAlias(field?.docxAlias);
+        if (!alias || used.has(alias) || nonAliasReserved.has(alias)) alias = generateUniqueDocxAlias(used);
+        field.docxAlias = alias;
+        used.add(alias);
+      });
     }
 
     function normalizeCalculationDependencies(rawList) {
@@ -1058,6 +1147,8 @@ num(value) <= 95</code></pre>
         calculationDependencies: calcEnabled ? calculationDependencies : [],
         hasBorder: visualOnly ? false : (raw.hasBorder === true || String(raw.hasBorder) === 'true'),
         backgroundColor: visualOnly ? '' : normalizeHexColor(raw.backgroundColor),
+        exportTextCase: visualOnly ? EXPORT_TEXT_CASES.AS_ENTERED : normalizeExportTextCase(raw.exportTextCase),
+        docxAlias: visualOnly ? '' : normalizeDocxAlias(raw.docxAlias),
         prefillKey: visualOnly ? '' : String(raw.prefillKey || '').trim(),
         helpText: String(raw.helpText || '').trim(),
         placeholderToken: visualOnly ? '' : placeholderToken,
@@ -1088,6 +1179,7 @@ num(value) <= 95</code></pre>
           placeholderToken: String(initialMap[id] || field?.placeholder || '').trim()
         });
       });
+      ensureClientDocxAliases();
     }
 
     async function copyText(value) {
@@ -1127,6 +1219,7 @@ num(value) <= 95</code></pre>
       if (String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED) flags.push('<span class="badge bg-warning-subtle text-warning-emphasis border">Calculated</span>');
       if (field.hasBorder) flags.push('<span class="badge bg-secondary-subtle text-secondary-emphasis border">Border</span>');
       if (field.backgroundColor) flags.push(`<span class="badge border" style="background-color:${escapeHtml(field.backgroundColor)};">Back color</span>`);
+      if (normalizeExportTextCase(field.exportTextCase) !== EXPORT_TEXT_CASES.AS_ENTERED) flags.push(`<span class="badge bg-dark-subtle text-dark border">DOCX: ${escapeHtml(normalizeExportTextCase(field.exportTextCase))}</span>`);
       return flags.length ? flags.join(' ') : '<span class="text-muted small">None</span>';
     }
 
@@ -1141,6 +1234,7 @@ num(value) <= 95</code></pre>
         const layoutSummary = field.fullPageWidth ? 'Layout: Full page width' : 'Layout: Row-based width';
         const prefillSummary = field.prefillKey ? `Prefill: ${field.prefillKey}` : '';
         const placeholderSummary = field.placeholderToken ? `Token: ${field.placeholderToken}` : '';
+        const docxAliasSummary = field.docxAlias ? `DOCX shortcut: {{${field.docxAlias}}}` : '';
         const optionsSummary = field.type === 'select' && field.options.length
           ? `Options: ${toOptionsCsv(field.options)}`
           : '';
@@ -1155,9 +1249,12 @@ num(value) <= 95</code></pre>
           : '';
         const borderSummary = field.hasBorder ? 'Border: enabled' : '';
         const backgroundSummary = field.backgroundColor ? `Back color: ${field.backgroundColor}` : '';
+        const exportCaseSummary = normalizeExportTextCase(field.exportTextCase) !== EXPORT_TEXT_CASES.AS_ENTERED
+          ? `DOCX value case: ${normalizeExportTextCase(field.exportTextCase)}`
+          : '';
         const detailsParts = visualOnly
           ? ['Display-only grouping row', String(field.helpText || '').trim()].filter(Boolean)
-          : [layoutSummary, prefillSummary, placeholderSummary, optionsSummary, validationSummary, conversionSummary, calcSummary, borderSummary, backgroundSummary, String(field.helpText || '').trim()].filter(Boolean);
+          : [layoutSummary, prefillSummary, placeholderSummary, docxAliasSummary, exportCaseSummary, optionsSummary, validationSummary, conversionSummary, calcSummary, borderSummary, backgroundSummary, String(field.helpText || '').trim()].filter(Boolean);
         const detailsText = detailsParts.join(' | ') || '-';
         const visualClass = visualOnly ? ' field-row-visual' : '';
         let visualKind = '';
@@ -1203,6 +1300,7 @@ num(value) <= 95</code></pre>
     }
 
     function collect() {
+      ensureClientDocxAliases();
       const fields = [];
       const placeholderMap = {};
 
@@ -1244,6 +1342,8 @@ num(value) <= 95</code></pre>
           calculationDependencies,
           hasBorder: visualOnly ? false : source?.hasBorder === true,
           backgroundColor: visualOnly ? '' : normalizeHexColor(source?.backgroundColor),
+          exportTextCase: visualOnly ? EXPORT_TEXT_CASES.AS_ENTERED : normalizeExportTextCase(source?.exportTextCase),
+          docxAlias: visualOnly ? '' : normalizeDocxAlias(source?.docxAlias),
           prefillKey: visualOnly ? '' : String(source?.prefillKey || '').trim(),
           helpText: String(source?.helpText || '').trim(),
           options: normalizedType === 'select'
@@ -1284,6 +1384,8 @@ num(value) <= 95</code></pre>
       if (fieldEditorOptionsWrap) fieldEditorOptionsWrap.style.display = (type === 'select' && !visualOnly) ? '' : 'none';
       if (fieldEditorPrefillInput) fieldEditorPrefillInput.disabled = visualOnly;
       if (fieldEditorPlaceholderInput) fieldEditorPlaceholderInput.disabled = visualOnly;
+      if (fieldEditorDocxAliasInput) fieldEditorDocxAliasInput.disabled = visualOnly;
+      if (fieldEditorExportTextCaseInput) fieldEditorExportTextCaseInput.disabled = visualOnly;
       if (fieldEditorRequiredInput) fieldEditorRequiredInput.disabled = visualOnly || calculatedMode;
       if (fieldEditorReadonlyInput) fieldEditorReadonlyInput.disabled = visualOnly || calculatedMode;
       if (fieldEditorFullWidthInput) fieldEditorFullWidthInput.disabled = visualOnly;
@@ -1303,6 +1405,8 @@ num(value) <= 95</code></pre>
       if (visualOnly) {
         fieldEditorPrefillInput.value = '';
         fieldEditorPlaceholderInput.value = '';
+        fieldEditorDocxAliasInput.value = '';
+        fieldEditorExportTextCaseInput.value = EXPORT_TEXT_CASES.AS_ENTERED;
         fieldEditorRequiredInput.checked = false;
         fieldEditorReadonlyInput.checked = false;
         fieldEditorFullWidthInput.checked = true;
@@ -1336,6 +1440,8 @@ num(value) <= 95</code></pre>
       fieldEditorTypeInput.value = normalizeFieldType(field.type);
       fieldEditorPrefillInput.value = field.prefillKey || '';
       fieldEditorPlaceholderInput.value = field.placeholderToken || '';
+      fieldEditorDocxAliasInput.value = field.docxAlias || generateUniqueDocxAlias();
+      fieldEditorExportTextCaseInput.value = normalizeExportTextCase(field.exportTextCase);
       fieldEditorOptionsInput.value = toOptionsCsv(field.options);
       fieldEditorHelpInput.value = field.helpText || '';
       fieldEditorValidationRulesInput.value = toValidationRulesJson(field.validationRules);
@@ -1385,6 +1491,7 @@ num(value) <= 95</code></pre>
       const prefillKey = String(fieldEditorPrefillInput.value || '').trim();
       let placeholderToken = String(fieldEditorPlaceholderInput.value || '').trim();
       const helpText = String(fieldEditorHelpInput.value || '').trim();
+      const exportTextCase = normalizeExportTextCase(fieldEditorExportTextCaseInput.value);
       const required = fieldEditorRequiredInput.checked === true;
       const readOnly = fieldEditorReadonlyInput.checked === true;
       const sharedAcrossStudents = fieldEditorSharedInput.checked === true;
@@ -1395,6 +1502,7 @@ num(value) <= 95</code></pre>
       const backgroundColor = backgroundCleared ? '' : normalizeHexColor(backgroundColorInput);
       const options = type === 'select' ? parseOptionsCsv(fieldEditorOptionsInput.value) : [];
       const visualOnly = isVisualOnlyType(type);
+      const docxAlias = visualOnly ? '' : (normalizeDocxAlias(fieldEditorDocxAliasInput.value) || generateUniqueDocxAlias());
       const calculatedEnabled = !visualOnly && fieldEditorCalculatedEnabledInput.checked === true;
       const calculationExpression = String(fieldEditorCalculationExpressionInput.value || '').trim();
       const calculationOnError = String(fieldEditorCalculationOnErrorInput.value || CALC_ON_ERROR.KEEP_LAST).trim().toLowerCase() === CALC_ON_ERROR.EMPTY ? CALC_ON_ERROR.EMPTY : CALC_ON_ERROR.KEEP_LAST;
@@ -1495,6 +1603,8 @@ num(value) <= 95</code></pre>
         calculationDependencies: visualOnly ? [] : (calculatedEnabled ? calculationDependencies : []),
         hasBorder: visualOnly ? false : hasBorder,
         backgroundColor: visualOnly ? '' : backgroundColor,
+        exportTextCase: visualOnly ? EXPORT_TEXT_CASES.AS_ENTERED : exportTextCase,
+        docxAlias,
         options: visualOnly ? [] : options,
         validationRules: visualOnly ? [] : validationRules,
         conversionRule: visualOnly
@@ -1590,7 +1700,8 @@ num(value) <= 95</code></pre>
         field.fullPageWidth ? '<span class="badge bg-primary-subtle text-primary-emphasis border ms-1">Full width</span>' : '',
         String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED ? '<span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Auto-calculated</span>' : '',
         field.hasBorder ? '<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1">Border</span>' : '',
-        field.backgroundColor ? `<span class="badge border ms-1" style="background-color:${escapeHtml(field.backgroundColor)};">Back color</span>` : ''
+        field.backgroundColor ? `<span class="badge border ms-1" style="background-color:${escapeHtml(field.backgroundColor)};">Back color</span>` : '',
+        normalizeExportTextCase(field.exportTextCase) !== EXPORT_TEXT_CASES.AS_ENTERED ? `<span class="badge bg-dark-subtle text-dark border ms-1">DOCX: ${escapeHtml(normalizeExportTextCase(field.exportTextCase))}</span>` : ''
       ].filter(Boolean).join('');
       const helpHtml = field.helpText ? `<div class="small text-muted mt-1">${escapeHtml(field.helpText)}</div>` : '';
       const prefillHtml = field.prefillKey
@@ -1770,7 +1881,8 @@ num(value) <= 95</code></pre>
           ...source,
           id: buildUniqueDuplicateId(source.id),
           label: `${source.label} (Copy)`,
-          placeholderToken: source.placeholderToken
+          placeholderToken: source.placeholderToken,
+          docxAlias: generateUniqueDocxAlias()
         });
         fieldsState.splice(index + 1, 0, duplicate);
         renderFieldRows();
@@ -1923,7 +2035,8 @@ num(value) <= 95</code></pre>
             label,
             fieldId,
             prefillKey,
-            docxToken: token
+            docxToken: token,
+            docxShortcut: field?.docxAlias ? `{{${field.docxAlias}}}` : ''
           };
         })
         .filter((row) => row.key && row.label)
@@ -1955,13 +2068,14 @@ num(value) <= 95</code></pre>
       }
       const stamp = new Date().toISOString().slice(0, 10);
       if (format === 'csv') {
-        const header = ['key', 'label', 'docxToken', 'fieldId', 'prefillKey'];
+        const header = ['key', 'label', 'docxToken', 'docxShortcut', 'fieldId', 'prefillKey'];
         const csvLines = [header.join(',')];
         rows.forEach((row) => {
           csvLines.push([
             buildCsvValue(row.key),
             buildCsvValue(row.label),
             buildCsvValue(row.docxToken),
+            buildCsvValue(row.docxShortcut),
             buildCsvValue(row.fieldId),
             buildCsvValue(row.prefillKey)
           ].join(','));

@@ -1,0 +1,381 @@
+<script>
+(function initReportCalculatedFields(root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.SchoolReportCalculatedFields = api;
+}(typeof globalThis !== 'undefined' ? globalThis : this, function createReportCalculatedFields() {
+  'use strict';
+
+  function isVisualOnlyField(field) {
+    const type = String(field?.type || '').trim().toLowerCase();
+    return type === 'section' || type === 'subheader' || type === 'row_break';
+  }
+
+  function isCalculatedField(field) {
+    return !isVisualOnlyField(field)
+      && String(field?.valueMode || 'manual').trim().toLowerCase() === 'calculated';
+  }
+
+  function normalizeCalculationRule(rawRule) {
+    const rule = rawRule && typeof rawRule === 'object' ? rawRule : {};
+    return {
+      enabled: rule.enabled === true || String(rule.enabled || '').trim().toLowerCase() === 'true',
+      expression: String(rule.expression || '').trim(),
+      onError: String(rule.onError || 'keep_last').trim().toLowerCase() === 'empty' ? 'empty' : 'keep_last'
+    };
+  }
+
+  function normalizeCalculationDependencies(rawList) {
+    const list = Array.isArray(rawList)
+      ? rawList
+      : String(rawList || '').split(',').map((item) => String(item || '').trim()).filter(Boolean);
+    const out = [];
+    const seen = new Set();
+    list.forEach((item) => {
+      const token = String(item || '').trim();
+      const key = token.toLowerCase();
+      if (!token || seen.has(key)) return;
+      seen.add(key);
+      out.push(token);
+    });
+    return out;
+  }
+
+  function helpers() {
+    return {
+      num(value, fallback = 0) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number : Number(fallback || 0);
+      },
+      str(value) {
+        return value === undefined || value === null ? '' : String(value);
+      },
+      len(value) {
+        if (Array.isArray(value) || typeof value === 'string') return value.length;
+        if (value && typeof value === 'object') return Object.keys(value).length;
+        return 0;
+      },
+      round(value, decimals = 0) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return NaN;
+        const places = Math.max(0, Math.min(8, Math.floor(Number(decimals) || 0)));
+        const factor = 10 ** places;
+        return Math.round(number * factor) / factor;
+      },
+      min() { return Math.min(...Array.from(arguments).map((value) => Number(value))); },
+      max() { return Math.max(...Array.from(arguments).map((value) => Number(value))); },
+      abs(value) { return Math.abs(Number(value)); },
+      clamp(value, minValue, maxValue) {
+        const number = Number(value);
+        const minimum = Number(minValue);
+        const maximum = Number(maxValue);
+        if (![number, minimum, maximum].every(Number.isFinite)) return NaN;
+        return Math.min(Math.max(number, minimum), maximum);
+      },
+      ifelse(condition, whenTrue, whenFalse = '') {
+        return condition ? whenTrue : whenFalse;
+      },
+      caseof(value) {
+        const branches = Array.from(arguments).slice(1);
+        const hasDefault = branches.length % 2 === 1;
+        const pairLimit = hasDefault ? branches.length - 1 : branches.length;
+        for (let index = 0; index < pairLimit; index += 2) {
+          if (value == branches[index]) return branches[index + 1]; // eslint-disable-line eqeqeq
+        }
+        return hasDefault ? branches[branches.length - 1] : value;
+      }
+    };
+  }
+
+  function tokenize(expression) {
+    const source = String(expression || '').trim();
+    if (!source) throw new Error('Empty expression.');
+    const tokens = [];
+    let index = 0;
+    while (index < source.length) {
+      const char = source[index];
+      if (/\s/.test(char)) { index += 1; continue; }
+      const pair = source.slice(index, index + 2);
+      if (['&&', '||', '==', '!=', '<=', '>='].includes(pair)) {
+        tokens.push({ type: 'operator', value: pair });
+        index += 2;
+        continue;
+      }
+      if (/[0-9]/.test(char) || (char === '.' && /[0-9]/.test(source[index + 1]))) {
+        let end = index + 1;
+        while (end < source.length && /[0-9.]/.test(source[end])) end += 1;
+        const rawNumber = source.slice(index, end);
+        const number = Number(rawNumber);
+        if (!Number.isFinite(number) || (rawNumber.match(/\./g) || []).length > 1) {
+          throw new Error('Invalid number in expression.');
+        }
+        tokens.push({ type: 'number', value: number });
+        index = end;
+        continue;
+      }
+      if (['+', '-', '*', '/', '%', '<', '>', '!', '.'].includes(char)) {
+        tokens.push({ type: 'operator', value: char });
+        index += 1;
+        continue;
+      }
+      if (char === '(' || char === ')') {
+        tokens.push({ type: 'paren', value: char });
+        index += 1;
+        continue;
+      }
+      if (char === ',') {
+        tokens.push({ type: 'comma', value: char });
+        index += 1;
+        continue;
+      }
+      if (char === '"' || char === '\'') {
+        const quote = char;
+        let value = '';
+        let closed = false;
+        index += 1;
+        while (index < source.length) {
+          const current = source[index];
+          if (current === '\\') {
+            const next = source[index + 1];
+            if (next === undefined) break;
+            value += next === 'n' ? '\n' : next === 't' ? '\t' : next;
+            index += 2;
+            continue;
+          }
+          if (current === quote) { index += 1; closed = true; break; }
+          value += current;
+          index += 1;
+        }
+        if (!closed) throw new Error('Unterminated string literal in expression.');
+        tokens.push({ type: 'string', value });
+        continue;
+      }
+      if (/[A-Za-z_]/.test(char)) {
+        let end = index + 1;
+        while (end < source.length && /[A-Za-z0-9_]/.test(source[end])) end += 1;
+        tokens.push({ type: 'identifier', value: source.slice(index, end) });
+        index = end;
+        continue;
+      }
+      throw new Error('Unsupported character in expression.');
+    }
+    tokens.push({ type: 'eof', value: '' });
+    return tokens;
+  }
+
+  function evaluateExpression(expression, context = {}) {
+    const tokens = tokenize(expression);
+    const helperFunctions = helpers();
+    const safeContext = {
+      value: context.value,
+      answers: context.answers && typeof context.answers === 'object' ? context.answers : {},
+      prefill: context.prefill && typeof context.prefill === 'object' ? context.prefill : {}
+    };
+    let position = 0;
+
+    function current() { return tokens[position]; }
+    function match(type, value) {
+      const token = current();
+      if (!token || token.type !== type || (value !== undefined && token.value !== value)) return false;
+      position += 1;
+      return true;
+    }
+    function expect(type, value) {
+      if (match(type, value)) return tokens[position - 1];
+      throw new Error('Invalid expression syntax.');
+    }
+    function resolve(path) {
+      const root = path[0];
+      if (root === 'true') return true;
+      if (root === 'false') return false;
+      if (root === 'null') return null;
+      if (root === 'undefined') return undefined;
+      if (!Object.prototype.hasOwnProperty.call(safeContext, root)) throw new Error('Unknown identifier.');
+      let value = safeContext[root];
+      for (let index = 1; index < path.length; index += 1) {
+        if (value === null || value === undefined) return undefined;
+        if (typeof value !== 'object' && typeof value !== 'function') return undefined;
+        const key = path[index];
+        value = Object.prototype.hasOwnProperty.call(value, key) ? value[key] : undefined;
+      }
+      return value;
+    }
+    function primary() {
+      const token = current();
+      if (match('number')) return { kind: 'literal', value: token.value };
+      if (match('string')) return { kind: 'literal', value: token.value };
+      if (match('paren', '(')) {
+        const node = expressionOr();
+        expect('paren', ')');
+        return node;
+      }
+      if (match('identifier')) {
+        const path = [token.value];
+        while (match('operator', '.')) path.push(expect('identifier').value);
+        if (match('paren', '(')) {
+          const args = [];
+          if (!match('paren', ')')) {
+            while (true) {
+              args.push(expressionOr());
+              if (match('paren', ')')) break;
+              expect('comma', ',');
+            }
+          }
+          return { kind: 'call', path, args };
+        }
+        return { kind: 'path', path };
+      }
+      throw new Error('Invalid expression syntax.');
+    }
+    function unary() {
+      if (match('operator', '!')) return { kind: 'unary', operator: '!', value: unary() };
+      if (match('operator', '-')) return { kind: 'unary', operator: '-', value: unary() };
+      if (match('operator', '+')) return { kind: 'unary', operator: '+', value: unary() };
+      return primary();
+    }
+    function multiply() {
+      let node = unary();
+      while (true) {
+        if (match('operator', '*')) node = { kind: 'binary', operator: '*', left: node, right: unary() };
+        else if (match('operator', '/')) node = { kind: 'binary', operator: '/', left: node, right: unary() };
+        else if (match('operator', '%')) node = { kind: 'binary', operator: '%', left: node, right: unary() };
+        else break;
+      }
+      return node;
+    }
+    function add() {
+      let node = multiply();
+      while (true) {
+        if (match('operator', '+')) node = { kind: 'binary', operator: '+', left: node, right: multiply() };
+        else if (match('operator', '-')) node = { kind: 'binary', operator: '-', left: node, right: multiply() };
+        else break;
+      }
+      return node;
+    }
+    function compare() {
+      let node = add();
+      while (true) {
+        if (match('operator', '<')) node = { kind: 'binary', operator: '<', left: node, right: add() };
+        else if (match('operator', '>')) node = { kind: 'binary', operator: '>', left: node, right: add() };
+        else if (match('operator', '<=')) node = { kind: 'binary', operator: '<=', left: node, right: add() };
+        else if (match('operator', '>=')) node = { kind: 'binary', operator: '>=', left: node, right: add() };
+        else break;
+      }
+      return node;
+    }
+    function equal() {
+      let node = compare();
+      while (true) {
+        if (match('operator', '==')) node = { kind: 'binary', operator: '==', left: node, right: compare() };
+        else if (match('operator', '!=')) node = { kind: 'binary', operator: '!=', left: node, right: compare() };
+        else break;
+      }
+      return node;
+    }
+    function expressionAnd() {
+      let node = equal();
+      while (match('operator', '&&')) node = { kind: 'binary', operator: '&&', left: node, right: equal() };
+      return node;
+    }
+    function expressionOr() {
+      let node = expressionAnd();
+      while (match('operator', '||')) node = { kind: 'binary', operator: '||', left: node, right: expressionAnd() };
+      return node;
+    }
+    function run(node) {
+      if (node.kind === 'literal') return node.value;
+      if (node.kind === 'path') return resolve(node.path);
+      if (node.kind === 'call') {
+        if (node.path.length !== 1 || typeof helperFunctions[node.path[0]] !== 'function') throw new Error('Unknown helper call.');
+        return helperFunctions[node.path[0]](...node.args.map(run));
+      }
+      if (node.kind === 'unary') {
+        const value = run(node.value);
+        if (node.operator === '!') return !value;
+        if (node.operator === '-') return -Number(value);
+        return Number(value);
+      }
+      if (node.kind === 'binary') {
+        if (node.operator === '&&') { const left = run(node.left); return left ? run(node.right) : left; }
+        if (node.operator === '||') { const left = run(node.left); return left ? left : run(node.right); }
+        const left = run(node.left);
+        const right = run(node.right);
+        if (node.operator === '+') return left + right;
+        if (node.operator === '-') return Number(left) - Number(right);
+        if (node.operator === '*') return Number(left) * Number(right);
+        if (node.operator === '/') return Number(left) / Number(right);
+        if (node.operator === '%') return Number(left) % Number(right);
+        if (node.operator === '<') return left < right;
+        if (node.operator === '>') return left > right;
+        if (node.operator === '<=') return left <= right;
+        if (node.operator === '>=') return left >= right;
+        if (node.operator === '==') return left == right; // eslint-disable-line eqeqeq
+        if (node.operator === '!=') return left != right; // eslint-disable-line eqeqeq
+      }
+      throw new Error('Invalid expression evaluation.');
+    }
+
+    const ast = expressionOr();
+    expect('eof');
+    return run(ast);
+  }
+
+  function buildCalculatedFieldPlan(fields) {
+    const dataFields = (Array.isArray(fields) ? fields : []).filter((field) => field?.id && !isVisualOnlyField(field));
+    const fieldMap = new Map(dataFields.map((field) => [String(field.id), field]));
+    const calculated = dataFields.filter(isCalculatedField);
+    const calculatedIds = new Set(calculated.map((field) => String(field.id)));
+    const indegree = new Map();
+    const reverse = new Map();
+    calculated.forEach((field) => { indegree.set(String(field.id), 0); reverse.set(String(field.id), []); });
+    calculated.forEach((field) => {
+      const fieldId = String(field.id);
+      normalizeCalculationDependencies(field.calculationDependencies).forEach((dependency) => {
+        const dependencyId = String(dependency || '').trim();
+        if (!dependencyId || dependencyId === fieldId || !fieldMap.has(dependencyId) || !calculatedIds.has(dependencyId)) return;
+        reverse.get(dependencyId).push(fieldId);
+        indegree.set(fieldId, (indegree.get(fieldId) || 0) + 1);
+      });
+    });
+    const queue = [...calculatedIds].filter((fieldId) => (indegree.get(fieldId) || 0) === 0);
+    const orderedIds = [];
+    while (queue.length) {
+      const current = queue.shift();
+      orderedIds.push(current);
+      (reverse.get(current) || []).forEach((target) => {
+        const next = (indegree.get(target) || 0) - 1;
+        indegree.set(target, next);
+        if (next === 0) queue.push(target);
+      });
+    }
+    return { fieldMap, orderedIds };
+  }
+
+  function recomputeCalculatedAnswers({ fields = [], answers = {}, prefill = {} } = {}) {
+    const nextAnswers = answers && typeof answers === 'object' ? { ...answers } : {};
+    const safePrefill = prefill && typeof prefill === 'object' ? prefill : {};
+    const diagnostics = [];
+    const plan = buildCalculatedFieldPlan(fields);
+    plan.orderedIds.forEach((fieldId) => {
+      const field = plan.fieldMap.get(fieldId);
+      const rule = normalizeCalculationRule(field?.calculationRule);
+      if (!rule.enabled || !rule.expression) return;
+      const previousValue = nextAnswers[fieldId];
+      try {
+        nextAnswers[fieldId] = evaluateExpression(rule.expression, { value: previousValue, answers: nextAnswers, prefill: safePrefill });
+      } catch (error) {
+        nextAnswers[fieldId] = rule.onError === 'empty' ? '' : previousValue;
+        diagnostics.push({ fieldId, error: error.message, onError: rule.onError });
+      }
+    });
+    return { answers: nextAnswers, diagnostics, orderedIds: plan.orderedIds };
+  }
+
+  return {
+    evaluateExpression,
+    buildCalculatedFieldPlan,
+    recomputeCalculatedAnswers,
+    isCalculatedField
+  };
+}));
+</script>

@@ -7,6 +7,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const PizZip = require('pizzip');
+const ejs = require('ejs');
 
 const reportService = require('../packages/school/MVC/services/school/reportService');
 const reportDocxRenderService = require('../packages/school/MVC/services/school/reportDocxRenderService');
@@ -204,6 +205,51 @@ test('DOCX renderer expands repeat collection data', async () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('DOCX renderer preserves the Word run font size around a mapped value', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'school-report-docx-font-'));
+  const filePath = path.join(tmpDir, 'font-size.docx');
+  const runXml = '<w:p><w:r><w:rPr><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr><w:t>{{student_name}}</w:t></w:r></w:p>';
+  fs.writeFileSync(filePath, createMinimalDocxBuffer(runXml));
+
+  try {
+    const rendered = await reportDocxRenderService.renderReportInstanceDocx({
+      template: { id: 'TPL-FONT', title: 'Font Template', docxTemplate: { path: filePath } },
+      instance: { id: 'INST-FONT' },
+      placeholders: { '{{student_name}}': 'Ada Lovelace' },
+      collections: {}
+    });
+    const xml = new PizZip(rendered.buffer).file('word/document.xml').asText();
+    assert.match(xml, /<w:sz w:val="28"\/>/);
+    assert.match(xml, /<w:szCs w:val="28"\/>/);
+    assert.match(xml, /Ada Lovelace/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('DOCX renderer treats a full placeholder and its four-character shortcut identically', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'school-report-docx-alias-'));
+  const filePath = path.join(tmpDir, 'alias.docx');
+  const bodyXml = '<w:p><w:r><w:t>{{class_gradebook_period_avg_percent}}|{{x6i4}}</w:t></w:r></w:p>';
+  fs.writeFileSync(filePath, createMinimalDocxBuffer(bodyXml));
+
+  try {
+    const rendered = await reportDocxRenderService.renderReportInstanceDocx({
+      template: { id: 'TPL-ALIAS', title: 'Alias Template', docxTemplate: { path: filePath } },
+      instance: { id: 'INST-ALIAS' },
+      placeholders: {
+        '{{class_gradebook_period_avg_percent}}': '84.5',
+        '{{x6i4}}': '84.5'
+      },
+      collections: {}
+    });
+    const xml = new PizZip(rendered.buffer).file('word/document.xml').asText();
+    assert.match(xml, /84\.5\|84\.5/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
 test('DOCX template resolver treats /app/uploads paths as upload storage references', () => {
   const storedPath = '/app/uploads/ORG_900000/reports/Semi-Monthly-Report_1783055912591.docx';
   const railwayVolumeRoot = '/app/uploads';
@@ -254,6 +300,50 @@ test('report template save and instance hydration use normalized prefill keys', 
   assert.match(templateModelSource, /normalizePrefillKey\(cleanString\(rawField\.prefillKey/);
   assert.match(controllerSource, /getPrefillValue\(prefill,\s*field\?\.prefillKey\)/);
   assert.match(controllerSource, /const rawPrefill = resolvedPrefill\.value/);
+});
+
+test('report template editor exposes DOCX value case and Word font-size guidance', () => {
+  const templateFormSource = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/report/templateForm.ejs'), 'utf8');
+  const controllerSource = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/controllers/school/reportController.js'), 'utf8');
+  assert.match(templateFormSource, /DOCX Value Case/);
+  assert.match(templateFormSource, /DOCX Shortcut/);
+  assert.match(templateFormSource, /select the complete placeholder in Word and format it there/i);
+  assert.match(templateFormSource, /exportTextCase/);
+  assert.match(templateFormSource, /docxAlias:\s*generateUniqueDocxAlias\(\)/);
+  assert.match(templateFormSource, /docxShortcut/);
+  assert.match(controllerSource, /validateTemplateExportTextCases\(payload\)/);
+  assert.match(controllerSource, /ensureTemplateDocxAliases\(payload\)/);
+  assert.match(controllerSource, /format === 'docx'[\s\S]*buildDocxPlaceholderPayloadDetailed/);
+});
+
+test('report template editor renders valid client JavaScript with DOCX shortcuts', async () => {
+  const html = await ejs.renderFile(
+    path.join(ROOT, 'packages/school/MVC/views/school/report/templateForm.ejs'),
+    {
+      title: 'Edit Report Template',
+      actionStateId: 'ACTION-1',
+      template: {
+        id: 'TPL-1',
+        title: 'Progress',
+        type: 'progress',
+        version: 1,
+        status: 'draft',
+        description: '',
+        schema: { fields: [{ id: 'student_name', label: 'Student Name', type: 'text', docxAlias: 'x6i4' }] },
+        placeholderMap: { student_name: '{{student_name}}' }
+      },
+      templateStatuses: ['draft', 'active', 'inactive', 'archived'],
+      fieldTypes: ['text', 'textarea', 'number', 'date', 'select', 'checkbox', 'section', 'subheader', 'row_break'],
+      prefillCatalog: {
+        common: [], classOnly: [], gradebookPeriodClass: [], gradebookPeriodSkillsClass: [], examPeriodClass: [],
+        studentOnly: [], gradebookPeriodStudent: [], gradebookPeriodSkillsStudent: [], examPeriodStudent: []
+      }
+    }
+  );
+  assert.match(html, /"docxAlias":"x6i4"/);
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+  assert.ok(scripts.length > 0);
+  scripts.forEach((source) => { new Function(source); });
 });
 
 test('buildPrefillSnapshot uses attendance matrix percent and counts missing marks as absent', async () => {

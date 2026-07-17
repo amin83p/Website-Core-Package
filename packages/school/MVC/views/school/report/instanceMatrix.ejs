@@ -49,7 +49,7 @@
   <input type="hidden" name="actionStateId" id="reportMatrixActionStateId" value="<%= actionStateId || '' %>">
   <script type="application/json" id="reportMatrixData"><%- JSON.stringify(matrix || {}).replace(/</g, '\\u003c') %></script>
 
-  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
     <div>
       <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;">Fill Reports</h1>
       <h5 class="fw-bold text-primary mt-2 mb-1"><%= matrix.templateTitle %></h5>
@@ -62,18 +62,21 @@
       </div>
       <div class="text-muted small mt-1">Report period: <strong><%= matrix.reportStartDate || '-' %></strong> to <strong><%= matrix.reportDueDate || '-' %></strong></div>
     </div>
-    <div class="d-flex gap-2">
-      <% if (matrix.classId && matrix.sessionId) { %>
-        <a href="/school/classes/<%= encodeURIComponent(matrix.classId) %>/sessions/<%= encodeURIComponent(matrix.sessionId) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Session</a>
-      <% } %>
-      <a href="/school/reports/instances" class="btn btn-outline-primary btn-sm"><i class="bi bi-list-check me-1"></i>Instances</a>
-      <button type="button" class="btn btn-outline-warning btn-sm" id="btnMatrixPrefillPreview"><i class="bi bi-arrow-repeat me-1"></i>Preview Prefill Updates</button>
-      <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=docx" class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</a>
-      <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=json&download=1" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
-    </div>
   </div>
 
-  <div id="reportMatrixAlert" class="alert d-none" role="alert"></div>
+  <div class="card border-0 shadow-sm mb-4" id="reportMatrixNavigation">
+    <div class="card-body py-2">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <% if (matrix.classId && matrix.sessionId) { %>
+          <a href="/school/classes/<%= encodeURIComponent(matrix.classId) %>/sessions/<%= encodeURIComponent(matrix.sessionId) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Session</a>
+        <% } %>
+        <a href="/school/reports/instances" class="btn btn-outline-primary btn-sm"><i class="bi bi-list-check me-1"></i>Instances</a>
+        <button type="button" class="btn btn-outline-warning btn-sm" id="btnMatrixPrefillPreview"><i class="bi bi-arrow-repeat me-1"></i>Preview Prefill Updates</button>
+        <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=docx" class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</a>
+        <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=json&download=1" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
+      </div>
+    </div>
+  </div>
 
   <div class="d-flex flex-wrap gap-2 mb-4">
     <div class="card border-0 shadow-sm matrix-summary-card"><div class="card-body py-2"><div class="small text-muted">Students</div><div class="fs-5 fw-bold" data-progress-key="total"><%= progress.total %></div></div></div>
@@ -119,11 +122,11 @@
     </div>
   <% } %>
 
-  <div class="card border-0 shadow-sm">
+  <div class="card border-0 shadow-sm" id="reportMatrixStudentReports">
     <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
       <div>
         <h5 class="m-0 fw-bold"><i class="bi bi-table me-2 text-primary"></i>Student reports</h5>
-        <div class="small text-muted mt-1">Use the buttons below to save or submit all editable student reports. Scroll horizontally to see every report field.</div>
+        <div class="small text-muted mt-1">Use the actions above to save or submit all editable student reports. Scroll horizontally to see every report field.</div>
       </div>
       <span class="badge bg-light text-dark border"><%= tableFields.length %> student-specific field(s)</span>
     </div>
@@ -179,11 +182,14 @@
         </tbody>
       </table>
     </div>
-    <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <div class="small text-muted" data-matrix-bulk-summary>Use the buttons to save or submit all editable student reports.</div>
-      <div class="d-flex gap-2">
-        <button type="button" class="btn btn-outline-primary js-matrix-bulk-action" data-action="save" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-save me-1"></i>Save All Drafts</button>
-        <button type="button" class="btn btn-success js-matrix-bulk-action" data-action="submit" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-send-check me-1"></i>Submit All Reports</button>
+  </div>
+
+  <div class="card border-0 shadow-sm mt-4" id="reportMatrixActions">
+    <div class="card-body py-2">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <button type="button" class="btn btn-primary btn-sm js-matrix-bulk-action" data-action="save" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-save me-1"></i>Save All Drafts</button>
+        <button type="button" class="btn btn-success btn-sm js-matrix-bulk-action" data-action="submit" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-send-check me-1"></i>Submit All Reports</button>
+        <button type="button" class="btn btn-outline-dark btn-sm js-matrix-bulk-action" data-action="lock" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-lock me-1"></i>Lock All Reports</button>
       </div>
     </div>
   </div>
@@ -197,10 +203,10 @@
   </div></div>
 </div>
 
+<%- include('partials/calculatedFieldsRuntime') %>
 <script>
   (function () {
     const dataEl = document.getElementById('reportMatrixData');
-    const alertEl = document.getElementById('reportMatrixAlert');
     let matrixState = JSON.parse(dataEl?.textContent || '{}');
     const dirtyStudents = new Set();
     let sharedDirty = false;
@@ -212,12 +218,17 @@
       });
     }
 
-    function showAlert(message, kind) {
-      if (!alertEl) return;
-      alertEl.className = `alert alert-${kind || 'info'}`;
-      alertEl.textContent = String(message || '');
-      alertEl.classList.toggle('d-none', !message);
-      if (message) alertEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    function showReportMatrixMessage({ title = 'Fill Reports', icon = 'info', message = '' } = {}) {
+      if (typeof showMessageModal === 'function') {
+        return showMessageModal({
+          title,
+          icon,
+          message,
+          buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+        });
+      }
+      window.alert(String(message || title || 'Fill Reports'));
+      return Promise.resolve();
     }
 
     function readControl(control) {
@@ -244,6 +255,41 @@
         if (fieldId) out[fieldId] = readControl(control);
       });
       return out;
+    }
+
+    function allMatrixFields() {
+      return [
+        ...(matrixState.sharedFields || []),
+        ...(matrixState.commonFields || []),
+        ...(matrixState.tableFields || [])
+      ];
+    }
+
+    function recalculateRow(row) {
+      if (!row || !window.SchoolReportCalculatedFields?.recomputeCalculatedAnswers) return;
+      const studentId = String(row.dataset.studentId || '');
+      const rowState = (matrixState.rows || []).find((item) => String(item.studentId || '') === studentId);
+      if (!rowState) return;
+      const answers = {
+        ...(rowState.answers || {}),
+        ...collectControls(document, '#reportMatrixCommonFields [data-field-id]'),
+        ...collectControls(document, '.js-matrix-shared-field'),
+        ...collectControls(row, '.js-matrix-row-field')
+      };
+      const result = window.SchoolReportCalculatedFields.recomputeCalculatedAnswers({
+        fields: allMatrixFields(),
+        answers,
+        prefill: rowState.calculationPrefill || {}
+      });
+      rowState.answers = result.answers;
+      (matrixState.tableFields || []).filter((field) => field.calculated).forEach((field) => {
+        const selector = `.js-matrix-row-field[data-field-id="${CSS.escape(field.id)}"]`;
+        writeControl(row.querySelector(selector), result.answers[field.id]);
+      });
+    }
+
+    function recalculateAllRows() {
+      document.querySelectorAll('tr[data-student-id]').forEach(recalculateRow);
     }
 
     function badgeClass(status) {
@@ -298,22 +344,29 @@
     }
 
     async function runBulkAction(button) {
-      const submitAction = String(button?.dataset.action || 'save').toLowerCase() === 'submit' ? 'submit' : 'save';
+      const requestedAction = String(button?.dataset.action || 'save').toLowerCase();
+      const submitAction = ['save', 'submit', 'lock'].includes(requestedAction) ? requestedAction : 'save';
       const rowStates = new Map((matrixState.rows || []).map((row) => [String(row.studentId), row]));
       const editableRows = Array.from(document.querySelectorAll('tr[data-student-id]')).filter((row) => {
         const state = rowStates.get(String(row.dataset.studentId || ''));
         return state ? !state.locked : !row.classList.contains('table-secondary');
       });
       if (!editableRows.length) {
-        showAlert('There are no editable student reports to process.', 'info');
+        await showReportMatrixMessage({
+          title: 'No Editable Reports',
+          icon: 'info',
+          message: 'There are no editable student reports to process.'
+        });
         return;
       }
       const actionButtons = Array.from(document.querySelectorAll('.js-matrix-bulk-action'));
       actionButtons.forEach((item) => { item.disabled = true; });
-      showAlert('', 'info');
       const loadingToken = typeof window.showLoading === 'function'
-        ? window.showLoading(submitAction === 'submit' ? 'Submitting student reports...' : 'Saving student reports...')
+        ? window.showLoading(submitAction === 'submit'
+          ? 'Submitting student reports...'
+          : (submitAction === 'lock' ? 'Locking student reports...' : 'Saving student reports...'))
         : null;
+      let feedback;
       try {
         const response = await fetch('/school/reports/instances/matrix/' + encodeURIComponent(matrixState.assignmentId) + '/save-all', {
           method: 'POST',
@@ -339,33 +392,42 @@
         if (!response.ok || !['success', 'partial'].includes(result.status)) {
           throw new Error(result.message || 'Unable to process the report matrix.');
         }
-        const failedIds = new Set((result.results || [])
-          .filter((item) => item.status === 'error')
+        const unsuccessfulIds = new Set((result.results || [])
+          .filter((item) => item.status !== 'success')
           .map((item) => String(item.studentId || '')));
-        applyMatrixState(result.matrix, null, { preserveStudentIds: failedIds, preserveShared: failedIds.size > 0 });
+        applyMatrixState(result.matrix, null, { preserveStudentIds: unsuccessfulIds, preserveShared: unsuccessfulIds.size > 0 });
         dirtyStudents.clear();
         document.querySelectorAll('tr[data-student-id]').forEach((row) => row.classList.remove('matrix-row-dirty'));
-        failedIds.forEach((studentId) => {
+        unsuccessfulIds.forEach((studentId) => {
           dirtyStudents.add(studentId);
           document.querySelector('tr[data-student-id="' + CSS.escape(studentId) + '"]')?.classList.add('matrix-row-dirty');
         });
-        sharedDirty = failedIds.size > 0;
+        sharedDirty = unsuccessfulIds.size > 0;
         const detail = (result.results || [])
           .filter((item) => item.status === 'error' && item.message)
           .slice(0, 3)
           .map((item) => String(item.studentId || '') + ': ' + item.message)
           .join(' | ');
         const message = [result.message || 'Report matrix processed.', detail].filter(Boolean).join(' ');
-        const summaryEl = document.querySelector('[data-matrix-bulk-summary]');
-        if (summaryEl) summaryEl.textContent = message;
-        showAlert(message, result.status === 'partial' ? 'warning' : 'success');
+        feedback = {
+          title: submitAction === 'submit' ? 'Reports Submitted' : (submitAction === 'lock' ? 'Reports Locked' : 'Reports Saved'),
+          icon: result.status === 'partial' ? 'warning' : 'success',
+          message
+        };
       } catch (error) {
-        showAlert(error.message, 'danger');
+        feedback = {
+          title: submitAction === 'submit'
+            ? 'Unable to Submit Reports'
+            : (submitAction === 'lock' ? 'Unable to Lock Reports' : 'Unable to Save Reports'),
+          icon: 'error',
+          message: error.message
+        };
       } finally {
         const hasEditable = (matrixState.rows || []).some((row) => !row.locked);
         actionButtons.forEach((item) => { item.disabled = !hasEditable; });
         if (typeof window.hideLoading === 'function') window.hideLoading(loadingToken || { force: true });
       }
+      await showReportMatrixMessage(feedback);
     }
 
     const prefillModal = document.getElementById('reportMatrixPrefillModal');
@@ -408,9 +470,17 @@
         const result = await response.json().catch(() => ({}));
         if (!response.ok || !['success','partial'].includes(result.status)) throw new Error(result.message || 'Unable to apply prefill updates.');
         if (typeof bootstrap !== 'undefined' && prefillModal) bootstrap.Modal.getOrCreateInstance(prefillModal).hide();
-        showAlert(result.message || 'Prefill updates applied.', result.status === 'partial' ? 'warning' : 'success');
-        if (result.matrix) applyMatrixState(result.matrix, null); else window.location.reload();
-      } catch (error) { showAlert(error.message, 'danger'); applyPrefillButton.disabled = false; }
+        if (result.matrix) applyMatrixState(result.matrix, null);
+        await showReportMatrixMessage({
+          title: 'Prefill Updates Applied',
+          icon: result.status === 'partial' ? 'warning' : 'success',
+          message: result.message || 'Prefill updates applied.'
+        });
+        if (!result.matrix) window.location.reload();
+      } catch (error) {
+        await showReportMatrixMessage({ title: 'Unable to Apply Prefill Updates', icon: 'error', message: error.message });
+        applyPrefillButton.disabled = false;
+      }
     }
     document.getElementById('btnMatrixPrefillPreview')?.addEventListener('click', loadPrefillPreview);
     applyPrefillButton?.addEventListener('click', applyPrefillUpdates);
@@ -419,19 +489,21 @@
       control.addEventListener('change', () => {
         const row = control.closest('tr[data-student-id]');
         if (!row) return;
+        recalculateRow(row);
         dirtyStudents.add(String(row.dataset.studentId || ''));
         row.classList.add('matrix-row-dirty');
       });
       control.addEventListener('input', () => {
         const row = control.closest('tr[data-student-id]');
         if (!row) return;
+        recalculateRow(row);
         dirtyStudents.add(String(row.dataset.studentId || ''));
         row.classList.add('matrix-row-dirty');
       });
     });
     document.querySelectorAll('.js-matrix-shared-field').forEach((control) => {
-      control.addEventListener('change', () => { sharedDirty = true; });
-      control.addEventListener('input', () => { sharedDirty = true; });
+      control.addEventListener('change', () => { sharedDirty = true; recalculateAllRows(); });
+      control.addEventListener('input', () => { sharedDirty = true; recalculateAllRows(); });
     });
     document.querySelectorAll('.js-matrix-bulk-action').forEach((button) => {
       button.addEventListener('click', () => runBulkAction(button));
@@ -441,6 +513,7 @@
       event.preventDefault();
       event.returnValue = '';
     });
+    recalculateAllRows();
     initializeTooltips();
   })();
 </script>

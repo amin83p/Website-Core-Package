@@ -117,6 +117,107 @@ test('placeholder payload uses converted values while merged/raw answers stay un
   assert.deepEqual(bundle.conversionDiagnostics, []);
 });
 
+test('DOCX value case supports all modes after conversion without changing stored answers', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'as_entered', label: 'As Entered', type: 'text' },
+        { id: 'upper', label: 'Upper', type: 'text', exportTextCase: 'upper', docxAlias: 'x6i4' },
+        { id: 'lower', label: 'Lower', type: 'text', exportTextCase: 'lower' },
+        { id: 'title', label: 'Title', type: 'text', exportTextCase: 'title' },
+        {
+          id: 'converted',
+          label: 'Converted',
+          type: 'text',
+          exportTextCase: 'lower',
+          conversionRule: { enabled: true, expression: '"CONVERTED OUTPUT"', onError: 'use_raw' }
+        }
+      ]
+    },
+    placeholderMap: {
+      as_entered: '{{as_entered}}',
+      upper: '{{upper}}',
+      lower: '{{lower}}',
+      title: '{{title}}',
+      converted: '{{converted}}'
+    }
+  };
+  const instance = {
+    answers: {
+      as_entered: 'MiXeD Value',
+      upper: 'Mixed Value',
+      lower: 'Mixed Value',
+      title: 'ÉCOLE du NORD',
+      converted: 'ORIGINAL ANSWER'
+    },
+    prefillSnapshot: { direct_catalog_value: 'MiXeD Direct Value' }
+  };
+
+  const bundle = reportService.buildDocxPlaceholderPayloadDetailed(template, instance, null);
+
+  assert.equal(bundle.placeholders['{{as_entered}}'], 'MiXeD Value');
+  assert.equal(bundle.placeholders['{{upper}}'], 'MIXED VALUE');
+  assert.equal(bundle.placeholders['{{x6i4}}'], 'MIXED VALUE');
+  assert.equal(bundle.placeholders['{{lower}}'], 'mixed value');
+  assert.equal(bundle.placeholders['{{title}}'], 'École Du Nord');
+  assert.equal(bundle.placeholders['{{converted}}'], 'converted output');
+  assert.equal(bundle.placeholders['{{direct_catalog_value}}'], 'MiXeD Direct Value');
+  assert.equal(instance.answers.converted, 'ORIGINAL ANSWER');
+
+  const genericBundle = reportService.buildPlaceholderPayloadDetailed(template, instance, null);
+  assert.equal(genericBundle.placeholders['{{upper}}'], 'Mixed Value');
+  assert.equal(Object.prototype.hasOwnProperty.call(genericBundle.placeholders, '{{x6i4}}'), false);
+  assert.equal(genericBundle.placeholders['{{title}}'], 'ÉCOLE du NORD');
+});
+
+test('DOCX shortcuts are generated uniquely and reject invalid or conflicting values', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'first_name', label: 'First Name', type: 'text' },
+        { id: 'last_name', label: 'Last Name', type: 'text' }
+      ]
+    },
+    placeholderMap: {
+      first_name: '{{x6i4}}',
+      last_name: '{{last_name}}'
+    }
+  };
+  reportRuleEngineService.ensureTemplateDocxAliases(template);
+  const aliases = template.schema.fields.map((field) => field.docxAlias);
+  assert.match(aliases[0], /^[a-z][a-z0-9]{3}$/);
+  assert.match(aliases[1], /^[a-z][a-z0-9]{3}$/);
+  assert.notEqual(aliases[0], aliases[1]);
+  assert.notEqual(aliases[0], 'x6i4');
+  assert.notEqual(aliases[1], 'x6i4');
+
+  assert.throws(
+    () => reportRuleEngineService.ensureTemplateDocxAliases({
+      schema: { fields: [{ id: 'name', label: 'Name', type: 'text', docxAlias: 'toolong' }] }
+    }),
+    /Name.*invalid DOCX shortcut/i
+  );
+  assert.throws(
+    () => reportRuleEngineService.ensureTemplateDocxAliases({
+      schema: { fields: [
+        { id: 'one', label: 'One', type: 'text', docxAlias: 'a123' },
+        { id: 'two', label: 'Two', type: 'text', docxAlias: 'a123' }
+      ] }
+    }),
+    /Two.*duplicate DOCX shortcut "a123"/i
+  );
+});
+
+test('DOCX value case validation rejects unsupported modes and defaults missing modes', () => {
+  assert.equal(reportRuleEngineService.normalizeExportTextCase(undefined, { strict: true }), 'as_entered');
+  assert.throws(
+    () => reportRuleEngineService.validateTemplateExportTextCases({
+      schema: { fields: [{ id: 'name', label: 'Student Name', type: 'text', exportTextCase: 'sentence' }] }
+    }),
+    /Student Name.*Unsupported DOCX value case "sentence"/i
+  );
+});
+
 test('conversion supports ifelse and caseof branching', () => {
   const template = {
     schema: {
@@ -223,6 +324,44 @@ test('calculated fields recompute in dependency order', () => {
   });
   assert.equal(recomputed.answers.sum, 95);
   assert.equal(recomputed.answers.grade, 'A');
+});
+
+test('calculated field validation rejects unsupported formula operators', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'score', label: 'Score', type: 'number' },
+        {
+          id: 'average',
+          label: 'Average Class Mark',
+          type: 'number',
+          valueMode: 'calculated',
+          calculationRule: { enabled: true, expression: "round(num(answers.score), 0) & '%'", onError: 'keep_last' },
+          calculationDependencies: ['score']
+        }
+      ]
+    }
+  };
+  assert.throws(
+    () => reportRuleEngineService.validateCalculatedFieldExpressions(template, { strict: true }),
+    /Average Class Mark.*Unsupported character "&"/i
+  );
+});
+
+test('server calculator returns 54 for report instance 542136 Average Class Mark inputs', () => {
+  const expression = 'round((num(answers.Attendance)+num(answers.Punctuality)+num(answers.Respects_The_Teachers)+num(answers.Returns_Assignments)+num(answers.Treats_Other_Students)+num(answers.Writes_Tests)+num(answers.classEffort)+num(answers.Class_Participation))/8.0,0)';
+  const result = reportRuleEngineService.evaluateSafeExpression(expression, {
+    answers: {
+      Attendance: 31.48,
+      Punctuality: 0,
+      Respects_The_Teachers: 100,
+      Treats_Other_Students: 100,
+      classEffort: 100,
+      Class_Participation: 100
+    },
+    prefill: {}
+  });
+  assert.equal(result, 54);
 });
 
 test('calculated field cycle is rejected', () => {
