@@ -1,5 +1,22 @@
 <style>
     .session-manager-page { --session-sidebar-w: 260px; --session-sidebar-collapsed-w: 72px; --session-topbar-h: auto; }
+    .session-completed-check {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.75rem;
+        height: 2.75rem;
+        margin-left: 0.65rem;
+        border: 3px solid #bbf7d0;
+        border-radius: 50%;
+        background: linear-gradient(145deg, #22c55e, #15803d);
+        color: #fff;
+        font-size: 1.8rem;
+        line-height: 1;
+        vertical-align: middle;
+        box-shadow: 0 0 0 0.2rem rgba(34, 197, 94, 0.18), 0 0.45rem 1rem rgba(21, 128, 61, 0.3);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
     .att-label { background-color: transparent; border: 1px solid transparent; color: #adb5bd; transition: all 0.2s ease-in-out; }
     .att-label:hover { background-color: #f8f9fa; color: #495057; }
     .btn-check[value="present"]:checked + .att-label { background-color: #198754; color: #fff; font-weight: bold; }
@@ -840,6 +857,9 @@
             ? normalizedSessionStatus
             : fallbackStatusCode;
         const currentSessionStatusMeta = availableStatusRows.find((row) => normalizeStatusCode(row?.code) === currentSessionStatus) || null;
+        const isSessionCompleted = currentSessionStatusMeta
+            ? (currentSessionStatusMeta.isFinal === true && currentSessionStatusMeta.makeUpRequired !== true && currentSessionStatusMeta.excludeFromAttendance !== true)
+            : currentSessionStatus === 'completed';
         const isMakeupRequiredInactive = currentSessionStatusMeta && currentSessionStatusMeta.makeUpRequired === true;
         const canCreateMakeupSession = !isReadOnly && currentSessionStatusMeta && currentSessionStatusMeta.makeUpRequired === true;
         const existingMakeupHistory = Array.isArray(session.makeupHistory) ? session.makeupHistory : [];
@@ -892,7 +912,7 @@
     %>
 
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-        <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-journal-check me-2 text-primary"></i>Manage Session</h1>
+        <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-journal-check me-2 text-primary"></i>Manage Session<% if (isSessionCompleted) { %><span class="session-completed-check" role="img" aria-label="Session completed" title="Session completed"><i class="bi bi-check-lg" aria-hidden="true"></i></span><% } %></h1>
         <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md session-manager-nav-away" id="linkSessionDashboard" data-confirm-title="Go to dashboard?" data-confirm-message="Leave this page and go to the school dashboard? Unsaved changes will be lost unless you save first."><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
     </div>
 

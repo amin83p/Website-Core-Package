@@ -35,3 +35,14 @@ test('session manager bulk All Late shows one guidance warning instead of openin
   assert.ok(source.includes('showLateMinutesRequiredWarning(getLateMissingMinuteRows(), { openFirst: false })'));
   assert.ok(source.includes('if (options.openFirst !== false) openLateDetailsForRow(issueRows[0]);'));
 });
+
+test('session manager shows a highlighted completion check beside the title for completed sessions', () => {
+  const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.ok(source.includes('const isSessionCompleted = currentSessionStatusMeta'));
+  assert.ok(source.includes('currentSessionStatusMeta.isFinal === true'));
+  assert.ok(source.includes(": currentSessionStatus === 'completed';"));
+  assert.ok(source.includes('class="session-completed-check"'));
+  assert.ok(source.includes('aria-label="Session completed"'));
+  assert.ok(source.includes('bi-check-lg'));
+  assert.ok(source.includes('box-shadow: 0 0 0 0.2rem rgba(34, 197, 94, 0.18)'));
+});
