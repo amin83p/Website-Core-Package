@@ -682,7 +682,7 @@ async function buildTimesheetOrgLookup(options = {}) {
 
 async function enrichTimesheetsWithOrg(rows, options = {}) {
   const periodOrgLookup = await buildTimesheetOrgLookup(options);
-  return normalizeRows(rows).map((timesheet) => {
+  return normalizeRows(rows).map(timesheetModel.normalizeLegacyTimesheetRecord).map((timesheet) => {
     const directOrgId = toPublicId(timesheet?.orgId);
     if (directOrgId) return timesheet;
 
@@ -695,6 +695,7 @@ async function enrichTimesheetsWithOrg(rows, options = {}) {
 
 async function enrichTimesheetItem(item, options = {}) {
   if (!item) return null;
+  item = timesheetModel.normalizeLegacyTimesheetRecord(item);
   const directOrgId = toPublicId(item.orgId);
   if (directOrgId) return item;
   const lookup = await buildTimesheetOrgLookup(options);
@@ -1054,6 +1055,7 @@ const schoolRepositories = {
     },
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'Timesheets cannot be deleted from this service.',
+    normalizePayload: (data) => timesheetModel.sanitizeTimesheetPayload(data),
     defaultSearchFields: ['id', 'periodId', 'teacherId', 'status', 'orgId'],
     transformList: enrichTimesheetsWithOrg,
     transformItem: enrichTimesheetItem,

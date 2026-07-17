@@ -70,6 +70,25 @@ test('school package views should use stable partial include paths', () => {
   assert.deepEqual(offenders, []);
 });
 
+test('school-owned partials resolve through the package view root', async () => {
+  const html = await ejs.render(
+    `<%- include('school/partials/studentNameLink', {
+      name: 'Test Student',
+      studentRecordId: 'STU_TEST',
+      canOpenStudentProfile: true,
+      linkClass: 'test-link'
+    }) %>`,
+    {},
+    {
+      filename: path.join(SCHOOL_VIEW_ROOT, 'class/finalGrades.ejs'),
+      views: [CORE_VIEW_ROOT, SCHOOL_PACKAGE_VIEW_ROOT]
+    }
+  );
+
+  assert.match(html, /Test Student/);
+  assert.match(html, /test-link/);
+});
+
 test('school rolling enrollment below-heading include resolves through package view root', async () => {
   const rollingEnrollmentView = path.join(SCHOOL_VIEW_ROOT, 'class/rollingEnrollment.ejs');
   const rollingEnrollmentSource = fs.readFileSync(rollingEnrollmentView, 'utf8');

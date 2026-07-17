@@ -862,7 +862,7 @@ async function upsertTimesheetTask(timesheet = {}, period = {}, actorUser = null
     message: `${teacherName} submitted a timesheet for ${periodLabel} (${totalHours.toFixed(2)} hours).`,
     severity: options.severity || 'info',
     taskTitle: 'Review timesheet',
-    taskDescription: 'Review the submitted timesheet and approve or reopen it.',
+    taskDescription: 'Review the submitted timesheet, resolve paid manual rows, then manager approve, process, or send it back for revision.',
     metadata: {
       timesheetStatus: timesheet.status,
       teacherId,
@@ -871,6 +871,39 @@ async function upsertTimesheetTask(timesheet = {}, period = {}, actorUser = null
     },
     note: options.note || ''
   }, actorUser, options);
+}
+
+async function upsertTimesheetRevisionTask(timesheet = {}, period = {}, actorUser = null, options = {}) {
+  const id = toPublicId(timesheet?.id);
+  const teacherId = toPublicId(timesheet?.teacherId || '');
+  if (!id || !teacherId) return null;
+  const teacherName = await personDisplayNameService.resolvePersonDisplayName(teacherId, {
+    fallback: cleanString(teacherId, 160) || 'Timesheet author'
+  });
+  const periodId = toPublicId(timesheet.periodId || period?.id || '');
+  const periodLabel = cleanString(period?.name || period?.label || period?.title || periodId, 120) || 'timesheet period';
+  const note = cleanString(options.note || timesheet.returnReason || '', 1000);
+  return upsertSourceTask({
+    orgId: timesheet.orgId || period?.orgId,
+    sourceType: 'timesheet',
+    sourceId: id,
+    sourceUrl: periodId ? `/school/timesheets/editor/${encodeURIComponent(periodId)}` : '',
+    title: `Timesheet returned for revision: ${periodLabel}`,
+    message: note || `Your timesheet for ${periodLabel} was returned for revision.`,
+    severity: 'warning',
+    taskTitle: 'Revise and resubmit timesheet',
+    taskDescription: note || 'Review the reviewer note, update the timesheet, and submit it again.',
+    assignedPersonId: teacherId,
+    assignedPersonName: teacherName,
+    metadata: {
+      timesheetStatus: 'draft',
+      teacherId,
+      teacherName,
+      periodId,
+      returnedForRevision: true
+    },
+    note
+  }, actorUser, { ...options, requireActiveRoutingRule: false });
 }
 
 async function resolveTimesheetTask(timesheet = {}, actorUser = null, options = {}) {
@@ -1212,6 +1245,7 @@ module.exports = {
   upsertLeaveRequestTask,
   resolveLeaveRequestTask,
   upsertTimesheetTask,
+  upsertTimesheetRevisionTask,
   resolveTimesheetTask,
   deleteSourceTask,
   deleteTask,

@@ -16,6 +16,7 @@ function normalizeDate(value) {
 function isManualMaterializationCandidate(entry = {}) {
   if (!entry || entry.isDeleted === true || entry.isManual !== true) return false;
   if (entry.materializedAt || entry.materializedSessionId) return false;
+  if (String(entry.approvalStatus || '').trim().toLowerCase() !== 'approved') return false;
   const sessionId = normalizeId(entry.sessionId);
   if (!sessionId.startsWith('MAN_')) return false;
   return Boolean(normalizeId(entry.classId) || normalizeId(entry.activityId));
@@ -207,11 +208,13 @@ async function materializeApprovedTimesheetManualEntries({ timesheet = {}, perio
         if (!result) continue;
         const prior = entryBySessionId.get(normalizeId(entry.sessionId));
         if (prior) {
+          const originalManualEntryId = normalizeId(entry.sessionId);
           prior.sessionId = result.sessionId;
           prior.classId = result.classId;
           prior.materializedAt = new Date().toISOString();
           prior.materializedSessionId = result.sessionId;
           prior.materializedFromTimesheetId = normalizeId(timesheet?.id);
+          prior.materializedFromTimesheetEntryId = originalManualEntryId;
           prior.attendanceDuePeriodId = attendanceDuePeriodId;
           prior.isManual = true;
           prior.approvalStatus = 'approved';
@@ -230,12 +233,14 @@ async function materializeApprovedTimesheetManualEntries({ timesheet = {}, perio
         if (!result) continue;
         const prior = entryBySessionId.get(normalizeId(entry.sessionId));
         if (prior) {
+          const originalManualEntryId = normalizeId(entry.sessionId);
           const payableHours = Number(parseFloat(entry?.requestedHours ?? entry?.durationHours ?? entry?.hours) || 0);
           prior.sessionId = result.sessionId;
           prior.activityEntryId = result.activityEntryId;
           prior.materializedAt = new Date().toISOString();
           prior.materializedSessionId = result.sessionId;
           prior.materializedFromTimesheetId = normalizeId(timesheet?.id);
+          prior.materializedFromTimesheetEntryId = originalManualEntryId;
           prior.approvalStatus = 'approved';
           prior.excludeFromTotals = false;
           prior.hours = payableHours;
@@ -276,10 +281,11 @@ async function materializeApprovedTimesheetManualEntries({ timesheet = {}, perio
 
 async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = {}) {
   const token = normalizeId(timesheetId);
-  if (!token) return { revertedClassSessions: 0, revertedActivityEntries: 0 };
+  if (!token) return { revertedClassSessions: 0, revertedActivityEntries: 0, entryRestorations: [] };
 
   let revertedClassSessions = 0;
   let revertedActivityEntries = 0;
+  const entryRestorations = [];
   const classes = await schoolDataService.fetchData('classes', {}, reqUser);
   for (const classRow of Array.isArray(classes) ? classes : []) {
     const classId = normalizeId(classRow?.id);
@@ -289,6 +295,10 @@ async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = 
     let changed = false;
     const kept = (Array.isArray(sessions) ? sessions : []).filter((session) => {
       if (normalizeId(session?.materializedFromTimesheetId) !== token) return true;
+      entryRestorations.push({
+        materializedSessionId: normalizeId(session?.sessionId),
+        originalEntryId: normalizeId(session?.materializedFromTimesheetEntryId)
+      });
       revertedClassSessions += 1;
       changed = true;
       return false;
@@ -309,6 +319,11 @@ async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = 
     entries.forEach((entry) => {
       const assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).filter((assignee) => {
         if (normalizeId(assignee?.materializedFromTimesheetId) === token) {
+          entryRestorations.push({
+            materializedSessionId: `act-${activityId}-${normalizeId(entry?.entryId || entry?.id)}-${normalizeId(assignee?.personId)}`,
+            activityEntryId: normalizeId(entry?.entryId || entry?.id),
+            originalEntryId: normalizeId(assignee?.materializedFromTimesheetEntryId)
+          });
           revertedActivityEntries += 1;
           changed = true;
           return false;
@@ -331,7 +346,7 @@ async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = 
     }
   }
 
-  return { revertedClassSessions, revertedActivityEntries };
+  return { revertedClassSessions, revertedActivityEntries, entryRestorations };
 }
 
 module.exports = {

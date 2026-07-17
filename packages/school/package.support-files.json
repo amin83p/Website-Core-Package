@@ -551,7 +551,7 @@
             "target": "packages/school/test/school-session-student-cases-feature.test.js",
             "category": "feature-regression",
             "status": "root-active",
-            "targetStatus": "package-planned"
+            "targetStatus": "package-mirrored"
         },
         {
             "source": "test/student-enrollment-detail.test.js",

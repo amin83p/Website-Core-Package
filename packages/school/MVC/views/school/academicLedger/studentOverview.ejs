@@ -34,7 +34,7 @@
       <h1 class="page-heading size-md m-0"><i class="bi bi-person-vcard me-2"></i><%= title %></h1>
       <% if (student) { %>
         <div class="text-muted small mt-1">
-          <%- include('../partials/studentNameLink', { name: studentName, studentRecordId: student.id, canOpenStudentProfile: true, linkClass: 'text-decoration-none fw-semibold text-primary' }) %>
+          <%- include('school/partials/studentNameLink', { name: studentName, studentRecordId: student.id, canOpenStudentProfile: true, linkClass: 'text-decoration-none fw-semibold text-primary' }) %>
           | Student ID: <%= student.id %>
           <% if (student.studentNumber) { %> | Student #: <%= student.studentNumber %><% } %>
           | Active Org: <%= activeOrgId %>

@@ -1280,7 +1280,7 @@
                                         <% session.roster.forEach((student, i) => { %>
                                             <tr class="roster-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
                                                 <td class="ps-4 fw-bold align-middle">
-                                                    <%- include('../partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
+                                                    <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
                                                     <% if (student.comments && student.comments.length > 0) { %>
                                                         <i class="bi bi-chat-dots-fill text-primary ms-1" style="font-size: 0.75rem;" title="Notes Exist"></i>
                                                     <% } %>
@@ -1374,7 +1374,7 @@
                                         <% session.roster.forEach((student) => { %>
                                             <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
                                                 <td class="ps-4 fw-bold align-middle">
-                                                    <%- include('../partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
+                                                    <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
                                                     <div class="small text-muted font-monospace"><%= student.personId %></div>
                                                 </td>
                                                 <% conductDimensions.forEach((dim) => { %>
@@ -5123,4 +5123,4 @@ function openDetailsModal(personId, name) {
     if (detailsModalInstance) detailsModalInstance.show();
 }
 </script>
-<%- include('../partials/studentProfileLinkBootstrap') %>
+<%- include('school/partials/studentProfileLinkBootstrap') %>

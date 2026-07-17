@@ -138,7 +138,7 @@
               <% const st = String(row.status || '').toLowerCase(); %>
               <tr>
                 <td class="ps-3">
-                  <div class="fw-semibold"><%- include('../partials/studentNameLink', { name: row.studentName || row.studentId || '-', studentRecordId: row.studentRecordId || row.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
+                  <div class="fw-semibold"><%- include('school/partials/studentNameLink', { name: row.studentName || row.studentId || '-', studentRecordId: row.studentRecordId || row.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
                   <div class="x-small text-muted font-monospace"><%= row.studentId || '-' %></div>
                   <% if (row.studentNo) { %>
                     <div class="x-small text-muted">No: <%= row.studentNo %></div>

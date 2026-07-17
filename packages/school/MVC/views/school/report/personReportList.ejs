@@ -155,7 +155,7 @@
             <% } %>
           </td>
           <td>
-            <div><%- include('../partials/studentNameLink', { name: row.studentName || '-', studentRecordId: row.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
+            <div><%- include('school/partials/studentNameLink', { name: row.studentName || '-', studentRecordId: row.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
             <% if (row.studentId && row.studentName && row.studentName !== row.studentId) { %>
               <div class="x-small text-muted font-monospace"><%= row.studentId %></div>
             <% } %>

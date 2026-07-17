@@ -46,7 +46,7 @@
             <div class="x-small text-muted registration-record-status">Record: <%= String(item.status || '').toLowerCase() === 'rolled_back' ? 'Moved back to draft' : item.status %></div>
           </td>
           <td>
-            <div class="fw-bold"><%- include('../partials/studentNameLink', { name: item.studentName || item.studentId, studentRecordId: item.studentRecordId || item.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
+            <div class="fw-bold"><%- include('school/partials/studentNameLink', { name: item.studentName || item.studentId, studentRecordId: item.studentRecordId || item.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
             <div class="small text-muted font-monospace"><%= item.studentId || '-' %></div>
             <div class="x-small text-muted"><%= item.feeCategorySnapshot || '-' %></div>
           </td>

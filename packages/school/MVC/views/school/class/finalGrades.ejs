@@ -87,7 +87,7 @@
         <tr data-person-id="<%= pid %>"
             data-phase="<%= phase %>"
             data-can-teacher="<%= teacherEdit ? '1' : '0' %>">
-          <td class="fw-semibold"><%- include('../partials/studentNameLink', { name: row.name || pid, studentRecordId: row.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none fw-semibold' }) %></td>
+          <td class="fw-semibold"><%- include('school/partials/studentNameLink', { name: row.name || pid, studentRecordId: row.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none fw-semibold' }) %></td>
           <td class="text-end fg-num"><%= row.attendancePct != null ? row.attendancePct : '—' %></td>
           <td class="text-end fg-num"><%= row.assignmentsPct != null ? row.assignmentsPct : '—' %></td>
           <td class="text-end fg-num text-muted"><%= sug != null ? sug : '—' %></td>

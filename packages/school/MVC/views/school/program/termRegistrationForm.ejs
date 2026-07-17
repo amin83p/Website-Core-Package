@@ -237,7 +237,7 @@
                 <% (recentRegistrations || []).forEach(function (row) { %>
                   <tr>
                     <td><div class="fw-bold"><a href="/school/programs/term-registrations/<%= encodeURIComponent(row.id) %>"><%= row.id %></a></div><div class="small text-muted"><%= row.registrationDate || '-' %></div></td>
-                    <td><div class="fw-bold"><%- include('../partials/studentNameLink', { name: row.studentName || row.studentId, studentRecordId: row.studentRecordId || row.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div><div class="small text-muted font-monospace"><%= row.studentId || '-' %></div></td>
+                    <td><div class="fw-bold"><%- include('school/partials/studentNameLink', { name: row.studentName || row.studentId, studentRecordId: row.studentRecordId || row.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div><div class="small text-muted font-monospace"><%= row.studentId || '-' %></div></td>
                     <td><div class="fw-bold"><%= row.programLabel || row.programId %></div><div class="small text-muted"><%= row.termLabel || row.termId %></div></td>
                     <td><%= Number(row.selectedCredits || 0).toFixed(2) %> / <%= row.classCount || 0 %> classes</td>
                     <td>Posted <strong><%= row.finance.posted %></strong> / <%= row.finance.expected %></td>

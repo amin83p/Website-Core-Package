@@ -28,7 +28,7 @@
             <dd class="col-7"><%= registration.registrationDate || '-' %></dd>
             <dt class="col-5 text-muted">Student</dt>
             <dd class="col-7">
-              <div class="fw-bold"><%- include('../partials/studentNameLink', { name: registration.studentName || registration.studentId, studentRecordId: registration.studentRecordId || registration.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
+              <div class="fw-bold"><%- include('school/partials/studentNameLink', { name: registration.studentName || registration.studentId, studentRecordId: registration.studentRecordId || registration.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
               <div class="font-monospace"><%= registration.studentId || '-' %></div>
             </dd>
             <dt class="col-5 text-muted">Program</dt>
@@ -473,7 +473,7 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
-<%- include('../partials/registrationStatusTransitionModal', {
+<%- include('school/partials/registrationStatusTransitionModal', {
   registrationStatusRegistrationId: registration.id,
   registrationStatusEndpointBase: '/school/programs/term-registrations/' + encodeURIComponent(registration.id) + '/status'
 }) %>

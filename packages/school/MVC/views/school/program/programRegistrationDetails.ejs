@@ -404,7 +404,7 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
-<%- include('../partials/registrationStatusTransitionModal', {
+<%- include('school/partials/registrationStatusTransitionModal', {
   registrationStatusRegistrationId: registration.id,
   registrationStatusEndpointBase: '/school/programs/registrations/' + encodeURIComponent(registration.id) + '/status'
 }) %>

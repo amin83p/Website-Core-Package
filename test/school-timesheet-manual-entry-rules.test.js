@@ -314,6 +314,7 @@ test('materialization service marks manual candidates and resolves next period',
     sessionId: 'MAN_1',
     isManual: true,
     classId: 'CLS-1',
+    approvalStatus: 'approved',
     date: '2026-07-01'
   }), true);
   assert.equal(service.isManualMaterializationCandidate({

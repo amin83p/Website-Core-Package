@@ -12,8 +12,22 @@ if (!fsSync.existsSync(dataPath)) {
     fsSync.writeFileSync(dataPath, '[]');
 }
 
-const TIMESHEET_STATUSES = new Set(['draft', 'submitted', 'approved', 'processed']);
-const REVIEW_HISTORY_EVENTS = new Set(['submitted', 'approved', 'reopened', 'processed']);
+const TIMESHEET_STATUSES = new Set(['draft', 'submitted', 'processed']);
+const LEGACY_TIMESHEET_STATUSES = new Set(['approved']);
+const REVIEW_HISTORY_EVENTS = new Set([
+    'submitted',
+    'reviewer_edited',
+    'manager_approved',
+    'returned',
+    'manual_row_approved',
+    'manual_row_rejected',
+    'processed',
+    // Read compatibility for history written by the former four-state workflow.
+    'approved',
+    'reopened'
+]);
+const REVIEW_HISTORY_STATUSES = new Set([...TIMESHEET_STATUSES, ...LEGACY_TIMESHEET_STATUSES]);
+const MANAGER_REVIEW_STATUSES = new Set(['pending', 'approved']);
 const MAX_REVIEW_HISTORY_ENTRIES = 100;
 
 function cleanString(v, { max = 500, allowEmpty = true } = {}) {
@@ -77,6 +91,63 @@ function cleanMoney(v) {
     return Number(n.toFixed(2));
 }
 
+function normalizeTimesheetStatus(value) {
+    const token = cleanString(value, { max: 30, allowEmpty: true }).toLowerCase() || 'draft';
+    return token === 'approved' ? 'submitted' : token;
+}
+
+function cleanNonNegativeInteger(value, fallback = 0) {
+    const number = Number.parseInt(String(value ?? ''), 10);
+    return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+function sanitizeManagerReview(input, { legacyApprovedAt = '', legacyApprovedBy = '', reviewVersion = 0 } = {}) {
+    const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+    let status = cleanString(source.status, { max: 30, allowEmpty: true }).toLowerCase();
+    if (!MANAGER_REVIEW_STATUSES.has(status)) {
+        status = legacyApprovedAt || legacyApprovedBy ? 'approved' : 'pending';
+    }
+    const result = {
+        status,
+        reviewVersion: cleanNonNegativeInteger(source.reviewVersion, reviewVersion)
+    };
+    const reviewedAt = cleanString(source.reviewedAt || legacyApprovedAt, { max: 40, allowEmpty: true });
+    const reviewedBy = cleanString(source.reviewedBy || legacyApprovedBy, { max: 120, allowEmpty: true });
+    const reviewedByName = cleanString(source.reviewedByName, { max: 200, allowEmpty: true });
+    const note = cleanString(source.note, { max: 2000, allowEmpty: true });
+    if (reviewedAt) result.reviewedAt = reviewedAt;
+    if (reviewedBy) result.reviewedBy = reviewedBy;
+    if (reviewedByName) result.reviewedByName = reviewedByName;
+    if (note) result.note = note;
+    return result;
+}
+
+function normalizeLegacyTimesheetRecord(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+    const rawStatus = cleanString(input.status, { max: 30, allowEmpty: true }).toLowerCase() || 'draft';
+    if (rawStatus !== 'approved') return input;
+    const reviewVersion = Math.max(1, cleanNonNegativeInteger(input.reviewVersion ?? input.submissionSnapshot?.reviewVersion, 0));
+    return {
+        ...input,
+        status: 'submitted',
+        reviewVersion,
+        managerReview: sanitizeManagerReview(input.managerReview, {
+            legacyApprovedAt: input.approvedAt || input.audit?.lastUpdateDateTime || input.submissionSnapshot?.submittedAt || '',
+            legacyApprovedBy: input.approvedBy || input.audit?.lastUpdateUser || '',
+            reviewVersion
+        }),
+        ...(input.submissionSnapshot && typeof input.submissionSnapshot === 'object'
+            ? {
+                submissionSnapshot: {
+                    ...input.submissionSnapshot,
+                    reviewVersion,
+                    lastModifiedAt: input.submissionSnapshot.lastModifiedAt || input.approvedAt || input.submissionSnapshot.submittedAt || ''
+                }
+            }
+            : {})
+    };
+}
+
 function applyPayrollFields(row, entry) {
     const personRole = cleanPayrollRole(entry?.personRole);
     if (personRole) row.personRole = personRole;
@@ -119,6 +190,26 @@ function sanitizeSnapshotEntry(entry) {
     if (entry.isSchoolActivity === true || sessionId.startsWith('act-')) row.isSchoolActivity = true;
     if (entry.isFinalStatus === true) row.isFinalStatus = true;
     if (entry.isFinalStatus === false) row.isFinalStatus = false;
+    if (row.isManual) {
+        const requestedHours = cleanHours(entry.requestedHours ?? entry.durationHours ?? entry.hours ?? 0, { min: 0, max: 24 });
+        const approvalToken = cleanString(entry.approvalStatus, { max: 40, allowEmpty: true }).toLowerCase();
+        const approvalStatus = ['pending_approval', 'approved', 'rejected', 'unpaid'].includes(approvalToken)
+            ? approvalToken
+            : (row.activityId ? (entry.activityPaid === true ? 'pending_approval' : 'unpaid') : 'approved');
+        row.requestedHours = requestedHours;
+        row.durationHours = requestedHours;
+        row.activityPaid = entry.activityPaid === true;
+        row.approvalStatus = approvalStatus;
+        row.excludeFromTotals = entry.excludeFromTotals === true || ['pending_approval', 'rejected', 'unpaid'].includes(approvalStatus);
+        const decisionAt = cleanString(entry.decisionAt, { max: 40, allowEmpty: true });
+        const decisionBy = cleanString(entry.decisionBy, { max: 120, allowEmpty: true });
+        const decisionByName = cleanString(entry.decisionByName, { max: 200, allowEmpty: true });
+        const decisionNote = cleanString(entry.decisionNote, { max: 2000, allowEmpty: true });
+        if (decisionAt) row.decisionAt = decisionAt;
+        if (decisionBy) row.decisionBy = decisionBy;
+        if (decisionByName) row.decisionByName = decisionByName;
+        if (decisionNote) row.decisionNote = decisionNote;
+    }
     return applyPayrollFields(row, entry);
 }
 
@@ -131,8 +222,8 @@ function sanitizeReviewHistoryEntry(input) {
     const by = cleanString(input.by, { max: 120, allowEmpty: true });
     const byName = cleanString(input.byName, { max: 200, allowEmpty: true });
     const note = cleanString(input.note, { max: 2000, allowEmpty: true });
-    if (event === 'reopened' && !note) {
-        throw new Error('Reopen review history entries require a note.');
+    if ((event === 'reopened' || event === 'returned' || event === 'manual_row_rejected') && !note) {
+        throw new Error(`${event.replace(/_/g, ' ')} review history entries require a note.`);
     }
     const statusBefore = cleanString(input.statusBefore, { max: 30, allowEmpty: true }).toLowerCase();
     const statusAfter = cleanString(input.statusAfter, { max: 30, allowEmpty: true }).toLowerCase();
@@ -146,8 +237,8 @@ function sanitizeReviewHistoryEntry(input) {
         byName: byName || ''
     };
     if (note) row.note = note;
-    if (statusBefore && TIMESHEET_STATUSES.has(statusBefore)) row.statusBefore = statusBefore;
-    if (statusAfter && TIMESHEET_STATUSES.has(statusAfter)) row.statusAfter = statusAfter;
+    if (statusBefore && REVIEW_HISTORY_STATUSES.has(statusBefore)) row.statusBefore = statusBefore;
+    if (statusAfter && REVIEW_HISTORY_STATUSES.has(statusAfter)) row.statusAfter = statusAfter;
     if (submissionSnapshotAt) row.submissionSnapshotAt = submissionSnapshotAt;
     if (Number.isFinite(totalHours)) row.totalHours = Number(totalHours.toFixed(2));
     if (Number.isFinite(entryCount) && entryCount >= 0) row.entryCount = Math.floor(entryCount);
@@ -176,12 +267,16 @@ function sanitizeSubmissionSnapshot(input) {
     const entries = (Array.isArray(input.entries) ? input.entries : [])
         .map(sanitizeSnapshotEntry)
         .filter(Boolean);
-    return {
+    const result = {
         submittedAt,
         sourcePeriodId: String(sourcePeriodId),
         sourcePeriodName: String(sourcePeriodName || ''),
         entries
     };
+    result.reviewVersion = cleanNonNegativeInteger(input.reviewVersion, 0);
+    const lastModifiedAt = cleanString(input.lastModifiedAt, { max: 40, allowEmpty: true });
+    if (lastModifiedAt) result.lastModifiedAt = lastModifiedAt;
+    return result;
 }
 
 function sanitizeAdjustmentMeta(input) {
@@ -236,19 +331,38 @@ function sanitizeEntry(entry) {
         const requestedHoursRaw = Number(entry.requestedHours ?? entry.durationHours ?? entry.hours ?? 0);
         const requestedHours = cleanHours(requestedHoursRaw, { min: 0, max: 24 });
         const approvalToken = String(entry.approvalStatus || '').trim().toLowerCase();
-        const approvalStatus = ['pending_approval', 'approved', 'unpaid'].includes(approvalToken)
+        const approvalStatus = ['pending_approval', 'approved', 'rejected', 'unpaid'].includes(approvalToken)
             ? approvalToken
             : '';
-        const excludeFromTotals = entry.excludeFromTotals === true || approvalStatus === 'pending_approval';
+        const excludeFromTotals = entry.excludeFromTotals === true || ['pending_approval', 'rejected', 'unpaid'].includes(approvalStatus);
         row.requestedHours = requestedHours;
         row.durationHours = requestedHours;
         row.startTime = cleanTime(entry.startTime, { allowEmpty: true });
         row.endTime = cleanTime(entry.endTime, { allowEmpty: true });
         row.activityId = cleanString(entry.activityId, { max: 80, allowEmpty: true });
+        row.activityEntryId = cleanString(entry.activityEntryId, { max: 80, allowEmpty: true });
         row.activityName = cleanString(entry.activityName, { max: 220, allowEmpty: true });
         row.activityPaid = entry.activityPaid === true;
         row.approvalStatus = approvalStatus || (row.activityId ? (row.activityPaid ? 'pending_approval' : 'unpaid') : 'approved');
         row.excludeFromTotals = excludeFromTotals;
+        const decisionAt = cleanString(entry.decisionAt, { max: 40, allowEmpty: true });
+        const decisionBy = cleanString(entry.decisionBy, { max: 120, allowEmpty: true });
+        const decisionByName = cleanString(entry.decisionByName, { max: 200, allowEmpty: true });
+        const decisionNote = cleanString(entry.decisionNote, { max: 2000, allowEmpty: true });
+        if (decisionAt) row.decisionAt = decisionAt;
+        if (decisionBy) row.decisionBy = decisionBy;
+        if (decisionByName) row.decisionByName = decisionByName;
+        if (decisionNote) row.decisionNote = decisionNote;
+        const materializedAt = cleanString(entry.materializedAt, { max: 40, allowEmpty: true });
+        const materializedSessionId = cleanString(entry.materializedSessionId, { max: 80, allowEmpty: true });
+        const materializedFromTimesheetId = cleanString(entry.materializedFromTimesheetId, { max: 80, allowEmpty: true });
+        const materializedFromTimesheetEntryId = cleanString(entry.materializedFromTimesheetEntryId, { max: 80, allowEmpty: true });
+        const attendanceDuePeriodId = cleanString(entry.attendanceDuePeriodId, { max: 80, allowEmpty: true });
+        if (materializedAt) row.materializedAt = materializedAt;
+        if (materializedSessionId) row.materializedSessionId = materializedSessionId;
+        if (materializedFromTimesheetId) row.materializedFromTimesheetId = materializedFromTimesheetId;
+        if (materializedFromTimesheetEntryId) row.materializedFromTimesheetEntryId = materializedFromTimesheetEntryId;
+        if (attendanceDuePeriodId) row.attendanceDuePeriodId = attendanceDuePeriodId;
         if (excludeFromTotals) {
             row.hours = 0;
         }
@@ -284,7 +398,8 @@ function sanitizeTimesheetPayload(input) {
     if (!periodId) throw new Error('periodId is required.');
     if (!teacherId) throw new Error('teacherId is required.');
 
-    const status = cleanString(input.status, { max: 30, allowEmpty: true }).toLowerCase() || 'draft';
+    const rawStatus = cleanString(input.status, { max: 30, allowEmpty: true }).toLowerCase() || 'draft';
+    const status = normalizeTimesheetStatus(rawStatus);
     if (!TIMESHEET_STATUSES.has(status)) throw new Error('Invalid timesheet status.');
 
     if (!Array.isArray(input.entries)) throw new Error('Timesheet entries must be an array.');
@@ -294,7 +409,7 @@ function sanitizeTimesheetPayload(input) {
     const computedTotal = entries.reduce((sum, e) => {
         if (e.isDeleted) return sum;
         if (e.excludeFromTotals === true) return sum;
-        if (String(e.approvalStatus || '').trim().toLowerCase() === 'pending_approval') return sum;
+        if (['pending_approval', 'rejected', 'unpaid'].includes(String(e.approvalStatus || '').trim().toLowerCase())) return sum;
         return sum + (Number(e.hours) || 0);
     }, 0);
 
@@ -307,6 +422,20 @@ function sanitizeTimesheetPayload(input) {
         totalHours: Number(computedTotal.toFixed(2))
     };
 
+    const reviewVersion = rawStatus === 'approved'
+        ? Math.max(1, cleanNonNegativeInteger(input.reviewVersion, 0))
+        : cleanNonNegativeInteger(input.reviewVersion, 0);
+    if (input.reviewVersion !== undefined || input.managerReview !== undefined || rawStatus === 'approved') {
+        result.reviewVersion = reviewVersion;
+    }
+    if (input.managerReview !== undefined || rawStatus === 'approved' || input.approvedAt || input.approvedBy) {
+        result.managerReview = sanitizeManagerReview(input.managerReview, {
+            legacyApprovedAt: rawStatus === 'approved' ? input.approvedAt : '',
+            legacyApprovedBy: rawStatus === 'approved' ? input.approvedBy : '',
+            reviewVersion
+        });
+    }
+
     if (input.submissionSnapshot !== undefined) {
         const snapshot = sanitizeSubmissionSnapshot(input.submissionSnapshot);
         if (snapshot) result.submissionSnapshot = snapshot;
@@ -317,10 +446,18 @@ function sanitizeTimesheetPayload(input) {
         if (appliedFrom) result.priorPeriodAdjustmentsAppliedFrom = String(appliedFrom);
     }
 
-    const approvedAt = cleanString(input.approvedAt, { max: 40, allowEmpty: true });
-    if (approvedAt) result.approvedAt = approvedAt;
-    const approvedBy = cleanString(input.approvedBy, { max: 120, allowEmpty: true });
-    if (approvedBy) result.approvedBy = approvedBy;
+    const optionalStrings = [
+        ['approvedAt', 40], ['approvedBy', 120], ['processedAt', 40], ['processedBy', 120],
+        ['processedByName', 200], ['returnedAt', 40], ['returnedBy', 120], ['returnReason', 2000]
+    ];
+    optionalStrings.forEach(([key, max]) => {
+        if (input[key] !== undefined) result[key] = cleanString(input[key], { max, allowEmpty: true });
+    });
+    if (input.materializationSummary !== undefined) {
+        result.materializationSummary = input.materializationSummary && typeof input.materializationSummary === 'object'
+            ? JSON.parse(JSON.stringify(input.materializationSummary))
+            : null;
+    }
     if (Array.isArray(input.lockedSourceRefs)) {
         result.lockedSourceRefs = input.lockedSourceRefs
             .filter((ref) => ref && typeof ref === 'object' && !Array.isArray(ref))
@@ -345,7 +482,8 @@ function sanitizeTimesheetPayload(input) {
 async function getAllTimesheets() {
     try {
         const data = await fs.readFile(dataPath, 'utf8');
-        return JSON.parse(data || '[]');
+        const rows = JSON.parse(data || '[]');
+        return (Array.isArray(rows) ? rows : []).map(normalizeLegacyTimesheetRecord);
     } catch (error) {
         if (error.code === 'ENOENT') return [];
         throw new Error('Failed to retrieve Timesheets');
@@ -391,6 +529,13 @@ async function saveTimesheet(data) {
             }
             if (sanitized.approvedAt === undefined && existing.approvedAt) merged.approvedAt = existing.approvedAt;
             if (sanitized.approvedBy === undefined && existing.approvedBy) merged.approvedBy = existing.approvedBy;
+            if (sanitized.managerReview === undefined && existing.managerReview) merged.managerReview = existing.managerReview;
+            if (sanitized.processedAt === undefined && existing.processedAt) merged.processedAt = existing.processedAt;
+            if (sanitized.processedBy === undefined && existing.processedBy) merged.processedBy = existing.processedBy;
+            if (sanitized.processedByName === undefined && existing.processedByName) merged.processedByName = existing.processedByName;
+            if (sanitized.returnedAt === undefined && existing.returnedAt) merged.returnedAt = existing.returnedAt;
+            if (sanitized.returnedBy === undefined && existing.returnedBy) merged.returnedBy = existing.returnedBy;
+            if (sanitized.returnReason === undefined && existing.returnReason) merged.returnReason = existing.returnReason;
             if (sanitized.lockedSourceRefs === undefined && existing.lockedSourceRefs) {
                 merged.lockedSourceRefs = existing.lockedSourceRefs;
             }
@@ -452,7 +597,11 @@ module.exports = {
     sanitizeSnapshotEntry,
     sanitizeReviewHistory,
     sanitizeReviewHistoryEntry,
+    sanitizeManagerReview,
+    normalizeTimesheetStatus,
+    normalizeLegacyTimesheetRecord,
     TIMESHEET_STATUSES: Object.freeze([...TIMESHEET_STATUSES]),
+    LEGACY_TIMESHEET_STATUSES: Object.freeze([...LEGACY_TIMESHEET_STATUSES]),
     REVIEW_HISTORY_EVENTS: Object.freeze([...REVIEW_HISTORY_EVENTS])
 };
 

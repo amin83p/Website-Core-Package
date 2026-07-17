@@ -39,7 +39,7 @@ test('schoolDependencyService parses activity session ids', () => {
   });
 });
 
-test('timesheet model accepts approved status and approval metadata', () => {
+test('timesheet model reads legacy approved records as submitted manager-approved records', () => {
   const payload = timesheetModel.sanitizeTimesheetPayload({
     orgId: '900000',
     periodId: 'TSP_APPROVE_1',
@@ -57,19 +57,24 @@ test('timesheet model accepts approved status and approval metadata', () => {
     }]
   });
 
-  assert.equal(payload.status, 'approved');
+  assert.equal(payload.status, 'submitted');
+  assert.equal(payload.managerReview.status, 'approved');
+  assert.equal(payload.managerReview.reviewVersion, payload.reviewVersion);
   assert.equal(payload.approvedAt, '2026-07-02T10:00:00.000Z');
   assert.equal(payload.approvedBy, 'admin_1');
   assert.equal(payload.lockedSourceRefs.length, 1);
   assert.equal(payload.lockedSourceRefs[0].sessionId, 'SES_1');
 });
 
-test('timesheet routes expose approve and reopen admin endpoints', () => {
+test('timesheet routes expose manager approval, return compatibility, and finance processing endpoints', () => {
   const source = read('packages/school/MVC/routes/timesheetRoutes.js');
   assert.match(source, /approveTimesheet/);
-  assert.match(source, /reopenTimesheet/);
+  assert.match(source, /returnTimesheet/);
+  assert.match(source, /processTimesheet/);
   assert.match(source, /\/editor\/:periodId\/approve/);
+  assert.match(source, /\/editor\/:periodId\/return/);
   assert.match(source, /\/editor\/:periodId\/reopen/);
+  assert.match(source, /\/editor\/:periodId\/process/);
 });
 
 test('timesheet editor renders frozen snapshot rows and admin approval controls', () => {
@@ -81,22 +86,31 @@ test('timesheet editor renders frozen snapshot rows and admin approval controls'
   assert.match(source, /executeAdminTimesheetAction/);
 });
 
-test('activity delete path checks dependency service before removal', () => {
-  const source = read('packages/school/MVC/controllers/school/activityController.js');
-  assert.match(source, /assertSourceNotReferenced/);
-  assert.match(source, /assertActivityNotTimesheetLocked/);
+test('activity delete path is protected by the centralized deletion guard', () => {
+  const controllerSource = read('packages/school/MVC/controllers/school/activityController.js');
+  const dataServiceSource = read('packages/school/MVC/services/school/schoolDataService.js');
+  const ruleRegistrySource = read('packages/school/MVC/services/school/schoolDeletionRuleRegistry.js');
+  assert.match(controllerSource, /schoolDataService\.deleteData\('activities'/);
+  assert.match(dataServiceSource, /schoolDeletionGuardService\.assertCanDelete/);
+  assert.match(ruleRegistrySource, /scanActivityTimesheetLock/);
+  assert.match(ruleRegistrySource, /sourceType:\s*'activity'/);
 });
 
-test('class delete path checks locked sessions and approved timesheet references', () => {
-  const source = read('packages/school/MVC/controllers/school/classController.js');
-  assert.match(source, /assertClassHasNoLockedSessions/);
-  assert.match(source, /assertClassSessionsNotReferencedByApprovedTimesheets/);
-  assert.match(source, /assertSessionNotTimesheetLocked/);
+test('class delete path is protected against sessions, locks, and timesheet references', () => {
+  const controllerSource = read('packages/school/MVC/controllers/school/classController.js');
+  const ruleRegistrySource = read('packages/school/MVC/services/school/schoolDeletionRuleRegistry.js');
+  assert.match(controllerSource, /schoolDataService\.deleteData\('classes'/);
+  assert.match(ruleRegistrySource, /code:\s*'CLASS_SESSION'/);
+  assert.match(ruleRegistrySource, /scanClassLockedSessions/);
+  assert.match(ruleRegistrySource, /scanClassAllSessionTimesheetRefs/);
+  assert.match(ruleRegistrySource, /scanSessionTimesheetLock/);
 });
 
-test('timesheet period delete is blocked when timesheets exist', () => {
-  const source = read('packages/school/MVC/controllers/school/timesheetPeriodController.js');
-  assert.match(source, /assertPeriodHasNoTimesheets/);
+test('timesheet period delete is centrally blocked when timesheets exist', () => {
+  const controllerSource = read('packages/school/MVC/controllers/school/timesheetPeriodController.js');
+  const ruleRegistrySource = read('packages/school/MVC/services/school/schoolDeletionRuleRegistry.js');
+  assert.match(controllerSource, /dataService\.deleteData\('timesheetPeriods'/);
+  assert.match(ruleRegistrySource, /scanTimesheetPeriodAnyTimesheets/);
 });
 
 test('assertActivityNotTimesheetLocked rejects timesheet-locked activities', () => {
@@ -115,13 +129,13 @@ test('meetsMinTimesheetStatus treats approved as guarded status', () => {
   assert.equal(schoolDependencyService.meetsMinTimesheetStatus('processed', 'approved'), true);
 });
 
-test('timesheet list and manage views surface approved status', () => {
+test('timesheet list and manage views expose only three states and a manager-approved badge', () => {
   const listSource = read('packages/school/MVC/views/school/timesheet/timesheetList.ejs');
   const manageSource = read('packages/school/MVC/views/school/timesheet/timesheetManage.ejs');
-  assert.match(listSource, /'approved'/);
-  assert.match(listSource, /tsStatus === 'approved'/);
-  assert.match(manageSource, /value="approved"/);
-  assert.match(manageSource, /approved:/);
+  assert.doesNotMatch(listSource, /value="approved"/);
+  assert.doesNotMatch(manageSource, /value="approved"/);
+  assert.match(listSource, /MANAGER APPROVED/i);
+  assert.match(manageSource, /MANAGER APPROVED/i);
 });
 
 test('timesheet editor shows admin approve independently of teacher read-only state', () => {

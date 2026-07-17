@@ -25,7 +25,11 @@ const PASS27_MODELS = new Set([
 const MODELS_WITHOUT_DIRECT_DATA_PATH = new Set([
   'examModelUtils.js',
   'feeCategoryCatalog.js',
-  'postingPolicyModel.js'
+  'postingPolicyModel.js',
+  'registrationTransactionSummary.js'
+]);
+const MODELS_WITHOUT_CORE_RESOLVER = new Set([
+  'registrationTransactionSummary.js'
 ]);
 
 function read(filePath) {
@@ -94,7 +98,7 @@ test('school package pass28 owns remaining school models and rewires shared requ
     if (source.includes(`requireCoreModule('')`)) {
       offenders.push(`${fileName}: unresolved converted require`);
     }
-    if (!usesSchoolCoreModuleResolver(source)) {
+    if (!MODELS_WITHOUT_CORE_RESOLVER.has(fileName) && !usesSchoolCoreModuleResolver(source)) {
       offenders.push(`${fileName}: missing schoolCoreModuleResolver import`);
     }
     if (!MODELS_WITHOUT_DIRECT_DATA_PATH.has(fileName) && !usesRootedSchoolDataPath(source)) {

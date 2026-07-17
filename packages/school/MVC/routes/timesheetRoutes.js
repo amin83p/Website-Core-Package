@@ -4,6 +4,7 @@ const ctrl = require('../controllers/school/timesheetController');
 const {
   requireAuth,
   requireAccess,
+  requireAccessAny,
   trackActionState,
   SECTIONS,
   OPERATIONS
@@ -15,6 +16,7 @@ const timesheetEditorMutationActionState = {
   requireToken: true,
   keepActive: true,
   allowOperationTokenFallback: true,
+  allowSectionTokenFallback: true,
   allowInactiveTokenFallback: true
 };
 
@@ -59,7 +61,7 @@ router.post('/editor/:periodId/api/validate-manual-row',
   ctrl.validateManualTimesheetRow);
 
 router.get('/editor/:periodId',
-  requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),
+  requireAccessAny([SECTIONS.SCHOOL_TIMESHEETS, SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT], OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),
   ctrl.viewTimesheet);
 
@@ -74,7 +76,7 @@ router.post('/editor/:periodId/apply-prior-adjustments',
   ctrl.applyPriorAdjustments);
 
 router.post('/editor/:periodId/save',
-  requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),
+  requireAccessAny([SECTIONS.SCHOOL_TIMESHEETS, SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT], OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, {
     requireToken: true,
     allowOperationTokenFallback: true,
@@ -88,9 +90,24 @@ router.post('/editor/:periodId/approve',
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
   ctrl.approveTimesheet);
 
+router.post('/editor/:periodId/manual-entries/:entryId/decision',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.decideManualTimesheetRow);
+
+router.post('/editor/:periodId/process',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.CONFIGURE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.CONFIGURE, timesheetEditorMutationActionState),
+  ctrl.processTimesheet);
+
+router.post('/editor/:periodId/return',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.returnTimesheet);
+
 router.post('/editor/:periodId/reopen',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
-  ctrl.reopenTimesheet);
+  ctrl.returnTimesheet);
 
 module.exports = router;

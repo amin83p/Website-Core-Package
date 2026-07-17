@@ -215,7 +215,7 @@
               <div class="card border h-100">
                 <div class="card-body">
                   <div class="small text-muted text-uppercase">Student</div>
-                  <div class="fw-semibold mt-1"><%- include('../partials/studentNameLink', { name: dtl.studentName || (instance.studentId ? `Record ${instance.studentId}` : '-'), studentRecordId: dtl.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
+                  <div class="fw-semibold mt-1"><%- include('school/partials/studentNameLink', { name: dtl.studentName || (instance.studentId ? `Record ${instance.studentId}` : '-'), studentRecordId: dtl.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
                   <div class="x-small text-muted font-monospace">
                     <% if (dtl.studentLocalId) { %>Local <%= dtl.studentLocalId %> | <% } %>Record ID <%= instance.studentId || '-' %>
                   </div>
@@ -290,7 +290,7 @@
             <div class="col-md-3">
               <div class="small text-muted">Student</div>
               <% if (dtl.studentName) { %>
-                <div class="fw-bold"><%- include('../partials/studentNameLink', { name: dtl.studentName, studentRecordId: dtl.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
+                <div class="fw-bold"><%- include('school/partials/studentNameLink', { name: dtl.studentName, studentRecordId: dtl.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
                 <div class="font-monospace x-small text-muted">
                   <% if (dtl.studentLocalId) { %>Local <%= dtl.studentLocalId %> | <% } %>Record ID <%= instance.studentId || '-' %>
                 </div>

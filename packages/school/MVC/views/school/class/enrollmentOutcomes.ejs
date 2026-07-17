@@ -53,7 +53,7 @@
         <tbody>
           <% pending.forEach((row) => { %>
             <tr data-period-id="<%= row.periodId %>">
-              <td class="fw-semibold"><%- include('../partials/studentNameLink', { name: row.studentName, studentRecordId: row.studentRecordId || row.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none fw-semibold' }) %></td>
+              <td class="fw-semibold"><%- include('school/partials/studentNameLink', { name: row.studentName, studentRecordId: row.studentRecordId || row.studentId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none fw-semibold' }) %></td>
               <td class="small text-muted"><%= row.startDate || '—' %> → <%= row.endDate || '—' %></td>
               <td><span class="badge bg-light text-dark border"><%= row.status || '' %></span></td>
               <td class="text-end font-monospace"><%= row.suggestedFinalPercent != null ? row.suggestedFinalPercent : '—' %></td>

@@ -252,7 +252,7 @@
               </div>
             </div>
           </div>
-          <%- include('../partials/personAttachments', {
+          <%- include('school/partials/personAttachments', {
             attachmentInitialRows: s.attachments || [],
             attachmentRouteBase: '/school/staff',
             attachmentRecordId: routeId,
@@ -270,7 +270,7 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
-<%- include('../partials/personProfileEditModal') %>
+<%- include('school/partials/personProfileEditModal') %>
 
 <script>
 (function () {

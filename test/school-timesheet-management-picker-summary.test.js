@@ -86,7 +86,9 @@ test('timesheet management roster can be filtered by timesheet status', () => {
 
   assert.match(controller, /req\.query\.timesheetStatus/);
   assert.match(controller, /status = String\(timesheet\?\.status \|\| 'not_started'\)\.toLowerCase\(\)/);
-  assert.match(controller, /!requestedTimesheetStatus \|\| row\.status === requestedTimesheetStatus/);
+  assert.match(controller, /if \(!requestedTimesheetStatus\) return true/);
+  assert.match(controller, /requestedTimesheetStatus === 'approved'/);
+  assert.match(controller, /return row\.status === requestedTimesheetStatus/);
 
   assert.match(manageView, /id="timesheetStatusFilter"/);
   assert.match(manageView, /rosterParams\.set\('timesheetStatus', requestedStatus\)/);

@@ -70,7 +70,9 @@
     "test:ielts:freeze": "node test/ielts.behavior-freeze.step6t.test.js",
     "test:ielts:gate": "node scripts/ielts/runIeltsGate.js",
     "school:tasks:migrate:dry-run": "node scripts/school/migration/migrateTaskDomainFromLegacy.js",
-    "school:tasks:migrate:apply": "node scripts/school/migration/migrateTaskDomainFromLegacy.js --apply"
+    "school:tasks:migrate:apply": "node scripts/school/migration/migrateTaskDomainFromLegacy.js --apply",
+    "school:timesheets:three-state:backfill": "node scripts/school/migration/backfillTimesheetThreeStateLifecycle.js",
+    "school:timesheets:three-state:backfill:apply": "node scripts/school/migration/backfillTimesheetThreeStateLifecycle.js --apply"
   },
   "keywords": [],
   "author": "",

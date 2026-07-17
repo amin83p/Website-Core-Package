@@ -20,9 +20,20 @@ function assertPteStyleRows(rows = [], kind = '') {
     assert.equal(typeof row.source, 'string', `${kind} support row should declare source`);
     assert.equal(typeof row.target, 'string', `${kind} support row should declare target`);
     assert.equal(typeof row.category, 'string', `${kind} support row should declare category`);
-    assert.equal(row.status, 'root-active', `${row.source} should keep root-active status`);
-    assert.equal(row.targetStatus, 'package-mirrored', `${row.source} should be package mirrored`);
-    assert.equal(fs.existsSync(path.join(ROOT_DIR, row.source)), true, `${row.source} should exist`);
+    const isPackageOnly = row.status === 'package-only';
+    assert.equal(
+      row.status,
+      isPackageOnly ? 'package-only' : 'root-active',
+      `${row.source} should declare a supported source status`
+    );
+    assert.equal(
+      row.targetStatus,
+      isPackageOnly ? 'package-active' : 'package-mirrored',
+      `${row.source} should declare the matching package status`
+    );
+    if (!isPackageOnly) {
+      assert.equal(fs.existsSync(path.join(ROOT_DIR, row.source)), true, `${row.source} should exist`);
+    }
     assert.equal(fs.existsSync(path.join(ROOT_DIR, row.target)), true, `${row.target} should exist`);
     assert.equal(normalizeRepoPath(row.target).startsWith(`packages/school/${kind}/`), true);
   });
