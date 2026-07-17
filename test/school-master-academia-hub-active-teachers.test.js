@@ -43,3 +43,17 @@ test('master academia schedule workspace has all-active-teacher button and bulk 
   assert.match(viewSource, /await loadAllHubSchedulePeople\(\)/);
   assert.match(viewSource, /activeTeachersBtn\.addEventListener\('click',\s*loadAllActiveHubScheduleTeachers\)/);
 });
+
+test('schedule calendar date clicks load the day automatically and supports colored day and month switching', () => {
+  const viewSource = read('packages/school/MVC/views/school/masterAcademiaHub.ejs');
+
+  assert.match(viewSource, /data-hub-schedule-date/);
+  assert.match(viewSource, /hubScheduleState\.loadedPersonIds\.clear\(\);[\s\S]*?loadActiveHubSchedulePerson\(\);/);
+  assert.match(viewSource, /diffDays <= 10/);
+  assert.match(viewSource, /range.startDate === range.endDate || diffDays <= 0[\s\S]*?mode = 'timeline'[\s\S]*?renderHubScheduleTimelineView/);
+  assert.match(viewSource, /data-hub-schedule-view-timeline/);
+  assert.match(viewSource, /data-hub-schedule-view-month/);
+  assert.match(viewSource, /hubScheduleState.viewMode = 'timeline'/);
+  assert.ok(viewSource.includes("hubScheduleState.viewMode = timelineButton ? 'timeline' : 'calendar';"));
+  assert.match(viewSource, /min-height: 4\.25rem/);
+});

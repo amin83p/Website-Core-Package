@@ -1,0 +1,20 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..');
+const person = fs.readFileSync(path.join(root, 'packages/school/MVC/views/school/schedule/personSchedule.ejs'), 'utf8');
+const hub = fs.readFileSync(path.join(root, 'packages/school/MVC/views/school/masterAcademiaHub.ejs'), 'utf8');
+test('schedule pages mark report events and mirror day/month switching', () => {
+assert.ok(person.includes('report-priority-marker'), 'person schedule has report marker');
+assert.ok(person.includes("=== 'report_task'") && hub.includes("=== 'report_task'"), 'report task events are classified');
+assert.ok(hub.includes('report-priority-marker'), 'master hub has report marker');
+assert.ok(person.includes('bi-stars') && hub.includes('bi-stars'), 'report markers use stars icon');
+assert.ok(person.includes('@keyframes reportPriorityBlink') && hub.includes('@keyframes reportPriorityBlink'), 'both views blink report markers');
+assert.ok(person.includes('data-schedule-view-timeline') && person.includes('data-schedule-view-month'), 'person schedule has day/month switches');
+assert.ok(person.includes("scheduleViewMode = dayButton ? 'timeline' : 'calendar'"), 'person schedule toggles view mode');
+assert.ok(person.includes('diffDays <= 10'), 'person schedule uses ten-day timeline threshold');
+assert.ok(person.includes('const reportMarker = dayEvents.some(isReportScheduleEvent)'), 'person calendar marks report days');
+assert.ok(hub.includes('data-hub-schedule-view-timeline') && hub.includes('data-hub-schedule-view-month'), 'master hub has day/month switches');
+assert.ok(hub.includes('const reportMarker = reportEvent ? buildReportPriorityMarker(reportEvent) :'), 'master hub marks report days');
+});

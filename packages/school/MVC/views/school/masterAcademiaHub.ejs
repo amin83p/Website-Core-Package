@@ -224,6 +224,15 @@
     animation: schoolHubBeat 850ms ease-in-out infinite;
   }
 
+  @keyframes reportPriorityBlink {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .35; transform: scale(1.18); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .school-master-hub .report-priority-marker { animation: none; }
+  }
+
   @keyframes schoolHubBeat {
     0%, 100% {
       transform: scale(1);
@@ -487,7 +496,7 @@
 
   .school-master-hub .timeline-body {
     position: relative;
-    min-height: 64px;
+    min-height: 76px;
     background-image: repeating-linear-gradient(to right, transparent, transparent calc(6.66% - 1px), #f1f3f5 calc(6.66% - 1px), #f1f3f5 6.66%);
   }
 
@@ -535,6 +544,20 @@
   .school-master-hub .event-block:hover {
     transform: scale(1.02);
     z-index: 20;
+  }
+
+  .school-master-hub .report-priority-marker {
+    display: inline-flex;
+    align-items: center;
+    color: #dc3545;
+    font-size: 1.05rem;
+    line-height: 1;
+    filter: drop-shadow(0 0 4px rgba(220, 53, 69, 0.35));
+    animation: reportPriorityBlink 1s ease-in-out infinite;
+  }
+
+  .school-master-hub .report-priority-marker .bi {
+    filter: drop-shadow(0 1px 1px rgba(120, 0, 0, 0.35));
   }
 
   .school-master-hub .event-meta {
@@ -596,7 +619,8 @@
     grid-template-columns: auto 170px 1fr auto;
     gap: 0.85rem;
     align-items: start;
-    padding: 0.7rem 0.9rem;
+    min-height: 4.25rem;
+    padding: 0.85rem 0.95rem;
     border-bottom: 1px dashed #e9ecef;
   }
 
@@ -681,6 +705,8 @@
     transition: 0.2s;
     font-size: 0.85rem;
   }
+
+  .school-master-hub .cal-day .report-priority-marker { position: absolute; top: 2px; left: 3px; z-index: 2; }
 
   .school-master-hub .cal-day.empty {
     color: #adb5bd;
@@ -3400,7 +3426,8 @@
     eventsByPersonId: {},
     statusMetaByPersonId: {},
     loadedPersonIds: new Set(),
-    loadingPersonId: ''
+    loadingPersonId: '',
+    viewMode: 'auto'
   };
 
   function resolveHubSchedulePersonId(item) {
@@ -3529,6 +3556,7 @@
     hubScheduleState.eventsByPersonId = {};
     hubScheduleState.statusMetaByPersonId = {};
     hubScheduleState.loadedPersonIds.clear();
+    hubScheduleState.viewMode = 'auto';
     refreshHubScheduleActiveView();
   }
 
@@ -3597,6 +3625,16 @@
     };
   }
 
+  function isReportScheduleEvent(event) {
+    return String(event?.eventType || '').trim().toLowerCase() === 'report_task'
+      || Boolean(String(event?.assignmentId || '').trim());
+  }
+
+  function buildReportPriorityMarker(event) {
+    if (!isReportScheduleEvent(event)) return '';
+    return '<span class="report-priority-marker" role="img" aria-label="Important report" title="Important report"><i class="bi bi-stars" aria-hidden="true"></i></span>';
+  }
+
   function getHubScheduleEventTitle(event) {
     return String(event?.className || event?.title || event?.label || event?.classId || 'Schedule Item').trim();
   }
@@ -3639,15 +3677,15 @@
     const host = document.getElementById('hubScheduleLegend');
     if (!host) return;
     if (mode === 'calendar') {
-      host.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</div><div class="text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</div><div class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</div><div class="text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</div><div class="text-muted small">Click any day to zoom in</div>';
+      host.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</div><div class="text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</div><div class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</div><div class="text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</div><div class="text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</div><div class="text-muted small">Click any day to load its day view</div><button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-timeline aria-label="Switch to day view" title="Show scheduled sessions in the colored time timeline"><i class="bi bi-calendar-day me-1"></i>Switch to day view</button>';
       return;
     }
     if (mode === 'timeline') {
-      host.innerHTML = '<div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</div>';
+      host.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-calendar-day me-1"></i> Day view</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</div><div class="text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</div><button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-month aria-label="Switch to month view" title="Show the calendar month view"><i class="bi bi-calendar3 me-1"></i>Switch to month view</button>';
       return;
     }
     if (mode === 'single') {
-      host.innerHTML = '<div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-muted small">Vertical full-detail view for selected day</div>';
+      host.innerHTML = '<div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-muted small">Vertical full-detail day view</div>';
       return;
     }
     host.innerHTML = '<div class="text-muted small">Vertical full-detail view for selected day</div>';
@@ -3684,7 +3722,7 @@
           '<div class="schedule-scan-cell">' + scanIcon + '</div>',
           '<div class="event-time">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</div>',
           '<div>',
-          '<div class="fw-bold">' + escapeHtml(title) + '</div>',
+          '<div class="fw-bold">' + buildReportPriorityMarker(event) + escapeHtml(title) + '</div>',
           '<div class="mt-1 d-flex flex-wrap gap-2 align-items-center">',
           '<span class="badge ' + (leave ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : 'bg-primary-subtle text-primary border') + '">' + escapeHtml(leave ? 'Approved Leave' : (event?.role || event?.roleLabel || '-')) + '</span>',
           caseBadge,
@@ -3731,11 +3769,11 @@
         }
       });
 
-      const bodyHeight = Math.max(64, tracks.length * 56 + 10);
+      const bodyHeight = Math.max(76, tracks.length * 64 + 14);
       html += '<div class="timeline-container shadow-sm ' + (hasConflict ? 'border-danger' : '') + '"><div class="timeline-header ' + (hasConflict ? 'conflict' : '') + '"><span>' + escapeHtml(displayDate) + '</span><span>' + (hasConflict ? '<i class="bi bi-exclamation-triangle-fill me-1"></i> Conflict Detected' : '') + '</span></div><div class="timeline-body pb-3" style="height:' + escapeHtml(bodyHeight) + 'px;">';
 
       dayEvents.forEach(function (event) {
-        const topPos = (event.__hubTrackIndex * 54) + 5;
+        const topPos = (event.__hubTrackIndex * 62) + 7;
         const leave = isHubScheduleLeaveEvent(event);
         const roleText = String(event?.role || event?.roleLabel || '').toLowerCase();
         const cssClass = leave ? 'event-leave' : (roleText.includes('teacher') || roleText.includes('staff') ? 'role-teacher' : 'role-student');
@@ -3755,7 +3793,7 @@
           detailUrl ? ' onclick="window.open(decodeURIComponent(\'' + escapeHtml(encodedDetailUrl) + '\'), \'_blank\')"' : '',
           '>',
           scanIcon,
-          '<div class="fw-bold text-truncate">' + escapeHtml(title) + '</div>',
+          '<div class="fw-bold text-truncate">' + buildReportPriorityMarker(event) + ' ' + escapeHtml(title) + '</div>',
           caseBadge ? '<div class="mt-1">' + caseBadge + '</div>' : '',
           '<div class="event-meta x-small"><span class="text-truncate">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</span>' + hubScheduleEventScanBadge(event, statusMap) + '</div>',
           '</div>'
@@ -3797,6 +3835,8 @@
         const hasConflict = dayEvents.some(function (event) { return event?.hasOverlap; });
         const hasLeave = dayEvents.some(isHubScheduleLeaveEvent);
         const count = dayEvents.length;
+        const reportEvent = dayEvents.find(isReportScheduleEvent);
+        const reportMarker = reportEvent ? buildReportPriorityMarker(reportEvent) : '';
         let classes = 'cal-day ';
         let badge = '';
         if (hasConflict) {
@@ -3813,7 +3853,7 @@
         } else {
           classes += 'empty';
         }
-        html += '<div class="' + classes + '" data-hub-schedule-date="' + escapeHtml(dateStr) + '"><span class="d-block">' + escapeHtml(dayNo) + '</span>' + badge + '</div>';
+        html += '<div class="' + classes + '" data-hub-schedule-date="' + escapeHtml(dateStr) + '">' + reportMarker + '<span class="d-block">' + escapeHtml(dayNo) + '</span>' + badge + '</div>';
       }
       html += '</div></div></div></div>';
       current.setMonth(current.getMonth() + 1);
@@ -3854,10 +3894,16 @@
     const diffDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
     let mode = 'calendar';
     let content = '';
-    if (range.startDate === range.endDate || diffDays <= 0) {
-      mode = 'single';
-      content = renderHubScheduleSingleDayView(grouped, statusMap);
-    } else if (diffDays <= 14) {
+    if (hubScheduleState.viewMode === 'timeline') {
+      mode = 'timeline';
+      content = renderHubScheduleTimelineView(grouped, statusMap);
+    } else if (hubScheduleState.viewMode === 'calendar') {
+      mode = 'calendar';
+      content = renderHubScheduleCalendarView(grouped, range.startDate, range.endDate, statusMap);
+    } else if (range.startDate === range.endDate || diffDays <= 0) {
+      mode = 'timeline';
+      content = renderHubScheduleTimelineView(grouped, statusMap);
+    } else if (diffDays <= 10) {
       mode = 'timeline';
       content = renderHubScheduleTimelineView(grouped, statusMap);
     } else {
@@ -4054,9 +4100,15 @@
     const activeTeachersBtn = document.getElementById('hubScheduleAllActiveTeachers');
     if (activeTeachersBtn) activeTeachersBtn.addEventListener('click', loadAllActiveHubScheduleTeachers);
     const loadBtn = document.getElementById('hubScheduleLoadActive');
-    if (loadBtn) loadBtn.addEventListener('click', loadActiveHubSchedulePerson);
+    if (loadBtn) loadBtn.addEventListener('click', function () {
+      hubScheduleState.viewMode = 'auto';
+      loadActiveHubSchedulePerson();
+    });
     const loadAllBtn = document.getElementById('hubScheduleLoadAll');
-    if (loadAllBtn) loadAllBtn.addEventListener('click', loadAllHubSchedulePeople);
+    if (loadAllBtn) loadAllBtn.addEventListener('click', function () {
+      hubScheduleState.viewMode = 'auto';
+      loadAllHubSchedulePeople();
+    });
     const roleSelect = document.getElementById('hubScheduleRole');
     if (roleSelect) roleSelect.addEventListener('change', function () {
       const person = activeHubSchedulePerson();
@@ -4065,6 +4117,7 @@
         delete hubScheduleState.eventsByPersonId[person.id];
         delete hubScheduleState.statusMetaByPersonId[person.id];
         hubScheduleState.loadedPersonIds.delete(person.id);
+        hubScheduleState.viewMode = 'auto';
         refreshHubScheduleActiveView();
       }
     });
@@ -4073,6 +4126,7 @@
       hubScheduleState.eventsByPersonId = {};
       hubScheduleState.statusMetaByPersonId = {};
       hubScheduleState.loadedPersonIds.clear();
+      hubScheduleState.viewMode = 'auto';
       refreshHubScheduleActiveView();
     });
     root.querySelectorAll('[data-hub-schedule-range]').forEach(function (btn) {
@@ -4114,6 +4168,17 @@
         hubScheduleState.eventsByPersonId = {};
         hubScheduleState.statusMetaByPersonId = {};
         hubScheduleState.loadedPersonIds.clear();
+        hubScheduleState.viewMode = 'timeline';
+        loadActiveHubSchedulePerson();
+      });
+    }
+    const legend = document.getElementById('hubScheduleLegend');
+    if (legend) {
+      legend.addEventListener('click', function (event) {
+        const timelineButton = event.target && event.target.closest('[data-hub-schedule-view-timeline]');
+        const monthButton = event.target && event.target.closest('[data-hub-schedule-view-month]');
+        if (!timelineButton && !monthButton) return;
+        hubScheduleState.viewMode = timelineButton ? 'timeline' : 'calendar';
         refreshHubScheduleActiveView();
       });
     }
