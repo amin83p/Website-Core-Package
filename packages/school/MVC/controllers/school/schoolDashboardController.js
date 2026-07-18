@@ -19,6 +19,7 @@ const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/academic-ledger(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_ACADEMIC_LEDGER },
     { pattern: /^\/school\/sample-data(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SAMPLE_DATA },
     { pattern: /^\/school\/data-maintenance(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_DATA_MAINTENANCE },
+    { pattern: /^\/school\/funders(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_FUNDERS },
     { pattern: /^\/school\/students(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_STUDENTS },
     { pattern: /^\/school\/teachers(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TEACHERS },
     { pattern: /^\/school\/staff(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_STAFF },

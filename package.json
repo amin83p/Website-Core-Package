@@ -59,6 +59,7 @@
     "membership:period-org:migrate": "node scripts/migrate-membership-period-org-scope.js",
     "school:enrollment-periods:backfill": "node scripts/school/migration/backfillClassEnrollmentPeriods.js",
     "school:enrollment-periods:backfill:apply": "node scripts/school/migration/backfillClassEnrollmentPeriods.js --apply",
+    "school:funders:legacy-report": "node scripts/school/migration/reportLegacyStudentFunding.js",
     "school:class-mode:migration:dry-run": "node scripts/school/migration/migrateClassRegistrationMode.js",
     "school:class-mode:migration:apply": "node scripts/school/migration/migrateClassRegistrationMode.js --apply",
     "school:smoke:pass40": "node scripts/school/smoke-pass40.js",

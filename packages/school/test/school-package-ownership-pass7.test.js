@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+// Test paths below are project-root relative (packages/school/...).
+const ROOT_DIR = path.resolve(__dirname, '../../..');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
@@ -327,15 +328,15 @@ test('school package pass14 owns classRoutes implementation', () => {
   const routeSource = read('packages/school/MVC/routes/classRoutes.js');
 
   assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/classRoutes')"), false);
-  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/classController'\)/);
+  assert.match(routeSource, /const\s+classCtrl\s*=\s*require\('\.\.\/controllers\/school\/classController'\)/);
   assert.match(routeSource, /requireCoreModule\('MVC\/services\/security\/index'\)/);
   assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_CLASSES,\s*OPERATIONS\.READ_ALL\)/);
   assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_CLASS_ENROLLMENT_PERIODS,\s*OPERATIONS\.UPDATE\)/);
   assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_CLASS_CYCLES,\s*OPERATIONS\.UPDATE\)/);
-  assert.match(routeSource, /ctrl\.listClasses/);
-  assert.match(routeSource, /ctrl\.showFinalGradesPage/);
-  assert.match(routeSource, /ctrl\.createClassEnrollmentWithTransactions/);
-  assert.match(routeSource, /ctrl\.manageSession/);
+  assert.match(routeSource, /classCtrl\.listClasses/);
+  assert.match(routeSource, /classCtrl\.showFinalGradesPage/);
+  assert.match(routeSource, /rollingCtrl\.createClassEnrollmentWithTransactions/);
+  assert.match(routeSource, /classCtrl\.manageSession/);
 });
 
 test('school package pass14 owns programRoutes implementation', () => {

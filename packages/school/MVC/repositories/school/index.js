@@ -1,4 +1,5 @@
 const studentModel = require('../../models/school/studentModel');
+const funderModel = require('../../models/school/funderModel');
 const programModel = require('../../models/school/programModel');
 const transactionDefinitionModel = require('../../models/school/transactionDefinitionModel');
 const globalTransactionLedgerModel = require('../../models/school/globalTransactionLedgerModel');
@@ -705,6 +706,17 @@ async function enrichTimesheetItem(item, options = {}) {
 }
 
 const schoolRepositories = {
+  funders: createSchoolRepository({
+    entityName: 'funders',
+    collectionName: 'schoolFunders',
+    getAll: funderModel.getAllFunders,
+    getById: funderModel.getFunderById,
+    create: funderModel.addFunder,
+    update: funderModel.updateFunder,
+    remove: funderModel.deleteFunder,
+    defaultSearchFields: ['id', 'personId', 'externalReference', 'status', 'notes'],
+    assignmentScopeKind: 'personId'
+  }),
   students: createSchoolRepository({
     entityName: 'students',
     collectionName: 'schoolStudents',

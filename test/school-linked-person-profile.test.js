@@ -43,6 +43,7 @@ test('toProfileDto maps person fields for modal consumption', () => {
   const dto = service.toProfileDto({
     id: 'PER-1',
     active: true,
+    personProfileType: 'individual',
     name: { first: 'Ada', middle: 'M', last: 'Lovelace', preferred: 'Ada L' },
     demographics: { gender: 'female', dateOfBirth: '1815-12-10' },
     contact: {
@@ -55,6 +56,8 @@ test('toProfileDto maps person fields for modal consumption', () => {
   });
 
   assert.equal(dto.id, 'PER-1');
+  assert.equal(dto.personProfileType, 'individual');
+  assert.equal(dto.organizationLegalName, '');
   assert.equal(dto.firstName, 'Ada');
   assert.equal(dto.gender, 'female');
   assert.equal(dto.dateOfBirth, '1815-12-10');
@@ -62,6 +65,29 @@ test('toProfileDto maps person fields for modal consumption', () => {
   assert.equal(dto.phones[0].number, '555-0100');
   assert.equal(dto.addresses[0].city, 'London');
   assert.equal(dto.organizations.length, 1);
+});
+
+test('toProfileDto maps organization profile fields', () => {
+  const service = reloadService();
+  const dto = service.toProfileDto({
+    id: 'PER-ORG-1',
+    active: true,
+    personProfileType: 'organization',
+    organizationProfile: { legalName: 'Workers Compensation Board' },
+    name: { preferred: 'WCB' },
+    contact: {
+      emails: [{ type: 'primary', email: 'billing@wcb.example', isPrimary: true }],
+      phones: []
+    },
+    addresses: [],
+    organizations: [{ orgId: 'ORG-1', roles: ['school_funder'] }]
+  });
+
+  assert.equal(dto.personProfileType, 'organization');
+  assert.equal(dto.organizationLegalName, 'Workers Compensation Board');
+  assert.equal(dto.preferredName, 'WCB');
+  assert.equal(dto.gender, '');
+  assert.equal(dto.dateOfBirth, '');
 });
 
 test('assertLinkedPersonAccess rejects mismatched personId on edit link', async () => {
@@ -123,6 +149,7 @@ test('updateLinkedPersonProfile preserves organizations and validates required p
   const existingPerson = {
     id: 'PER-1',
     active: true,
+    personProfileType: 'individual',
     name: { first: 'Old', last: 'Name' },
     demographics: { gender: 'male', dateOfBirth: '2000-01-01' },
     contact: { emails: [{ type: 'primary', email: 'old@example.com', isPrimary: true }], phones: [] },
@@ -190,11 +217,97 @@ test('updateLinkedPersonProfile preserves organizations and validates required p
 
     assert.equal(result.displayName, 'New Name');
     assert.equal(result.person.gender, 'female');
+    assert.equal(result.person.personProfileType, 'individual');
     assert.equal(result.organizations[0].orgId, 'ORG-1');
     assert.deepEqual(result.organizations[0].roles, ['member', 'school_student']);
   } finally {
     schoolDataService.getDataById = originalGetStudent;
     schoolPersonAccessService.getPersonById = originalGetPerson;
+    coreDataService.getDataById = originalGetById;
+    coreDataService.updateData = originalUpdate;
+    restoreAdmin();
+  }
+});
+
+test('updateLinkedPersonProfile saves organization funder without gender or DOB', async () => {
+  const service = reloadService();
+  const restoreAdmin = mockAdminAccess(true);
+  const originalGetFunder = schoolDataService.getDataById;
+  const originalGetById = coreDataService.getDataById;
+  const originalUpdate = coreDataService.updateData;
+
+  const existingPerson = {
+    id: 'PER-ORG-1',
+    active: true,
+    personProfileType: 'organization',
+    organizationProfile: { legalName: 'Old WCB Name' },
+    name: { preferred: 'Old WCB Name' },
+    demographics: { gender: null, dateOfBirth: null },
+    contact: { emails: [{ type: 'primary', email: 'old-wcb@example.com', isPrimary: true }], phones: [] },
+    addresses: [],
+    organizations: [{ orgId: 'ORG-1', roles: ['member', 'school_funder'], name: 'Test Org' }],
+    manualTags: [],
+    tags: [],
+    avatarUrl: null,
+    audit: { createUser: 'SYS', createDateTime: '2020-01-01T00:00:00.000Z' }
+  };
+
+  let storedPerson = JSON.parse(JSON.stringify(existingPerson));
+
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'funders' && id === 'FND-1') {
+      return { id: 'FND-1', orgId: 'ORG-1', personId: 'PER-ORG-1' };
+    }
+    return null;
+  };
+  coreDataService.getDataById = async () => storedPerson;
+  coreDataService.updateData = async (_type, _id, updates) => {
+    storedPerson = { ...storedPerson, ...updates };
+    return storedPerson;
+  };
+
+  try {
+    await assert.rejects(
+      () => service.updateLinkedPersonProfile({
+        reqUser,
+        personId: 'PER-ORG-1',
+        linkType: 'funder',
+        linkId: 'FND-1',
+        body: {
+          organizationLegalName: '',
+          emails: JSON.stringify([{ type: 'primary', email: 'billing@wcb.example', isPrimary: true }]),
+          phones: '[]',
+          addresses: '[]',
+          active: 'true'
+        }
+      }),
+      /Organization legal name is required/
+    );
+
+    const result = await service.updateLinkedPersonProfile({
+      reqUser,
+      personId: 'PER-ORG-1',
+      linkType: 'funder',
+      linkId: 'FND-1',
+      body: {
+        organizationLegalName: 'Workers Compensation Board',
+        emails: JSON.stringify([{ type: 'primary', email: 'billing@wcb.example', isPrimary: true }]),
+        phones: '[]',
+        addresses: '[]',
+        active: 'true',
+        notes: 'Company funder'
+      }
+    });
+
+    assert.equal(result.person.personProfileType, 'organization');
+    assert.equal(result.person.organizationLegalName, 'Workers Compensation Board');
+    assert.equal(result.displayName, 'Workers Compensation Board');
+    assert.equal(result.person.gender, '');
+    assert.equal(result.person.dateOfBirth, '');
+    assert.equal(storedPerson.organizationProfile.legalName, 'Workers Compensation Board');
+    assert.equal(storedPerson.name.preferred, 'Workers Compensation Board');
+  } finally {
+    schoolDataService.getDataById = originalGetFunder;
     coreDataService.getDataById = originalGetById;
     coreDataService.updateData = originalUpdate;
     restoreAdmin();
@@ -210,14 +323,29 @@ test('identity routes and forms expose linked person profile integration', () =>
   const studentForm = read('packages/school/MVC/views/school/student/studentForm.ejs');
   const teacherForm = read('packages/school/MVC/views/school/teacher/teacherForm.ejs');
   const staffForm = read('packages/school/MVC/views/school/staff/staffForm.ejs');
+  const funderForm = read('packages/school/MVC/views/school/funder/funderForm.ejs');
   assert.match(studentForm, /btnEditPersonProfile/);
-  assert.match(studentForm, /include\('\.\.\/partials\/personProfileEditModal'\)/);
+  assert.match(studentForm, /include\('\.\.\/partials\/personProfileEditModal'\)|include\('school\/partials\/personProfileEditModal'\)/);
   assert.match(teacherForm, /btnEditPersonProfile/);
   assert.match(staffForm, /btnEditPersonProfile/);
-  for (const form of [studentForm, teacherForm, staffForm]) {
-    assert.match(form, /data-can-edit-person="<%= canEditLinkedPerson \? 'true' : 'false' %>"/);
+  assert.match(funderForm, /btnEditPersonProfile/);
+  assert.match(funderForm, /include\('school\/partials\/personProfileEditModal'\)/);
+  assert.match(funderForm, /linkType: btnEditPerson\.dataset\.linkType \|\| 'funder'/);
+  for (const form of [studentForm, teacherForm, staffForm, funderForm]) {
+    assert.match(form, /data-can-edit-person="<%=[\s\S]*?canEditLinkedPerson[\s\S]*?%>"/);
     assert.match(form, /You do not have permission to edit this person account\./);
-    assert.match(form, /if \(btnEditPerson\.dataset\.canEditPerson !== 'true'\) \{[\s\S]*?showMsg\([\s\S]*?return;[\s\S]*?SchoolPersonProfileModal\.open/);
+    assert.match(form, /if \(btnEditPerson\.dataset\.canEditPerson !== 'true'\) \{[\s\S]*?(showMsg|showModal)\([\s\S]*?return;[\s\S]*?SchoolPersonProfileModal\.open/);
   }
   assert.match(read('public/scripts/schoolPersonProfileModal.js'), /SchoolPersonProfileModal/);
+  assert.match(read('public/scripts/schoolPersonProfileModal.js'), /syncProfileTypeUi/);
+  assert.match(read('public/scripts/schoolPersonProfileModal.js'), /organizationLegalName/);
+  assert.match(read('packages/school/MVC/views/school/partials/personProfileEditModal.ejs'), /schoolPersonProfileOrganizationLegalName/);
+  assert.match(read('packages/school/MVC/views/school/partials/personProfileEditModal.ejs'), /school-person-organization-fields/);
+  assert.match(read('packages/school/MVC/views/school/partials/personProfileEditModal.ejs'), /school-person-individual-fields/);
+
+  const linkedService = read('packages/school/MVC/services/school/schoolLinkedPersonProfileService.js');
+  assert.match(linkedService, /funder:\s*\{[\s\S]*?entityType:\s*'funders'/);
+  assert.match(linkedService, /SCHOOL_FUNDERS/);
+  assert.match(linkedService, /personProfileType/);
+  assert.match(linkedService, /organizationLegalName/);
 });

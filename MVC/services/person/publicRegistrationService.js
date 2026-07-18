@@ -258,14 +258,22 @@ async function validatePersonInput(body, {
   checkUserEmailUnique = false
 } = {}) {
   const errors = [];
+  const profileType = String(body.personProfileType || 'individual').trim().toLowerCase() === 'organization'
+    ? 'organization'
+    : 'individual';
+  const legalName = String(body.organizationLegalName || '').trim();
   const first = body.firstName?.trim();
   const last = body.lastName?.trim();
   const gender = body.gender?.trim();
   const dob = body.dateOfBirth?.trim();
   const primaryEmail = extractPrimaryEmailFromBody(body);
 
-  if (!first) errors.push('First name is required.');
-  if (!last) errors.push('Last name is required.');
+  if (profileType === 'organization') {
+    if (!legalName) errors.push('Organization legal name is required.');
+  } else {
+    if (!first) errors.push('First name is required.');
+    if (!last) errors.push('Last name is required.');
+  }
   if (primaryEmail && !validateEmail(primaryEmail)) errors.push('Invalid email.');
 
   if (isSelfRegistration || requirePrimaryEmail) {
@@ -299,16 +307,33 @@ function buildPersonFromBody(body, reqUserId, existing = null) {
   }
 
   const manualTags = deriveManualTagsFromOrganizations(organizations);
+  const personProfileType = String(body.personProfileType || existing?.personProfileType || 'individual').trim().toLowerCase() === 'organization'
+    ? 'organization'
+    : 'individual';
+  const organizationLegalName = personProfileType === 'organization'
+    ? String(body.organizationLegalName || '').trim()
+    : '';
+  const preferredFromBody = body.preferredName ? String(body.preferredName).trim() : '';
+  const preferredName = preferredFromBody
+    || (personProfileType === 'organization' ? organizationLegalName : '')
+    || null;
 
   return {
+    personProfileType,
+    organizationProfile: {
+      ...(existing?.organizationProfile || {}),
+      legalName: organizationLegalName
+    },
     active: parseBool(body.active),
     name: {
-      first: (body.firstName || '').trim(),
-      middle: body.middleName ? body.middleName.trim() : null,
-      last: (body.lastName || '').trim(),
-      preferred: body.preferredName ? body.preferredName.trim() : null
+      first: personProfileType === 'organization' ? '' : (body.firstName || '').trim(),
+      middle: personProfileType === 'organization' ? null : (body.middleName ? body.middleName.trim() : null),
+      last: personProfileType === 'organization' ? '' : (body.lastName || '').trim(),
+      preferred: preferredName
     },
-    demographics: { gender: body.gender || null, dateOfBirth: body.dateOfBirth || null },
+    demographics: personProfileType === 'organization'
+      ? { gender: null, dateOfBirth: null }
+      : { gender: body.gender || null, dateOfBirth: body.dateOfBirth || null },
     contact: { emails, phones, email: emails.find(e => e.isPrimary)?.email || emails[0]?.email || null },
     addresses,
     address: addresses[0] || {},

@@ -239,8 +239,6 @@ function resolveStudentCategoryParentAccount(orgAccounts, studentsHeadAccount, f
 async function createStudentSubAccount({
     student,
     person,
-    selfFund,
-    funderAccountId,
     accessibleAccounts,
     reqUser,
     options = {}
@@ -252,32 +250,16 @@ async function createStudentSubAccount({
     const orgAccounts = allAccessibleAccounts.filter((a) => String(a?.orgId || '') === orgId);
     const systemAccounts = allAccessibleAccounts.filter((a) => String(a?.orgId || '').toUpperCase() === 'SYSTEM');
 
-    let parentAccount = null;
-    if (selfFund) {
-        const studentsHead =
-            findActiveOrgHeadAccount(orgAccounts, orgId, 'students', ['student_all']) ||
-            findActiveOrgHeadAccount(systemAccounts, 'SYSTEM', 'students', ['student_all']);
-        if (!studentsHead) {
-            throw new Error('No active "students" head account is configured. Please set one in School Accounts before admitting self-funded students.');
-        }
-        const candidatePool = String(studentsHead?.orgId || '').toUpperCase() === 'SYSTEM'
-            ? systemAccounts
-            : orgAccounts;
-        parentAccount = resolveStudentCategoryParentAccount(candidatePool, studentsHead, student?.feeCategory) || studentsHead;
-    } else {
-        const funderId = String(funderAccountId || '').trim();
-        if (!funderId) {
-            throw new Error('Please select a funder account or enable self-funded mode.');
-        }
-        parentAccount = allAccessibleAccounts.find((a) => String(a.id || '') === funderId) || null;
-        if (!parentAccount) {
-            throw new Error('Selected funder account was not found in the active organization.');
-        }
-        const parentOrgId = String(parentAccount?.orgId || '').trim();
-        if (parentOrgId && parentOrgId !== orgId && parentOrgId.toUpperCase() !== 'SYSTEM') {
-            throw new Error('Selected funder account belongs to another organization and cannot be linked to this student.');
-        }
+    const studentsHead =
+        findActiveOrgHeadAccount(orgAccounts, orgId, 'students', ['student_all']) ||
+        findActiveOrgHeadAccount(systemAccounts, 'SYSTEM', 'students', ['student_all']);
+    if (!studentsHead) {
+        throw new Error('No active "students" head account is configured. Please set one in School Accounts before admitting students.');
     }
+    const candidatePool = String(studentsHead?.orgId || '').toUpperCase() === 'SYSTEM'
+        ? systemAccounts
+        : orgAccounts;
+    const parentAccount = resolveStudentCategoryParentAccount(candidatePool, studentsHead, student?.feeCategory) || studentsHead;
 
     const parentLevel = Number(parentAccount?.level || 1);
     const childLevel = parentLevel + 1;
@@ -286,11 +268,11 @@ async function createStudentSubAccount({
     }
 
     const displayName = resolvePersonDisplayName(person, student?.id);
-    const baseCode = selfFund ? `STU_${student?.id}` : `FUND_STU_${student?.id}`;
+    const baseCode = `STU_${student?.id}`;
     const code = buildUniqueAccountCode(orgAccounts, baseCode);
     const name = buildUniqueAccountName(
         orgAccounts,
-        selfFund ? `${displayName} (Self-Funded Student)` : `${displayName} (Funded Student)`
+        `${displayName} (Student Account)`
     );
 
     const accountPayload = {
@@ -688,7 +670,6 @@ exports.showForm = async (req, res) => {
         let student = {};
         let personName = '';
         let personOrganizations = [];
-        let funderAccountName = '';
 
         if (isEdit) {
             student = await dataService.getDataById('students', req.params.id, req.user, routeAccess(req));
@@ -701,15 +682,6 @@ exports.showForm = async (req, res) => {
                 personOrganizations = Array.isArray(person.organizations) ? person.organizations : [];
             }
 
-            if (student.funderAccountId) {
-                const accessibleAccounts = await dataService.fetchData('schoolAccounts', {}, req.user, routeAccess(req));
-                const account = accessibleAccounts.find((a) => idsEqual(a.id, student.funderAccountId));
-                if (account) {
-                    funderAccountName = `${account.code || ''} - ${account.name || ''}`.trim();
-                } else {
-                    funderAccountName = String(student.funderAccountId);
-                }
-            }
         }
 
         const organizations = await dataServiceGlobal.fetchData('organizations', {}, req.user);
@@ -735,7 +707,6 @@ exports.showForm = async (req, res) => {
             student,
             personName,
             personOrganizations,
-            funderAccountName,
             organizationLookup,
             feeCategories: FEE_CATEGORIES,
             academicStatuses: ACADEMIC_STATUSES,
@@ -773,11 +744,6 @@ exports.saveStudent1 = async (req, res) => {
             // Financial & Organizational Defaults
             feeCategory: req.body.feeCategory || '', 
             sendingOrganization: '',
-            funderOrganization: '',
-            funderAccountId: String(req.body.funderAccountId || '').trim(),
-            studentIdAtFunder: String(req.body.studentIdAtFunder || '').trim(),
-            selfFund: req.body.selfFund === 'true' || req.body.selfFund === 'on' || req.body.selfFund === true,
-            funderNote: String(req.body.funderNote || '').trim(),
             
             // Status & Notes
             enrollmentDate: req.body.enrollmentDate,
@@ -789,12 +755,6 @@ exports.saveStudent1 = async (req, res) => {
             
             attachments: parsedAttachments
         };
-
-        if (payload.funderAccountId) {
-            const accessibleAccounts = await dataService.fetchData('schoolAccounts', {}, req.user, routeAccess(req));
-            const isValidFunder = accessibleAccounts.some((a) => idsEqual(a.id, payload.funderAccountId));
-            if (!isValidFunder) throw new Error('Selected funder account is invalid or inaccessible.');
-        }
 
         if (!payload.personId) throw new Error("A valid Person must be selected.");
 
@@ -911,12 +871,7 @@ exports.saveStudent = async (req, res) => {
             countryOfOrigin: req.body.countryOfOrigin || '',
             feeCategory: req.body.feeCategory || '',
             sendingOrganization: '',
-            funderOrganization: '',
-            funderAccountId: String(req.body.funderAccountId || '').trim(),
             studentAccountId: existingStudent?.studentAccountId ? String(existingStudent.studentAccountId) : '',
-            studentIdAtFunder: String(req.body.studentIdAtFunder || '').trim(),
-            selfFund: req.body.selfFund === 'true' || req.body.selfFund === 'on' || req.body.selfFund === true,
-            funderNote: String(req.body.funderNote || '').trim(),
             enrollmentDate: req.body.enrollmentDate,
             academicStatus: req.body.academicStatus || 'Active',
             notes: (req.body.notes || '').trim(),
@@ -924,29 +879,11 @@ exports.saveStudent = async (req, res) => {
             clbLevelHistory: parsedClbLevelHistory
         };
 
-        if (payload.selfFund) {
-            payload.funderAccountId = '';
-            payload.studentIdAtFunder = '';
-        }
-
-        const shouldLoadAccounts = !id || !!payload.funderAccountId;
-        const accessibleAccounts = shouldLoadAccounts
+        const accessibleAccounts = !id
             ? await dataService.fetchData('schoolAccounts', {}, req.user, routeAccess(req))
             : [];
-        if (payload.funderAccountId) {
-            const selectedFunder = accessibleAccounts.find((a) => idsEqual(a.id || '', payload.funderAccountId));
-            if (!selectedFunder) throw new Error('Selected funder account is invalid or inaccessible.');
-            const selectedOrgId = String(selectedFunder.orgId || '').trim();
-            const studentOrgId = String(payload.orgId || '').trim();
-            if (selectedOrgId && selectedOrgId !== studentOrgId && selectedOrgId.toUpperCase() !== 'SYSTEM') {
-                throw new Error('Selected funder account belongs to another organization.');
-            }
-        }
 
         if (!payload.personId) throw new Error("A valid Person must be selected.");
-        if (!id && !payload.selfFund && !payload.funderAccountId) {
-            throw new Error('Please select funding mode: enable Self-funded, or choose a Funder Account.');
-        }
 
         await assertNoDuplicatePersonAccount({
             entityType: 'students',
@@ -990,8 +927,6 @@ exports.saveStudent = async (req, res) => {
             const studentAccount = await createStudentSubAccount({
                 student: savedStudent,
                 person,
-                selfFund: payload.selfFund,
-                funderAccountId: payload.funderAccountId,
                 accessibleAccounts,
                 reqUser: req.user,
                 options: { transactionContext: txContext }

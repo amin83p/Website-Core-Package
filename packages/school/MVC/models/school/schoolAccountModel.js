@@ -13,10 +13,11 @@ if (!fsSync.existsSync(dataPath)) {
 
 const ACCOUNT_TYPES = Object.freeze(['asset', 'liability', 'equity', 'income', 'expense']);
 const ACCOUNT_STATUSES = Object.freeze(['active', 'inactive', 'archived']);
-const ACCOUNT_PARTY_ROLES = Object.freeze(['none', 'student', 'teacher', 'staff', 'parent', 'vendor', 'organization', 'other']);
+const ACCOUNT_PARTY_ROLES = Object.freeze(['none', 'student', 'teacher', 'staff', 'parent', 'funder', 'vendor', 'organization', 'other']);
 const ACCOUNT_HEAD_CATEGORIES = Object.freeze([
   'none',
   'students',
+  'funders',
   'student_all',
   'student_domestic',
   'student_international',

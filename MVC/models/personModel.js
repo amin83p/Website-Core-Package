@@ -13,6 +13,7 @@ const dataPath = path.join(__dirname, '../../data/persons.json');
 const PERSON_SYSTEM_TAG_KEYS = Object.freeze([
   // School domain-managed roles
   'school_student',
+  'school_funder',
   'school_teacher',
   'school_staff',
   // Credit domain-managed roles
@@ -23,6 +24,10 @@ const PERSON_SYSTEM_TAG_ALIAS = Object.freeze({
   'school-student': 'school_student',
   schoolstudents: 'school_student',
   'school-students': 'school_student',
+  schoolfunder: 'school_funder',
+  'school-funder': 'school_funder',
+  schoolfunders: 'school_funder',
+  'school-funders': 'school_funder',
   schoolteacher: 'school_teacher',
   'school-teacher': 'school_teacher',
   schoolteachers: 'school_teacher',
@@ -70,6 +75,10 @@ const AUDIENCE_ALIAS_TO_CANONICAL = Object.freeze({
   school_students: 'school_student',
   schoolstudent: 'school_student',
   schoolstudents: 'school_student',
+  school_funder: 'school_funder',
+  school_funders: 'school_funder',
+  schoolfunder: 'school_funder',
+  schoolfunders: 'school_funder',
   school_teacher: 'school_teacher',
   school_teachers: 'school_teacher',
   schoolteacher: 'school_teacher',
@@ -251,6 +260,7 @@ async function resolveSchoolRoleIndexForEnrichment(enrichment = {}) {
 
 function hydratePersonForRead(rawPerson, options = {}) {
   const p = JSON.parse(JSON.stringify(rawPerson || {}));
+  normalizePersonProfile(p);
   normalizeOrganizationsForPerson(p);
   const enrichment = resolvePersonEnrichmentOptions(options?.enrichment || options);
   const schoolRoleIndex = options?.schoolRoleIndex || null;
@@ -271,11 +281,22 @@ function hydratePersonForRead(rawPerson, options = {}) {
 
 function preparePersonForPersist(rawPerson) {
   const p = { ...(rawPerson || {}) };
+  normalizePersonProfile(p);
   const manualTags = normalizeManualTags(p.manualTags ?? p.tags ?? []);
   p.manualTags = manualTags;
   p.tags = manualTags; // persisted user-editable tags only
   delete p.systemTags;
   return p;
+}
+
+function normalizePersonProfile(person) {
+  if (!person || typeof person !== 'object') return person;
+  const profileType = String(person.personProfileType || 'individual').trim().toLowerCase();
+  person.personProfileType = profileType === 'organization' ? 'organization' : 'individual';
+  const legalName = String(person?.organizationProfile?.legalName || person?.organizationLegalName || '').trim();
+  person.organizationProfile = { ...(person.organizationProfile || {}), legalName };
+  delete person.organizationLegalName;
+  return person;
 }
 
 function buildAudienceTagsFromPerson(person) {
@@ -442,25 +463,34 @@ function validateData(person) {
     return { isValid: false, errors: ['No person data provided'] };
   }
 
-  if (!person.name?.first?.trim()) {
-    errors.push('First Name is required.');
-  } else if (!nameRegex.test(person.name.first)) {
-    errors.push('First Name contains invalid characters.');
+  normalizePersonProfile(person);
+  const isOrganization = person.personProfileType === 'organization';
+
+  if (isOrganization && !person.organizationProfile?.legalName?.trim()) {
+    errors.push('Organization legal name is required.');
   }
 
-  if (!person.name?.last?.trim()) {
-    errors.push('Last Name is required.');
-  } else if (!nameRegex.test(person.name.last)) {
-    errors.push('Last Name contains invalid characters.');
+  if (!isOrganization) {
+    if (!person.name?.first?.trim()) {
+      errors.push('First Name is required.');
+    } else if (!nameRegex.test(person.name.first)) {
+      errors.push('First Name contains invalid characters.');
+    }
+
+    if (!person.name?.last?.trim()) {
+      errors.push('Last Name is required.');
+    } else if (!nameRegex.test(person.name.last)) {
+      errors.push('Last Name contains invalid characters.');
+    }
+
+    if (person.name?.middle && !nameRegex.test(person.name.middle)) {
+      errors.push('Middle Name contains invalid characters.');
+    }
   }
 
-  if (person.name?.middle && !nameRegex.test(person.name.middle)) {
-    errors.push('Middle Name contains invalid characters.');
-  }
-
-  if (!person.demographics?.dateOfBirth) {
+  if (!isOrganization && !person.demographics?.dateOfBirth) {
     errors.push('Date of Birth is required.');
-  } else {
+  } else if (!isOrganization) {
     const dob = new Date(person.demographics.dateOfBirth);
     const now = new Date();
     if (Number.isNaN(dob.getTime())) {
@@ -473,9 +503,9 @@ function validateData(person) {
   }
 
   const validGenders = ['male', 'female', 'nonbinary', 'other'];
-  if (!person.demographics?.gender) {
+  if (!isOrganization && !person.demographics?.gender) {
     errors.push('Gender is required.');
-  } else if (!validGenders.includes(String(person.demographics.gender).toLowerCase())) {
+  } else if (!isOrganization && !validGenders.includes(String(person.demographics.gender).toLowerCase())) {
     errors.push(`Gender must be one of: ${validGenders.join(', ')}.`);
   }
 
@@ -610,6 +640,8 @@ module.exports = {
   addPerson,
   updatePerson,
   deletePerson,
+  validateData,
+  normalizePersonProfile,
   normalizeManualTags,
   getAllowedManualTags,
   getSystemTagKeys,

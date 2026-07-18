@@ -1,5 +1,7 @@
 <%
   const p = person || {};
+  const personProfileType = p.personProfileType === 'organization' ? 'organization' : 'individual';
+  const organizationProfile = p.organizationProfile || {};
   const name = p.name || {};
   const dem = p.demographics || {};
   const contact = p.contact || {};
@@ -9,6 +11,7 @@
   const manualTagPresets = Array.isArray(locals.manualTagPresets) ? locals.manualTagPresets : [];
   const systemTagKeys = Array.isArray(locals.systemTagKeys) ? locals.systemTagKeys : [
     'school_student',
+    'school_funder',
     'school_teacher',
     'school_staff',
     'pte_student',
@@ -101,6 +104,45 @@
             </div>
             <div class="card shadow-sm border-0">
                 <div class="card-body p-4">
+                    <h6 class="fw-bold text-uppercase text-muted mb-3"><i class="bi bi-person-bounding-box me-2"></i>Profile Type</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label d-block">Profile Type</label>
+                            <% if (p.id) { %>
+                              <input type="hidden" name="personProfileType" id="personProfileType" value="<%= personProfileType %>">
+                              <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <span class="badge text-bg-<%= personProfileType === 'organization' ? 'primary' : 'secondary' %> px-3 py-2">
+                                  <% if (personProfileType === 'organization') { %>
+                                    <i class="bi bi-building me-1"></i>Organization / Company
+                                  <% } else { %>
+                                    <i class="bi bi-person me-1"></i>Individual
+                                  <% } %>
+                                </span>
+                              </div>
+                              <div class="alert alert-warning py-2 px-3 mb-0 small" role="status">
+                                <i class="bi bi-lock-fill me-1"></i>
+                                Profile type cannot be changed after the person is created. Create a new person record if the wrong type was selected.
+                              </div>
+                            <% } else { %>
+                              <div class="btn-group w-100" role="group" aria-label="Profile type">
+                                <input type="radio" class="btn-check" name="personProfileType" id="personProfileTypeIndividual" value="individual" autocomplete="off" <%= personProfileType === 'individual' ? 'checked' : '' %>>
+                                <label class="btn btn-outline-secondary" for="personProfileTypeIndividual">
+                                  <i class="bi bi-person me-1"></i>Individual
+                                </label>
+                                <input type="radio" class="btn-check" name="personProfileType" id="personProfileTypeOrganization" value="organization" autocomplete="off" <%= personProfileType === 'organization' ? 'checked' : '' %>>
+                                <label class="btn btn-outline-secondary" for="personProfileTypeOrganization">
+                                  <i class="bi bi-building me-1"></i>Organization / Company
+                                </label>
+                              </div>
+                              <div class="form-text mt-2">Choose carefully — profile type cannot be changed later on the edit page.</div>
+                            <% } %>
+                        </div>
+                        <div class="col-md-6 organization-profile-field">
+                            <label class="form-label">Organization Legal Name <span class="text-danger">*</span></label>
+                            <input type="text" name="organizationLegalName" id="organizationLegalName" class="form-control size-md" value="<%= organizationProfile.legalName || '' %>">
+                        </div>
+                    </div>
+                    <div class="individual-profile-fields">
                     <h6 class="fw-bold text-uppercase text-muted mb-3"><i class="bi bi-person-bounding-box me-2"></i>Personal Information</h6>
                     
                     <div class="row g-3 mb-3">
@@ -149,6 +191,7 @@
                             <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
                             <input type="date" name="dateOfBirth" class="form-control size-md" value="<%= dem.dateOfBirth || '' %>">
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -864,6 +907,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- INITIAL RENDER ---
+  const organizationLegalName = document.getElementById('organizationLegalName');
+  const individualProfileFields = document.querySelectorAll('.individual-profile-fields');
+  const organizationProfileFields = document.querySelectorAll('.organization-profile-field');
+  const getSelectedPersonProfileType = () => {
+    const checked = document.querySelector('input[name="personProfileType"]:checked');
+    if (checked) return checked.value;
+    const hidden = document.getElementById('personProfileType');
+    return hidden ? hidden.value : 'individual';
+  };
+  const syncPersonProfileType = () => {
+    const isOrganization = getSelectedPersonProfileType() === 'organization';
+    individualProfileFields.forEach((node) => { node.style.display = isOrganization ? 'none' : ''; });
+    organizationProfileFields.forEach((node) => { node.style.display = isOrganization ? '' : 'none'; });
+    if (organizationLegalName) organizationLegalName.required = Boolean(isOrganization);
+    document.querySelectorAll('.individual-profile-fields input[name="firstName"], .individual-profile-fields input[name="lastName"]').forEach((input) => {
+      input.required = !isOrganization;
+    });
+  };
+  document.querySelectorAll('input[name="personProfileType"]').forEach((input) => {
+    input.addEventListener('change', syncPersonProfileType);
+  });
+  syncPersonProfileType();
   renderEmails(); renderPhones(); renderAddresses(); renderOrgs(); syncHidden(); renderPersonRoleSummary();
 
   // --- FORM SUBMIT ---

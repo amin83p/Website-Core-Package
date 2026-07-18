@@ -69,6 +69,29 @@
     }
   },
   {
+    "id": "ROL1017",
+    "key": "school_funder",
+    "label": "School Funder",
+    "description": "School-scoped funder role alias for audience targeting.",
+    "domain": "school",
+    "packageName": "SCHOOL",
+    "aliases": [
+      "schoolfunder",
+      "school-funder",
+      "schoolfunders",
+      "school-funders",
+      "school_funders"
+    ],
+    "active": true,
+    "system": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-07-17T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-07-17T00:00:00.000Z"
+    }
+  },
+  {
     "id": "ROL1007",
     "key": "pte_student",
     "label": "PTE Student",

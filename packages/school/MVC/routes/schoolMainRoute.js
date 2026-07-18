@@ -32,6 +32,7 @@ router.use(async (req, res, next) => {
 router.use('/master-hub', require('./schoolMasterAcademiaHubRoutes'));
 router.use('/identity', require('./schoolIdentityRoutes'));
 router.use('/students', require('./studentRoutes'));
+router.use('/funders', require('./funderRoutes'));
 router.use('/teachers', require('./teacherRoutes'));
 router.use('/staff', require('./staffRoutes'));
 router.use('/programs', require('./programRoutes'));

@@ -23,6 +23,7 @@ function getDeletionGuardDeps() {
 }
 
 const SCHOOL_ENTITY_REGISTRY = Object.freeze({
+  funders: { repository: schoolRepositories.funders },
   students: { repository: schoolRepositories.students },
   programs: { repository: schoolRepositories.programs },
   transactionDefinitions: { repository: schoolRepositories.transactionDefinitions, allowSystemFallback: true },

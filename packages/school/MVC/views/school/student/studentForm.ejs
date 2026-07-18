@@ -347,51 +347,8 @@
                      </select>
                   </div>
                </div>
-               <div class="row g-3 mb-1">
-                  <div class="col-lg-4">
-                     <div class="card border-success shadow-sm h-100" id="selfFundSection">
-                        <div class="card-header bg-success-subtle text-success fw-bold text-uppercase small">
-                           <i class="bi bi-person-check me-1"></i>Self-funded Student
-                        </div>
-                        <div class="card-body">
-                           <div class="form-check form-switch">
-                              <input class="form-check-input" type="checkbox" id="chk_selfFund" name="selfFund" value="true" <%= s.selfFund ? 'checked' : '' %>>
-                              <label class="form-check-label fw-bold" for="chk_selfFund">This student is self-funded</label>
-                           </div>
-                           <div class="form-text small mt-2">Use this when the student pays directly and no external funder account should be linked.</div>
-                        </div>
-                     </div>
-                  </div>
-                  <div class="col-lg-8">
-                     <div class="card border-primary shadow-sm h-100" id="fundedStudentSection">
-                        <div class="card-header bg-primary-subtle text-primary fw-bold text-uppercase small">
-                           <i class="bi bi-building me-1"></i>Funded Student
-                        </div>
-                        <div class="card-body">
-                           <div class="mb-3">
-                              <label class="form-label fw-bold">Funder Account</label>
-                              <div class="input-group">
-                                 <input type="hidden" name="funderAccountId" id="inp_funderAccountId" value="<%= s.funderAccountId || '' %>">
-                                 <input type="text" id="inp_funderAccountName" class="form-control size-md bg-white border-primary fw-bold" value="<%= funderAccountName || '' %>" placeholder="Select account..." readonly>
-                                 <button type="button" class="btn btn-primary" id="btnPickFunder"><i class="bi bi-search"></i></button>
-                                 <button type="button" class="btn btn-outline-secondary" id="btnClearFunder">Clear</button>
-                              </div>
-                              <div class="form-text small">Pick the default funder account used for this student.</div>
-                           </div>
-                           <div class="mb-0">
-                              <label class="form-label fw-bold">Student ID at Funder</label>
-                              <input type="text" name="studentIdAtFunder" id="inp_studentIdAtFunder" class="form-control size-md" placeholder="External ID used by funder" value="<%= s.studentIdAtFunder || '' %>">
-                              <div class="form-text small">Enabled only when a funder account is selected.</div>
-                           </div>
-                        </div>
-                     </div>
-                  </div>
-               </div>
-               <div class="row">
-                  <div class="col-md-12 mb-3">
-                     <label class="form-label fw-bold">Note</label>
-                     <textarea name="funderNote" class="form-control size-md" rows="3" placeholder="Funding-related notes..."><%= s.funderNote || '' %></textarea>
-                  </div>
+               <div class="alert alert-light border mb-0">
+                 <i class="bi bi-wallet2 me-2"></i>A separate Student Account is created automatically under the configured Students head account when the student is admitted.
                </div>
            </div>
 
@@ -663,31 +620,6 @@
         '</div>'
       );
     }).join('');
-  }
-
-  function syncFunderDependentFields() {
-    const selfFundCheckbox = document.getElementById('chk_selfFund');
-    const funderIdInput = document.getElementById('inp_funderAccountId');
-    const funderNameInput = document.getElementById('inp_funderAccountName');
-    const funderPickBtn = document.getElementById('btnPickFunder');
-    const funderClearBtn = document.getElementById('btnClearFunder');
-    const funderStudentIdInput = document.getElementById('inp_studentIdAtFunder');
-    const fundedSection = document.getElementById('fundedStudentSection');
-    if (!funderIdInput || !funderStudentIdInput) return;
-
-    const isSelfFund = Boolean(selfFundCheckbox?.checked);
-    if (isSelfFund) {
-      funderIdInput.value = '';
-      if (funderNameInput) funderNameInput.value = '';
-      funderStudentIdInput.value = '';
-    }
-
-    const hasFunder = Boolean(funderIdInput.value?.trim());
-    funderStudentIdInput.disabled = isSelfFund || !hasFunder;
-    if (funderPickBtn) funderPickBtn.disabled = isSelfFund;
-    if (funderClearBtn) funderClearBtn.disabled = isSelfFund;
-    if (fundedSection) fundedSection.classList.toggle('opacity-50', isSelfFund);
-    if (!hasFunder) funderStudentIdInput.value = '';
   }
 
   function syncPersonModeUI() {
@@ -1451,34 +1383,6 @@
       });
     }
 
-    const selfFundToggle = document.getElementById('chk_selfFund');
-    if (selfFundToggle) selfFundToggle.addEventListener('change', syncFunderDependentFields);
-
-    const funderBtn = document.getElementById('btnPickFunder');
-    const funderClearBtn = document.getElementById('btnClearFunder');
-    if (funderBtn) {
-      funderBtn.addEventListener('click', () => {
-        GenericPicker.open(GenericPickerPresets.account({
-          title: 'Select Funder Account',
-          icon: 'bi-diagram-2',
-          placeholder: 'Search by account code or name...',
-          onSelect: (item) => {
-            document.getElementById('inp_funderAccountId').value = item.id || '';
-            const code = String(item.code || '').trim();
-            const name = String(item.name || '').trim();
-            document.getElementById('inp_funderAccountName').value = (code && name) ? `${code} - ${name}` : (name || code || item.id || '');
-            syncFunderDependentFields();
-          }
-        }));
-      });
-    }
-    if (funderClearBtn) {
-      funderClearBtn.addEventListener('click', () => {
-        document.getElementById('inp_funderAccountId').value = '';
-        document.getElementById('inp_funderAccountName').value = '';
-        syncFunderDependentFields();
-      });
-    }
 
     if (btnAddNewPersonEmail) {
       btnAddNewPersonEmail.addEventListener('click', () => {
@@ -1760,7 +1664,6 @@
     renderExisting();
     renderNewFiles();
     renderPersonRoleSummary();
-    syncFunderDependentFields();
     syncPersonModeUI();
     syncNewPersonHiddenState();
     wireClbLevelHistoryUi();

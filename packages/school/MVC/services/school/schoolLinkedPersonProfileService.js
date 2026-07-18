@@ -30,6 +30,11 @@ const LINK_TYPE_CONFIG = Object.freeze({
     entityType: 'staff',
     section: SECTIONS.SCHOOL_STAFF,
     orgField: 'orgId'
+  },
+  funder: {
+    entityType: 'funders',
+    section: SECTIONS.SCHOOL_FUNDERS,
+    orgField: 'orgId'
   }
 });
 
@@ -38,7 +43,7 @@ const { validatePersonInput, buildPersonFromBody } = publicRegistrationService;
 function normalizeLinkType(value) {
   const token = String(value || '').trim().toLowerCase();
   if (!LINK_TYPE_CONFIG[token]) {
-    throw new Error('linkType must be student, teacher, or staff.');
+    throw new Error('linkType must be student, teacher, staff, or funder.');
   }
   return token;
 }
@@ -124,10 +129,17 @@ async function loadPersonRecord(personId, reqUser) {
   return person;
 }
 
+function resolvePersonProfileType(personOrBody = {}) {
+  return String(personOrBody.personProfileType || '').trim().toLowerCase() === 'organization'
+    ? 'organization'
+    : 'individual';
+}
+
 function toProfileDto(person = {}) {
   const name = person.name || {};
   const demographics = person.demographics || {};
   const contact = person.contact || {};
+  const organizationProfile = person.organizationProfile || {};
   const addressesLegacy = person.address || {};
   const addresses = Array.isArray(person.addresses)
     ? person.addresses
@@ -135,10 +147,13 @@ function toProfileDto(person = {}) {
   const emails = Array.isArray(contact.emails)
     ? contact.emails
     : (contact.email ? [{ type: 'primary', email: contact.email, isPrimary: true }] : []);
+  const personProfileType = resolvePersonProfileType(person);
 
   return {
     id: toPublicId(person.id || person.personId),
     active: person.active !== false,
+    personProfileType,
+    organizationLegalName: String(organizationProfile.legalName || '').trim(),
     firstName: String(name.first || '').trim(),
     middleName: String(name.middle || '').trim(),
     lastName: String(name.last || '').trim(),
@@ -170,7 +185,12 @@ async function getLinkedPersonProfile({ reqUser, personId, linkType, linkId = ''
   };
 }
 
-function assertSchoolProfileFields(body = {}) {
+function assertSchoolProfileFields(body = {}, existing = {}) {
+  const personProfileType = resolvePersonProfileType({
+    personProfileType: body.personProfileType || existing.personProfileType
+  });
+  if (personProfileType === 'organization') return;
+
   const gender = String(body.gender || '').trim();
   const dateOfBirth = String(body.dateOfBirth || '').trim();
   if (!gender) throw new Error('Gender is required.');
@@ -188,11 +208,25 @@ async function updateLinkedPersonProfile({ reqUser, personId, linkType, linkId =
   });
 
   const existing = await loadPersonRecord(personId, reqUser);
-  assertSchoolProfileFields(body);
+  const personProfileType = resolvePersonProfileType(existing);
+  const organizationLegalName = personProfileType === 'organization'
+    ? String(
+      Object.prototype.hasOwnProperty.call(body, 'organizationLegalName')
+        ? body.organizationLegalName
+        : (existing.organizationProfile?.legalName || '')
+    ).trim()
+    : '';
+
+  const bodyForCore = {
+    ...body,
+    personProfileType,
+    organizationLegalName
+  };
+  assertSchoolProfileFields(bodyForCore, existing);
 
   const priorDisplayName = schoolPersonAccessService.formatPersonName(existing, toPublicId(existing.id || personId));
 
-  await validatePersonInput(body, {
+  await validatePersonInput(bodyForCore, {
     isSelfRegistration: false,
     requirePrimaryEmail: true,
     existingPersonId: existing.id,
@@ -202,7 +236,7 @@ async function updateLinkedPersonProfile({ reqUser, personId, linkType, linkId =
 
   const reqUserId = reqUser?.id || reqUser?.username || 'SYSTEM';
   const bodyWithOrganizations = {
-    ...body,
+    ...bodyForCore,
     organizations: body.organizations || JSON.stringify(Array.isArray(existing.organizations) ? existing.organizations : [])
   };
   const updates = buildPersonFromBody(bodyWithOrganizations, reqUserId, existing);

@@ -49,6 +49,7 @@ const LABEL_FIELDS = Object.freeze({
 });
 
 const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
+  { entityType: 'funders', label: 'Funders', group: 'people', collectionName: 'schoolFunders', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false },
   { entityType: 'students', label: 'Students', group: 'people', collectionName: 'schoolStudents', deleteStrategy: DELETE_STRATEGIES.PURGE, supportsClearAll: false },
   { entityType: 'teachers', label: 'Teachers', group: 'people', collectionName: 'schoolTeachers', deleteStrategy: DELETE_STRATEGIES.PURGE, supportsClearAll: false },
   { entityType: 'staff', label: 'Staff', group: 'people', collectionName: 'schoolStaff', deleteStrategy: DELETE_STRATEGIES.PURGE, supportsClearAll: false },

@@ -1,0 +1,44 @@
+<%- include('partials/tablePages-start', {
+  title, newUrl, newLabel, user, tableName, btn_export: true, print,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_PEOPLE" class="school-navigator-dashboard btn btn-filled btn-secondary mb-2 btn-md"><i class="bi bi-people me-1"></i> People Dashboard</a>'
+  ]
+}) %>
+
+<%- include('partials/tablePages-search', { placeholder: 'Search funders...', fields: [{ name: 'status', label: 'Status', type: 'select', options: ['active', 'inactive', 'archived'] }] }) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true" data-action-state-id="<%= actionStateId || '' %>">
+  <table class="table-responsive size-md" id="first-table">
+    <thead><tr><th class="ps-4">Funder</th><th>Contact</th><th>Financial Account</th><th>Status</th><th class="text-end pe-4">Actions</th></tr></thead>
+    <tbody>
+      <% if (!data.length) { %><tr><td colspan="5" class="text-center py-4 text-muted">No Funders found in the active organization.</td></tr><% } %>
+      <% data.forEach((item) => { %>
+        <tr>
+          <td class="ps-4"><div class="fw-bold text-primary"><%= item.personName || item.personId %></div><div class="small text-muted font-monospace"><%= item.id %></div><div class="small text-muted"><%= item.externalReference || '-' %></div></td>
+          <td class="small text-muted"><%= item.personEmail || '-' %></td>
+          <td class="small"><% if (item.account) { %><div class="fw-semibold"><%= item.account.code %></div><div class="text-muted"><%= item.account.name %></div><% } else { %><span class="text-warning">Not linked</span><% } %></td>
+          <td><span class="badge <%= item.status === 'active' ? 'bg-success' : (item.status === 'inactive' ? 'bg-secondary' : 'bg-dark') %>"><%= String(item.status || '').toUpperCase() %></span></td>
+          <td class="table-actions text-end pe-4"><div class="row-actions-wrap"><button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= item.id %>"><i class="bi bi-three-dots-vertical"></i></button><div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>"><a href="/school/funders/edit/<%= item.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a><button type="button" class="btn btn-outline-danger btn-sm delete-funder" data-id="<%= item.id %>" data-account="<%= item.funderAccountId || '' %>"><i class="bi bi-archive me-2"></i>Archive</button></div></div></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<span id="urlRef" data-id="school/funders" hidden></span>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/funders' }) %>
+<%- include('partials/tablePages-end') %>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.delete-funder').forEach((button) => button.addEventListener('click', async () => {
+    if (button.dataset.account) { await window.showMessageModal?.({ title: 'Funder Account Linked', icon: 'warning', message: 'Unlink the Funder Account before archiving this Funder.', buttons: [{ text: 'OK', class: 'btn-primary' }] }); return; }
+    const choice = await window.showMessageModal?.({ title: 'Archive Funder', icon: 'warning', message: 'Archive this Funder record?', buttons: [{ text: 'Archive', class: 'btn-danger' }, { text: 'Cancel', class: 'btn-secondary' }] });
+    if (choice !== 'Archive') return;
+    const actionStateId = document.querySelector('[data-action-state-id]')?.dataset.actionStateId || '';
+    const response = await fetch('/school/funders/delete/' + encodeURIComponent(button.dataset.id), { method: 'DELETE', headers: { 'X-AJAX-Request': 'true', 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ actionStateId }).toString() });
+    const result = await response.json();
+    await window.showMessageModal?.({ title: result.status === 'success' ? 'Success' : 'Error', icon: result.status === 'success' ? 'success' : 'error', message: result.message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+    if (result.status === 'success') window.location.reload();
+  }));
+});
+</script>

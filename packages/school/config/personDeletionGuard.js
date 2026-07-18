@@ -18,11 +18,12 @@ function normalizeOrgRoles(membership = {}) {
   return roles.map((role) => String(role || '').trim().toLowerCase()).filter(Boolean);
 }
 
-const PERSON_ROLE_DELETE_BLOCK_ORDER = ['school_student', 'school_teacher', 'school_staff'];
+const PERSON_ROLE_DELETE_BLOCK_ORDER = ['school_student', 'school_teacher', 'school_staff', 'school_funder'];
 const PERSON_ROLE_DISPLAY_LABELS = Object.freeze({
   school_student: 'student',
   school_teacher: 'teacher',
-  school_staff: 'staff'
+  school_staff: 'staff',
+  school_funder: 'funder'
 });
 const PERSON_ROLE_ALIASES = {};
 const PERSON_ROLE_DELETE_BLOCKED_SET = new Set([
@@ -68,7 +69,7 @@ function buildDeleteBlockedBySchoolRoleMessage(roleScan) {
   const extraLine = extraCount ? `<br>...and ${extraCount} more linked role assignment(s).` : '';
   const details = rows.length ? `<br><br>${rows.join('<br>')}${extraLine}` : '';
 
-  return `<b>Deletion blocked.</b><br>This person is assigned as ${roleLabels} in school records.<br>Please resolve/archive the related records in Students, Teachers, or Staff before deleting this person.${details}`;
+  return `<b>Deletion blocked.</b><br>This person is assigned as ${roleLabels} in school records.<br>Please resolve/archive the related records in Students, Teachers, Staff, or School Funders before deleting this person.${details}`;
 }
 
 async function collectPersonDeleteBlocks(person) {

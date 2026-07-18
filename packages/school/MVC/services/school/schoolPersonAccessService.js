@@ -35,8 +35,10 @@ function formatPersonName(person = {}, fallback = '') {
   if (preferred) return preferred;
   const first = readNamePart(person, 'first');
   const last = readNamePart(person, 'last');
+  const organizationLegalName = normalizeText(person?.organizationProfile?.legalName || person?.organizationLegalName);
   return [first, last].filter(Boolean).join(' ')
-    || normalizeText(person.displayName || person.fullName || person.name)
+    || organizationLegalName
+    || normalizeText(person.displayName || person.fullName || (typeof person.name === 'string' ? person.name : ''))
     || normalizeText(fallback);
 }
 

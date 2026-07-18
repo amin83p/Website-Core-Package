@@ -1,0 +1,681 @@
+<%
+  const f = funder || {};
+  const isEdit = Boolean(f.id);
+  const selectedPersonId = String(f.personId || '');
+  const selectedAccountId = String(f.funderAccountId || '');
+  const selectedParentAccountId = String(suggestedFunderAccountParentId || '');
+  const selectedParentAccount = (funderAccountParents || []).find((account) => String(account?.id || '') === selectedParentAccountId)
+    || (typeof suggestedFunderAccountParent !== 'undefined' ? suggestedFunderAccountParent : null)
+    || {};
+  const parentAccountDisplayName = selectedParentAccount?.id
+    ? `${selectedParentAccount.code || selectedParentAccount.id} — ${selectedParentAccount.name || ''}`.trim()
+    : '';
+  const suggestedParentHint = selectedParentAccount?.id
+    ? `${selectedParentAccount.code || selectedParentAccount.id} — ${selectedParentAccount.name || ''}`.trim()
+    : 'Sponsored Organizations Receivable Control (1240)';
+  const personDisplayName = String(typeof personName !== 'undefined' ? personName : '').trim();
+  const entityDisplayName = personDisplayName || 'Funder';
+  const entityRecordId = String(f.id || f.personId || '').trim();
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const initialPersonOrganizationsJson = JSON.stringify(
+    typeof personOrganizations !== 'undefined' ? (personOrganizations || []) : []
+  ).replace(/</g, '\\u003c');
+  const initialOrganizationLookupJson = JSON.stringify(
+    typeof organizationLookup !== 'undefined' ? (organizationLookup || {}) : {}
+  ).replace(/</g, '\\u003c');
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0">
+      <i class="bi bi-person-vcard me-2"></i>
+      <% if (isEdit) { %>
+        Edit Funder: <%= entityDisplayName %> <small class="text-muted fw-normal">(<%= entityRecordId %>)</small>
+      <% } else { %>
+        Add New Funder
+      <% } %>
+    </h1>
+    <a href="/school/funders" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form
+      id="funderForm"
+      action="<%= (isEdit ? '/school/funders/edit/' + f.id : '/school/funders/new') + (asid ? ('?actionStateId=' + encodeURIComponent(asid)) : '') %>"
+      method="POST"
+    >
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+      <script type="application/json" id="init_personOrganizations"><%- initialPersonOrganizationsJson %></script>
+      <script type="application/json" id="init_organizationLookup"><%- initialOrganizationLookupJson %></script>
+
+      <ul class="nav nav-tabs mb-4" id="funderTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-person" type="button">Step 1: Person</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-funder" type="button">Step 2: Funder</button></li>
+      </ul>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4 tab-content">
+          <div class="tab-pane fade show active" id="tab-person">
+            <% if (!isEdit) { %>
+              <div class="alert alert-light border shadow-sm mb-4">
+                <div class="fw-bold mb-2"><i class="bi bi-person-plus me-2"></i>Person Source</div>
+                <div class="d-flex flex-wrap gap-4">
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="personMode" id="personModeExisting" value="existing" checked>
+                    <label class="form-check-label fw-bold" for="personModeExisting">Use Existing Person</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="personMode" id="personModeNew" value="new">
+                    <label class="form-check-label fw-bold" for="personModeNew">Create New Person</label>
+                  </div>
+                </div>
+              </div>
+            <% } else { %>
+              <input type="hidden" name="personMode" value="existing">
+            <% } %>
+
+            <div id="existingPersonBlock">
+              <div class="row">
+                <div class="col-md-8 mb-3">
+                  <label class="form-label fw-bold">Select Person *</label>
+                  <div class="input-group">
+                    <input type="hidden" name="personId" id="inp_personId" value="<%= selectedPersonId %>" required>
+                    <input type="text" id="inp_personName" class="form-control size-md bg-white border-primary fw-bold" placeholder="Search Person Directory..." value="<%= personDisplayName %>" readonly required>
+                    <button type="button" class="btn btn-primary" id="btnPickPerson" <%= isEdit ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
+                    <button
+                      type="button"
+                      class="btn <%= (typeof canEditLinkedPerson !== 'undefined' && canEditLinkedPerson) ? 'btn-outline-primary' : 'btn-outline-secondary' %>"
+                      id="btnEditPersonProfile"
+                      data-link-type="<%= linkedPersonLinkType || 'funder' %>"
+                      data-link-id="<%= linkedPersonLinkId || '' %>"
+                      data-can-edit-person="<%= (typeof canEditLinkedPerson !== 'undefined' && canEditLinkedPerson) ? 'true' : 'false' %>"
+                      title="<%= (typeof canEditLinkedPerson !== 'undefined' && canEditLinkedPerson) ? 'Edit person profile' : 'You do not have permission to edit this person account' %>"
+                    ><i class="bi <%= (typeof canEditLinkedPerson !== 'undefined' && canEditLinkedPerson) ? 'bi-pencil-square' : 'bi-lock' %>"></i></button>
+                  </div>
+                  <div class="form-text small">Links this funder profile to a Person. A Person can be an individual or an organization.</div>
+                </div>
+              </div>
+
+              <div class="card border shadow-sm bg-light-subtle mb-3">
+                <div class="card-header bg-light fw-bold"><i class="bi bi-diagram-3 me-2"></i>Current Person Role Composition</div>
+                <div class="card-body" id="personRoleSummary"></div>
+              </div>
+            </div>
+
+            <% if (!isEdit) { %>
+              <div id="newPersonBlock" class="d-none">
+                <div class="card shadow-sm border-0 mb-3">
+                  <div class="card-body">
+                    <h6 class="fw-bold text-uppercase text-muted mb-3"><i class="bi bi-person-bounding-box me-2"></i>Profile &amp; Identity</h6>
+                    <div class="row g-3 mb-3">
+                      <div class="col-md-4">
+                        <label class="form-label fw-bold">Person Type *</label>
+                        <select id="newPersonProfileType" name="newPersonProfileType" class="form-select size-md">
+                          <option value="organization" selected>Organization / Company</option>
+                          <option value="individual">Individual</option>
+                        </select>
+                        <div class="form-text">Funders may be a company or an individual.</div>
+                      </div>
+                      <div class="col-md-8 organization-field">
+                        <label class="form-label fw-bold">Organization Legal Name *</label>
+                        <input type="text" name="newOrganizationLegalName" id="inp_newOrganizationLegalName" class="form-control size-md" placeholder="Legal company or organization name">
+                      </div>
+                      <div class="col-md-4 individual-field d-none">
+                        <label class="form-label fw-bold">First Name *</label>
+                        <input type="text" name="newPersonFirstName" id="inp_newPersonFirstName" class="form-control size-md" placeholder="First name">
+                      </div>
+                      <div class="col-md-4 individual-field d-none">
+                        <label class="form-label fw-bold">Last Name *</label>
+                        <input type="text" name="newPersonLastName" id="inp_newPersonLastName" class="form-control size-md" placeholder="Last name">
+                      </div>
+                    </div>
+                    <div class="row g-3 individual-field d-none">
+                      <div class="col-md-6">
+                        <label class="form-label fw-bold">Gender *</label>
+                        <select name="newPersonGender" id="inp_newPersonGender" class="form-select size-md">
+                          <option value="">-- Select Gender --</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="nonbinary">Non-binary</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label fw-bold">Date of Birth *</label>
+                        <input type="date" name="newPersonDateOfBirth" id="inp_newPersonDateOfBirth" class="form-control size-md">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                  <div class="col-lg-6">
+                    <div class="card shadow-sm border-0 h-100">
+                      <div class="card-header bg-light fw-bold text-uppercase small text-muted"><i class="bi bi-envelope-paper me-2"></i>Communication</div>
+                      <div class="card-body">
+                        <label class="form-label fw-bold">Business Email *</label>
+                        <input type="email" name="newPersonEmail" id="inp_newPersonEmail" class="form-control size-md" placeholder="email@example.com">
+                        <div class="form-text">This is saved as the Person's primary work email.</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-lg-6">
+                    <div class="card shadow-sm border-0 h-100">
+                      <div class="card-header bg-light fw-bold text-uppercase small text-muted"><i class="bi bi-journal-text me-2"></i>Person Notes</div>
+                      <div class="card-body bg-light-subtle">
+                        <textarea name="newPersonNotes" id="inp_newPersonNotes" class="form-control size-md" rows="3" placeholder="Optional internal notes for this Person profile..."></textarea>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <% } %>
+          </div>
+
+          <div class="tab-pane fade" id="tab-funder">
+            <div class="alert alert-info border-info shadow-sm mb-4">
+              <i class="bi bi-info-circle me-2"></i>
+              A Funder Account is created automatically when a new Funder is saved. Place it under a receivable control that can hold many funders (and later many students), not under a single student account.
+              Suggested parent: <strong><%= suggestedParentHint %></strong>.
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <label class="form-label fw-bold">Status</label>
+                <select name="status" class="form-select size-md">
+                  <% ['active', 'inactive', 'archived'].forEach((status) => { %>
+                    <option value="<%= status %>" <%= (f.status || 'active') === status ? 'selected' : '' %>><%= status[0].toUpperCase() + status.slice(1) %></option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="col-md-8">
+                <label class="form-label fw-bold">External Reference</label>
+                <input type="text" name="externalReference" class="form-control size-md" maxlength="120" placeholder="Optional external reference or customer number" value="<%= f.externalReference || '' %>">
+              </div>
+            </div>
+
+            <div class="card border-secondary shadow-sm mb-3">
+              <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <span class="fw-bold"><i class="bi bi-wallet2 me-2"></i>Funder Account</span>
+                <% if (isEdit && !selectedAccountId) { %>
+                  <button id="createAccountBtn" type="button" class="btn btn-sm btn-outline-primary fw-bold"><i class="bi bi-plus-lg me-1"></i>Create Funder Account</button>
+                <% } %>
+              </div>
+              <div class="card-body">
+                <div class="row g-3">
+                  <div class="col-md-8">
+                    <input type="hidden" name="funderAccountId" id="funderAccountId" value="<%= selectedAccountId %>">
+                    <% if (!isEdit || !selectedAccountId) { %>
+                      <div class="alert alert-light border shadow-sm mb-3">
+                        <div class="fw-bold mb-2"><i class="bi bi-wallet2 me-2"></i>Account Source</div>
+                        <div class="d-flex flex-wrap gap-4">
+                          <div class="form-check">
+                            <input class="form-check-input" type="radio" name="accountMode" id="accountModeNew" value="new" <%= selectedAccountId ? '' : 'checked' %>>
+                            <label class="form-check-label fw-bold" for="accountModeNew">Create New Funder Account</label>
+                          </div>
+                          <div class="form-check">
+                            <input class="form-check-input" type="radio" name="accountMode" id="accountModeExisting" value="existing" <%= selectedAccountId ? 'checked' : '' %>>
+                            <label class="form-check-label fw-bold" for="accountModeExisting">Use Existing Account</label>
+                          </div>
+                        </div>
+                      </div>
+                    <% } else { %>
+                      <input type="hidden" name="accountMode" value="existing">
+                    <% } %>
+
+                    <div id="newFunderAccountBlock" class="<%= selectedAccountId ? 'd-none' : '' %>">
+                      <label class="form-label fw-bold text-success" for="funderAccountParentId"><i class="bi bi-diagram-3 me-1"></i>Parent Account for New Funder Account *</label>
+                      <div class="input-group">
+                        <input type="hidden" name="funderAccountParentId" id="funderAccountParentId" value="<%= selectedParentAccountId %>">
+                        <input type="text" id="funderAccountParentName" class="form-control size-md bg-white border-success fw-bold" placeholder="Select parent account..." value="<%= parentAccountDisplayName %>" readonly>
+                        <button type="button" class="btn btn-success" id="btnPickFunderParent" title="Select parent account"><i class="bi bi-search"></i></button>
+                      </div>
+                      <div class="form-text">Suggested default is the Sponsored Organizations / Funders receivable control so one funder can later sponsor many students. The picker lists only accounts that allow child accounts.</div>
+                    </div>
+
+                    <div id="existingFunderAccountBlock" class="<%= selectedAccountId ? '' : 'd-none' %>">
+                      <label class="form-label fw-bold text-success" for="funderAccountName"><i class="bi bi-link-45deg me-1"></i>Existing Funder Account</label>
+                      <div class="input-group">
+                        <input type="text" id="funderAccountName" class="form-control size-md bg-white border-success fw-bold" placeholder="Select an active, postable account..." value="<%= linkedAccount ? ((linkedAccount.code || linkedAccount.id) + ' — ' + (linkedAccount.name || '')) : '' %>" readonly>
+                        <button type="button" class="btn btn-success" id="btnPickFunderAccount" title="Select account"><i class="bi bi-search"></i></button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnClearFunderAccount" title="Clear account"><i class="bi bi-x-lg"></i></button>
+                      </div>
+                      <div class="form-text">Select an existing active, postable account to avoid creating a new Funder Account.</div>
+                    </div>
+
+                    <% if (isEdit && selectedAccountId) { %>
+                      <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" name="unlinkFunderAccount" id="unlinkFunderAccount" value="true">
+                        <label class="form-check-label fw-bold" for="unlinkFunderAccount">Unlink the current Funder Account</label>
+                      </div>
+                    <% } %>
+                  </div>
+                  <div class="col-md-4 d-flex align-items-end">
+                    <% if (selectedAccountId) { %>
+                      <div class="alert alert-success py-2 mb-0 w-100"><i class="bi bi-check-circle me-1"></i>Existing Funder Account linked</div>
+                    <% } else if (!(funderAccountParents || []).length) { %>
+                      <div class="alert alert-warning py-2 mb-0 w-100"><i class="bi bi-exclamation-triangle me-1"></i>Configure an active parent account before saving.</div>
+                    <% } else { %>
+                      <div class="alert alert-light border py-2 mb-0 w-100"><i class="bi bi-info-circle me-1"></i>Choose an existing account or create one automatically.</div>
+                    <% } %>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row mt-2">
+              <div class="col-12 mb-3">
+                <label class="form-label fw-bold">Funder Notes</label>
+                <textarea name="notes" class="form-control size-md" rows="3" placeholder="Internal notes..." maxlength="5000"><%= f.notes || '' %></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="button" class="btn btn-outline-primary btn-md" id="btnWizardPrev">Back</button>
+        <button type="button" class="btn btn-filled btn-primary btn-md fw-bold px-4" id="btnWizardNext">Next</button>
+        <button type="submit" class="btn btn-filled btn-success btn-md fw-bold px-4 d-none" id="btnWizardSubmit"><i class="bi bi-save me-1"></i>Save Funder</button>
+        <a href="/school/funders" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/school/funders">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/modal_GenericPicker') %>
+<%- include('school/partials/personProfileEditModal') %>
+
+<script>
+  window.__FUNDER_PERSON_ORGANIZATIONS__ = <%- initialPersonOrganizationsJson %>;
+</script>
+<script>
+(() => {
+  const form = document.getElementById('funderForm');
+  const wizardTargets = ['#tab-person', '#tab-funder'];
+  const tabs = document.getElementById('funderTabs');
+  const btnPrevious = document.getElementById('btnWizardPrev');
+  const btnNext = document.getElementById('btnWizardNext');
+  const btnSubmit = document.getElementById('btnWizardSubmit');
+  const existingMode = document.getElementById('personModeExisting');
+  const newMode = document.getElementById('personModeNew');
+  const existingBlock = document.getElementById('existingPersonBlock');
+  const newBlock = document.getElementById('newPersonBlock');
+  const personId = document.getElementById('inp_personId');
+  const personName = document.getElementById('inp_personName');
+  const profileType = document.getElementById('newPersonProfileType');
+  const roleSummary = document.getElementById('personRoleSummary');
+  const accountModeNew = document.getElementById('accountModeNew');
+  const accountModeExisting = document.getElementById('accountModeExisting');
+  const newAccountBlock = document.getElementById('newFunderAccountBlock');
+  const existingAccountBlock = document.getElementById('existingFunderAccountBlock');
+  const funderAccountId = document.getElementById('funderAccountId');
+  const funderAccountName = document.getElementById('funderAccountName');
+  const funderAccountParentId = document.getElementById('funderAccountParentId');
+  const funderAccountParentName = document.getElementById('funderAccountParentName');
+  const unlinkFunderAccount = document.getElementById('unlinkFunderAccount');
+  let currentStep = 0;
+  let selectedPersonOrganizations = (() => {
+    try {
+      const embedded = document.getElementById('init_personOrganizations')?.textContent;
+      if (embedded) return JSON.parse(embedded);
+    } catch (_) { /* fall through */ }
+    return Array.isArray(window.__FUNDER_PERSON_ORGANIZATIONS__)
+      ? window.__FUNDER_PERSON_ORGANIZATIONS__
+      : [];
+  })();
+  const organizationLookup = (() => {
+    try {
+      return JSON.parse(document.getElementById('init_organizationLookup')?.textContent || '{}') || {};
+    } catch (_) {
+      return {};
+    }
+  })();
+
+  const showModal = (options) => window.showMessageModal
+    ? window.showMessageModal(options)
+    : Promise.resolve('OK');
+
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
+
+  const displayPerson = (person) => {
+    const preferred = String(person?.preferredName || person?.name?.preferred || '').trim();
+    if (preferred) return preferred;
+    const first = String(person?.firstName || person?.name?.first || '').trim();
+    const last = String(person?.lastName || person?.name?.last || '').trim();
+    const organizationLegalName = String(
+      person?.organizationProfile?.legalName || person?.organizationLegalName || ''
+    ).trim();
+    const displayName = String(person?.displayName || '').trim();
+    const joined = [first, last].filter(Boolean).join(' ').trim();
+    const rawName = typeof person?.name === 'string' ? String(person.name).trim() : '';
+    return displayName || joined || organizationLegalName || rawName || String(person?.id || person?.personId || '').trim();
+  };
+
+  const formatRole = (role) => {
+    const token = String(role || '').trim().toLowerCase();
+    if (token === 'school_funder') return 'School Funder';
+    if (token === 'school_student') return 'School Student';
+    if (token === 'school_teacher') return 'School Teacher';
+    if (token === 'school_staff') return 'School Staff';
+    return token
+      .split(/[_-]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  };
+
+  const resolveOrganizationName = (organization) => {
+    const id = String(organization?.orgId || organization?.id || '').trim();
+    if (id && Object.prototype.hasOwnProperty.call(organizationLookup, id)) {
+      return String(organizationLookup[id] || '').trim() || id;
+    }
+    return String(
+      organization?.orgName || organization?.name || organization?.organizationName || id || 'Unknown Organization'
+    ).trim();
+  };
+
+  const renderRoleSummary = () => {
+    if (!roleSummary) return;
+    if (!selectedPersonOrganizations.length) {
+      roleSummary.innerHTML = '<div class="text-muted small">No organization role assignments are available for the selected person yet.</div>';
+      return;
+    }
+    roleSummary.innerHTML = selectedPersonOrganizations.map((organization) => {
+      const roles = Array.isArray(organization?.roles) && organization.roles.length
+        ? organization.roles
+        : (organization?.role ? [organization.role] : []);
+      const badges = roles.length
+        ? roles.map((role) => `<span class="badge text-bg-primary-subtle text-primary-emphasis border me-1 mb-1">${escapeHtml(formatRole(role))}</span>`).join('')
+        : '<span class="text-muted small">No school roles assigned</span>';
+      const organizationName = resolveOrganizationName(organization);
+      return `<div class="border rounded p-3 mb-2 bg-white"><div class="fw-bold">${escapeHtml(organizationName)}</div><div class="small text-muted mb-2">Org ID: ${escapeHtml(organization?.orgId || '-')}</div><div>${badges}</div></div>`;
+    }).join('');
+  };
+
+  const syncPersonMode = () => {
+    const isNew = Boolean(newMode?.checked);
+    existingBlock?.classList.toggle('d-none', isNew);
+    newBlock?.classList.toggle('d-none', !isNew);
+    if (personId) personId.required = !isNew;
+    if (personName) personName.required = !isNew;
+    document.getElementById('inp_newPersonEmail')?.toggleAttribute('required', isNew);
+    syncProfileType();
+  };
+
+  const syncProfileType = () => {
+    const isNew = Boolean(newMode?.checked);
+    const organization = !profileType || profileType.value === 'organization';
+    document.querySelectorAll('.organization-field').forEach((node) => node.classList.toggle('d-none', !organization));
+    document.querySelectorAll('.individual-field').forEach((node) => node.classList.toggle('d-none', organization));
+    document.getElementById('inp_newOrganizationLegalName')?.toggleAttribute('required', isNew && organization);
+    ['inp_newPersonFirstName', 'inp_newPersonLastName', 'inp_newPersonGender', 'inp_newPersonDateOfBirth'].forEach((id) => {
+      document.getElementById(id)?.toggleAttribute('required', isNew && !organization);
+    });
+  };
+
+  const syncAccountMode = () => {
+    const useExisting = accountModeExisting
+      ? accountModeExisting.checked
+      : true;
+    newAccountBlock?.classList.toggle('d-none', useExisting);
+    existingAccountBlock?.classList.toggle('d-none', !useExisting);
+  };
+
+  const accountLabel = (item) => {
+    const code = String(item?.code || item?.id || '').trim();
+    const name = String(item?.name || '').trim();
+    return [code, name].filter(Boolean).join(' — ');
+  };
+
+  const pickerUnavailable = () => showModal({
+    title: 'Unavailable',
+    icon: 'warning',
+    message: 'Account picker is not available on this page.',
+    buttons: [{ text: 'OK', class: 'btn-warning' }]
+  });
+
+  const openAccountPicker = (mode) => {
+    if (!window.GenericPicker || !window.GenericPickerPresets?.account) {
+      pickerUnavailable();
+      return;
+    }
+    const isParent = mode === 'parent';
+    window.GenericPicker.open(window.GenericPickerPresets.account({
+      title: isParent ? 'Select Funder Account Parent' : 'Select Existing Funder Account',
+      icon: 'bi-wallet2',
+      placeholder: isParent
+        ? 'Search accounts that allow children (control/head accounts)...'
+        : 'Search active, postable accounts...',
+      apiEndpoint: isParent
+        ? '/school/funders/api/eligible-accounts?kind=parent'
+        : '/school/funders/api/eligible-accounts?kind=postable',
+      onSelect: (item) => {
+        const id = String(item?.id || '').trim();
+        if (!id) return;
+        const level = Number(item?.level || 0);
+        const partyRole = String(item?.partyRole || 'none').trim().toLowerCase();
+        const allowPost = item?.allowPost === true || String(item?.allowPost || '').toLowerCase() === 'true';
+        const isControl = item?.isControl === true || String(item?.isControl || '').toLowerCase() === 'true';
+        const headCategory = String(item?.headCategory || 'none').trim().toLowerCase();
+        const partyLeafRoles = new Set(['student', 'teacher', 'staff', 'parent', 'funder', 'vendor', 'organization', 'other']);
+        if (isParent) {
+          const allowsChildren = Number.isInteger(level)
+            && level >= 1
+            && level < 6
+            && (isControl || headCategory !== 'none' || !(partyLeafRoles.has(partyRole) && allowPost));
+          if (!allowsChildren) {
+            showModal({
+              title: 'Invalid Parent Account',
+              icon: 'warning',
+              message: 'Choose an active control/head account that can own many child accounts. Individual student or party leaf accounts cannot be used as the Funder parent.',
+              buttons: [{ text: 'OK', class: 'btn-warning' }]
+            });
+            return;
+          }
+        }
+        if (!isParent && (String(item?.status || '').toLowerCase() !== 'active' || !allowPost)) {
+          showModal({
+            title: 'Invalid Funder Account',
+            icon: 'warning',
+            message: 'Choose an active, postable account in the active organization.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+          return;
+        }
+        if (isParent) {
+          if (funderAccountParentId) funderAccountParentId.value = id;
+          if (funderAccountParentName) funderAccountParentName.value = accountLabel(item);
+          if (funderAccountId) funderAccountId.value = '';
+          if (funderAccountName) funderAccountName.value = '';
+          if (unlinkFunderAccount) unlinkFunderAccount.checked = false;
+          if (accountModeNew) accountModeNew.checked = true;
+        } else {
+          if (funderAccountId) funderAccountId.value = id;
+          if (funderAccountName) funderAccountName.value = accountLabel(item);
+          if (accountModeExisting) accountModeExisting.checked = true;
+          if (unlinkFunderAccount) unlinkFunderAccount.checked = false;
+        }
+        syncAccountMode();
+      }
+    }));
+  };
+
+  const updateWizardButtons = () => {
+    btnPrevious?.classList.toggle('d-none', currentStep === 0);
+    btnNext?.classList.toggle('d-none', currentStep === wizardTargets.length - 1);
+    btnSubmit?.classList.toggle('d-none', currentStep !== wizardTargets.length - 1);
+  };
+
+  const showStep = (nextStep) => {
+    currentStep = Math.max(0, Math.min(nextStep, wizardTargets.length - 1));
+    const button = document.querySelector(`#funderTabs [data-bs-target="${wizardTargets[currentStep]}"]`);
+    if (button && window.bootstrap?.Tab) new window.bootstrap.Tab(button).show();
+    updateWizardButtons();
+  };
+
+  const validateCurrentStep = () => {
+    const pane = document.querySelector(wizardTargets[currentStep]);
+    if (!pane) return true;
+    for (const control of pane.querySelectorAll('input, select, textarea')) {
+      if (!control || control.disabled || control.type === 'hidden' || control.closest('.d-none')) continue;
+      if (!control.checkValidity()) {
+        control.reportValidity();
+        return false;
+      }
+    }
+    if (wizardTargets[currentStep] === '#tab-funder') {
+      const useExisting = accountModeExisting
+        ? accountModeExisting.checked
+        : true;
+      if (useExisting && !String(funderAccountId?.value || '').trim() && !unlinkFunderAccount?.checked) {
+        showModal({ title: 'Account Required', icon: 'warning', message: 'Select an existing Funder Account or choose a parent account for a new one.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+        return false;
+      }
+      if (!useExisting && !String(funderAccountParentId?.value || '').trim()) {
+        showModal({ title: 'Parent Account Required', icon: 'warning', message: 'Select the parent account for the new Funder Account.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+        return false;
+      }
+    }
+    return true;
+  };
+
+  existingMode?.addEventListener('change', () => { syncPersonMode(); refreshEditPersonButton(); });
+  newMode?.addEventListener('change', () => { syncPersonMode(); refreshEditPersonButton(); });
+  profileType?.addEventListener('change', syncProfileType);
+  accountModeNew?.addEventListener('change', () => {
+    if (accountModeNew.checked) {
+      if (funderAccountId) funderAccountId.value = '';
+      if (funderAccountName) funderAccountName.value = '';
+      if (unlinkFunderAccount) unlinkFunderAccount.checked = false;
+    }
+    syncAccountMode();
+  });
+  accountModeExisting?.addEventListener('change', syncAccountMode);
+  tabs?.querySelectorAll('[data-bs-toggle="tab"]').forEach((button) => {
+    button.addEventListener('shown.bs.tab', () => {
+      currentStep = wizardTargets.indexOf(button.getAttribute('data-bs-target'));
+      if (currentStep < 0) currentStep = 0;
+      updateWizardButtons();
+    });
+  });
+
+  function refreshEditPersonButton() {
+    const btnEditPerson = document.getElementById('btnEditPersonProfile');
+    if (!btnEditPerson || !window.SchoolPersonProfileModal) return;
+    const selectedId = String(personId?.value || '').trim();
+    const personModeExisting = !newMode || !newMode.checked;
+    window.SchoolPersonProfileModal.updateEditButtonState(btnEditPerson, {
+      personId: selectedId,
+      personModeExisting
+    });
+  }
+
+  document.getElementById('btnPickPerson')?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    window.GenericPicker.open(window.GenericPickerPresets.person({
+      title: 'Select Person',
+      apiEndpoint: '/school/funders/api/eligible-persons',
+      placeholder: 'Search by name or email...',
+      onSelect: (item) => {
+        const id = String(item?.personId || item?.id || '').trim();
+        if (!id) return;
+        if (personId) personId.value = id;
+        if (personName) personName.value = displayPerson(item) || id;
+        selectedPersonOrganizations = Array.isArray(item?.organizations) ? item.organizations : [];
+        renderRoleSummary();
+        refreshEditPersonButton();
+      }
+    }));
+  });
+
+  const btnEditPerson = document.getElementById('btnEditPersonProfile');
+  if (btnEditPerson && window.SchoolPersonProfileModal) {
+    btnEditPerson.addEventListener('click', () => {
+      if (btnEditPerson.dataset.canEditPerson !== 'true') {
+        showModal({
+          title: 'Permission Required',
+          icon: 'warning',
+          message: 'You do not have permission to edit this person account.',
+          buttons: [{ text: 'OK', class: 'btn-warning' }]
+        });
+        return;
+      }
+      const selectedId = String(personId?.value || '').trim();
+      if (!selectedId) return;
+      window.SchoolPersonProfileModal.open({
+        personId: selectedId,
+        linkType: btnEditPerson.dataset.linkType || 'funder',
+        linkId: btnEditPerson.dataset.linkId || '',
+        organizationLookup,
+        onSaved: ({ displayName, organizations: nextOrganizations }) => {
+          if (displayName && personName) personName.value = displayName;
+          selectedPersonOrganizations = Array.isArray(nextOrganizations) ? nextOrganizations : [];
+          renderRoleSummary();
+        }
+      });
+    });
+  }
+
+  document.getElementById('btnPickFunderParent')?.addEventListener('click', () => openAccountPicker('parent'));
+  document.getElementById('btnPickFunderAccount')?.addEventListener('click', () => openAccountPicker('existing'));
+  document.getElementById('btnClearFunderAccount')?.addEventListener('click', () => {
+    if (funderAccountId) funderAccountId.value = '';
+    if (funderAccountName) funderAccountName.value = '';
+    if (unlinkFunderAccount) unlinkFunderAccount.checked = true;
+    if (accountModeNew) accountModeNew.checked = true;
+    syncAccountMode();
+  });
+
+  btnPrevious?.addEventListener('click', () => showStep(currentStep - 1));
+  btnNext?.addEventListener('click', () => {
+    if (validateCurrentStep()) showStep(currentStep + 1);
+  });
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!validateCurrentStep()) return;
+    const response = await fetch(form.action, {
+      method: 'POST',
+      headers: { 'X-AJAX-Request': 'true', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(new FormData(form)).toString()
+    });
+    const result = await response.json().catch(() => ({ status: 'error', message: 'The Funder could not be saved.' }));
+    await showModal({
+      title: result.status === 'success' ? 'Success' : 'Error',
+      icon: result.status === 'success' ? 'success' : 'error',
+      message: result.message,
+      buttons: [{ text: 'OK', class: 'btn-primary' }]
+    });
+    if (result.status === 'success') window.location.href = '/school/funders';
+  });
+
+  document.getElementById('createAccountBtn')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    const parentId = document.getElementById('funderAccountParentId')?.value || '';
+    const response = await fetch('/school/funders/<%= f.id || '' %>/create-account', {
+      method: 'POST',
+      headers: { 'X-AJAX-Request': 'true', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ actionStateId: '<%= asid %>', funderAccountParentId: parentId }).toString()
+    });
+    const result = await response.json().catch(() => ({ status: 'error', message: 'The Funder Account could not be created.' }));
+    await showModal({
+      title: result.status === 'success' ? 'Success' : 'Error',
+      icon: result.status === 'success' ? 'success' : 'error',
+      message: result.message,
+      buttons: [{ text: 'OK', class: 'btn-primary' }]
+    });
+    if (result.status === 'success') window.location.reload();
+    else button.disabled = false;
+  });
+
+  syncPersonMode();
+  syncAccountMode();
+  renderRoleSummary();
+  updateWizardButtons();
+  refreshEditPersonButton();
+})();
+</script>

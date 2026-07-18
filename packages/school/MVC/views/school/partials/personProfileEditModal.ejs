@@ -18,48 +18,62 @@
           <input type="hidden" id="schoolPersonProfileEmailsHidden" name="emails" value="[]">
           <input type="hidden" id="schoolPersonProfilePhonesHidden" name="phones" value="[]">
           <input type="hidden" id="schoolPersonProfileAddressesHidden" name="addresses" value="[]">
+          <input type="hidden" id="schoolPersonProfileType" name="personProfileType" value="individual">
 
           <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
               <h6 class="fw-bold text-uppercase text-muted mb-3"><i class="bi bi-person-bounding-box me-2"></i>Profile & Identity</h6>
-              <div class="row g-3 mb-3">
-                <div class="col-md-3">
-                  <label class="form-label fw-bold" for="schoolPersonProfileFirstName">First Name *</label>
-                  <input type="text" class="form-control size-md" id="schoolPersonProfileFirstName" name="firstName" required>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label fw-bold" for="schoolPersonProfileMiddleName">Middle Name</label>
-                  <input type="text" class="form-control size-md" id="schoolPersonProfileMiddleName" name="middleName">
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label fw-bold" for="schoolPersonProfileLastName">Last Name *</label>
-                  <input type="text" class="form-control size-md" id="schoolPersonProfileLastName" name="lastName" required>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label fw-bold" for="schoolPersonProfilePreferredName">Preferred Name</label>
-                  <input type="text" class="form-control size-md" id="schoolPersonProfilePreferredName" name="preferredName">
+
+              <div class="row g-3 mb-3 school-person-organization-fields" style="display: none;">
+                <div class="col-md-12">
+                  <label class="form-label fw-bold" for="schoolPersonProfileOrganizationLegalName">Organization Legal Name *</label>
+                  <input type="text" class="form-control size-md" id="schoolPersonProfileOrganizationLegalName" name="organizationLegalName">
                 </div>
               </div>
+
+              <div class="school-person-individual-fields">
+                <div class="row g-3 mb-3">
+                  <div class="col-md-3">
+                    <label class="form-label fw-bold" for="schoolPersonProfileFirstName">First Name *</label>
+                    <input type="text" class="form-control size-md" id="schoolPersonProfileFirstName" name="firstName" required>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label fw-bold" for="schoolPersonProfileMiddleName">Middle Name</label>
+                    <input type="text" class="form-control size-md" id="schoolPersonProfileMiddleName" name="middleName">
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label fw-bold" for="schoolPersonProfileLastName">Last Name *</label>
+                    <input type="text" class="form-control size-md" id="schoolPersonProfileLastName" name="lastName" required>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label fw-bold" for="schoolPersonProfilePreferredName">Preferred Name</label>
+                    <input type="text" class="form-control size-md" id="schoolPersonProfilePreferredName" name="preferredName">
+                  </div>
+                </div>
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label fw-bold" for="schoolPersonProfileGender">Gender *</label>
+                    <select class="form-select size-md" id="schoolPersonProfileGender" name="gender" required>
+                      <option value="">-- Select Gender --</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="nonbinary">Non-binary</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label fw-bold" for="schoolPersonProfileDateOfBirth">Date of Birth *</label>
+                    <input type="date" class="form-control size-md" id="schoolPersonProfileDateOfBirth" name="dateOfBirth" required>
+                  </div>
+                </div>
+              </div>
+
               <div class="row g-3">
                 <div class="col-md-4">
-                  <div class="form-check form-switch mt-4 pt-1">
+                  <div class="form-check form-switch mt-1">
                     <input class="form-check-input" type="checkbox" id="schoolPersonProfileActive" name="active" checked>
                     <label class="form-check-label fw-bold" for="schoolPersonProfileActive">Active Person Profile</label>
                   </div>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label fw-bold" for="schoolPersonProfileGender">Gender *</label>
-                  <select class="form-select size-md" id="schoolPersonProfileGender" name="gender" required>
-                    <option value="">-- Select Gender --</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="nonbinary">Non-binary</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label fw-bold" for="schoolPersonProfileDateOfBirth">Date of Birth *</label>
-                  <input type="date" class="form-control size-md" id="schoolPersonProfileDateOfBirth" name="dateOfBirth" required>
                 </div>
               </div>
             </div>

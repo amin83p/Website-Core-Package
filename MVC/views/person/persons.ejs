@@ -36,7 +36,10 @@
         <%
           const n = person.name || {};
           const personId = person.id;
-          const fullName = [n.first, n.middle, n.last].filter(Boolean).join(' ');
+          const individualName = [n.first, n.middle, n.last].filter(Boolean).join(' ');
+          const fullName = person.personProfileType === 'organization'
+            ? (person.organizationProfile?.legalName || individualName)
+            : individualName;
 
           const dem = person.demographics || {};
           const contact = person.contact || {};
@@ -63,7 +66,7 @@
         <tr>
           <td><%= personId || '—' %></td>
           <td><%= fullName || '—' %></td>
-          <td><%= n.preferred || '—' %></td>
+          <td><%= person.personProfileType === 'organization' ? 'Organization' : (n.preferred || '—') %></td>
           <td><%= primaryEmail || '—' %></td>
           <td><%= primaryPhone || '—' %></td>
           <td>

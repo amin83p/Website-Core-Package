@@ -16,6 +16,7 @@ const BUILTIN_REPOSITORY_MODULES = Object.freeze({
 
 const BUILTIN_QUERY_EXECUTOR_DECLARATIONS = Object.freeze({
   school: Object.freeze([
+    { entity: 'school.funders', source: 'school', repository: 'funders' },
     { entity: 'school.students', source: 'school', repository: 'students' },
     { entity: 'school.programs', source: 'school', repository: 'programs' },
     { entity: 'school.transactiondefinitions', source: 'school', repository: 'transactionDefinitions' },

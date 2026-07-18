@@ -63,6 +63,7 @@ const SECTION_HREFS = Object.freeze({
   students: (id) => `/school/students/edit/${encodeURIComponent(id)}`,
   teachers: (id) => `/school/teachers/edit/${encodeURIComponent(id)}`,
   staff: (id) => `/school/staff/edit/${encodeURIComponent(id)}`,
+  funders: (id) => `/school/funders/edit/${encodeURIComponent(id)}`,
   payRates: (id) => `/school/payRates/edit/${encodeURIComponent(id)}`,
   schoolAccounts: (id) => `/school/accounts/edit/${encodeURIComponent(id)}`,
   transactionTemplates: (id) => `/school/transactionTemplates/edit/${encodeURIComponent(id)}`,
@@ -442,10 +443,11 @@ async function scanAccountOwnerConflicts(accountId, orgId, reqUser, rule) {
   if (!targetAccountId) return null;
 
   const owners = [];
-  const [students, teachers, staffRows] = await Promise.all([
+  const [students, teachers, staffRows, funders] = await Promise.all([
     schoolDataService.fetchData('students', {}, reqUser),
     schoolDataService.fetchData('teachers', {}, reqUser),
-    schoolDataService.fetchData('staff', {}, reqUser)
+    schoolDataService.fetchData('staff', {}, reqUser),
+    schoolDataService.fetchData('funders', {}, reqUser)
   ]);
 
   (Array.isArray(students) ? students : []).forEach((student) => {
@@ -475,10 +477,14 @@ async function scanAccountOwnerConflicts(accountId, orgId, reqUser, rule) {
       href: SECTION_HREFS.staff(toPublicId(member?.id))
     });
   });
+  (Array.isArray(funders) ? funders : []).forEach((funder) => {
+    if (!idsEqual(funder?.funderAccountId, targetAccountId)) return;
+    owners.push({ type: 'funder', id: toPublicId(funder?.id), status: funder?.status || 'Unknown', href: SECTION_HREFS.funders(toPublicId(funder?.id)) });
+  });
 
   const scopedOwners = orgId
     ? owners.filter((owner) => {
-      const rows = owner.type === 'student' ? students : owner.type === 'teacher' ? teachers : staffRows;
+      const rows = owner.type === 'student' ? students : owner.type === 'teacher' ? teachers : owner.type === 'staff' ? staffRows : funders;
       const row = (Array.isArray(rows) ? rows : []).find((item) => idsEqual(item?.id, owner.id));
       return !row?.orgId || idsEqual(row.orgId, orgId);
     })
@@ -1194,6 +1200,16 @@ const ENTITY_DEFINITIONS = Object.freeze({
     ]
   },
 
+  funder: {
+    entityKey: 'funder',
+    repositoryKey: 'funders',
+    deleteMode: 'archive_only',
+    labelFields: ['externalReference', 'personId'],
+    fieldRules: [
+      { type: 'fieldMatch', code: 'GLOBAL_TRANSACTION', entityType: 'globalTransactions', field: 'party.funderId', label: 'Global Transactions', section: 'transactions', childPolicy: 'immutable_child', resolveHint: 'Financial transactions are immutable. Use reversal or void workflows.' }
+    ]
+  },
+
   schoolAccount: {
     entityKey: 'schoolAccount',
     repositoryKey: 'schoolAccounts',
@@ -1382,6 +1398,7 @@ const REPOSITORY_KEY_TO_ENTITY_KEY = Object.freeze({
   students: 'student',
   teachers: 'teacher',
   staff: 'staff',
+  funders: 'funder',
   schoolAccounts: 'schoolAccount',
   transactionDefinitions: 'transactionDefinition',
   transactionTemplates: 'transactionDefinition',

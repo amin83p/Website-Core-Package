@@ -154,22 +154,13 @@ function sanitizeStudentInput(input, { isUpdate = false } = {}) {
         countryOfOrigin: cleanString(input.countryOfOrigin, { max: 80, allowEmpty: true }),
         feeCategory: feeCategory,
         sendingOrganization: cleanString(input.sendingOrganization, { max: 120, allowEmpty: true }),
-        funderOrganization: cleanString(input.funderOrganization, { max: 120, allowEmpty: true }),
-        funderAccountId: cleanId(input.funderAccountId, { max: 64, allowEmpty: true }),
         studentAccountId: cleanId(input.studentAccountId, { max: 64, allowEmpty: true }),
-        studentIdAtFunder: cleanString(input.studentIdAtFunder, { max: 120, allowEmpty: true }),
-        selfFund: cleanBoolean(input.selfFund),
-        funderNote: cleanString(input.funderNote, { max: 5000, allowEmpty: true }),
         enrollmentDate,
         academicStatus,
         notes: cleanString(input.notes, { max: 5000, allowEmpty: true }),
         attachments: cleanAttachments(input.attachments),
         clbLevelHistory: cleanClbLevelHistory(input.clbLevelHistory)
     };
-
-    if (!out.funderAccountId) {
-        out.studentIdAtFunder = '';
-    }
 
     // Optional id on create
     if (!isUpdate && input.id) {

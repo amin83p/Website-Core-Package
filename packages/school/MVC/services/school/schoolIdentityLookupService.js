@@ -45,6 +45,7 @@ function roleTokensFromMembership(entry = {}) {
       if (token === 'memberschool_student') return ['member', 'school_student'];
       if (token === 'memberschool_teacher') return ['member', 'school_teacher'];
       if (token === 'memberschool_staff') return ['member', 'school_staff'];
+      if (token === 'memberschool_funder') return ['member', 'school_funder'];
       return [token];
     });
 }
@@ -109,9 +110,15 @@ function formatPersonName(person = {}, fallback = '') {
   if (preferred) return preferred;
   const first = normalizeText(person.firstName || person.name?.first);
   const last = normalizeText(person.lastName || person.name?.last);
+  const organizationLegalName = normalizeText(
+    person.organizationProfile?.legalName
+    || person.organizationLegalName
+  );
+  const rawName = typeof person.name === 'string' ? normalizeText(person.name) : '';
   return [first, last].filter(Boolean).join(' ')
-    || normalizeText(person.displayName || person.fullName || person.name)
-    || fallback;
+    || organizationLegalName
+    || normalizeText(person.displayName || person.fullName || rawName)
+    || normalizeText(fallback);
 }
 
 function readPersonEmail(person = {}) {
@@ -153,6 +160,8 @@ function personMatchesQuery(person = {}, q = '', activeOrgId = '') {
     personId,
     formatPersonName(person, personId),
     readPersonEmail(person),
+    person?.organizationProfile?.legalName,
+    person?.organizationLegalName,
     ...(Array.isArray(roles) ? roles : [])
   ].join(' ').toLowerCase();
   return searchBlob.includes(query);
@@ -219,14 +228,22 @@ async function listSchoolPersons({ reqUser, q = '', query = {}, requireSchoolRol
     const firstName = normalizeText(person.firstName || person.name?.first);
     const lastName = normalizeText(person.lastName || person.name?.last);
     const preferredName = normalizeText(person.preferredName || person.name?.preferred);
+    const organizationLegalName = normalizeText(
+      person.organizationProfile?.legalName || person.organizationLegalName
+    );
+    const displayName = formatPersonName(person, personId);
     return {
       id: personId,
       personId,
-      displayName: formatPersonName(person, personId),
-      name: formatPersonName(person, personId),
+      displayName,
+      name: displayName,
       firstName,
       lastName,
       preferredName,
+      organizationLegalName,
+      organizationProfile: person.organizationProfile || null,
+      personProfileType: person.personProfileType || 'individual',
+      organizations: Array.isArray(person.organizations) ? person.organizations : [],
       email: readPersonEmail(person),
       roles,
       schoolRoles: roles,

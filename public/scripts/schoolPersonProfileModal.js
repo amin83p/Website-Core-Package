@@ -213,7 +213,40 @@
     if (saveBtn()) saveBtn().disabled = Boolean(isLoading);
   }
 
+  function syncProfileTypeUi(profileType) {
+    const isOrganization = String(profileType || '').trim().toLowerCase() === 'organization';
+    const typeEl = document.getElementById('schoolPersonProfileType');
+    if (typeEl) typeEl.value = isOrganization ? 'organization' : 'individual';
+
+    document.querySelectorAll('.school-person-organization-fields').forEach((node) => {
+      node.style.display = isOrganization ? '' : 'none';
+    });
+    document.querySelectorAll('.school-person-individual-fields').forEach((node) => {
+      node.style.display = isOrganization ? 'none' : '';
+    });
+
+    const legalNameEl = document.getElementById('schoolPersonProfileOrganizationLegalName');
+    const firstNameEl = document.getElementById('schoolPersonProfileFirstName');
+    const lastNameEl = document.getElementById('schoolPersonProfileLastName');
+    const genderEl = document.getElementById('schoolPersonProfileGender');
+    const dobEl = document.getElementById('schoolPersonProfileDateOfBirth');
+
+    if (legalNameEl) legalNameEl.required = isOrganization;
+    if (firstNameEl) firstNameEl.required = !isOrganization;
+    if (lastNameEl) lastNameEl.required = !isOrganization;
+    if (genderEl) genderEl.required = !isOrganization;
+    if (dobEl) dobEl.required = !isOrganization;
+  }
+
   function populateForm(person) {
+    const profileType = String(person.personProfileType || '').trim().toLowerCase() === 'organization'
+      ? 'organization'
+      : 'individual';
+    syncProfileTypeUi(profileType);
+
+    const legalNameEl = document.getElementById('schoolPersonProfileOrganizationLegalName');
+    if (legalNameEl) legalNameEl.value = person.organizationLegalName || '';
+
     document.getElementById('schoolPersonProfileFirstName').value = person.firstName || '';
     document.getElementById('schoolPersonProfileMiddleName').value = person.middleName || '';
     document.getElementById('schoolPersonProfileLastName').value = person.lastName || '';
@@ -239,14 +272,18 @@
 
   function buildPayload() {
     syncHiddenState();
+    const profileType = document.getElementById('schoolPersonProfileType')?.value || 'individual';
+    const isOrganization = profileType === 'organization';
     return {
-      firstName: document.getElementById('schoolPersonProfileFirstName')?.value?.trim() || '',
-      middleName: document.getElementById('schoolPersonProfileMiddleName')?.value?.trim() || '',
-      lastName: document.getElementById('schoolPersonProfileLastName')?.value?.trim() || '',
-      preferredName: document.getElementById('schoolPersonProfilePreferredName')?.value?.trim() || '',
+      personProfileType: profileType,
+      organizationLegalName: document.getElementById('schoolPersonProfileOrganizationLegalName')?.value?.trim() || '',
+      firstName: isOrganization ? '' : (document.getElementById('schoolPersonProfileFirstName')?.value?.trim() || ''),
+      middleName: isOrganization ? '' : (document.getElementById('schoolPersonProfileMiddleName')?.value?.trim() || ''),
+      lastName: isOrganization ? '' : (document.getElementById('schoolPersonProfileLastName')?.value?.trim() || ''),
+      preferredName: isOrganization ? '' : (document.getElementById('schoolPersonProfilePreferredName')?.value?.trim() || ''),
       active: document.getElementById('schoolPersonProfileActive')?.checked ? 'true' : 'false',
-      gender: document.getElementById('schoolPersonProfileGender')?.value?.trim() || '',
-      dateOfBirth: document.getElementById('schoolPersonProfileDateOfBirth')?.value?.trim() || '',
+      gender: isOrganization ? '' : (document.getElementById('schoolPersonProfileGender')?.value?.trim() || ''),
+      dateOfBirth: isOrganization ? '' : (document.getElementById('schoolPersonProfileDateOfBirth')?.value?.trim() || ''),
       notes: document.getElementById('schoolPersonProfileNotes')?.value?.trim() || '',
       emails: document.getElementById('schoolPersonProfileEmailsHidden')?.value || '[]',
       phones: document.getElementById('schoolPersonProfilePhonesHidden')?.value || '[]',
@@ -254,6 +291,20 @@
       linkType: currentContext?.linkType || '',
       linkId: currentContext?.linkId || ''
     };
+  }
+
+  function assertClientProfileFields(body) {
+    const isOrganization = String(body.personProfileType || '').trim().toLowerCase() === 'organization';
+    if (isOrganization) {
+      if (!String(body.organizationLegalName || '').trim()) {
+        throw new Error('Organization legal name is required.');
+      }
+      return;
+    }
+    if (!String(body.firstName || '').trim()) throw new Error('First name is required.');
+    if (!String(body.lastName || '').trim()) throw new Error('Last name is required.');
+    if (!String(body.gender || '').trim()) throw new Error('Gender is required.');
+    if (!String(body.dateOfBirth || '').trim()) throw new Error('Date of birth is required.');
   }
 
   function buildProfileUrl(personId) {
@@ -292,6 +343,7 @@
     if (saveBtn()) saveBtn().disabled = true;
     try {
       const body = buildPayload();
+      assertClientProfileFields(body);
       const res = await fetch(buildProfileUrl(currentContext.personId), {
         method: 'PATCH',
         headers: {

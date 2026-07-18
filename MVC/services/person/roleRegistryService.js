@@ -10,6 +10,7 @@ const CACHE_TTL_MS = 2000;
 
 const LEGACY_SYSTEM_ROLE_KEYS = Object.freeze([
   'school_student',
+  'school_funder',
   'school_teacher',
   'school_staff',
   'credit_customer'
@@ -20,6 +21,10 @@ const LEGACY_SYSTEM_ROLE_ALIAS = Object.freeze({
   'school-student': 'school_student',
   schoolstudents: 'school_student',
   'school-students': 'school_student',
+  schoolfunder: 'school_funder',
+  'school-funder': 'school_funder',
+  schoolfunders: 'school_funder',
+  'school-funders': 'school_funder',
   schoolteacher: 'school_teacher',
   'school-teacher': 'school_teacher',
   schoolteachers: 'school_teacher',

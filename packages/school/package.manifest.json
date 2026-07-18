@@ -82,6 +82,24 @@
       "active": true,
       "system": true,
       "adoptExisting": true
+    },
+    {
+      "id": "ROL1007",
+      "key": "school_funder",
+      "label": "School Funder",
+      "description": "School-scoped funder role alias for audience targeting.",
+      "domain": "school",
+      "packageName": "SCHOOL",
+      "aliases": [
+        "schoolfunder",
+        "school-funder",
+        "schoolfunders",
+        "school-funders",
+        "school_funders"
+      ],
+      "active": true,
+      "system": true,
+      "adoptExisting": true
     }
   ],
   "sections": [
@@ -1415,6 +1433,9 @@
         },
         {
           "id": "332230"
+        },
+        {
+          "id": "332232"
         }
       ],
       "related": [],
@@ -2227,6 +2248,30 @@
           "sessionTime": 15,
           "active": true
         }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "332232",
+      "name": "SCHOOL_FUNDERS",
+      "category": "SCHOOL",
+      "description": "Manage School Funder records, linked people, and financial accounts.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/funders",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true }
       ],
       "subsections": [],
       "related": [],
@@ -3364,6 +3409,18 @@
       "tags": [
         "SCHOOL_STUDENTS",
         "332230"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_101",
+      "name": "SCHOOL_FUNDERS",
+      "type": "class",
+      "value": "bi bi-bank2",
+      "tags": [
+        "SCHOOL_FUNDERS",
+        "332232"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -7530,6 +7587,11 @@
       "label": "Student Program Registrations"
     },
     {
+      "entityType": "funders",
+      "label": "School Funders",
+      "collectionName": "schoolFunders"
+    },
+    {
       "entityType": "students",
       "label": "Students"
     },
@@ -7637,6 +7699,19 @@
       "target": "_self",
       "category": "School",
       "active": true
+    },
+    {
+      "id": "school-menu-funders",
+      "label": "School Funders",
+      "href": "/school/funders",
+      "icon": "bi bi-bank2",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true,
+      "sectionId": "332232",
+      "symbolId": "SYM_SYSTEM_101",
+      "adoptExisting": true
     },
     {
       "id": "school-menu-programs",
@@ -7795,6 +7870,20 @@
       "target": "_self",
       "category": "School",
       "active": true
+    },
+    {
+      "id": "school-dashboard-funders",
+      "label": "School Funders",
+      "href": "/school/funders",
+      "icon": "bi bi-bank2",
+      "description": "Manage funder profiles and their linked financial accounts.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true,
+      "sectionId": "332232",
+      "symbolId": "SYM_SYSTEM_101",
+      "adoptExisting": true
     },
     {
       "id": "school-dashboard-programs",

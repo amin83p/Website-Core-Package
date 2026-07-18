@@ -273,6 +273,7 @@ function buildCatalog() {
     },
 
     // School
+    { key: 'school.funders', domain: 'School', section: 'Funders', source: 'school/funders.json', collection: 'schoolFunders' },
     { key: 'school.students', domain: 'School', section: 'Students', source: 'school/students.json', collection: 'schoolStudents' },
     { key: 'school.programs', domain: 'School', section: 'Programs', source: 'school/programs.json', collection: 'schoolPrograms' },
     { key: 'school.transactionDefinitions', domain: 'School', section: 'Transaction Definitions', source: 'school/transactionDefinitions.json', collection: 'schoolTransactionDefinitions' },

@@ -272,6 +272,16 @@ async function editPerson(req, res) {
   try {
     const existing = await dataService.getDataById('persons', req.params.id, req.user, PERSON_QUERY_OPTIONS);
     if (!existing) throw new Error('Person not found!');
+
+    // Profile type is immutable after create — ignore any client-submitted change.
+    const lockedProfileType = String(existing.personProfileType || '').trim().toLowerCase() === 'organization'
+      ? 'organization'
+      : 'individual';
+    req.body = {
+      ...req.body,
+      personProfileType: lockedProfileType
+    };
+
     await validatePersonInput(req.body, {
       isSelfRegistration: false,
       requirePrimaryEmail: true,
