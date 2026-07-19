@@ -6,6 +6,7 @@ const addCreditDataService = require('./addCreditDataService');
 const dataService = require('../dataService');
 const settingService = require('../settingService');
 const { toPublicId, idsEqual } = require('../../utils/idAdapter');
+const { getDateKeyInTimezone } = require('../../utils/timezoneUtils');
 const { SYSTEM_CONTEXT } = require('../../../config/constants');
 
 const METRIC_FIELDS = Object.freeze(['call', 'amount', 'token', 'volume']);
@@ -86,22 +87,7 @@ function normalizeTimezoneToken(value, fallback = 'UTC') {
 }
 
 function getDateKeyInTimeZone(isoDateTime = '', timeZone = 'UTC') {
-  const date = isoDateTime ? new Date(isoDateTime) : new Date();
-  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: normalizeTimezoneToken(timeZone, 'UTC'),
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).formatToParts(date);
-    const year = parts.find((part) => part.type === 'year')?.value || '1970';
-    const month = parts.find((part) => part.type === 'month')?.value || '01';
-    const day = parts.find((part) => part.type === 'day')?.value || '01';
-    return `${year}-${month}-${day}`;
-  } catch (_) {
-    return date.toISOString().slice(0, 10);
-  }
+  return getDateKeyInTimezone(isoDateTime, normalizeTimezoneToken(timeZone, 'UTC'));
 }
 
 function normalizeFilters(raw = {}) {

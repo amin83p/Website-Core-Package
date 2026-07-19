@@ -1,6 +1,7 @@
 // MVC/controllers/school/scheduleController.js
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const schoolDataService = require('../../services/school/schoolDataService'); 
 const schoolRepositories = require('../../repositories/school');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
@@ -658,10 +659,10 @@ function normalizeDateOnly(value) {
     return parsed.toISOString().slice(0, 10);
 }
 
-function isOpenCanonicalEnrollmentPeriod(row, referenceDate = '') {
+function isOpenCanonicalEnrollmentPeriod(row, referenceDate = '', orgToday = '') {
     const status = String(row?.status || '').trim().toLowerCase();
     if (!['active', 'planned'].includes(status)) return false;
-    const day = normalizeDateOnly(referenceDate) || new Date().toISOString().slice(0, 10);
+    const day = normalizeDateOnly(referenceDate) || normalizeDateOnly(orgToday) || resolveOrgTodayFromContext({ orgToday });
     const start = normalizeDateOnly(row?.startDate);
     const end = normalizeDateOnly(row?.endDate);
     if (start && start > day && status !== 'planned') return false;
@@ -942,7 +943,8 @@ function summarizeTimesheetHoursForEvents(events, statusMap) {
             totalTimesheetHours += sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                 status: event?.status,
                 notes: event?.notes || '',
-                durationHours: Number(event?.duration || 0)
+                durationHours: Number(event?.duration || 0),
+                session: event
             });
         } else {
             totalTimesheetHours += Number(event?.timesheetHours ?? event?.duration ?? 0);
@@ -1053,7 +1055,7 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
         if (linkedStudentIds.length && hasCanonicalPeriods) {
             for (const studentId of linkedStudentIds) {
                 const rows = canonicalPeriodsByStudent.get(studentId) || [];
-                if (rows.some((row) => idsEqual(row?.classId, normalizedClassId) && isOpenCanonicalEnrollmentPeriod(row, normalizedDate))) {
+                if (rows.some((row) => idsEqual(row?.classId, normalizedClassId) && isOpenCanonicalEnrollmentPeriod(row, normalizedDate, reqUser?.orgToday))) {
                     isActive = true;
                     break;
                 }

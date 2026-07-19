@@ -79,53 +79,142 @@
         </div>
       </div>
 
+      <style>
+        .session-status-rule-group + .session-status-rule-group {
+          margin-top: 1.5rem;
+          padding-top: 1.5rem;
+          border-top: 1px solid var(--bs-border-color);
+        }
+        .session-status-rule-tile {
+          height: 100%;
+        }
+        .session-status-rule-tile .form-check {
+          margin-bottom: 0;
+        }
+        .session-status-rule-tile .rule-tile-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 0.75rem;
+        }
+        .session-status-rule-tile .rule-tile-label {
+          font-weight: 600;
+          margin-bottom: 0;
+        }
+        .makeup-policy-panel {
+          border-left: 3px solid var(--bs-warning);
+        }
+      </style>
+
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white border-bottom">
           <h6 class="fw-bold m-0 text-primary"><i class="bi bi-diagram-3 me-2"></i>Behavior Rules</h6>
+          <div class="small text-muted mt-1">These rules control payroll, attendance, schedules, and make-up behavior for sessions with this status.</div>
         </div>
         <div class="card-body p-4">
-          <div class="row g-3">
-            <div class="col-md-3">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="isFinal" name="isFinal" value="true" <%= item.isFinal ? 'checked' : '' %>>
-                <label class="form-check-label fw-bold" for="isFinal">Final Status</label>
+
+          <div class="session-status-rule-group">
+            <div class="text-uppercase text-muted small fw-bold mb-3">Session Lifecycle</div>
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <div class="session-status-rule-tile border rounded p-3 bg-light-subtle">
+                  <div class="rule-tile-header">
+                    <label class="rule-tile-label" for="isFinal">Final Status</label>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" role="switch" id="isFinal" name="isFinal" value="true" <%= item.isFinal ? 'checked' : '' %>>
+                    </div>
+                  </div>
+                  <div class="form-text small mt-2 mb-0">Allows timesheet submission when a session has this status.</div>
+                </div>
               </div>
-              <div class="form-text small">If checked, timesheet can be submitted with this status.</div>
-            </div>
-            <div class="col-md-3">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="makeUpRequired" name="makeUpRequired" value="true" <%= item.makeUpRequired ? 'checked' : '' %>>
-                <label class="form-check-label fw-bold" for="makeUpRequired">Make-up Required</label>
-              </div>
-              <div class="form-text small">Use for missed sessions that must be replaced later.</div>
-            </div>
-            <div class="col-md-3">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="excludeFromAttendance" name="excludeFromAttendance" value="true" <%= item.excludeFromAttendance ? 'checked' : '' %>>
-                <label class="form-check-label fw-bold" for="excludeFromAttendance">Exclude Attendance</label>
-              </div>
-              <div class="form-text small">Skip this status in attendance matrix/report rollups.</div>
-            </div>
-            <div class="col-md-3">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="active" name="active" value="true" <%= (item.active === false ? '' : 'checked') %>>
-                <label class="form-check-label fw-bold" for="active">Active</label>
-              </div>
-              <div class="form-text small">Inactive statuses cannot be selected in new operations.</div>
-            </div>
-            <div class="col-md-6">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="excludeFromTeacherIndex" name="excludeFromTeacherIndex" value="true" <%= item.excludeFromTeacherIndex ? 'checked' : '' %>>
-                <label class="form-check-label fw-bold" for="excludeFromTeacherIndex">Exclude from Teacher Schedule Index</label>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="excludeFromStudentIndex" name="excludeFromStudentIndex" value="true" <%= item.excludeFromStudentIndex ? 'checked' : '' %>>
-                <label class="form-check-label fw-bold" for="excludeFromStudentIndex">Exclude from Student Schedule Index</label>
+              <div class="col-lg-6">
+                <div class="session-status-rule-tile border rounded p-3 bg-light-subtle">
+                  <div class="rule-tile-header">
+                    <label class="rule-tile-label" for="active">Active</label>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" role="switch" id="active" name="active" value="true" <%= (item.active === false ? '' : 'checked') %>>
+                    </div>
+                  </div>
+                  <div class="form-text small mt-2 mb-0">Inactive statuses cannot be selected for new session operations.</div>
+                </div>
               </div>
             </div>
           </div>
+
+          <div class="session-status-rule-group">
+            <div class="text-uppercase text-muted small fw-bold mb-3">Make-up Policy</div>
+            <div class="session-status-rule-tile border rounded p-3 bg-light-subtle">
+              <div class="rule-tile-header">
+                <label class="rule-tile-label" for="makeUpRequired">Make-up Required</label>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" role="switch" id="makeUpRequired" name="makeUpRequired" value="true" <%= item.makeUpRequired ? 'checked' : '' %>>
+                </div>
+              </div>
+              <div class="form-text small mt-2 mb-0">Use for missed sessions that must be replaced with a make-up session later.</div>
+
+              <div class="makeup-policy-panel border rounded p-3 bg-white mt-3" id="makeupPolicyPanel">
+                <div class="fw-semibold small text-uppercase text-muted mb-3">Make-up Session Defaults</div>
+                <div class="row g-3">
+                  <div class="col-12">
+                    <label class="form-label fw-bold" for="makeupDurationPercent">Make-up Duration %</label>
+                    <input type="number" class="form-control size-md" id="makeupDurationPercent" name="makeupDurationPercent" min="1" max="100" step="1" value="<%= Number(item.makeupDurationPercent || 100) %>">
+                    <div class="form-text small">Default share of the original session length for the make-up session.</div>
+                  </div>
+                </div>
+                <div class="alert alert-light border small mb-0 mt-3 py-2">
+                  Original session payroll is controlled by <strong>Timesheet Formula</strong> above (on the full session duration).
+                  The make-up session is paid when completed, using normal timesheet rules on the make-up session duration.
+                  Example: a 3 hr session at 50% creates a 1.5 hr make-up session.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="session-status-rule-group">
+            <div class="text-uppercase text-muted small fw-bold mb-3">Attendance</div>
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <div class="session-status-rule-tile border rounded p-3 bg-light-subtle">
+                  <div class="rule-tile-header">
+                    <label class="rule-tile-label" for="excludeFromAttendance">Exclude Attendance</label>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" role="switch" id="excludeFromAttendance" name="excludeFromAttendance" value="true" <%= item.excludeFromAttendance ? 'checked' : '' %>>
+                    </div>
+                  </div>
+                  <div class="form-text small mt-2 mb-0">Hide this status from attendance matrix and report rollups.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="session-status-rule-group">
+            <div class="text-uppercase text-muted small fw-bold mb-3">Schedule Indexes</div>
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <div class="session-status-rule-tile border rounded p-3 bg-light-subtle">
+                  <div class="rule-tile-header">
+                    <label class="rule-tile-label" for="excludeFromTeacherIndex">Exclude from Teacher Schedule Index</label>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" role="switch" id="excludeFromTeacherIndex" name="excludeFromTeacherIndex" value="true" <%= item.excludeFromTeacherIndex ? 'checked' : '' %>>
+                    </div>
+                  </div>
+                  <div class="form-text small mt-2 mb-0">Remove sessions with this status from teacher schedule views and conflict checks.</div>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="session-status-rule-tile border rounded p-3 bg-light-subtle">
+                  <div class="rule-tile-header">
+                    <label class="rule-tile-label" for="excludeFromStudentIndex">Exclude from Student Schedule Index</label>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" role="switch" id="excludeFromStudentIndex" name="excludeFromStudentIndex" value="true" <%= item.excludeFromStudentIndex ? 'checked' : '' %>>
+                    </div>
+                  </div>
+                  <div class="form-text small mt-2 mb-0">Remove sessions with this status from student schedule views and leave-window checks.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -209,6 +298,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setInputValue('input[name="timesheetFormula"]', source.timesheetFormula || 'duration');
     setCheckboxValue('#isFinal', source.isFinal, false);
     setCheckboxValue('#makeUpRequired', source.makeUpRequired, false);
+    setInputValue('#makeupDurationPercent', Number(source.makeupDurationPercent || 100));
+    syncMakeupPolicyFields();
     setCheckboxValue('#excludeFromAttendance', source.excludeFromAttendance, false);
     setCheckboxValue('#excludeFromTeacherIndex', source.excludeFromTeacherIndex, false);
     setCheckboxValue('#excludeFromStudentIndex', source.excludeFromStudentIndex, false);
@@ -361,6 +452,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  function syncMakeupPolicyFields() {
+    const enabled = Boolean(document.getElementById('makeUpRequired')?.checked);
+    const panel = document.getElementById('makeupPolicyPanel');
+    if (panel) panel.style.display = enabled ? '' : 'none';
+    const percentInput = document.getElementById('makeupDurationPercent');
+    if (percentInput) percentInput.required = enabled;
+  }
+
+  document.getElementById('makeUpRequired')?.addEventListener('change', syncMakeupPolicyFields);
+  syncMakeupPolicyFields();
   updateColorPreview();
 });
 </script>

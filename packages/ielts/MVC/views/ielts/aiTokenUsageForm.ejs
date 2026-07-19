@@ -22,7 +22,7 @@
               <div class="row g-3">
                 <div class="col-md-6">
                   <label class="form-label fw-bold small text-muted text-uppercase">Consumed At</label>
-                  <input type="text" class="form-control" value="<%= record.consumedAt ? new Date(record.consumedAt).toLocaleString() : '-' %>" readonly>
+                  <input type="text" class="form-control" value="<%= record.consumedAt ? formatOrgDateTime(record.consumedAt) : '-' %>" readonly>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label fw-bold small text-muted text-uppercase">User ID</label>

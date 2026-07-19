@@ -45,15 +45,8 @@
   function formatDateTime(value) {
     const text = String(value || '').trim();
     if (!text) return '-';
-    const parsed = new Date(text);
-    if (Number.isNaN(parsed.getTime())) return text;
-    return parsed.toLocaleString('en-CA', {
-      year: 'numeric',
-      month: 'short',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (typeof formatOrgDateTime === 'function') return formatOrgDateTime(text);
+    return text;
   }
 %>
 

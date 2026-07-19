@@ -9,6 +9,7 @@ const settingService = requireCoreModule('MVC/services/settingService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
+const { resolveOrgYearFromRequest, resolveOrgTodayFromRequest } = requireCoreModule('MVC/utils/timezoneUtils');
 
 function getActiveOrgIdOrThrow(reqUser) {
     const activeOrgId = reqUser?.activeOrgId ? String(reqUser.activeOrgId) : '';
@@ -66,7 +67,13 @@ async function listHolidays(req, res) {
         // Extract the UI year filter for post-load filtering.
         // Keep repository queries backend-safe by not sending year as a direct DB filter.
         const requestedYear = String(query.year || '').trim();
-        const targetYear = /^\d{4}$/.test(requestedYear) ? requestedYear : new Date().getFullYear().toString();
+        const targetYear = /^\d{4}$/.test(requestedYear) ? requestedYear : resolveOrgYearFromRequest(req);
+        const orgToday = resolveOrgTodayFromRequest(req);
+        const selectedYear = Number(targetYear) || Number(resolveOrgYearFromRequest(req));
+        const yearOptions = [];
+        for (let year = selectedYear - 2; year <= selectedYear + 3; year += 1) {
+          yearOptions.push(String(year));
+        }
         const dataQuery = { ...query };
         if (Object.prototype.hasOwnProperty.call(dataQuery, 'year')) delete dataQuery.year;
 
@@ -90,6 +97,8 @@ async function listHolidays(req, res) {
             yearHolidayData: filteredHolidays,
             searchableFields,
             currentYear: targetYear,
+            orgToday,
+            yearOptions,
             tableName: 'Holidays_Management',
             includeModal: true,
             includeModal_Table: true,

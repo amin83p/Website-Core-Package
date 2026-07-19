@@ -36,7 +36,7 @@
           <td><span class="badge bg-info text-dark"><%= (item.category === 'NO_CATEGORY' || !item.category) ? 'No Category' : item.category %></span></td>
           <td>
             <% if (item.updatedAt) { %>
-              <%= new Date(item.updatedAt).toLocaleDateString() %>
+              <%= formatOrgDateTime(item.updatedAt) %>
             <% } else { %> — <% } %>
           </td>
           <td>

@@ -41,13 +41,13 @@
           </td>
 
           <td>
-            <%= new Date(conv.startDate).toLocaleDateString() %>
-            <div class="text-muted x-small"><%= new Date(conv.startDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) %></div>
+            <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(conv.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : new Date(conv.startDate).toLocaleDateString() %>
+            <div class="text-muted x-small"><%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(conv.startDate, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : new Date(conv.startDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) %></div>
           </td>
 
           <td>
-            <%= new Date(conv.updatedAt).toLocaleDateString() %>
-            <div class="text-muted x-small"><%= new Date(conv.updatedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) %></div>
+            <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(conv.updatedAt, { month: 'short', day: 'numeric', year: 'numeric' }) : new Date(conv.updatedAt).toLocaleDateString() %>
+            <div class="text-muted x-small"><%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(conv.updatedAt, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : new Date(conv.updatedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) %></div>
           </td>
 
           <td>
@@ -181,7 +181,7 @@ async function adminViewChat(convId, participants) {
 
             // 3. Render Messages (Log Style)
             res.data.forEach(msg => {
-                const timeStr = new Date(msg.timestamp).toLocaleString();
+                const timeStr = (window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(msg.timestamp) : new Date(msg.timestamp).toLocaleString();
                 
                 // Content Handling
                 let contentHtml = msg.content;

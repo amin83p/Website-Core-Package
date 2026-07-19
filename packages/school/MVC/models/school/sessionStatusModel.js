@@ -14,6 +14,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     timesheetFormula: 'duration',
     isFinal: false,
     makeUpRequired: false,
+    makeupDurationPercent: 100,
     excludeFromAttendance: false,
     excludeFromTeacherIndex: false,
     excludeFromStudentIndex: false,
@@ -30,6 +31,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     timesheetFormula: 'duration',
     isFinal: true,
     makeUpRequired: false,
+    makeupDurationPercent: 100,
     excludeFromAttendance: false,
     excludeFromTeacherIndex: false,
     excludeFromStudentIndex: false,
@@ -46,6 +48,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     timesheetFormula: '0',
     isFinal: true,
     makeUpRequired: false,
+    makeupDurationPercent: 100,
     excludeFromAttendance: true,
     excludeFromTeacherIndex: true,
     excludeFromStudentIndex: true,
@@ -62,6 +65,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     timesheetFormula: '0',
     isFinal: true,
     makeUpRequired: true,
+    makeupDurationPercent: 100,
     excludeFromAttendance: true,
     excludeFromTeacherIndex: false,
     excludeFromStudentIndex: false,
@@ -128,6 +132,14 @@ function cleanFormula(v) {
   return s;
 }
 
+function cleanMakeupDurationPercent(v, { defaultValue = 100 } = {}) {
+  if (v === undefined || v === null || v === '') return Number(defaultValue);
+  const n = Number(v);
+  if (!Number.isFinite(n)) throw new Error('Make-up duration percent must be a number.');
+  if (n < 1 || n > 100) throw new Error('Make-up duration percent must be between 1 and 100.');
+  return Math.round(n);
+}
+
 function generateStatusId() {
   const year = new Date().getFullYear();
   const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
@@ -171,6 +183,7 @@ function normalizeStoredStatus(row) {
     timesheetFormula: cleanFormula(row?.timesheetFormula || 'duration'),
     isFinal: cleanBoolean(row?.isFinal, false),
     makeUpRequired: cleanBoolean(row?.makeUpRequired, false),
+    makeupDurationPercent: cleanMakeupDurationPercent(row?.makeupDurationPercent, { defaultValue: 100 }),
     excludeFromAttendance: cleanBoolean(row?.excludeFromAttendance, false),
     excludeFromTeacherIndex: cleanBoolean(row?.excludeFromTeacherIndex, false),
     excludeFromStudentIndex: cleanBoolean(row?.excludeFromStudentIndex, false),
@@ -209,6 +222,7 @@ function sanitizeInput(input, { isUpdate = false } = {}) {
     timesheetFormula: cleanFormula(input.timesheetFormula || 'duration'),
     isFinal: cleanBoolean(input.isFinal, false),
     makeUpRequired: cleanBoolean(input.makeUpRequired, false),
+    makeupDurationPercent: cleanMakeupDurationPercent(input.makeupDurationPercent, { defaultValue: 100 }),
     excludeFromAttendance: cleanBoolean(input.excludeFromAttendance, false),
     excludeFromTeacherIndex: cleanBoolean(input.excludeFromTeacherIndex, false),
     excludeFromStudentIndex: cleanBoolean(input.excludeFromStudentIndex, false),

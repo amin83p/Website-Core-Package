@@ -4,7 +4,10 @@ const { idsEqual } = require('../utils/idAdapter');
 
 const dataService = require('../services/dataService'); // ✅ Single Data Access Point
 const { SYSTEM_CONTEXT } = require('../../config/constants'); // Required for system-level fetching
+const { formatInstantInTimezone } = require('../utils/timezoneUtils');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
+
+let activeExportTimeZone = 'UTC';
 
 // ==========================================================================
 //  HELPERS
@@ -45,7 +48,7 @@ function resolveLogActorLabel(log = {}, userMap = new Map()) {
 // Helper to format ISO dates
 function fmtDate(isoString) {
   if (!isoString) return '';
-  return new Date(isoString).toLocaleString();
+  return formatInstantInTimezone(isoString, activeExportTimeZone);
 }
 
 // Helper to attach standard Audit columns
@@ -316,6 +319,8 @@ async function performExport(req, res) {
     if (!strategy) {
       return res.status(400).json({ status: 'error', message: `No export strategy defined for type: ${type}` });
     }
+
+    activeExportTimeZone = req.orgTimeZone || req.user?.activeOrgTimeZone || 'UTC';
 
     // 2. Pre-fetch User Map (Efficiency)
     // Always fetch ALL users to resolve names for audit columns

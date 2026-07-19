@@ -363,7 +363,7 @@
                       <td class="text-capitalize"><%= row.status || '-' %></td>
                       <td><%= Number(row.submittedQuestions || 0) %> / <%= Number(row.totalQuestions || 0) %></td>
                       <td><%= Number(row.percentage || 0).toFixed(2) %>%</td>
-                      <td><%= row.startedAt ? new Date(row.startedAt).toLocaleString() : '-' %></td>
+                      <td><%= row.startedAt ? formatOrgDateTime(row.startedAt) : '-' %></td>
                     </tr>
                   <% }) %>
                 </tbody>

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { formatInstantInTimezone } = require('../utils/timezoneUtils');
 
 const DOCS_ROOT = path.resolve(__dirname, '../../docs');
 const MAX_VIEWABLE_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -48,7 +49,7 @@ function normalizeRequestedPath(rawPath) {
   return { relativePath: normalized, absolutePath };
 }
 
-function listDocsFiles() {
+function listDocsFiles(timeZone = 'UTC') {
   if (!fs.existsSync(DOCS_ROOT)) return [];
 
   const files = [];
@@ -78,7 +79,7 @@ function listDocsFiles() {
         size: Number(stat.size || 0),
         sizeLabel: formatBytes(stat.size),
         updatedAt,
-        updatedAtLabel: updatedAt.toLocaleString(),
+        updatedAtLabel: formatInstantInTimezone(updatedAt, timeZone),
         isTextViewable: TEXT_VIEWABLE_EXTS.has(ext)
       });
     });
@@ -102,7 +103,8 @@ function buildGroups(files) {
 
 async function docsHome(req, res) {
   try {
-    const files = listDocsFiles();
+    const orgTimeZone = req.orgTimeZone || req.user?.activeOrgTimeZone || 'UTC';
+    const files = listDocsFiles(orgTimeZone);
     const warning = String(req.query.warning || '').trim();
 
     res.render('docs/index', {
@@ -160,6 +162,7 @@ async function viewDocument(req, res) {
       return res.redirect(`/docs?warning=${encodeURIComponent('This file is too large to preview. Please download it instead.')}`);
     }
 
+    const orgTimeZone = req.orgTimeZone || req.user?.activeOrgTimeZone || 'UTC';
     const content = fs.readFileSync(target.absolutePath, 'utf8');
 
     return res.render('docs/view', {
@@ -169,7 +172,7 @@ async function viewDocument(req, res) {
         relativePath: target.relativePath,
         ext,
         sizeLabel: formatBytes(stat.size),
-        updatedAtLabel: (stat.mtime instanceof Date ? stat.mtime : new Date()).toLocaleString()
+        updatedAtLabel: formatInstantInTimezone(stat.mtime instanceof Date ? stat.mtime : new Date(), orgTimeZone)
       },
       content
     });

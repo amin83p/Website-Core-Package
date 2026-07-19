@@ -10,6 +10,7 @@
   function formatDateTime(value) {
     const token = String(value || '').trim();
     if (!token) return '-';
+    if (typeof formatOrgDateTime === 'function') return formatOrgDateTime(token);
     const date = new Date(token);
     if (Number.isNaN(date.getTime())) return token;
     return date.toLocaleString();

@@ -114,7 +114,7 @@
 
           <td>
             <% if (sample.updatedAt) { %>
-              <%= new Date(sample.updatedAt).toLocaleDateString() %>
+              <%= formatOrgDateTime(sample.updatedAt) %>
             <% } else { %>
               —
             <% } %>

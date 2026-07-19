@@ -103,6 +103,15 @@
   <% } %>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <% if (typeof orgTimeZone !== 'undefined' && orgTimeZone) { %>
+    <script>
+      window.__APP_ORG_DATETIME__ = {
+        timeZone: <%- JSON.stringify(orgTimeZone) %>,
+        today: <%- JSON.stringify(typeof orgToday !== 'undefined' ? orgToday : '') %>
+      };
+    </script>
+    <script src="/scripts/orgDateTime.js"></script>
+  <% } %>
   <script src="/scripts/main.js"></script>
 
   <% if (typeof includeModal !== 'undefined' && includeModal) { %>

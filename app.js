@@ -42,6 +42,7 @@ const logger = require('./MVC/utils/logger');
 // Import Middleware & Models (Defined at top)
 const { softAuth } = require('./MVC/middleware/authMiddleware'); // New helper
 const chatAccessLocals = require('./MVC/middleware/chatAccessLocalsMiddleware');
+const orgTimezoneLocals = require('./MVC/middleware/orgTimezoneLocalsMiddleware');
 const enforceSitePolicy = require('./MVC/middleware/siteStateMiddleware');
 const sessionEnforcement = require('./MVC/middleware/sessionEnforcement');
 const requestRatePhaseOne = require('./MVC/middleware/requestRateMonitor');
@@ -231,6 +232,7 @@ app.use((req, res, next) => {
 
 // 2. Soft Auth (Populate req.user if token exists, but don't block)
 app.use(softAuth); 
+app.use(orgTimezoneLocals);
 app.use(dataBackendRecoveryMiddleware.exposeBackendStatus);
 app.use(chatAccessLocals);
 app.use(async (req, res, next) => {

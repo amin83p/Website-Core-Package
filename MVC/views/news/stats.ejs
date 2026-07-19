@@ -7,8 +7,7 @@
     const articleTitle = safeMeta.title || safeArticle.title || safeArticle.name || 'Untitled News';
     const articleId = safeArticle.id || safeArticle._id || '-';
     const rawPublishDate = safeMeta.publishDate || safeArticle.createdAt || safeArticle.audit?.createDateTime || '';
-    const publishDate = rawPublishDate ? new Date(rawPublishDate) : null;
-    const publishedLabel = publishDate && !Number.isNaN(publishDate.getTime()) ? publishDate.toLocaleDateString() : '-';
+    const publishedLabel = rawPublishDate ? formatOrgDateTime(rawPublishDate) : '-';
     const totalViews = Number(safeStats.totalViews || 0);
     const uniqueUsers = Number(safeStats.uniqueUsers || 0);
     const readTime = safeStats.readTime || '0m';

@@ -230,7 +230,7 @@
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Created At</label>
-              <input type="text" class="form-control size-md" disabled value="<%= audit.createDateTime ? new Date(audit.createDateTime).toLocaleString() : '' %>">
+              <input type="text" class="form-control size-md" disabled value="<%= audit.createDateTime ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.createDateTime) : new Date(audit.createDateTime).toLocaleString()) : '' %>">
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Last Updated By</label>
@@ -238,7 +238,7 @@
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Last Updated At</label>
-              <input type="text" class="form-control size-md" disabled value="<%= audit.lastUpdateDateTime ? new Date(audit.lastUpdateDateTime).toLocaleString() : '' %>">
+              <input type="text" class="form-control size-md" disabled value="<%= audit.lastUpdateDateTime ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.lastUpdateDateTime) : new Date(audit.lastUpdateDateTime).toLocaleString()) : '' %>">
             </div>
           </div>
         </div>

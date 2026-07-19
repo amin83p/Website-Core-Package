@@ -78,8 +78,8 @@
             <div class="x-small text-muted mt-1"><%= item.notes ? item.notes.slice(0, 80) : 'No notes' %><%= item.notes && item.notes.length > 80 ? '...' : '' %></div>
           </td>
           <td>
-            <div class="small text-dark">Applied: <%= item.appliedAt ? new Date(item.appliedAt).toLocaleString() : '-' %></div>
-            <div class="x-small text-muted">Removed: <%= item.removedAt ? new Date(item.removedAt).toLocaleString() : '-' %></div>
+            <div class="small text-dark">Applied: <%= item.appliedAt ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(item.appliedAt) : new Date(item.appliedAt).toLocaleString()) : '-' %></div>
+            <div class="x-small text-muted">Removed: <%= item.removedAt ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(item.removedAt) : new Date(item.removedAt).toLocaleString()) : '-' %></div>
           </td>
           <td>
             <div class="small fw-bold text-dark"><%= creator.displayName || (creator.type === 'system' ? 'System' : '-') %></div>

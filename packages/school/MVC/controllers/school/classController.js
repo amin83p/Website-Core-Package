@@ -61,6 +61,7 @@ const {
     assertOrgAccess
 } = requireCoreModule('MVC/utils/orgContextUtils');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const sessionReportInstanceService = require('../../services/school/sessionReportInstanceService');
 const schoolRecordAccessService = require('../../services/school/schoolRecordAccessService');
@@ -282,8 +283,8 @@ function isSchoolRequestAdmin(reqUser, sectionId, operationId = OPERATIONS.READ_
  * Rolling enrollment periods that have ended (or are closed) but have no Pass/Continue/Withdraw decision yet.
  * Excludes draft/planned/cancelled/archived/error rows.
  */
-function periodNeedsCompletionDecision(period) {
-    const today = new Date().toISOString().slice(0, 10);
+function periodNeedsCompletionDecision(period, today = '') {
+    const day = String(today || '').trim() || resolveOrgTodayFromContext({ orgToday: today });
     const d = String(period.completionDecision || '').trim().toLowerCase();
     if (d === 'pass' || d === 'continue' || d === 'withdraw') return false;
     const status = String(period.status || '').trim().toLowerCase();
@@ -1061,10 +1062,10 @@ function normalizeDateOnlyValue(value) {
     return parsed.toISOString().slice(0, 10);
 }
 
-function isActivePeriodOnDate(row, referenceDate = '') {
+function isActivePeriodOnDate(row, referenceDate = '', orgToday = '') {
     const status = String(row?.status || '').trim().toLowerCase();
     if (!['active', 'planned'].includes(status)) return false;
-    const day = normalizeDateOnlyValue(referenceDate) || new Date().toISOString().slice(0, 10);
+    const day = normalizeDateOnlyValue(referenceDate) || normalizeDateOnlyValue(orgToday) || resolveOrgTodayFromContext({ orgToday });
     const start = normalizeDateOnlyValue(row?.startDate);
     const end = normalizeDateOnlyValue(row?.endDate);
     // For session/attendance visibility we require period start <= reference day
@@ -1381,11 +1382,11 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
     return enrichedRoster;
 }
 
-async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = []) {
+async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = [], orgToday = '') {
     const idSet = new Set((Array.isArray(classIds) ? classIds : []).map((id) => toPublicId(id)).filter(Boolean));
     const rows = await schoolDataService.getAccessibleClassEnrollmentPeriods(reqUser);
     const periodRows = Array.isArray(rows) ? rows : [];
-    const today = new Date().toISOString().slice(0, 10);
+    const today = String(orgToday || '').trim() || resolveOrgTodayFromContext({ orgToday });
     const map = new Map();
 
     periodRows.forEach((row) => {
@@ -1403,9 +1404,9 @@ async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = []) {
     return map;
 }
 
-async function buildClassLifecycleContext(classData, reqUser) {
+async function buildClassLifecycleContext(classData, reqUser, orgToday = '') {
     const classId = toPublicId(classData?.id);
-    const metricsMap = await buildClassEnrollmentPeriodMetrics(reqUser, [classId]);
+    const metricsMap = await buildClassEnrollmentPeriodMetrics(reqUser, [classId], orgToday);
     const metrics = metricsMap.get(classId) || { openPeriodCount: 0, activePeriodCount: 0, totalPeriodCount: 0 };
 
     let previousClass = null;
@@ -2024,11 +2025,28 @@ async function assertCanCreateMakeupSession(req, classData, originalSession) {
     assertSessionScopeForRequest(req, classData, originalSession, 'manageSession');
 }
 
-function buildMakeupSession({ originalSession, classId, input, reqUser, defaultStatus }) {
+function buildMakeupSession({ originalSession, classId, input, reqUser, defaultStatus, statusDefinition = null }) {
     const now = new Date().toISOString();
     const date = normalizeDateOnlyValue(input?.date);
     const startTime = normalizeClockTime(input?.startTime || originalSession?.startTime);
-    const endTime = normalizeClockTime(input?.endTime || originalSession?.endTime);
+    const originalDurationHours = calculateSessionDurationHours(
+        originalSession?.startTime,
+        originalSession?.endTime,
+        originalSession?.durationHours
+    );
+    const makeupDurationPercent = sessionStatusPolicyService.normalizeMakeupDurationPercent(
+        input?.makeupDurationPercent ?? statusDefinition?.makeupDurationPercent,
+        statusDefinition?.makeupDurationPercent ?? 100
+    );
+    const makeupDurationHours = sessionStatusPolicyService.calculateMakeupSessionDurationHours(
+        originalDurationHours,
+        makeupDurationPercent
+    );
+    const computedEndTime = sessionStatusPolicyService.addMinutesToClockTime(
+        startTime,
+        Math.round(makeupDurationHours * 60)
+    );
+    const endTime = normalizeClockTime(input?.endTime || computedEndTime || originalSession?.endTime);
     if (!date) throw new Error('Make-up session date is required.');
     if (!startTime || !endTime || startTime >= endTime) throw new Error('Make-up session start time must be before end time.');
 
@@ -2040,7 +2058,7 @@ function buildMakeupSession({ originalSession, classId, input, reqUser, defaultS
         date,
         startTime,
         endTime,
-        durationHours: calculateSessionDurationHours(startTime, endTime, originalSession?.durationHours),
+        durationHours: calculateSessionDurationHours(startTime, endTime, makeupDurationHours || originalDurationHours),
         status: String(defaultStatus || 'scheduled').trim() || 'scheduled',
         notes: String(input?.notes || '').trim().slice(0, 2000),
         room: String(input?.room || originalSession?.room || '').trim().slice(0, 200),
@@ -2059,6 +2077,10 @@ function buildMakeupSession({ originalSession, classId, input, reqUser, defaultS
             originalClassId: toPublicId(classId),
             originalSessionId,
             originalStatus: sessionStatusPolicyService.normalizeSessionStatus(originalSession?.status, originalSession?.notes),
+            originalDurationHours,
+            durationPercent: makeupDurationPercent,
+            makeupDurationHours,
+            remainingDurationHours: Number(Math.max(0, originalDurationHours - makeupDurationHours).toFixed(4)),
             createdAt: now,
             createdBy: toPublicId(reqUser?.id || reqUser?.username || ''),
             createdByPersonId: cleanPersonId(reqUser?.personId),
@@ -2296,7 +2318,7 @@ async function listClasses(req, res) {
     const classes = await schoolDataService.fetchData('classes', query, req.user, buildRouteAccessContext(req));
     const orgs = await dataService.fetchData('organizations', {}, req.user);
     const classIds = (Array.isArray(classes) ? classes : []).map((row) => toPublicId(row?.id)).filter(Boolean);
-    const periodMetricsMap = await buildClassEnrollmentPeriodMetrics(req.user, classIds);
+    const periodMetricsMap = await buildClassEnrollmentPeriodMetrics(req.user, classIds, resolveOrgTodayFromRequest(req));
     const searchableFields = await inferSearchableFields(classes, { exclude: ['audit', 'attachments'] });
     const classTitleMap = new Map((Array.isArray(classes) ? classes : []).map((row) => [toPublicId(row?.id), String(row?.title || '').trim()]));
 
@@ -2356,6 +2378,7 @@ async function showAddForm(req, res) {
     }));
     res.render('school/class/classForm', {
       title: 'Add Class', classData: null, includeModal: true, user: req.user,
+      orgToday: resolveOrgTodayFromRequest(req),
       lifecycleContext: {},
       feeCategories: getFeeCategories({ includeAll: false }),
       allFeeCategoryKey: ALL_FEE_CATEGORIES_KEY,
@@ -2404,7 +2427,7 @@ async function showAddWizardForm(req, res) {
 async function showEditForm(req, res) {
   try {
     const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
-    const lifecycleContext = await buildClassLifecycleContext(classData, req.user);
+    const lifecycleContext = await buildClassLifecycleContext(classData, req.user, resolveOrgTodayFromRequest(req));
     const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
     const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
     const subjectFeeCatalog = subjects.map((subject) => ({
@@ -2441,6 +2464,7 @@ async function showEditForm(req, res) {
       title: 'Edit Class', 
       classData, 
       lifecycleContext,
+      orgToday: resolveOrgTodayFromRequest(req),
       sessionsData, 
       includeModal: true, 
       feeCategories: getFeeCategories({ includeAll: false }),
@@ -2460,7 +2484,7 @@ async function showEditForm(req, res) {
 async function showEditWizardForm(req, res) {
   try {
     const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
-    const lifecycleContext = await buildClassLifecycleContext(classData, req.user);
+    const lifecycleContext = await buildClassLifecycleContext(classData, req.user, resolveOrgTodayFromRequest(req));
     const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
     const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
     const subjectFeeCatalog = subjects.map((subject) => ({
@@ -3747,7 +3771,8 @@ async function createMakeupSession(req, res) {
             classId,
             input: req.body || {},
             reqUser: req.user,
-            defaultStatus: resolveDefaultSessionStatusCode(statusMeta)
+            defaultStatus: resolveDefaultSessionStatusCode(statusMeta),
+            statusDefinition
         });
         makeupSession.sessionId = generateMakeupSessionId(sessions);
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, makeupSession, req.user);
@@ -3802,11 +3827,17 @@ async function createMakeupSession(req, res) {
             makeupDate: makeupSession.date,
             makeupStartTime: makeupSession.startTime,
             makeupEndTime: makeupSession.endTime,
+            makeupDurationPercent: makeupSession.makeup?.durationPercent || null,
+            makeupDurationHours: makeupSession.makeup?.makeupDurationHours || makeupSession.durationHours || null,
             teacherId: makeupSession.delivery?.deliveredBy || '',
             teacherName: makeupSession.delivery?.deliveredByName || '',
             createdAt: makeupSession.makeup.createdAt,
             createdBy: makeupSession.makeup.createdBy,
             reason: makeupSession.makeup.reason
+        };
+        originalSession.makeupScheduling = {
+            durationPercent: makeupSession.makeup?.durationPercent || statusDefinition?.makeupDurationPercent || 100,
+            configuredAt: makeupSession.makeup.createdAt
         };
         originalSession.makeupHistory = Array.isArray(originalSession.makeupHistory)
             ? [...originalSession.makeupHistory, historyRow]

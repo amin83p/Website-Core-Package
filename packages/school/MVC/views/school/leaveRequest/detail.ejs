@@ -24,22 +24,19 @@
   function formatFriendlyDate(value) {
     const token = String(value || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return token || '-';
-    const date = new Date(token + 'T12:00:00');
-    if (Number.isNaN(date.getTime())) return token;
-    return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    if (typeof formatOrgDate === 'function') {
+      return formatOrgDate(token, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    return token;
   }
   function formatDateTime(value) {
     const token = String(value || '').trim();
     if (!token) return '-';
-    const date = new Date(token);
-    if (Number.isNaN(date.getTime())) return token;
-    return date.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    });
+    if (typeof formatOrgDateTime === 'function') return formatOrgDateTime(token);
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatInstant === 'function') {
+      return window.AppOrgDateTime.formatInstant(token);
+    }
+    return token;
   }
   function countInclusiveDays(startDate, endDate) {
     const start = String(startDate || '').trim();

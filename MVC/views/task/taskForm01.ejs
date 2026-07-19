@@ -251,7 +251,7 @@
                                                             <span class="badge bg-info text-dark" title="Step ID: <%= f.checkpointId %>">Step: <%= f.stepName %></span>
                                                         <% } %>
                                                     </td>
-                                                    <td class="small text-muted"><%= new Date(f.uploadedAt).toLocaleDateString() %></td>
+                                                    <td class="small text-muted"><%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(f.uploadedAt, { month: 'short', day: 'numeric', year: 'numeric' }) : new Date(f.uploadedAt).toLocaleDateString() %></td>
                                                     <td class="text-end pe-3">
                                                         <a href="<%= f.url %>" download class="btn btn-sm btn-light border"><i class="bi bi-download"></i></a>
                                                     </td>

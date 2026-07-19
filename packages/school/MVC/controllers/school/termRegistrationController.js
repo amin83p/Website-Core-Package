@@ -16,6 +16,7 @@ const {
   assertCreateOrgContextOrThrow,
   canCreateOrgScopedItem
 } = requireCoreModule('MVC/utils/orgContextUtils');
+const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 function parseJsonSafe(v, fallback) {
   if (v === undefined || v === null || v === '') return fallback;
@@ -347,7 +348,8 @@ async function buildTermRegistrationPreview({
   classIds,
   reqUser,
   requestBody = {},
-  ignoreRegistrationId = ''
+  ignoreRegistrationId = '',
+  orgToday = ''
 }) {
   return termRegistrationViewService.buildTermRegistrationPreview({
     studentId,
@@ -356,7 +358,8 @@ async function buildTermRegistrationPreview({
     classIds,
     reqUser,
     requestBody,
-    ignoreRegistrationId
+    ignoreRegistrationId,
+    orgToday
   });
 }
 
@@ -381,23 +384,25 @@ function normalizeDateOnly(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : '';
 }
 
-function normalizeTermRegistrationPayload(body = {}) {
+function normalizeTermRegistrationPayload(body = {}, orgToday = '') {
+  const today = resolveOrgTodayFromContext({ orgToday });
   return {
     studentId: toPublicId(body.studentId),
     programRegistrationId: toPublicId(body.programRegistrationId),
     termId: toPublicId(body.termId),
     classIds: asIdArray(parseJsonSafe(body.classIds, [])),
-    effectiveDate: normalizeDateOnly(body.effectiveDate) || new Date().toISOString().slice(0, 10),
+    effectiveDate: normalizeDateOnly(body.effectiveDate) || today,
     note: String(body.note || '').trim(),
     externalReference: String(body.externalReference || '').trim()
   };
 }
 
-function normalizeTermBatchPayload(body = {}) {
+function normalizeTermBatchPayload(body = {}, orgToday = '') {
+  const today = resolveOrgTodayFromContext({ orgToday });
   return {
     programId: toPublicId(body.programId),
     termId: toPublicId(body.termId),
-    effectiveDate: normalizeDateOnly(body.effectiveDate) || new Date().toISOString().slice(0, 10),
+    effectiveDate: normalizeDateOnly(body.effectiveDate) || today,
     externalReference: String(body.externalReference || '').trim(),
     note: String(body.note || '').trim(),
     programRegistrationIds: asIdArray(parseJsonSafe(body.programRegistrationIds, [])),
@@ -808,6 +813,7 @@ async function renderRegistrationPage(req, res, viewName, pageTitle) {
       title: pageTitle,
       recentRegistrations,
       canManageRegistrations,
+      orgToday: req.orgToday || req.user?.orgToday || '',
       user: req.user,
       includeModal: true,
       actionStateId: req.actionStateId
@@ -888,7 +894,7 @@ exports.listBatchClasses = async (req, res) => {
 exports.previewBatchRegistration = async (req, res) => {
   try {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    const payload = normalizeTermBatchPayload(req.body);
+    const payload = normalizeTermBatchPayload(req.body, resolveOrgTodayFromRequest(req));
 
     const preview = await buildTermBatchPreview(req.user, activeOrgId, payload);
     const status = preview.summary.errorRows ? (preview.summary.readyRows ? 'warning' : 'error') : 'success';
@@ -925,7 +931,7 @@ exports.previewBatchRegistration = async (req, res) => {
 exports.applyBatchRegistration = async (req, res) => {
   try {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    const payload = normalizeTermBatchPayload(req.body);
+    const payload = normalizeTermBatchPayload(req.body, resolveOrgTodayFromRequest(req));
     const guardKey = idempotencyGuardService.createGuardKey([
       'term_batch_apply',
       activeOrgId,
@@ -1190,7 +1196,7 @@ exports.listAvailableTerms = async (req, res) => {
 
 exports.previewRegistration = async (req, res) => {
   try {
-    const payload = normalizeTermRegistrationPayload(req.body);
+    const payload = normalizeTermRegistrationPayload(req.body, resolveOrgTodayFromRequest(req));
     const preview = await buildValidatedSinglePreview(req.user, payload);
 
     return res.json({ status: 'success', preview });
@@ -1206,7 +1212,7 @@ function countExpectedAcademicEntries(preview) {
 exports.applyRegistration = async (req, res) => {
   try {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    const payload = normalizeTermRegistrationPayload(req.body);
+    const payload = normalizeTermRegistrationPayload(req.body, resolveOrgTodayFromRequest(req));
     const guardKey = idempotencyGuardService.createGuardKey([
       'term_single_apply',
       activeOrgId,
@@ -1447,7 +1453,7 @@ exports.approveRegistration = async (req, res) => {
 
     const classRows = Array.isArray(registration?.classSummary?.rows) ? registration.classSummary.rows : [];
     const classIds = asIdArray(classRows.map((row) => row?.classId || row?.id));
-    const effectiveDate = String(registration.registrationDate || '').trim() || new Date().toISOString().slice(0, 10);
+    const effectiveDate = String(registration.registrationDate || '').trim() || resolveOrgTodayFromRequest(req);
     const externalReference = String(registration?.transactionSummary?.externalReference || '').trim();
     const effectiveNote = approvalNote || String(registration.note || '').trim();
 
@@ -1463,6 +1469,7 @@ exports.approveRegistration = async (req, res) => {
         sourceEventId: `STR-${registration.id}`,
         idempotencyKey: `STR|${registration.id}|${effectiveDate}`
       },
+      orgToday: resolveOrgTodayFromRequest(req),
       ignoreRegistrationId: registration.id
     });
 
@@ -1607,6 +1614,7 @@ exports.approveRegistration = async (req, res) => {
           programId: preview.programRegistration.programId,
           termId,
           effectiveDate,
+          orgToday: resolveOrgTodayFromRequest(req),
           options: { transactionContext: txContext }
         });
         if (!classEnrollmentEntry.reused) classEnrollmentEntries.push(classEnrollmentEntry);
@@ -1698,7 +1706,7 @@ exports.approveRegistration = async (req, res) => {
         studentId: preview.student.id,
         programId: preview.programRegistration.programId,
         reason: `Term registration draft approval ${registration.id} failed and was rolled back. ${approvalError.message}`,
-        options: { transactionContext: txContext }
+        options: { transactionContext: txContext, orgToday: resolveOrgTodayFromRequest(req) }
       });
       let financialRollback = null;
       const financialIssues = [];
@@ -1936,7 +1944,7 @@ exports.rollbackRegistration = async (req, res) => {
       studentId: registration.studentId,
       programId: registration.programId,
       reason: note || `Manual rollback of term registration ${registration.id}`,
-      options: { transactionContext: txContext }
+      options: { transactionContext: txContext, orgToday: resolveOrgTodayFromRequest(req) }
     });
     let financeRollback = null;
     const financeIssues = [];
@@ -2044,7 +2052,7 @@ exports.previewStatusTransition = async (req, res) => {
       effectiveDate: req.body?.effectiveDate,
       reason: req.body?.reason,
       orgId: getActiveOrgIdOrThrow(req.user)
-    }, { requestingUser: req.user });
+    }, { requestingUser: req.user, orgToday: resolveOrgTodayFromRequest(req) });
     return res.status(preview.canApply ? 200 : 409).json({
       status: preview.canApply ? 'success' : 'blocked',
       message: preview.canApply
@@ -2066,7 +2074,7 @@ exports.applyStatusTransition = async (req, res) => {
       effectiveDate: req.body?.effectiveDate,
       reason: req.body?.reason,
       orgId: getActiveOrgIdOrThrow(req.user)
-    }, { requestingUser: req.user });
+    }, { requestingUser: req.user, orgToday: resolveOrgTodayFromRequest(req) });
     return res.json({ status: 'success', message: `Registration changed to ${result.targetStatus}.`, result });
   } catch (error) {
     return res.status(error.preview?.blockers?.length ? 409 : 400).json({

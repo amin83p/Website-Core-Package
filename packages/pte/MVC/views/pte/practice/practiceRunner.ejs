@@ -6833,7 +6833,9 @@
     const writtenResponse = clean(scoring?.responseText || '');
     const scoredAt = clean(scoring?.scoredAt || '');
     const scoredAtDate = scoredAt ? new Date(scoredAt) : null;
-    const scoredAtText = scoredAtDate && !Number.isNaN(scoredAtDate.getTime()) ? scoredAtDate.toLocaleString() : '';
+    const scoredAtText = scoredAtDate && !Number.isNaN(scoredAtDate.getTime())
+      ? ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(scoredAtDate) : scoredAtDate.toLocaleString())
+      : '';
 
     nodes.scorePanel.innerHTML = ''
       + '<div class="pte-score-panel">'
@@ -7877,7 +7879,7 @@
       return;
     }
     const ratedAt = clean(item.selfDifficultyRatedAt);
-    nodes.ratingMeta.textContent = 'Saved as ' + formatRatingLabel(rating) + (ratedAt ? (' at ' + new Date(ratedAt).toLocaleString()) : '.');
+    nodes.ratingMeta.textContent = 'Saved as ' + formatRatingLabel(rating) + (ratedAt ? (' at ' + ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(ratedAt) : new Date(ratedAt).toLocaleString())) : '.');
   }
 
   function setRatingLocked(locked, hintText = '') {

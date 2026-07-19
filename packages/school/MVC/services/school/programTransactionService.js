@@ -3,6 +3,7 @@ const transactionDefinitionModel = require('../../models/school/transactionDefin
 const { ALL_FEE_CATEGORIES_KEY } = require('../../models/school/feeCategoryCatalog');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 function collectFeeLinesForCategory(feeGroups, feeCategory) {
   const normalizedCategory = String(feeCategory || '').trim();
@@ -107,7 +108,7 @@ function buildTransactionsForFeeLines({
 
   const effectiveOrgId = toPublicId(orgId || student?.orgId);
   const allowedOrgIds = new Set([effectiveOrgId, 'SYSTEM']);
-  const effectiveDate = String(requestBody.effectiveDate || '').trim() || new Date().toISOString().slice(0, 10);
+  const effectiveDate = String(requestBody.effectiveDate || '').trim() || resolveOrgTodayFromContext({ orgToday: reqUser?.orgToday, user: reqUser });
   const safeSourceEventType = String(sourceEventType || 'fee_transactions_apply').trim();
   const rawSourceEventIdBase = String(sourceEventIdBase || `FEEAPPLY-${student?.id || 'student'}-${Date.now()}`).trim();
   const safeSourceEventIdBase = rawSourceEventIdBase

@@ -23,6 +23,11 @@ const coreFilesService = require('../services/coreFilesService');
 const localPackageSyncService = require('../services/localPackageSyncService');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
 const { getPackageStorageRootAbsolute, getPackageStorageRootResolution } = require('../utils/packageStoragePathUtils');
+const {
+  listCuratedTimezoneOptions,
+  parseOrganizationTimezoneInput,
+  resolveDefaultTimezone
+} = require('../utils/timezoneUtils');
 
 const PUBLIC_PAGE_MEDIA_FOLDER = 'misc/public-pages';
 const MONGO_RESTORE_MAX_UPLOAD_MB = Number.parseInt(process.env.MONGO_BACKUP_RESTORE_MAX_MB || '100', 10) || 100;
@@ -238,7 +243,9 @@ exports.showAppSettings = async (req, res) => {
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId,
-      publicMenuEndpointOptions: appBrandingService.getPublicMenuEndpointOptions()
+      publicMenuEndpointOptions: appBrandingService.getPublicMenuEndpointOptions(),
+      timezoneOptions: listCuratedTimezoneOptions(),
+      defaultTimezone: resolveDefaultTimezone()
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -578,11 +585,17 @@ exports.updateAppSettings = async (req, res) => {
       publicMenu.defaultHomePath = publicHomePath;
     }
 
+    const timezoneParse = parseOrganizationTimezoneInput(body, resolveDefaultTimezone());
+    if (timezoneParse.error) {
+      throw new Error(timezoneParse.error);
+    }
+
     const formData = {
       app: {
         defaultPageSize: parseInt(req.body.defaultPageSize, 10),
         searchDefaultKeyword: req.body.searchDefaultKeyword,
         buildVersionOverride: cleanFormText(req.body.buildVersionOverride, 120),
+        defaultTimezone: timezoneParse.timeZone,
         // Save raw string exactly as typed (e.g., "uploads" or "/app/uploads")
         uploadsPath: req.body.uploadsPath,
         brand: {

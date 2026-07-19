@@ -159,6 +159,9 @@
   function formatDateTime(value) {
     const token = cleanText(value);
     if (!token) return '-';
+    if (window.AppOrgDateTime && typeof AppOrgDateTime.formatInstant === 'function') {
+      return AppOrgDateTime.formatInstant(token) || token;
+    }
     const parsed = new Date(token);
     if (Number.isNaN(parsed.getTime())) return token;
     return parsed.toLocaleString();

@@ -138,7 +138,7 @@
                                     <div class="d-flex align-items-center mb-1">
                                         <div class="avatar-sm rounded-circle bg-secondary text-white small me-2"><%= (c.userName||'U').charAt(0).toUpperCase() %></div>
                                         <div class="small fw-bold text-dark"><%= c.userName %></div>
-                                        <div class="x-small text-muted ms-auto"><%= new Date(c.timestamp).toLocaleDateString() %></div>
+                                        <div class="x-small text-muted ms-auto"><%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(c.timestamp, { month: 'short', day: 'numeric' }) : new Date(c.timestamp).toLocaleDateString() %></div>
                                     </div>
                                     <div class="small text-muted text-truncate ps-1 border-start border-2 ms-2"><%= c.details %></div>
                                 </div>
@@ -393,14 +393,14 @@
                                                             <div class="avatar-sm rounded-circle bg-secondary text-white flex-shrink-0"><%= (item.userName||'U').charAt(0) %></div>
                                                             <div>
                                                                 <div class="comment-bubble"><strong><%= item.userName %>:</strong> <%= item.details %><% if(item.file) { %><div class="mt-1 border-top pt-1"><a href="<%= item.file.url %>" target="_blank"><i class="bi bi-paperclip"></i> <%= item.file.filename %></a></div><% } %></div>
-                                                                <div class="x-small text-muted ms-1"><%= new Date(item.timestamp).toLocaleString() %></div>
+                                                                <div class="x-small text-muted ms-1"><%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(item.timestamp) : new Date(item.timestamp).toLocaleString() %></div>
                                                             </div>
                                                         </div>
                                                     <% } else { 
                                                         let readableContent = `<h5 class='fw-bold mb-3'>Update Log</h5>`;
                                                         readableContent += `<table class='table table-sm table-bordered'><tbody>`;
                                                         readableContent += `<tr><td class='bg-light fw-bold' style='width:30%'>User</td><td>${item.userName}</td></tr>`;
-                                                        readableContent += `<tr><td class='bg-light fw-bold'>Date</td><td>${new Date(item.timestamp).toLocaleString()}</td></tr>`;
+                                                        readableContent += `<tr><td class='bg-light fw-bold'>Date</td><td>${(window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(item.timestamp) : new Date(item.timestamp).toLocaleString()}</td></tr>`;
                                                         readableContent += `<tr><td class='bg-light fw-bold'>Reason</td><td>${item.note || '-'}</td></tr>`;
                                                         readableContent += `</tbody></table>`;
                                                         if(item.changes && Object.keys(item.changes).length > 0) {
@@ -411,7 +411,7 @@
                                                         }
                                                     %>
                                                         <div class="history-update-card p-2 rounded cursor-pointer" onclick="openReader('Update Details', `<%= readableContent %>`)">
-                                                            <div class="d-flex justify-content-between align-items-center mb-1"><strong class="small text-primary"><%= item.userName %> updated step</strong><span class="x-small text-muted"><%= new Date(item.timestamp).toLocaleDateString() %></span></div>
+                                                            <div class="d-flex justify-content-between align-items-center mb-1"><strong class="small text-primary"><%= item.userName %> updated step</strong><span class="x-small text-muted"><%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(item.timestamp, { month: 'short', day: 'numeric' }) : new Date(item.timestamp).toLocaleDateString() %></span></div>
                                                             <div class="text-dark small mb-1 text-truncate" style="max-width: 90%; font-style: italic;">"<%= item.note %>"</div>
                                                         </div>
                                                     <% } %>
@@ -766,7 +766,7 @@ function createFileRowHTML(f, isSidebar) {
                     const emptyMsg = historyContainer.querySelector('.no-history-msg');
                     if(emptyMsg) emptyMsg.remove(); 
                     const item = d.entry; 
-                    const newHtml = `<div class="d-flex gap-2"><div class="avatar-sm rounded-circle bg-secondary text-white flex-shrink-0">${(item.userName||'U').charAt(0)}</div><div><div class="comment-bubble"><strong>${item.userName}:</strong> ${item.details}${item.file ? `<div class="mt-1 border-top pt-1"><a href="${item.file.url}" target="_blank"><i class="bi bi-paperclip"></i> ${item.file.filename}</a></div>` : ''}</div><div class="x-small text-muted ms-1">${new Date().toLocaleString()}</div></div></div>`;
+                    const newHtml = `<div class="d-flex gap-2"><div class="avatar-sm rounded-circle bg-secondary text-white flex-shrink-0">${(item.userName||'U').charAt(0)}</div><div><div class="comment-bubble"><strong>${item.userName}:</strong> ${item.details}${item.file ? `<div class="mt-1 border-top pt-1"><a href="${item.file.url}" target="_blank"><i class="bi bi-paperclip"></i> ${item.file.filename}</a></div>` : ''}</div><div class="x-small text-muted ms-1">${(window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(new Date()) : new Date().toLocaleString()}</div></div></div>`;
                     const wrapper = historyContainer.querySelector('.d-flex.flex-column'); 
                     if(wrapper) wrapper.insertAdjacentHTML('afterbegin', newHtml); 
                     else historyContainer.insertAdjacentHTML('afterbegin', `<div class="d-flex flex-column gap-3">${newHtml}</div>`);

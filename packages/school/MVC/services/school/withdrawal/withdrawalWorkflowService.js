@@ -278,7 +278,7 @@ async function createPendingWithdrawalRecord({
     throw buildDuplicateRequestError(type, toPublicId(duplicate.id) || duplicate.id);
   }
 
-  const nowDate = withdrawalPolicyService.todayISO();
+  const nowDate = withdrawalPolicyService.resolveBusinessToday('', reqUser);
   const internalLines = [];
   internalLines.push(`Request submitted by ${toPublicId(reqUser?.id) || 'unknown'} (${reqUser?.username || 'n/a'}).`);
   if (queueStatus === 'pending_program_admin_approval' && context?.programAdministratorPersonId) {
@@ -552,7 +552,7 @@ async function finalizePendingWithdrawal(withdrawalId, payload, reqUser) {
   const mergedPayload = {
     reason: payload?.reason || existing.reason || 'other',
     reasonDetail: payload?.reasonDetail || existing.reasonDetail || '',
-    effectiveDate: payload?.effectiveDate || existing.effectiveDate || withdrawalPolicyService.todayISO(),
+    effectiveDate: payload?.effectiveDate || existing.effectiveDate || withdrawalPolicyService.resolveBusinessToday('', reqUser),
     existingWithdrawalId: existing.id,
     manualSettlementRows: Array.isArray(payload?.manualSettlementRows) ? payload.manualSettlementRows : [],
     settlementNote: String(payload?.settlementNote || '').trim()
@@ -607,7 +607,7 @@ async function rejectPendingWithdrawal(withdrawalId, payload, reqUser) {
 
   return await withdrawalRepository.updateWithdrawal(existing.id, {
     status: 'rejected',
-    approvedDate: withdrawalPolicyService.todayISO(),
+    approvedDate: withdrawalPolicyService.resolveBusinessToday('', reqUser),
     approvedBy: reviewerId,
     processedBy: reviewerId,
     internalNotes: reviewNote,

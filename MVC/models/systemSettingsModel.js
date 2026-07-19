@@ -119,6 +119,7 @@ const DEFAULTS = {
     defaultPageSize: 30,
     searchDefaultKeyword: 'aaa',
     buildVersionOverride: '',
+    defaultTimezone: 'UTC',
     uploadsPath: 'uploads', // Store as string, resolve at runtime
     uploadFolders: uploadFolderSettingsService.getDefaultUploadFolders(),
     brand: DEFAULT_APP_BRAND,

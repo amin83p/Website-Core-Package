@@ -1061,6 +1061,56 @@
 <script src="/scripts/scheduleCompletionDisplay.js"></script>
 <script>
 (function () {
+  function formatHubDateKey(dateValue, options = {}) {
+    const raw = String(dateValue || '').trim();
+    if (!raw) return '-';
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatDateKey === 'function') {
+      return window.AppOrgDateTime.formatDateKey(raw, options);
+    }
+    return raw;
+  }
+
+  function formatHubInstant(value) {
+    if (value === undefined || value === null || value === '') return 'just now';
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatInstant === 'function') {
+      return window.AppOrgDateTime.formatInstant(value);
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'just now' : date.toLocaleString();
+  }
+
+  function hubTodayIso() {
+    if (window.AppOrgDateTime && window.AppOrgDateTime.today) {
+      return String(window.AppOrgDateTime.today);
+    }
+    return '';
+  }
+
+  function hubOrgYear() {
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.orgYear === 'function') {
+      const year = String(window.AppOrgDateTime.orgYear() || '').trim();
+      if (year) return year;
+    }
+    return hubTodayIso().slice(0, 4);
+  }
+
+  function hubTodayDate() {
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.dateKeyToDate === 'function') {
+      const parsed = window.AppOrgDateTime.dateKeyToDate(hubTodayIso());
+      if (parsed) return parsed;
+    }
+    return new Date();
+  }
+
+  function hubDateToIso(date) {
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.dateToDateKey === 'function') {
+      return window.AppOrgDateTime.dateToDateKey(date);
+    }
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+    return local.toISOString().slice(0, 10);
+  }
+
   const root = document.querySelector('[data-master-hub]');
   if (!root) return;
 
@@ -1267,7 +1317,7 @@
       'report-instances': '',
       holidays: ''
     },
-    holidaysYear: String(new Date().getFullYear())
+    holidaysYear: String((typeof orgToday !== 'undefined' && orgToday) ? String(orgToday).slice(0, 4) : hubTodayIso().slice(0, 4))
     ,
     taskShowAll: canManageAllTasks ? readTaskAdminShowAll() : false,
     taskPersonId: '',
@@ -1544,7 +1594,7 @@
   function renderTaskWorkspace(payload) {
     const section = payload && payload.section ? payload.section : workspaceSections.tasks;
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
-    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const refreshed = payload && payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : 'just now';
     const taskScopeText = payload && payload.canManageAll === true
       ? (workspaceState.taskShowAll
         ? ((workspaceState.taskPersonName || payload.selectedPersonName || payload.selectedPersonId)
@@ -1666,7 +1716,7 @@
     const section = payload && payload.section ? payload.section : workspaceSections.classes;
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
     const notLoaded = payload && payload.notLoaded === true;
-    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const refreshed = payload && payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : 'just now';
     const body = rows.length
       ? rows.map(function (row) {
         const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
@@ -1845,7 +1895,7 @@
     const fromEl = document.getElementById('hubActivityDateFrom');
     const toEl = document.getElementById('hubActivityDateTo');
     if (!fromEl || !toEl) return;
-    const today = new Date();
+    const today = hubTodayDate();
     let start = new Date(today);
     let end = new Date(today);
 
@@ -1985,7 +2035,7 @@
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
     const notLoaded = payload && payload.notLoaded === true;
     const filters = payload && payload.filters ? payload.filters : {};
-    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const refreshed = payload && payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : 'just now';
     if (filters.assigneePersonId) {
       workspaceState.activityPersonId = filters.assigneePersonId;
       workspaceState.activityPersonName = workspaceState.activityPersonName || filters.assigneePersonName || filters.assigneePersonId;
@@ -2051,18 +2101,6 @@
     ].join('');
 
     bindActivityWorkspaceControls();
-  }
-
-  function hubTodayIso() {
-    const now = new Date();
-    const local = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
-    return local.toISOString().slice(0, 10);
-  }
-
-  function hubDateToIso(date) {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
-    const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-    return local.toISOString().slice(0, 10);
   }
 
   function normalizeSessionStatusCode(value) {
@@ -2284,7 +2322,7 @@
     const startEl = document.getElementById('hubSessionStartDate');
     const endEl = document.getElementById('hubSessionEndDate');
     if (!startEl || !endEl) return;
-    const today = new Date();
+    const today = hubTodayDate();
     let start = new Date(today);
     let end = new Date(today);
 
@@ -2537,6 +2575,8 @@
       '<div class="col-md-4"><label class="form-label fw-bold">Date</label><input type="date" class="form-control" id="hubMakeupSessionDate"></div>',
       '<div class="col-md-4"><label class="form-label fw-bold">Start Time</label><input type="time" class="form-control" id="hubMakeupSessionStart"></div>',
       '<div class="col-md-4"><label class="form-label fw-bold">End Time</label><input type="time" class="form-control" id="hubMakeupSessionEnd"></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold">Make-up Duration %</label><input type="number" class="form-control" id="hubMakeupSessionDurationPercent" min="1" max="100" step="1"></div>',
+      '<div class="col-md-8"><div class="alert alert-light border small mb-0 h-100" id="hubMakeupSessionDurationSummary"></div></div>',
       '<div class="col-md-6"><label class="form-label fw-bold">Teacher</label><div class="input-group"><input type="text" class="form-control bg-white" id="hubMakeupSessionTeacherName" readonly><button type="button" class="btn btn-outline-primary" id="hubMakeupSessionPickTeacher"><i class="bi bi-person-check"></i></button></div></div>',
       '<div class="col-md-6"><label class="form-label fw-bold">Location</label><input type="text" class="form-control" id="hubMakeupSessionRoom" maxlength="200"></div>',
       '<div class="col-12"><label class="form-label fw-bold">Reason</label><textarea class="form-control" id="hubMakeupSessionReason" rows="3" maxlength="1000"></textarea></div>',
@@ -2570,23 +2610,89 @@
       }));
     });
     modal.querySelector('#hubMakeupSessionCreate')?.addEventListener('click', createHubMakeupSessionFromModal);
+    modal.querySelector('#hubMakeupSessionDurationPercent')?.addEventListener('input', syncHubMakeupSessionDurationPreview);
+    modal.querySelector('#hubMakeupSessionStart')?.addEventListener('input', syncHubMakeupSessionDurationPreview);
     return modal;
+  }
+
+  let hubMakeupOriginalDurationHours = 0;
+  let hubMakeupDefaultPercent = 100;
+
+  function hubAddMinutesToClockTime(startTime, minutesToAdd) {
+    const start = String(startTime || '').trim();
+    if (!/^\d{2}:\d{2}$/.test(start)) return '';
+    const parts = start.split(':').map(Number);
+    const totalMinutes = (parts[0] * 60) + parts[1] + Number(minutesToAdd || 0);
+    if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+    const endH = Math.floor(totalMinutes / 60) % 24;
+    const endM = totalMinutes % 60;
+    return String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0');
+  }
+
+  function hubFormatDurationHoursLabel(hours) {
+    const safe = Number(hours);
+    if (!Number.isFinite(safe) || safe <= 0) return '0 hr';
+    const minutes = Math.round(safe * 60);
+    const wholeHours = Math.floor(minutes / 60);
+    const remainderMinutes = minutes % 60;
+    if (wholeHours && remainderMinutes) return wholeHours + ' hr ' + remainderMinutes + ' min';
+    if (wholeHours) return wholeHours + ' hr';
+    return remainderMinutes + ' min';
+  }
+
+  function hubResolveOriginalDurationHours(row) {
+    const start = String(row?.startTime || '').trim();
+    const end = String(row?.endTime || '').trim();
+    if (start && end && /^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end)) {
+      const [sh, sm] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+      const minutes = ((eh * 60) + em) - ((sh * 60) + sm);
+      if (minutes > 0) return Number((minutes / 60).toFixed(2));
+    }
+    const fallback = Number(row?.durationHours || 0);
+    return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
+  }
+
+  function syncHubMakeupSessionDurationPreview() {
+    const modal = document.getElementById('hubSessionMakeupModal');
+    if (!modal) return;
+    const percentInput = modal.querySelector('#hubMakeupSessionDurationPercent');
+    const startInput = modal.querySelector('#hubMakeupSessionStart');
+    const endInput = modal.querySelector('#hubMakeupSessionEnd');
+    const summary = modal.querySelector('#hubMakeupSessionDurationSummary');
+    const percent = Math.max(1, Math.min(100, Number(percentInput?.value || hubMakeupDefaultPercent || 100)));
+    if (percentInput) percentInput.value = String(percent);
+    const makeupHours = Number((Number(hubMakeupOriginalDurationHours || 0) * (percent / 100)).toFixed(2));
+    if (startInput?.value) {
+      const computedEnd = hubAddMinutesToClockTime(startInput.value, Math.round(makeupHours * 60));
+      if (computedEnd && endInput) endInput.value = computedEnd;
+    }
+    if (!summary) return;
+    summary.innerHTML = '<strong>Original session:</strong> ' + hubFormatDurationHoursLabel(hubMakeupOriginalDurationHours)
+      + '<br><strong>Make-up at ' + percent + '%:</strong> ' + hubFormatDurationHoursLabel(makeupHours)
+      + '<br><span class="text-muted">Original session payroll uses Timesheet Formula on the full duration. Make-up payroll applies when the make-up session is completed.</span>';
   }
 
   function openHubSessionMakeupModal(row) {
     if (!row) return;
     const modal = ensureHubSessionMakeupModal();
+    const statusMap = buildSessionStatusMetaMap(hubSessionStatusMeta || []);
+    const statusMeta = statusMap.get(normalizeSessionStatusCode(row.status)) || null;
+    hubMakeupOriginalDurationHours = hubResolveOriginalDurationHours(row);
+    hubMakeupDefaultPercent = Number(statusMeta?.makeupDurationPercent || 100);
     modal.querySelector('#hubMakeupSessionClassId').value = row.classId || '';
     modal.querySelector('#hubMakeupSessionSessionId').value = row.sessionId || '';
     modal.querySelector('#hubMakeupSessionTeacherId').value = row.teacherId || '';
     modal.querySelector('#hubMakeupSessionDate').value = '';
     modal.querySelector('#hubMakeupSessionStart').value = row.startTime || '';
     modal.querySelector('#hubMakeupSessionEnd').value = row.endTime || '';
+    modal.querySelector('#hubMakeupSessionDurationPercent').value = String(hubMakeupDefaultPercent || 100);
     modal.querySelector('#hubMakeupSessionTeacherName').value = row.teacherName || '';
     modal.querySelector('#hubMakeupSessionRoom').value = row.room || '';
     modal.querySelector('#hubMakeupSessionReason').value = '';
     const count = Array.isArray(row.makeupHistory) ? row.makeupHistory.length : 0;
     modal.querySelector('#hubMakeupSessionContext').innerHTML = '<strong>' + escapeHtml(row.className || row.classId || 'Class') + '</strong><div class="text-muted font-monospace">' + escapeHtml(row.sessionId || '') + '</div>' + (count ? '<div class="text-warning mt-2"><i class="bi bi-exclamation-triangle me-1"></i>' + escapeHtml(String(count)) + ' make-up session(s) already exist for this original session.</div>' : '');
+    syncHubMakeupSessionDurationPreview();
     if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).show();
   }
 
@@ -2600,6 +2706,7 @@
       date: hubInputValue('hubMakeupSessionDate'),
       startTime: hubInputValue('hubMakeupSessionStart'),
       endTime: hubInputValue('hubMakeupSessionEnd'),
+      makeupDurationPercent: hubInputValue('hubMakeupSessionDurationPercent') || hubMakeupDefaultPercent || 100,
       teacherId: hubInputValue('hubMakeupSessionTeacherId'),
       teacherName: hubInputValue('hubMakeupSessionTeacherName'),
       room: hubInputValue('hubMakeupSessionRoom'),
@@ -2792,7 +2899,7 @@
     if (!rowEl || !updatedRow) return;
     const statusMap = buildSessionStatusMetaMap(hubSessionStatusMeta);
     const dateLabel = updatedRow.date
-      ? new Date(updatedRow.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+      ? formatHubDateKey(updatedRow.date, { weekday: 'short', month: 'short', day: 'numeric' })
       : '-';
     const commentsIcon = updatedRow.hasComments ? '<i class="bi bi-chat-dots-fill text-primary ms-1" title="Interactive notes inside"></i>' : '';
     const searchText = [
@@ -2896,7 +3003,7 @@
     hubSessionStatusMeta = statusMeta.slice();
     hubSessionRowsByKey = new Map();
     const statusMap = buildSessionStatusMetaMap(statusMeta);
-    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const refreshed = payload && payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : 'just now';
     const selectedStatus = normalizeSessionStatusCode(filters.status || '');
     const statusOptions = statusMeta.slice().sort(function (a, b) {
       const ao = Number(a && (a.sortOrder ?? a.order ?? 999));
@@ -2914,7 +3021,7 @@
         const rowKey = String(row.classId || '') + '::' + String(row.sessionId || '');
         hubSessionRowsByKey.set(rowKey, row);
         const dateLabel = row.date
-          ? new Date(row.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+          ? formatHubDateKey(row.date, { weekday: 'short', month: 'short', day: 'numeric' })
           : '-';
         const badgeHtml = buildSessionStatusBadgeHtml(row.status, statusMap);
         const caseBadgeHtml = buildSessionCaseBadgeHtml(row.caseSummary);
@@ -3032,7 +3139,7 @@
     const raw = String(dateValue || '').trim();
     if (!raw) return '-';
     try {
-      return new Date(raw + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      return formatHubDateKey(raw, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     } catch (error) {
       return raw;
     }
@@ -3041,9 +3148,7 @@
   function formatHubSessionIssueDateTime(value) {
     const raw = String(value || '').trim();
     if (!raw) return '-';
-    const date = new Date(raw);
-    if (Number.isNaN(date.getTime())) return raw;
-    return date.toLocaleString();
+    return formatHubInstant(raw);
   }
 
   function resolveHubClassId(item) {
@@ -3130,7 +3235,7 @@
     const startEl = document.getElementById('hubSessionIssueStartDate');
     const endEl = document.getElementById('hubSessionIssueEndDate');
     if (!startEl || !endEl) return;
-    const today = new Date();
+    const today = hubTodayDate();
     let start = new Date(today);
     let end = new Date(today);
 
@@ -3317,7 +3422,7 @@
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
     const notLoaded = payload && payload.notLoaded === true;
     const filters = payload && payload.filters ? payload.filters : {};
-    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const refreshed = payload && payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : 'just now';
     const severityOptions = Array.isArray(payload && payload.severityOptions) ? payload.severityOptions : ['info', 'warning', 'urgent'];
     const categoryOptions = Array.isArray(payload && payload.categoryOptions) ? payload.categoryOptions : ['learning', 'technology', 'engagement', 'behavior', 'support', 'resources', 'lesson_delivery', 'other'];
     const statusGroupOptions = Array.isArray(payload && payload.statusGroupOptions) ? payload.statusGroupOptions : [
@@ -3516,7 +3621,7 @@
     const startEl = document.getElementById('hubScheduleStartDate');
     const endEl = document.getElementById('hubScheduleEndDate');
     if (!startEl || !endEl) return;
-    const today = new Date();
+    const today = hubTodayDate();
     let start = new Date(today);
     let end = new Date(today);
 
@@ -4254,7 +4359,7 @@
     const endEl = document.getElementById('hubAttendanceEndDate');
     if (!startEl || !endEl) return;
 
-    const today = new Date();
+    const today = hubTodayDate();
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const day = today.getDay() || 7;
     let start = null;
@@ -4702,7 +4807,7 @@
       status.innerHTML = [
         '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">',
         '<div><div class="fw-bold">' + escapeHtml(result.className || 'Class Attendance') + '</div>',
-        '<div class="text-muted small">' + escapeHtml(String(matrix.length)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions. Last loaded: ' + escapeHtml(new Date().toLocaleString()) + '</div></div>',
+        '<div class="text-muted small">' + escapeHtml(String(matrix.length)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions. Last loaded: ' + escapeHtml(formatHubInstant(new Date())) + '</div></div>',
         '<div class="small text-muted"><span class="me-3"><i class="bi bi-check-circle-fill attendance-status-present"></i> Present</span><span class="me-3"><i class="bi bi-clock-fill attendance-status-late"></i> Late</span><span class="me-3"><i class="bi bi-envelope-paper-fill attendance-status-excused"></i> Excused</span><span><i class="bi bi-x-circle-fill attendance-status-absent"></i> Absent</span></div>',
         '</div>'
       ].join('');
@@ -4716,7 +4821,7 @@
     const headerCells = sessions.map(function (session) {
       const dateText = String(session.date || '').trim();
       const displayDate = dateText
-        ? new Date(dateText + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        ? formatHubDateKey(dateText, { month: 'short', day: 'numeric' })
         : String(session.id || '');
       return '<th class="text-center small">' + escapeHtml(displayDate) + '</th>';
     }).join('');
@@ -4794,7 +4899,7 @@
     }, 0);
 
     if (status) {
-      status.innerHTML = '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2"><div><div class="fw-bold">All Active Classes Attendance</div><div class="text-muted small">' + escapeHtml(String(successful.length)) + ' classes loaded, ' + escapeHtml(String(totalStudents)) + ' visible students, ' + escapeHtml(String(totalSessions)) + ' sessions. Last loaded: ' + escapeHtml(new Date().toLocaleString()) + '</div></div>' + (failed.length ? '<span class="badge text-bg-warning">' + escapeHtml(String(failed.length)) + ' failed</span>' : '') + '</div>';
+      status.innerHTML = '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2"><div><div class="fw-bold">All Active Classes Attendance</div><div class="text-muted small">' + escapeHtml(String(successful.length)) + ' classes loaded, ' + escapeHtml(String(totalStudents)) + ' visible students, ' + escapeHtml(String(totalSessions)) + ' sessions. Last loaded: ' + escapeHtml(formatHubInstant(new Date())) + '</div></div>' + (failed.length ? '<span class="badge text-bg-warning">' + escapeHtml(String(failed.length)) + ' failed</span>' : '') + '</div>';
     }
 
     function renderBatchClassPanel(row) {
@@ -4812,7 +4917,7 @@
       const headerCells = sessions.map(function (session) {
         const dateText = String(session.date || '').trim();
         const displayDate = dateText
-          ? new Date(dateText + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          ? formatHubDateKey(dateText, { month: 'short', day: 'numeric' })
           : String(session.id || '');
         return '<th class="text-center small">' + escapeHtml(displayDate) + '</th>';
       }).join('');
@@ -5146,7 +5251,7 @@
     const rows = Array.isArray(payload.rows) ? payload.rows : [];
     const notLoaded = payload.notLoaded === true;
     const filters = payload.filters || {};
-    const refreshed = payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const refreshed = payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : 'just now';
     workspaceState.serverSearch['report-assignments'] = typeof payload.searchQuery === 'string'
       ? payload.searchQuery
       : String(workspaceState.serverSearch['report-assignments'] || '');
@@ -5309,7 +5414,7 @@
     const startEl = document.getElementById('hubReportInstanceStartDate');
     const endEl = document.getElementById('hubReportInstanceEndDate');
     if (!startEl || !endEl) return;
-    const today = new Date();
+    const today = hubTodayDate();
     let start = new Date(today);
     let end = new Date(today);
 
@@ -5555,7 +5660,7 @@
     const rows = Array.isArray(payload.rows) ? payload.rows : [];
     const notLoaded = payload.notLoaded === true;
     const filters = payload.filters || {};
-    const refreshed = payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const refreshed = payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : 'just now';
     const templateOptions = Array.isArray(payload.templateOptions) ? payload.templateOptions : [];
     const statusOptions = Array.isArray(payload.statusOptions) ? payload.statusOptions : [
       { value: '', label: 'All Statuses' },
@@ -5695,7 +5800,7 @@
       '</div>',
       '<div class="p-3 border-bottom bg-white">',
       '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">',
-      '<div class="small text-muted">' + (notLoaded ? 'Leave requests are not loaded automatically. Click Load Leave Requests when ready.' : 'Showing ' + escapeHtml(String(rows.length)) + ' leave request(s). Last refreshed: ' + escapeHtml(payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : new Date().toLocaleString()) + '.') + '</div>',
+      '<div class="small text-muted">' + (notLoaded ? 'Leave requests are not loaded automatically. Click Load Leave Requests when ready.' : 'Showing ' + escapeHtml(String(rows.length)) + ' leave request(s). Last refreshed: ' + escapeHtml(payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : formatHubInstant(new Date())) + '.') + '</div>',
       '<div class="small text-muted"><span class="badge text-bg-warning me-1">SUBMITTED</span><span class="badge text-bg-success me-1">APPROVED</span><span class="badge text-bg-danger">FINAL</span></div>',
       '</div>',
       '</div>',
@@ -5758,7 +5863,7 @@
     const raw = String(dateValue || '').trim();
     if (!raw) return '-';
     try {
-      return new Date(raw + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return formatHubDateKey(raw, { month: 'short', day: 'numeric', year: 'numeric' });
     } catch (error) {
       return raw;
     }
@@ -5789,7 +5894,7 @@
     const deadlineStartEl = document.getElementById('hubTimesheetPeriodDeadlineStartDate');
     const deadlineEndEl = document.getElementById('hubTimesheetPeriodDeadlineEndDate');
     if (!periodStartEl || !periodEndEl || !deadlineStartEl || !deadlineEndEl) return;
-    const today = new Date();
+    const today = hubTodayDate();
     let start = new Date(today);
     let end = new Date(today);
 
@@ -5888,7 +5993,7 @@
     const rows = Array.isArray(payload.rows) ? payload.rows : [];
     const notLoaded = payload.notLoaded === true;
     const filters = payload.filters || {};
-    const refreshed = payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const refreshed = payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : 'just now';
     const statusOptions = Array.isArray(payload.statusOptions) && payload.statusOptions.length
       ? payload.statusOptions
       : [
@@ -5978,7 +6083,7 @@
       return;
     }
     if (!hubTimesheetManagementState.selectedYear || !years.includes(String(hubTimesheetManagementState.selectedYear))) {
-      const currentYear = String(new Date().getFullYear());
+      const currentYear = hubOrgYear();
       hubTimesheetManagementState.selectedYear = years.includes(currentYear) ? currentYear : years[0];
     }
   }
@@ -6402,12 +6507,12 @@
     };
     const rows = Array.isArray(payload.rows) ? payload.rows : [];
     const notLoaded = payload.notLoaded === true;
-    const refreshed = payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
-    const currentYear = String(payload.currentYear || workspaceState.holidaysYear || new Date().getFullYear());
+    const refreshed = payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : 'just now';
+    const currentYear = String(payload.currentYear || workspaceState.holidaysYear || hubOrgYear());
     workspaceState.holidaysYear = currentYear;
     const yearOptions = Array.isArray(payload.yearOptions) && payload.yearOptions.length
       ? payload.yearOptions
-      : Array.from({ length: 5 }, function (_unused, index) { return String(new Date().getFullYear() - 1 + index); });
+      : Array.from({ length: 5 }, function (_unused, index) { return String(Number(hubOrgYear()) - 1 + index); });
     const yearSelect = yearOptions.map(function (year) {
       const value = String(year);
       return '<option value="' + escapeHtml(value) + '"' + (value === currentYear ? ' selected' : '') + '>' + escapeHtml(value) + '</option>';
@@ -6503,7 +6608,7 @@
     const yearSelect = document.getElementById('hubHolidayYear');
     if (yearSelect) {
       yearSelect.addEventListener('change', function () {
-        workspaceState.holidaysYear = String(yearSelect.value || new Date().getFullYear());
+        workspaceState.holidaysYear = String(yearSelect.value || hubOrgYear());
         loadWorkspaceSection('holidays');
       });
     }
@@ -6537,7 +6642,7 @@
     const modalEl = document.getElementById('hubHolidayModal');
     const form = document.getElementById('hubHolidayForm');
     if (!modalEl || !form) return;
-    const selectedYear = String(document.getElementById('hubHolidayYear')?.value || workspaceState.holidaysYear || new Date().getFullYear());
+    const selectedYear = String(document.getElementById('hubHolidayYear')?.value || workspaceState.holidaysYear || hubOrgYear());
     const fallbackDate = selectedYear + '-01-01';
     document.getElementById('hubHolidayModalTitle').textContent = row.id ? 'Edit Holiday' : 'Add Holiday';
     document.getElementById('hubHolidayId').value = row.id || '';
@@ -6810,7 +6915,7 @@
     if (key === 'timesheet-periods') appendTimesheetPeriodWorkspaceQuery(requestQuery);
     if (key === 'report-assignments') appendReportAssignmentWorkspaceQuery(requestQuery);
     if (key === 'report-instances') appendReportInstanceWorkspaceQuery(requestQuery);
-    if (key === 'holidays') requestQuery.set('year', workspaceState.holidaysYear || String(new Date().getFullYear()));
+    if (key === 'holidays') requestQuery.set('year', workspaceState.holidaysYear || hubOrgYear());
 
     workspaceState.currentSection = key;
     workspaceState.loading = true;
@@ -7108,7 +7213,7 @@
         },
         rows: [],
         total: 0,
-        currentYear: workspaceState.holidaysYear || String(new Date().getFullYear())
+        currentYear: workspaceState.holidaysYear || hubOrgYear()
       });
       return;
     }
@@ -7349,7 +7454,7 @@
     if (els.eyebrow) els.eyebrow.textContent = module ? module.sectionId : 'Directory';
     if (els.title) els.title.textContent = module ? module.label : 'School Master Hub';
     if (els.meta) {
-      const refreshed = result && result.refreshedAt ? new Date(result.refreshedAt).toLocaleString() : 'not loaded yet';
+      const refreshed = result && result.refreshedAt ? formatHubInstant(result.refreshedAt) : 'not loaded yet';
       els.meta.textContent = String(result && result.total != null ? result.total : 0) + ' matching records. Last refreshed: ' + refreshed + '.';
     }
   }

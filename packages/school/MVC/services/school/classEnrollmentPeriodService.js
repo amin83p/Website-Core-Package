@@ -5,10 +5,15 @@ const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyS
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const TERMINAL_STATUSES = new Set(['cancelled', 'archived', 'error']);
 const OPEN_STATUSES = new Set(['draft', 'planned', 'active']);
 const REENTRY_SOURCE_STATUSES = new Set(['completed', 'withdrawn', 'cancelled', 'archived']);
+
+function todayISO(orgToday = '', reqUser = null) {
+  return resolveOrgTodayFromContext({ orgToday, user: reqUser });
+}
 
 let dependencies = {
   repositories: schoolRepositories,
@@ -329,7 +334,8 @@ async function closePeriod(periodId, input = {}, requestingUser = null, options 
 
   await getClassOrThrow(existing.classId, options);
   const periodStart = requireDateOnly(existing.startDate, 'startDate');
-  const closeDate = normalizeDateOnly(input.endDate) || normalizeDateOnly(existing.endDate) || new Date().toISOString().slice(0, 10);
+  const fallbackToday = todayISO(options.orgToday);
+  const closeDate = normalizeDateOnly(input.endDate) || normalizeDateOnly(existing.endDate) || fallbackToday;
   if (closeDate < periodStart) throw new Error('close endDate cannot be before period startDate.');
 
   const nextStatus = normalizeStatus(
@@ -356,7 +362,8 @@ async function reopenViaNewPeriod(periodId, input = {}, requestingUser = null, o
     throw new Error('Re-entry requires a terminal enrollment period. Complete, withdraw, or cancel the current period first.');
   }
 
-  const desiredStartDate = normalizeDateOnly(input.startDate) || addDays(normalizeDateOnly(existing.endDate) || new Date().toISOString().slice(0, 10), 1);
+  const fallbackToday = todayISO(options.orgToday);
+  const desiredStartDate = normalizeDateOnly(input.startDate) || addDays(normalizeDateOnly(existing.endDate) || fallbackToday, 1);
 
   const created = await createPeriod({
     orgId: existing.orgId,

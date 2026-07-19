@@ -108,18 +108,36 @@
     vertical-align: middle;
   }
   .ts-date-label {
-    font-size: 0.78rem;
+    font-size: 1rem;
+    font-weight: 700;
     letter-spacing: 0.02em;
+    color: #212529;
   }
   .ts-day-name {
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 0.85rem;
+    font-weight: 500;
     line-height: 1.25;
     margin-top: 0.1rem;
+    color: #6c757d;
   }
   .ts-time-label {
     font-size: 0.95rem;
     font-weight: 500;
+  }
+  .ts-day-add-row > * {
+    border-top: 1px dashed rgba(13, 110, 253, 0.25) !important;
+    background-color: rgba(13, 110, 253, 0.03) !important;
+  }
+  .ts-comment-trigger {
+    min-height: 31px;
+    white-space: normal;
+    word-break: break-word;
+  }
+  .ts-comment-trigger:hover {
+    background-color: #f8f9fa !important;
+  }
+  #tsDepartmentTotals .table {
+    margin-bottom: 0;
   }
 </style>
 
@@ -214,7 +232,7 @@
                         <tbody>
                             <% reviewHistoryRows.slice().reverse().forEach((row) => { %>
                                 <tr>
-                                    <td class="ps-4 small text-muted"><%= row.at ? new Date(row.at).toLocaleString() : '-' %></td>
+                                    <td class="ps-4 small text-muted"><%= row.at ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.at) : row.at) : '-' %></td>
                                     <td><span class="badge bg-light text-dark border text-uppercase"><%= row.event || '-' %></span></td>
                                     <td class="small"><%= row.byName || row.by || '-' %></td>
                                     <td class="small text-muted"><%= row.statusBefore ? row.statusBefore + ' → ' + (row.statusAfter || '-') : (row.statusAfter || '-') %></td>
@@ -269,6 +287,7 @@
                         <tr>
                             <th class="ps-4" style="width: 140px;">Date</th>
                             <th>Class / Description</th>
+                            <th style="width: 160px;">Student Name</th>
                             <th>Time</th>
                             <th style="width: 120px;">Status</th>
                             <th>Comment</th>
@@ -280,12 +299,34 @@
                     </tbody>
                     <tfoot class="table-light border-top border-3">
                         <tr>
-                            <!-- FIX: keep total in Hours column, not Act column -->
-                            <td colspan="5" class="text-end fw-bold text-uppercase">Total Period Hours:</td>
+                            <td colspan="6" class="text-end fw-bold text-uppercase">Total Period Hours:</td>
                             <td class="text-end pe-4 fw-bold text-success fs-5" id="lbl_grandTotal">0.00</td>
                             <% if (!isEditorLocked) { %><td></td><% } %>
                         </tr>
                     </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4" id="tsDepartmentTotals">
+        <div class="card-header bg-light border-bottom py-3">
+            <div class="fw-bold"><i class="bi bi-diagram-3 me-2 text-primary"></i>Hours by Department</div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Department</th>
+                            <th class="text-end pe-4" style="width: 140px;">Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tsDepartmentTotalsBody">
+                        <tr>
+                            <td colspan="2" class="text-center text-muted py-3">No payable hours yet.</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -449,6 +490,22 @@
   </div>
 </div>
 
+<div class="modal" id="timesheetCommentModal" tabindex="-1" aria-hidden="true" data-bs-focus="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-chat-left-text me-2 text-primary"></i>Session Comment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="small text-muted mb-2" id="timesheetCommentContext"></div>
+        <textarea id="timesheetCommentInput" class="form-control" rows="5" maxlength="2000" placeholder="Add notes for this session row..."></textarea>
+        <div class="form-text mb-0">Your comment is saved automatically when you close this window.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="priorAdjustmentModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content border-0 shadow">
@@ -488,6 +545,8 @@
 <script>
     const P_START = "<%= period.startDate %>";
     const P_END = "<%= period.endDate %>";
+    const ORG_TIMEZONE = <%- JSON.stringify(typeof orgTimeZone !== 'undefined' ? orgTimeZone : '') %>;
+    const ORG_TODAY = <%- JSON.stringify(typeof orgToday !== 'undefined' ? orgToday : '') %>;
     const LIVE_SESSIONS = <%- JSON.stringify(liveSessions || []) %>;
     const HOLIDAYS = <%- JSON.stringify(holidays || []) %>;
     const TIMESHEET_ENTRIES = <%- JSON.stringify(timesheet.entries || []) %>;
@@ -862,16 +921,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getDatesInRange(startStr, endStr) {
         const dates = [];
-        let curr = new Date(startStr + 'T00:00:00');
-        const end = new Date(endStr + 'T00:00:00');
-        while (curr <= end) { dates.push(new Date(curr)); curr.setDate(curr.getDate() + 1); }
+        let curr = String(startStr || '').trim();
+        const end = String(endStr || '').trim();
+        while (curr && end && curr <= end) {
+            dates.push(curr);
+            const parts = curr.split('-').map((part) => Number(part));
+            if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) break;
+            const next = new Date(parts[0], parts[1] - 1, parts[2] + 1);
+            const year = next.getFullYear();
+            const month = String(next.getMonth() + 1).padStart(2, '0');
+            const day = String(next.getDate()).padStart(2, '0');
+            curr = `${year}-${month}-${day}`;
+        }
         return dates;
+    }
+
+    function formatTimesheetDateLabel(dateStr, options = { weekday: 'short', month: 'short', day: 'numeric' }) {
+        const token = String(dateStr || '').trim();
+        if (!token) return '';
+        if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatDateKey === 'function') {
+            return window.AppOrgDateTime.formatDateKey(token, options);
+        }
+        return token;
+    }
+
+    function dateKeyWeekday(dateStr) {
+        const parts = String(dateStr || '').split('-').map((part) => Number(part));
+        if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return { dayName: '', dayOfWeek: -1 };
+        const date = new Date(parts[0], parts[1] - 1, parts[2]);
+        return {
+            dayName: formatTimesheetDateLabel(dateStr, { weekday: 'long' }),
+            dayOfWeek: date.getDay()
+        };
     }
 
     const dates = getDatesInRange(P_START, P_END);
     const dateDayIndexMap = new Map();
-    dates.forEach((dObj, index) => {
-        dateDayIndexMap.set(dObj.toISOString().split('T')[0], index);
+    dates.forEach((dateStr, index) => {
+        dateDayIndexMap.set(dateStr, index);
     });
 
     function isWeekendDay(dayOfWeek) {
@@ -898,22 +985,158 @@ document.addEventListener('DOMContentLoaded', () => {
         return (hol && (hol.name || hol.title || hol.holidayName || hol.label)) || 'Holiday';
     }
 
-    function buildAddDayButton(dateStr) {
-        if (IS_READONLY) return '';
-        return `<button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold shadow-sm mt-2" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg"></i> Add</button>`;
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
-    function buildDateCellHtml(dateStr, dayName, isHoliday, hol, showAddButton) {
+    function buildCommentCellHtml(ses) {
+        const comment = String(ses?.comment || '').trim();
+        if (IS_READONLY || ses?.isPriorPeriodAdjustment === true) {
+            return `<span class="text-muted fst-italic">${escapeHtml(comment || '-')}</span>`;
+        }
+        const label = comment || 'Add comment...';
+        const toneClass = comment ? 'text-dark' : 'text-muted fst-italic';
+        return `<button type="button" class="btn btn-light btn-sm w-100 text-start ts-comment-trigger border shadow-sm ${toneClass}" data-sesid="${escapeHtml(ses.sessionId)}">${escapeHtml(label)}</button>`;
+    }
+
+    let timesheetCommentModal = null;
+    let activeCommentSessionId = '';
+
+    function updateCommentTriggerCell(sessionId, commentValue) {
+        const trigger = Array.from(tbody.querySelectorAll('.ts-comment-trigger'))
+            .find((el) => String(el.dataset.sesid || '') === String(sessionId || ''));
+        if (!trigger) return;
+        const comment = String(commentValue || '').trim();
+        trigger.textContent = comment || 'Add comment...';
+        trigger.classList.toggle('text-muted', !comment);
+        trigger.classList.toggle('fst-italic', !comment);
+        trigger.classList.toggle('text-dark', Boolean(comment));
+    }
+
+    function releaseStrayModalShell() {
+        if (document.querySelector('.modal.show')) return;
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+        document.querySelectorAll('body > .modal-backdrop').forEach((el) => el.remove());
+    }
+
+    function persistTimesheetCommentModal() {
+        if (!activeCommentSessionId) return;
+        const nextValue = String(document.getElementById('timesheetCommentInput')?.value || '').trim();
+        const entry = activeEntries.find((row) => String(row?.sessionId || '') === activeCommentSessionId);
+        if (entry) entry.comment = nextValue;
+        updateCommentTriggerCell(activeCommentSessionId, nextValue);
+        activeCommentSessionId = '';
+    }
+
+    window.openTimesheetCommentModal = function(sessionId) {
+        const entry = activeEntries.find((row) => String(row?.sessionId || '') === String(sessionId || ''));
+        if (!entry || IS_READONLY || entry.isPriorPeriodAdjustment === true) return;
+        const modalEl = document.getElementById('timesheetCommentModal');
+        const inputEl = document.getElementById('timesheetCommentInput');
+        if (!modalEl || !inputEl) return;
+        if (modalEl.classList.contains('show')) return;
+
+        activeCommentSessionId = String(sessionId || '').trim();
+        const contextEl = document.getElementById('timesheetCommentContext');
+        if (contextEl) {
+            const bits = [entry.className, entry.activityName, entry.date].map((value) => String(value || '').trim()).filter(Boolean);
+            contextEl.textContent = bits.join(' • ') || activeCommentSessionId;
+        }
+        inputEl.value = String(entry.comment || '');
+        if (!timesheetCommentModal && window.bootstrap) {
+            timesheetCommentModal = window.bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, focus: true });
+        }
+        if (timesheetCommentModal) timesheetCommentModal.show();
+        setTimeout(() => inputEl.focus(), 0);
+    };
+
+    const TABLE_COL_COUNT = IS_READONLY ? 7 : 8;
+
+    function buildMakeupOriginalSessionLabel(entry) {
+        const dateStr = String(entry?.makeupOriginalDate || '').trim();
+        const startTime = String(entry?.makeupOriginalStartTime || '').trim();
+        const endTime = String(entry?.makeupOriginalEndTime || '').trim();
+        const dateLabel = dateStr ? formatTimesheetDateLabel(dateStr) : '';
+        const timeLabel = startTime && endTime ? `${startTime} – ${endTime}` : (startTime || endTime || '');
+        if (dateLabel && timeLabel) return `For ${dateLabel} · ${timeLabel}`;
+        if (dateLabel) return `For ${dateLabel}`;
+        if (timeLabel) return `For ${timeLabel}`;
+        return 'For original session';
+    }
+
+    function buildMakeupSessionStatusHtml(entry) {
+        if (!entry?.isMakeupSession) return '';
+        const originalSessionId = String(entry?.makeupOriginalSessionId || '').trim();
+        const originalClassId = String(entry?.makeupOriginalClassId || '').trim();
+        const forLabel = buildMakeupOriginalSessionLabel(entry);
+        const badgeHtml = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"><i class="bi bi-arrow-return-left me-1"></i>Make-up</span>';
+        if (!originalSessionId || !originalClassId) {
+            return `<div class="d-flex flex-column gap-1 align-items-start">${badgeHtml}<span class="small text-muted">${escapeHtml(forLabel)}</span></div>`;
+        }
+        const href = `/school/classes/${encodeURIComponent(originalClassId)}/sessions/${encodeURIComponent(originalSessionId)}`;
+        const linkHtml = `<a href="${escapeHtml(href)}" class="small text-decoration-none" target="_blank" rel="noopener noreferrer" title="Open original session in Session Manager">${escapeHtml(forLabel)} <i class="bi bi-box-arrow-up-right"></i></a>`;
+        return `<div class="d-flex flex-column gap-1 align-items-start">${badgeHtml}${linkHtml}</div>`;
+    }
+
+    function buildDayAddRowHtml(dateStr, bgClass) {
+        if (IS_READONLY) return '';
+        return `<tr class="${bgClass} row-hover ts-day-add-row border-bottom border-2">
+            <td colspan="${TABLE_COL_COUNT}" class="p-2">
+                <button type="button" class="btn btn-outline-primary w-100 fw-semibold" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg me-1"></i> Add</button>
+            </td>
+        </tr>`;
+    }
+
+    function buildDateCellHtml(dateStr, dayName, isHoliday, hol) {
         const holidayLine = isHoliday
             ? `<div class="ts-holiday-label small text-danger fw-semibold mt-1"><i class="bi bi-balloon-fill me-1"></i>${holidayName(hol)}</div>`
             : '';
         const dayClass = isHoliday ? 'text-danger' : '';
-        const addBtn = showAddButton ? buildAddDayButton(dateStr) : '';
         return `
-            <div class="ts-date-label text-muted">${dateStr}</div>
+            <div class="ts-date-label">${formatTimesheetDateLabel(dateStr)}</div>
             <div class="ts-day-name ${dayClass}">${dayName}</div>
-            ${holidayLine}
-            ${addBtn}`;
+            ${holidayLine}`;
+    }
+
+    function buildStudentNameCellHtml(ses) {
+        const name = String(ses?.singleStudentName || '').trim();
+        if (!name) return '<span class="text-muted">—</span>';
+        return `<span class="fw-semibold">${name}</span>`;
+    }
+
+    function resolveDepartmentLabel(entry) {
+        return String(entry?.deliveryDepartmentName || entry?.deliveryDepartmentId || '').trim() || 'No Department';
+    }
+
+    function renderDepartmentTotals() {
+        const totalsBody = document.getElementById('tsDepartmentTotalsBody');
+        if (!totalsBody) return;
+        const buckets = new Map();
+        activeEntries.forEach((entry) => {
+            if (entry?.isDeleted) return;
+            const hrs = resolveEntryHours(entry);
+            if (!Number.isFinite(hrs) || hrs <= 0) return;
+            const dept = resolveDepartmentLabel(entry);
+            buckets.set(dept, Number((buckets.get(dept) || 0) + hrs));
+        });
+        const rows = Array.from(buckets.entries()).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+        if (!rows.length) {
+            totalsBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-3">No payable hours yet.</td></tr>';
+            return;
+        }
+        let total = 0;
+        const html = rows.map(([dept, hrs]) => {
+            total += hrs;
+            return `<tr><td class="ps-4">${dept}</td><td class="text-end pe-4 fw-semibold">${hrs.toFixed(2)}</td></tr>`;
+        }).join('');
+        totalsBody.innerHTML = `${html}<tr class="table-light"><td class="ps-4 fw-bold">Total</td><td class="text-end pe-4 fw-bold text-success">${total.toFixed(2)}</td></tr>`;
     }
 
     function renderTable() {
@@ -922,10 +1145,8 @@ document.addEventListener('DOMContentLoaded', () => {
         hasUncompletedSessions = Array.isArray(INCOMPLETE_SESSIONS) && INCOMPLETE_SESSIONS.length > 0;
         hasPendingApprovals = false;
 
-        dates.forEach((dObj) => {
-            const dateStr = dObj.toISOString().split('T')[0];
-            const dayName = dObj.toLocaleDateString('en-US', { weekday: 'long' });
-            const dayOfWeek = dObj.getDay();
+        dates.forEach((dateStr) => {
+            const { dayName, dayOfWeek } = dateKeyWeekday(dateStr);
 
             const hol = holidayMap.get(dateStr);
             const isHoliday = !!hol;
@@ -933,24 +1154,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const bgClass = resolveBgClass(isHoliday, isWeekend, dateStr);
 
             const dayEntries = activeEntries.filter(e => e.date === dateStr);
+            const dayRowSpan = Math.max(1, dayEntries.length) + (IS_READONLY ? 0 : 1);
 
             if (dayEntries.length === 0) {
-                const dateCell = buildDateCellHtml(dateStr, dayName, isHoliday, hol, !IS_READONLY);
+                const dateCell = buildDateCellHtml(dateStr, dayName, isHoliday, hol);
                 if (isHoliday) {
-                    tbody.innerHTML += `<tr class="${bgClass} row-hover border-bottom border-2">
-                        <td class="ps-4 align-middle border-end border-2">${dateCell}</td>
-                        <td colspan="4" class="align-middle text-danger fw-bold"><i class="bi bi-calendar-x-fill me-1"></i> Holiday: ${holidayName(hol)}</td>
+                    tbody.innerHTML += `<tr class="${bgClass} row-hover">
+                        <td class="ps-4 align-middle border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
+                        <td colspan="5" class="align-middle text-danger fw-bold"><i class="bi bi-calendar-x-fill me-1"></i> Holiday: ${holidayName(hol)}</td>
                         <td class="text-end align-middle fw-bold">0.00</td>
                         ${IS_READONLY ? '' : '<td></td>'}
                     </tr>`;
                 } else {
-                    tbody.innerHTML += `<tr class="${bgClass} row-hover border-bottom border-2">
-                        <td class="ps-4 align-middle border-end border-2">${dateCell}</td>
-                        <td colspan="4" class="text-muted fst-italic align-middle">No sessions logged.</td>
+                    tbody.innerHTML += `<tr class="${bgClass} row-hover">
+                        <td class="ps-4 align-middle border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
+                        <td colspan="5" class="text-muted fst-italic align-middle">No sessions logged.</td>
                         <td class="text-end align-middle fw-bold">0.00</td>
                         ${IS_READONLY ? '' : '<td></td>'}
                     </tr>`;
                 }
+                tbody.innerHTML += buildDayAddRowHtml(dateStr, bgClass);
             } else {
                 dayEntries.forEach((ses, sIdx) => {
                     const hrs = resolveEntryHours(ses);
@@ -965,14 +1188,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     const isPriorAdj = ses.isPriorPeriodAdjustment === true;
-                    const isLastEntry = sIdx === dayEntries.length - 1;
                     const rowClass = isPriorAdj
-                        ? `${bgClass} row-hover row-prior-adjustment${isLastEntry ? ' border-bottom border-2' : ''}`
-                        : `${bgClass} row-hover${isLastEntry ? ' border-bottom border-2' : ''}`;
+                        ? `${bgClass} row-hover row-prior-adjustment`
+                        : `${bgClass} row-hover`;
 
-                    const commentInput = (IS_READONLY || isPriorAdj)
-                        ? `<span class="text-muted fst-italic">${ses.comment || '-'}</span>`
-                        : `<input type="text" class="form-control form-control-sm ts-comment border-0 shadow-sm" data-sesid="${ses.sessionId}" placeholder="Notes..." value="${ses.comment || ''}" onchange="updateComment('${ses.sessionId}', this.value)">`;
+                    const commentInput = buildCommentCellHtml(ses);
 
                     let actBtns = '';
                     if (!IS_READONLY) {
@@ -992,8 +1212,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const actHtml = IS_READONLY ? '' : `<td class="text-center align-middle text-nowrap">${actBtns}</td>`;
                     const dateCell = sIdx === 0
-                        ? `<td class="ps-4 align-top border-end border-2" rowspan="${dayEntries.length}">
-                            ${buildDateCellHtml(dateStr, dayName, isHoliday, hol, !IS_READONLY)}
+                        ? `<td class="ps-4 align-top border-end border-2" rowspan="${dayRowSpan}">
+                            ${buildDateCellHtml(dateStr, dayName, isHoliday, hol)}
                            </td>`
                         : '';
 
@@ -1018,18 +1238,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         <tr class="${rowClass}">
                             ${dateCell}
                             <td><div class="fw-bold text-primary">${ses.className || ''}${payrollRoleBadge(ses.personRole)}</div>${classMeta}</td>
+                            <td>${buildStudentNameCellHtml(ses)}</td>
                             <td>${timeLabel}</td>
-                            <td>${statusBadge}</td>
+                            <td><div class="d-flex flex-column gap-1">${statusBadge}${buildMakeupSessionStatusHtml(ses)}</div></td>
                             <td>${commentInput}</td>
                             <td class="text-end fw-bold align-middle">${hoursDisplay}</td>
                             ${actHtml}
                         </tr>
                     `;
                 });
+                tbody.innerHTML += buildDayAddRowHtml(dateStr, bgClass);
             }
         });
 
         document.getElementById('lbl_grandTotal').innerText = grandTotalHours.toFixed(2);
+        renderDepartmentTotals();
 
         const btnSubmit = document.getElementById('btnSubmit');
         if (btnSubmit) {
@@ -1053,6 +1276,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (isEdited) document.getElementById('badge_manualEdit').classList.remove('d-none');
+    }
+
+    tbody.addEventListener('click', (event) => {
+        const trigger = event.target.closest('.ts-comment-trigger');
+        if (!trigger) return;
+        const sessionId = String(trigger.dataset.sesid || '').trim();
+        if (sessionId) openTimesheetCommentModal(sessionId);
+    });
+
+    const timesheetCommentModalEl = document.getElementById('timesheetCommentModal');
+    if (timesheetCommentModalEl) {
+        timesheetCommentModalEl.addEventListener('hide.bs.modal', persistTimesheetCommentModal);
+        timesheetCommentModalEl.addEventListener('hidden.bs.modal', releaseStrayModalShell);
     }
 
     window.updateComment = function(sesId, val) {
@@ -1501,6 +1737,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.isPriorPeriodAdjustment = true;
                 row.adjustmentMeta = e.adjustmentMeta || {};
             }
+            if (e.isMakeupSession === true) {
+                row.isMakeupSession = true;
+                if (e.makeupOriginalSessionId) row.makeupOriginalSessionId = e.makeupOriginalSessionId;
+                if (e.makeupOriginalClassId) row.makeupOriginalClassId = e.makeupOriginalClassId;
+                if (e.makeupOriginalDate) row.makeupOriginalDate = e.makeupOriginalDate;
+                if (e.makeupOriginalStartTime) row.makeupOriginalStartTime = e.makeupOriginalStartTime;
+                if (e.makeupOriginalEndTime) row.makeupOriginalEndTime = e.makeupOriginalEndTime;
+            }
             return row;
         });
 
@@ -1921,15 +2165,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function escapeHtml(value) {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
     function normalizeIncompleteStatusCode(value) {
         return String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
     }
@@ -1991,8 +2226,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return rows.map((row, index) => {
             const dateStr = row?.date || '';
             const dayName = dateStr
-                ? new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short' })
+                ? formatTimesheetDateLabel(dateStr, { weekday: 'long' })
                 : '';
+            const shortDateLabel = dateStr
+                ? formatTimesheetDateLabel(dateStr, { weekday: 'short', month: 'short', day: 'numeric' })
+                : '-';
             const timeLabel = row?.startTime && row?.endTime
                 ? `${row.startTime} - ${row.endTime}`
                 : 'Time not set';
@@ -2011,7 +2249,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return `
                 <tr class="${rowClass}">
                     <td class="ps-4 fw-semibold">
-                        <div>${escapeHtml(dateStr || '-')}</div>
+                        <div class="ts-date-label">${escapeHtml(shortDateLabel)}</div>
                         <div class="small text-muted">${escapeHtml(dayName)}</div>
                         ${holidayNote}
                     </td>

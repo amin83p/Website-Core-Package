@@ -11,6 +11,7 @@ const studentAcademicOverviewService = require('../../services/school/studentAca
 const studentEnrollmentDetailService = require('../../services/school/studentEnrollmentDetailService');
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
+const { formatInstantInTimezone } = requireCoreModule('MVC/utils/timezoneUtils');
 
 function getProgramSubject(program, subjectId) {
   return (Array.isArray(program?.subjects) ? program.subjects : []).find((subject) => idsEqual(subject.subjectId || '', subjectId || '')) || null;
@@ -77,7 +78,7 @@ function sendGuardedResponse(res, guardResult, duplicateMessage, duplicateStatus
   return false;
 }
 
-function enrichLedgerEntry(entry, maps) {
+function enrichLedgerEntry(entry, maps, orgTimeZone = 'UTC') {
   const student = maps.studentMap.get(String(entry.studentId || '')) || null;
   const person = student?.personId ? maps.personMap.get(String(student.personId || '')) : null;
   const program = maps.programMap.get(String(entry.programId || '')) || null;
@@ -91,7 +92,7 @@ function enrichLedgerEntry(entry, maps) {
     __termLabel: [String(term?.code || entry.termId || ''), String(term?.name || '')].filter(Boolean).join(' - '),
     __classLabel: [String(classItem?.code || entry.classId || ''), String(classItem?.title || classItem?.name || '')].filter(Boolean).join(' - '),
     __subjectLabel: [String(subject?.code || entry.subjectId || ''), String(subject?.title || subject?.name || '')].filter(Boolean).join(' - '),
-    __postedAtDisplay: entry.postedAt ? new Date(entry.postedAt).toLocaleString() : '-'
+    __postedAtDisplay: entry.postedAt ? formatInstantInTimezone(entry.postedAt, orgTimeZone) : '-'
   };
 }
 
@@ -151,7 +152,7 @@ exports.listLedger = async (req, res) => {
     };
 
     const filteredRows = entries
-      .map((entry) => enrichLedgerEntry(entry, maps))
+      .map((entry) => enrichLedgerEntry(entry, maps, req.orgTimeZone || req.user?.activeOrgTimeZone))
       .filter((entry) => {
         if (!matchesAny(entry.programId, filters.programIds)) return false;
         if (!matchesAny(entry.studentId, filters.studentIds)) return false;

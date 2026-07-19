@@ -2,6 +2,7 @@ const settingService = require('../settingService');
 const dataService = require('../dataService');
 const adminAuthorityService = require('../adminAuthorityService');
 const { toPublicId } = require('../../utils/idAdapter');
+const { resolveOrganizationTimezoneFromRow } = require('../../utils/timezoneUtils');
 
 const DEFAULT_LOOKBACK_DAYS = 7;
 const DEFAULT_MERGE_LIMIT = 1500;
@@ -125,23 +126,6 @@ function resolveDefaultTimezone() {
   return normalizeTimezoneToken(token, DEFAULT_ORG_TIMEZONE);
 }
 
-function resolveOrganizationTimezoneFromRow(row = {}) {
-  const candidates = [
-    row?.settings?.timeZone,
-    row?.settings?.timezone,
-    row?.timeZone,
-    row?.timezone,
-    row?.identity?.timeZone,
-    row?.identity?.timezone
-  ];
-  for (const candidate of candidates) {
-    const token = cleanText(candidate, 80);
-    if (!token) continue;
-    return normalizeTimezoneToken(token, resolveDefaultTimezone());
-  }
-  return resolveDefaultTimezone();
-}
-
 function resolveAllowedOrgTimezoneFromUser(requestUser = null, orgId = '') {
   const targetOrgId = toPublicId(orgId || '');
   const rows = Array.isArray(requestUser?.allowedOrgs) ? requestUser.allowedOrgs : [];
@@ -149,6 +133,9 @@ function resolveAllowedOrgTimezoneFromUser(requestUser = null, orgId = '') {
     const rowOrgId = toPublicId(row?.orgId || row?.id || '');
     if (!rowOrgId) continue;
     if (targetOrgId && rowOrgId !== targetOrgId) continue;
+    if (row?.timeZone) {
+      return normalizeTimezoneToken(row.timeZone, resolveDefaultTimezone());
+    }
     const token = resolveOrganizationTimezoneFromRow(row || {});
     if (token) return token;
   }
@@ -1337,6 +1324,12 @@ async function resolveTimelineTimezone(filters = {}, requestUser = null, lookups
   const fallback = resolveDefaultTimezone();
   const targetOrgFilterId = pickPrimaryId(filters.orgIds, filters.orgId, 120);
   const targetOrgId = resolveActiveOrgId(requestUser, targetOrgFilterId);
+  const activeOrgId = resolveActiveOrgId(requestUser, '');
+  const activeOrgTimeZone = cleanText(requestUser?.activeOrgTimeZone, 80);
+
+  if (activeOrgTimeZone && (!targetOrgId || (activeOrgId && targetOrgId === activeOrgId))) {
+    return normalizeTimezoneToken(activeOrgTimeZone, fallback);
+  }
 
   const fromAllowedOrg = resolveAllowedOrgTimezoneFromUser(requestUser, targetOrgId);
   if (fromAllowedOrg) return fromAllowedOrg;

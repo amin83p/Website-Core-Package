@@ -175,7 +175,9 @@ const TaskCommentModule = (() => {
 
     function createCommentHTML(c) {
         const isMine = (typeof currentUserId !== 'undefined' && String(c.userId) === String(currentUserId));
-        const dateStr = new Date(c.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const dateStr = (window.AppOrgDateTime && AppOrgDateTime.formatInstant)
+          ? AppOrgDateTime.formatInstant(c.timestamp, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
+          : new Date(c.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         
         let fileHtml = '';
         if (c.file) {

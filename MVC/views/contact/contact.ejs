@@ -581,8 +581,8 @@ trackForm?.addEventListener('submit', async (e) => {
     if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Lookup failed.');
 
 
-    const received = data.result?.receivedAt ? new Date(data.result.receivedAt).toLocaleString() : '-';
-    const updated = data.result?.lastUpdatedAt ? new Date(data.result.lastUpdatedAt).toLocaleString() : '-';
+    const received = data.result?.receivedAt ? ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(data.result.receivedAt) : new Date(data.result.receivedAt).toLocaleString()) : '-';
+    const updated = data.result?.lastUpdatedAt ? ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(data.result.lastUpdatedAt) : new Date(data.result.lastUpdatedAt).toLocaleString()) : '-';
     const note = (data.result?.userNote || '').trim();
 
     setTrackStatus(

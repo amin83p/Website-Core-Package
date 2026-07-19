@@ -264,7 +264,7 @@
               <div class="article-leading-icon"><i class="bi bi-file-earmark-text"></i></div>
               <div class="d-flex justify-content-between align-items-center mb-2">
                 <span class="badge bg-light text-dark border"><%= a.category || 'Uncategorized' %></span>
-                <span class="small text-muted">Updated: <%= new Date(a.updatedAt).toLocaleString() %></span>
+                <span class="small text-muted">Updated: <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(a.updatedAt) : new Date(a.updatedAt).toLocaleString() %></span>
               </div>
               <h5 class="fw-bold mb-2 article-title">
                 <a href="/help/article/<%= encodeURIComponent(a.slug) %>" class="text-decoration-none"><%= a.title %></a>

@@ -95,8 +95,7 @@
                 <% } %>
             </td>
             <td>
-                <%= hasPublishDate ? publishDate.toLocaleDateString() : '-' %>
-                <div class="text-muted x-small"><%= hasPublishDate ? publishDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '' %></div>
+                <%= hasPublishDate ? formatOrgDateTime(rawPublishDate) : '-' %>
             </td>
 
           <td class="text-end">

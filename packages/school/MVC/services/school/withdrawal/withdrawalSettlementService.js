@@ -1,6 +1,13 @@
 const { requireCoreModule } = require('../schoolCoreContracts');
 const schoolRepositories = require('../../../repositories/school');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
+
+function resolveSettlementDate(effectiveDate = '', reqUser = null) {
+  const explicit = String(effectiveDate || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(explicit)) return explicit;
+  return resolveOrgTodayFromContext({ orgToday: reqUser?.orgToday, user: reqUser });
+}
 
 function asIdArray(value) {
   return Array.from(new Set((Array.isArray(value) ? value : [])
@@ -161,7 +168,7 @@ async function settleRefundWithManualEntries({
   relatedTransactionIds,
   reqUser
 }) {
-  void reqUser;
+  const settlementDate = resolveSettlementDate(effectiveDate, reqUser);
   const withdrawalId = toPublicId(withdrawalRecord?.id || '');
   const targetOrgId = toPublicId(orgId || withdrawalRecord?.orgId || '');
   const existingSettlementIds = asIdArray(withdrawalRecord?.financialImpact?.refundTransactionIds);
@@ -229,7 +236,7 @@ async function settleRefundWithManualEntries({
     createPayload.push({
       orgId: targetOrgId,
       postedAt: new Date().toISOString(),
-      effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
+      effectiveDate: settlementDate,
       status: 'posted',
       transactionType: 'adjustment',
       source: {
@@ -257,7 +264,7 @@ async function settleRefundWithManualEntries({
     createPayload.push({
       orgId: targetOrgId,
       postedAt: new Date().toISOString(),
-      effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
+      effectiveDate: settlementDate,
       status: 'posted',
       transactionType: 'adjustment',
       source: {
@@ -308,6 +315,7 @@ async function settleRefundFromTransactions({
   classId = '',
   reqUser
 }) {
+  const settlementDate = resolveSettlementDate(effectiveDate, reqUser);
   const withdrawalId = toPublicId(withdrawalRecord?.id || '');
   const targetOrgId = toPublicId(orgId || withdrawalRecord?.orgId || '');
   const existingSettlementIds = asIdArray(withdrawalRecord?.financialImpact?.refundTransactionIds);
@@ -407,7 +415,7 @@ async function settleRefundFromTransactions({
       const created = await schoolRepositories.globalTransactions.create({
         orgId: targetOrgId,
         postedAt: new Date().toISOString(),
-        effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
+        effectiveDate: settlementDate,
         status: 'posted',
         transactionType: 'adjustment',
         source: {

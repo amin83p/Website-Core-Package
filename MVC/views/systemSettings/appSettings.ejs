@@ -63,6 +63,17 @@
   const endpointOptionsFromServer = (typeof publicMenuEndpointOptions !== 'undefined' && Array.isArray(publicMenuEndpointOptions)) ? publicMenuEndpointOptions : [];
   const endpointOptions = endpointOptionsFromServer.length ? endpointOptionsFromServer : fallbackEndpointOptions;
   const endpointOptionsJson = JSON.stringify(endpointOptions).replace(/</g, '\\u003c');
+  const tzOptions = (typeof timezoneOptions !== 'undefined' && Array.isArray(timezoneOptions)) ? timezoneOptions : [];
+  const savedDefaultTimezone = String(appSettings.defaultTimezone || appSettings.timezone || (typeof defaultTimezone !== 'undefined' ? defaultTimezone : 'UTC') || 'UTC').trim() || 'UTC';
+  const curatedTimezoneValues = tzOptions.map((row) => String(row?.value || '').trim()).filter(Boolean);
+  const defaultTimezoneSelectValue = curatedTimezoneValues.includes(savedDefaultTimezone) ? savedDefaultTimezone : '__custom__';
+  const defaultTimezoneCustomValue = defaultTimezoneSelectValue === '__custom__' ? savedDefaultTimezone : '';
+  const timezoneGroups = tzOptions.reduce((acc, row) => {
+    const group = String(row?.group || 'Other').trim() || 'Other';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(row);
+    return acc;
+  }, {});
 %>
 <div class="sections-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
@@ -585,6 +596,26 @@
         <div class="card-body p-4">
             
             <div class="mb-4">
+                <label class="form-label fw-bold">Default Timezone</label>
+                <select id="defaultTimezoneSelect" name="timeZone" class="form-select">
+                  <% Object.keys(timezoneGroups).forEach((groupName) => { %>
+                    <optgroup label="<%= groupName %>">
+                      <% timezoneGroups[groupName].forEach((row) => { %>
+                        <option value="<%= row.value %>" <%= defaultTimezoneSelectValue === row.value ? 'selected' : '' %>><%= row.label %></option>
+                      <% }) %>
+                    </optgroup>
+                  <% }) %>
+                  <option value="__custom__" <%= defaultTimezoneSelectValue === '__custom__' ? 'selected' : '' %>>Custom IANA timezone...</option>
+                </select>
+                <div class="form-text">System-wide fallback when an organization has no timezone configured.</div>
+            </div>
+
+            <div class="mb-4" id="defaultTimezoneCustomWrap" style="<%= defaultTimezoneSelectValue === '__custom__' ? '' : 'display:none;' %>">
+                <label class="form-label fw-bold" for="defaultTimezoneCustom">Custom IANA timezone</label>
+                <input id="defaultTimezoneCustom" name="timeZoneCustom" class="form-control font-monospace" placeholder="e.g. America/Edmonton" value="<%= defaultTimezoneCustomValue %>">
+            </div>
+
+            <div class="mb-4">
                 <label class="form-label fw-bold">Default Page Size</label>
                 <div class="input-group">
                     <input type="number" name="defaultPageSize" class="form-control" value="<%= settings.app.defaultPageSize %>" min="5" max="100">
@@ -1061,6 +1092,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   renderPublicMenuBuilder();
+
+  const defaultTimezoneSelect = document.getElementById('defaultTimezoneSelect');
+  const defaultTimezoneCustomWrap = document.getElementById('defaultTimezoneCustomWrap');
+  if (defaultTimezoneSelect && defaultTimezoneCustomWrap) {
+    defaultTimezoneSelect.addEventListener('change', () => {
+      defaultTimezoneCustomWrap.style.display = defaultTimezoneSelect.value === '__custom__' ? '' : 'none';
+    });
+  }
 
   const form = document.getElementById('appSettingsForm');
   if (form) {

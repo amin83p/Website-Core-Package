@@ -3,6 +3,7 @@ const schoolRepositories = require('../../repositories/school');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { evaluateSimpleFormula } = requireCoreModule('MVC/utils/simpleFormulaEvaluator');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const CACHE_TTL_MS = 60 * 1000;
 const statusCache = new Map();
@@ -50,8 +51,8 @@ function getVirtualHolidayDefinition() {
   };
 }
 
-function generateStatusId() {
-  const year = new Date().getFullYear();
+function generateStatusId(orgToday = '') {
+  const year = resolveOrgTodayFromContext({ orgToday }).slice(0, 4);
   const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
   return `SSS-${year}-${rand}`;
 }
@@ -281,6 +282,41 @@ function shouldExcludeFromStudentIndexByMap(statusMap, { status, notes = '' } = 
   return definition.excludeFromStudentIndex === true || definition.makeUpRequired === true;
 }
 
+function normalizeMakeupDurationPercent(value, fallback = 100) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return Math.max(1, Math.min(100, Math.round(Number(fallback) || 100)));
+  return Math.max(1, Math.min(100, Math.round(n)));
+}
+
+function resolveMakeupSchedulingContext(session = {}, definition = null) {
+  const scheduling = session?.makeupScheduling && typeof session.makeupScheduling === 'object'
+    ? session.makeupScheduling
+    : {};
+  const makeupPercent = normalizeMakeupDurationPercent(
+    scheduling.durationPercent ?? definition?.makeupDurationPercent,
+    definition?.makeupDurationPercent ?? 100
+  );
+  return { makeupPercent };
+}
+
+function calculateMakeupSessionDurationHours(originalDurationHours, makeupDurationPercent) {
+  const safeOriginal = Number(originalDurationHours);
+  if (!Number.isFinite(safeOriginal) || safeOriginal <= 0) return 0;
+  const percent = normalizeMakeupDurationPercent(makeupDurationPercent, 100);
+  return Number((safeOriginal * (percent / 100)).toFixed(4));
+}
+
+function addMinutesToClockTime(startTime, minutesToAdd) {
+  const start = String(startTime || '').trim();
+  if (!/^\d{2}:\d{2}$/.test(start)) return '';
+  const [h, m] = start.split(':').map(Number);
+  const totalMinutes = (h * 60) + m + Number(minutesToAdd || 0);
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+  const endH = Math.floor(totalMinutes / 60) % 24;
+  const endM = totalMinutes % 60;
+  return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+}
+
 function evaluateTimesheetFormula(formula, durationHours) {
   const duration = Number(durationHours);
   const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
@@ -292,23 +328,25 @@ function evaluateTimesheetFormula(formula, durationHours) {
   return Number(raw.toFixed(2));
 }
 
-function calculateTimesheetHoursByMap(statusMap, { status, notes = '', durationHours = 0 } = {}) {
+function calculateTimesheetHoursByMap(statusMap, { status, notes = '', durationHours = 0, session = null } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
   if (normalized === 'holiday') return 0;
+  const safeDuration = Number(durationHours);
+  const effectiveDuration = Number.isFinite(safeDuration) && safeDuration > 0 ? safeDuration : 0;
   const formula = String(definition?.timesheetFormula || getFallbackFormula(normalized));
   try {
-    return evaluateTimesheetFormula(formula, durationHours);
+    return evaluateTimesheetFormula(formula, effectiveDuration);
   } catch (_) {
-    return evaluateTimesheetFormula(getFallbackFormula(normalized), durationHours);
+    return evaluateTimesheetFormula(getFallbackFormula(normalized), effectiveDuration);
   }
 }
 
-async function calculateTimesheetHours({ orgId, status, notes = '', durationHours = 0 }) {
+async function calculateTimesheetHours({ orgId, status, notes = '', durationHours = 0, session = null }) {
   const normalized = normalizeSessionStatus(status, notes);
   if (normalized === 'holiday') return 0;
 
   const statusMap = await getStatusMap(orgId);
-  return calculateTimesheetHoursByMap(statusMap, { status: normalized, notes, durationHours });
+  return calculateTimesheetHoursByMap(statusMap, { status: normalized, notes, durationHours, session });
 }
 
 async function isFinalStatus({ orgId, status, notes = '' }) {
@@ -347,6 +385,7 @@ function buildClientStatusMeta(definitions) {
     timesheetFormula: String(row?.timesheetFormula || ''),
     isFinal: row?.isFinal === true,
     makeUpRequired: row?.makeUpRequired === true,
+    makeupDurationPercent: normalizeMakeupDurationPercent(row?.makeupDurationPercent, 100),
     excludeFromAttendance: row?.excludeFromAttendance === true,
     excludeFromTeacherIndex: row?.excludeFromTeacherIndex === true,
     excludeFromStudentIndex: row?.excludeFromStudentIndex === true,
@@ -385,6 +424,10 @@ module.exports = {
   calculateTimesheetHoursByMap,
   buildClientStatusMeta,
   calculateTimesheetHours,
+  normalizeMakeupDurationPercent,
+  resolveMakeupSchedulingContext,
+  calculateMakeupSessionDurationHours,
+  addMinutesToClockTime,
   isFinalStatus,
   shouldExcludeFromAttendance,
   shouldExcludeFromTeacherIndex,

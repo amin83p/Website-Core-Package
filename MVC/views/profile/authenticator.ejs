@@ -37,7 +37,7 @@
             <div class="fw-bold">Authenticator status</div>
             <div class="small text-muted" id="adminTotpStatusLabel">
               <% if (totpStatus.enabled) { %>
-                Enrolled<%= totpStatus.enrolledAt ? (' · ' + new Date(totpStatus.enrolledAt).toLocaleString()) : '' %>
+                Enrolled<%= totpStatus.enrolledAt ? (' · ' + (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(totpStatus.enrolledAt) : new Date(totpStatus.enrolledAt).toLocaleString())) : '' %>
               <% } else { %>
                 Not enrolled
               <% } %>
@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', function () {
       };
       if (statusLabel) {
         statusLabel.textContent = enabled
-          ? (`Enrolled${enrolledAt ? (' · ' + new Date(enrolledAt).toLocaleString()) : ''}`)
+          ? (`Enrolled${enrolledAt ? (' · ' + ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(enrolledAt) : new Date(enrolledAt).toLocaleString())) : ''}`)
           : 'Not enrolled';
       }
       if (regenLabel) {

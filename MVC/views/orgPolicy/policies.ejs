@@ -40,7 +40,7 @@
                 <span class="badge bg-danger"><%= p.bannedUsers.length %> User(s)</span>
              <% } else { %><span class="text-muted small">None</span><% } %>
           </td>
-          <td><%= p.audit?.lastUpdateDateTime ? new Date(p.audit.lastUpdateDateTime).toLocaleDateString() : '-' %></td>
+          <td><%= p.audit?.lastUpdateDateTime ? formatOrgDateTime(p.audit.lastUpdateDateTime) : '-' %></td>
           <td class="table-actions text-end pe-4">
             <div class="row-actions-wrap">
               <button

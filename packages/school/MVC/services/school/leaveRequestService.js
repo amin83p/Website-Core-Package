@@ -10,6 +10,7 @@ const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const ACTIVE_REVIEW_STATUSES = new Set(['submitted', 'pending_reapproval']);
@@ -413,7 +414,7 @@ async function listVisibleRequests(reqUser, filters = {}, accessContext = {}) {
   return Promise.all(sorted.map((row) => enrichLeaveRequestForDisplay(row, reqUser)));
 }
 
-async function buildCreatePayload(reqUser, input = {}) {
+async function buildCreatePayload(reqUser, input = {}, options = {}) {
   assertCreateAllowed(reqUser);
   const admin = isAdminViewer(reqUser);
   const ownPersonId = getRequesterPersonId(reqUser);
@@ -438,7 +439,10 @@ async function buildCreatePayload(reqUser, input = {}) {
     requesterName,
     requesterRole,
     status: 'submitted',
-    requestDate: cleanDate(input.requestDate) || new Date().toISOString().slice(0, 10),
+    requestDate: cleanDate(input.requestDate)
+      || cleanDate(options.orgToday)
+      || cleanDate(reqUser?.orgToday)
+      || resolveOrgTodayFromContext({ orgToday: options.orgToday || reqUser?.orgToday, user: reqUser }),
     audit: {
       createdBy: getActorId(reqUser),
       updatedBy: getActorId(reqUser)
@@ -455,8 +459,8 @@ async function buildCreatePayload(reqUser, input = {}) {
   };
 }
 
-async function createRequest(reqUser, input = {}) {
-  const payload = await buildCreatePayload(reqUser, input);
+async function createRequest(reqUser, input = {}, options = {}) {
+  const payload = await buildCreatePayload(reqUser, input, options);
   const created = await schoolRepositories.leaveRequests.create(payload, normalizeQueryScope(reqUser));
   await syncLeaveRequestTask('upsert', created, reqUser);
   return created;

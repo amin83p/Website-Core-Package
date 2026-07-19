@@ -50,7 +50,7 @@
         <% const deleteTargetId = groupInfo && groupInfo.id ? groupInfo.id : item.id; %>
         <tr>
           <td class="ps-4">
-            <div class="fw-bold text-dark"><%= item.dateTime ? new Date(item.dateTime).toLocaleString() : '-' %></div>
+            <div class="fw-bold text-dark"><%= item.dateTime ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(item.dateTime) : new Date(item.dateTime).toLocaleString()) : '-' %></div>
             <div class="x-small text-muted font-monospace"><%= item.id || '-' %></div>
             <% if (groupInfo && groupInfo.id) { %>
               <div class="x-small mt-1">

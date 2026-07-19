@@ -89,7 +89,7 @@
 
           <td>
             <% if (s.subscribedAt) { %>
-              <%= new Date(s.subscribedAt).toLocaleString() %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(s.subscribedAt) : new Date(s.subscribedAt).toLocaleString() %>
             <% } else { %>
               <span class="text-muted">—</span>
             <% } %>
@@ -97,7 +97,7 @@
 
           <td>
             <% if (audit.lastUpdateDateTime) { %>
-              <%= new Date(audit.lastUpdateDateTime).toLocaleString() %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.lastUpdateDateTime) : new Date(audit.lastUpdateDateTime).toLocaleString() %>
               <% if (audit.lastUpdateUser) { %>
                 <br><span class="text-muted small">by <%= audit.lastUpdateUser %></span>
               <% } %>

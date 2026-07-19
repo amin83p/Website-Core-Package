@@ -182,7 +182,7 @@
                 <% } %>
               </td>
               <td><%= f.size %></td>
-              <td><%= new Date(f.modified).toLocaleDateString() %></td>
+              <td><%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(f.modified, { month: 'short', day: 'numeric', year: 'numeric' }) : new Date(f.modified).toLocaleDateString() %></td>
               <td class="text-end">
                 <% if (!f.isDir) { %>
                 <button class="btn btn-sm btn-outline-secondary border-0 file-preview-trigger"
@@ -245,7 +245,7 @@
                     data-index="<%= idx %>"><%= f.name %></a>
                 <% } %>
                 <div class="small text-muted">
-                  <%= f.isDir ? 'Folder' : f.size %> - <%= new Date(f.modified).toLocaleString() %>
+                  <%= f.isDir ? 'Folder' : f.size %> - <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(f.modified) : new Date(f.modified).toLocaleString() %>
                 </div>
               </div>
             </div>
@@ -303,7 +303,7 @@
                 data-index="<%= idx %>"><%= f.name %></a>
             <% } %>
             <div class="small text-muted mt-1"><%= f.isDir ? '-' : f.size %></div>
-            <div class="small text-muted mb-3"><%= new Date(f.modified).toLocaleDateString() %></div>
+            <div class="small text-muted mb-3"><%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(f.modified, { month: 'short', day: 'numeric', year: 'numeric' }) : new Date(f.modified).toLocaleDateString() %></div>
             <div class="mt-auto d-flex gap-1">
               <% if (!f.isDir) { %>
                 <button class="btn btn-sm btn-outline-secondary file-preview-trigger"

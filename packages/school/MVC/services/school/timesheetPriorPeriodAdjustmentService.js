@@ -84,7 +84,8 @@ async function buildCurrentPayableIndex({ teacherId, periodStartDate, periodEndD
             const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                 status: sessionRow?.status,
                 notes: sessionRow?.notes,
-                durationHours: rawDurationHours
+                durationHours: rawDurationHours,
+                session: sessionRow
             });
             index.set(sessionId, {
                 sessionId,

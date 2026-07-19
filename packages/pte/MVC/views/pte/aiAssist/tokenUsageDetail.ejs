@@ -4,7 +4,7 @@
     : '/dashboard';
   const aiAssistDashboardHref = '/dashboard/section-nav/PTE_AI_ASSISST';
   const usage = record || {};
-  const consumedAtDisplay = usage.consumedAtDisplay || (usage.consumedAt ? new Date(usage.consumedAt).toLocaleString() : '-');
+  const consumedAtDisplay = usage.consumedAtDisplay || (usage.consumedAt ? formatOrgDateTime(usage.consumedAt) : '-');
   const status = String(usage.status || '').trim().toLowerCase();
   const statusClass = status === 'success' ? 'bg-success' : (status === 'failed' ? 'bg-danger' : 'bg-secondary');
 %>

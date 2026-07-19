@@ -231,7 +231,7 @@
                <div class="row">
                   <div class="col-md-6 mb-3">
                      <label class="form-label fw-bold">Admission Date *</label>
-                     <input type="date" name="enrollmentDate" class="form-control size-md" value="<%= s.enrollmentDate || new Date().toISOString().split('T')[0] %>" required>
+                     <input type="date" name="enrollmentDate" class="form-control size-md" value="<%= s.enrollmentDate || orgToday || new Date().toISOString().split('T')[0] %>" required>
                   </div>
                   <div class="col-md-6 mb-3">
                      <label class="form-label fw-bold">Global Academic Status</label>
@@ -953,7 +953,7 @@
   }
 
   function clearClbEditor() {
-    if (inpClbRecordedAt) inpClbRecordedAt.value = new Date().toISOString().slice(0, 10);
+    if (inpClbRecordedAt && window.AppOrgDateTime && AppOrgDateTime.today) inpClbRecordedAt.value = String(AppOrgDateTime.today);
     CLB_VALUE_GROUPS.forEach((group) => {
       CLB_SKILLS.forEach((skill) => {
         const input = getClbEditorInput(group, skill);

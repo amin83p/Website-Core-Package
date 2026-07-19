@@ -390,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<tr>
                 <td>${href ? `<a href="${attachmentEscape(href)}" target="_blank" rel="noopener"><i class="bi bi-paperclip me-1"></i>${label}</a>` : label}</td>
                 <td>${attachmentEscape(formatAttachmentSize(att?.size))}</td>
-                <td class="small text-muted">${attachmentEscape(att?.uploadedAt ? new Date(att.uploadedAt).toLocaleString() : '-')}</td>
+                <td class="small text-muted">${attachmentEscape(att?.uploadedAt ? ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(att.uploadedAt) : new Date(att.uploadedAt).toLocaleString()) : '-')}</td>
                 <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger btn-delete-subject-attachment" data-id="${attachmentEscape(att?.id || index)}"><i class="bi bi-trash"></i></button></td>
             </tr>`;
         }).join('');

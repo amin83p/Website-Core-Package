@@ -240,7 +240,7 @@
                 <span class="badge rounded-pill bg-light text-dark border"><%= item.attemptCount %></span>
             </td>
             <td class="text-end font-monospace small"><%= (item.volumeUsageKB || 0).toFixed(2) %> KB</td>
-            <td><div class="small"><%= new Date(item.startedAt || item.createdAt).toLocaleString() %></div></td>
+            <td><div class="small"><%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(item.startedAt || item.createdAt) : new Date(item.startedAt || item.createdAt).toLocaleString() %></div></td>
             <td class="table-actions text-end pe-4">
               <div class="row-actions-wrap">
                 <button
@@ -541,7 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const summary = event?.summary || {};
             const actor = event?.actor || {};
             const changes = Array.isArray(event?.changes) ? event.changes : [];
-            const eventAt = event?.at ? new Date(event.at).toLocaleString() : '-';
+            const eventAt = event?.at ? ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(event.at) : new Date(event.at).toLocaleString()) : '-';
             const actorName = actor.displayName || actor.username || actor.userId || '-';
 
             let changesHtml = '<div class="text-muted small fst-italic">No field-level changes captured.</div>';
@@ -609,7 +609,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const actor = event?.actor || {};
             const summary = event?.summary || {};
             const actorName = actor.displayName || actor.username || actor.userId || row?.userId || '-';
-            const atDisplay = row?.at ? new Date(row.at).toLocaleString() : '-';
+            const atDisplay = row?.at ? ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(row.at) : new Date(row.at).toLocaleString()) : '-';
             return `
               <div class="border-start ps-2 mb-2">
                 <div class="fw-semibold x-small">${escapeHtml(atDisplay)} - ${escapeHtml(actorName)}</div>

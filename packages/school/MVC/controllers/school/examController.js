@@ -4,6 +4,7 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromRequest } = requireCoreModule('MVC/utils/timezoneUtils');
 const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
@@ -592,7 +593,7 @@ async function resolveRosterStudentIdsByClass(classId, reqUser) {
 
   const classRow = await schoolDataService.getDataById('classes', normalizedClassId, reqUser);
   const activeOrgId = String(reqUser?.activeOrgId || classRow?.orgId || '').trim();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = resolveOrgTodayFromRequest({ orgToday: reqUser?.orgToday, user: reqUser, orgTimeZone: reqUser?.activeOrgTimeZone });
   const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
     classId: normalizedClassId,
     classItem: classRow,
@@ -601,7 +602,8 @@ async function resolveRosterStudentIdsByClass(classId, reqUser) {
     sessionDates: [today],
     startDate: today,
     endDate: today,
-    canonicalStatuses: ['active']
+    canonicalStatuses: ['active'],
+    orgToday: today
   });
   const studentIds = Array.from(
     enrollmentSnapshot?.studentIds instanceof Set

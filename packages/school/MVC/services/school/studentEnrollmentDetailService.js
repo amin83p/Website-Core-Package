@@ -6,6 +6,7 @@ const { buildGradesMatrixPayload } = require('../../controllers/school/gradesMat
 const { resolveRegistrationSource } = require('./studentAcademicOverviewService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const RELATED_LEDGER_ENTRY_LIMIT = 25;
 
@@ -26,8 +27,8 @@ function normalizeDateOnly(value) {
   return parsed.toISOString().slice(0, 10);
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+function todayISO(orgToday = '', reqUser = null) {
+  return resolveOrgTodayFromContext({ orgToday, user: reqUser });
 }
 
 function buildLinkedClassEnrollmentSnippet(period, classRow) {
@@ -128,10 +129,10 @@ function buildAttendanceHistoryFromMatrix(columns, cells) {
   return Array.from(bySession.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }
 
-async function loadRelatedLedgerEntries({ studentId, classId, startDate, endDate }) {
+async function loadRelatedLedgerEntries({ studentId, classId, startDate, endDate, orgToday = '' }) {
   const entries = await schoolRepositories.academicLedger.list({ query: {}, scope: { canViewAll: true } });
   const windowStart = normalizeDateOnly(startDate);
-  const windowEnd = normalizeDateOnly(endDate || todayISO());
+  const windowEnd = normalizeDateOnly(endDate || todayISO(orgToday));
   return (Array.isArray(entries) ? entries : [])
     .filter((entry) => idsEqual(entry?.studentId, studentId))
     .filter((entry) => !classId || idsEqual(entry?.classId, classId))
@@ -163,12 +164,13 @@ async function buildClassEnrollmentDetail({
   classRow,
   program,
   term,
-  registrationMeta
+  registrationMeta,
+  orgToday = ''
 }) {
   const personId = toPublicId(student?.personId);
   const classId = toPublicId(period?.classId);
   const startDate = String(period?.startDate || '').trim();
-  const endDate = String(period?.endDate || '').trim() || todayISO();
+  const endDate = String(period?.endDate || '').trim() || todayISO(orgToday);
 
   const [progressRows, relatedRecords] = await Promise.all([
     classEnrollmentPeriodProgressService.attachSessionProgressToEnrollmentPeriodRows(
@@ -181,7 +183,8 @@ async function buildClassEnrollmentDetail({
       studentId: student.id,
       classId,
       startDate,
-      endDate
+      endDate,
+      orgToday
     })
   ]);
   const progress = progressRows[0] || period;
@@ -306,6 +309,8 @@ async function buildEnrollmentDetail({ reqUser, activeOrgId, studentId, enrollme
     period.termId ? dataService.getDataById('terms', period.termId, reqUser) : null
   ]);
 
+  const orgToday = String(reqUser?.orgToday || '').trim();
+
   if (registrationMeta.registrationType === 'term_registration') {
     return buildTermRegistrationDetail({
       reqUser,
@@ -313,7 +318,8 @@ async function buildEnrollmentDetail({ reqUser, activeOrgId, studentId, enrollme
       student,
       period,
       classRow,
-      registrationMeta
+      registrationMeta,
+      orgToday
     });
   }
 
@@ -325,7 +331,8 @@ async function buildEnrollmentDetail({ reqUser, activeOrgId, studentId, enrollme
     classRow,
     program,
     term,
-    registrationMeta
+    registrationMeta,
+    orgToday
   });
 }
 

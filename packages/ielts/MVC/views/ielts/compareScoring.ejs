@@ -204,7 +204,7 @@ function truncateForCell(value, maxLen = 220) {
                                         <%= s.metadata?.sampleName || 'Unknown Sample' %>
                                     </div>
                                     <div class="compare-header-id"><%= String(s?.sessionId || s?.id || 'Unknown').substring(0, 8) %>...</div>
-                                    <div class="compare-header-time"><%= new Date(s.savedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) %></div>
+                                    <div class="compare-header-time"><%= formatOrgDateTime(s.savedAt) %></div>
                                     <% if (sessions.length > 2) { %>
                                         <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-column-btn mt-1" data-column-index="<%= i %>" title="Remove this sample from comparison"><i class="bi bi-x-lg"></i></button>
                                     <% } %>
@@ -599,7 +599,7 @@ function truncateForCell(value, maxLen = 220) {
                                     <%= s.metadata?.sampleName || 'Unknown Sample' %>
                                 </div>
                                 <div class="compare-header-id"><%= String(s?.sessionId || s?.id || 'Unknown').substring(0, 8) %>...</div>
-                                <div class="compare-header-time"><%= new Date(s.savedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) %></div>
+                                <div class="compare-header-time"><%= formatOrgDateTime(s.savedAt) %></div>
                                 <% if (sessions.length > 2) { %>
                                     <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-column-btn mt-1" data-column-index="<%= i %>" title="Remove this sample from comparison"><i class="bi bi-x-lg"></i></button>
                                 <% } %>
@@ -750,7 +750,7 @@ function truncateForCell(value, maxLen = 220) {
                                     <%= s.metadata?.sampleName || 'Unknown Sample' %>
                                 </div>
                                 <div class="compare-header-id"><%= String(s?.sessionId || s?.id || 'Unknown').substring(0, 8) %>...</div>
-                                <div class="compare-header-time"><%= new Date(s.savedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) %></div>
+                                <div class="compare-header-time"><%= formatOrgDateTime(s.savedAt) %></div>
                                 <% if (sessions.length > 2) { %>
                                     <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-column-btn mt-1" data-column-index="<%= i %>" title="Remove this sample from comparison"><i class="bi bi-x-lg"></i></button>
                                 <% } %>
@@ -1551,9 +1551,9 @@ function truncateForCell(value, maxLen = 220) {
         const id = String(item?.id || item?.sessionId || '').trim();
         const pipelineMode = normalizePipelineMode(item?.pipelineMode || item?.researchConfig?.pipelineMode || item?.metadata?.pipelineMode);
         const band = item?.overallBand ?? item?.steps?.step4grade?.response?.json?.data?.overallBand ?? '-';
-        const savedAt = item?.savedAt ? new Date(item.savedAt) : null;
-        const safeTime = savedAt && Number.isFinite(savedAt.getTime())
-            ? `${savedAt.toLocaleDateString()} ${savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+        const savedAt = item?.savedAt ? String(item.savedAt).trim() : '';
+        const safeTime = savedAt
+            ? ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(savedAt) : savedAt)
             : '-';
         return `
             <div class="d-flex flex-column gap-1">

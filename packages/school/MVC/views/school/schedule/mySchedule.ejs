@@ -281,6 +281,15 @@ document.addEventListener('DOMContentLoaded', () => {
         personName: String(<%- JSON.stringify(prefillPersonName || selfPersonName || '') %> || '').trim()
     };
 
+    const formatScheduleDateKey = (dateKey, options = {}) => {
+        const token = String(dateKey || '').trim();
+        if (!token) return '-';
+        if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatDateKey === 'function') {
+            return window.AppOrgDateTime.formatDateKey(token, options);
+        }
+        return token;
+    };
+
     const els = {
         personId: document.getElementById('ms_personId'),
         personName: document.getElementById('ms_personName'),
@@ -557,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         els.sessionsBody.innerHTML = rows.map((event) => {
-            const dateLabel = new Date(`${event.date}T00:00:00`).toLocaleDateString('en-US', {
+            const dateLabel = formatScheduleDateKey(event.date, {
                 weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
             });
             const url = String(event.detailsUrl || '').trim();

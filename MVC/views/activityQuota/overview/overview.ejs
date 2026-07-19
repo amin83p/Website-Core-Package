@@ -21,6 +21,9 @@
   function formatDateTime(value) {
     const token = String(value || '').trim();
     if (!token) return '-';
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatInstant === 'function') {
+      return window.AppOrgDateTime.formatInstant(token);
+    }
     const date = new Date(token);
     if (Number.isNaN(date.getTime())) return token;
     return date.toLocaleString();

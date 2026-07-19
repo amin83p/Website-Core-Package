@@ -3408,7 +3408,7 @@ function renderReport() {
 
   const metaLine = document.getElementById("reportMetaLine");
   if (metaLine) {
-    metaLine.textContent = `${sampleName ? sampleName + " • " : ""}${sampleId ? "ID: " + sampleId + " • " : ""}${savedAt ? "Saved: " + savedAt + " • " : ""}Total time: ${formatMs(totalMs())}`;
+    metaLine.textContent = `${sampleName ? sampleName + " • " : ""}${sampleId ? "ID: " + sampleId + " • " : ""}${savedAt ? "Saved: " + ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(savedAt) : savedAt) + " • " : ""}Total time: ${formatMs(totalMs())}`;
   }
   const examinerBand = parseBandScoreOrNull(
     SESSION_BUNDLE?.metadata?.examinerBandScore ??

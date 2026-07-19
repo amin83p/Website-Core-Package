@@ -61,7 +61,7 @@
           </td>
           <td>
             <% if (item.updatedAt) { %>
-              <%= new Date(item.updatedAt).toLocaleDateString() %>
+              <%= formatOrgDateTime(item.updatedAt) %>
             <% } else { %> — <% } %>
           </td>
           <td class="table-actions">

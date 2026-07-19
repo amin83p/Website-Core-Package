@@ -44,7 +44,7 @@
           <div class="mb-2"><strong>Operation ID:</strong> <code><%= article.operationId || 'DEFAULT' %></code></div>
           <div class="mb-2"><strong>Audience:</strong> <%= Array.isArray(article.audience) && article.audience.length ? article.audience.join(', ') : 'all' %></div>
           <div class="mb-2"><strong>Content Mode:</strong> <%= article.contentMode || 'richtext' %></div>
-          <div class="mb-2"><strong>Updated:</strong> <%= new Date(article.updatedAt).toLocaleString() %></div>
+          <div class="mb-2"><strong>Updated:</strong> <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(article.updatedAt) : new Date(article.updatedAt).toLocaleString() %></div>
           <% if (Array.isArray(article.tags) && article.tags.length > 0) { %>
             <div class="mb-1"><strong>Tags:</strong></div>
             <div>

@@ -37,7 +37,7 @@
         </div>
         <div class="col-md-4">
           <div class="small text-muted">Date/Time</div>
-          <div class="fw-bold"><%= row.dateTime ? new Date(row.dateTime).toLocaleString() : '-' %></div>
+          <div class="fw-bold"><%= row.dateTime ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.dateTime) : new Date(row.dateTime).toLocaleString()) : '-' %></div>
         </div>
         <div class="col-md-4">
           <div class="small text-muted">Status</div>

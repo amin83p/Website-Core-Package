@@ -164,6 +164,9 @@
   };
   const fmtDate = (value) => {
     if (!value) return '-';
+    if (window.AppOrgDateTime && typeof AppOrgDateTime.formatInstant === 'function') {
+      return AppOrgDateTime.formatInstant(value) || '-';
+    }
     const dt = new Date(value);
     if (Number.isNaN(dt.getTime())) return '-';
     return `${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;

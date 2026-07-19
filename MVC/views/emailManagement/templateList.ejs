@@ -118,7 +118,7 @@
           </td>
           <td>
             <% if (row.updatedAt) { %>
-              <%= new Date(row.updatedAt).toLocaleString() %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.updatedAt) : new Date(row.updatedAt).toLocaleString() %>
             <% } else { %>
               <span class="text-muted">-</span>
             <% } %>

@@ -86,7 +86,7 @@
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label fw-bold">Effective Date *</label>
-              <input type="date" id="effectiveDate" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>" required>
+              <input type="date" id="effectiveDate" class="form-control" value="<%= typeof orgToday !== 'undefined' && orgToday ? orgToday : '' %>" required>
             </div>
             <div class="col-md-4">
               <label class="form-label fw-bold">External Ref</label>

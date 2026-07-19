@@ -1107,7 +1107,7 @@
   }
 
   function getTodayIso() {
-    return new Date().toISOString().slice(0, 10);
+    return (window.AppOrgDateTime && AppOrgDateTime.today) ? String(AppOrgDateTime.today) : '';
   }
 
   function isExpiredDefinition(definitionLike) {

@@ -93,7 +93,7 @@
 
           <td>
              <% if (lastUpdateDateTime) { %>
-              <%= new Date(lastUpdateDateTime).toLocaleString() %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(lastUpdateDateTime) : new Date(lastUpdateDateTime).toLocaleString() %>
               <% if (lastUpdateUser) { %>
                 <br><span class="text-muted small">by <%= lastUpdateUser %></span>
               <% } %>

@@ -3,6 +3,7 @@ const dataService = require('../services/dataService');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
 const { Parser } = require('json2csv');
 const { toPublicId } = require('../utils/idAdapter');
+const { formatInstantInTimezone } = require('../utils/timezoneUtils');
 
 function cleanText(value, max = 220) {
   if (value === undefined || value === null) return '';
@@ -181,7 +182,7 @@ async function viewActivityLog(req, res) {
         sectionDisplay,
         operationName: operationInfo.name,
         operationDisplay,
-        formattedDate: new Date(log.timestamp).toLocaleString(),
+        formattedDate: formatInstantInTimezone(log.timestamp, req.orgTimeZone || req.user?.activeOrgTimeZone || 'UTC'),
         rateLimitGroup: log?.details?.rateLimitGroup || '',
         actorIdentity: identity
       };
@@ -241,13 +242,14 @@ async function exportActivityLog(req, res) {
     const operationMap = buildLookupMap(operations);
     const orgMap = buildLookupMap(organizations);
 
+    const exportTimeZone = req.orgTimeZone || req.user?.activeOrgTimeZone || 'UTC';
     const enrichedLogs = logs.map((log) => {
       const sectionInfo = resolveSectionInfo(log, sectionMap);
       const operationInfo = resolveOperationInfo(log, operationMap);
       const identity = resolveLogIdentity(log, userMap, orgMap);
 
       return {
-        Timestamp: new Date(log.timestamp).toLocaleString(),
+        Timestamp: formatInstantInTimezone(log.timestamp, exportTimeZone),
         User: identity.primary,
         User_ID: identity.userId || '',
         Username: identity.username || '',

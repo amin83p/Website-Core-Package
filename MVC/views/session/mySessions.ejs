@@ -66,7 +66,7 @@
              <span class="badge bg-light text-secondary border">Org #<%= sess.currentOrgId %></span>
           </td>
 
-          <td class="text-muted small pt-3"><%= new Date(sess.createdAt).toLocaleString() %></td>
+          <td class="text-muted small pt-3"><%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(sess.createdAt) : new Date(sess.createdAt).toLocaleString() %></td>
 
           <td class="pt-3">
              <% 
@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
             s.orgHistory.forEach(h => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="ps-3 text-muted">${new Date(h.enteredAt).toLocaleString()}</td>
+                    <td class="ps-3 text-muted">${(window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(h.enteredAt) : new Date(h.enteredAt).toLocaleString()}</td>
                     <td><span class="badge bg-light text-dark border">${h.action}</span></td>
                     <td class="font-monospace">#${h.orgId}</td>
                 `;

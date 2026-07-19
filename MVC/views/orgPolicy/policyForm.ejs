@@ -893,6 +893,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function formatDateTimeShort(value) {
       if (!value) return 'Any';
+      if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatInstant === 'function') {
+          return window.AppOrgDateTime.formatInstant(value);
+      }
       const dt = new Date(value);
       if (Number.isNaN(dt.getTime())) return 'Any';
       return dt.toLocaleString();
@@ -1407,7 +1410,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const userName = escapeHtml(row.userName || row.userId || '');
         const userId = escapeHtml(row.userId || '');
         const reason = escapeHtml(row.reason || '');
-        const dateText = row.dateBanned ? escapeHtml(new Date(row.dateBanned).toLocaleDateString()) : 'N/A';
+        const dateText = row.dateBanned
+          ? escapeHtml((window.AppOrgDateTime && AppOrgDateTime.formatInstant)
+            ? AppOrgDateTime.formatInstant(row.dateBanned, { month: 'short', day: 'numeric', year: 'numeric' })
+            : new Date(row.dateBanned).toLocaleDateString())
+          : 'N/A';
         return `<tr>
           <td>${userName}<div class="small text-muted">${userId}</div></td>
           <td><input type="text" class="form-control form-control-sm ban-reason-input" data-idx="${idx}" value="${reason}"></td>

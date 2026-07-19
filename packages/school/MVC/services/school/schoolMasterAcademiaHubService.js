@@ -13,6 +13,7 @@ const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseM
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const { buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const accessService = requireCoreModule('MVC/services/security');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
@@ -782,18 +783,21 @@ function sortActivityRows(rows) {
   });
 }
 
-function resolveHolidayYear(value) {
+function resolveHolidayYear(value, orgToday = '') {
   const candidate = normalizeText(value);
-  return /^\d{4}$/.test(candidate) ? candidate : String(new Date().getFullYear());
+  if (/^\d{4}$/.test(candidate)) return candidate;
+  const today = String(orgToday || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(today)) return today.slice(0, 4);
+  return resolveOrgTodayFromContext({ orgToday }).slice(0, 4);
 }
 
-function buildHolidayYearOptions(selectedYear) {
-  const selected = Number(resolveHolidayYear(selectedYear));
+function buildHolidayYearOptions(selectedYear, orgToday = '') {
+  const selected = Number(resolveHolidayYear(selectedYear, orgToday));
   const years = new Set();
   for (let year = selected - 2; year <= selected + 3; year += 1) {
     years.add(String(year));
   }
-  years.add(String(new Date().getFullYear()));
+  years.add(String(resolveHolidayYear('', orgToday)));
   return Array.from(years).sort();
 }
 
@@ -1591,7 +1595,8 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       error.statusCode = 403;
       throw error;
     }
-    const targetYear = resolveHolidayYear(queryInput?.year || query.year);
+    const orgToday = String(req?.orgToday || req?.user?.orgToday || '').trim();
+    const targetYear = resolveHolidayYear(queryInput?.year || query.year, orgToday);
     const fetchQuery = {
       ...query,
       searchFields: query.searchFields || 'id,date,title,type,notes,orgId'
@@ -1614,7 +1619,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       rows: normalizedRows,
       total: normalizedRows.length,
       currentYear: targetYear,
-      yearOptions: buildHolidayYearOptions(targetYear),
+      yearOptions: buildHolidayYearOptions(targetYear, orgToday),
       searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()
     };

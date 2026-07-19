@@ -301,7 +301,10 @@
     const leaveRangeNextMonth = document.getElementById('leaveRangeNextMonth');
     const wasApproved = form?.dataset?.approvedRequest === 'true';
     const initial = form ? new FormData(form) : null;
-    let leaveRangeAnchor = new Date();
+    const orgTodayYmd = (window.AppOrgDateTime && AppOrgDateTime.today) ? String(AppOrgDateTime.today) : '<%= typeof orgToday === "string" ? orgToday : "" %>';
+    let leaveRangeAnchor = (orgTodayYmd && window.AppOrgDateTime && typeof AppOrgDateTime.dateKeyToDate === 'function')
+      ? (AppOrgDateTime.dateKeyToDate(orgTodayYmd) || new Date())
+      : new Date();
     let leaveRangeSelectingEnd = false;
 
     function escapeHtml(value) {
@@ -494,7 +497,12 @@
       if (!leaveRangeCalendarGrid) return;
       leaveRangeAnchor = anchorDate instanceof Date && !Number.isNaN(anchorDate.getTime())
         ? new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1)
-        : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        : (() => {
+            const orgAnchor = (orgTodayYmd && window.AppOrgDateTime && AppOrgDateTime.dateKeyToDate)
+              ? AppOrgDateTime.dateKeyToDate(orgTodayYmd)
+              : new Date();
+            return new Date(orgAnchor.getFullYear(), orgAnchor.getMonth(), 1);
+          })();
 
       const year = leaveRangeAnchor.getFullYear();
       const month = leaveRangeAnchor.getMonth();
@@ -505,7 +513,7 @@
       const firstOfMonth = new Date(year, month, 1);
       const startOffset = firstOfMonth.getDay();
       const gridStart = new Date(year, month, 1 - startOffset);
-      const todayYmd = toYmd(new Date());
+      const todayYmd = orgTodayYmd || toYmd(new Date());
       leaveRangeCalendarGrid.innerHTML = '';
 
       for (let i = 0; i < 42; i += 1) {

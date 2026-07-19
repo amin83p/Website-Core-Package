@@ -1,6 +1,7 @@
 const dataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromRequest } = requireCoreModule('MVC/utils/timezoneUtils');
 const { createTransactionContext } = requireCoreModule('MVC/services/transactionContextService');
 
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
@@ -358,6 +359,7 @@ async function renderBatchRegistrationPage(req, res, viewName, pageTitle) {
       title: pageTitle,
       programs,
       canManageRegistrations,
+      orgToday: req.orgToday || req.user?.orgToday || '',
       user: req.user,
       includeModal: true,
       actionStateId: req.actionStateId
@@ -482,7 +484,7 @@ exports.applyBatchRegistration = async (req, res) => {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     const programId = String(req.body.programId || '').trim();
     const studentIds = asIdArray(parseJsonSafe(req.body.studentIds, []));
-    const registrationDate = String(req.body.effectiveDate || '').trim() || new Date().toISOString().slice(0, 10);
+    const registrationDate = String(req.body.effectiveDate || '').trim() || resolveOrgTodayFromRequest(req);
     const note = String(req.body.note || '').trim();
     if (!programId) throw new Error('Program is required.');
     if (!studentIds.length) throw new Error('Select at least one student.');
@@ -1136,7 +1138,7 @@ exports.previewStatusTransition = async (req, res) => {
       effectiveDate: req.body?.effectiveDate,
       reason: req.body?.reason,
       orgId: getActiveOrgIdOrThrow(req.user)
-    }, { requestingUser: req.user });
+    }, { requestingUser: req.user, orgToday: resolveOrgTodayFromRequest(req) });
     return res.status(preview.canApply ? 200 : 409).json({
       status: preview.canApply ? 'success' : 'blocked',
       message: preview.canApply
@@ -1158,7 +1160,7 @@ exports.applyStatusTransition = async (req, res) => {
       effectiveDate: req.body?.effectiveDate,
       reason: req.body?.reason,
       orgId: getActiveOrgIdOrThrow(req.user)
-    }, { requestingUser: req.user });
+    }, { requestingUser: req.user, orgToday: resolveOrgTodayFromRequest(req) });
     return res.json({ status: 'success', message: `Registration changed to ${result.targetStatus}.`, result });
   } catch (error) {
     return res.status(error.preview?.blockers?.length ? 409 : 400).json({

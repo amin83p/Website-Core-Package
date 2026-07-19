@@ -2066,7 +2066,7 @@ num(value) <= 95</code></pre>
         await showReportModal({ title: 'No Keys Found', icon: 'warning', message: 'No template keys are available to export yet. Add fields first.' });
         return;
       }
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = (window.AppOrgDateTime && AppOrgDateTime.today) ? String(AppOrgDateTime.today) : '';
       if (format === 'csv') {
         const header = ['key', 'label', 'docxToken', 'docxShortcut', 'fieldId', 'prefillKey'];
         const csvLines = [header.join(',')];

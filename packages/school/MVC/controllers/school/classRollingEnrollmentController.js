@@ -55,6 +55,7 @@ const {
     assertOrgAccess
 } = requireCoreModule('MVC/utils/orgContextUtils');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
@@ -209,8 +210,8 @@ function isSchoolRequestAdmin(reqUser, sectionId, operationId = OPERATIONS.READ_
  * Rolling enrollment periods that have ended (or are closed) but have no Pass/Continue/Withdraw decision yet.
  * Excludes draft/planned/cancelled/archived/error rows.
  */
-function periodNeedsCompletionDecision(period) {
-    const today = new Date().toISOString().slice(0, 10);
+function periodNeedsCompletionDecision(period, today = '') {
+    const day = String(today || '').trim() || resolveOrgTodayFromContext({ orgToday: today });
     const d = String(period.completionDecision || '').trim().toLowerCase();
     if (d === 'pass' || d === 'continue' || d === 'withdraw') return false;
     const status = String(period.status || '').trim().toLowerCase();
@@ -929,10 +930,10 @@ function normalizeDateOnlyValue(value) {
     return parsed.toISOString().slice(0, 10);
 }
 
-function isActivePeriodOnDate(row, referenceDate = '') {
+function isActivePeriodOnDate(row, referenceDate = '', orgToday = '') {
     const status = String(row?.status || '').trim().toLowerCase();
     if (!['active', 'planned'].includes(status)) return false;
-    const day = normalizeDateOnlyValue(referenceDate) || new Date().toISOString().slice(0, 10);
+    const day = normalizeDateOnlyValue(referenceDate) || normalizeDateOnlyValue(orgToday) || resolveOrgTodayFromContext({ orgToday });
     const start = normalizeDateOnlyValue(row?.startDate);
     const end = normalizeDateOnlyValue(row?.endDate);
     // For session/attendance visibility we require period start <= reference day
@@ -1061,11 +1062,11 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
     };
 }
 
-async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = []) {
+async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = [], orgToday = '') {
     const idSet = new Set((Array.isArray(classIds) ? classIds : []).map((id) => toPublicId(id)).filter(Boolean));
     const rows = await schoolDataService.getAccessibleClassEnrollmentPeriods(reqUser);
     const periodRows = Array.isArray(rows) ? rows : [];
-    const today = new Date().toISOString().slice(0, 10);
+    const today = String(orgToday || '').trim() || resolveOrgTodayFromContext({ orgToday: today });
     const map = new Map();
 
     periodRows.forEach((row) => {
@@ -1305,6 +1306,7 @@ async function showRollingEnrollmentPage(req, res) {
       includeModal_Table: true,
       print: true,
       filters: req.query,
+      orgToday: resolveOrgTodayFromRequest(req),
       user: req.user,
       actionStateId: req.actionStateId
     });
@@ -1724,7 +1726,7 @@ async function buildRollingEnrollmentPrerequisitePreview(req, classData, student
       warnings: []
     };
   }
-  const effectiveDate = String(startDate || '').trim() || new Date().toISOString().slice(0, 10);
+  const effectiveDate = String(startDate || '').trim() || resolveOrgTodayFromRequest(req);
 
   const program = await schoolDataService.getDataById('programs', pid, req.user);
   if (!program) {
@@ -1821,7 +1823,7 @@ async function previewRollingEnrollmentEligibility(req, res) {
       throw new Error('Student organization does not match the class organization.');
     }
 
-    const effectiveStart = startDate || new Date().toISOString().slice(0, 10);
+    const effectiveStart = startDate || resolveOrgTodayFromRequest(req);
     let merged;
     try {
       merged = await resolveRollingEnrollmentProgramFromStudentRegistrations(req, classData, student, {
@@ -2189,7 +2191,8 @@ async function buildStudentWindowsForGapConflictReview({
   enrollingStudentId = '',
   enrollmentStartDate = '',
   enrollmentEndDate = '',
-  reqUser
+  reqUser,
+  orgToday = ''
 } = {}) {
   const classId = toPublicId(classData?.id);
   const activeOrgId = String(classData?.orgId || reqUser?.activeOrgId || '').trim();
@@ -2226,7 +2229,7 @@ async function buildStudentWindowsForGapConflictReview({
 
   const windowBounds = (() => {
     if (!sessionDates.length) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = String(orgToday || '').trim() || resolveOrgTodayFromContext({ orgToday: today });
       return { start: today, end: today };
     }
     const sorted = sessionDates.slice().sort();
@@ -2331,7 +2334,8 @@ async function postEnrollmentGapConflictReview(req, res) {
       enrollingStudentId,
       enrollmentStartDate,
       enrollmentEndDate,
-      reqUser: req.user
+      reqUser: req.user,
+      orgToday: resolveOrgTodayFromRequest(req)
     });
 
     const review = sessionConflictDetectionService.buildEnrollmentGapConflictReview({
@@ -3595,7 +3599,7 @@ async function createClassEnrollmentPeriod(req, res) {
     }
     await applyRollingEnrollmentResolutionFromRegistrations(req, classData, studentRow);
     const enrollmentPayload = buildClassEnrollmentCreatePayloadFromRequest(classData, req);
-    const effDate = String(enrollmentPayload.startDate || '').trim() || new Date().toISOString().slice(0, 10);
+    const effDate = String(enrollmentPayload.startDate || '').trim() || resolveOrgTodayFromRequest(req);
     await assertRollingEnrollmentPrerequisitesOrThrow(req, classData, studentRow, req.body?.programId, req.body?.termId, effDate);
     await assertEnrollmentSessionAlignmentForCreate({ classData, body: req.body, reqUser: req.user });
 
@@ -3689,7 +3693,7 @@ async function reopenClassEnrollmentPeriod(req, res) {
       reasonEnd: String(req.body?.reasonEnd || '').trim(),
       closeReason: String(req.body?.closeReason || '').trim(),
       allowOverlap: parseBoolean(req.body?.allowOverlap, false)
-    }, req.user);
+    }, req.user, { orgToday: resolveOrgTodayFromRequest(req) });
 
     const newPeriod = result?.newPeriod || null;
     const newPeriodId = toPublicId(newPeriod?.id || '');
@@ -4002,7 +4006,7 @@ async function showEnrollmentOutcomesPage(req, res) {
         });
 
         const pendingRows = (Array.isArray(periods) ? periods : [])
-            .filter(periodNeedsCompletionDecision)
+            .filter((period) => periodNeedsCompletionDecision(period, resolveOrgTodayFromRequest(req)))
             .map((p) => {
                 const sid = String(p.studentId || '');
                 const pid = String(studentToPerson.get(sid) || '');
@@ -4080,7 +4084,7 @@ async function previewClassEnrollmentStatusTransition(req, res) {
       effectiveDate: req.body?.effectiveDate,
       reason: req.body?.reason,
       orgId: getActiveOrgIdOrThrow(req.user)
-    }, { requestingUser: req.user });
+    }, { requestingUser: req.user, orgToday: resolveOrgTodayFromRequest(req) });
     return res.status(preview.canApply ? 200 : 409).json({
       status: preview.canApply ? 'success' : 'blocked',
       message: preview.canApply
@@ -4106,7 +4110,7 @@ async function applyClassEnrollmentStatusTransition(req, res) {
       effectiveDate: req.body?.effectiveDate,
       reason: req.body?.reason,
       orgId: getActiveOrgIdOrThrow(req.user)
-    }, { requestingUser: req.user });
+    }, { requestingUser: req.user, orgToday: resolveOrgTodayFromRequest(req) });
     return res.json({ status: 'success', message: `Enrollment changed to ${result.targetStatus}.`, result });
   } catch (error) {
     return res.status(error.preview?.blockers?.length ? 409 : 400).json({

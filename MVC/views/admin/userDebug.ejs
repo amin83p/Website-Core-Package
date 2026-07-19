@@ -68,7 +68,7 @@
               </li>
               <li class="list-group-item d-flex justify-content-between px-0">
                 <span class="text-muted">Last Login At:</span>
-                <span class="font-monospace"><%= user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'N/A' %></span>
+                <span class="font-monospace"><%= user.lastLoginAt ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(user.lastLoginAt) : new Date(user.lastLoginAt).toLocaleString()) : 'N/A' %></span>
               </li>
             </ul>
           </div>
@@ -89,7 +89,7 @@
                 </li>
                 <li class="list-group-item d-flex justify-content-between px-0">
                   <span class="text-muted">Created On:</span>
-                  <span class="font-monospace"><%= user.audit.createDateTime ? new Date(user.audit.createDateTime).toLocaleString() : 'N/A' %></span>
+                  <span class="font-monospace"><%= user.audit.createDateTime ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(user.audit.createDateTime) : new Date(user.audit.createDateTime).toLocaleString()) : 'N/A' %></span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between px-0">
                   <span class="text-muted">Last Updated By:</span>
@@ -97,7 +97,7 @@
                 </li>
                 <li class="list-group-item d-flex justify-content-between px-0">
                   <span class="text-muted">Last Updated On:</span>
-                  <span class="font-monospace"><%= user.audit.lastUpdateDateTime ? new Date(user.audit.lastUpdateDateTime).toLocaleString() : 'N/A' %></span>
+                  <span class="font-monospace"><%= user.audit.lastUpdateDateTime ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(user.audit.lastUpdateDateTime) : new Date(user.audit.lastUpdateDateTime).toLocaleString()) : 'N/A' %></span>
                 </li>
               </ul>
             <% } else { %>

@@ -164,6 +164,7 @@ async function showNewWithdrawalWizard(req, res) {
     res.render('school/withdrawal/wizard', {
       title: 'New Withdrawal',
       reasons: withdrawalPolicyService.getWithdrawalReasons(),
+      orgToday: req.orgToday || req.user?.orgToday || '',
       actionStateId: req.actionStateId,
       user: req.user
     });

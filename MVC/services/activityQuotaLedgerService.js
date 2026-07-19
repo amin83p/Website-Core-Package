@@ -6,6 +6,7 @@ const quotaBalanceSnapshotRepository = require('../repositories/quotaBalanceSnap
 const dataService = require('./dataService');
 const settingService = require('./settingService');
 const { toPublicId } = require('../utils/idAdapter');
+const { resolveOrganizationTimezoneFromRow, getDateKeyInTimezone } = require('../utils/timezoneUtils');
 
 const METRIC_FIELDS = Object.freeze(['call', 'amount', 'token', 'volume']);
 const ENTRY_TYPES = Object.freeze(['credit', 'consumption', 'adjustment']);
@@ -406,42 +407,7 @@ async function withQuotaKeyLock(key, task) {
 }
 
 function getDateKeyInTimeZone(isoDateTime = '', timeZone = DEFAULT_ORG_TIMEZONE) {
-  const date = isoDateTime ? new Date(isoDateTime) : new Date();
-  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: normalizeTimezoneToken(timeZone, DEFAULT_ORG_TIMEZONE),
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).formatToParts(date);
-    const year = parts.find((part) => part.type === 'year')?.value || '1970';
-    const month = parts.find((part) => part.type === 'month')?.value || '01';
-    const day = parts.find((part) => part.type === 'day')?.value || '01';
-    return `${year}-${month}-${day}`;
-  } catch (_) {
-    return date.toISOString().slice(0, 10);
-  }
-}
-
-function resolveOrganizationTimezoneFromRow(row = {}) {
-  const candidates = [
-    row?.settings?.timeZone,
-    row?.settings?.timezone,
-    row?.timeZone,
-    row?.timezone,
-    row?.identity?.timeZone,
-    row?.identity?.timezone
-  ];
-  for (const candidate of candidates) {
-    const token = cleanString(candidate, { max: 80, allowEmpty: true });
-    if (!token) continue;
-    return normalizeTimezoneToken(token, DEFAULT_ORG_TIMEZONE);
-  }
-  return normalizeTimezoneToken(
-    resolveDefaultTimezone(),
-    DEFAULT_ORG_TIMEZONE
-  );
+  return getDateKeyInTimezone(isoDateTime, normalizeTimezoneToken(timeZone, DEFAULT_ORG_TIMEZONE));
 }
 
 async function resolveOrgTimezone(orgId = '', options = {}) {
@@ -450,6 +416,20 @@ async function resolveOrgTimezone(orgId = '', options = {}) {
     resolveDefaultTimezone(),
     DEFAULT_ORG_TIMEZONE
   );
+  const requestUser = options?.requestUser;
+
+  if (requestUser) {
+    const activeOrgId = resolveActiveOrgId(requestUser, orgToken);
+    if (orgToken && activeOrgId === orgToken && requestUser.activeOrgTimeZone) {
+      return normalizeTimezoneToken(requestUser.activeOrgTimeZone, fallback);
+    }
+    const allowedOrgs = Array.isArray(requestUser.allowedOrgs) ? requestUser.allowedOrgs : [];
+    const matchedOrg = allowedOrgs.find((row) => toPublicId(row?.orgId || row?.id || '') === orgToken);
+    if (matchedOrg?.timeZone) {
+      return normalizeTimezoneToken(matchedOrg.timeZone, fallback);
+    }
+  }
+
   if (!orgToken) return fallback;
 
   const cacheRow = ORG_TZ_CACHE.get(orgToken);

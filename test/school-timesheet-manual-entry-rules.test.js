@@ -53,6 +53,9 @@ test('timesheet controller wires activity-based manual options and incomplete wa
   const source = read('packages/school/MVC/controllers/school/timesheetController.js');
   assert.match(source, /listManualEntryActivitiesForPerson/);
   assert.match(source, /listManualEntryClasses/);
+  assert.match(source, /buildDataServiceQuery\(req\.query\)/);
+  assert.match(source, /paginate\(results, query\)/);
+  assert.match(source, /searchTerm/);
   assert.match(source, /validateManualTimesheetRow/);
   assert.match(source, /timesheetManualMaterializationService/);
   assert.match(source, /attendanceDuePeriodId/);

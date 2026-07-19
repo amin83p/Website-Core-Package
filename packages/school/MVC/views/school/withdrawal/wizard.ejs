@@ -134,7 +134,7 @@
 
             <div class="mb-3">
               <label class="form-label fw-bold">Effective Date</label>
-              <input type="date" id="effectiveDate" class="form-control" value="<%= new Date().toISOString().slice(0, 10) %>">
+              <input type="date" id="effectiveDate" class="form-control" value="<%= typeof orgToday !== 'undefined' && orgToday ? orgToday : '' %>">
             </div>
           </div>
         </div>

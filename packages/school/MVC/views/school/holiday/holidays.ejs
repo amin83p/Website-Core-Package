@@ -30,10 +30,10 @@
       <label class="fw-bold mb-0 text-dark"><i class="bi bi-calendar-range me-2"></i>Select Year:</label>
       <form id="yearForm" action="/school/holidays" method="GET" class="m-0">
           <select name="year" class="form-select form-select-sm border-secondary w-auto fw-bold" onchange="document.getElementById('yearForm').submit();">
-              <% const baseYear = new Date().getFullYear() - 1; %>
-              <% for(let i = 0; i < 5; i++) { const y = baseYear + i; %>
+              <% const holidayYearOptions = Array.isArray(yearOptions) && yearOptions.length ? yearOptions : [String(currentYear)]; %>
+              <% holidayYearOptions.forEach((y) => { %>
                   <option value="<%= y %>" <%= currentYear == y ? 'selected' : '' %>><%= y %></option>
-              <% } %>
+              <% }) %>
           </select>
       </form>
     </div>
@@ -58,8 +58,9 @@
                 <tr><td colspan="5" class="text-center py-5 text-muted">No holidays recorded for <%= currentYear %>.</td></tr>
             <% } else { %>
                 <% data.forEach(item => { 
-                    const d = new Date(item.date + 'T00:00:00'); 
-                    const displayDate = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    const displayDate = (typeof formatOrgDate === 'function')
+                      ? formatOrgDate(item.date, { weekday: 'short', month: 'short', day: 'numeric' })
+                      : String(item.date || '');
                 %>
                 <tr>
                     <td class="ps-4 fw-bold text-dark" data-sort-value="<%= item.date %>"><%= displayDate %></td>
@@ -183,10 +184,19 @@
 let modalInstance = null;
 let holidayYearModalInstance = null;
 const holidayYearData = <%- JSON.stringify(holidayYearRows || []).replace(/</g, '\\u003c') %>;
-const selectedHolidayYear = Number('<%= currentYear %>') || new Date().getFullYear();
+const selectedHolidayYear = Number('<%= currentYear %>') || Number('<%= String(orgToday || currentYear || "").slice(0, 4) %>');
+
+function formatHolidayDateKey(dateKey, options = {}) {
+    const token = String(dateKey || '').trim();
+    if (!token) return '-';
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatDateKey === 'function') {
+        return window.AppOrgDateTime.formatDateKey(token, options);
+    }
+    return token;
+}
 
 function monthLabel(year, monthIndex) {
-    return new Date(year, monthIndex, 1).toLocaleDateString('en-US', { month: 'long' });
+    return formatHolidayDateKey(`${year}-${String(monthIndex + 1).padStart(2, '0')}-01`, { month: 'long' });
 }
 
 function buildHolidayLookup(rows) {

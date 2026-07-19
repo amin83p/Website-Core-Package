@@ -4,6 +4,11 @@ const dataService = require('../services/dataService');
 const organizationNameSnapshotService = require('../services/organizationNameSnapshotService');
 const { buildDataServiceQuery, isAjax } = require('../utils/generalTools');
 const { idsEqual } = require('../utils/idAdapter');
+const {
+  listCuratedTimezoneOptions,
+  resolveDefaultTimezone,
+  parseOrganizationTimezoneInput
+} = require('../utils/timezoneUtils');
 
 const ORGANIZATION_SEARCHABLE_FIELDS = Object.freeze([
   'id',
@@ -49,8 +54,22 @@ function parseNum(v, fallback = null) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function buildOrganizationFormViewModel(organization = null) {
+  const defaultTimezone = resolveDefaultTimezone();
+  const savedTimeZone = String(organization?.settings?.timeZone || organization?.settings?.timezone || '').trim();
+  return {
+    timezoneOptions: listCuratedTimezoneOptions(),
+    defaultTimezone,
+    selectedTimeZone: savedTimeZone
+  };
+}
+
 function buildOrganizationFromBody(body, reqUserId) {
   const now = new Date().toISOString();
+  const timezoneResult = parseOrganizationTimezoneInput(body, resolveDefaultTimezone());
+  if (timezoneResult.error) {
+    throw new Error(timezoneResult.error);
+  }
 
   // Parse admins if provided as JSON string
   let admins = [];
@@ -116,7 +135,8 @@ function buildOrganizationFromBody(body, reqUserId) {
       defaultAccessLevel: parseNum(body.defaultAccessLevel, 0),
       allowSelfRegistration: parseBool(body.allowSelfRegistration),
       requireAdminApprovalForImport: parseBool(body.requireAdminApprovalForImport),
-      dataRetentionDays: parseNum(body.dataRetentionDays, null)
+      dataRetentionDays: parseNum(body.dataRetentionDays, null),
+      timeZone: timezoneResult.timeZone
     },
 
     people: {
@@ -222,6 +242,7 @@ async function showAddOrganizationForm(req, res) {
     includeModal: true,
     organization: null,
     organizationContracts: [],
+    ...buildOrganizationFormViewModel(null),
     user: req.user || null,
     actionStateId: req.actionStateId
   });
@@ -271,6 +292,7 @@ async function showEditOrganizationForm(req, res) {
       includeModal: true,
       organization,
       organizationContracts: Array.isArray(contracts) ? contracts.filter((c) => idsEqual(c?.orgId, organization.id)) : [],
+      ...buildOrganizationFormViewModel(organization),
       user: req.user || null,
       actionStateId: req.actionStateId
     });

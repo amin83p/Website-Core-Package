@@ -1,6 +1,8 @@
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const leaveSessionResolutionService = require('../../services/school/leaveSessionResolutionService');
+const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
+const { resolveOrgTodayFromRequest } = requireCoreModule('MVC/utils/timezoneUtils');
 
 function getStatusCode(error, fallback = 500) {
   const status = Number(error?.statusCode || error?.status || fallback);
@@ -70,8 +72,10 @@ function buildAccessContext(req) {
 
 async function baseViewModel(req, res, extra = {}) {
   const requesterRoleOptions = leaveRequestService.getRequesterRoleOptions(req.user);
+  const orgToday = resolveOrgTodayFromRequest(req);
   return {
     user: req.user,
+    orgToday,
     includeModal: true,
     actionStateId: req.actionStateId,
     statuses: leaveRequestModel.LEAVE_REQUEST_STATUSES,
@@ -119,7 +123,11 @@ async function showNewForm(req, res) {
 
 async function createRequest(req, res) {
   try {
-    const created = await leaveRequestService.createRequest(req.user, buildFormPayload(req.body || {}));
+    const created = await leaveRequestService.createRequest(
+      req.user,
+      buildFormPayload(req.body || {}),
+      { orgToday: resolveOrgTodayFromRequest(req) }
+    );
     return res.redirect(`/school/leave-requests/detail/${encodeURIComponent(created.id)}`);
   } catch (error) {
     return sendError(req, res, error, 400);

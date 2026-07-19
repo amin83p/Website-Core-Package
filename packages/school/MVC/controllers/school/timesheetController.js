@@ -19,6 +19,8 @@ const timesheetPayrollContextService = require('../../services/school/timesheetP
 const timesheetPayRateService = require('../../services/school/timesheetPayRateService');
 const taskService = require('../../services/school/taskService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
+const timesheetSessionStudentLabelService = require('../../services/school/timesheetSessionStudentLabelService');
+const { resolveOrgTodayFromRequest, resolveOrgYearFromRequest } = requireCoreModule('MVC/utils/timezoneUtils');
 const {
     sanitizeSnapshotEntry,
     sanitizeSubmissionSnapshot,
@@ -432,6 +434,44 @@ function buildSubmissionSnapshot({ normalizedEntries, period, reviewVersion = 0,
 
 function normalizeStatusCode(value) {
     return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'scheduled';
+}
+
+function buildTimesheetMakeupMeta(sessionRow, classRow, sessionsByClassId = null) {
+    const isMakeupSession = sessionRow?.makeup?.isMakeup === true;
+    if (!isMakeupSession) {
+        return {
+            isMakeupSession: false,
+            makeupOriginalSessionId: '',
+            makeupOriginalClassId: '',
+            makeupOriginalDate: '',
+            makeupOriginalStartTime: '',
+            makeupOriginalEndTime: ''
+        };
+    }
+    const makeupOriginalSessionId = String(sessionRow?.makeup?.originalSessionId || '').trim();
+    const makeupOriginalClassId = String(sessionRow?.makeup?.originalClassId || classRow?.id || '').trim();
+    let makeupOriginalDate = '';
+    let makeupOriginalStartTime = '';
+    let makeupOriginalEndTime = '';
+    const classSessions = sessionsByClassId instanceof Map
+        ? (sessionsByClassId.get(makeupOriginalClassId) || [])
+        : [];
+    if (makeupOriginalSessionId && Array.isArray(classSessions)) {
+        const originalSession = classSessions.find((row) => idsEqual(row?.sessionId || row?.id, makeupOriginalSessionId));
+        if (originalSession) {
+            makeupOriginalDate = String(originalSession.date || '').trim();
+            makeupOriginalStartTime = String(originalSession.startTime || '').trim();
+            makeupOriginalEndTime = String(originalSession.endTime || '').trim();
+        }
+    }
+    return {
+        isMakeupSession: true,
+        makeupOriginalSessionId,
+        makeupOriginalClassId,
+        makeupOriginalDate,
+        makeupOriginalStartTime,
+        makeupOriginalEndTime
+    };
 }
 
 function formatPeriodDeadlineLabel(period) {
@@ -858,11 +898,13 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
     ]);
 
     const classRows = (Array.isArray(classes) ? classes : []).filter((row) => idsEqual(row?.orgId, activeOrgId));
-    const liveSessions = [];
+    const liveSessionBuilders = [];
+    const sessionsByClassId = new Map();
 
     for (const classRow of classRows) {
         // eslint-disable-next-line no-await-in-loop
         const sessions = await dataService.getClassSessions(classRow.id, reqUser);
+        sessionsByClassId.set(String(classRow.id || '').trim(), Array.isArray(sessions) ? sessions : []);
         (Array.isArray(sessions) ? sessions : [])
             .filter((sessionRow) =>
                 idsEqual(sessionRow?.delivery?.deliveredBy, personId) &&
@@ -880,25 +922,51 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
                 const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                     status: sessionRow?.status,
                     notes: sessionRow?.notes,
-                    durationHours: rawDurationHours
-                });
-                liveSessions.push({
-                    sessionId: sessionRow?.sessionId,
-                    classId: String(classRow?.id || ''),
-                    className: String(classRow?.title || classRow?.name || ''),
-                    deliveryDepartmentId: classRow?.deliveryDepartmentId || '',
-                    deliveryDepartmentName: classRow?.deliveryDepartmentName || '',
-                    date: sessionRow?.date,
-                    startTime: sessionRow?.startTime,
-                    endTime: sessionRow?.endTime,
                     durationHours: rawDurationHours,
-                    timesheetHours,
-                    status: normalizedStatus,
-                    isFinalStatus,
-                    isManual: false
+                    session: sessionRow
+                });
+                liveSessionBuilders.push({
+                    classId: String(classRow?.id || ''),
+                    sessionRow,
+                    payload: {
+                        sessionId: sessionRow?.sessionId,
+                        classId: String(classRow?.id || ''),
+                        className: String(classRow?.title || classRow?.name || ''),
+                        deliveryDepartmentId: classRow?.deliveryDepartmentId || '',
+                        deliveryDepartmentName: classRow?.deliveryDepartmentName || '',
+                        date: sessionRow?.date,
+                        startTime: sessionRow?.startTime,
+                        endTime: sessionRow?.endTime,
+                        durationHours: rawDurationHours,
+                        timesheetHours,
+                        status: normalizedStatus,
+                        isFinalStatus,
+                        isManual: false,
+                        ...buildTimesheetMakeupMeta(sessionRow, classRow, sessionsByClassId)
+                    }
                 });
             });
     }
+
+    const [students, personPayload] = await Promise.all([
+        dataService.fetchData('students', { orgId__eq: activeOrgId }, reqUser),
+        schoolIdentityLookupService.listSchoolPersonRecords({
+            reqUser,
+            requireSchoolRole: false,
+            query: { limit: 5000 }
+        })
+    ]);
+    const persons = personPayload?.allRows || personPayload?.rows || [];
+    const liveSessions = await timesheetSessionStudentLabelService.enrichClassLiveSessions({
+        classRows,
+        sessionsByClassId,
+        liveSessionBuilders,
+        students,
+        persons,
+        statusMap,
+        activeOrgId,
+        reqUser
+    });
 
     const reportReflectionSessions = await buildReportReflectionLiveSessions({
         teacherPersonId: personId,
@@ -1116,7 +1184,7 @@ exports.listMyTimesheets = async (req, res) => {
         const requestedTsStatus = query.tsStatus;
         delete query.tsStatus;
 
-        const selectedYear = query.year || new Date().getFullYear().toString();
+        const selectedYear = query.year || resolveOrgTodayFromRequest(req).slice(0, 4);
         delete query.year;
 
         delete query.teacherId;
@@ -1124,8 +1192,9 @@ exports.listMyTimesheets = async (req, res) => {
         delete query.orgId__eq;
 
         const allPeriods = await dataService.fetchData('timesheetPeriods', { ...query, orgId__eq: activeOrgId }, req.user);
+        const fallbackYear = Number(resolveOrgYearFromRequest(req));
         const availableYears = [...new Set(allPeriods.map((p) => {
-            if (!p.startDate) return new Date().getFullYear();
+            if (!p.startDate) return fallbackYear;
             return new Date(p.startDate).getFullYear();
         }))].sort((a, b) => b - a);
 
@@ -1241,11 +1310,13 @@ exports.viewTimesheet = async (req, res) => {
 
         const classes = await dataService.fetchData('classes', {}, req.user);
         const scopedClasses = (Array.isArray(classes) ? classes : []).filter((row) => idsEqual(row?.orgId, activeOrgId));
-        const liveSessions = [];
+        const liveSessionBuilders = [];
+        const sessionsByClassId = new Map();
         const incompleteSessions = [];
 
         for (const c of scopedClasses) {
             const sessions = await dataService.getClassSessions(c.id, req.user);
+            sessionsByClassId.set(String(c.id || '').trim(), Array.isArray(sessions) ? sessions : []);
             const myClassSessions = sessions.filter((s) =>
                 idsEqual(s.delivery?.deliveredBy, teacherContext.targetTeacherId) &&
                 s.date >= period.startDate &&
@@ -1276,26 +1347,52 @@ exports.viewTimesheet = async (req, res) => {
                 const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                     status: s.status,
                     notes: s.notes,
-                    durationHours: rawDurationHours
-                });
-                liveSessions.push({
-                    sessionId: s.sessionId,
-                    classId: c.id,
-                    className: c.title,
-                    deliveryDepartmentId: c.deliveryDepartmentId || '',
-                    deliveryDepartmentName: c.deliveryDepartmentName || '',
-                    date: s.date,
-                    startTime: s.startTime,
-                    endTime: s.endTime,
                     durationHours: rawDurationHours,
-                    timesheetHours,
-                    status: normalizedStatus,
-                    isFinalStatus,
-                    notes: s.notes || '',
-                    room: s.room || ''
+                    session: s
+                });
+                liveSessionBuilders.push({
+                    classId: String(c.id || ''),
+                    sessionRow: s,
+                    payload: {
+                        sessionId: s.sessionId,
+                        classId: c.id,
+                        className: c.title,
+                        deliveryDepartmentId: c.deliveryDepartmentId || '',
+                        deliveryDepartmentName: c.deliveryDepartmentName || '',
+                        date: s.date,
+                        startTime: s.startTime,
+                        endTime: s.endTime,
+                        durationHours: rawDurationHours,
+                        timesheetHours,
+                        status: normalizedStatus,
+                        isFinalStatus,
+                        notes: s.notes || '',
+                        room: s.room || '',
+                        ...buildTimesheetMakeupMeta(s, c, sessionsByClassId)
+                    }
                 });
             });
         }
+
+        const [students, personPayload] = await Promise.all([
+            dataService.fetchData('students', { orgId__eq: activeOrgId }, req.user),
+            schoolIdentityLookupService.listSchoolPersonRecords({
+                reqUser: req.user,
+                requireSchoolRole: false,
+                query: { limit: 5000 }
+            })
+        ]);
+        const persons = personPayload?.allRows || personPayload?.rows || [];
+        const liveSessions = await timesheetSessionStudentLabelService.enrichClassLiveSessions({
+            classRows: scopedClasses,
+            sessionsByClassId,
+            liveSessionBuilders,
+            students,
+            persons,
+            statusMap,
+            activeOrgId,
+            reqUser: req.user
+        });
 
         for (const c of scopedClasses) {
             const sessions = await dataService.getClassSessions(c.id, req.user);
@@ -1729,7 +1826,8 @@ exports.saveTimesheet = async (req, res) => {
             const hours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                 status: sessionRef.status,
                 notes: sessionRef.notes,
-                durationHours: sessionRef.durationHours
+                durationHours: sessionRef.durationHours,
+                session: sessionRef
             });
             const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
                 status: sessionRef.status,
@@ -2099,8 +2197,13 @@ exports.applyPriorAdjustments = async (req, res) => {
 exports.listManualEntryClasses = async (req, res) => {
     try {
         const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const query = await buildDataServiceQuery(req.query);
+        const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
+        if (query.q === searchDefaultKeyword) query.q = '';
+        const searchTerm = String(query.q || '').trim().toLowerCase();
+
         const classes = await dataService.fetchData('classes', {}, req.user);
-        const results = (Array.isArray(classes) ? classes : [])
+        let results = (Array.isArray(classes) ? classes : [])
             .filter((row) => idsEqual(row?.orgId, activeOrgId))
             .filter((row) => isActiveClassForManualEntry(row))
             .filter((row) => !isInactiveSchoolRecord(row))
@@ -2112,7 +2215,25 @@ exports.listManualEntryClasses = async (req, res) => {
             }))
             .filter((row) => row.id)
             .sort((a, b) => String(a.title).localeCompare(String(b.title)));
-        return res.json({ status: 'success', results, data: results, items: results, total: results.length });
+
+        if (searchTerm) {
+            results = results.filter((row) =>
+                String(row.id || '').toLowerCase().includes(searchTerm)
+                || String(row.title || '').toLowerCase().includes(searchTerm)
+                || String(row.name || '').toLowerCase().includes(searchTerm)
+                || String(row.status || '').toLowerCase().includes(searchTerm)
+            );
+        }
+
+        const { data, pagination } = paginate(results, query);
+        return res.json({
+            status: 'success',
+            results: data,
+            data,
+            items: data,
+            pagination,
+            total: pagination?.totalItems || data.length
+        });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
     }

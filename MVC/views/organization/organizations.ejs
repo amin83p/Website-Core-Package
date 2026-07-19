@@ -94,7 +94,7 @@
             <% const audit = org.audit || {}; %>
             <td>
               <% if (audit.createDateTime) { %>
-                <%= new Date(audit.createDateTime).toLocaleString() %>
+                <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.createDateTime) : new Date(audit.createDateTime).toLocaleString() %>
                 <% if (audit.createUser) { %>
                   <div class="text-muted x-small">by <%= audit.createUser %></div>
                 <% } %>
@@ -105,7 +105,7 @@
 
             <td>
               <% if (audit.lastUpdateDateTime) { %>
-                <%= new Date(audit.lastUpdateDateTime).toLocaleString() %>
+                <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.lastUpdateDateTime) : new Date(audit.lastUpdateDateTime).toLocaleString() %>
                 <% if (audit.lastUpdateUser) { %>
                   <div class="text-muted x-small">by <%= audit.lastUpdateUser %></div>
                 <% } %>

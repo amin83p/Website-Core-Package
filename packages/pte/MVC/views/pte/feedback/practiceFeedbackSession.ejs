@@ -859,7 +859,7 @@
       <div class="col-md-3"><strong>Total Questions:</strong> <%= Number(session?.totalQuestions || 0) %></div>
       <div class="col-md-3"><strong>Submitted:</strong> <%= Number(session?.submittedQuestions || 0) %></div>
       <div class="col-md-3"><strong>Feedback Count:</strong> <%= Number(session?.feedbackCount || 0) %></div>
-      <div class="col-md-3"><strong>Started At:</strong> <%= session?.startedAt ? new Date(session.startedAt).toLocaleString() : '-' %></div>
+      <div class="col-md-3"><strong>Started At:</strong> <%= session?.startedAt ? formatOrgDateTime(session.startedAt) : '-' %></div>
     </div>
   </div>
 
@@ -1247,7 +1247,7 @@
                   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-2">
                     <div class="small text-muted" id="feedback_meta_<%= itemId %>">
                       <% if (feedbackStamp) { %>
-                        Last saved at <%= new Date(feedbackStamp).toLocaleString() %>.
+                        Last saved at <%= formatOrgDateTime(feedbackStamp) %>.
                       <% } else { %>
                         Not saved yet.
                       <% } %>
@@ -1438,8 +1438,8 @@
       String(provider.modelUsed || '').trim()
     ].filter(Boolean).join(' / ');
     const rows = [];
-    if (source.generatedAt) rows.push(`Generated at: ${new Date(source.generatedAt).toLocaleString()}`);
-    if (saved && source.savedAt) rows.push(`Saved at: ${new Date(source.savedAt).toLocaleString()}`);
+    if (source.generatedAt) rows.push(`Generated at: ${(window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(source.generatedAt) : source.generatedAt}`);
+    if (saved && source.savedAt) rows.push(`Saved at: ${(window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(source.savedAt) : source.savedAt}`);
     rows.push(providerLabel ? `Provider: ${providerLabel}` : 'Provider: Deterministic fallback');
     if (warningRows.length) rows.push(`Warnings: ${warningRows.join(' | ')}`);
     return rows.join(' | ');
@@ -1798,7 +1798,7 @@
       if (metaNode) {
         const stamp = String(item.feedbackProvidedAt || '').trim();
         metaNode.textContent = stamp
-          ? ('Last saved at ' + new Date(stamp).toLocaleString() + '.')
+          ? ('Last saved at ' + ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(stamp) : stamp) + '.')
           : 'Feedback saved.';
       }
       showSavedFlag(itemId);

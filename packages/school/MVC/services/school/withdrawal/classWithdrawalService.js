@@ -103,7 +103,7 @@ async function previewClassWithdrawal({
     studentName: '',
     enrollmentId: '',
     reason: reason || '',
-    effectiveDate: effectiveDate || withdrawalPolicyService.todayISO(),
+    effectiveDate: effectiveDate || withdrawalPolicyService.resolveBusinessToday('', reqUser),
     financialImpact: null,
     academicImpact: null,
     canProceed: true
@@ -252,8 +252,8 @@ async function executeClassWithdrawal({
       reasonDetail: reasonDetail || existing.reasonDetail || '',
       initiatorType: initiatorType || existing.initiatorType || 'admin',
       initiatorId: initiatorId || existing.initiatorId || '',
-      requestDate: existing.requestDate || withdrawalPolicyService.todayISO(),
-      effectiveDate: effectiveDate || existing.effectiveDate || withdrawalPolicyService.todayISO(),
+      requestDate: existing.requestDate || withdrawalPolicyService.resolveBusinessToday('', reqUser),
+      effectiveDate: effectiveDate || existing.effectiveDate || withdrawalPolicyService.resolveBusinessToday('', reqUser),
       classEnrollmentId: enrollment.enrollmentId,
       classId,
       termRegistrationId: termRegistrationId || existing.termRegistrationId || '',
@@ -278,8 +278,8 @@ async function executeClassWithdrawal({
       reasonDetail: reasonDetail || '',
       initiatorType: initiatorType || 'admin',
       initiatorId: initiatorId || '',
-      requestDate: withdrawalPolicyService.todayISO(),
-      effectiveDate: effectiveDate || withdrawalPolicyService.todayISO(),
+      requestDate: withdrawalPolicyService.resolveBusinessToday('', reqUser),
+      effectiveDate: effectiveDate || withdrawalPolicyService.resolveBusinessToday('', reqUser),
       classEnrollmentId: enrollment.enrollmentId,
       classId,
       termRegistrationId: termRegistrationId || '',
@@ -314,7 +314,7 @@ async function executeClassWithdrawal({
         personId: student.personId || '',
         entryType: 'class_dropped',
         status: 'posted',
-        effectiveDate: effectiveDate || withdrawalPolicyService.todayISO(),
+        effectiveDate: effectiveDate || withdrawalPolicyService.resolveBusinessToday('', reqUser),
         classId,
         termRegistrationId: termRegistrationId || '',
         note: `Class withdrawal: ${reason || 'other'}`,
@@ -349,7 +349,7 @@ async function executeClassWithdrawal({
         scopeType: 'class',
         relatedTransactionIds: resolvedTransactionIds,
         targetRefundAmount: Number(preview?.financialImpact?.refundAmount || 0),
-        effectiveDate: effectiveDate || withdrawalPolicyService.todayISO(),
+        effectiveDate: effectiveDate || withdrawalPolicyService.resolveBusinessToday('', reqUser),
         reason,
         includeClassLinked: 'only',
         classId,
@@ -373,7 +373,7 @@ async function executeClassWithdrawal({
       if (String(enrollment?.enrollmentId || '').trim()) {
         await schoolDataService.closeClassEnrollmentPeriod(String(enrollment.enrollmentId).trim(), {
           status: 'withdrawn',
-          endDate: effectiveDate || withdrawalPolicyService.todayISO(),
+          endDate: effectiveDate || withdrawalPolicyService.resolveBusinessToday('', reqUser),
           reasonEnd: reason || 'class_withdrawal'
         }, reqUser, options);
         removedEnrollments.push({
@@ -394,8 +394,8 @@ async function executeClassWithdrawal({
   const finalStatus = errors.length > 0 ? 'error' : 'completed';
   const updatedWithdrawal = await withdrawalRepository.updateWithdrawal(withdrawalRecord.id, {
     status: finalStatus,
-    completedDate: finalStatus === 'completed' ? withdrawalPolicyService.todayISO() : '',
-    approvedDate: finalStatus === 'completed' ? withdrawalPolicyService.todayISO() : '',
+    completedDate: finalStatus === 'completed' ? withdrawalPolicyService.resolveBusinessToday('', reqUser) : '',
+    approvedDate: finalStatus === 'completed' ? withdrawalPolicyService.resolveBusinessToday('', reqUser) : '',
     approvedBy: finalStatus === 'completed' ? (initiatorId || reqUser?.id || '') : '',
     processedBy: finalStatus === 'completed' ? (initiatorId || reqUser?.id || '') : '',
     academicImpact: {
@@ -440,7 +440,7 @@ async function getActiveClassEnrollmentsForStudent(studentId, orgId, reqUser) {
   const classMap = new Map((Array.isArray(classes) ? classes : []).map((row) => [String(row?.id || '').trim(), row]));
   const enrollments = [];
   const canonicalRows = await schoolDataService.getClassEnrollmentPeriodsByStudentId(studentId, reqUser);
-  const nowDay = withdrawalPolicyService.todayISO();
+  const nowDay = withdrawalPolicyService.resolveBusinessToday('', reqUser);
   const filteredRows = (Array.isArray(canonicalRows) ? canonicalRows : [])
     .filter((row) => String(row?.orgId || '').trim() === String(orgId || '').trim())
     .filter((row) => isOpenCanonicalPeriod(row, nowDay));

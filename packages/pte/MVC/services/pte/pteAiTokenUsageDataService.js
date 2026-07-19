@@ -9,6 +9,8 @@ const {
   idsEqual,
   toPublicId
 } = require('./pteCoreDependencies');
+const { requireCoreModule } = require('./pteCoreContracts');
+const { formatInstantInTimezone } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const ORGANIZATION_SCOPE_NAMES = new Set(['ADMIN', 'GLOBAL', 'ORGANIZATION', 'ORG']);
 const STATUS_OPTIONS = Object.freeze([
@@ -369,6 +371,22 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(numeric) ? numeric : Number(fallback || 0);
 }
 
+function resolveOrgTimeZone(accessContext = {}, options = {}, requestingUser = {}) {
+  const token = String(
+    options?.orgTimeZone
+    || accessContext?.orgTimeZone
+    || requestingUser?.activeOrgTimeZone
+    || ''
+  ).trim();
+  return token || 'UTC';
+}
+
+function formatTokenUsageInstant(value, orgTimeZone) {
+  const cleaned = cleanString(value, { max: 80, allowEmpty: true });
+  if (!cleaned) return '-';
+  return formatInstantInTimezone(cleaned, orgTimeZone || 'UTC');
+}
+
 const pteAiTokenUsageDataService = {
   async resolveReadVisibility(requestingUser, accessContext = {}) {
     const visibility = await resolveVisibility(requestingUser, accessContext);
@@ -382,6 +400,7 @@ const pteAiTokenUsageDataService = {
 
   async listTokenUsages(rawFilters = {}, requestingUser, accessContext = {}, options = {}) {
     const visibility = await this.resolveReadVisibility(requestingUser, accessContext);
+    const orgTimeZone = resolveOrgTimeZone(accessContext, options, requestingUser);
     const filters = parseListFilters(rawFilters);
 
     if (filters.userIds.length && visibility.mode === 'creator') {
@@ -430,9 +449,7 @@ const pteAiTokenUsageDataService = {
       return {
         ...row,
         userLabel: buildUserDisplayLabel(userRow),
-        consumedAtDisplay: cleanString(row?.consumedAt, { max: 80, allowEmpty: true })
-          ? new Date(row.consumedAt).toLocaleString()
-          : '-'
+        consumedAtDisplay: formatTokenUsageInstant(row?.consumedAt, orgTimeZone)
       };
     });
 
@@ -464,6 +481,7 @@ const pteAiTokenUsageDataService = {
 
   async getTokenUsageById(id, requestingUser, accessContext = {}, options = {}) {
     const visibility = await this.resolveReadVisibility(requestingUser, accessContext);
+    const orgTimeZone = resolveOrgTimeZone(accessContext, options, requestingUser);
     const row = await pteAiTokenUsageRepository.getById(id, {
       backendMode: options?.backendMode
     });
@@ -485,9 +503,7 @@ const pteAiTokenUsageDataService = {
     return {
       ...row,
       userLabel,
-      consumedAtDisplay: cleanString(row?.consumedAt, { max: 80, allowEmpty: true })
-        ? new Date(row.consumedAt).toLocaleString()
-        : '-'
+      consumedAtDisplay: formatTokenUsageInstant(row?.consumedAt, orgTimeZone)
     };
   },
 

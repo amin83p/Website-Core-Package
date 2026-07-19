@@ -9,6 +9,7 @@ const registrationIntegrityService = require('./registrationIntegrityService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 function asIdArray(value) {
   return Array.from(new Set((Array.isArray(value) ? value : [])
@@ -94,9 +95,12 @@ async function buildTermRegistrationPreview({
   classIds,
   reqUser,
   requestBody = {},
-  ignoreRegistrationId = ''
+  ignoreRegistrationId = '',
+  orgToday = ''
 }) {
-  const effectiveDate = String(requestBody.effectiveDate || '').trim() || new Date().toISOString().slice(0, 10);
+  const effectiveDate = String(requestBody.effectiveDate || '').trim()
+    || String(orgToday || reqUser?.orgToday || '').trim()
+    || resolveOrgTodayFromContext({ orgToday, user: reqUser });
   const selectedClassIds = asIdArray(classIds);
 
   const dependencyContext = await registrationIntegrityService.resolveTermPreviewDependencyContext({

@@ -1,5 +1,6 @@
 const { WITHDRAWAL_REASONS, WITHDRAWAL_REASON_LABELS } = require('../../../models/school/withdrawalModel');
 const { requireCoreModule } = require('../schoolCoreContracts');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const REFUND_POLICIES = Object.freeze({
   FULL_REFUND: 'full_refund',
@@ -48,8 +49,14 @@ function parseDate(value) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+function todayISO(orgToday = '', reqUser = null) {
+  return resolveOrgTodayFromContext({ orgToday, user: reqUser });
+}
+
+function resolveBusinessToday(explicit = '', reqUser = null) {
+  const fromExplicit = String(explicit || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(fromExplicit)) return fromExplicit;
+  return resolveOrgTodayFromContext({ orgToday: reqUser?.orgToday, user: reqUser });
 }
 
 function roundMoney(value) {
@@ -226,6 +233,7 @@ module.exports = {
   getRefundPolicies,
   getGradeOptions,
   todayISO,
+  resolveBusinessToday,
   roundMoney,
   getMissingCriticalDates
 };

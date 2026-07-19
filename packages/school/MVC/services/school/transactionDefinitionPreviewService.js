@@ -2,6 +2,7 @@ const globalTransactionLedgerModel = require('../../models/school/globalTransact
 const { parseAccountRef } = require('../../models/school/transactionDefinitionModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 function parseJsonSafe(value, fallback) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -205,7 +206,7 @@ function buildPostingItemsFromPreview({
   const entityId = toPublicId(requestBody.entityId);
   const entityName = String(requestBody.entityName || '').trim();
   const externalReference = String(requestBody.externalReference || '').trim();
-  const effectiveDate = String(requestBody.effectiveDate || '').trim() || new Date().toISOString().slice(0, 10);
+  const effectiveDate = String(requestBody.effectiveDate || '').trim() || resolveOrgTodayFromContext({ orgToday: reqUser?.orgToday, user: reqUser });
   const sourceEventType = String(requestBody.sourceEventType || 'transaction_definition_apply').trim();
   const sourceEventIdBase = String(requestBody.sourceEventId || `${definition?.id || 'TRX'}-${Date.now()}`).trim();
   const idempotencyBase = String(requestBody.idempotencyKey || `TRXDEF|${toPublicId(definition?.id)}|${sourceEventIdBase}`).trim();

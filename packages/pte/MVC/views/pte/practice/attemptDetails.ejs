@@ -91,13 +91,13 @@
     <div class="col-md-3">
       <div class="border rounded p-2 bg-light">
         <div class="x-small text-muted">Started</div>
-        <div class="fw-bold"><%= session?.startedAt ? new Date(session.startedAt).toLocaleString() : '-' %></div>
+        <div class="fw-bold"><%= session?.startedAt ? formatOrgDateTime(session.startedAt) : '-' %></div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="border rounded p-2 bg-light">
         <div class="x-small text-muted">Finished</div>
-        <div class="fw-bold"><%= session?.finishedAt ? new Date(session.finishedAt).toLocaleString() : '-' %></div>
+        <div class="fw-bold"><%= session?.finishedAt ? formatOrgDateTime(session.finishedAt) : '-' %></div>
       </div>
     </div>
   </div>
@@ -223,8 +223,8 @@
                   <div class="x-small text-muted font-monospace"><%= row?.itemId || '-' %></div>
                 </td>
                 <td><%= Number(row?.startNo || 0) %></td>
-                <td class="small"><%= row?.startedAt ? new Date(row.startedAt).toLocaleString() : '-' %></td>
-                <td class="small"><%= row?.endedAt ? new Date(row.endedAt).toLocaleString() : '-' %></td>
+                <td class="small"><%= row?.startedAt ? formatOrgDateTime(row.startedAt) : '-' %></td>
+                <td class="small"><%= row?.endedAt ? formatOrgDateTime(row.endedAt) : '-' %></td>
                 <td><span class="badge bg-secondary"><%= row?.endReason || '-' %></span></td>
                 <td><%= formatSeconds(row?.durationSeconds || 0) %></td>
                 <td><%= Number(row?.saveCountInInterval || 0) %></td>
@@ -265,7 +265,7 @@
                   <div class="small fw-bold"><%= row?.questionTitle || row?.questionVersionId || row?.itemId || '-' %></div>
                   <div class="x-small text-muted font-monospace"><%= row?.itemId || '-' %></div>
                 </td>
-                <td class="small"><%= row?.eventAt ? new Date(row.eventAt).toLocaleString() : '-' %></td>
+                <td class="small"><%= row?.eventAt ? formatOrgDateTime(row.eventAt) : '-' %></td>
                 <td class="x-small font-monospace"><%= row?.eventType || '-' %> / <%= row?.eventId || '-' %></td>
                 <td class="small"><%= row?.message || '-' %></td>
               </tr>
@@ -362,7 +362,7 @@
             <% } %>
             <% artifacts.forEach((artifact) => { %>
               <tr>
-                <td class="small"><%= artifact.createdAt ? new Date(artifact.createdAt).toLocaleString() : '-' %></td>
+                <td class="small"><%= artifact.createdAt ? formatOrgDateTime(artifact.createdAt) : '-' %></td>
                 <td class="x-small font-monospace"><%= artifact.attemptItemId || '-' %></td>
                 <td><span class="badge bg-secondary text-capitalize"><%= artifact.artifactType || '-' %></span></td>
                 <td>

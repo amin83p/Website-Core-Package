@@ -5,6 +5,7 @@ const { queueWrite } = require('./fileQueue');
 const { applyGenericFilter } = require('../utils/queryEngine');
 const { toIdArray, toPublicId, idsEqual } = require('../utils/idAdapter');
 const { getEntityQueryExecutor } = require('./queryExecutionBridge');
+const { isValidTimezoneToken } = require('../utils/timezoneUtils');
 
 // ✅ Match your sectionModel style: data folder beside models
 const dataPath = path.join(__dirname, '../../data/organizations.json');
@@ -118,6 +119,11 @@ function validateData(org) {
   }
   if (org.billing?.billingEmail && !validateEmail(org.billing.billingEmail)) {
     errors.push('billing.billingEmail is invalid.');
+  }
+
+  const orgTimeZone = String(org.settings?.timeZone || org.settings?.timezone || '').trim();
+  if (orgTimeZone && !isValidTimezoneToken(orgTimeZone)) {
+    errors.push('settings.timeZone must be a valid IANA timezone.');
   }
 
   // contracts array

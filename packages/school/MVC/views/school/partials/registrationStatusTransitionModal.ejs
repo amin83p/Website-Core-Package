@@ -14,7 +14,7 @@
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label">Effective Date *</label>
-              <input type="date" class="form-control" id="status_effectiveDate">
+              <input type="date" class="form-control" id="status_effectiveDate" value="<%= typeof orgToday !== 'undefined' && orgToday ? orgToday : '' %>">
             </div>
             <div class="col-md-8">
               <label class="form-label">Reason *</label>
@@ -73,6 +73,11 @@
     const applyBtn = document.getElementById('btnApplyStatus');
     let approvedPreview = null;
     let previewInProgress = false;
+    const ORG_TODAY = <%- JSON.stringify(typeof orgToday !== 'undefined' ? orgToday : '') %>;
+    function orgTodayFallback() {
+      if (ORG_TODAY) return ORG_TODAY;
+      return (window.AppOrgDateTime && window.AppOrgDateTime.today) ? String(window.AppOrgDateTime.today) : '';
+    }
 
     function isCancellation() {
       return String(document.getElementById('status_target')?.value || '').trim().toLowerCase() === 'cancelled';
@@ -141,7 +146,7 @@
       approvedPreview = null;
       applyBtn.disabled = true;
       document.getElementById('status_target').value = String(button?.dataset?.targetStatus || '');
-      document.getElementById('status_effectiveDate').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('status_effectiveDate').value = orgTodayFallback();
       document.getElementById('status_reason').value = '';
       previewEl.className = 'alert alert-light border mb-0';
       previewEl.textContent = '';

@@ -3,6 +3,7 @@ const classEnrollmentReadService = require('./classEnrollmentReadService');
 const registrationFinanceLifecycleService = require('./registrationFinanceLifecycleService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const TERMINAL_STATUSES = new Set(['withdrawn', 'cancelled', 'completed', 'archived', 'rolled_back', 'void']);
 const OPEN_CLASS_STATUSES = new Set(['active', 'planned']);
@@ -11,8 +12,11 @@ function normalizeStatus(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+function todayISO(orgToday = '', options = {}) {
+  return resolveOrgTodayFromContext({
+    orgToday: orgToday || options.orgToday || options.requestingUser?.orgToday,
+    user: options.requestingUser
+  });
 }
 
 function actorId(options = {}) {
@@ -202,7 +206,7 @@ async function previewTransition(input = {}, options = {}) {
     currentStatus,
     targetStatus,
     alreadyApplied: currentStatus === targetStatus,
-    effectiveDate: String(input.effectiveDate || todayISO()).trim(),
+    effectiveDate: String(input.effectiveDate || todayISO(input.orgToday, options)).trim(),
     reason: String(input.reason || '').trim(),
     blockers,
     canApply: blockers.length === 0 && !hasUnresolvedFinance(transactionSummary),

@@ -25,7 +25,8 @@ const PRACTICE_RESCORING_SECTION_CANDIDATES = Object.freeze([
 function buildPracticeAccessContext(req) {
   return {
     scopeId: req?.accessScope,
-    adminContext: req?.adminContext || null
+    adminContext: req?.adminContext || null,
+    orgTimeZone: req?.orgTimeZone || req?.user?.activeOrgTimeZone || ''
   };
 }
 

@@ -78,7 +78,7 @@
           <% const audit = item.audit || {}; %>
           <td>
             <% if (audit.lastUpdateDateTime) { %>
-              <%= new Date(audit.lastUpdateDateTime).toLocaleString() %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.lastUpdateDateTime) : new Date(audit.lastUpdateDateTime).toLocaleString() %>
               <div class="small text-muted">by User <%= audit.lastUpdateUser %></div>
             <% } else { %>
               <span class="text-muted">—</span>

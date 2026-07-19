@@ -155,7 +155,7 @@ async function previewProgramWithdrawal({
     programId: '',
     programName: '',
     reason: reason || '',
-    effectiveDate: effectiveDate || withdrawalPolicyService.todayISO(),
+    effectiveDate: effectiveDate || withdrawalPolicyService.resolveBusinessToday('', reqUser),
     termWithdrawals: [],
     financialImpact: {
       programFeeOriginal: 0,
@@ -390,7 +390,7 @@ async function executeProgramWithdrawal({
       reasonDetail: reasonDetail || existing.reasonDetail || '',
       initiatorType: initiatorType || existing.initiatorType || 'admin',
       initiatorId: initiatorId || existing.initiatorId || '',
-      requestDate: existing.requestDate || withdrawalPolicyService.todayISO(),
+      requestDate: existing.requestDate || withdrawalPolicyService.resolveBusinessToday('', reqUser),
       effectiveDate: preview.effectiveDate,
       programRegistrationId,
       programId: preview.programId,
@@ -418,7 +418,7 @@ async function executeProgramWithdrawal({
       reasonDetail: reasonDetail || '',
       initiatorType: initiatorType || 'admin',
       initiatorId: initiatorId || '',
-      requestDate: withdrawalPolicyService.todayISO(),
+      requestDate: withdrawalPolicyService.resolveBusinessToday('', reqUser),
       effectiveDate: preview.effectiveDate,
       programRegistrationId,
       programId: preview.programId,
@@ -537,8 +537,8 @@ async function executeProgramWithdrawal({
   const finalStatus = errors.length > 0 ? 'error' : 'completed';
   const updatedWithdrawal = await withdrawalRepository.updateWithdrawal(withdrawalRecord.id, {
     status: finalStatus,
-    completedDate: finalStatus === 'completed' ? withdrawalPolicyService.todayISO() : '',
-    approvedDate: finalStatus === 'completed' ? withdrawalPolicyService.todayISO() : '',
+    completedDate: finalStatus === 'completed' ? withdrawalPolicyService.resolveBusinessToday('', reqUser) : '',
+    approvedDate: finalStatus === 'completed' ? withdrawalPolicyService.resolveBusinessToday('', reqUser) : '',
     approvedBy: finalStatus === 'completed' ? (initiatorId || reqUser?.id || '') : '',
     processedBy: finalStatus === 'completed' ? (initiatorId || reqUser?.id || '') : '',
     financialImpact: {

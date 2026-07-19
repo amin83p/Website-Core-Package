@@ -10,6 +10,7 @@ const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyS
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const { buildVoidPatch } = require('../../models/school/voidRecordMetadata');
 const registrationFinanceLifecycleService = require('./registrationFinanceLifecycleService');
 
@@ -391,8 +392,8 @@ function resolveClassCredits(classItem) {
   return null;
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+function todayISO(orgToday = '', reqUser = null) {
+  return resolveOrgTodayFromContext({ orgToday, user: reqUser });
 }
 
 function normalizeClassBillingMode(value) {
@@ -1008,8 +1009,10 @@ const registrationIntegrityService = {
     programId = '',
     termId = '',
     effectiveDate,
+    orgToday = '',
     options = {}
   }) {
+    const businessToday = todayISO(orgToday || options.orgToday || reqUser?.orgToday);
     const classItem = await schoolDataService.getDataById('classes', classId, reqUser);
     if (!classItem) throw new Error(`Class ${classId} not found.`);
 
@@ -1029,7 +1032,7 @@ const registrationIntegrityService = {
 
     const pricingSnapshot = {
       currency: String(classPreview?.pricing?.currency || 'CAD'),
-      effectiveDate: String(effectiveDate || '').trim() || todayISO(),
+      effectiveDate: String(effectiveDate || '').trim() || businessToday,
       suggestedTotal: roundMoney(classPreview?.pricing?.total || 0),
       finalTotal: roundMoney(classPreview?.pricing?.total || 0),
       note: `Added by term registration ${registrationId}`,
@@ -1041,7 +1044,7 @@ const registrationIntegrityService = {
       orgId: String(classItem?.orgId || '').trim(),
       classId: String(classId || '').trim(),
       studentId: String(student?.id || '').trim(),
-      startDate: String(effectiveDate || '').trim() || todayISO(),
+      startDate: String(effectiveDate || '').trim() || businessToday,
       status: 'active',
       authorizationRef: String(registrationId || '').trim(),
       reasonStart: `Term registration ${registrationId}`,
@@ -1219,6 +1222,7 @@ const registrationIntegrityService = {
       }
     }
 
+    const businessToday = todayISO(options.orgToday || reqUser?.orgToday);
     if (includeClassEnrollmentRollback || includeRosterRollback) {
       for (const enrollmentEntry of enrollmentRows) {
         const classId = String(enrollmentEntry?.classId || '').trim();
@@ -1227,7 +1231,7 @@ const registrationIntegrityService = {
         try {
           await schoolDataService.closeClassEnrollmentPeriod(enrollmentId, {
             status: 'cancelled',
-            endDate: todayISO(),
+            endDate: businessToday,
             reasonEnd: reason || `Rollback of ${memoLabel} ${registrationId}`
           }, reqUser, options);
           await indexService.rebuildIndexesForClass(classId);

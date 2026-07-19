@@ -10,6 +10,22 @@
   const people = org.people || {};
   const audit = org.audit || {};
   const orgContracts = Array.isArray(organizationContracts) ? organizationContracts : [];
+  const tzOptions = (typeof timezoneOptions !== 'undefined' && Array.isArray(timezoneOptions)) ? timezoneOptions : [];
+  const orgDefaultTimezone = (typeof defaultTimezone !== 'undefined' ? String(defaultTimezone || 'UTC') : 'UTC').trim() || 'UTC';
+  const savedOrgTimeZone = (typeof selectedTimeZone !== 'undefined'
+    ? String(selectedTimeZone || '')
+    : String(settings.timeZone || settings.timezone || '')).trim();
+  const curatedTimezoneValues = tzOptions.map((row) => String(row?.value || '').trim()).filter(Boolean);
+  const timezoneSelectValue = !savedOrgTimeZone
+    ? '__default__'
+    : (curatedTimezoneValues.includes(savedOrgTimeZone) ? savedOrgTimeZone : '__custom__');
+  const timezoneCustomValue = timezoneSelectValue === '__custom__' ? savedOrgTimeZone : '';
+  const timezoneGroups = tzOptions.reduce((acc, row) => {
+    const group = String(row?.group || 'Other').trim() || 'Other';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(row);
+    return acc;
+  }, {});
 %>
 
 <div class="sections-page">
@@ -143,6 +159,32 @@
             <label class="form-label">Country</label>
             <input name="country" class="form-control size-md" value="<%= address.country || '' %>">
           </div>
+
+          <hr>
+          <h6 class="fw-bold mb-2">Locale / Time</h6>
+          <div class="mb-3">
+            <label class="form-label" for="orgTimeZoneSelect">Timezone *</label>
+            <select id="orgTimeZoneSelect" name="timeZone" class="form-select size-md" required>
+              <option value="__default__" <%= timezoneSelectValue === '__default__' ? 'selected' : '' %>>Use system default (<%= orgDefaultTimezone %>)</option>
+              <% Object.keys(timezoneGroups).forEach((groupName) => { %>
+                <optgroup label="<%= groupName %>">
+                  <% timezoneGroups[groupName].forEach((row) => { %>
+                    <option value="<%= row.value %>" <%= timezoneSelectValue === row.value ? 'selected' : '' %>><%= row.label %></option>
+                  <% }) %>
+                </optgroup>
+              <% }) %>
+              <option value="__custom__" <%= timezoneSelectValue === '__custom__' ? 'selected' : '' %>>Custom IANA timezone...</option>
+            </select>
+            <div class="form-text">Controls how this organization's dates and times are interpreted across the application.</div>
+          </div>
+
+          <div class="mb-3" id="orgTimeZoneCustomWrap" style="<%= timezoneSelectValue === '__custom__' ? '' : 'display:none;' %>">
+            <label class="form-label" for="orgTimeZoneCustom">Custom IANA timezone</label>
+            <input id="orgTimeZoneCustom" name="timeZoneCustom" class="form-control size-md" placeholder="e.g. America/Edmonton" value="<%= timezoneCustomValue %>">
+            <div class="form-text">Enter a valid IANA timezone identifier when your zone is not listed above.</div>
+          </div>
+
+          <div class="small text-muted" id="orgTimeZonePreview" aria-live="polite"></div>
         </div>
 
         <div class="tab-pane fade" id="tab-domain">
@@ -339,11 +381,11 @@
             <hr>
             <div class="row text-muted small">
               <div class="col-md-6">
-                <div><strong>Created:</strong> <%= audit.createDateTime ? new Date(audit.createDateTime).toLocaleString() : 'N/A' %></div>
+                <div><strong>Created:</strong> <%= audit.createDateTime ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.createDateTime) : new Date(audit.createDateTime).toLocaleString()) : 'N/A' %></div>
                 <div><strong>Created By:</strong> <%= audit.createUser ?? 'N/A' %></div>
               </div>
               <div class="col-md-6">
-                <div><strong>Updated:</strong> <%= audit.lastUpdateDateTime ? new Date(audit.lastUpdateDateTime).toLocaleString() : 'N/A' %></div>
+                <div><strong>Updated:</strong> <%= audit.lastUpdateDateTime ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.lastUpdateDateTime) : new Date(audit.lastUpdateDateTime).toLocaleString()) : 'N/A' %></div>
                 <div><strong>Updated By:</strong> <%= audit.lastUpdateUser ?? 'N/A' %></div>
               </div>
             </div>
@@ -364,6 +406,65 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('organizationForm');
   const adminsHidden = document.getElementById('adminsHidden');
   const adminsEditor = document.getElementById('adminsEditor');
+  const orgTimeZoneSelect = document.getElementById('orgTimeZoneSelect');
+  const orgTimeZoneCustomWrap = document.getElementById('orgTimeZoneCustomWrap');
+  const orgTimeZoneCustom = document.getElementById('orgTimeZoneCustom');
+  const orgTimeZonePreview = document.getElementById('orgTimeZonePreview');
+  const orgDefaultTimezone = <%- JSON.stringify(orgDefaultTimezone) %>;
+
+  function resolveSelectedTimezoneToken() {
+    const selectValue = String(orgTimeZoneSelect?.value || '').trim();
+    if (selectValue === '__default__') return orgDefaultTimezone;
+    if (selectValue === '__custom__') return String(orgTimeZoneCustom?.value || '').trim();
+    return selectValue;
+  }
+
+  function formatTimezonePreview(timeZone) {
+    const token = String(timeZone || '').trim();
+    if (!token) return 'Current time in selected timezone: —';
+    try {
+      const formatted = new Intl.DateTimeFormat('en-US', {
+        timeZone: token,
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }).format(new Date());
+      return `Current time in selected timezone: ${formatted}`;
+    } catch (_) {
+      return 'Current time in selected timezone: invalid timezone';
+    }
+  }
+
+  function syncTimezoneUi() {
+    const isCustom = String(orgTimeZoneSelect?.value || '') === '__custom__';
+    if (orgTimeZoneCustomWrap) {
+      orgTimeZoneCustomWrap.style.display = isCustom ? '' : 'none';
+    }
+    if (orgTimeZoneCustom) {
+      orgTimeZoneCustom.required = isCustom;
+      if (!isCustom) orgTimeZoneCustom.setCustomValidity('');
+    }
+    if (orgTimeZonePreview) {
+      orgTimeZonePreview.textContent = formatTimezonePreview(resolveSelectedTimezoneToken());
+    }
+  }
+
+  if (orgTimeZoneSelect) {
+    orgTimeZoneSelect.addEventListener('change', syncTimezoneUi);
+  }
+  if (orgTimeZoneCustom) {
+    orgTimeZoneCustom.addEventListener('input', syncTimezoneUi);
+  }
+  syncTimezoneUi();
+  window.setInterval(() => {
+    if (orgTimeZonePreview) {
+      orgTimeZonePreview.textContent = formatTimezonePreview(resolveSelectedTimezoneToken());
+    }
+  }, 60000);
 
   function syncAdminsHidden() {
     if (!adminsHidden || !adminsEditor) return;

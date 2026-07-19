@@ -8,7 +8,8 @@
     "allowFreeRegistration": true,
     "defaultTrialDays": 14,
     "freeOrgId": 900000,
-    "freeOrgName": "Free User"
+    "freeOrgName": "Free User",
+    "pteJoinOrgId": 900000
   },
   "access": {
     "highAccessMin": 8,
@@ -23,6 +24,8 @@
   "app": {
     "defaultPageSize": 50,
     "searchDefaultKeyword": "aaa",
+    "buildVersionOverride": "",
+    "defaultTimezone": "UTC",
     "uploadsPath": "/app/uploads",
     "uploadFolders": {
       "core.fileManager": "misc",
@@ -41,6 +44,8 @@
       "generated.heic": "heic-converter/{jobDate}/{jobId}",
       "generated.importReports": "importReports",
       "generated.benchpathReports": "benchpath/reports",
+      "school.teachers": "teachers/{personId}",
+      "school.staff": "staff/{personId}",
       "pte.questionBank": "PTE/Question_Bank",
       "pte.students": "PTE/Students",
       "pte.studentItem": "PTE/Students/{itemId}",
@@ -51,10 +56,6 @@
       "pte.mockExamAttempt": "PTE/Mock_Exams/{userId}/{testName}/{sessionId}/{itemId}",
       "pte.packageAssets": "PTE/Package_Assets"
     },
-    "schoolCanonicalEnrollmentRead": false,
-    "schoolCanonicalEnrollmentWrite": false,
-    "schoolIntentionalConflictMode": false,
-    "schoolReadModelsEnabled": false,
     "brand": {
       "appName": "Amin Pakenjad",
       "appShortName": "Amin Pakenjad",
@@ -189,7 +190,7 @@
           "icon": "bi-stars",
           "visibility": "all",
           "target": "_self",
-          "active": true,
+          "active": false,
           "children": []
         },
         {
@@ -209,7 +210,7 @@
           "icon": "bi-mortarboard",
           "visibility": "all",
           "target": "_self",
-          "active": true,
+          "active": false,
           "children": []
         },
         {
@@ -219,7 +220,7 @@
           "icon": "bi-person-badge",
           "visibility": "all",
           "target": "_self",
-          "active": true,
+          "active": false,
           "children": []
         },
         {
@@ -239,7 +240,7 @@
           "icon": "bi-info-circle",
           "visibility": "all",
           "target": "_self",
-          "active": true,
+          "active": false,
           "children": []
         },
         {
@@ -253,10 +254,17 @@
           "children": []
         }
       ]
-    }
+    },
+    "schoolCanonicalEnrollmentRead": false,
+    "schoolCanonicalEnrollmentWrite": false,
+    "schoolIntentionalConflictMode": false,
+    "schoolReadModelsEnabled": false,
+    "enableRollingClassWorkflow": true,
+    "rollingWorkflowPilotOrgIds": "",
+    "rollingWorkflowPilotProgramIds": ""
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-05-26T02:28:09.173Z"
+    "lastUpdateDateTime": "2026-07-19T07:44:06.987Z"
   }
 }

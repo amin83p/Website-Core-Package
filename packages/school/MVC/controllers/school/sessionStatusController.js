@@ -79,6 +79,7 @@ function buildPayload(reqBody, { activeOrgId, userId }) {
     timesheetFormula: String(reqBody.timesheetFormula || '').trim(),
     isFinal: toBoolean(reqBody.isFinal, false),
     makeUpRequired: toBoolean(reqBody.makeUpRequired, false),
+    makeupDurationPercent: Number(reqBody.makeupDurationPercent || 100),
     excludeFromAttendance: toBoolean(reqBody.excludeFromAttendance, false),
     excludeFromTeacherIndex: toBoolean(reqBody.excludeFromTeacherIndex, false),
     excludeFromStudentIndex: toBoolean(reqBody.excludeFromStudentIndex, false),

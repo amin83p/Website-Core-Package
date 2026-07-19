@@ -153,7 +153,7 @@
     if (els.title) els.title.textContent = module ? module.label : 'School Master Hub';
     if (els.meta) {
       const refreshed = result && result.refreshedAt
-        ? new Date(result.refreshedAt).toLocaleString()
+        ? ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(result.refreshedAt) : new Date(result.refreshedAt).toLocaleString())
         : 'not loaded yet';
       els.meta.textContent = `${result && result.total != null ? result.total : 0} active records. Last refreshed: ${refreshed}.`;
     }

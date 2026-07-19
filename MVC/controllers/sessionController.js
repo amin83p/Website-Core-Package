@@ -1,6 +1,7 @@
 // MVC/controllers/sessionController.js
 const sessionService = require('../services/SessionService');const { idsEqual } = require('../utils/idAdapter');
 const { buildDataServiceQuery } = require('../utils/generalTools');
+const { formatInstantInTimezone } = require('../utils/timezoneUtils');
 
 const dataService = require('../services/dataService');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
@@ -190,14 +191,14 @@ async function getSessionDetails(req, res) {
         // Enrich with User info
         const user = await dataService.getDataById('users', session.userId, SYSTEM_CONTEXT);
         
+        const orgTimeZone = req.orgTimeZone || req.user?.activeOrgTimeZone || 'UTC';
         const details = {
             ...session,
             username: user ? user.username : 'Unknown',
             userEmail: user ? user.email : 'Unknown',
-            // Format timestamps for display
-            formattedCreated: new Date(session.createdAt).toLocaleString(),
-            formattedLastActive: new Date(session.lastActivityAt).toLocaleString(),
-            formattedExpiry: new Date(session.absoluteExpiry).toLocaleString()
+            formattedCreated: formatInstantInTimezone(session.createdAt, orgTimeZone),
+            formattedLastActive: formatInstantInTimezone(session.lastActivityAt, orgTimeZone),
+            formattedExpiry: formatInstantInTimezone(session.absoluteExpiry, orgTimeZone)
         };
 
         res.json({ status: 'success', session: details });

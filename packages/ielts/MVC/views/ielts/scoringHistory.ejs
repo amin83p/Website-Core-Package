@@ -315,8 +315,7 @@
           </td>
           <td>
              <span class="text-muted small">
-                <%= new Date(item.savedAt).toLocaleDateString() %> 
-                <span class="text-muted opacity-50"><%= new Date(item.savedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) %></span>
+                <%= formatOrgDateTime(item.savedAt) %>
              </span>
           </td>
 

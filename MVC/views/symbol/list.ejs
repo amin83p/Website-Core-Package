@@ -74,7 +74,7 @@
 
           <td>
             <% if (sym.audit && sym.audit.lastUpdateDateTime) { %>
-                <%= new Date(sym.audit.lastUpdateDateTime).toLocaleString() %>
+                <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(sym.audit.lastUpdateDateTime) : new Date(sym.audit.lastUpdateDateTime).toLocaleString() %>
                 <br><span class="text-muted x-small">by <%= sym.audit.lastUpdateUser %></span>
             <% } else { %> - <% } %>
           </td>

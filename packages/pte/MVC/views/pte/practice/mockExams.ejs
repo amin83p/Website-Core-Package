@@ -8,8 +8,7 @@
   const fmtDate = (value) => {
     const token = String(value || '').trim();
     if (!token) return '-';
-    const date = new Date(token);
-    return Number.isNaN(date.getTime()) ? token : date.toLocaleString();
+    return typeof formatOrgDateTime === 'function' ? formatOrgDateTime(token) : token;
   };
 %>
 

@@ -39,7 +39,7 @@
         <tr>
           <td>
             <% if (item.consumedAt || item.createdAt) { %>
-              <%= new Date(item.consumedAt || item.createdAt).toLocaleString() %>
+              <%= formatOrgDateTime(item.consumedAt || item.createdAt) %>
             <% } else { %>
               -
             <% } %>

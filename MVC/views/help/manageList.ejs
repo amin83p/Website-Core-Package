@@ -72,7 +72,7 @@
           <td class="text-center">
             <div><span class="badge <%= item.active ? 'bg-success' : 'bg-secondary' %>"><%= item.active ? 'ACTIVE' : 'INACTIVE' %></span></div>
             <div class="x-small text-muted mt-1">Priority: <%= item.priority || 0 %></div>
-            <div class="x-small text-muted"><%= item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '-' %></div>
+            <div class="x-small text-muted"><%= item.updatedAt ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(item.updatedAt) : new Date(item.updatedAt).toLocaleString()) : '-' %></div>
           </td>
           <td class="table-actions">
             <% if (item.slug) { %>

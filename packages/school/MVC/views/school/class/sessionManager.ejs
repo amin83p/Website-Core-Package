@@ -1941,6 +1941,16 @@
 let detailsModalInstance = null;
 let currentMentions = [];
 
+function formatSchoolInstant(value) {
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatSchoolInstant === 'function') {
+        return window.AppOrgDateTime.formatSchoolInstant(value);
+    }
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatInstant === 'function') {
+        return window.AppOrgDateTime.formatInstant(value);
+    }
+    return '-';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const actionStateId = <%- jsonForScript((typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '') %>;
     const defaultSessionStatusCode = <%- jsonForScript(fallbackStatusCode) %>;
@@ -1957,6 +1967,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionDefaultDate = <%- jsonForScript(session.date || '') %>;
     const sessionDefaultStartTime = <%- jsonForScript(session.startTime || '') %>;
     const sessionDefaultEndTime = <%- jsonForScript(session.endTime || '') %>;
+    const sessionOriginalDurationHours = <%- jsonForScript((() => {
+        const start = String(session.startTime || '').trim();
+        const end = String(session.endTime || '').trim();
+        if (start && end && /^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end)) {
+            const [sh, sm] = start.split(':').map(Number);
+            const [eh, em] = end.split(':').map(Number);
+            const minutes = ((eh * 60) + em) - ((sh * 60) + sm);
+            if (minutes > 0) return Number((minutes / 60).toFixed(2));
+        }
+        const fallback = Number(session.durationHours || 0);
+        return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
+    })()) %>;
+    const sessionMakeupDefaultPercent = <%- jsonForScript(Number(currentSessionStatusMeta?.makeupDurationPercent || 100)) %>;
     const sessionCanAssignReports = <%- jsonForScript(Boolean(canAssignSessionReports)) %>;
     const sessionReportRosterRows = <%- jsonForScript(Array.isArray(session.roster) ? session.roster : []) %>;
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
@@ -2040,6 +2063,8 @@ document.addEventListener('DOMContentLoaded', () => {
             '<div class="col-md-4"><label class="form-label fw-bold">Date</label><input type="date" class="form-control" id="makeupSessionDate"></div>',
             '<div class="col-md-4"><label class="form-label fw-bold">Start Time</label><input type="time" class="form-control" id="makeupSessionStart"></div>',
             '<div class="col-md-4"><label class="form-label fw-bold">End Time</label><input type="time" class="form-control" id="makeupSessionEnd"></div>',
+            '<div class="col-md-4"><label class="form-label fw-bold">Make-up Duration %</label><input type="number" class="form-control" id="makeupSessionDurationPercent" min="1" max="100" step="1"></div>',
+            '<div class="col-md-8"><div class="alert alert-light border small mb-0 h-100" id="makeupSessionDurationSummary"></div></div>',
             '<div class="col-md-6"><label class="form-label fw-bold">Teacher</label><div class="input-group"><input type="text" class="form-control bg-white" id="makeupSessionTeacherName" readonly><button type="button" class="btn btn-outline-primary" id="makeupSessionPickTeacher"><i class="bi bi-person-check"></i></button></div></div>',
             '<div class="col-md-6"><label class="form-label fw-bold">Location</label><input type="text" class="form-control" id="makeupSessionRoom" maxlength="200"></div>',
             '<div class="col-12"><label class="form-label fw-bold">Reason</label><textarea class="form-control" id="makeupSessionReason" rows="3" maxlength="1000" placeholder="Why is this make-up session needed?"></textarea></div>',
@@ -2073,7 +2098,51 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         });
         modal.querySelector('#makeupSessionCreate')?.addEventListener('click', createMakeupSessionFromModal);
+        modal.querySelector('#makeupSessionDurationPercent')?.addEventListener('input', syncMakeupSessionDurationPreview);
+        modal.querySelector('#makeupSessionStart')?.addEventListener('input', syncMakeupSessionDurationPreview);
         return modal;
+    }
+
+    function addMinutesToClockTimeClient(startTime, minutesToAdd) {
+        const start = String(startTime || '').trim();
+        if (!/^\d{2}:\d{2}$/.test(start)) return '';
+        const [h, m] = start.split(':').map(Number);
+        const totalMinutes = (h * 60) + m + Number(minutesToAdd || 0);
+        if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+        const endH = Math.floor(totalMinutes / 60) % 24;
+        const endM = totalMinutes % 60;
+        return String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0');
+    }
+
+    function formatDurationHoursLabel(hours) {
+        const safe = Number(hours);
+        if (!Number.isFinite(safe) || safe <= 0) return '0 hr';
+        const minutes = Math.round(safe * 60);
+        const wholeHours = Math.floor(minutes / 60);
+        const remainderMinutes = minutes % 60;
+        if (wholeHours && remainderMinutes) return wholeHours + ' hr ' + remainderMinutes + ' min';
+        if (wholeHours) return wholeHours + ' hr';
+        return remainderMinutes + ' min';
+    }
+
+    function syncMakeupSessionDurationPreview() {
+        const modal = document.getElementById('makeupSessionModal');
+        if (!modal) return;
+        const percentInput = modal.querySelector('#makeupSessionDurationPercent');
+        const startInput = modal.querySelector('#makeupSessionStart');
+        const endInput = modal.querySelector('#makeupSessionEnd');
+        const summary = modal.querySelector('#makeupSessionDurationSummary');
+        const percent = Math.max(1, Math.min(100, Number(percentInput?.value || sessionMakeupDefaultPercent || 100)));
+        if (percentInput) percentInput.value = String(percent);
+        const makeupHours = Number((Number(sessionOriginalDurationHours || 0) * (percent / 100)).toFixed(2));
+        if (startInput?.value) {
+            const computedEnd = addMinutesToClockTimeClient(startInput.value, Math.round(makeupHours * 60));
+            if (computedEnd && endInput) endInput.value = computedEnd;
+        }
+        if (!summary) return;
+        summary.innerHTML = '<strong>Original session:</strong> ' + formatDurationHoursLabel(sessionOriginalDurationHours)
+            + '<br><strong>Make-up at ' + percent + '%:</strong> ' + formatDurationHoursLabel(makeupHours)
+            + '<br><span class="text-muted">Original session payroll uses Timesheet Formula on the full duration. Make-up payroll applies when the make-up session is completed.</span>';
     }
 
     function openMakeupSessionModal() {
@@ -2081,6 +2150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.querySelector('#makeupSessionDate').value = '';
         modal.querySelector('#makeupSessionStart').value = sessionDefaultStartTime || '';
         modal.querySelector('#makeupSessionEnd').value = sessionDefaultEndTime || '';
+        modal.querySelector('#makeupSessionDurationPercent').value = String(sessionMakeupDefaultPercent || 100);
         modal.querySelector('#makeupSessionTeacherId').value = sessionDefaultTeacherId || '';
         modal.querySelector('#makeupSessionTeacherName').value = sessionDefaultTeacherName || sessionDefaultTeacherId || '';
         modal.querySelector('#makeupSessionRoom').value = sessionDefaultRoom || '';
@@ -2089,6 +2159,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ? '<div class="mt-2 text-warning"><i class="bi bi-exclamation-triangle me-1"></i>' + sessionMakeupHistory.length + ' make-up session(s) already exist for this original session.</div>'
             : '';
         modal.querySelector('#makeupSessionContext').innerHTML = '<strong>Original session:</strong> ' + attendanceAttachmentEscape(sessionManagerSessionId) + historyNote;
+        syncMakeupSessionDurationPreview();
         if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).show();
     }
 
@@ -2100,6 +2171,7 @@ document.addEventListener('DOMContentLoaded', () => {
             date: modal.querySelector('#makeupSessionDate')?.value || '',
             startTime: modal.querySelector('#makeupSessionStart')?.value || '',
             endTime: modal.querySelector('#makeupSessionEnd')?.value || '',
+            makeupDurationPercent: modal.querySelector('#makeupSessionDurationPercent')?.value || sessionMakeupDefaultPercent || 100,
             teacherId: modal.querySelector('#makeupSessionTeacherId')?.value || '',
             teacherName: modal.querySelector('#makeupSessionTeacherName')?.value || '',
             room: modal.querySelector('#makeupSessionRoom')?.value || '',
@@ -3767,7 +3839,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 thread.innerHTML += `
                     <div class="comment-bubble">
-                        <span class="comment-time">${new Date(result.comment.timestamp).toLocaleString()}</span>
+                        <span class="comment-time">${formatSchoolInstant(result.comment.timestamp)}</span>
                         <div class="comment-author">${result.comment.authorName}</div>
                         <div class="mt-1">${mentionHtml} ${result.comment.text}</div>
                         ${attachmentHtml}
@@ -5103,7 +5175,7 @@ function openDetailsModal(personId, name) {
 
                 thread.innerHTML += `
                     <div class="comment-bubble">
-                        <span class="comment-time">${new Date(c.timestamp).toLocaleString()}</span>
+                        <span class="comment-time">${formatSchoolInstant(c.timestamp)}</span>
                         <div class="comment-author">${c.authorName}</div>
                         <div class="mt-1">${mentionHtml} ${c.text}</div>
                         ${attachmentHtml}

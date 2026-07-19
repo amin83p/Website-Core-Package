@@ -109,7 +109,7 @@
                   <div class="mb-2">
                     <div class="form-text x-small">Received</div>
                     <div class="fw-bold">
-                      <%= audit.createDateTime ? new Date(audit.createDateTime).toLocaleString() : '—' %>
+                      <%= audit.createDateTime ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.createDateTime) : new Date(audit.createDateTime).toLocaleString()) : '—' %>
                     </div>
                   </div>
 

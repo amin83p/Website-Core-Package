@@ -791,6 +791,12 @@
 
 
 <script>
+const ORG_TODAY = <%- JSON.stringify(typeof orgToday !== 'undefined' ? orgToday : '') %>;
+function orgTodayFallback() {
+    if (ORG_TODAY) return ORG_TODAY;
+    return (window.AppOrgDateTime && window.AppOrgDateTime.today) ? String(window.AppOrgDateTime.today) : '';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // UI helpers (prefer message modal if available)
     async function uiAlert(message, title = 'Notice') {
@@ -1828,7 +1834,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getProposalRuleCandidates(subject, feeCategory) {
         const rules = Array.isArray(subject?.feeRules) ? subject.feeRules : [];
-        const currentDate = new Date().toISOString().slice(0, 10);
+        const currentDate = orgTodayFallback();
         const isActiveRule = (rule) => rule && rule.active !== false && String(rule.active) !== 'false';
         const isEffectiveRule = (rule) => {
             if (!isActiveRule(rule)) return false;
@@ -2756,7 +2762,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await uiAlert('Please select a teacher first to view their schedule.', 'Teacher Schedule');
                 return; 
             }
-            const date = document.getElementById('bg_start').value || new Date().toISOString().split('T')[0];
+            const date = document.getElementById('bg_start').value || orgTodayFallback();
             window.open(`/school/schedules/viewer?personId=${tid}&personName=${encodeURIComponent(tName)}&date=${date}`, '_blank');
         });
     }

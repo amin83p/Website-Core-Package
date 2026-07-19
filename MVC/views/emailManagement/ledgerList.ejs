@@ -120,7 +120,7 @@
       <% (data || []).forEach((row) => { %>
         <tr>
           <td class="font-monospace"><%= row.id %></td>
-          <td><%= row.dateTime ? new Date(row.dateTime).toLocaleString() : '-' %></td>
+          <td><%= row.dateTime ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.dateTime) : new Date(row.dateTime).toLocaleString()) : '-' %></td>
           <td>
             <% if (String(row.status || '').toLowerCase() === 'accepted') { %>
               <span class="badge bg-success-subtle text-success border">Accepted</span>

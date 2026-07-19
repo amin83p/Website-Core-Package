@@ -758,7 +758,9 @@
   }
 
   function render(report, vars, step3Vars, list) {
-    document.getElementById('visualGeneratedAt').textContent = report?.generatedAt ? new Date(report.generatedAt).toLocaleString() : '-';
+    document.getElementById('visualGeneratedAt').textContent = report?.generatedAt
+      ? ((window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(report.generatedAt) : report.generatedAt)
+      : '-';
     document.getElementById('visualStatus').textContent = `Loaded ${report?.runCount || 0} runs.`;
     document.getElementById('visualStatus').className = 'small text-success';
 

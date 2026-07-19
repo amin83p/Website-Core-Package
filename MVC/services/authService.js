@@ -10,6 +10,11 @@ const { normalizeOrgRoles, getPrimaryOrgRole } = require('../utils/orgContextUti
 const { idsEqual, toPublicId, toStorageId } = require('../utils/idAdapter');
 const userRepository = require('../repositories/userRepository');
 const { evaluateUserEntitlement } = require('./security/entitlementService');
+const {
+  resolveOrganizationTimezoneFromRow,
+  resolveActiveOrgTimezoneFromUser,
+  getTodayDateKeyInTimezone
+} = require('../utils/timezoneUtils');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 async function resolveUserById(userId) {
@@ -249,7 +254,8 @@ async function getUserFromToken(token) {
               isOrgActive: orgIsActive,
               hasActiveContract,
               isSelectable,
-              switchDisabledReason: disabledReason
+              switchDisabledReason: disabledReason,
+              timeZone: resolveOrganizationTimezoneFromRow(o)
           };
           const realMem = realLocalMemberships.find(rm => idsEqual(rm.orgId, o.id));
           if (realMem && realMem.memberStatus === 'active') {
@@ -283,7 +289,8 @@ async function getUserFromToken(token) {
                     orgName: resolvedOrgName,
                     organizationName: resolvedOrgName,
                     roles: normalizeOrgRoles(org),
-                    role: getPrimaryOrgRole(org)
+                    role: getPrimaryOrgRole(org),
+                    timeZone: resolveOrganizationTimezoneFromRow(orgData)
                   }); 
               } else {
                   // Optional: You could log this rejection
@@ -300,7 +307,9 @@ async function getUserFromToken(token) {
       allowedOrgs = allowedOrgs.map((org) => {
           if (idsEqual(org?.orgId, 'SYSTEM')) return org;
           const nextOrg = { ...org };
-          const orgEntitlement = evaluateUserEntitlement(membershipRows, user.id, nextOrg.orgId);
+          const orgEntitlement = evaluateUserEntitlement(membershipRows, user.id, nextOrg.orgId, {
+            today: getTodayDateKeyInTimezone(nextOrg.timeZone || 'UTC')
+          });
           entitlementByOrgId.set(String(nextOrg.orgId), orgEntitlement);
           nextOrg.entitlement = orgEntitlement;
           if (orgEntitlement.enforced && orgEntitlement.active === false) {
@@ -387,6 +396,8 @@ async function getUserFromToken(token) {
   }
 
   // 7. MEMBERSHIP / ENTITLEMENT WINDOW (per-user validity)
+  const activeOrgTimeZone = resolveActiveOrgTimezoneFromUser({ activeOrgId, allowedOrgs });
+  const orgToday = getTodayDateKeyInTimezone(activeOrgTimeZone);
   let entitlement = buildBypassEntitlement('bypass', 'Entitlement check bypassed for virtual super admin.');
 
   if (!user.isVirtualSuperAdmin) {
@@ -394,7 +405,7 @@ async function getUserFromToken(token) {
       entitlement = buildBypassEntitlement('system_mode', 'System mode is not membership-restricted.');
     } else {
       entitlement = entitlementByOrgId.get(String(activeOrgId))
-        || evaluateUserEntitlement(membershipRows, user.id, activeOrgId);
+        || evaluateUserEntitlement(membershipRows, user.id, activeOrgId, { today: orgToday });
     }
   }
 
@@ -412,7 +423,9 @@ async function getUserFromToken(token) {
     isVirtualSuperAdmin: user.isVirtualSuperAdmin, 
     isSystemAdmin: (currentProfileMode === 'SYSTEM' && (isVirtualSuperAdmin || hasSystemProfile)), 
     activeOrgId, 
-    allowedOrgs, 
+    allowedOrgs,
+    activeOrgTimeZone,
+    orgToday,
     activeProfile, 
     activePolicy, 
     activeOrgPolicy,
@@ -465,7 +478,9 @@ async function switchOrganization(userId, targetOrgId, currentSessionId) {
 
   if (!user?.isVirtualSuperAdmin) {
       const membershipRows = await fetchUserMembershipRows(user.id);
-      const targetEntitlement = evaluateUserEntitlement(membershipRows, user.id, target.id);
+      const targetEntitlement = evaluateUserEntitlement(membershipRows, user.id, target.id, {
+        today: getTodayDateKeyInTimezone(resolveOrganizationTimezoneFromRow(target))
+      });
       if (targetEntitlement.enforced && targetEntitlement.active === false) {
           return { success: false, message: targetEntitlement.reason || 'Membership is inactive for this organization.' };
       }

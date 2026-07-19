@@ -1,0 +1,7 @@
+<%
+  const instantValue = typeof value !== 'undefined' ? value : '';
+  const instantFallback = typeof fallback !== 'undefined' ? fallback : '-';
+%>
+<%= (instantValue && typeof formatOrgDateTime === 'function')
+  ? formatOrgDateTime(instantValue)
+  : (instantValue ? new Date(instantValue).toLocaleString() : instantFallback) %>

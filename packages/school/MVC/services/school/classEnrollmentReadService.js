@@ -1,6 +1,7 @@
 const schoolDataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 
 const OPEN_PERIOD_STATUSES = new Set(['active', 'planned']);
@@ -20,8 +21,10 @@ function normalizeDateOnly(value) {
   return parsed.toISOString().slice(0, 10);
 }
 
-function getReferenceDate(referenceDate = '') {
-  return normalizeDateOnly(referenceDate) || new Date().toISOString().slice(0, 10);
+function getReferenceDate(referenceDate = '', orgToday = '', reqUser = null) {
+  return normalizeDateOnly(referenceDate)
+    || normalizeDateOnly(orgToday)
+    || resolveOrgTodayFromContext({ orgToday, user: reqUser });
 }
 
 function isOpenCanonicalPeriod(row, referenceDate = '') {
@@ -38,7 +41,8 @@ function isOpenCanonicalPeriod(row, referenceDate = '') {
 function parseWindowDates({
   sessionDates = [],
   startDate = '',
-  endDate = ''
+  endDate = '',
+  orgToday = ''
 } = {}) {
   const candidates = [];
   (Array.isArray(sessionDates) ? sessionDates : []).forEach((value) => {
@@ -50,7 +54,7 @@ function parseWindowDates({
   if (normalizedStart) candidates.push(normalizedStart);
   if (normalizedEnd) candidates.push(normalizedEnd);
   if (!candidates.length) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = normalizeDateOnly(orgToday) || resolveOrgTodayFromContext({ orgToday });
     return { start: today, end: today };
   }
   candidates.sort();
@@ -114,7 +118,8 @@ const classEnrollmentReadService = {
     sessionDates = [],
     startDate = '',
     endDate = '',
-    canonicalStatuses = null
+    canonicalStatuses = null,
+    orgToday = ''
   } = {}) {
     const normalizedClassId = toPublicId(classId || classItem?.id);
     if (!normalizedClassId) return { source: 'none', studentIds: new Set(), usedFallback: false };
@@ -128,7 +133,7 @@ const classEnrollmentReadService = {
       return { source: 'canonical', studentIds: new Set(), usedFallback: false };
     }
 
-    const window = parseWindowDates({ sessionDates, startDate, endDate });
+    const window = parseWindowDates({ sessionDates, startDate, endDate, orgToday: orgToday || reqUser?.orgToday });
     const normalizedStatusSet = Array.isArray(canonicalStatuses) && canonicalStatuses.length
       ? new Set(canonicalStatuses.map((value) => normalizeStatus(value)).filter(Boolean))
       : OPEN_PERIOD_STATUSES;

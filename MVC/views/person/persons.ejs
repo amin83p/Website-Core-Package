@@ -82,7 +82,7 @@
           </td>
           <td>
             <% if (createDateTime) { %>
-              <%= new Date(createDateTime).toLocaleString() %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(createDateTime) : new Date(createDateTime).toLocaleString() %>
               <% if (createUser) { %>
                 <br><span class="text-muted small">by <%= createUser %></span>
               <% } %>
@@ -92,7 +92,7 @@
           </td>
           <td>
             <% if (lastUpdateDateTime) { %>
-              <%= new Date(lastUpdateDateTime).toLocaleString() %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(lastUpdateDateTime) : new Date(lastUpdateDateTime).toLocaleString() %>
               <% if (lastUpdateUser) { %>
                 <br><span class="text-muted small">by <%= lastUpdateUser %></span>
               <% } %>

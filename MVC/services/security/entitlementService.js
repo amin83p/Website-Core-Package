@@ -1,4 +1,5 @@
 const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { resolveOrgTodayFromContext } = require('../../utils/timezoneUtils');
 
 const MEMBERSHIP_PERIOD_SOURCE_TYPE_OPTIONS = Object.freeze([
   { value: 'manual', label: 'Manual' },
@@ -49,7 +50,7 @@ function toDateKey(value) {
 }
 
 function getTodayDateKey() {
-  return new Date().toISOString().slice(0, 10);
+  return resolveOrgTodayFromContext({});
 }
 
 function addDays(dateKey, days) {

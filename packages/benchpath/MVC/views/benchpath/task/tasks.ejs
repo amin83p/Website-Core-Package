@@ -67,7 +67,7 @@
               <span class="badge bg-light text-dark border">Pending</span>
             <% } %>
           </td>
-          <td><%= item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '-' %></td>
+          <td><%= item.updatedAt ? formatOrgDateTime(item.updatedAt) : '-' %></td>
           <td class="table-actions text-end pe-4">
             <a href="<%= wizardUrl %>" class="btn btn-sm btn-outline-info me-1"><%= item.status === 'draft' ? 'Resume Wizard' : 'Edit Wizard' %></a>
             <a href="/benchpath/tasks/view/<%= item.id %>" class="btn btn-sm btn-filled btn-edit me-1">View</a>

@@ -1245,6 +1245,9 @@
   function formatDateTime(iso) {
     const token = cleanText(iso);
     if (!token) return '-';
+    if (window.AppOrgDateTime && typeof AppOrgDateTime.formatInstant === 'function') {
+      return AppOrgDateTime.formatInstant(token) || '-';
+    }
     const parsed = new Date(token);
     if (Number.isNaN(parsed.getTime())) return '-';
     return parsed.toLocaleString();

@@ -3,6 +3,7 @@ const schoolDataService = require('../../services/school/schoolDataService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const chatRepository = requireCoreModule('MVC/repositories/chatRepository');
 const socketService = requireCoreModule('MVC/services/socketService'); // IMPORT SOCKET SERVICE
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
@@ -51,12 +52,13 @@ async function assertAttendanceMatrixSessionEditable(req, classData, session) {
     }
 }
 
-function resolveDateWindow({ sessions = [], startDate = '', endDate = '' } = {}) {
+function resolveDateWindow({ sessions = [], startDate = '', endDate = '', orgToday = '' } = {}) {
     const sessionDates = (Array.isArray(sessions) ? sessions : [])
         .map((row) => normalizeDateOnly(row?.date))
         .filter(Boolean)
         .sort();
-    const start = normalizeDateOnly(startDate) || sessionDates[0] || new Date().toISOString().slice(0, 10);
+    const fallbackToday = resolveOrgTodayFromContext({ orgToday });
+    const start = normalizeDateOnly(startDate) || sessionDates[0] || fallbackToday;
     const end = normalizeDateOnly(endDate) || sessionDates[sessionDates.length - 1] || start;
     return { start, end };
 }

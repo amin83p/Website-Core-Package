@@ -97,11 +97,11 @@
             <div class="small text-muted"><%= row.email || '-' %></div>
           </td>
           <td>
-            <div><%= row.lastActivityAt ? new Date(row.lastActivityAt).toLocaleString() : '-' %></div>
+            <div><%= row.lastActivityAt ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.lastActivityAt) : new Date(row.lastActivityAt).toLocaleString()) : '-' %></div>
             <div class="small text-muted"><%= formatRelativeTime(row.lastActivityAt) %></div>
           </td>
           <td>
-            <div><%= row.lastLoginAt ? new Date(row.lastLoginAt).toLocaleString() : '-' %></div>
+            <div><%= row.lastLoginAt ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.lastLoginAt) : new Date(row.lastLoginAt).toLocaleString()) : '-' %></div>
             <div class="small text-muted"><%= formatRelativeTime(row.lastLoginAt) %></div>
           </td>
           <td class="text-center">

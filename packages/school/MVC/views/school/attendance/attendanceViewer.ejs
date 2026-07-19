@@ -284,6 +284,16 @@ let detailsModalInstance = null;
 let attendanceMatrixBusyToken = null;
 let attendanceMatrixBusyDepth = 0;
 
+function formatSchoolInstant(value) {
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatSchoolInstant === 'function') {
+        return window.AppOrgDateTime.formatSchoolInstant(value);
+    }
+    if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatInstant === 'function') {
+        return window.AppOrgDateTime.formatInstant(value);
+    }
+    return '-';
+}
+
 const attendanceAttachmentEscape = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -839,10 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const orgName = String(meta.orgName || '').trim();
         const rangeLabel = attPrintFormatRangeLabel(meta.startDate, meta.endDate);
         const printedAt = meta.printedAt instanceof Date ? meta.printedAt : new Date();
-        const printedAtLabel = printedAt.toLocaleString('en-US', {
-            year: 'numeric', month: 'short', day: 'numeric',
-            hour: 'numeric', minute: '2-digit'
-        });
+        const printedAtLabel = formatSchoolInstant(printedAt);
 
         const footnotes = [];
         const footnoteByKey = new Map();
@@ -1244,7 +1251,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const attachmentHtml = result.comment.attachment ? `<div class="small mt-1">${renderAttendanceAttachmentLink(result.comment.attachment)}</div>` : '';
             thread.innerHTML += `
                 <div class="comment-bubble">
-                    <span class="comment-time">${new Date(result.comment.timestamp).toLocaleString()}</span>
+                    <span class="comment-time">${formatSchoolInstant(result.comment.timestamp)}</span>
                     <div class="comment-author">${result.comment.authorName}</div>
                     <div class="mt-1">${mentionHtml} ${result.comment.text}</div>
                     ${attachmentHtml}
@@ -1479,7 +1486,7 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
             
             thread.innerHTML += `
                 <div class="comment-bubble">
-                    <span class="comment-time">${new Date(c.timestamp).toLocaleString()}</span>
+                    <span class="comment-time">${formatSchoolInstant(c.timestamp)}</span>
                     <div class="comment-author">${c.authorName}</div>
                     <div class="mt-1">${mentionHtml} ${c.text}</div>
                     ${attachmentHtml}

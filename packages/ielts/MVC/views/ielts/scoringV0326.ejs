@@ -1842,6 +1842,9 @@ function resolveSessionStep3ModelLabel(session) {
 function formatSavedAtLabel(value) {
   const txt = String(value || "").trim();
   if (!txt) return "-";
+  if (window.AppOrgDateTime && typeof AppOrgDateTime.formatInstant === 'function') {
+    return AppOrgDateTime.formatInstant(txt) || txt;
+  }
   const date = new Date(txt);
   if (Number.isNaN(date.getTime())) return txt;
   return date.toLocaleString();

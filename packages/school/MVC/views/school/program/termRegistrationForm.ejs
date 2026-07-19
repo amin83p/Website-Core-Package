@@ -62,7 +62,7 @@
             </div>
             <div class="col-lg-2">
               <label class="form-label fw-bold">Effective Date *</label>
-              <input type="date" class="form-control" name="effectiveDate" id="inp_effectiveDate" value="<%= new Date().toISOString().slice(0,10) %>" required>
+              <input type="date" class="form-control" name="effectiveDate" id="inp_effectiveDate" value="<%= typeof orgToday !== 'undefined' && orgToday ? orgToday : '' %>" required>
             </div>
             <div class="col-lg-2">
               <label class="form-label fw-bold">External Ref</label>

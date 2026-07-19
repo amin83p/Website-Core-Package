@@ -14,8 +14,10 @@ const {
   isRailwayProxyMode,
   activityQuotaLedgerService,
   consumptionDefinitionPolicyService,
-  resolveEntity
+  resolveEntity,
+  requireCoreModule
 } = require('./pteCoreContracts');
+const { formatInstantInTimezone } = requireCoreModule('MVC/utils/timezoneUtils');
 const pteUploadPathUtils = require('../../utils/pteUploadPathUtils');
 const { toPublicId, idsEqual } = require('../../utils/idAdapter');
 const { applyGenericFilter } = require('../../utils/queryEngine');
@@ -108,6 +110,22 @@ function cleanNonNegativeInteger(value, fallback = 0) {
     throw new Error('Integer fields must be zero or positive integers.');
   }
   return numeric;
+}
+
+function resolveOrgTimeZone(accessContext = {}, options = {}, requestingUser = {}) {
+  const token = String(
+    options?.orgTimeZone
+    || accessContext?.orgTimeZone
+    || requestingUser?.activeOrgTimeZone
+    || ''
+  ).trim();
+  return token || 'UTC';
+}
+
+function formatLedgerInstant(value, orgTimeZone) {
+  const cleaned = cleanString(value, { max: 80, allowEmpty: true });
+  if (!cleaned) return '-';
+  return formatInstantInTimezone(cleaned, orgTimeZone || 'UTC');
 }
 
 function sanitizePracticeName(value, { required = false } = {}) {
@@ -4732,6 +4750,7 @@ const pteAttemptLedgerService = {
   async listPracticeFeedbackSessions(rawFilters = {}, requestingUser, accessContext = {}, options = {}) {
     const visibility = await resolveVisibility(requestingUser, accessContext, { treatDivisionAsOrg: true });
     assertReadableVisibility(visibility);
+    const orgTimeZone = resolveOrgTimeZone(accessContext, options, requestingUser);
     const requesterUserId = resolveRequesterUserId(requestingUser);
     const canSelectStudent = canSelectPracticeStudent(requestingUser);
     if (!requesterUserId) {
@@ -4817,12 +4836,8 @@ const pteAttemptLedgerService = {
         feedbackCount: cleanNonNegativeInteger(row?.feedbackCount, 0),
         startedAt: cleanString(row?.startedAt, { max: 80, allowEmpty: true }) || '',
         finishedAt: cleanString(row?.finishedAt, { max: 80, allowEmpty: true }) || '',
-        startedAtDisplay: cleanString(row?.startedAt, { max: 80, allowEmpty: true })
-          ? new Date(row.startedAt).toLocaleString()
-          : '-',
-        finishedAtDisplay: cleanString(row?.finishedAt, { max: 80, allowEmpty: true })
-          ? new Date(row.finishedAt).toLocaleString()
-          : '-'
+        startedAtDisplay: formatLedgerInstant(row?.startedAt, orgTimeZone),
+        finishedAtDisplay: formatLedgerInstant(row?.finishedAt, orgTimeZone)
       };
     };
 
@@ -5622,6 +5637,7 @@ const pteAttemptLedgerService = {
   async listMyPracticeAttempts(rawFilters = {}, requestingUser, accessContext = {}, options = {}) {
     const visibility = await resolveVisibility(requestingUser, accessContext);
     assertReadableVisibility(visibility);
+    const orgTimeZone = resolveOrgTimeZone(accessContext, options, requestingUser);
 
     const requesterUserId = resolveRequesterUserId(requestingUser);
     if (!requesterUserId) {
@@ -5785,13 +5801,9 @@ const pteAttemptLedgerService = {
             lastFeedbackViewedAt: lastViewedAt,
             hasFeedback,
             unreadFeedback,
-            startedAtDisplay: cleanString(row?.startedAt, { max: 80, allowEmpty: true })
-              ? new Date(row.startedAt).toLocaleString()
-              : '-',
-            finishedAtDisplay: cleanString(row?.finishedAt, { max: 80, allowEmpty: true })
-              ? new Date(row.finishedAt).toLocaleString()
-              : '-',
-            latestFeedbackAtDisplay: latestFeedbackAt ? new Date(latestFeedbackAt).toLocaleString() : '-'
+            startedAtDisplay: formatLedgerInstant(row?.startedAt, orgTimeZone),
+            finishedAtDisplay: formatLedgerInstant(row?.finishedAt, orgTimeZone),
+            latestFeedbackAtDisplay: formatLedgerInstant(latestFeedbackAt, orgTimeZone)
           };
         })
         .sort((a, b) => String(b.startedAt || '').localeCompare(String(a.startedAt || '')));
@@ -5940,13 +5952,9 @@ const pteAttemptLedgerService = {
         lastFeedbackViewedAt: lastViewedAt,
         hasFeedback,
         unreadFeedback,
-        startedAtDisplay: cleanString(row?.startedAt, { max: 80, allowEmpty: true })
-          ? new Date(row.startedAt).toLocaleString()
-          : '-',
-        finishedAtDisplay: cleanString(row?.finishedAt, { max: 80, allowEmpty: true })
-          ? new Date(row.finishedAt).toLocaleString()
-          : '-',
-        latestFeedbackAtDisplay: latestFeedbackAt ? new Date(latestFeedbackAt).toLocaleString() : '-'
+        startedAtDisplay: formatLedgerInstant(row?.startedAt, orgTimeZone),
+        finishedAtDisplay: formatLedgerInstant(row?.finishedAt, orgTimeZone),
+        latestFeedbackAtDisplay: formatLedgerInstant(latestFeedbackAt, orgTimeZone)
       };
     });
 
@@ -6013,6 +6021,7 @@ const pteAttemptLedgerService = {
   async getMyPracticeAttemptFeedbackDetail(sessionId, requestingUser, accessContext = {}, options = {}) {
     const visibility = await resolveVisibility(requestingUser, accessContext);
     assertReadableVisibility(visibility);
+    const orgTimeZone = resolveOrgTimeZone(accessContext, options, requestingUser);
 
     const requesterUserId = resolveRequesterUserId(requestingUser);
     if (!requesterUserId) {
@@ -6090,9 +6099,9 @@ const pteAttemptLedgerService = {
       feedbackSummary: {
         feedbackCount,
         latestFeedbackAt,
-        latestFeedbackAtDisplay: latestFeedbackAt ? new Date(latestFeedbackAt).toLocaleString() : '-',
+        latestFeedbackAtDisplay: formatLedgerInstant(latestFeedbackAt, orgTimeZone),
         previouslyViewedAt: lastViewedAt || '',
-        previouslyViewedAtDisplay: lastViewedAt ? new Date(lastViewedAt).toLocaleString() : '-',
+        previouslyViewedAtDisplay: formatLedgerInstant(lastViewedAt, orgTimeZone),
         wasUnreadBeforeOpen: hasUnreadFeedback
       },
       items: items.map((item) => ({
@@ -6306,6 +6315,7 @@ const pteAttemptLedgerService = {
   async listRuntimeLedgerEvents(rawFilters = {}, requestingUser, accessContext = {}, options = {}) {
     const visibility = await resolveVisibility(requestingUser, accessContext);
     assertReadableVisibility(visibility);
+    const orgTimeZone = resolveOrgTimeZone(accessContext, options, requestingUser);
 
     const filters = isPlainObject(rawFilters) ? rawFilters : {};
     const searchText = cleanString(filters.q || filters.search, { max: 220, allowEmpty: true }) || '';
@@ -6505,9 +6515,7 @@ const pteAttemptLedgerService = {
           userLabel: buildUserDisplayLabel(userRow || { id: row?.userId || '' }),
           sessionStatus: cleanString(sessionRow?.status, { max: 40, allowEmpty: true }).toLowerCase() || '',
           itemStatus: cleanString(itemRow?.status, { max: 40, allowEmpty: true }).toLowerCase() || '',
-          eventAtDisplay: cleanString(row?.eventAt, { max: 80, allowEmpty: true })
-            ? new Date(row.eventAt).toLocaleString()
-            : '-'
+          eventAtDisplay: formatLedgerInstant(row?.eventAt, orgTimeZone)
         };
       });
 
@@ -6609,6 +6617,7 @@ const pteAttemptLedgerService = {
   async listAttemptSessionsForDetails(rawFilters = {}, requestingUser, accessContext = {}, options = {}) {
     const visibility = await resolveVisibility(requestingUser, accessContext);
     assertReadableVisibility(visibility);
+    const orgTimeZone = resolveOrgTimeZone(accessContext, options, requestingUser);
 
     const filters = isPlainObject(rawFilters) ? rawFilters : {};
     const q = cleanString(filters.q || filters.search, { max: 220, allowEmpty: true }) || '';
@@ -6744,15 +6753,9 @@ const pteAttemptLedgerService = {
         ...rowWithoutMetadata,
         practiceName,
         userLabel: buildUserDisplayLabel(userRow),
-        startedAtDisplay: cleanString(rowObject?.startedAt, { max: 80, allowEmpty: true })
-          ? new Date(rowObject.startedAt).toLocaleString()
-          : '-',
-        finishedAtDisplay: cleanString(rowObject?.finishedAt, { max: 80, allowEmpty: true })
-          ? new Date(rowObject.finishedAt).toLocaleString()
-          : '-',
-        submittedAtDisplay: cleanString(rowObject?.submittedAt, { max: 80, allowEmpty: true })
-          ? new Date(rowObject.submittedAt).toLocaleString()
-          : '-'
+        startedAtDisplay: formatLedgerInstant(rowObject?.startedAt, orgTimeZone),
+        finishedAtDisplay: formatLedgerInstant(rowObject?.finishedAt, orgTimeZone),
+        submittedAtDisplay: formatLedgerInstant(rowObject?.submittedAt, orgTimeZone)
       };
     });
 
@@ -6775,6 +6778,7 @@ const pteAttemptLedgerService = {
   async getAttemptOverallPerformance(rawFilters = {}, requestingUser, accessContext = {}, options = {}) {
     const visibility = await resolveVisibility(requestingUser, accessContext);
     assertReadableVisibility(visibility);
+    const orgTimeZone = resolveOrgTimeZone(accessContext, options, requestingUser);
 
     const filters = isPlainObject(rawFilters) ? rawFilters : {};
     const q = cleanString(filters.q || filters.search, { max: 220, allowEmpty: true }) || '';
@@ -6985,7 +6989,7 @@ const pteAttemptLedgerService = {
       .map((row) => ({
         ...row,
         averagePercentage: row.sessionCount ? Number((row.averagePercentage / row.sessionCount).toFixed(2)) : 0,
-        latestStartedAtDisplay: row.latestStartedAt ? new Date(row.latestStartedAt).toLocaleString() : '-'
+        latestStartedAtDisplay: formatLedgerInstant(row.latestStartedAt, orgTimeZone)
       }))
       .sort((a, b) => b.sessionCount - a.sessionCount);
 

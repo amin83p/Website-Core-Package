@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { SECRET_KEY } = require('../../config/security');
 const adminAuthorityService = require('../services/adminAuthorityService');
 const effectiveAccessResolverService = require('../services/security/effectiveAccessResolverService');
+const { attachOrgTimezoneContext } = require('../utils/timezoneUtils');
 
 let cachedAuthService = null;
 
@@ -173,6 +174,7 @@ async function requireAuth(req, res, next) {
       return res.redirect('/membership-status');
     }
     attachAdminContext(req, res);
+    attachOrgTimezoneContext(req, res);
     next();
   } catch (error) {
     console.warn('Auth Context Failed:', error.message);    
@@ -198,6 +200,7 @@ async function softAuth(req, res, next) {
   if (!token) {
       req.user = null; // Guest
       attachAdminContext(req, res);
+      attachOrgTimezoneContext(req, res);
       return next();
   }
   try {
@@ -205,9 +208,11 @@ async function softAuth(req, res, next) {
       const user = await getAuthService().getUserFromToken(token);
       req.user = user;
       attachAdminContext(req, res);
+      attachOrgTimezoneContext(req, res);
   } catch (error) {
       req.user = null; // Invalid token -> Treat as Guest
       attachAdminContext(req, res);
+      attachOrgTimezoneContext(req, res);
       // Optional: res.clearCookie('auth_token');
   }
   next();

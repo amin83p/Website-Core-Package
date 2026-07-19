@@ -11,6 +11,8 @@ exports.showMasterAcademiaHubPage = async (req, res) => {
       modules,
       defaultType: defaultModule ? defaultModule.type : '',
       canManageAllTasks: taskService.isAdminViewer(req.user),
+      orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+      orgToday: req.orgToday || req.user?.orgToday || '',
       user: req.user
     });
   } catch (error) {

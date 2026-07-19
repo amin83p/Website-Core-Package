@@ -82,7 +82,7 @@
 
           <td>
             <% if (audit.createDateTime) { %>
-              <%= new Date(audit.createDateTime).toLocaleString() %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.createDateTime) : new Date(audit.createDateTime).toLocaleString() %>
             <% } else { %>
               <span class="text-muted">—</span>
             <% } %>

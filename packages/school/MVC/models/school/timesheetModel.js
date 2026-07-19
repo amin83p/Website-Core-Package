@@ -190,6 +190,19 @@ function sanitizeSnapshotEntry(entry) {
     if (entry.isSchoolActivity === true || sessionId.startsWith('act-')) row.isSchoolActivity = true;
     if (entry.isFinalStatus === true) row.isFinalStatus = true;
     if (entry.isFinalStatus === false) row.isFinalStatus = false;
+    if (entry.isMakeupSession === true) {
+        row.isMakeupSession = true;
+        const makeupOriginalSessionId = cleanString(entry.makeupOriginalSessionId, { max: 80, allowEmpty: true });
+        const makeupOriginalClassId = cleanString(entry.makeupOriginalClassId, { max: 64, allowEmpty: true });
+        const makeupOriginalDate = cleanDate(entry.makeupOriginalDate, { allowEmpty: true });
+        const makeupOriginalStartTime = cleanTime(entry.makeupOriginalStartTime, { allowEmpty: true });
+        const makeupOriginalEndTime = cleanTime(entry.makeupOriginalEndTime, { allowEmpty: true });
+        if (makeupOriginalSessionId) row.makeupOriginalSessionId = makeupOriginalSessionId;
+        if (makeupOriginalClassId) row.makeupOriginalClassId = makeupOriginalClassId;
+        if (makeupOriginalDate) row.makeupOriginalDate = makeupOriginalDate;
+        if (makeupOriginalStartTime) row.makeupOriginalStartTime = makeupOriginalStartTime;
+        if (makeupOriginalEndTime) row.makeupOriginalEndTime = makeupOriginalEndTime;
+    }
     if (row.isManual) {
         const requestedHours = cleanHours(entry.requestedHours ?? entry.durationHours ?? entry.hours ?? 0, { min: 0, max: 24 });
         const approvalToken = cleanString(entry.approvalStatus, { max: 40, allowEmpty: true }).toLowerCase();

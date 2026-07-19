@@ -64,7 +64,7 @@
           </td>
           <td>
             <% if (audit.createDateTime) { %>
-              <%= new Date(audit.createDateTime).toLocaleString() %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.createDateTime) : new Date(audit.createDateTime).toLocaleString() %>
               <% if (audit.createUser) { %>
                 <br><span class="text-muted small">by User <%= audit.createUser %></span>
               <% } %>
@@ -74,7 +74,7 @@
           </td>
           <td>
             <% if (audit.lastUpdateDateTime) { %>
-              <%= new Date(audit.lastUpdateDateTime).toLocaleString() %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(audit.lastUpdateDateTime) : new Date(audit.lastUpdateDateTime).toLocaleString() %>
               <% if (audit.lastUpdateUser) { %>
                 <br><span class="text-muted small">by User <%= audit.lastUpdateUser %></span>
               <% } %>

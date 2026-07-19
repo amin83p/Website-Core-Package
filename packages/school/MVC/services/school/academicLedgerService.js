@@ -3,9 +3,10 @@ const academicSnapshotService = require('./academicSnapshotService');
 const academicRuleResolverService = require('./academicRuleResolverService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
+const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
-function nowDate() {
-  return new Date().toISOString().slice(0, 10);
+function nowDate(reqUser = null) {
+  return resolveOrgTodayFromContext({ user: reqUser, orgToday: reqUser?.orgToday });
 }
 
 function buildCommonEntry({
