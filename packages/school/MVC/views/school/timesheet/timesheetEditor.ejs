@@ -96,6 +96,63 @@
   .ts-meta-line {
     line-height: 1.5;
   }
+  .ts-page-header__aside {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.65rem;
+    flex-shrink: 0;
+  }
+  .ts-deadline-chip {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 7.5rem;
+    text-align: center;
+    user-select: none;
+  }
+  .ts-deadline-chip.is-visible {
+    display: inline-flex;
+  }
+  .ts-deadline-chip.is-timer {
+    background: #dc3545;
+    color: #fff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    padding: 0.45rem 0.85rem;
+    border-radius: 0.4rem;
+    box-shadow: 0 2px 6px rgba(220, 53, 69, 0.35);
+    transform: none;
+  }
+  .ts-deadline-chip.is-stamp {
+    background: transparent;
+    font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.7rem;
+    border: 3px solid currentColor;
+    border-radius: 0.25rem;
+    box-shadow: inset 0 0 0 1px currentColor;
+    transform: rotate(-10deg);
+    line-height: 1.15;
+    opacity: 0.9;
+  }
+  .ts-deadline-chip.is-stamp.ts-stamp-submitted {
+    color: #b78103;
+  }
+  .ts-deadline-chip.is-stamp.ts-stamp-approved {
+    color: #198754;
+  }
+  .ts-deadline-chip.is-stamp.ts-stamp-processed {
+    color: #0d6efd;
+  }
+  .ts-deadline-chip.is-stamp.ts-stamp-deadline-passed {
+    color: #495057;
+  }
   #tsTable thead th {
     font-size: 0.8rem;
     text-transform: uppercase;
@@ -171,7 +228,18 @@
                 <% } %>
             </div>
         </div>
-        <a href="/school/timesheets/my-timesheets" class="btn btn-outline-secondary btn-sm flex-shrink-0"><i class="bi bi-arrow-left"></i> Back</a>
+        <div class="ts-page-header__aside">
+            <div
+                id="tsDeadlineStatusChip"
+                class="ts-deadline-chip"
+                role="status"
+                aria-live="polite"
+                data-deadline-at="<%= typeof submissionDeadlineAt !== 'undefined' ? String(submissionDeadlineAt || '') : '' %>"
+                data-status="<%= timesheetStatus %>"
+                data-manager-approved="<%= managerReviewApproved ? 'true' : 'false' %>"
+            ></div>
+            <a href="/school/timesheets/my-timesheets" class="btn btn-outline-secondary btn-sm flex-shrink-0"><i class="bi bi-arrow-left"></i> Back</a>
+        </div>
     </div>
 
     <% if (pageIsReadOnly) { %>
@@ -591,6 +659,83 @@
         params.set('period', 'day');
         return `/school/schedules/my?${params.toString()}`;
     }
+
+    (function initTimesheetDeadlineStatusChip() {
+        const chip = document.getElementById('tsDeadlineStatusChip');
+        if (!chip) return;
+
+        const status = String(chip.getAttribute('data-status') || 'draft').toLowerCase();
+        const managerApproved = String(chip.getAttribute('data-manager-approved') || '').toLowerCase() === 'true';
+        const deadlineAt = String(chip.getAttribute('data-deadline-at') || '').trim();
+        const deadlineMs = deadlineAt ? Date.parse(deadlineAt) : NaN;
+        let timerId = null;
+
+        function pad2(value) {
+            return String(Math.max(0, value)).padStart(2, '0');
+        }
+
+        function formatCountdown(remainingMs) {
+            const totalSec = Math.max(0, Math.floor(remainingMs / 1000));
+            const days = Math.floor(totalSec / 86400);
+            const hours = Math.floor((totalSec % 86400) / 3600);
+            const minutes = Math.floor((totalSec % 3600) / 60);
+            const seconds = totalSec % 60;
+            return `${pad2(days)}:${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+        }
+
+        function clearTimer() {
+            if (timerId !== null) {
+                clearInterval(timerId);
+                timerId = null;
+            }
+        }
+
+        function showStamp(label, stampClass) {
+            clearTimer();
+            chip.className = `ts-deadline-chip is-visible is-stamp ${stampClass}`;
+            chip.textContent = label;
+            chip.setAttribute('aria-label', label);
+        }
+
+        function showTimer(text) {
+            chip.className = 'ts-deadline-chip is-visible is-timer';
+            chip.textContent = text;
+            chip.setAttribute('aria-label', `Time left to submit: ${text}`);
+        }
+
+        if (status === 'processed') {
+            showStamp('PROCESSED', 'ts-stamp-processed');
+            return;
+        }
+        if (status === 'submitted' && managerApproved) {
+            showStamp('APPROVED', 'ts-stamp-approved');
+            return;
+        }
+        if (status === 'submitted') {
+            showStamp('SUBMITTED', 'ts-stamp-submitted');
+            return;
+        }
+
+        // Draft (or unknown): countdown while before deadline, else deadline-passed stamp
+        if (!Number.isFinite(deadlineMs)) {
+            return;
+        }
+
+        function tick() {
+            const remaining = deadlineMs - Date.now();
+            if (remaining <= 0) {
+                showStamp('DEADLINE PASSED', 'ts-stamp-deadline-passed');
+                return;
+            }
+            showTimer(formatCountdown(remaining));
+        }
+
+        tick();
+        if (deadlineMs > Date.now()) {
+            timerId = setInterval(tick, 1000);
+            window.addEventListener('pagehide', clearTimer, { once: true });
+        }
+    })();
 </script>
 
 <script>

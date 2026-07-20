@@ -319,6 +319,57 @@ function resolveOrgTodayFromContext({ orgToday, orgTimeZone, user, orgId } = {})
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Convert a wall-clock date+time in a named timezone to a UTC epoch ms.
+ * dateKey: YYYY-MM-DD, timeHm: HH:mm or HH:mm:ss
+ */
+function zonedWallClockToUtcMs(dateKey = '', timeHm = '00:00', timeZone = FALLBACK_TIMEZONE) {
+  const dateToken = String(dateKey || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateToken)) return NaN;
+  const timeToken = String(timeHm || '00:00').trim() || '00:00';
+  const timeMatch = timeToken.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!timeMatch) return NaN;
+
+  const year = Number(dateToken.slice(0, 4));
+  const month = Number(dateToken.slice(5, 7));
+  const day = Number(dateToken.slice(8, 10));
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+  const second = Number(timeMatch[3] || 0);
+  if (![year, month, day, hour, minute, second].every((n) => Number.isFinite(n))) return NaN;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) return NaN;
+
+  const tz = normalizeTimezoneToken(timeZone, FALLBACK_TIMEZONE);
+  const desiredUtcLike = Date.UTC(year, month - 1, day, hour, minute, second);
+  let guess = desiredUtcLike;
+
+  for (let i = 0; i < 6; i += 1) {
+    const parts = getDateTimePartsInTimezone(guess, tz);
+    if (!parts) return NaN;
+    let partHour = Number(parts.hour);
+    if (partHour === 24) partHour = 0;
+    const actualUtcLike = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      partHour,
+      Number(parts.minute),
+      Number(parts.second)
+    );
+    const delta = desiredUtcLike - actualUtcLike;
+    if (delta === 0) return guess;
+    guess += delta;
+  }
+
+  return guess;
+}
+
+function zonedWallClockToIso(dateKey = '', timeHm = '00:00', timeZone = FALLBACK_TIMEZONE) {
+  const ms = zonedWallClockToUtcMs(dateKey, timeHm, timeZone);
+  if (!Number.isFinite(ms)) return '';
+  return new Date(ms).toISOString();
+}
+
 module.exports = {
   FALLBACK_TIMEZONE,
   cleanTimezoneToken,
@@ -337,6 +388,8 @@ module.exports = {
   resolveOrgTodayFromRequest,
   resolveOrgYearFromRequest,
   resolveOrgTodayFromContext,
+  zonedWallClockToUtcMs,
+  zonedWallClockToIso,
   listCuratedTimezoneOptions,
   isCuratedTimezoneValue,
   parseOrganizationTimezoneInput,

@@ -74,6 +74,55 @@ test('classController passes org today into period decision helpers', () => {
   assert.match(rollingController, /periodNeedsCompletionDecision\(period, resolveOrgTodayFromRequest\(req\)\)/);
 });
 
+test('rolling enrollment today fallbacks avoid temporal dead zone self-reference', () => {
+  const rollingController = read('packages/school/MVC/controllers/school/classRollingEnrollmentController.js');
+  const classController = read('packages/school/MVC/controllers/school/classController.js');
+  assert.doesNotMatch(
+    rollingController,
+    /const today = String\(orgToday \|\| ''\)\.trim\(\) \|\| resolveOrgTodayFromContext\(\{\s*orgToday:\s*today\s*\}\)/
+  );
+  assert.match(
+    rollingController,
+    /const today = String\(orgToday \|\| ''\)\.trim\(\) \|\| resolveOrgTodayFromContext\(\{\s*orgToday\s*\}\)/
+  );
+  assert.match(rollingController, /if \(end && end <= day\) return true;/);
+  assert.match(classController, /if \(end && end <= day\) return true;/);
+});
+
+test('org-timezone today assignments do not self-reference the const being initialized', () => {
+  const files = [
+    'packages/school/MVC/controllers/school/classRollingEnrollmentController.js',
+    'packages/school/MVC/controllers/school/classController.js',
+    'packages/school/MVC/controllers/school/termRegistrationController.js',
+    'packages/school/MVC/controllers/school/scheduleController.js',
+    'packages/school/MVC/controllers/school/attendanceController.js',
+    'packages/school/MVC/controllers/school/examController.js',
+    'packages/school/MVC/controllers/school/timesheetController.js',
+    'packages/school/MVC/services/school/classEnrollmentReadService.js',
+    'packages/school/MVC/services/school/termRegistrationViewService.js',
+    'packages/school/MVC/services/school/classEnrollmentPeriodService.js',
+    'packages/school/MVC/services/school/studentEnrollmentDetailService.js',
+    'packages/school/MVC/services/school/registrationIntegrityService.js',
+    'packages/school/MVC/services/school/leaveRequestService.js',
+    'packages/school/MVC/services/school/schoolMasterAcademiaHubService.js',
+    'packages/school/MVC/services/school/withdrawal/withdrawalPolicyService.js',
+    'packages/school/MVC/services/school/withdrawal/withdrawalSettlementService.js',
+    'packages/school/MVC/services/school/programTransactionService.js',
+    'packages/school/MVC/services/school/transactionDefinitionPreviewService.js',
+    'packages/school/MVC/services/school/sessionStatusPolicyService.js',
+    'MVC/services/security/entitlementService.js'
+  ];
+  const selfRef = /const\s+(today|day|orgToday)\s*=\s*[^\n]*\{\s*orgToday:\s*\1\s*\}/;
+  for (const relativePath of files) {
+    const source = read(relativePath);
+    assert.equal(
+      selfRef.test(source),
+      false,
+      `${relativePath} must not initialize today/day/orgToday from itself`
+    );
+  }
+});
+
 test('classEnrollmentReadService and termRegistrationViewService accept orgToday overrides', () => {
   const enrollmentRead = read('packages/school/MVC/services/school/classEnrollmentReadService.js');
   const termView = read('packages/school/MVC/services/school/termRegistrationViewService.js');

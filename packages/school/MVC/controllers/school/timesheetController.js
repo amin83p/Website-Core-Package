@@ -20,7 +20,11 @@ const timesheetPayRateService = require('../../services/school/timesheetPayRateS
 const taskService = require('../../services/school/taskService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const timesheetSessionStudentLabelService = require('../../services/school/timesheetSessionStudentLabelService');
-const { resolveOrgTodayFromRequest, resolveOrgYearFromRequest } = requireCoreModule('MVC/utils/timezoneUtils');
+const {
+    resolveOrgTodayFromRequest,
+    resolveOrgYearFromRequest,
+    zonedWallClockToIso
+} = requireCoreModule('MVC/utils/timezoneUtils');
 const {
     sanitizeSnapshotEntry,
     sanitizeSubmissionSnapshot,
@@ -479,6 +483,13 @@ function formatPeriodDeadlineLabel(period) {
     if (!deadline) return '-';
     const time = String(period?.submissionDeadlineTime || '23:59').trim() || '23:59';
     return `${deadline} ${time}`;
+}
+
+function resolvePeriodSubmissionDeadlineAt(period, orgTimeZone = '') {
+    const deadline = String(period?.submissionDeadline || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return '';
+    const time = String(period?.submissionDeadlineTime || '23:59').trim() || '23:59';
+    return zonedWallClockToIso(deadline, time, orgTimeZone) || '';
 }
 
 function formatHourlyRateLabel(value) {
@@ -1502,6 +1513,11 @@ exports.viewTimesheet = async (req, res) => {
             !idsEqual(teacherContext.targetTeacherId, teacherContext.currentTeacherId)
         );
 
+        const submissionDeadlineAt = resolvePeriodSubmissionDeadlineAt(
+            period,
+            req.orgTimeZone || req.user?.activeOrgTimeZone || ''
+        );
+
         res.render('school/timesheet/timesheetEditor', {
             title: `Timesheet: ${period.name}`,
             period,
@@ -1534,6 +1550,7 @@ exports.viewTimesheet = async (req, res) => {
             canFinanceProcess,
             canReviewerEdit,
             managerApproved,
+            submissionDeadlineAt,
             reviewHistory: getReviewHistory(timesheet)
         });
     } catch (error) {
