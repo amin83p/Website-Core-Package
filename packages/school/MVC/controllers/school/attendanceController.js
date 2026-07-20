@@ -367,6 +367,7 @@ async function getAttendanceData(req, res) {
             String(req.user?.activeOrgId || classData?.orgId || '').trim()
         );
         const attendancePolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
+        const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
 
         const getApplicabilityForSession = (stu, ses) => {
             if (registrationMode !== 'rolling') return { expected: true, reason: 'date_window' };
@@ -455,6 +456,7 @@ async function getAttendanceData(req, res) {
             sessions: filteredSessions.map(s => ({ id: s.sessionId, date: s.date, status: s.status })),
             matrix,
             attendancePolicy,
+            enabledAttendanceStatuses,
             enrollmentSource: registrationMode === 'rolling'
                 ? 'canonical_active_only_rolling'
                 : String(enrollmentSnapshot?.source || 'legacy'),
@@ -628,10 +630,14 @@ async function updateAttendanceRosterCell(req, res) {
             reqUser: req.user
         });
 
-        const normalizedAttendance = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(req.body?.attendance, '');
-        if (!normalizedAttendance) {
-            throw new Error('Invalid attendance. Use present, late, excused, absent, ACF, or N/A.');
-        }
+        const previousAttendance = session.roster?.find((r) => idsEqual(r.personId, studentPersonId))?.attendance;
+        const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
+        const normalizedAttendance = attendanceMatrixMetricsService.assertAttendanceStatusAllowedForSave({
+            status: req.body?.attendance,
+            enabledStatuses: enabledAttendanceStatuses,
+            previousStatus: previousAttendance,
+            allowSystemNotApplicable: true
+        });
 
         if (!session.roster) session.roster = [];
         let rosterRecord = session.roster.find((r) => idsEqual(r.personId, studentPersonId));
@@ -670,6 +676,10 @@ async function updateAttendanceRosterCell(req, res) {
         Object.assign(
             rosterRecord,
             attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(rosterRecord, matrixPolicyCell)
+        );
+        rosterRecord.attendance = attendanceMatrixMetricsService.coerceAttendanceStatusToEnabled(
+            rosterRecord.attendance,
+            enabledAttendanceStatuses
         );
 
         await schoolDataService.saveClassSessions(classId, sessions, req.user);

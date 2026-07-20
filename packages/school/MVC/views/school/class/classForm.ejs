@@ -10,6 +10,12 @@
   const initInstructors = JSON.stringify(c.instructors || []);
   const initEnrollment = JSON.stringify(c.enrollment || { maxCapacity: 30, students: [] });
   const initEvaluation = JSON.stringify(c.evaluation || { passingScore: 60, weights: { attendance: 10, assignments: 40, midterm: 20, finalExam: 30 } });
+  const defaultEnabledAttendanceStatuses = ['present', 'late', 'excused', 'absent', 'acf', 'not_applicable'];
+  const initEnabledAttendanceStatuses = JSON.stringify(
+    Array.isArray(c.enabledAttendanceStatuses) && c.enabledAttendanceStatuses.length
+      ? c.enabledAttendanceStatuses
+      : defaultEnabledAttendanceStatuses
+  );
   const initSessions = JSON.stringify(typeof sessionsData !== 'undefined' ? sessionsData : []);
   const sessionStatuses = Array.isArray(sessionStatusMeta) ? sessionStatusMeta : [];
   const activeSessionStatuses = sessionStatuses.filter((row) => row && row.active !== false);
@@ -93,6 +99,7 @@
       <input type="hidden" name="instructors" id="hid_instructors" value='<%- initInstructors %>'>
       <input type="hidden" name="enrollment" id="hid_enrollment" value='<%- initEnrollment %>'>
       <input type="hidden" name="evaluation" id="hid_evaluation" value='<%- initEvaluation %>'>
+      <input type="hidden" name="enabledAttendanceStatuses" id="hid_enabledAttendanceStatuses" value='<%- initEnabledAttendanceStatuses %>'>
       <input type="hidden" name="sessions" id="hid_sessions" value='<%- initSessions %>'>
       <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
 
@@ -102,6 +109,7 @@
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-curriculum" type="button">Curriculum & Team</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sessions" type="button">Session Builder</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-eval" type="button">Evaluation Rules</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-attendance-statuses" type="button">Attendance Statuses</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-pricing" type="button">Pricing</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-posting" type="button">Posting Policies</button></li>
       </ul>
@@ -473,6 +481,42 @@
               <div class="col-md-3 mb-3" id="wrap_eval_midterm"><label class="form-label">Midterm</label><input type="number" min="0" max="100" id="inp_wMid" class="form-control size-md"></div>
               <div class="col-md-3 mb-3" id="wrap_eval_final"><label class="form-label">Final Exam</label><input type="number" min="0" max="100" id="inp_wFin" class="form-control size-md"></div>
            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-attendance-statuses">
+           <h6 class="fw-bold text-primary mb-2">Student Attendance Statuses</h6>
+           <p class="small text-muted mb-3">Choose which attendance statuses teachers can mark in sessions for this class. Present, Absent, and N/A are always available.</p>
+           <div class="row g-3">
+              <div class="col-md-6">
+                 <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="attStatus_present" checked disabled>
+                    <label class="form-check-label" for="attStatus_present">Present <span class="text-muted">(required)</span></label>
+                 </div>
+                 <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="attStatus_absent" checked disabled>
+                    <label class="form-check-label" for="attStatus_absent">Absent <span class="text-muted">(required)</span></label>
+                 </div>
+                 <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="attStatus_not_applicable" checked disabled>
+                    <label class="form-check-label" for="attStatus_not_applicable">N/A (Not Applicable) <span class="text-muted">(required)</span></label>
+                 </div>
+              </div>
+              <div class="col-md-6">
+                 <div class="form-check">
+                    <input class="form-check-input att-status-optional" type="checkbox" id="attStatus_late" value="late" data-status="late">
+                    <label class="form-check-label" for="attStatus_late">Late</label>
+                 </div>
+                 <div class="form-check mt-2">
+                    <input class="form-check-input att-status-optional" type="checkbox" id="attStatus_excused" value="excused" data-status="excused">
+                    <label class="form-check-label" for="attStatus_excused">Excused</label>
+                 </div>
+                 <div class="form-check mt-2">
+                    <input class="form-check-input att-status-optional" type="checkbox" id="attStatus_acf" value="acf" data-status="acf">
+                    <label class="form-check-label" for="attStatus_acf">Absent Camera Off (ACF)</label>
+                 </div>
+              </div>
+           </div>
+           <p class="small text-muted mt-3 mb-0">N/A is also applied automatically by approved leave or session-status rules when needed.</p>
         </div>
 
         <div class="tab-pane fade" id="tab-pricing">
@@ -1053,6 +1097,58 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('inp_wAtt').value = dEval.weights?.attendance || 10;
     document.getElementById('inp_wAss').value = dEval.weights?.assignments || 40;
     document.getElementById('inp_wMid').value = dEval.weights?.midterm || 20;
+
+    const OPTIONAL_ATTENDANCE_STATUSES = ['late', 'excused', 'acf'];
+    const ALL_ATTENDANCE_STATUSES_ORDERED = ['present', 'late', 'excused', 'absent', 'acf', 'not_applicable'];
+    const hidEnabledAttendanceStatuses = document.getElementById('hid_enabledAttendanceStatuses');
+
+    function readEnabledAttendanceStatusesFromHidden() {
+        try {
+            const parsed = JSON.parse(hidEnabledAttendanceStatuses?.value || '[]');
+            if (Array.isArray(parsed) && parsed.length) return parsed.map((s) => String(s || '').trim().toLowerCase()).filter(Boolean);
+        } catch (_) { /* ignore */ }
+        return [...ALL_ATTENDANCE_STATUSES_ORDERED];
+    }
+
+    function syncAttendanceStatusCheckboxesFromList(list) {
+        const enabled = new Set(
+            (Array.isArray(list) && list.length ? list : ALL_ATTENDANCE_STATUSES_ORDERED)
+                .map((s) => String(s || '').trim().toLowerCase())
+        );
+        enabled.add('present');
+        enabled.add('absent');
+        enabled.add('not_applicable');
+        OPTIONAL_ATTENDANCE_STATUSES.forEach((code) => {
+            const el = document.getElementById(`attStatus_${code}`);
+            if (el) el.checked = enabled.has(code);
+        });
+        const presentEl = document.getElementById('attStatus_present');
+        const absentEl = document.getElementById('attStatus_absent');
+        const naEl = document.getElementById('attStatus_not_applicable');
+        if (presentEl) presentEl.checked = true;
+        if (absentEl) absentEl.checked = true;
+        if (naEl) naEl.checked = true;
+    }
+
+    function collectEnabledAttendanceStatusesFromCheckboxes() {
+        const selected = new Set(['present', 'absent', 'not_applicable']);
+        OPTIONAL_ATTENDANCE_STATUSES.forEach((code) => {
+            const el = document.getElementById(`attStatus_${code}`);
+            if (el && el.checked) selected.add(code);
+        });
+        return ALL_ATTENDANCE_STATUSES_ORDERED.filter((code) => selected.has(code));
+    }
+
+    function syncEnabledAttendanceStatusesHidden() {
+        if (!hidEnabledAttendanceStatuses) return;
+        hidEnabledAttendanceStatuses.value = JSON.stringify(collectEnabledAttendanceStatusesFromCheckboxes());
+    }
+
+    syncAttendanceStatusCheckboxesFromList(readEnabledAttendanceStatusesFromHidden());
+    document.querySelectorAll('.att-status-optional').forEach((el) => {
+        el.addEventListener('change', syncEnabledAttendanceStatusesHidden);
+    });
+    syncEnabledAttendanceStatusesHidden();
     document.getElementById('inp_wFin').value = dEval.weights?.finalExam || 30;
 
     function refreshLifecycleModeUi() {
@@ -2558,6 +2654,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('inp_wMid').value = Number(copiedWeights?.midterm || 0);
         document.getElementById('inp_wFin').value = Number(copiedWeights?.finalExam || 0);
 
+        syncAttendanceStatusCheckboxesFromList(
+            Array.isArray(source?.enabledAttendanceStatuses) && source.enabledAttendanceStatuses.length
+                ? source.enabledAttendanceStatuses
+                : ALL_ATTENDANCE_STATUSES_ORDERED
+        );
+        syncEnabledAttendanceStatusesHidden();
+
         sessionsState = normalizeCopiedSessions(source?.sessions);
         pendingEligibilityProgram = null;
 
@@ -3663,6 +3766,8 @@ form.addEventListener('submit', async (e) => {
                     finalExam: rollingSave ? 0 : (parseInt(document.getElementById('inp_wFin').value) || 0)
                 }
             }));
+            syncEnabledAttendanceStatusesHidden();
+            params.append('enabledAttendanceStatuses', hidEnabledAttendanceStatuses?.value || JSON.stringify(ALL_ATTENDANCE_STATUSES_ORDERED));
             
             // Append sessions payload directly from JS memory
             const submitSessionsPayload = buildSessionsPayloadForValidation();

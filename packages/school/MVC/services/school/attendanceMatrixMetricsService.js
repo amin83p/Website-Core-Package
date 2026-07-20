@@ -37,6 +37,39 @@ const ATTENDANCE_STATUS_ALIASES = Object.freeze({
   notapplicable: ATTENDANCE_STATUS.NOT_APPLICABLE
 });
 
+/** Always available on every class; cannot be disabled. */
+const MANDATORY_ATTENDANCE_STATUSES = Object.freeze([
+  ATTENDANCE_STATUS.PRESENT,
+  ATTENDANCE_STATUS.ABSENT,
+  ATTENDANCE_STATUS.NOT_APPLICABLE
+]);
+
+/** Optional per-class toggles (mandatory statuses are never in this list). */
+const OPTIONAL_ATTENDANCE_STATUSES = Object.freeze([
+  ATTENDANCE_STATUS.LATE,
+  ATTENDANCE_STATUS.EXCUSED,
+  ATTENDANCE_STATUS.ACF
+]);
+
+/** Stable display order for all known statuses. */
+const ALL_ATTENDANCE_STATUSES_ORDERED = Object.freeze([
+  ATTENDANCE_STATUS.PRESENT,
+  ATTENDANCE_STATUS.LATE,
+  ATTENDANCE_STATUS.EXCUSED,
+  ATTENDANCE_STATUS.ABSENT,
+  ATTENDANCE_STATUS.ACF,
+  ATTENDANCE_STATUS.NOT_APPLICABLE
+]);
+
+const ATTENDANCE_STATUS_META = Object.freeze({
+  [ATTENDANCE_STATUS.PRESENT]: { code: ATTENDANCE_STATUS.PRESENT, label: 'Present', shortLabel: 'Present' },
+  [ATTENDANCE_STATUS.LATE]: { code: ATTENDANCE_STATUS.LATE, label: 'Late', shortLabel: 'Late' },
+  [ATTENDANCE_STATUS.EXCUSED]: { code: ATTENDANCE_STATUS.EXCUSED, label: 'Excused', shortLabel: 'Excused' },
+  [ATTENDANCE_STATUS.ABSENT]: { code: ATTENDANCE_STATUS.ABSENT, label: 'Absent', shortLabel: 'Absent' },
+  [ATTENDANCE_STATUS.ACF]: { code: ATTENDANCE_STATUS.ACF, label: 'Absent Camera Off', shortLabel: 'ACF' },
+  [ATTENDANCE_STATUS.NOT_APPLICABLE]: { code: ATTENDANCE_STATUS.NOT_APPLICABLE, label: 'Not Applicable', shortLabel: 'N/A' }
+});
+
 function normalizeStatus(status, fallback = '') {
   const raw = String(status || '').trim().toLowerCase();
   if (!raw) return fallback;
@@ -60,6 +93,130 @@ function isEligibleAttendanceStatus(status) {
 function normalizeAttendanceStatusForSave(status, fallback = ATTENDANCE_STATUS.ABSENT) {
   const normalized = normalizeStatus(status, fallback);
   return Object.values(ATTENDANCE_STATUS).includes(normalized) ? normalized : fallback;
+}
+
+/**
+ * Normalize a raw enabled-status list from form/API/storage.
+ * Always includes Present and Absent; drops unknowns; stable order.
+ * Empty/invalid input → all statuses enabled.
+ * @param {unknown} input
+ * @returns {string[]}
+ */
+function normalizeEnabledAttendanceStatuses(input) {
+  const known = new Set(ALL_ATTENDANCE_STATUSES_ORDERED);
+  let rawList = [];
+  if (Array.isArray(input)) {
+    rawList = input;
+  } else if (typeof input === 'string' && input.trim()) {
+    try {
+      const parsed = JSON.parse(input);
+      if (Array.isArray(parsed)) rawList = parsed;
+      else rawList = input.split(/[,|]/);
+    } catch (_) {
+      rawList = input.split(/[,|]/);
+    }
+  } else if (input && typeof input === 'object') {
+    // Checkbox map: { late: true, excused: false, ... }
+    rawList = Object.keys(input).filter((key) => {
+      const v = input[key];
+      return v === true || v === 1 || String(v).trim().toLowerCase() === 'true' || String(v).trim() === '1';
+    });
+  }
+
+  const selected = new Set();
+  for (const item of rawList) {
+    const st = normalizeAttendanceStatusForSave(item, '');
+    if (st && known.has(st)) selected.add(st);
+  }
+
+  if (!selected.size) {
+    return [...ALL_ATTENDANCE_STATUSES_ORDERED];
+  }
+
+  for (const mandatory of MANDATORY_ATTENDANCE_STATUSES) {
+    selected.add(mandatory);
+  }
+
+  return ALL_ATTENDANCE_STATUSES_ORDERED.filter((st) => selected.has(st));
+}
+
+/**
+ * Resolve enabled attendance statuses for a class.
+ * Missing/empty field → all statuses (backward compatible).
+ * @param {object} [classData]
+ * @returns {string[]}
+ */
+function resolveEnabledAttendanceStatuses(classData = {}) {
+  const raw = classData && typeof classData === 'object'
+    ? classData.enabledAttendanceStatuses
+    : undefined;
+  if (raw == null || (Array.isArray(raw) && raw.length === 0)) {
+    return [...ALL_ATTENDANCE_STATUSES_ORDERED];
+  }
+  return normalizeEnabledAttendanceStatuses(raw);
+}
+
+/**
+ * @param {object} classData
+ * @param {string} status
+ * @returns {boolean}
+ */
+function isAttendanceStatusEnabled(classData, status) {
+  const st = normalizeAttendanceStatusForSave(status, '');
+  if (!st) return false;
+  return resolveEnabledAttendanceStatuses(classData).includes(st);
+}
+
+/**
+ * Validate a status for manual roster save against the class enabled list.
+ * System-forced N/A (leave / session-status) may pass when allowSystemNotApplicable is true.
+ * Preserving an already-stored disabled status is allowed when previousStatus matches.
+ * @param {{ status: unknown, enabledStatuses?: string[], classData?: object, allowSystemNotApplicable?: boolean, previousStatus?: unknown }} opts
+ * @returns {string} normalized status
+ * @throws {Error} when status is not allowed
+ */
+function assertAttendanceStatusAllowedForSave(opts = {}) {
+  const enabled = Array.isArray(opts.enabledStatuses) && opts.enabledStatuses.length
+    ? normalizeEnabledAttendanceStatuses(opts.enabledStatuses)
+    : resolveEnabledAttendanceStatuses(opts.classData || {});
+  const normalized = normalizeAttendanceStatusForSave(opts.status, '');
+  if (!normalized) {
+    throw new Error('Invalid attendance status.');
+  }
+  if (enabled.includes(normalized)) {
+    return normalized;
+  }
+  if (
+    opts.allowSystemNotApplicable === true
+    && normalized === ATTENDANCE_STATUS.NOT_APPLICABLE
+  ) {
+    return normalized;
+  }
+  const previous = normalizeAttendanceStatusForSave(opts.previousStatus, '');
+  if (previous && previous === normalized) {
+    return normalized;
+  }
+  const meta = ATTENDANCE_STATUS_META[normalized];
+  const label = meta?.shortLabel || meta?.label || normalized;
+  throw new Error(`Attendance status "${label}" is not enabled for this class.`);
+}
+
+/**
+ * After matrix roster rules may change status (e.g. present+lateMinutes → late),
+ * coerce any newly disabled status to Absent (Present/Absent always allowed).
+ * @param {string} status
+ * @param {string[]} enabledStatuses
+ * @returns {string}
+ */
+function coerceAttendanceStatusToEnabled(status, enabledStatuses) {
+  const enabled = normalizeEnabledAttendanceStatuses(enabledStatuses);
+  const normalized = normalizeAttendanceStatusForSave(status, ATTENDANCE_STATUS.ABSENT);
+  if (enabled.includes(normalized)) return normalized;
+  if (normalized === ATTENDANCE_STATUS.NOT_APPLICABLE) {
+    // System N/A may exist even when toggle is off; keep it.
+    return normalized;
+  }
+  return ATTENDANCE_STATUS.ABSENT;
 }
 
 const MINUTES_PER_DAY = 24 * 60;
@@ -291,11 +448,20 @@ function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {
 
 module.exports = {
   ATTENDANCE_STATUS,
+  MANDATORY_ATTENDANCE_STATUSES,
+  OPTIONAL_ATTENDANCE_STATUSES,
+  ALL_ATTENDANCE_STATUSES_ORDERED,
+  ATTENDANCE_STATUS_META,
   normalizeStatus,
   isNotApplicableStatus,
   isAbsentLikeStatus,
   isEligibleAttendanceStatus,
   normalizeAttendanceStatusForSave,
+  normalizeEnabledAttendanceStatuses,
+  resolveEnabledAttendanceStatuses,
+  isAttendanceStatusEnabled,
+  assertAttendanceStatusAllowedForSave,
+  coerceAttendanceStatusToEnabled,
   resolvePolicy,
   parseTimeToMinutes,
   scheduledMinutesFromSession,

@@ -6,7 +6,12 @@ const {
   resolvePolicy,
   scheduledMinutesFromSession,
   parseTimeToMinutes,
-  normalizeAttendanceStatusForSave
+  normalizeAttendanceStatusForSave,
+  normalizeEnabledAttendanceStatuses,
+  resolveEnabledAttendanceStatuses,
+  assertAttendanceStatusAllowedForSave,
+  coerceAttendanceStatusToEnabled,
+  ALL_ATTENDANCE_STATUSES_ORDERED
 } = require('../packages/school/MVC/services/school/attendanceMatrixMetricsService');
 
 const policy180 = {
@@ -223,4 +228,56 @@ test('rollup counts ACF in totalAbsentSessions', () => {
   assert.equal(s.totalPresentSessions, 1);
   assert.equal(s.totalAbsentSessions, 2);
   assert.equal(s.performancePercent, Math.round((100 / 3) * 100) / 100);
+});
+
+test('resolveEnabledAttendanceStatuses defaults to all when missing', () => {
+  assert.deepEqual(resolveEnabledAttendanceStatuses({}), [...ALL_ATTENDANCE_STATUSES_ORDERED]);
+  assert.deepEqual(resolveEnabledAttendanceStatuses({ enabledAttendanceStatuses: [] }), [...ALL_ATTENDANCE_STATUSES_ORDERED]);
+});
+
+test('normalizeEnabledAttendanceStatuses always keeps present, absent, and N/A', () => {
+  const result = normalizeEnabledAttendanceStatuses(['late', 'acf', 'bogus']);
+  assert.deepEqual(result, ['present', 'late', 'absent', 'acf', 'not_applicable']);
+  assert.ok(result.includes('present'));
+  assert.ok(result.includes('absent'));
+  assert.ok(result.includes('not_applicable'));
+  assert.ok(!result.includes('excused'));
+});
+
+test('assertAttendanceStatusAllowedForSave rejects disabled statuses', () => {
+  const enabled = ['present', 'absent', 'late'];
+  assert.equal(
+    assertAttendanceStatusAllowedForSave({ status: 'late', enabledStatuses: enabled }),
+    'late'
+  );
+  assert.throws(
+    () => assertAttendanceStatusAllowedForSave({ status: 'acf', enabledStatuses: enabled }),
+    /not enabled for this class/i
+  );
+});
+
+test('assertAttendanceStatusAllowedForSave always allows N/A and historical values', () => {
+  const enabled = ['present', 'absent'];
+  assert.equal(
+    assertAttendanceStatusAllowedForSave({
+      status: 'not_applicable',
+      enabledStatuses: enabled
+    }),
+    'not_applicable'
+  );
+  assert.equal(
+    assertAttendanceStatusAllowedForSave({
+      status: 'acf',
+      enabledStatuses: enabled,
+      previousStatus: 'acf'
+    }),
+    'acf'
+  );
+});
+
+test('coerceAttendanceStatusToEnabled maps disabled late to absent but keeps N/A', () => {
+  const enabled = ['present', 'absent', 'not_applicable'];
+  assert.equal(coerceAttendanceStatusToEnabled('late', enabled), 'absent');
+  assert.equal(coerceAttendanceStatusToEnabled('not_applicable', enabled), 'not_applicable');
+  assert.equal(coerceAttendanceStatusToEnabled('present', enabled), 'present');
 });

@@ -4991,6 +4991,23 @@
     return '<i class="bi bi-dash attendance-status-na" title="No record"></i>';
   }
 
+  function buildHubAttendanceLegendHtml(enabledStatuses) {
+    const enabled = new Set(
+      (Array.isArray(enabledStatuses) && enabledStatuses.length
+        ? enabledStatuses
+        : ['present', 'late', 'excused', 'absent', 'acf', 'not_applicable']
+      ).map(function (s) { return String(s || '').trim().toLowerCase(); })
+    );
+    const parts = [];
+    if (enabled.has('present')) parts.push('<span class="me-3"><i class="bi bi-check-circle-fill attendance-status-present"></i> Present</span>');
+    if (enabled.has('late')) parts.push('<span class="me-3"><i class="bi bi-clock-fill attendance-status-late"></i> Late</span>');
+    if (enabled.has('excused')) parts.push('<span class="me-3"><i class="bi bi-envelope-paper-fill attendance-status-excused"></i> Excused</span>');
+    if (enabled.has('absent')) parts.push('<span class="me-3"><i class="bi bi-x-circle-fill attendance-status-absent"></i> Absent</span>');
+    if (enabled.has('acf')) parts.push('<span class="me-3"><i class="bi bi-camera-video-off-fill attendance-status-acf"></i> ACF</span>');
+    if (enabled.has('not_applicable')) parts.push('<span><i class="bi bi-dash attendance-status-na"></i> N/A</span>');
+    return '<div class="small text-muted">' + parts.join('') + '</div>';
+  }
+
   function getHubAttendanceBatchClassKey(row, index) {
     return String(row?.classId || row?.id || row?.className || ('class-' + String(index + 1))).trim();
   }
@@ -5019,7 +5036,7 @@
         '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">',
         '<div><div class="fw-bold">' + escapeHtml(result.className || 'Class Attendance') + '</div>',
         '<div class="text-muted small">' + escapeHtml(String(matrix.length)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions. Last loaded: ' + escapeHtml(formatHubInstant(new Date())) + '</div></div>',
-        '<div class="small text-muted"><span class="me-3"><i class="bi bi-check-circle-fill attendance-status-present"></i> Present</span><span class="me-3"><i class="bi bi-clock-fill attendance-status-late"></i> Late</span><span class="me-3"><i class="bi bi-envelope-paper-fill attendance-status-excused"></i> Excused</span><span class="me-3"><i class="bi bi-x-circle-fill attendance-status-absent"></i> Absent</span><span><i class="bi bi-camera-video-off-fill attendance-status-acf"></i> ACF</span></div>',
+        buildHubAttendanceLegendHtml(result.enabledAttendanceStatuses),
         '</div>'
       ].join('');
     }
@@ -5089,7 +5106,7 @@
           '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">',
           '<div><div class="fw-bold">' + escapeHtml(result.className || 'Class Attendance') + '</div>',
           '<div class="text-muted small">' + escapeHtml(String(visibleCount)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions. Last loaded: ' + escapeHtml(formatHubInstant(new Date())) + '</div></div>',
-          '<div class="small text-muted"><span class="me-3"><i class="bi bi-check-circle-fill attendance-status-present"></i> Present</span><span class="me-3"><i class="bi bi-clock-fill attendance-status-late"></i> Late</span><span class="me-3"><i class="bi bi-envelope-paper-fill attendance-status-excused"></i> Excused</span><span class="me-3"><i class="bi bi-x-circle-fill attendance-status-absent"></i> Absent</span><span><i class="bi bi-camera-video-off-fill attendance-status-acf"></i> ACF</span></div>',
+          buildHubAttendanceLegendHtml(result.enabledAttendanceStatuses),
           '</div>'
         ].join('');
       }
