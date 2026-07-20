@@ -1,5 +1,5 @@
-const OPEN_STATUSES = new Set(['draft', 'planned', 'active']);
-const PROMOTION_SOURCE_STATUSES = new Set(['draft', 'planned', 'error']);
+const OPEN_STATUSES = new Set(['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'active']);
+const PROMOTION_SOURCE_STATUSES = new Set(['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'error']);
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();

@@ -5,7 +5,7 @@ const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtil
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 
 const OPEN_PERIOD_STATUSES = new Set(['active', 'planned']);
-const REPORT_ROSTER_OPEN_STATUSES = Object.freeze(['active', 'planned']);
+const REPORT_ROSTER_OPEN_STATUSES = Object.freeze(['active', 'planned', 'to_be_confirmed']);
 const HISTORICAL_ROLLING_ROSTER_STATUSES = Object.freeze(['active', 'planned', 'completed']);
 
 function normalizeStatus(value) {

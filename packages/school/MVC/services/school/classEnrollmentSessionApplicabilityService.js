@@ -14,12 +14,13 @@ const ROLLING_DISPLAY_PERIOD_STATUSES = new Set([
   'cancelled',
   'archived'
 ]);
-const OPEN_STATUSES = new Set(['active', 'planned']);
+const OPEN_STATUSES = new Set(['active', 'planned', 'to_be_confirmed']);
 const COUNTED_ATTENDANCE_STATUSES = new Set([
   attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT,
   attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE,
   attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED,
-  attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+  attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT,
+  attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF
 ]);
 const SESSION_COUNT_POLICY = 'all_non_na';
 const TARGET_SESSION_COMPLETION_REASON = 'target_session_count_reached';

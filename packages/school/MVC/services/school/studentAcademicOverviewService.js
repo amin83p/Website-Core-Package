@@ -6,7 +6,7 @@ const programRegistrationViewService = require('./programRegistrationViewService
 const termRegistrationViewService = require('./termRegistrationViewService');
 const programWithdrawalService = require('./withdrawal/programWithdrawalService');
 
-const ACTIVE_REGISTRATION_STATUSES = new Set(['registered', 'draft', 'error', 'planned', 'active']);
+const ACTIVE_REGISTRATION_STATUSES = new Set(['registered', 'draft', 'error', 'planned', 'to_be_confirmed', 'waiting_list', 'active']);
 
 function registrationSortRank(status) {
   const normalized = String(status || '').trim().toLowerCase();

@@ -35,6 +35,7 @@ const academicSnapshotService = require('../../services/school/academicSnapshotS
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
+const rollingEnrollmentFunderService = require('../../services/school/rollingEnrollmentFunderService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
 const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
 const classEnrollmentDeleteService = require('../../services/school/classEnrollmentDeleteService');
@@ -215,10 +216,10 @@ function periodNeedsCompletionDecision(period, today = '') {
     const d = String(period.completionDecision || '').trim().toLowerCase();
     if (d === 'pass' || d === 'continue' || d === 'withdraw') return false;
     const status = String(period.status || '').trim().toLowerCase();
-    if (['cancelled', 'archived', 'error', 'draft', 'planned'].includes(status)) return false;
+    if (['cancelled', 'archived', 'error', 'draft', 'planned', 'to_be_confirmed', 'waiting_list'].includes(status)) return false;
     if (status === 'completed' || status === 'withdrawn') return true;
     const end = String(period.endDate || '').trim();
-    if (end && end <= today) return true;
+    if (end && end <= day) return true;
     return false;
 }
 
@@ -766,7 +767,10 @@ async function buildClassEnrollmentTransactionDraft({
     startDate,
     externalReference,
     reqUser,
-    programIdForPosting = ''
+    programIdForPosting = '',
+    billingAccountId = '',
+    studentDetail = null,
+    enrichStudentMemo = false
 }) {
     const billingMode = normalizeClassBillingMode(classData?.billingMode);
     if (billingMode === 'no_charge') {
@@ -822,13 +826,16 @@ async function buildClassEnrollmentTransactionDraft({
         return String(account?.status || '').trim().toLowerCase() === 'active';
     });
 
+    const resolvedBillingAccountId = toPublicId(billingAccountId)
+      || toPublicId(student?.studentAccountId || '');
+
     const previewRows = transactionDefinitionPreviewService.buildPreviewRows(
         definition,
         postingAccounts,
         classData?.orgId,
         {
             amount: classFeeAmount,
-            studentAccountId: toPublicId(student?.studentAccountId || ''),
+            studentAccountId: resolvedBillingAccountId,
             studentId: toPublicId(student?.id || ''),
             personId: toPublicId(student?.personId || ''),
             feeCategory
@@ -853,7 +860,14 @@ async function buildClassEnrollmentTransactionDraft({
         reqUser
     });
 
-    const draftTransactionItems = programRegistrationDraftService.normalizeDraftTransactionItems(items);
+    const memoAwareItems = enrichStudentMemo
+      ? rollingEnrollmentFunderService.appendStudentDetailToDraftMemos(items, {
+          studentId: studentDetail?.studentId || student?.id,
+          studentLabel: studentDetail?.studentLabel || ''
+        })
+      : items;
+
+    const draftTransactionItems = programRegistrationDraftService.normalizeDraftTransactionItems(memoAwareItems);
     const draftPreviewRows = programRegistrationDraftService.buildDraftPreviewRowsFromItems(draftTransactionItems);
     const totalAmount = roundMoney(draftPreviewRows.reduce((sum, row) => sum + Number(row.amount || 0), 0));
 
@@ -865,6 +879,7 @@ async function buildClassEnrollmentTransactionDraft({
         billingMode,
         isChargeable: true,
         feeCategory,
+        billingAccountId: resolvedBillingAccountId,
         classFeeRule: {
             feeCategory: String(classFeeRule?.feeCategory || '').trim(),
             amount: classFeeAmount,
@@ -1066,7 +1081,7 @@ async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = [], orgToda
     const idSet = new Set((Array.isArray(classIds) ? classIds : []).map((id) => toPublicId(id)).filter(Boolean));
     const rows = await schoolDataService.getAccessibleClassEnrollmentPeriods(reqUser);
     const periodRows = Array.isArray(rows) ? rows : [];
-    const today = String(orgToday || '').trim() || resolveOrgTodayFromContext({ orgToday: today });
+    const today = String(orgToday || '').trim() || resolveOrgTodayFromContext({ orgToday });
     const map = new Map();
 
     periodRows.forEach((row) => {
@@ -1076,7 +1091,7 @@ async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = [], orgToda
         const status = String(row?.status || '').trim().toLowerCase();
         const metrics = map.get(classId) || { openPeriodCount: 0, activePeriodCount: 0, totalPeriodCount: 0 };
         metrics.totalPeriodCount += 1;
-        if (['draft', 'planned', 'active'].includes(status)) metrics.openPeriodCount += 1;
+        if (['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'active'].includes(status)) metrics.openPeriodCount += 1;
         if (isActivePeriodOnDate(row, today)) metrics.activePeriodCount += 1;
         map.set(classId, metrics);
     });
@@ -1126,10 +1141,94 @@ const ROLLING_ENROLLMENT_SEARCHABLE_FIELDS = Object.freeze([
   'startDate',
   'endDate',
   'status',
+  'funderLabel',
   'funderType',
-  'funderId',
-  'authorizationRef'
+  'funderId'
 ]);
+
+async function loadActiveFunderOptions(reqUser, orgId) {
+  const orgToken = toPublicId(orgId);
+  if (!orgToken) return [];
+  const rows = await schoolDataService.fetchData('funders', {}, reqUser);
+  const scoped = (Array.isArray(rows) ? rows : []).filter((row) => {
+    if (!idsEqual(row?.orgId, orgToken)) return false;
+    return String(row?.status || '').trim().toLowerCase() === 'active';
+  });
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser,
+    personIds: scoped.map((row) => row.personId)
+  });
+  return scoped
+    .map((row) => {
+      const id = toPublicId(row?.id);
+      if (!id) return null;
+      const personId = toPublicId(row?.personId);
+      const label = schoolPersonAccessService.formatPersonName(personById.get(personId), id)
+        || String(personById.get(personId)?.organizationProfile?.legalName || '').trim()
+        || id;
+      return {
+        id,
+        label,
+        funderAccountId: toPublicId(row?.funderAccountId || '') || '',
+        personId
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
+}
+
+function attachFunderLabelsToPeriodRows(periodRows, funderOptions = []) {
+  const labelById = new Map(
+    (Array.isArray(funderOptions) ? funderOptions : []).map((row) => [String(row.id), String(row.label || row.id)])
+  );
+  return (Array.isArray(periodRows) ? periodRows : []).map((row) => ({
+    ...row,
+    funderLabel: rollingEnrollmentFunderService.resolveEnrollmentFunderLabel(row, labelById)
+  }));
+}
+
+async function loadFunderRecordOrThrow(reqUser, orgId, funderId) {
+  const id = toPublicId(funderId);
+  if (!id) throw new Error('Selected funder was not found.');
+  const funder = await schoolDataService.getDataById('funders', id, reqUser);
+  if (!funder || !idsEqual(funder?.orgId, orgId)) {
+    throw new Error('Selected funder was not found.');
+  }
+  return funder;
+}
+
+async function resolveEnrollmentFunderBillingContext({
+  reqUser,
+  orgId,
+  student,
+  funderId,
+  funderType,
+  chargeable = false,
+  studentLabel = ''
+} = {}) {
+  const normalized = rollingEnrollmentFunderService.normalizeEnrollmentFunderSelection({ funderId, funderType });
+  let funderRecord = null;
+  if (!rollingEnrollmentFunderService.isSelfFund(normalized.funderId)) {
+    funderRecord = await loadFunderRecordOrThrow(reqUser, orgId, normalized.funderId);
+  }
+  const billingAccountId = rollingEnrollmentFunderService.resolveEnrollmentBillingAccountId({
+    funderId: normalized.funderId,
+    student,
+    funderRecord,
+    chargeable
+  });
+  return {
+    ...normalized,
+    authorizationRef: '',
+    billingAccountId,
+    funderRecord,
+    studentDetail: {
+      studentId: toPublicId(student?.id || ''),
+      studentLabel: String(studentLabel || '').trim()
+    },
+    isSelfFund: rollingEnrollmentFunderService.isSelfFund(normalized.funderId)
+  };
+}
 
 function filterPeriodRowsBySearchQuery(rows, query) {
   if (!Array.isArray(rows) || !rows.length) return rows;
@@ -1156,9 +1255,9 @@ function filterPeriodRowsBySearchQuery(rows, query) {
       case 'startDate': return norm(row.startDate);
       case 'endDate': return norm(row.endDate);
       case 'status': return norm(row.status);
+      case 'funderLabel': return norm(row.funderLabel || row.funderType || row.funderId);
       case 'funderType': return norm(row.funderType);
       case 'funderId': return norm(row.funderId);
-      case 'authorizationRef': return norm(row.authorizationRef);
       default: return '';
     }
   };
@@ -1254,9 +1353,10 @@ async function showRollingEnrollmentPage(req, res) {
     assertRollingWorkflowEnabledForClass(req, classData);
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user);
 
-    const [periods, students] = await Promise.all([
+    const [periods, students, funderOptions] = await Promise.all([
       schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user),
-      schoolDataService.fetchData('students', {}, req.user)
+      schoolDataService.fetchData('students', {}, req.user),
+      loadActiveFunderOptions(req.user, classData.orgId)
     ]);
 
     const personById = await schoolPersonAccessService.buildPersonByIdMap({
@@ -1287,6 +1387,7 @@ async function showRollingEnrollmentPage(req, res) {
         studentLabel: studentLabelMap.get(toPublicId(row?.studentId)) || toPublicId(row?.studentId),
         studentRecordId: toPublicId(row?.studentId)
       }));
+    periodRows = attachFunderLabelsToPeriodRows(periodRows, funderOptions);
 
     periodRows = filterPeriodRowsBySearchQuery(periodRows, req.query);
     periodRows = await attachSessionProgressToEnrollmentPeriodRows(periodRows, classData, req.user, students);
@@ -1296,6 +1397,7 @@ async function showRollingEnrollmentPage(req, res) {
       classData,
       lifecycleContext,
       studentOptions,
+      funderOptions,
       periodRows,
       enrollmentProgramChoices: buildRollingEnrollmentProgramChoices(classData),
       canCreateProgramRegistrations: await canCreateOrgScopedItem(req.user, { scopeLabel: 'program registrations' }),
@@ -1341,8 +1443,12 @@ async function listClassEnrollmentPeriods(req, res) {
       rows = filterPeriodRowsBySearchQuery(rows, req.query);
     }
 
-    const students = await schoolDataService.fetchData('students', {}, req.user);
+    const [students, funderOptions] = await Promise.all([
+      schoolDataService.fetchData('students', {}, req.user),
+      loadActiveFunderOptions(req.user, classData.orgId)
+    ]);
     rows = await attachSessionProgressToEnrollmentPeriodRows(rows, classData, req.user, students);
+    rows = attachFunderLabelsToPeriodRows(rows, funderOptions);
 
     return res.json({
       status: 'success',
@@ -1895,6 +2001,10 @@ async function previewRollingEnrollmentEligibility(req, res) {
 }
 
 function buildClassEnrollmentCreatePayloadFromRequest(classData, req) {
+  const funder = rollingEnrollmentFunderService.normalizeEnrollmentFunderSelection({
+    funderId: req.body?.funderId,
+    funderType: req.body?.funderType
+  });
   return {
     orgId: classData.orgId,
     classId: classData.id,
@@ -1902,9 +2012,9 @@ function buildClassEnrollmentCreatePayloadFromRequest(classData, req) {
     startDate: String(req.body?.startDate || '').trim(),
     endDate: String(req.body?.endDate || '').trim(),
     status: String(req.body?.status || '').trim(),
-    funderType: String(req.body?.funderType || '').trim(),
-    funderId: String(req.body?.funderId || '').trim(),
-    authorizationRef: String(req.body?.authorizationRef || '').trim(),
+    funderType: funder.funderType,
+    funderId: funder.funderId,
+    authorizationRef: '',
     reasonStart: String(req.body?.reasonStart || '').trim(),
     reasonEnd: String(req.body?.reasonEnd || '').trim(),
     targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount),
@@ -2229,7 +2339,7 @@ async function buildStudentWindowsForGapConflictReview({
 
   const windowBounds = (() => {
     if (!sessionDates.length) {
-      const today = String(orgToday || '').trim() || resolveOrgTodayFromContext({ orgToday: today });
+      const today = String(orgToday || '').trim() || resolveOrgTodayFromContext({ orgToday });
       return { start: today, end: today };
     }
     const sorted = sessionDates.slice().sort();
@@ -2428,13 +2538,34 @@ async function previewClassEnrollmentWithTransactions(req, res) {
     await assertRollingEnrollmentPrerequisitesOrThrow(req, classData, student, req.body?.programId, req.body?.termId, startDate);
     const postingProgramId = toPublicId(req.body?.programId || '');
 
+    const personById = await schoolPersonAccessService.buildPersonByIdMap({
+      reqUser: req.user,
+      personIds: [student?.personId]
+    });
+    const studentLabel = schoolPersonAccessService.formatPersonName(
+      personById.get(toPublicId(student?.personId)),
+      toPublicId(student?.id)
+    );
+    const funderBilling = await resolveEnrollmentFunderBillingContext({
+      reqUser: req.user,
+      orgId: classData.orgId,
+      student,
+      funderId: req.body?.funderId,
+      funderType: req.body?.funderType,
+      chargeable: normalizeClassBillingMode(classData?.billingMode) !== 'no_charge',
+      studentLabel
+    });
+
     const draft = await buildClassEnrollmentTransactionDraft({
       classData,
       student,
       startDate,
-      externalReference: String(req.body?.authorizationRef || '').trim(),
+      externalReference: '',
       reqUser: req.user,
-      programIdForPosting: postingProgramId
+      programIdForPosting: postingProgramId,
+      billingAccountId: funderBilling.billingAccountId,
+      studentDetail: funderBilling.studentDetail,
+      enrichStudentMemo: !funderBilling.isSelfFund
     });
 
     if (!draft.isChargeable) {
@@ -2456,7 +2587,10 @@ async function previewClassEnrollmentWithTransactions(req, res) {
         totalAmount: draft.totalAmount,
         classFeeRule: draft.classFeeRule,
         draftPreviewRows: draft.draftPreviewRows,
-        draftTransactionItems: draft.draftTransactionItems
+        draftTransactionItems: draft.draftTransactionItems,
+        billingAccountId: draft.billingAccountId || funderBilling.billingAccountId,
+        funderId: funderBilling.funderId,
+        funderType: funderBilling.funderType
       }
     });
   } catch (error) {
@@ -2493,6 +2627,27 @@ async function createClassEnrollmentWithTransactions(req, res) {
     await assertEnrollmentSessionAlignmentForCreate({ classData, body: req.body, reqUser: req.user });
 
     const billingMode = normalizeClassBillingMode(classData?.billingMode);
+    const personById = await schoolPersonAccessService.buildPersonByIdMap({
+      reqUser: req.user,
+      personIds: [student?.personId]
+    });
+    const studentLabel = schoolPersonAccessService.formatPersonName(
+      personById.get(toPublicId(student?.personId)),
+      toPublicId(student?.id)
+    );
+    const funderBilling = await resolveEnrollmentFunderBillingContext({
+      reqUser: req.user,
+      orgId: classData.orgId,
+      student,
+      funderId: enrollmentPayload.funderId,
+      funderType: enrollmentPayload.funderType,
+      chargeable: billingMode !== 'no_charge',
+      studentLabel
+    });
+    enrollmentPayload.funderId = funderBilling.funderId;
+    enrollmentPayload.funderType = funderBilling.funderType;
+    enrollmentPayload.authorizationRef = '';
+
     guardKey = idempotencyGuardService.createGuardKey([
       'class_enrollment_period_create_with_transactions',
       String(classData?.orgId || '').trim(),
@@ -2504,7 +2659,8 @@ async function createClassEnrollmentWithTransactions(req, res) {
       String(enrollmentPayload.endDate || '').trim(),
       String(enrollmentPayload.targetSessionCount || '').trim(),
       String(enrollmentPayload.sessionCountPolicy || '').trim(),
-      String(enrollmentPayload.status || '').trim().toLowerCase()
+      String(enrollmentPayload.status || '').trim().toLowerCase(),
+      String(enrollmentPayload.funderId || '').trim()
     ]);
     const guardResult = idempotencyGuardService.beginGuard({
       key: guardKey,
@@ -2579,9 +2735,12 @@ async function createClassEnrollmentWithTransactions(req, res) {
           classData,
           student,
           startDate: enrollmentPayload.startDate,
-          externalReference: enrollmentPayload.authorizationRef,
+          externalReference: '',
           reqUser: req.user,
-          programIdForPosting: toPublicId(enrollmentPayload.programId || '')
+          programIdForPosting: toPublicId(enrollmentPayload.programId || ''),
+          billingAccountId: funderBilling.billingAccountId,
+          studentDetail: funderBilling.studentDetail,
+          enrichStudentMemo: !funderBilling.isSelfFund
         });
 
     const accountMap = await buildPostableAccountMap(req.user, classData.orgId);
@@ -2594,7 +2753,7 @@ async function createClassEnrollmentWithTransactions(req, res) {
       student,
       feeCategory,
       startDate: enrollmentPayload.startDate,
-      externalReference: enrollmentPayload.authorizationRef,
+      externalReference: '',
       requestUser: req.user
     });
 
@@ -2645,8 +2804,12 @@ async function createClassEnrollmentWithTransactions(req, res) {
       },
       { requestingUser: req.user }
     );
+    const requestedStatus = String(enrollmentPayload.status || '').trim().toLowerCase();
+    const persistStatus = ['waiting_list', 'to_be_confirmed'].includes(requestedStatus)
+      ? requestedStatus
+      : 'draft';
     const updatedDraft = await schoolDataService.updateClassEnrollmentPeriod(draftPeriodId, {
-      status: 'draft',
+      status: persistStatus,
       notes: enrollmentPayload.notes || `Draft rolling enrollment for class ${classData.id}.`,
       transactionSummary: {
         ...draftFinance.summary,
@@ -2698,7 +2861,7 @@ async function saveClassEnrollmentDraft(req, res) {
     assertRollingWorkflowEnabledForClass(req, classData);
 
     const currentStatus = String(period?.status || '').trim().toLowerCase();
-    if (!['draft', 'error', 'planned', 'active'].includes(currentStatus)) {
+    if (!['draft', 'error', 'planned', 'to_be_confirmed', 'waiting_list', 'active'].includes(currentStatus)) {
       throw new Error('Only draft-like enrollment periods can be edited here.');
     }
 
@@ -2753,13 +2916,21 @@ async function saveClassEnrollmentDraft(req, res) {
       { requestingUser: req.user }
     );
 
+    const funderSelection = rollingEnrollmentFunderService.normalizeEnrollmentFunderSelection({
+      funderId: req.body?.funderId !== undefined ? req.body?.funderId : period?.funderId,
+      funderType: req.body?.funderType !== undefined ? req.body?.funderType : period?.funderType
+    });
+    if (!rollingEnrollmentFunderService.isSelfFund(funderSelection.funderId)) {
+      await loadFunderRecordOrThrow(req.user, classData.orgId, funderSelection.funderId);
+    }
+
     const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate: nextStartDate,
       endDate: nextEndDate,
       status: nextStatus,
-      funderType: String(req.body?.funderType || period?.funderType || '').trim(),
-      funderId: String(req.body?.funderId || period?.funderId || '').trim(),
-      authorizationRef: String(req.body?.authorizationRef || period?.authorizationRef || '').trim(),
+      funderType: funderSelection.funderType,
+      funderId: funderSelection.funderId,
+      authorizationRef: '',
       reasonStart: String(req.body?.reasonStart || period?.reasonStart || '').trim(),
       targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount || period?.targetSessionCount),
       sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || period?.sessionCountPolicy),
@@ -3069,7 +3240,7 @@ async function approveClassEnrollmentDraft(req, res) {
     assertRollingWorkflowEnabledForClass(req, classData);
 
     const currentStatus = String(period?.status || '').trim().toLowerCase();
-    if (!['draft', 'error', 'planned', 'active'].includes(currentStatus)) {
+    if (!['draft', 'error', 'planned', 'to_be_confirmed', 'waiting_list', 'active'].includes(currentStatus)) {
       throw new Error('Only draft enrollment periods can be approved from this endpoint.');
     }
     const alreadyPostedIds = Array.isArray(period?.transactionSummary?.postedTransactionIds)
@@ -3160,15 +3331,28 @@ async function approveClassEnrollmentDraft(req, res) {
     const programIdToStore = toPublicId(period?.programId) || inferredLedgerProgramId || '';
     const termIdToStore = toPublicId(period?.termId) || inferredLedgerTermId || '';
 
+    const funderSelection = rollingEnrollmentFunderService.normalizeEnrollmentFunderSelection({
+      funderId: req.body?.funderId !== undefined ? req.body?.funderId : period?.funderId,
+      funderType: req.body?.funderType !== undefined ? req.body?.funderType : period?.funderType
+    });
+    if (!rollingEnrollmentFunderService.isSelfFund(funderSelection.funderId)) {
+      await loadFunderRecordOrThrow(req.user, classData.orgId, funderSelection.funderId);
+    }
+
+    const requestedApproveStatus = String(req.body?.status || '').trim().toLowerCase();
+    const approveStatus = ['active', 'to_be_confirmed', 'waiting_list'].includes(requestedApproveStatus)
+      ? requestedApproveStatus
+      : 'active';
+
     const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate: String(req.body?.startDate || period?.startDate || '').trim(),
       endDate: String(req.body?.endDate || period?.endDate || '').trim(),
-      status: 'active',
+      status: approveStatus,
       programId: programIdToStore,
       termId: termIdToStore,
-      funderType: String(req.body?.funderType || period?.funderType || '').trim(),
-      funderId: String(req.body?.funderId || period?.funderId || '').trim(),
-      authorizationRef: String(req.body?.authorizationRef || period?.authorizationRef || '').trim(),
+      funderType: funderSelection.funderType,
+      funderId: funderSelection.funderId,
+      authorizationRef: '',
       reasonStart: String(req.body?.reasonStart || period?.reasonStart || '').trim(),
       targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount || period?.targetSessionCount),
       sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || period?.sessionCountPolicy),
@@ -3325,7 +3509,7 @@ async function editClassEnrollmentPeriod(req, res) {
     if (!startDate) throw new Error('startDate is required.');
     const endDate = String(req.body?.endDate || '').trim();
     const statusInput = String(req.body?.status || periodRow?.status || 'active').trim().toLowerCase();
-    const status = ['draft', 'planned', 'active', 'completed', 'withdrawn', 'cancelled', 'archived', 'error'].includes(statusInput)
+    const status = ['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'active', 'completed', 'withdrawn', 'cancelled', 'archived', 'error'].includes(statusInput)
       ? statusInput
       : String(periodRow?.status || 'active').trim().toLowerCase();
     const currentStatus = String(periodRow?.status || '').trim().toLowerCase();
@@ -3349,13 +3533,21 @@ async function editClassEnrollmentPeriod(req, res) {
       });
     }
 
+    const funderSelection = rollingEnrollmentFunderService.normalizeEnrollmentFunderSelection({
+      funderId: req.body?.funderId !== undefined ? req.body?.funderId : periodRow?.funderId,
+      funderType: req.body?.funderType !== undefined ? req.body?.funderType : periodRow?.funderType
+    });
+    if (!rollingEnrollmentFunderService.isSelfFund(funderSelection.funderId)) {
+      await loadFunderRecordOrThrow(req.user, classData.orgId, funderSelection.funderId);
+    }
+
     const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate,
       endDate,
       status,
-      funderType: String(req.body?.funderType || periodRow?.funderType || '').trim(),
-      funderId: String(req.body?.funderId || periodRow?.funderId || '').trim(),
-      authorizationRef: String(req.body?.authorizationRef || periodRow?.authorizationRef || '').trim(),
+      funderType: funderSelection.funderType,
+      funderId: funderSelection.funderId,
+      authorizationRef: '',
       reasonStart: String(req.body?.reasonStart || periodRow?.reasonStart || '').trim(),
       targetSessionCount,
       sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || periodRow?.sessionCountPolicy)
@@ -3599,6 +3791,9 @@ async function createClassEnrollmentPeriod(req, res) {
     }
     await applyRollingEnrollmentResolutionFromRegistrations(req, classData, studentRow);
     const enrollmentPayload = buildClassEnrollmentCreatePayloadFromRequest(classData, req);
+    if (!rollingEnrollmentFunderService.isSelfFund(enrollmentPayload.funderId)) {
+      await loadFunderRecordOrThrow(req.user, classData.orgId, enrollmentPayload.funderId);
+    }
     const effDate = String(enrollmentPayload.startDate || '').trim() || resolveOrgTodayFromRequest(req);
     await assertRollingEnrollmentPrerequisitesOrThrow(req, classData, studentRow, req.body?.programId, req.body?.termId, effDate);
     await assertEnrollmentSessionAlignmentForCreate({ classData, body: req.body, reqUser: req.user });
@@ -3682,13 +3877,21 @@ async function reopenClassEnrollmentPeriod(req, res) {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Enrollment period reopen is already in progress. Please wait.')) return;
 
+    const funderSelection = rollingEnrollmentFunderService.normalizeEnrollmentFunderSelection({
+      funderId: req.body?.funderId,
+      funderType: req.body?.funderType
+    });
+    if (!rollingEnrollmentFunderService.isSelfFund(funderSelection.funderId)) {
+      await loadFunderRecordOrThrow(req.user, classData.orgId, funderSelection.funderId);
+    }
+
     const result = await schoolDataService.reopenClassEnrollmentPeriodViaNewPeriod(periodId, {
       startDate: String(req.body?.startDate || '').trim(),
       endDate: String(req.body?.endDate || '').trim(),
       status: 'draft',
-      funderType: String(req.body?.funderType || '').trim(),
-      funderId: String(req.body?.funderId || '').trim(),
-      authorizationRef: String(req.body?.authorizationRef || '').trim(),
+      funderType: funderSelection.funderType,
+      funderId: funderSelection.funderId,
+      authorizationRef: '',
       reasonStart: String(req.body?.reasonStart || '').trim(),
       reasonEnd: String(req.body?.reasonEnd || '').trim(),
       closeReason: String(req.body?.closeReason || '').trim(),
@@ -3700,13 +3903,33 @@ async function reopenClassEnrollmentPeriod(req, res) {
     if (!newPeriodId) throw new Error('The new draft enrollment period was not created.');
     const student = await schoolDataService.getDataById('students', newPeriod.studentId, req.user);
     if (!student) throw new Error('Student not found for the new enrollment draft.');
+    const personById = await schoolPersonAccessService.buildPersonByIdMap({
+      reqUser: req.user,
+      personIds: [student?.personId]
+    });
+    const studentLabel = schoolPersonAccessService.formatPersonName(
+      personById.get(toPublicId(student?.personId)),
+      toPublicId(student?.id)
+    );
+    const funderBilling = await resolveEnrollmentFunderBillingContext({
+      reqUser: req.user,
+      orgId: classData.orgId,
+      student,
+      funderId: funderSelection.funderId,
+      funderType: funderSelection.funderType,
+      chargeable: normalizeClassBillingMode(classData?.billingMode) !== 'no_charge',
+      studentLabel
+    });
     const draft = await buildClassEnrollmentTransactionDraft({
       classData,
       student,
       startDate: newPeriod.startDate,
-      externalReference: newPeriod.authorizationRef,
+      externalReference: '',
       reqUser: req.user,
-      programIdForPosting: toPublicId(newPeriod.programId || '')
+      programIdForPosting: toPublicId(newPeriod.programId || ''),
+      billingAccountId: funderBilling.billingAccountId,
+      studentDetail: funderBilling.studentDetail,
+      enrichStudentMemo: !funderBilling.isSelfFund
     });
 
     let savedDraft = newPeriod;

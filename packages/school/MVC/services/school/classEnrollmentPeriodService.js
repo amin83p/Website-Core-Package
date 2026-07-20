@@ -8,7 +8,7 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const TERMINAL_STATUSES = new Set(['cancelled', 'archived', 'error']);
-const OPEN_STATUSES = new Set(['draft', 'planned', 'active']);
+const OPEN_STATUSES = new Set(['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'active']);
 const REENTRY_SOURCE_STATUSES = new Set(['completed', 'withdrawn', 'cancelled', 'archived']);
 
 function todayISO(orgToday = '', reqUser = null) {

@@ -15,6 +15,8 @@ if (!fsSync.existsSync(dataPath)) {
 const PERIOD_STATUSES = new Set([
   'draft',
   'planned',
+  'to_be_confirmed',
+  'waiting_list',
   'active',
   'completed',
   'withdrawn',

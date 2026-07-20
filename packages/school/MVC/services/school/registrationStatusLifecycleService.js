@@ -6,7 +6,7 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const TERMINAL_STATUSES = new Set(['withdrawn', 'cancelled', 'completed', 'archived', 'rolled_back', 'void']);
-const OPEN_CLASS_STATUSES = new Set(['active', 'planned']);
+const OPEN_CLASS_STATUSES = new Set(['active', 'planned', 'to_be_confirmed', 'waiting_list']);
 
 function normalizeStatus(value) {
   return String(value || '').trim().toLowerCase();

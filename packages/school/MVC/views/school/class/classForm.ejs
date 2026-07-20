@@ -978,7 +978,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return new Date(`${token}T00:00:00.000Z`);
     };
     const toStatusToken = (value) => String(value || '').trim().toLowerCase();
-    const openEnrollmentStatuses = new Set(['draft', 'planned', 'active']);
+    const openEnrollmentStatuses = new Set(['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'active']);
     const addDaysYmd = (value, days) => {
         const parsed = parseYmd(value);
         if (!parsed) return '';
@@ -3524,7 +3524,7 @@ form.addEventListener('submit', async (e) => {
                             await showMessageModal({
                                 title: 'Close Enrollment Blocked',
                                 icon: 'warning',
-                                message: `This class still has ${openRows.length} open enrollment period(s) (draft/planned/active). Close them before marking the class as Closed For New Enrollment.${details}`,
+                                message: `This class still has ${openRows.length} open enrollment period(s) (active / to be confirmed / waiting list / draft). Close them before marking the class as Closed For New Enrollment.${details}`,
                                 buttons: [{ text: 'OK', class: 'btn-warning' }]
                             });
                         } else {

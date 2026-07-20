@@ -12,6 +12,7 @@
   const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
   const initialRowsJson = JSON.stringify(Array.isArray(periodRows) ? periodRows : []);
   const studentOptionsJson = JSON.stringify(Array.isArray(studentOptions) ? studentOptions : []);
+  const funderOptionsJson = JSON.stringify(Array.isArray(funderOptions) ? funderOptions : []);
   const enrollmentProgramChoicesJson = JSON.stringify(Array.isArray(enrollmentProgramChoices) ? enrollmentProgramChoices : []);
   const canCreateProgramRegistrationsJson = JSON.stringify(Boolean(typeof canCreateProgramRegistrations !== 'undefined' && canCreateProgramRegistrations));
   const canCreatePriorSubjectCreditsJson = JSON.stringify(Boolean(typeof canCreatePriorSubjectCredits !== 'undefined' && canCreatePriorSubjectCredits));
@@ -204,8 +205,7 @@
           <th class="text-center">Remaining</th>
           <th>Completion</th>
           <th class="text-center">Period Status</th>
-          <th>Funder (Type / ID)</th>
-          <th>Auth Ref</th>
+          <th>Funder</th>
           <th class="text-end pe-4">Actions</th>
         </tr>
       </thead>
@@ -266,7 +266,7 @@
             <div class="col-md-4" id="wrap_inp_targetSessionCount">
               <label class="form-label">Number of Sessions <span class="text-muted fw-normal">(optional)</span></label>
               <input type="number" id="inp_targetSessionCount" class="form-control" min="1" step="1" placeholder="e.g. 10">
-              <div class="form-text compact-help">Set a target to count recorded attendance after Start Date. Present, Late, Excused, and Absent count; N/A does not.</div>
+              <div class="form-text compact-help">Set a target to count recorded attendance after Start Date. Present, Late, Excused, Absent, and ACF count; N/A does not.</div>
               <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
                 <div class="form-text compact-help mb-0" id="hint_sessionAlignment">Leave blank to enroll by date window. A session target stays open until recorded attendance reaches the target.</div>
                 <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 d-none" id="btn_viewEnrollmentSessions">View Sessions</button>
@@ -274,26 +274,22 @@
             </div>
           </div>
           <div class="row g-2 mt-2">
-            <div class="col-md-4">
-              <label class="form-label">Funder ID</label>
-              <input type="text" id="inp_funderId" class="form-control" placeholder="Optional">
+            <div class="col-md-6">
+              <label class="form-label" for="inp_funder">Funder</label>
+              <select id="inp_funder" class="form-select">
+                <option value="self" selected>Self Fund</option>
+                <% (Array.isArray(funderOptions) ? funderOptions : []).forEach((funder) => { %>
+                <option value="<%= String(funder.id || '') %>"><%= String(funder.label || funder.id || '') %></option>
+                <% }); %>
+              </select>
+              <div class="form-text compact-help">Self Fund posts to the student account. Other funders post to the funder account with student detail.</div>
             </div>
-            <div class="col-md-4">
-              <label class="form-label">Funder Type</label>
-              <input type="text" id="inp_funderType" class="form-control" placeholder="e.g. WCB">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Authorization Ref</label>
-              <input type="text" id="inp_authorizationRef" class="form-control" placeholder="Optional">
-            </div>
-          </div>
-          <div class="row g-2 mt-2">
             <div class="col-md-4">
               <label class="form-label">Status</label>
               <select id="inp_status" class="form-select">
                 <option value="active" selected>Active</option>
-                <option value="planned">Planned</option>
-                <option value="draft">Draft</option>
+                <option value="to_be_confirmed">To be Confirmed</option>
+                <option value="waiting_list">Waiting list</option>
               </select>
             </div>
           </div>
@@ -615,16 +611,14 @@
           <div class="form-text">The new period must be reviewed and approved before its charges are posted.</div>
         </div>
         <div class="mb-2">
-          <label class="form-label">Funder Type</label>
-          <input type="text" id="reentry_funderType" class="form-control">
-        </div>
-        <div class="mb-2">
-          <label class="form-label">Funder ID</label>
-          <input type="text" id="reentry_funderId" class="form-control">
-        </div>
-        <div class="mb-2">
-          <label class="form-label">Authorization Ref</label>
-          <input type="text" id="reentry_authorizationRef" class="form-control">
+          <label class="form-label" for="reentry_funder">Funder</label>
+          <select id="reentry_funder" class="form-select">
+            <option value="self" selected>Self Fund</option>
+            <% (Array.isArray(funderOptions) ? funderOptions : []).forEach((funder) => { %>
+            <option value="<%= String(funder.id || '') %>"><%= String(funder.label || funder.id || '') %></option>
+            <% }); %>
+          </select>
+          <div class="form-text compact-help">Self Fund posts to the student account. Other funders post to the funder account with student detail.</div>
         </div>
         <div>
           <label class="form-label">Reason Start</label>
@@ -666,9 +660,11 @@
           <div class="col-md-6">
             <label class="form-label">Status</label>
             <select id="edit_status" class="form-select">
+              <option value="active">Active</option>
+              <option value="to_be_confirmed">To be Confirmed</option>
+              <option value="waiting_list">Waiting list</option>
               <option value="draft">Draft</option>
               <option value="planned">Planned</option>
-              <option value="active">Active</option>
               <option value="completed">Completed</option>
               <option value="withdrawn">Withdrawn</option>
               <option value="cancelled">Cancelled</option>
@@ -677,16 +673,14 @@
             </select>
           </div>
           <div class="col-md-6">
-            <label class="form-label">Funder Type</label>
-            <input type="text" id="edit_funderType" class="form-control">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Funder ID</label>
-            <input type="text" id="edit_funderId" class="form-control">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Authorization Ref</label>
-            <input type="text" id="edit_authorizationRef" class="form-control">
+            <label class="form-label" for="edit_funder">Funder</label>
+            <select id="edit_funder" class="form-select">
+              <option value="self" selected>Self Fund</option>
+              <% (Array.isArray(funderOptions) ? funderOptions : []).forEach((funder) => { %>
+              <option value="<%= String(funder.id || '') %>"><%= String(funder.label || funder.id || '') %></option>
+              <% }); %>
+            </select>
+            <div class="form-text compact-help">Self Fund posts to the student account. Other funders post to the funder account with student detail.</div>
           </div>
           <div class="col-12">
             <label class="form-label">Reason Start</label>
@@ -723,9 +717,10 @@
           <div class="col-md-4">
             <label class="form-label">Draft Status</label>
             <select id="charge_status" class="form-select form-select-sm">
-              <option value="draft" selected>Draft</option>
-              <option value="planned">Planned</option>
-              <option value="active">Active</option>
+              <option value="active" selected>Active</option>
+              <option value="to_be_confirmed">To be Confirmed</option>
+              <option value="waiting_list">Waiting list</option>
+              <option value="draft">Draft</option>
             </select>
           </div>
         </div>
@@ -868,14 +863,48 @@
     endDate: <%- JSON.stringify(cycleEndDate) %>,
     isClosedForNewEnrollment: <%- JSON.stringify(Boolean(isClosedForNewEnrollment)) %>
   };
-  const periodTableColspan = 11;
+  const periodTableColspan = 10;
   const studentOptions = <%- studentOptionsJson %>;
+  const funderOptions = <%- funderOptionsJson %>;
+  const funderLabelById = new Map((Array.isArray(funderOptions) ? funderOptions : []).map((row) => [String(row.id || ''), String(row.label || row.id || '')]));
   const enrollmentProgramChoices = <%- enrollmentProgramChoicesJson %>;
   const canCreateProgramRegistrations = <%- canCreateProgramRegistrationsJson %>;
   const canCreatePriorSubjectCredits = <%- canCreatePriorSubjectCreditsJson %>;
   const defaultTeacher = <%- defaultTeacherJson %>;
   const studentMap = new Map((Array.isArray(studentOptions) ? studentOptions : []).map((row) => [String(row.id || ''), row]));
   let periodRows = <%- initialRowsJson %>;
+
+  function resolveFunderSelectionFromSelect(selectId) {
+    const value = String(qs(selectId)?.value || 'self').trim() || 'self';
+    if (!value || value.toLowerCase() === 'self') {
+      return { funderId: 'self', funderType: 'self' };
+    }
+    return { funderId: value, funderType: 'funder' };
+  }
+
+  function setFunderSelectValue(selectId, periodRow) {
+    const el = qs(selectId);
+    if (!el) return;
+    const funderId = String(periodRow?.funderId || '').trim();
+    if (funderId && funderId.toLowerCase() !== 'self' && funderLabelById.has(funderId)) {
+      el.value = funderId;
+      return;
+    }
+    el.value = 'self';
+  }
+
+  function resolveFunderDisplayLabel(row) {
+    if (row?.funderLabel) return String(row.funderLabel);
+    const funderId = String(row?.funderId || '').trim();
+    if (funderId && funderId.toLowerCase() !== 'self' && funderLabelById.has(funderId)) {
+      return funderLabelById.get(funderId);
+    }
+    const funderType = String(row?.funderType || '').trim();
+    if ((!funderId || funderId.toLowerCase() === 'self') && (!funderType || funderType.toLowerCase() === 'self')) {
+      return 'Self Fund';
+    }
+    return [funderType, funderId].filter(Boolean).join(' / ') || 'Self Fund';
+  }
   let pendingEnrollmentPayload = null;
   let pendingDraftTransactionItems = [];
   let manualRows = [];
@@ -1691,7 +1720,15 @@
 
   function isOpenStatus(status) {
     const s = String(status || '').trim().toLowerCase();
-    return ['draft', 'planned', 'active'].includes(s);
+    return ['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'active'].includes(s);
+  }
+
+  function formatPeriodStatusLabel(status) {
+    const s = String(status || '').trim().toLowerCase();
+    if (s === 'to_be_confirmed') return 'To be Confirmed';
+    if (s === 'waiting_list') return 'Waiting list';
+    if (!s) return '-';
+    return s.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
   }
 
   function oneDayAfter(dateText) {
@@ -1774,15 +1811,16 @@
   }
 
   function collectEnrollmentPayloadFromForm() {
+    const funder = resolveFunderSelectionFromSelect('inp_funder');
     const payload = {
       classId,
       studentId: String(qs('inp_studentId')?.value || '').trim(),
       startDate: String(qs('inp_startDate')?.value || '').trim(),
       endDate: String(qs('inp_endDate')?.value || '').trim(),
       status: String(qs('inp_status')?.value || 'active').trim(),
-      funderType: String(qs('inp_funderType')?.value || '').trim(),
-      funderId: String(qs('inp_funderId')?.value || '').trim(),
-      authorizationRef: String(qs('inp_authorizationRef')?.value || '').trim(),
+      funderType: funder.funderType,
+      funderId: funder.funderId,
+      authorizationRef: '',
       reasonStart: String(qs('inp_reasonStart')?.value || '').trim(),
       sessionCountPolicy: 'all_non_na',
       plannedNotApplicableSessionIds: []
@@ -2696,15 +2734,20 @@
   }
 
   function readChargeModalDraftContext() {
+    const funderFromSelect = resolveFunderSelectionFromSelect('inp_funder');
+    const funderId = String(pendingEnrollmentPayload?.funderId || funderFromSelect.funderId || 'self').trim() || 'self';
+    const funderType = (!funderId || funderId.toLowerCase() === 'self')
+      ? 'self'
+      : (String(pendingEnrollmentPayload?.funderType || funderFromSelect.funderType || 'funder').trim() || 'funder');
     return {
       periodId: String(qs('charge_draftPeriodId')?.value || '').trim(),
       startDate: String(qs('charge_startDate')?.value || '').trim(),
       endDate: String(qs('charge_endDate')?.value || '').trim(),
       status: String(qs('charge_status')?.value || 'draft').trim().toLowerCase() || 'draft',
-      funderType: String(qs('inp_funderType')?.value || '').trim(),
-      funderId: String(qs('inp_funderId')?.value || '').trim(),
-      authorizationRef: String(qs('inp_authorizationRef')?.value || '').trim(),
-      reasonStart: String(qs('inp_reasonStart')?.value || '').trim(),
+      funderType: funderType === 'self' ? 'self' : 'funder',
+      funderId: funderType === 'self' || !funderId ? 'self' : funderId,
+      authorizationRef: '',
+      reasonStart: String(qs('inp_reasonStart')?.value || pendingEnrollmentPayload?.reasonStart || '').trim(),
       targetSessionCount: String(pendingEnrollmentPayload?.targetSessionCount || '').trim(),
       sessionCountPolicy: String(pendingEnrollmentPayload?.sessionCountPolicy || 'all_non_na').trim() || 'all_non_na'
     };
@@ -2938,7 +2981,7 @@
     if (qs('charge_draftPeriodId')) qs('charge_draftPeriodId').value = '';
     if (qs('charge_startDate')) qs('charge_startDate').value = '';
     if (qs('charge_endDate')) qs('charge_endDate').value = '';
-    if (qs('charge_status')) qs('charge_status').value = 'draft';
+    if (qs('charge_status')) qs('charge_status').value = 'active';
     renderDraftTransactionRows([]);
     renderManualRows();
     clearManualAccount('Debit');
@@ -3140,7 +3183,9 @@
       const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(draftContext.periodId)}/approve`, 'POST', {
         startDate: draftContext.startDate,
         endDate: draftContext.endDate,
-        status: draftContext.status === 'draft' ? 'active' : draftContext.status,
+        status: ['active', 'to_be_confirmed', 'waiting_list'].includes(draftContext.status)
+          ? draftContext.status
+          : 'active',
         funderType: draftContext.funderType,
         funderId: draftContext.funderId,
         authorizationRef: draftContext.authorizationRef,
@@ -3182,19 +3227,24 @@
       return;
     }
 
+    const funderId = String(row?.funderId || '').trim();
+    const funderType = (!funderId || funderId.toLowerCase() === 'self')
+      ? 'self'
+      : (String(row?.funderType || '').trim() || 'funder');
     const payload = {
       classId,
       studentId: String(row?.studentId || '').trim(),
       startDate: String(row?.startDate || '').trim(),
       endDate: String(row?.endDate || '').trim(),
       status: String(row?.status || 'draft').trim().toLowerCase() || 'draft',
-      funderType: String(row?.funderType || '').trim(),
-      funderId: String(row?.funderId || '').trim(),
-      authorizationRef: String(row?.authorizationRef || '').trim(),
+      funderType: funderType === 'self' ? 'self' : 'funder',
+      funderId: funderType === 'self' || !funderId ? 'self' : funderId,
+      authorizationRef: '',
       reasonStart: String(row?.reasonStart || '').trim(),
       targetSessionCount: String(row?.targetSessionCount || '').trim(),
       sessionCountPolicy: String(row?.sessionCountPolicy || 'all_non_na').trim() || 'all_non_na'
     };
+    setFunderSelectValue('inp_funder', payload);
 
     openChargeModalWithDraft(payload, {
       draftTransactionItems,
@@ -3263,7 +3313,9 @@
       const studentId = String(row?.studentId || '');
       const status = String(row?.status || '').trim().toLowerCase();
       const badgeClass = status === 'active' ? 'bg-success'
-        : (status === 'planned' ? 'bg-primary' : (status === 'draft' ? 'bg-warning text-dark' : 'bg-secondary'));
+        : (status === 'to_be_confirmed' ? 'bg-info text-dark'
+          : (status === 'waiting_list' ? 'bg-primary'
+            : (status === 'planned' ? 'bg-primary' : (status === 'draft' ? 'bg-warning text-dark' : 'bg-secondary'))));
       const canClose = isOpenStatus(status);
       const canArchive = ['completed', 'withdrawn', 'cancelled'].includes(status);
       const canReenter = ['completed', 'withdrawn', 'cancelled', 'archived'].includes(status);
@@ -3278,13 +3330,16 @@
         || (transactionSummary.reconciliationIssues || []).length
         ? 'unresolved'
         : String(activePostingCycle?.status || ((transactionSummary.draftTransactionIds || []).length ? 'draft' : 'none')).trim().toLowerCase();
-      const canReviewDraft = status === 'draft' && Array.isArray(row?.transactionSummary?.draftPreviewRows) && row.transactionSummary.draftPreviewRows.length > 0;
+      const canReviewDraft = ['draft', 'to_be_confirmed', 'waiting_list'].includes(status)
+        && Array.isArray(row?.transactionSummary?.draftPreviewRows)
+        && row.transactionSummary.draftPreviewRows.length > 0
+        && !(Array.isArray(row?.transactionSummary?.postedTransactionIds) && row.transactionSummary.postedTransactionIds.length);
       const hasPostedTransactions = status !== 'draft'
         && Array.isArray(row?.transactionSummary?.postedTransactionIds)
         && row.transactionSummary.postedTransactionIds.length > 0;
       const canSyncAcademicLedger = hasPostedTransactions || status === 'active';
       const removeLabel = hasPostedTransactions ? 'Rollback' : 'Delete';
-      const funderLabel = [row?.funderType, row?.funderId].filter(Boolean).join(' / ') || '-';
+      const funderLabel = resolveFunderDisplayLabel(row);
       const explicitTargetSessionCount = Number(row?.targetSessionCount || 0);
       const effectiveTargetSessionCount = row?.effectiveTargetSessionCount === null || row?.effectiveTargetSessionCount === undefined
         ? (explicitTargetSessionCount || null)
@@ -3314,11 +3369,10 @@
           <td class="text-center">${remainingSessionCount !== null ? htmlEscape(String(remainingSessionCount)) : '<span class="text-muted">-</span>'}</td>
           <td>${completionHtml}</td>
           <td class="text-center">
-            <span class="badge ${badgeClass}">${htmlEscape(status || '-')}</span>
+            <span class="badge ${badgeClass}">${htmlEscape(formatPeriodStatusLabel(status))}</span>
             <div class="x-small text-muted mt-1">Finance: ${htmlEscape(financialStatus)}</div>
           </td>
           <td>${htmlEscape(funderLabel)}</td>
-          <td>${htmlEscape(String(row?.authorizationRef || '-'))}</td>
           <td class="text-end table-actions pe-4">
             <div class="rolling-row-actions-wrap">
               <button type="button" class="btn btn-secondary btn-sm rolling-row-actions-toggle" data-period-id="${htmlEscape(String(row?.id || ''))}">
@@ -3374,9 +3428,7 @@
     qs('inp_startDate').value = '';
     qs('inp_endDate').value = '';
     qs('inp_status').value = 'active';
-    qs('inp_funderType').value = '';
-    qs('inp_funderId').value = '';
-    qs('inp_authorizationRef').value = '';
+    setFunderSelectValue('inp_funder', { funderId: 'self', funderType: 'self' });
     qs('inp_reasonStart').value = '';
     if (qs('inp_targetSessionCount')) {
       qs('inp_targetSessionCount').value = '';
@@ -3551,9 +3603,7 @@
     qs('reentry_startDate').value = oneDayAfter(row.endDate) || '';
     qs('reentry_endDate').value = '';
     qs('reentry_status').value = 'Draft';
-    qs('reentry_funderType').value = String(row.funderType || '');
-    qs('reentry_funderId').value = String(row.funderId || '');
-    qs('reentry_authorizationRef').value = String(row.authorizationRef || '');
+    setFunderSelectValue('reentry_funder', row);
     qs('reentry_reasonStart').value = '';
     reentryModal.show();
   }
@@ -3565,9 +3615,7 @@
     qs('edit_startDate').value = String(row?.startDate || '').trim();
     qs('edit_endDate').value = String(row?.endDate || '').trim();
     qs('edit_status').value = String(row?.status || 'active').trim().toLowerCase() || 'active';
-    qs('edit_funderType').value = String(row?.funderType || '').trim();
-    qs('edit_funderId').value = String(row?.funderId || '').trim();
-    qs('edit_authorizationRef').value = String(row?.authorizationRef || '').trim();
+    setFunderSelectValue('edit_funder', row);
     qs('edit_reasonStart').value = String(row?.reasonStart || '').trim();
     if (qs('edit_targetSessionCount')) qs('edit_targetSessionCount').value = row?.targetSessionCount ? String(row.targetSessionCount) : '';
     editModal.show();
@@ -3582,13 +3630,14 @@
     }
     try {
       showBusy('Creating next period...');
+      const funder = resolveFunderSelectionFromSelect('reentry_funder');
       const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/reopen`, 'POST', {
         startDate,
         endDate: String(qs('reentry_endDate')?.value || '').trim(),
         status: 'draft',
-        funderType: String(qs('reentry_funderType')?.value || '').trim(),
-        funderId: String(qs('reentry_funderId')?.value || '').trim(),
-        authorizationRef: String(qs('reentry_authorizationRef')?.value || '').trim(),
+        funderType: funder.funderType,
+        funderId: funder.funderId,
+        authorizationRef: '',
         reasonStart: String(qs('reentry_reasonStart')?.value || '').trim()
       });
       if (!result) return;
@@ -3607,9 +3656,7 @@
       'inp_startDate',
       'inp_endDate',
       'inp_status',
-      'inp_funderType',
-      'inp_funderId',
-      'inp_authorizationRef'
+      'inp_funder'
     ];
     triggerAddOnEnterIds.forEach((id) => {
       const el = qs(id);
@@ -3697,20 +3744,21 @@
     if (cycleWindow?.isClosedForNewEnrollment && nextStatus === 'active') {
       const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === periodId);
       const priorStatus = String(row?.status || '').trim().toLowerCase();
-      if (['draft', 'planned', 'error'].includes(priorStatus)) {
-        await showMsg('Cycle closed', 'warning', 'This cycle is closed for new enrollment. Draft periods cannot be approved to active.');
+      if (['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'error'].includes(priorStatus)) {
+        await showMsg('Cycle closed', 'warning', 'This cycle is closed for new enrollment. Pending periods cannot be approved to active.');
         return;
       }
     }
     try {
       showBusy('Saving enrollment period changes...');
+      const funder = resolveFunderSelectionFromSelect('edit_funder');
       const editPayload = {
         startDate,
         endDate: String(qs('edit_endDate')?.value || '').trim(),
         status: String(qs('edit_status')?.value || 'active').trim(),
-        funderType: String(qs('edit_funderType')?.value || '').trim(),
-        funderId: String(qs('edit_funderId')?.value || '').trim(),
-        authorizationRef: String(qs('edit_authorizationRef')?.value || '').trim(),
+        funderType: funder.funderType,
+        funderId: funder.funderId,
+        authorizationRef: '',
         reasonStart: String(qs('edit_reasonStart')?.value || '').trim(),
         sessionCountPolicy: 'all_non_na'
       };
