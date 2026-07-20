@@ -568,10 +568,16 @@ function buildStudentPunctualitySummary(sessions, studentId, statusMap = null, o
 }
 
 function normalizeSessionRatingPercent(value, fallback = 100) {
-  const fallbackNumber = Number(fallback);
-  const safeFallback = Number.isFinite(fallbackNumber) ? fallbackNumber : 100;
+  if (value === null || value === undefined || value === '') return null;
+  const token = String(value).trim().toLowerCase();
+  if (token === 'n/a' || token === 'na') return null;
   const n = Number(value);
-  if (!Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(safeFallback * 100) / 100));
+  if (!Number.isFinite(n)) {
+    if (fallback === null || fallback === undefined) return null;
+    const fallbackNumber = Number(fallback);
+    if (!Number.isFinite(fallbackNumber)) return null;
+    return Math.max(0, Math.min(100, Math.round(fallbackNumber * 100) / 100));
+  }
   return Math.max(0, Math.min(100, Math.round(n * 100) / 100));
 }
 
@@ -621,14 +627,26 @@ function buildStudentSessionRatingSummary(sessions, studentId, statusMap = null,
     const status = String(normalized?.attendance || '').trim().toLowerCase();
     if (status !== 'present' && status !== 'late' && status !== 'excused') return;
 
-    ratings.classEffort.push(normalizeSessionRatingPercent(row?.classEffortPercent));
-    ratings.classParticipation.push(normalizeSessionRatingPercent(row?.classParticipationPercent));
-    ratings.respectsTeachers.push(normalizeSessionRatingPercent(row?.respectsTeachersPercent));
-    ratings.respectsStudents.push(normalizeSessionRatingPercent(row?.respectsStudentsPercent));
+    const pushIfRated = (bucket, raw) => {
+      const value = normalizeSessionRatingPercent(raw, null);
+      if (value === null) return;
+      bucket.push(value);
+    };
+    pushIfRated(ratings.classEffort, row?.classEffortPercent);
+    pushIfRated(ratings.classParticipation, row?.classParticipationPercent);
+    pushIfRated(ratings.respectsTeachers, row?.respectsTeachersPercent);
+    pushIfRated(ratings.respectsStudents, row?.respectsStudentsPercent);
   });
 
+  const ratedSessions = Math.max(
+    ratings.classEffort.length,
+    ratings.classParticipation.length,
+    ratings.respectsTeachers.length,
+    ratings.respectsStudents.length
+  );
+
   return {
-    ratedSessions: ratings.classEffort.length,
+    ratedSessions,
     classEffortPercent: averageSessionRating(ratings.classEffort),
     classParticipationPercent: averageSessionRating(ratings.classParticipation),
     respectsTeachersPercent: averageSessionRating(ratings.respectsTeachers),

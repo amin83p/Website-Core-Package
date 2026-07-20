@@ -52,31 +52,42 @@
         flex-wrap: wrap;
         margin-bottom: 0.35rem;
     }
-    .conduct-emoji-btn {
-        width: 2rem;
+    .conduct-emoji-btn,
+    .conduct-code-btn {
+        min-width: 2.1rem;
         height: 2rem;
-        padding: 0;
+        padding: 0 0.35rem;
         border: 1px solid #dbe3ef;
         border-radius: 8px;
         background: #fff;
-        font-size: 1rem;
+        font-size: 0.72rem;
+        font-weight: 700;
         line-height: 1;
-        opacity: 0.55;
+        opacity: 0.7;
         transition: all 0.15s ease;
+        color: #334155;
     }
-    .conduct-emoji-btn:hover:not(:disabled) {
-        opacity: 0.9;
+    .conduct-emoji-btn:hover:not(:disabled),
+    .conduct-code-btn:hover:not(:disabled) {
+        opacity: 0.95;
         border-color: #93b4f6;
         transform: translateY(-1px);
     }
-    .conduct-emoji-btn.active {
+    .conduct-emoji-btn.active,
+    .conduct-code-btn.active {
         opacity: 1;
         border-color: #2563eb;
         box-shadow: 0 0 0 0.15rem rgba(37, 99, 235, 0.15);
         background: #eff6ff;
+        color: #1d4ed8;
     }
-    .conduct-emoji-btn:disabled {
+    .conduct-emoji-btn:disabled,
+    .conduct-code-btn:disabled {
         cursor: not-allowed;
+    }
+    .conduct-code-btn[data-code="NA"] {
+        font-size: 0.68rem;
+        min-width: 2.4rem;
     }
     .conduct-percent-input {
         max-width: 5.5rem;
@@ -838,8 +849,11 @@
     } %>
     <%
         const sessionRatingValue = (value) => {
+            if (value === null || value === undefined || value === '') return '';
+            const token = String(value).trim().toLowerCase();
+            if (token === 'n/a' || token === 'na') return '';
             const n = Number(value);
-            if (!Number.isFinite(n)) return 100;
+            if (!Number.isFinite(n)) return '';
             return Math.max(0, Math.min(100, Math.round(n * 100) / 100));
         };
         const statusRows = Array.isArray(sessionStatusMeta) ? sessionStatusMeta : [];
@@ -849,10 +863,26 @@
         const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
         const attendanceSummary = (session.roster || []).reduce((acc, row) => {
             const rawKey = String(row?.attendance || '').trim().toLowerCase();
-            const key = (rawKey === 'n/a' || rawKey === 'na') ? 'not_applicable' : rawKey;
+            const key = (rawKey === 'n/a' || rawKey === 'na' || rawKey === 'absent_camera_off')
+                ? (rawKey === 'absent_camera_off' ? 'acf' : 'not_applicable')
+                : rawKey;
             if (Object.prototype.hasOwnProperty.call(acc, key)) acc[key] += 1;
             return acc;
         }, { present: 0, late: 0, excused: 0, absent: 0, acf: 0, not_applicable: 0 });
+        const resolvedEnabledAttendanceStatuses = (typeof enabledAttendanceStatuses !== 'undefined'
+            && Array.isArray(enabledAttendanceStatuses)
+            && enabledAttendanceStatuses.length)
+            ? enabledAttendanceStatuses.map((s) => String(s || '').trim().toLowerCase()).filter(Boolean)
+            : ['present', 'late', 'excused', 'absent', 'acf', 'not_applicable'];
+        const enabledAttendanceSet = new Set(resolvedEnabledAttendanceStatuses);
+        const isAttendanceStatusShown = (code, currentAttendance) => {
+            const normalized = String(code || '').trim().toLowerCase();
+            if (enabledAttendanceSet.has(normalized)) return true;
+            const current = String(currentAttendance || '').trim().toLowerCase();
+            const currentNorm = (current === 'n/a' || current === 'na') ? 'not_applicable'
+                : (current === 'absent_camera_off' ? 'acf' : current);
+            return currentNorm === normalized;
+        };
         const normalizedSessionStatus = normalizeStatusCode(session.status || fallbackStatusCode);
         const currentSessionStatus = availableStatusRows.some((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus)
             ? normalizedSessionStatus
@@ -896,14 +926,22 @@
         const isTimesheetSessionLock = typeof isSessionLocked !== 'undefined' && isSessionLocked && String(session.lockReason || '') === 'timesheet_approved';
         const canToggleSessionLock = canEditSessionMetadataFlag && !isTimesheetSessionLock;
         const conductScaleDefaultLevels = [
-            { code: 'S', label: 'Superior', emoji: '⭐', minPercent: 85, maxPercent: 100, defaultPercent: 92.5 },
-            { code: 'Sat', label: 'Satisfactory', emoji: '👍', minPercent: 60, maxPercent: 84, defaultPercent: 72 },
-            { code: 'NI', label: 'Needs Improvement', emoji: '😐', minPercent: 50, maxPercent: 59, defaultPercent: 54.5 },
-            { code: 'U', label: 'Unsatisfactory', emoji: '😞', minPercent: 0, maxPercent: 49, defaultPercent: 24.5 }
+            { code: 'S', label: 'Superior', displayCode: 'S', minPercent: 85, maxPercent: 100, defaultPercent: 92.5 },
+            { code: 'Sat', label: 'Satisfactory', displayCode: 'Sat', minPercent: 60, maxPercent: 84, defaultPercent: 72 },
+            { code: 'NI', label: 'Needs Improvement', displayCode: 'NI', minPercent: 50, maxPercent: 59, defaultPercent: 54.5 },
+            { code: 'U', label: 'Unsatisfactory', displayCode: 'U', minPercent: 0, maxPercent: 49, defaultPercent: 24.5 }
         ];
+        const conductNaLevel = { code: 'NA', label: 'Not Available', displayCode: 'N/A', minPercent: null, maxPercent: null, defaultPercent: null };
         const conductScaleLevels = (typeof conductRatingScaleResolved !== 'undefined' && conductRatingScaleResolved && Array.isArray(conductRatingScaleResolved.levels) && conductRatingScaleResolved.levels.length)
             ? conductRatingScaleResolved.levels
             : conductScaleDefaultLevels;
+        const conductPickerLevels = [...conductScaleLevels, conductNaLevel];
+        const conductReadyForReports = session.conductReadyForReports === true
+            || String(session.conductReadyForReports || '').trim().toLowerCase() === 'true';
+        const sessionReportRowsInitial = Array.isArray(typeof sessionReportInstanceRows !== 'undefined' ? sessionReportInstanceRows : [])
+            ? sessionReportInstanceRows
+            : [];
+        const hasSessionReportsAssigned = sessionReportRowsInitial.length > 0;
         const conductDimensions = [
             { key: 'classEffort', className: 'conduct-class-effort', label: 'Class Effort', valueKey: 'classEffortPercent', peClass: '' },
             { key: 'classParticipation', className: 'conduct-class-participation', label: 'Class Participation', valueKey: 'classParticipationPercent', peClass: '' },
@@ -1179,9 +1217,6 @@
                 <button type="button" class="session-manager-nav-item active" data-session-panel="attendance" role="tab" aria-selected="true">
                     <i class="bi bi-people-fill fs-5"></i><span class="session-manager-nav-label">Attendance</span>
                 </button>
-                <button type="button" class="session-manager-nav-item" data-session-panel="conduct" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
-                    <i class="bi bi-person-hearts fs-5"></i><span class="session-manager-nav-label">Class Conduct</span>
-                </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="session" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-journal-text fs-5"></i><span class="session-manager-nav-label">Session &amp; notes</span>
                 </button>
@@ -1209,7 +1244,7 @@
                     <i class="bi bi-calendar-plus fs-1 text-warning d-block mb-3"></i>
                     <h5 class="fw-bold text-dark mb-2">Instructional work is paused for this original session</h5>
                     <p class="text-muted mb-3">
-                        Attendance, class conduct, gradebook, content, assignments, and student cases belong on the make-up session, not this original session.
+                        Attendance, gradebook, content, assignments, and student cases belong on the make-up session, not this original session.
                     </p>
                     <% if (canCreateMakeupSession) { %>
                         <button type="button" class="btn btn-warning fw-bold" id="btnCreateMakeupSessionInline"><i class="bi bi-calendar-plus me-1"></i>Create make-up session</button>
@@ -1224,30 +1259,36 @@
                             <div class="session-summary-value text-success"><%= attendanceSummary.present %></div>
                         </div>
                     </div>
+                    <% if (enabledAttendanceSet.has('late')) { %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Late</div>
                             <div class="session-summary-value text-warning"><%= attendanceSummary.late %></div>
                         </div>
                     </div>
+                    <% } %>
+                    <% if (enabledAttendanceSet.has('excused')) { %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Excused</div>
                             <div class="session-summary-value text-info"><%= attendanceSummary.excused %></div>
                         </div>
                     </div>
+                    <% } %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Absent</div>
                             <div class="session-summary-value text-danger"><%= attendanceSummary.absent %></div>
                         </div>
                     </div>
+                    <% if (enabledAttendanceSet.has('acf')) { %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">ACF</div>
                             <div class="session-summary-value" style="color:#b02a37;"><%= attendanceSummary.acf %></div>
                         </div>
                     </div>
+                    <% } %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">N/A</div>
@@ -1263,7 +1304,9 @@
                             <% if (!isReadOnly && session.roster.length > 0) { %>
                                 <div class="btn-group btn-group-sm" role="group" aria-label="Bulk attendance">
                                     <button type="button" class="btn btn-outline-success" id="btnAllPresent">All Present</button>
+                                    <% if (enabledAttendanceSet.has('late')) { %>
                                     <button type="button" class="btn btn-outline-warning" id="btnAllLate">All Late</button>
+                                    <% } %>
                                     <button type="button" class="btn btn-outline-danger" id="btnAllAbsent">All Absent</button>
                                     <button type="button" class="btn btn-outline-secondary" id="btnAllNotApplicable">All N/A</button>
                                 </div>
@@ -1295,18 +1338,30 @@
                                                 <td class="pe-3 py-3">
                                                     <div class="d-flex gap-2 align-items-center flex-wrap">
                                                         <div class="btn-group btn-group-sm flex-grow-1" role="group">
+                                                            <% if (isAttendanceStatusShown('present', student.attendance)) { %>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="p_<%= i %>" value="present" <%= student.attendance === 'present' ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="p_<%= i %>" title="Present"><i class="bi bi-check-lg me-1"></i>Present</label>
+                                                            <% } %>
+                                                            <% if (isAttendanceStatusShown('late', student.attendance)) { %>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="l_<%= i %>" value="late" <%= student.attendance === 'late' ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="l_<%= i %>" title="Late"><i class="bi bi-clock-history"></i> Late</label>
+                                                            <% } %>
+                                                            <% if (isAttendanceStatusShown('excused', student.attendance)) { %>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="e_<%= i %>" value="excused" <%= student.attendance === 'excused' ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="e_<%= i %>" title="Excused Absence"><i class="bi bi-envelope-paper"></i> Excused</label>
+                                                            <% } %>
+                                                            <% if (isAttendanceStatusShown('absent', student.attendance)) { %>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="a_<%= i %>" value="absent" <%= student.attendance === 'absent' ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="a_<%= i %>" title="Absent"><i class="bi bi-x-lg"></i> Absent</label>
+                                                            <% } %>
+                                                            <% if (isAttendanceStatusShown('acf', student.attendance)) { %>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="acf_<%= i %>" value="acf" <%= student.attendance === 'acf' ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="acf_<%= i %>" title="Absent Camera Off"><i class="bi bi-camera-video-off"></i> ACF</label>
+                                                            <% } %>
+                                                            <% if (isAttendanceStatusShown('not_applicable', student.attendance)) { %>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="na_<%= i %>" value="not_applicable" <%= (student.attendance === 'not_applicable' || student.attendance === 'N/A' || student.attendance === 'n/a') ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="na_<%= i %>" title="Not applicable"><i class="bi bi-dash-circle"></i> N/A</label>
+                                                            <% } %>
                                                         </div>
                                                         <% const hasDetails = student.lateMinutes || student.earlyLeaveMinutes || student.excuseRef || student.excuseAttachment || (student.comments && student.comments.length > 0); %>
                                                         <% if (!isReadOnly) { %>
@@ -1327,77 +1382,6 @@
                                                     <input type="hidden" class="att-excuse-attachment" value='<%- JSON.stringify(student.excuseAttachment || null).replace(/</g, "\\u003c").replace(/'/g, "&#39;") %>'>
                                                     <input type="hidden" class="att-comments" value='<%- JSON.stringify(student.comments || []).replace(/</g, "\\u003c").replace(/'/g, "&#39;") %>'>
                                                 </td>
-                                            </tr>
-                                        <% }) %>
-                                    <% } %>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="session-panel" id="session-panel-conduct" role="tabpanel">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
-                        <div>
-                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-person-hearts me-2"></i>Class Conduct</h5>
-                            <div class="conduct-rating-help mt-1">Ratings default to <strong>Superior (S)</strong>. Tap an emoji to set effort, participation, or respect quickly, or open <strong>Quick rate conduct</strong> for the whole class.</div>
-                            <div class="d-flex flex-wrap gap-2 mt-2">
-                                <% conductScaleLevels.forEach((level) => { %>
-                                    <span class="conduct-legend-chip" title="<%= level.label %> (<%= level.minPercent %>%–<%= level.maxPercent %>%)">
-                                        <span aria-hidden="true"><%= level.emoji %></span>
-                                        <strong><%= level.code %></strong>
-                                        <span class="text-muted"><%= level.minPercent %>%–<%= level.maxPercent %>%</span>
-                                    </span>
-                                <% }) %>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                            <% if (!isReadOnly && session.roster.length > 0) { %>
-                                <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenConductBulkModal"><i class="bi bi-lightning-charge me-1"></i>Quick rate conduct</button>
-                            <% } %>
-                            <% if (canManageConductRatingScaleFlag) { %>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnOpenConductScaleSettingsModal"><i class="bi bi-sliders me-1"></i>Rating scale settings</button>
-                            <% } %>
-                            <span class="badge bg-light text-dark border"><%= session.roster.length %> Students</span>
-                        </div>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive" style="max-height: min(70vh, 700px); overflow-y: auto;">
-                            <table class="table table-hover align-middle mb-0" id="conductTable">
-                                <thead class="table-light position-sticky top-0" style="z-index: 1;">
-                                    <tr>
-                                        <th class="ps-4">Student Name</th>
-                                        <% conductDimensions.forEach((dim) => { %>
-                                            <th class="text-center <%= dim.peClass %>">
-                                                <div><%= dim.label %></div>
-                                            </th>
-                                        <% }) %>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <% if (session.roster.length === 0) { %>
-                                        <tr><td colspan="5" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
-                                    <% } else { %>
-                                        <% session.roster.forEach((student) => { %>
-                                            <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
-                                                <td class="ps-4 fw-bold align-middle">
-                                                    <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
-                                                    <div class="small text-muted font-monospace"><%= student.personId %></div>
-                                                </td>
-                                                <% conductDimensions.forEach((dim) => { %>
-                                                    <td class="text-center <%= dim.peClass %>">
-                                                        <div class="conduct-rating-cell" data-dimension="<%= dim.key %>">
-                                                            <div class="conduct-emoji-picker" role="group" aria-label="<%= dim.label %> rating">
-                                                                <% conductScaleLevels.forEach((level) => { %>
-                                                                    <button type="button" class="conduct-emoji-btn" data-code="<%= level.code %>" title="<%= level.label %> (<%= level.minPercent %>%–<%= level.maxPercent %>%)"><%= level.emoji %></button>
-                                                                <% }) %>
-                                                            </div>
-                                                            <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= sessionRatingValue(student[dim.valueKey]) %>" <%- disabledAttr %>>
-                                                        </div>
-                                                    </td>
-                                                <% }) %>
                                             </tr>
                                         <% }) %>
                                     <% } %>
@@ -1481,11 +1465,87 @@
                 </div>
             </div>
             <div class="session-panel" id="session-panel-assignments" role="tabpanel">
-                <div class="card border-0 shadow-sm">
+                <% if (hasSessionReportsAssigned) { %>
+                <div class="card border-0 shadow-sm mb-3" id="sessionReportConductStep">
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
                         <div>
-                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-clipboard-check me-2"></i>Report instances</h5>
-                            <div class="small text-muted mt-1">Reports are grouped by template and assigned teacher. Use <strong>Fill Reports</strong> for the student matrix, or open an individual report when needed.</div>
+                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-1-circle me-2"></i>Step 1 — Class Conduct</h5>
+                            <div class="conduct-rating-help mt-1">Complete class conduct for this session before filling reports. Use <strong>S</strong>, <strong>Sat</strong>, <strong>NI</strong>, <strong>U</strong>, or <strong>N/A</strong>.</div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <% conductPickerLevels.forEach((level) => { %>
+                                    <span class="conduct-legend-chip" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>">
+                                        <strong><%= level.displayCode || level.code %></strong>
+                                        <span class="text-muted"><%= level.label %></span>
+                                    </span>
+                                <% }) %>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                            <span class="badge <%= conductReadyForReports ? 'bg-success' : 'bg-warning text-dark' %>" id="conductReadyBadge"><%= conductReadyForReports ? 'Completed' : 'Required before reports' %></span>
+                            <% if (!isReadOnly && session.roster.length > 0) { %>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenConductBulkModal"><i class="bi bi-lightning-charge me-1"></i>Quick rate</button>
+                            <% } %>
+                            <% if (canManageConductRatingScaleFlag) { %>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnOpenConductScaleSettingsModal"><i class="bi bi-sliders me-1"></i>Scale settings</button>
+                            <% } %>
+                            <% if (!isReadOnly) { %>
+                                <button type="button" class="btn btn-primary btn-sm" id="btnSaveSessionConduct"><i class="bi bi-check2-circle me-1"></i>Save class conduct</button>
+                            <% } %>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: min(50vh, 520px); overflow-y: auto;">
+                            <table class="table table-hover align-middle mb-0" id="conductTable">
+                                <thead class="table-light position-sticky top-0" style="z-index: 1;">
+                                    <tr>
+                                        <th class="ps-4">Student Name</th>
+                                        <% conductDimensions.forEach((dim) => { %>
+                                            <th class="text-center <%= dim.peClass %>"><div><%= dim.label %></div></th>
+                                        <% }) %>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% if (session.roster.length === 0) { %>
+                                        <tr><td colspan="5" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
+                                    <% } else { %>
+                                        <% session.roster.forEach((student) => { %>
+                                            <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
+                                                <td class="ps-4 fw-bold align-middle">
+                                                    <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
+                                                </td>
+                                                <% conductDimensions.forEach((dim) => { %>
+                                                    <td class="text-center <%= dim.peClass %>">
+                                                        <div class="conduct-rating-cell" data-dimension="<%= dim.key %>">
+                                                            <div class="conduct-emoji-picker" role="group" aria-label="<%= dim.label %> rating">
+                                                                <% conductPickerLevels.forEach((level) => { %>
+                                                                    <button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="<%= level.code %>" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>"><%= level.displayCode || level.code %></button>
+                                                                <% }) %>
+                                                            </div>
+                                                            <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= sessionRatingValue(student[dim.valueKey]) %>" <%- disabledAttr %>>
+                                                        </div>
+                                                    </td>
+                                                <% }) %>
+                                            </tr>
+                                        <% }) %>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <% } %>
+
+                <div class="card border-0 shadow-sm" id="sessionReportInstancesStep">
+                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+                        <div>
+                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-<%= hasSessionReportsAssigned ? '2-circle' : 'clipboard-check' %> me-2"></i><%= hasSessionReportsAssigned ? 'Step 2 — ' : '' %>Report instances</h5>
+                            <div class="small text-muted mt-1">
+                                <% if (hasSessionReportsAssigned) { %>
+                                    Fill reports after class conduct is saved. Use <strong>Fill Reports</strong> for the student matrix, or open an individual report when needed.
+                                <% } else { %>
+                                    Assign a report to this session to unlock class conduct and report filling.
+                                <% } %>
+                            </div>
                         </div>
                         <div class="d-flex flex-wrap gap-2 flex-shrink-0">
                             <% if (canAssignSessionReports) { %>
@@ -1581,8 +1641,8 @@
                                     <th class="text-center small">
                                         <div><%= dim.label %></div>
                                         <div class="conduct-column-actions" role="group" aria-label="Set column for all modal students">
-                                            <% conductScaleLevels.forEach((level) => { %>
-                                                <button type="button" class="conduct-bulk-column-emoji-btn" data-dimension="<%= dim.key %>" data-code="<%= level.code %>" title="Set this column to <%= level.label %>"><%= level.emoji %></button>
+                                            <% conductPickerLevels.forEach((level) => { %>
+                                                <button type="button" class="conduct-bulk-column-emoji-btn conduct-code-btn" data-dimension="<%= dim.key %>" data-code="<%= level.code %>" title="Set this column to <%= level.label %>"><%= level.displayCode || level.code %></button>
                                             <% }) %>
                                         </div>
                                     </th>
@@ -1595,8 +1655,8 @@
             </div>
             <div class="modal-footer bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2 flex-wrap me-auto" role="group" aria-label="Set all conduct ratings">
-                    <% conductScaleLevels.forEach((level) => { %>
-                        <button type="button" class="btn <%= level.code === 'S' ? 'btn-outline-success' : 'btn-outline-secondary' %> btn-sm conduct-bulk-set-all-level" data-code="<%= level.code %>" title="Set all students to <%= level.label %>"<%= level.code === 'S' ? ' id="btnConductBulkSetAllSuperior"' : '' %>><span aria-hidden="true"><%= level.emoji %></span> <%= level.label %></button>
+                    <% conductPickerLevels.forEach((level) => { %>
+                        <button type="button" class="btn <%= level.code === 'S' ? 'btn-outline-success' : 'btn-outline-secondary' %> btn-sm conduct-bulk-set-all-level" data-code="<%= level.code %>" title="Set all students to <%= level.label %>"<%= level.code === 'S' ? ' id="btnConductBulkSetAllSuperior"' : '' %>><%= level.displayCode || level.code %> <%= level.label %></button>
                     <% }) %>
                 </div>
                 <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
@@ -1622,7 +1682,7 @@
                             <tr>
                                 <th>Code</th>
                                 <th>Label</th>
-                                <th>Emoji</th>
+                                <th>Display</th>
                                 <th>Min %</th>
                                 <th>Max %</th>
                                 <th>Default %</th>
@@ -1633,7 +1693,7 @@
                                 <tr class="conduct-scale-level-row" data-level-index="<%= index %>">
                                     <td class="fw-bold font-monospace"><%= level.code %></td>
                                     <td><input type="text" class="form-control form-control-sm conduct-scale-label" value="<%= level.label %>" maxlength="80"></td>
-                                    <td><input type="text" class="form-control form-control-sm conduct-scale-emoji" value="<%= level.emoji %>" maxlength="8" style="max-width:4rem;"></td>
+                                    <td><input type="text" class="form-control form-control-sm conduct-scale-display" value="<%= level.displayCode || level.code %>" maxlength="8" style="max-width:4.5rem;"></td>
                                     <td><input type="number" class="form-control form-control-sm conduct-scale-min" min="0" max="100" step="0.5" value="<%= level.minPercent %>"></td>
                                     <td><input type="number" class="form-control form-control-sm conduct-scale-max" min="0" max="100" step="0.5" value="<%= level.maxPercent %>"></td>
                                     <td><input type="number" class="form-control form-control-sm conduct-scale-default" min="0" max="100" step="0.5" value="<%= level.defaultPercent %>"></td>
@@ -2310,6 +2370,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const canManageConductRatingScaleClient = <%- jsonForScript(Boolean(canManageConductRatingScaleFlag)) %>;
     const conductDimensionMeta = <%- jsonForScript(conductDimensions) %>;
     const CONDUCT_SCALE_FALLBACK_LEVELS = <%- jsonForScript(conductScaleDefaultLevels) %>;
+    const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;
+    let sessionConductReadyForReports = <%- jsonForScript(Boolean(conductReadyForReports)) %>;
+    const sessionHasReportsForConduct = <%- jsonForScript(Boolean(hasSessionReportsAssigned)) %>;
 
     function conductEscapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (ch) => ({
@@ -2326,16 +2389,36 @@ document.addEventListener('DOMContentLoaded', () => {
         return Array.isArray(levels) && levels.length ? levels : CONDUCT_SCALE_FALLBACK_LEVELS;
     }
 
+    function getConductPickerLevels() {
+        return [...getConductScaleLevels(), CONDUCT_NA_LEVEL];
+    }
+
+    function conductDisplayCode(level) {
+        if (!level) return '';
+        return String(level.displayCode || level.code || '').trim();
+    }
+
     function normalizeConductPercent(value, fallback = 100) {
-        const fallbackNumber = Number(fallback);
-        const safeFallback = Number.isFinite(fallbackNumber) ? fallbackNumber : 100;
+        if (value === null || value === undefined || value === '') {
+            if (fallback === null || fallback === undefined) return null;
+            return normalizeConductPercent(fallback, 100);
+        }
+        const token = String(value).trim().toLowerCase();
+        if (token === 'n/a' || token === 'na') return null;
         const n = Number(value);
-        if (!Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(safeFallback * 10) / 10));
+        if (!Number.isFinite(n)) {
+            if (fallback === null || fallback === undefined) return null;
+            const fallbackNumber = Number(fallback);
+            if (!Number.isFinite(fallbackNumber)) return null;
+            return Math.max(0, Math.min(100, Math.round(fallbackNumber * 10) / 10));
+        }
         return Math.max(0, Math.min(100, Math.round(n * 10) / 10));
     }
 
     function percentToConductLevel(percent) {
-        const value = normalizeConductPercent(percent);
+        if (percent === null || percent === undefined || percent === '') return { ...CONDUCT_NA_LEVEL };
+        const value = normalizeConductPercent(percent, null);
+        if (value === null) return { ...CONDUCT_NA_LEVEL };
         const levels = getConductScaleLevels();
         const match = levels.find((row) => value >= Number(row.minPercent) && value <= Number(row.maxPercent));
         return match ? { ...match } : { ...levels[0] };
@@ -2343,6 +2426,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function levelByConductCode(code) {
         const key = String(code || '').trim();
+        if (key === 'NA' || key === 'N/A') return { ...CONDUCT_NA_LEVEL };
         const match = getConductScaleLevels().find((row) => row.code === key);
         return match ? { ...match } : null;
     }
@@ -2350,15 +2434,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateConductCellUi(cell) {
         if (!cell) return;
         const percentInput = cell.querySelector('.conduct-percent-input');
-        const percent = normalizeConductPercent(percentInput?.value);
+        const raw = percentInput?.value;
+        const isEmpty = raw === '' || raw === null || raw === undefined;
+        const percent = isEmpty ? null : normalizeConductPercent(raw, null);
         const level = percentToConductLevel(percent);
-        cell.querySelectorAll('.conduct-emoji-btn').forEach((btn) => {
+        cell.querySelectorAll('.conduct-emoji-btn, .conduct-code-btn').forEach((btn) => {
             const active = btn.dataset.code === level.code;
             btn.classList.toggle('active', active);
             btn.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
-        if (percentInput && String(percentInput.value) !== String(percent)) {
-            percentInput.value = String(percent);
+        if (percentInput) {
+            percentInput.value = percent === null ? '' : String(percent);
         }
         cell.dataset.levelCode = level.code;
     }
@@ -2368,7 +2454,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!level || !cell) return;
         const percentInput = cell.querySelector('.conduct-percent-input');
         if (percentInput && !options.keepPercent) {
-            percentInput.value = String(level.defaultPercent);
+            percentInput.value = level.code === 'NA' || level.defaultPercent == null ? '' : String(level.defaultPercent);
         }
         updateConductCellUi(cell);
     }
@@ -2376,12 +2462,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function applyConductPercent(cell, percent) {
         if (!cell) return;
         const percentInput = cell.querySelector('.conduct-percent-input');
-        if (percentInput) percentInput.value = String(normalizeConductPercent(percent));
+        if (percentInput) {
+            const normalized = normalizeConductPercent(percent, null);
+            percentInput.value = normalized === null ? '' : String(normalized);
+        }
         updateConductCellUi(cell);
     }
 
-    function readConductPercentFromCell(cell, fallback = 100) {
-        if (!cell) return normalizeConductPercent(fallback);
+    function readConductPercentFromCell(cell, fallback = null) {
+        if (!cell) return normalizeConductPercent(fallback, null);
         return normalizeConductPercent(cell.querySelector('.conduct-percent-input')?.value, fallback);
     }
 
@@ -2390,7 +2479,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateConductCellUi(cell);
         if (cell.dataset.conductBound === '1') return;
         cell.dataset.conductBound = '1';
-        cell.querySelectorAll('.conduct-emoji-btn').forEach((btn) => {
+        cell.querySelectorAll('.conduct-emoji-btn, .conduct-code-btn').forEach((btn) => {
             btn.addEventListener('click', () => {
                 if (sessionConductReadOnly) return;
                 applyConductLevel(cell, btn.dataset.code);
@@ -2406,20 +2495,122 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildConductEmojiPickerHtml(dimensionKey, personId) {
-        const levels = getConductScaleLevels();
-        const buttons = levels.map((level) => (
-            `<button type="button" class="conduct-emoji-btn" data-code="${conductEscapeHtml(level.code)}" title="${conductEscapeHtml(level.label)} (${level.minPercent}%–${level.maxPercent}%)">${conductEscapeHtml(level.emoji)}</button>`
-        )).join('');
-        return `<div class="conduct-rating-cell" data-dimension="${conductEscapeHtml(dimensionKey)}" data-personid="${conductEscapeHtml(personId)}"><div class="conduct-emoji-picker" role="group">${buttons}</div><input type="number" class="form-control form-control-sm conduct-percent-input" min="0" max="100" step="0.5" value="100"${sessionConductReadOnly ? ' disabled' : ''}></div>`;
+        const levels = getConductPickerLevels();
+        const buttons = levels.map((level) => {
+            const title = level.code === 'NA'
+                ? conductEscapeHtml(level.label)
+                : `${conductEscapeHtml(level.label)} (${level.minPercent}%–${level.maxPercent}%)`;
+            return `<button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="${conductEscapeHtml(level.code)}" title="${title}">${conductEscapeHtml(conductDisplayCode(level))}</button>`;
+        }).join('');
+        return `<div class="conduct-rating-cell" data-dimension="${conductEscapeHtml(dimensionKey)}" data-personid="${conductEscapeHtml(personId)}"><div class="conduct-emoji-picker" role="group">${buttons}</div><input type="number" class="form-control form-control-sm conduct-percent-input" min="0" max="100" step="0.5" value=""${sessionConductReadOnly ? ' disabled' : ''}></div>`;
     }
 
     function renderConductBulkLegend() {
         const host = document.getElementById('conductBulkLegend');
         if (!host) return;
-        host.innerHTML = getConductScaleLevels().map((level) => (
-            `<span class="conduct-legend-chip" title="${conductEscapeHtml(level.label)} (${level.minPercent}%–${level.maxPercent}%)"><span aria-hidden="true">${conductEscapeHtml(level.emoji)}</span><strong>${conductEscapeHtml(level.code)}</strong><span class="text-muted">${level.minPercent}%–${level.maxPercent}%</span></span>`
-        )).join('');
+        host.innerHTML = getConductPickerLevels().map((level) => {
+            const range = level.code === 'NA' ? '' : `<span class="text-muted">${level.minPercent}%–${level.maxPercent}%</span>`;
+            return `<span class="conduct-legend-chip" title="${conductEscapeHtml(level.label)}"><strong>${conductEscapeHtml(conductDisplayCode(level))}</strong><span class="text-muted">${conductEscapeHtml(level.label)}</span>${range}</span>`;
+        }).join('');
     }
+
+    function setConductReadyUi(ready) {
+        sessionConductReadyForReports = !!ready;
+        const badge = document.getElementById('conductReadyBadge');
+        if (badge) {
+            badge.className = `badge ${sessionConductReadyForReports ? 'bg-success' : 'bg-warning text-dark'}`;
+            badge.textContent = sessionConductReadyForReports ? 'Completed' : 'Required before reports';
+        }
+        renderSessionReportInstances();
+    }
+
+    function showConductRequiredModal() {
+        const message = 'Complete and save class conduct (Step 1) before opening or filling reports for this session.';
+        if (typeof showMessageModal === 'function') {
+            return showMessageModal({
+                title: 'Class conduct required',
+                icon: 'warning',
+                message,
+                buttons: [{ text: 'OK', class: 'btn-primary' }]
+            });
+        }
+        window.alert(message);
+        return Promise.resolve();
+    }
+
+    function collectConductRosterPayload() {
+        return Array.from(document.querySelectorAll('#conductTable .conduct-row')).map((row) => {
+            const personId = String(row.dataset.personid || '').trim();
+            const payload = { personId };
+            (conductDimensionMeta || []).forEach((dim) => {
+                const cell = row.querySelector(`.conduct-rating-cell[data-dimension="${dim.key}"]`);
+                const value = readConductPercentFromCell(cell, null);
+                payload[dim.valueKey] = value;
+            });
+            return payload;
+        }).filter((row) => row.personId);
+    }
+
+    async function saveSessionConductForReports() {
+        if (sessionConductReadOnly) return;
+        const btn = document.getElementById('btnSaveSessionConduct');
+        if (btn) btn.disabled = true;
+        if (typeof window.showLoading === 'function') window.showLoading('Saving class conduct...');
+        try {
+            const body = new URLSearchParams();
+            body.set('roster', JSON.stringify(collectConductRosterPayload()));
+            body.set('actionStateId', actionStateId);
+            const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/conduct`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-AJAX-Request': 'true',
+                    'Accept': 'application/json'
+                },
+                body: body.toString()
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status !== 'success') {
+                throw new Error(result.message || 'Failed to save class conduct.');
+            }
+            setConductReadyUi(true);
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: 'Class conduct saved',
+                    icon: 'success',
+                    message: result.message || 'You can now fill reports for this session.',
+                    buttons: [{ text: 'OK', class: 'btn-primary' }]
+                });
+            }
+        } catch (error) {
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: 'Unable to save class conduct',
+                    icon: 'error',
+                    message: error?.message || 'Failed to save class conduct.',
+                    buttons: [{ text: 'OK', class: 'btn-danger' }]
+                });
+            } else {
+                window.alert(error?.message || 'Failed to save class conduct.');
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+        }
+    }
+
+    document.getElementById('btnSaveSessionConduct')?.addEventListener('click', () => {
+        saveSessionConductForReports();
+    });
+
+    document.addEventListener('click', function (event) {
+        const gated = event.target.closest('.js-report-action-requires-conduct');
+        if (!gated) return;
+        if (!sessionHasReportsForConduct || sessionConductReadyForReports) return;
+        event.preventDefault();
+        event.stopPropagation();
+        showConductRequiredModal();
+    }, true);
 
     function getConductTableCell(personId, dimensionKey) {
         const row = document.querySelector(`.conduct-row[data-personid="${CSS.escape(String(personId || ''))}"]`);
@@ -2481,7 +2672,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const level = getConductScaleLevels()[index];
             if (!level) return;
             row.querySelector('.conduct-scale-label').value = level.label || level.code;
-            row.querySelector('.conduct-scale-emoji').value = level.emoji || '';
+            row.querySelector('.conduct-scale-display').value = level.displayCode || level.code || '';
             row.querySelector('.conduct-scale-min').value = level.minPercent;
             row.querySelector('.conduct-scale-max').value = level.maxPercent;
             row.querySelector('.conduct-scale-default').value = level.defaultPercent;
@@ -2492,7 +2683,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return Array.from(document.querySelectorAll('#conductScaleSettingsBody .conduct-scale-level-row')).map((row) => ({
             code: row.querySelector('td.fw-bold')?.textContent?.trim() || '',
             label: row.querySelector('.conduct-scale-label')?.value || '',
-            emoji: row.querySelector('.conduct-scale-emoji')?.value || '',
+            displayCode: row.querySelector('.conduct-scale-display')?.value || '',
             minPercent: row.querySelector('.conduct-scale-min')?.value,
             maxPercent: row.querySelector('.conduct-scale-max')?.value,
             defaultPercent: row.querySelector('.conduct-scale-default')?.value
@@ -2682,6 +2873,12 @@ document.addEventListener('DOMContentLoaded', () => {
         body.innerHTML = Array.from(groups.values()).map((groupRows) => {
             const first = groupRows[0] || {};
             const matrixHref = String(first.matrixHref || '');
+            const reportActionsLocked = sessionHasReportsForConduct && !sessionConductReadyForReports;
+            const matrixBtn = matrixHref
+                ? (reportActionsLocked
+                    ? `<button type="button" class="btn btn-sm btn-primary js-report-action-requires-conduct" title="Complete class conduct first"><i class="bi bi-table me-1"></i>Fill Reports</button>`
+                    : `<a href="${scEscapeHtml(matrixHref)}" class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" title="Open Fill Reports in a new tab"><i class="bi bi-table me-1"></i>Fill Reports</a>`)
+                : '';
             const groupHeader = `
                 <tr class="table-primary-subtle border-top">
                     <td colspan="5" class="px-4 py-3">
@@ -2690,7 +2887,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="fw-bold text-primary">${scEscapeHtml(first.templateTitle || 'Report')}</div>
                                 <div class="small text-muted">${scEscapeHtml(first.teacherName || '-')} · ${groupRows.length} student target(s) · ${scEscapeHtml(first.scopeLabel || '')}</div>
                             </div>
-                            ${matrixHref ? `<a href="${scEscapeHtml(matrixHref)}" class="btn btn-sm btn-primary"><i class="bi bi-table me-1"></i>Fill Reports</a>` : ''}
+                            ${matrixBtn}
                         </div>
                     </td>
                 </tr>`;
@@ -2702,15 +2899,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const studentSub = row.studentId
                     ? `<div class="small text-muted font-monospace">${scEscapeHtml(row.studentId)}</div>`
                     : '';
+                const actionBtn = reportActionsLocked
+                    ? `<button type="button" class="btn btn-sm btn-outline-primary js-report-action-requires-conduct" title="Complete class conduct first"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</button>`
+                    : `<a href="${scEscapeHtml(href)}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</a>`;
                 return `
                     <tr data-report-instance-id="${scEscapeHtml(row.id)}">
                         <td class="ps-4"><span class="text-muted small">Individual report</span></td>
                         <td class="fw-semibold">${scEscapeHtml(row.studentName)}${studentSub}</td>
                         <td>${scEscapeHtml(row.teacherName)}</td>
                         <td><span class="badge ${badgeClass} text-capitalize">${scEscapeHtml(statusLabel)}</span></td>
-                        <td class="pe-4 text-end">
-                            <a href="${scEscapeHtml(href)}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</a>
-                        </td>
+                        <td class="pe-4 text-end">${actionBtn}</td>
                     </tr>`;
             }).join('');
             return groupHeader + instanceRows;

@@ -523,6 +523,10 @@ router.post('/:id/sessions/:sessionId/save',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
   classCtrl.saveSession);
+router.post('/:id/sessions/:sessionId/conduct',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
+  classCtrl.saveSessionConduct);
 
 module.exports = router;
 

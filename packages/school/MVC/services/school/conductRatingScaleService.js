@@ -1,9 +1,19 @@
 const DEFAULT_LEVELS = Object.freeze([
-  Object.freeze({ code: 'S', label: 'Superior', emoji: '⭐', minPercent: 85, maxPercent: 100, defaultPercent: 92.5 }),
-  Object.freeze({ code: 'Sat', label: 'Satisfactory', emoji: '👍', minPercent: 60, maxPercent: 84, defaultPercent: 72 }),
-  Object.freeze({ code: 'NI', label: 'Needs Improvement', emoji: '😐', minPercent: 50, maxPercent: 59, defaultPercent: 54.5 }),
-  Object.freeze({ code: 'U', label: 'Unsatisfactory', emoji: '😞', minPercent: 0, maxPercent: 49, defaultPercent: 24.5 })
+  Object.freeze({ code: 'S', label: 'Superior', displayCode: 'S', minPercent: 85, maxPercent: 100, defaultPercent: 92.5 }),
+  Object.freeze({ code: 'Sat', label: 'Satisfactory', displayCode: 'Sat', minPercent: 60, maxPercent: 84, defaultPercent: 72 }),
+  Object.freeze({ code: 'NI', label: 'Needs Improvement', displayCode: 'NI', minPercent: 50, maxPercent: 59, defaultPercent: 54.5 }),
+  Object.freeze({ code: 'U', label: 'Unsatisfactory', displayCode: 'U', minPercent: 0, maxPercent: 49, defaultPercent: 24.5 })
 ]);
+
+/** Special non-percent option (not part of overlapping scale bands). */
+const NA_LEVEL = Object.freeze({
+  code: 'NA',
+  label: 'Not Available',
+  displayCode: 'N/A',
+  minPercent: null,
+  maxPercent: null,
+  defaultPercent: null
+});
 
 const DEFAULT_POLICY = Object.freeze({
   levels: DEFAULT_LEVELS
@@ -13,14 +23,18 @@ function cloneLevel(row) {
   if (!row || typeof row !== 'object') return null;
   const code = String(row.code || '').trim();
   if (!code) return null;
+  if (code === 'NA' || code === 'N/A') {
+    return { ...NA_LEVEL };
+  }
   const minPercent = Number(row.minPercent);
   const maxPercent = Number(row.maxPercent);
   const defaultPercent = Number(row.defaultPercent);
   if (!Number.isFinite(minPercent) || !Number.isFinite(maxPercent) || !Number.isFinite(defaultPercent)) return null;
+  const displayCode = String(row.displayCode || row.code || '').trim() || code;
   return {
     code,
     label: String(row.label || code).trim() || code,
-    emoji: String(row.emoji || '').trim() || '•',
+    displayCode,
     minPercent: Math.round(minPercent * 10) / 10,
     maxPercent: Math.round(maxPercent * 10) / 10,
     defaultPercent: Math.round(defaultPercent * 10) / 10
@@ -95,6 +109,9 @@ function resolvePolicy(orgPolicy = {}) {
 }
 
 function percentToLevel(percent, policy = DEFAULT_POLICY) {
+  if (percent === null || percent === undefined || percent === '') {
+    return { ...NA_LEVEL };
+  }
   const resolved = resolvePolicy(policy);
   const value = normalizePercent(percent);
   const match = resolved.levels.find((row) => value >= row.minPercent && value <= row.maxPercent);
@@ -102,15 +119,20 @@ function percentToLevel(percent, policy = DEFAULT_POLICY) {
 }
 
 function levelByCode(code, policy = DEFAULT_POLICY) {
-  const resolved = resolvePolicy(policy);
   const key = String(code || '').trim();
+  if (key === 'NA' || key === 'N/A' || key.toLowerCase() === 'n/a') {
+    return { ...NA_LEVEL };
+  }
+  const resolved = resolvePolicy(policy);
   const match = resolved.levels.find((row) => row.code === key);
   return match ? { ...match } : null;
 }
 
 function levelDefaultPercent(code, policy = DEFAULT_POLICY) {
   const level = levelByCode(code, policy);
-  return level ? level.defaultPercent : normalizePercent(100);
+  if (!level) return normalizePercent(100);
+  if (level.code === 'NA') return null;
+  return level.defaultPercent;
 }
 
 function normalizePolicyFromForm(input = {}) {
@@ -122,7 +144,12 @@ function normalizePolicyFromForm(input = {}) {
       levelsInput = [];
     }
   }
-  const validation = validatePolicyLevels(normalizeLevels(levelsInput));
+  // Strip NA from configurable overlapping bands; it is a fixed UI option.
+  const filtered = (Array.isArray(levelsInput) ? levelsInput : []).filter((row) => {
+    const code = String(row?.code || '').trim();
+    return code && code !== 'NA' && code !== 'N/A';
+  });
+  const validation = validatePolicyLevels(normalizeLevels(filtered));
   if (!validation.valid) {
     const err = new Error(validation.errors.join(' '));
     err.validationErrors = validation.errors;
@@ -142,6 +169,7 @@ function normalizePolicyFromStored(input = {}) {
 
 module.exports = {
   DEFAULT_LEVELS,
+  NA_LEVEL,
   DEFAULT_POLICY,
   normalizePercent,
   normalizeLevels,

@@ -44,6 +44,7 @@ const activityService = require('../../services/school/activityService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const { getPresetConfig } = require('../../services/school/sessionStudentCasePresetService');
 const sessionReportAssignmentService = require('../../services/school/sessionReportAssignmentService');
+const sessionConductService = require('../../services/school/sessionConductService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const schoolRepositories = require('../../repositories/school');
@@ -2148,6 +2149,13 @@ function buildClassFromBody(body, reqUserId, isNew = false, activeOrgId = '', ex
       parseData(body.evaluation) || { passingScore: 60, weights: {} },
       registrationMode
   );
+  const enabledAttendanceStatuses = attendanceMatrixMetricsService.normalizeEnabledAttendanceStatuses(
+      parseData(body.enabledAttendanceStatuses) != null
+          ? parseData(body.enabledAttendanceStatuses)
+          : (hasBodyField('enabledAttendanceStatuses')
+              ? body.enabledAttendanceStatuses
+              : (existingRecord?.enabledAttendanceStatuses || null))
+  );
   const cycleGroupId = String(fromBodyOrExisting('cycleGroupId', '') || '').trim();
   const cycleStartDate = normalizeDateOnlyOrEmpty(fromBodyOrExisting('cycleStartDate', ''));
   const cycleEndDate = normalizeDateOnlyOrEmpty(fromBodyOrExisting('cycleEndDate', ''));
@@ -2188,6 +2196,7 @@ function buildClassFromBody(body, reqUserId, isNew = false, activeOrgId = '', ex
     allowedProgramTerms,
     statusHistory: isNew ? [{ status: (body.status || 'active'), date: now, updatedBy: reqUserId, reason: 'Initial creation' }] : [],
     curriculum, pricing, postingTemplates, schedule, instructors, enrollment, evaluation,
+    enabledAttendanceStatuses,
     audit: { lastUpdateUser: reqUserId, lastUpdateDateTime: now }
   };
 }
@@ -2600,6 +2609,7 @@ async function getClassTemplate(req, res) {
         },
         classData?.registrationMode || 'term_based'
       ),
+      enabledAttendanceStatuses: attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData),
       // Intentionally do not copy session ledger from source class.
       // New class sessions must be generated/rebuilt for the new lifecycle.
       sessions: []
@@ -3160,6 +3170,7 @@ async function manageSession1(req, res) {
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
         );
         const attendanceMatrixPolicyResolved = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSm1);
+        const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
 
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
@@ -3169,6 +3180,7 @@ async function manageSession1(req, res) {
             prevSessionId,    // Passed to EJS
             nextSessionId,    // Passed to EJS
             attendanceMatrixPolicyResolved,
+            enabledAttendanceStatuses,
             user: req.user
         });
     } catch (error) {
@@ -3198,13 +3210,16 @@ async function saveSession1(req, res) {
             const existingRoster = sessions[sessionIndex].roster || [];
             
             // FIX: Merge the new attendance data with the existing records to preserve comments!
+            const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
             sessions[sessionIndex].roster = incomingRoster.map(incRec => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
-                const attendance = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(
-                    incRec.attendance,
-                    attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
-                );
+                const attendance = attendanceMatrixMetricsService.assertAttendanceStatusAllowedForSave({
+                    status: incRec.attendance,
+                    enabledStatuses: enabledAttendanceStatuses,
+                    previousStatus: existRec.attendance,
+                    allowSystemNotApplicable: true
+                });
                 assertLateAttendanceMinutesPresent({
                     ...incRec,
                     personId: incomingPersonId,
@@ -3216,7 +3231,7 @@ async function saveSession1(req, res) {
                 const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent);
                 return {
                     personId: incomingPersonId,
-                    attendance: incRec.attendance,
+                    attendance,
                     lateMinutes: incRec.lateMinutes,
                     earlyLeaveMinutes: incRec.earlyLeaveMinutes,
                     excuseRef: incRec.excuseRef,
@@ -3466,6 +3481,7 @@ async function manageSession(req, res) {
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
         );
         const attendanceMatrixPolicyResolved = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerMs);
+        const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
         const conductRatingScaleResolved = await conductRatingScalePolicyModel.getPolicyForOrg(
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
         );
@@ -3496,6 +3512,7 @@ async function manageSession(req, res) {
             canManageConductRatingScale: canOverride,
             canDeleteStudentCases,
             attendanceMatrixPolicyResolved,
+            enabledAttendanceStatuses,
             conductRatingScaleResolved,
             sessionStudentCases,
             studentCaseDetailPresets: getPresetConfig(),
@@ -4050,15 +4067,18 @@ async function saveSession(req, res) {
                 classData?.orgId || getActiveOrgIdOrThrow(req.user)
             );
             const matrixPolicySave = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSave);
+            const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
 
             originalSession.roster = incomingRoster.map((incRec) => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 if (!incomingPersonId) return null;
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
-                const attendance = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(
-                    incRec.attendance,
-                    attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
-                );
+                const attendance = attendanceMatrixMetricsService.assertAttendanceStatusAllowedForSave({
+                    status: incRec.attendance,
+                    enabledStatuses: enabledAttendanceStatuses,
+                    previousStatus: existRec.attendance,
+                    allowSystemNotApplicable: true
+                });
                 assertLateAttendanceMinutesPresent({
                     ...incRec,
                     personId: incomingPersonId,
@@ -4090,7 +4110,14 @@ async function saveSession(req, res) {
                     notes: existRec.notes || '',
                     comments: existRec.comments || []
                 };
-                return attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(merged, matrixPolicySave);
+                const ruled = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(merged, matrixPolicySave);
+                return {
+                    ...ruled,
+                    attendance: attendanceMatrixMetricsService.coerceAttendanceStatusToEnabled(
+                        ruled.attendance,
+                        enabledAttendanceStatuses
+                    )
+                };
             }).filter(Boolean);
         }
 
@@ -4367,6 +4394,62 @@ async function saveConductRatingScaleSettings(req, res) {
     }
 }
 
+async function saveSessionConduct(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { index: sessionIndex } = findSessionInList(sessions, sessionId);
+        if (sessionIndex === -1) {
+            return res.status(404).json({ status: 'error', message: 'Session not found.' });
+        }
+
+        const session = sessions[sessionIndex];
+        assertSessionScopeForRequest(req, classData, session, 'manageSession');
+        await assertSessionManagerSessionWithinClassWindowOrThrow(classData, session, req.user);
+
+        const isLocked = session.locked === true || String(session.locked) === 'true';
+        const canOverride = await adminChekersService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_CLASSES,
+            OPERATIONS.UPDATE,
+            { section: { id: SECTIONS.SCHOOL_CLASSES } }
+        );
+        if (isLocked && !canOverride) {
+            return res.status(403).json({ status: 'error', message: 'This session is locked. Class conduct cannot be changed.' });
+        }
+
+        let incomingRoster = req.body?.roster;
+        if (typeof incomingRoster === 'string') {
+            try {
+                incomingRoster = JSON.parse(incomingRoster);
+            } catch (_) {
+                throw new Error('Invalid conduct roster payload.');
+            }
+        }
+        if (!Array.isArray(incomingRoster)) {
+            throw new Error('Conduct roster is required.');
+        }
+
+        sessionConductService.applyConductRosterToSession(session, incomingRoster, {
+            ready: true,
+            userId: req.user?.id
+        });
+        sessions[sessionIndex] = session;
+        await schoolDataService.saveClassSessions(classId, sessions, req.user);
+
+        return res.json({
+            status: 'success',
+            message: 'Class conduct saved. You can now fill reports for this session.',
+            conductReadyForReports: true,
+            conductReadyAt: session.conductReadyAt || null
+        });
+    } catch (error) {
+        const statusCode = Number(error?.statusCode) || 400;
+        return res.status(statusCode).json({ status: 'error', message: error.message || 'Failed to save class conduct.' });
+    }
+}
+
 async function setSessionLock(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -4418,6 +4501,7 @@ module.exports = {
   previewTeacherAssignmentImpact,
   saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveConductRatingScaleSettings,
+  saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,
   postOfficialFinalGradesWorkflow
