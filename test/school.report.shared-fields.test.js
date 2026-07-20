@@ -1218,6 +1218,107 @@ test('buildPrefillSnapshot handles student with all absent attendance marks', as
   });
 });
 
+test('prefill catalog and snapshot expose ACF keys and include ACF in absent totals', async () => {
+  const catalog = reportService.getPrefillCatalog();
+  const classKeys = catalog.classOnly.map((row) => row.key);
+  const studentKeys = catalog.studentOnly.map((row) => row.key);
+  assert.ok(classKeys.includes('class_attendance_acf'));
+  assert.ok(classKeys.includes('class_attendance_span_acf'));
+  assert.ok(studentKeys.includes('student_attendance_acf'));
+  assert.ok(studentKeys.includes('student_attendance_span_acf'));
+
+  const assignment = {
+    id: 'ASN-ACF',
+    orgId: '900000',
+    classId: 'CLASS-1',
+    sessionId: 'SES-2',
+    reportStartDate: '2026-06-16',
+    reportDueDate: '2026-06-17',
+    teacherIds: ['TEACHER-1']
+  };
+  const sessions = [
+    {
+      sessionId: 'SES-1',
+      date: '2026-06-16',
+      status: 'completed',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: [{ personId: 'STU-ACF', attendance: 'acf' }]
+    },
+    {
+      sessionId: 'SES-2',
+      date: '2026-06-17',
+      status: 'completed',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: [{ personId: 'STU-ACF', attendance: 'present' }]
+    }
+  ];
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-1') return { id: 'CLASS-1', orgId: '900000', title: 'Class One' };
+      return null;
+    },
+    getClassSessions: async () => sessions,
+    fetchData: async (entityType) => {
+      if (entityType === 'students') return [{ id: 'STU-1', orgId: '900000', personId: 'STU-ACF' }];
+      if (entityType === 'examAssignments') return [];
+      return [];
+    }
+  }, async () => {
+    await withPatched(dataServiceGlobal, {
+      fetchData: async (entityType) => {
+        if (entityType === 'persons') {
+          return [
+            { id: 'TEACHER-1', name: { first: 'Teacher', last: 'One' } },
+            { id: 'STU-ACF', name: { first: 'Camera', last: 'Off' } }
+          ];
+        }
+        if (entityType === 'organizations') return [{ id: '900000', identity: { displayName: 'School' }, name: 'School' }];
+        return [];
+      }
+    }, async () => {
+      await withPatched(sessionStatusPolicyService, {
+        getStatusMap: async () => new Map()
+      }, async () => {
+        await withPatched(attendanceMatrixPolicyModel, {
+          getPolicyForOrg: async () => ({
+            scheduledMinutes: 60,
+            disqualifyLateMinutes: 30,
+            disqualifyEarlyLeaveMinutes: 30,
+            disqualifyCombinedMissedMinutes: null
+          })
+        }, async () => {
+          const snapshot = await reportService.buildPrefillSnapshot({
+            assignment,
+            teacherId: 'TEACHER-1',
+            studentId: 'STU-ACF',
+            reqUser: { id: 'USER-1', activeOrgId: '900000' }
+          });
+
+          assert.equal(snapshot.student_attendance_span_acf, 1);
+          assert.equal(snapshot.student_attendance_span_absent, 1, 'ACF included in absent totals');
+          assert.equal(snapshot.class_attendance_span_acf, 1);
+          assert.equal(snapshot.class_attendance_span_absent, 1);
+          assert.equal(snapshot.class_attendance_acf, 1);
+          assert.ok(Object.prototype.hasOwnProperty.call(snapshot, 'student_attendance_acf'));
+          assert.ok(Object.prototype.hasOwnProperty.call(snapshot, 'class_attendance_acf'));
+
+          const collections = await reportService.buildReportDocxCollections({
+            instance: { id: 'INST-ACF' },
+            assignment,
+            reqUser: { id: 'USER-1', activeOrgId: '900000' }
+          });
+          const acfRow = (collections.student_attendance_rows || []).find((row) => row.session_id === 'SES-1');
+          assert.equal(acfRow?.attendance_status, 'acf');
+          assert.equal(acfRow?.attendance_status_label, 'Absent Camera Off');
+        });
+      });
+    });
+  });
+});
+
 test('validateTemplatePrefillKeys rejects all live templates with invalid keys', () => {
   const templatesPath = path.join(ROOT, 'data/school/reportTemplates.json');
   if (!fs.existsSync(templatesPath)) {

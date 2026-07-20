@@ -382,7 +382,7 @@ async function buildGradesMatrixPayload(req, query) {
         : (rosterRecord
           ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
           : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
-      if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
+      if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(status))) {
         status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       }
       return {
@@ -413,10 +413,11 @@ async function buildGradesMatrixPayload(req, query) {
         : (rosterRecord
           ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
           : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
-      if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
+      if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(att))) {
         att = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       }
-      const absent = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+      const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
+        || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
 
       const payload = pickPayload(ses, col);
       if (!payload) {

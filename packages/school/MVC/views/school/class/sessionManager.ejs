@@ -23,6 +23,7 @@
     .btn-check[value="late"]:checked + .att-label { background-color: #ffc107; color: #000; font-weight: bold; }
     .btn-check[value="excused"]:checked + .att-label { background-color: #0dcaf0; color: #000; font-weight: bold; }
     .btn-check[value="absent"]:checked + .att-label { background-color: #dc3545; color: #fff; font-weight: bold; }
+    .btn-check[value="acf"]:checked + .att-label { background-color: #b02a37; color: #fff; font-weight: bold; }
     .btn-check[value="not_applicable"]:checked + .att-label { background-color: #6c757d; color: #fff; font-weight: bold; }
     .conduct-rating-input {
         max-width: 7rem;
@@ -851,7 +852,7 @@
             const key = (rawKey === 'n/a' || rawKey === 'na') ? 'not_applicable' : rawKey;
             if (Object.prototype.hasOwnProperty.call(acc, key)) acc[key] += 1;
             return acc;
-        }, { present: 0, late: 0, excused: 0, absent: 0, not_applicable: 0 });
+        }, { present: 0, late: 0, excused: 0, absent: 0, acf: 0, not_applicable: 0 });
         const normalizedSessionStatus = normalizeStatusCode(session.status || fallbackStatusCode);
         const currentSessionStatus = availableStatusRows.some((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus)
             ? normalizedSessionStatus
@@ -1243,6 +1244,12 @@
                     </div>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
+                            <div class="session-summary-label">ACF</div>
+                            <div class="session-summary-value" style="color:#b02a37;"><%= attendanceSummary.acf %></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md">
+                        <div class="session-summary-card h-100">
                             <div class="session-summary-label">N/A</div>
                             <div class="session-summary-value text-secondary"><%= attendanceSummary.not_applicable %></div>
                         </div>
@@ -1296,6 +1303,8 @@
                                                             <label class="btn att-label" for="e_<%= i %>" title="Excused Absence"><i class="bi bi-envelope-paper"></i> Excused</label>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="a_<%= i %>" value="absent" <%= student.attendance === 'absent' ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="a_<%= i %>" title="Absent"><i class="bi bi-x-lg"></i> Absent</label>
+                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="acf_<%= i %>" value="acf" <%= student.attendance === 'acf' ? 'checked' : '' %> <%- disabledAttr %>>
+                                                            <label class="btn att-label" for="acf_<%= i %>" title="Absent Camera Off"><i class="bi bi-camera-video-off"></i> ACF</label>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="na_<%= i %>" value="not_applicable" <%= (student.attendance === 'not_applicable' || student.attendance === 'N/A' || student.attendance === 'n/a') ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="na_<%= i %>" title="Not applicable"><i class="bi bi-dash-circle"></i> N/A</label>
                                                         </div>
@@ -4375,7 +4384,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function gbIsPersonAbsent(personId) {
         const status = gbAttendanceStatus(personId);
-        return status === 'absent' || status === 'not_applicable';
+        return status === 'absent' || status === 'acf' || status === 'not_applicable';
     }
 
     function gbNormalizeSkillToken(value) {

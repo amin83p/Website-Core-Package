@@ -6,6 +6,7 @@
     .status-late { color: #ffc107; font-weight: bold; }
     .status-excused { color: #0dcaf0; font-weight: bold; }
     .status-absent { color: #dc3545; font-weight: bold; }
+    .status-acf { color: #b02a37; font-weight: bold; }
     .status-na { color: #adb5bd; }
     
     .matrix-wrapper { max-height: 600px; overflow: auto; border: 1px solid #dee2e6; border-radius: 12px; box-shadow: 0 0.15rem 0.5rem rgba(15, 23, 42, 0.05); }
@@ -37,6 +38,33 @@
       background-color: #fff;
       z-index: 2;
       font-weight: bold;
+    }
+    .matrix-table th.matrix-sticky-name {
+      overflow: visible;
+    }
+    .matrix-student-filter-dropdown .dropdown-toggle {
+      font-size: 0.72rem;
+      padding: 0.15rem 0.45rem;
+      line-height: 1.2;
+    }
+    .matrix-student-filter-dropdown .dropdown-menu {
+      max-height: 280px;
+      overflow-y: auto;
+      min-width: 250px;
+      z-index: 30;
+    }
+    .matrix-student-filter-dropdown .form-check-label {
+      font-size: 0.82rem;
+      font-weight: 500;
+    }
+    .attendance-student-filter-menu-floating {
+      z-index: 2000 !important;
+      max-height: min(320px, calc(100vh - 24px));
+      overflow-y: auto;
+      min-width: 250px;
+    }
+    tr.matrix-student-row.is-student-hidden {
+      display: none !important;
     }
 
     /* Comment Thread CSS */
@@ -158,6 +186,7 @@
                 <span class="me-3"><i class="bi bi-clock-fill text-warning"></i> Late</span>
                 <span class="me-3"><i class="bi bi-envelope-paper-fill text-info"></i> Excused</span>
                 <span class="me-3"><i class="bi bi-x-circle-fill text-danger"></i> Absent</span>
+                <span class="me-3"><i class="bi bi-camera-video-off-fill status-acf"></i> ACF</span>
                 <span class="me-3"><i class="bi bi-percent text-secondary"></i> Rollup % = time-based credit (see column header)</span>
                 <span><i class="bi bi-chat-dots-fill text-primary"></i> Notes Exist</span>
             </div>
@@ -207,6 +236,8 @@
                         <label class="btn btn-outline-info text-dark" for="modal_att_excused" title="Excused"><i class="bi bi-envelope-paper me-1"></i>Excused</label>
                         <input type="radio" class="btn-check" name="modal_cell_attendance" id="modal_att_absent" value="absent">
                         <label class="btn btn-outline-danger" for="modal_att_absent" title="Absent"><i class="bi bi-x-lg me-1"></i>Absent</label>
+                        <input type="radio" class="btn-check" name="modal_cell_attendance" id="modal_att_acf" value="acf">
+                        <label class="btn btn-outline-danger" for="modal_att_acf" title="Absent Camera Off"><i class="bi bi-camera-video-off me-1"></i>ACF</label>
                         <input type="radio" class="btn-check" name="modal_cell_attendance" id="modal_att_na" value="not_applicable">
                         <label class="btn btn-outline-secondary" for="modal_att_na" title="Not applicable"><i class="bi bi-dash-circle me-1"></i>N/A</label>
                     </div>
@@ -279,10 +310,195 @@
 <script>
 // Store the loaded matrix globally so we can access it on clicks
 window.currentMatrixData = null;
+window.attendanceVisiblePersonIds = null;
 let currentMentions = [];
 let detailsModalInstance = null;
 let attendanceMatrixBusyToken = null;
 let attendanceMatrixBusyDepth = 0;
+
+function attEscapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function resetAttendanceStudentVisibility(matrixRows) {
+    const ids = new Set();
+    (Array.isArray(matrixRows) ? matrixRows : []).forEach((stu) => {
+        const id = String(stu?.personId || '').trim();
+        if (id) ids.add(id);
+    });
+    window.attendanceVisiblePersonIds = ids;
+    return ids;
+}
+
+function getAttendanceVisiblePersonIds() {
+    if (window.attendanceVisiblePersonIds instanceof Set) return window.attendanceVisiblePersonIds;
+    return resetAttendanceStudentVisibility(window.currentMatrixData?.matrix || []);
+}
+
+function buildAttendanceStudentFilterDropdownHtml(students, visibleIds) {
+    const rows = Array.isArray(students) ? students : [];
+    const visible = visibleIds instanceof Set ? visibleIds : new Set();
+    const total = rows.length;
+    const shown = rows.reduce((count, stu) => {
+        const id = String(stu?.personId || '').trim();
+        return count + (id && visible.has(id) ? 1 : 0);
+    }, 0);
+    const items = rows.map((stu) => {
+        const id = String(stu?.personId || '').trim();
+        if (!id) return '';
+        const name = String(stu?.name || id).trim() || id;
+        const checked = visible.has(id) ? ' checked' : '';
+        return `
+          <li class="px-3 py-1">
+            <div class="form-check mb-0">
+              <input class="form-check-input matrix-student-visibility-check" type="checkbox" value="${attEscapeHtml(id)}" id="attVis_${attEscapeHtml(id)}"${checked}>
+              <label class="form-check-label" for="attVis_${attEscapeHtml(id)}">${attEscapeHtml(name)}</label>
+            </div>
+          </li>`;
+    }).join('');
+    return `
+      <div class="d-flex flex-column align-items-start gap-1">
+        <div class="fw-bold">Student Name</div>
+        <div class="dropdown matrix-student-filter-dropdown">
+          <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="btn_matrixStudentFilter">
+            <i class="bi bi-people me-1"></i>Students <span class="matrix-student-filter-count">${shown}/${total}</span>
+          </button>
+          <ul class="dropdown-menu shadow-sm p-0 attendance-student-filter-menu" aria-labelledby="btn_matrixStudentFilter">
+            <li class="px-3 py-2 border-bottom bg-light sticky-top">
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-primary btn-sm flex-fill" id="btn_matrixStudentSelectAll">Select All</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" id="btn_matrixStudentClearAll">Clear All</button>
+              </div>
+            </li>
+            ${items || '<li class="px-3 py-2 text-muted small">No students loaded.</li>'}
+          </ul>
+        </div>
+      </div>`;
+}
+
+function updateAttendanceStudentFilterCount() {
+    const label = document.querySelector('#attendanceTable .matrix-student-filter-count');
+    if (!label) return;
+    const total = Array.isArray(window.currentMatrixData?.matrix) ? window.currentMatrixData.matrix.length : 0;
+    const visible = getAttendanceVisiblePersonIds().size;
+    label.textContent = `${Math.min(visible, total)}/${total}`;
+}
+
+function applyAttendanceStudentVisibility() {
+    const visible = getAttendanceVisiblePersonIds();
+    document.querySelectorAll('#matrixBody tr.matrix-student-row').forEach((row) => {
+        const id = String(row.getAttribute('data-person-id') || '').trim();
+        row.classList.toggle('is-student-hidden', !(id && visible.has(id)));
+    });
+    updateAttendanceStudentFilterCount();
+}
+
+function mountStudentFilterDropdownOutside(dropdownRoot) {
+    const toggle = dropdownRoot?.querySelector?.('[data-bs-toggle="dropdown"]');
+    const menu = dropdownRoot?.querySelector?.('.dropdown-menu');
+    if (!toggle || !menu || typeof bootstrap === 'undefined' || !bootstrap.Dropdown) return null;
+
+    const existing = bootstrap.Dropdown.getInstance(toggle);
+    if (existing) existing.dispose();
+
+    const instance = new bootstrap.Dropdown(toggle, {
+        autoClose: 'outside',
+        popperConfig(defaultConfig) {
+            const config = typeof defaultConfig === 'object' && defaultConfig ? { ...defaultConfig } : {};
+            config.strategy = 'fixed';
+            const modifiers = Array.isArray(config.modifiers) ? config.modifiers.slice() : [];
+            modifiers.push({
+                name: 'preventOverflow',
+                options: { boundary: 'viewport', padding: 8 }
+            });
+            modifiers.push({
+                name: 'flip',
+                options: { fallbackPlacements: ['bottom-start', 'top-start', 'bottom-end', 'top-end'] }
+            });
+            config.modifiers = modifiers;
+            return config;
+        }
+    });
+
+    if (toggle.dataset.studentFilterOutsideBound === '1') return instance;
+    toggle.dataset.studentFilterOutsideBound = '1';
+
+    toggle.addEventListener('show.bs.dropdown', () => {
+        if (menu.parentElement !== document.body) {
+            menu.dataset.returnToParent = '1';
+            document.body.appendChild(menu);
+        }
+        menu.classList.add('attendance-student-filter-menu-floating', 'show');
+    });
+
+    toggle.addEventListener('hidden.bs.dropdown', () => {
+        menu.classList.remove('attendance-student-filter-menu-floating', 'show');
+        if (menu.dataset.returnToParent === '1' && dropdownRoot.isConnected) {
+            dropdownRoot.appendChild(menu);
+            delete menu.dataset.returnToParent;
+        }
+    });
+
+    return instance;
+}
+
+function bindAttendanceStudentVisibilityDropdown() {
+    const table = document.getElementById('attendanceTable');
+    if (!table) return;
+    const dropdownRoot = table.querySelector('.matrix-student-filter-dropdown');
+    const menu = dropdownRoot?.querySelector('.dropdown-menu') || table;
+
+    mountStudentFilterDropdownOutside(dropdownRoot);
+
+    const bindRoot = (root) => {
+        root.querySelectorAll?.('.matrix-student-visibility-check')?.forEach((input) => {
+            input.addEventListener('change', () => {
+                const id = String(input.value || '').trim();
+                if (!id) return;
+                const visible = getAttendanceVisiblePersonIds();
+                if (input.checked) visible.add(id);
+                else visible.delete(id);
+                applyAttendanceStudentVisibility();
+            });
+        });
+
+        root.querySelector('#btn_matrixStudentSelectAll')?.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            resetAttendanceStudentVisibility(window.currentMatrixData?.matrix || []);
+            const checks = document.querySelectorAll('.matrix-student-visibility-check');
+            checks.forEach((input) => { input.checked = true; });
+            applyAttendanceStudentVisibility();
+        });
+
+        root.querySelector('#btn_matrixStudentClearAll')?.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            window.attendanceVisiblePersonIds = new Set();
+            const checks = document.querySelectorAll('.matrix-student-visibility-check');
+            checks.forEach((input) => { input.checked = false; });
+            applyAttendanceStudentVisibility();
+        });
+    };
+
+    bindRoot(menu);
+}
+
+function getVisibleAttendanceMatrixForPrint(matrixData) {
+    const data = matrixData && typeof matrixData === 'object' ? { ...matrixData } : {};
+    const allStudents = Array.isArray(data.matrix) ? data.matrix : [];
+    const visible = getAttendanceVisiblePersonIds();
+    data.matrix = allStudents.filter((stu) => {
+        const id = String(stu?.personId || '').trim();
+        return id && visible.has(id);
+    });
+    return data;
+}
 
 function formatSchoolInstant(value) {
     if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatSchoolInstant === 'function') {
@@ -492,6 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('filter_className').value = '';
         document.getElementById('resultsContainer').classList.add('d-none');
         window.currentMatrixData = null;
+        window.attendanceVisiblePersonIds = null;
         setAttendancePrintEnabled(false);
     });
 
@@ -502,6 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('filter_endDate').value = '';
         document.getElementById('resultsContainer').classList.add('d-none');
         window.currentMatrixData = null;
+        window.attendanceVisiblePersonIds = null;
         setAttendancePrintEnabled(false);
         setActiveRangeChip('');
     });
@@ -593,6 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (result.status !== 'success') throw new Error(result.message);
             
             window.currentMatrixData = result;
+            resetAttendanceStudentVisibility(result.matrix);
             document.getElementById('resultsContainer').classList.remove('d-none');
             setAttendancePrintEnabled(true);
             
@@ -613,16 +832,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 : null
             ].filter(Boolean).join(' · ');
 
+            const studentHeaderHtml = buildAttendanceStudentFilterDropdownHtml(
+                result.matrix,
+                getAttendanceVisiblePersonIds()
+            );
             let headerHtml = `
               <th class="matrix-sticky-rollup text-center small px-2 py-2" title="${policyTitle.replace(/"/g, '&quot;')}">
                 <div class="fw-bold text-secondary">Rollup</div>
                 <div class="text-muted" style="font-size: 0.68rem; line-height: 1.2;">P / A / %</div>
               </th>
-              <th style="min-width: 220px;" class="ps-3 matrix-sticky-name">Student Name</th>`;
+              <th style="min-width: 220px;" class="ps-3 matrix-sticky-name">${studentHeaderHtml}</th>`;
             if (result.sessions.length === 0) {
                 headerHtml += `<th>Status</th>`;
                 tbody.innerHTML = `<tr><td colspan="3" class="text-center py-5 text-muted">No active sessions found in this date range.</td></tr>`;
                 headers.innerHTML = headerHtml;
+                bindAttendanceStudentVisibilityDropdown();
                 return;
             }
 
@@ -637,10 +861,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (result.matrix.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="${result.sessions.length + 2}" class="text-center py-5 text-muted">No students found.</td></tr>`;
+                bindAttendanceStudentVisibilityDropdown();
                 return;
             }
 
             result.matrix.forEach(stu => {
+                const personId = String(stu?.personId || '').trim();
                 const s = stu.summary || {};
                 const p = Number(s.totalPresentSessions) || 0;
                 const a = Number(s.totalAbsentSessions) || 0;
@@ -671,6 +897,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (rec.status === 'late') { icon = `<i class="bi bi-clock-fill status-late"></i>`; tooltip = `Late`; }
                     else if (rec.status === 'excused') { icon = '<i class="bi bi-envelope-paper-fill status-excused"></i>'; tooltip = 'Excused'; }
                     else if (rec.status === 'absent') { icon = '<i class="bi bi-x-circle-fill status-absent"></i>'; tooltip = 'Absent'; }
+                    else if (rec.status === 'acf') { icon = '<i class="bi bi-camera-video-off-fill status-acf"></i>'; tooltip = 'Absent Camera Off'; }
                     else if (rec.status === 'not_applicable') {
                         icon = '<i class="bi bi-dash-circle-fill status-na"></i>';
                         tooltip = rec.withinEnrollmentWindow === false
@@ -691,8 +918,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         </td>
                     `;
                 });
-                tbody.innerHTML += `<tr>${rowHtml}</tr>`;
+                tbody.innerHTML += `<tr class="matrix-student-row" data-person-id="${attEscapeHtml(personId)}">${rowHtml}</tr>`;
             });
+
+            bindAttendanceStudentVisibilityDropdown();
+            applyAttendanceStudentVisibility();
 
             // Auto-open logic
             const currentUrlParams = new URLSearchParams(window.location.search);
@@ -713,6 +943,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error(error);
             window.currentMatrixData = null;
+            window.attendanceVisiblePersonIds = null;
             setAttendancePrintEnabled(false);
             showAttendanceMatrixMessage({
                 title: 'Error',
@@ -736,6 +967,7 @@ document.addEventListener('DOMContentLoaded', () => {
         late: 'L',
         excused: 'E',
         absent: 'A',
+        acf: 'ACF',
         not_applicable: '—'
     };
 
@@ -812,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function attPrintBuildSummary(matrixData) {
-        const counts = { present: 0, late: 0, excused: 0, absent: 0, not_applicable: 0, other: 0 };
+        const counts = { present: 0, late: 0, excused: 0, absent: 0, acf: 0, not_applicable: 0, other: 0 };
         const students = Array.isArray(matrixData?.matrix) ? matrixData.matrix : [];
         const sessions = Array.isArray(matrixData?.sessions) ? matrixData.sessions : [];
         let pctSum = 0;
@@ -913,7 +1145,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
 
         const emptyRow = !students.length
-            ? `<tr><td colspan="${sessions.length + 3}" class="empty-msg">No students found for this range.</td></tr>`
+            ? `<tr><td colspan="${sessions.length + 3}" class="empty-msg">No visible students to print. Use the Students filter on the matrix to show students, then print again.</td></tr>`
             : (!sessions.length
                 ? `<tr><td colspan="3" class="empty-msg">No active sessions found in this date range.</td></tr>`
                 : '');
@@ -1026,6 +1258,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .st-late { color: #997404; }
     .st-excused { color: #055160; }
     .st-absent { color: #842029; }
+    .st-acf { color: #a71d2a; }
     .st-not-applicable, .st-na { color: #6c757d; font-weight: 500; }
     .fn-mark { font-size: 8px; font-weight: 700; color: #0d6efd; margin-left: 1px; }
     .empty-msg { text-align: center; color: #666; padding: 16px !important; }
@@ -1105,10 +1338,11 @@ document.addEventListener('DOMContentLoaded', () => {
       <span class="stat">L <b>${c.late}</b></span>
       <span class="stat">E <b>${c.excused}</b></span>
       <span class="stat">A <b>${c.absent}</b></span>
+      <span class="stat">ACF <b>${c.acf || 0}</b></span>
       <span class="stat">N/A <b>${c.not_applicable}</b></span>
       <span class="stat">Avg rollup <b>${attPrintEscapeHtml(avgPctLabel)}</b></span>
     </div>
-    <div class="legend">Legend: P Present · L Late · E Excused · A Absent · — N/A · minutes as late'/early' (e.g. L 12', L /5', or L 12'/5')</div>
+    <div class="legend">Legend: P Present · L Late · E Excused · A Absent · ACF Absent Camera Off · — N/A · minutes as late'/early' (e.g. L 12', L /5', or L 12'/5')</div>
 
     <table class="matrix">
       <thead>
@@ -1149,7 +1383,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const orgName = String(document.getElementById('activeOrgNameRef')?.getAttribute('data-name') || '').trim();
         const startDate = document.getElementById('filter_startDate')?.value || '';
         const endDate = document.getElementById('filter_endDate')?.value || '';
-        const html = buildAttendancePrintDocument(window.currentMatrixData, {
+        const printData = getVisibleAttendanceMatrixForPrint(window.currentMatrixData);
+        const html = buildAttendancePrintDocument(printData, {
             orgName,
             startDate,
             endDate,
@@ -1282,7 +1517,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const attendance = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value;
             if (!attendance) {
                 if (typeof showMessageModal === 'function') {
-                    showMessageModal({ title: 'Attendance', icon: 'warning', message: 'Select a status (Present, Late, Excused, Absent, or N/A).', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+                    showMessageModal({ title: 'Attendance', icon: 'warning', message: 'Select a status (Present, Late, Excused, Absent, ACF, or N/A).', buttons: [{ text: 'OK', class: 'btn-primary' }] });
                 } else { alert('Select an attendance status.'); }
                 return;
             }
@@ -1422,7 +1657,7 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     }
     document.getElementById('det_date').innerText = `Session Date: ${record.date}`;
 
-    const allowed = ['present', 'late', 'excused', 'absent', 'not_applicable'];
+    const allowed = ['present', 'late', 'excused', 'absent', 'acf', 'not_applicable'];
     const effStatus = allowed.includes(record.status) ? record.status : 'absent';
     document.querySelectorAll('input[name="modal_cell_attendance"]').forEach((el) => {
         el.checked = el.value === effStatus;

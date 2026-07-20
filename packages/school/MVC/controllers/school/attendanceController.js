@@ -414,7 +414,7 @@ async function getAttendanceData(req, res) {
                 let applicability = !withinEnrollmentWindow
                     ? 'not_enrolled'
                     : (forceNotApplicable ? 'makeup_required' : (rosterRecord ? 'manual' : (expectedForSession ? 'expected_missing' : (applicabilityState.reason || 'not_enrolled'))));
-                if (withinEnrollmentWindow && !forceNotApplicable && hasApprovedLeave && (!rosterRecord || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT)) {
+                if (withinEnrollmentWindow && !forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(status))) {
                     status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
                     applicability = 'approved_leave';
                 } else if (withinEnrollmentWindow && !forceNotApplicable && status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE && rosterRecord) {
@@ -630,7 +630,7 @@ async function updateAttendanceRosterCell(req, res) {
 
         const normalizedAttendance = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(req.body?.attendance, '');
         if (!normalizedAttendance) {
-            throw new Error('Invalid attendance. Use present, late, excused, absent, or N/A.');
+            throw new Error('Invalid attendance. Use present, late, excused, absent, ACF, or N/A.');
         }
 
         if (!session.roster) session.roster = [];

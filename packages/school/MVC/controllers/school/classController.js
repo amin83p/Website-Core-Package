@@ -288,10 +288,10 @@ function periodNeedsCompletionDecision(period, today = '') {
     const d = String(period.completionDecision || '').trim().toLowerCase();
     if (d === 'pass' || d === 'continue' || d === 'withdraw') return false;
     const status = String(period.status || '').trim().toLowerCase();
-    if (['cancelled', 'archived', 'error', 'draft', 'planned'].includes(status)) return false;
+    if (['cancelled', 'archived', 'error', 'draft', 'planned', 'to_be_confirmed', 'waiting_list'].includes(status)) return false;
     if (status === 'completed' || status === 'withdrawn') return true;
     const end = String(period.endDate || '').trim();
-    if (end && end <= today) return true;
+    if (end && end <= day) return true;
     return false;
 }
 
@@ -1340,7 +1340,7 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
         }
         if (!hasApprovedLeaveFor(pid)) return row;
         const normalized = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
-        if (normalized !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+        if (!attendanceMatrixMetricsService.isAbsentLikeStatus(normalized)
             && normalized !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
             return row;
         }
@@ -1396,7 +1396,7 @@ async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = [], orgToda
         const status = String(row?.status || '').trim().toLowerCase();
         const metrics = map.get(classId) || { openPeriodCount: 0, activePeriodCount: 0, totalPeriodCount: 0 };
         metrics.totalPeriodCount += 1;
-        if (['draft', 'planned', 'active'].includes(status)) metrics.openPeriodCount += 1;
+        if (['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'active'].includes(status)) metrics.openPeriodCount += 1;
         if (isActivePeriodOnDate(row, today)) metrics.activePeriodCount += 1;
         map.set(classId, metrics);
     });
@@ -4242,7 +4242,8 @@ async function saveSessionGradebooks(req, res) {
 
             for (const pid of personIds) {
                 const att = attendanceByPerson.get(pid) || 'absent';
-                const isAbsent = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+                const isAbsent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
+                    || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
                 let v = rawScores[pid];
                 if (v === undefined) v = rawScores[String(pid)];
                 if (v === '' || v === undefined) v = null;

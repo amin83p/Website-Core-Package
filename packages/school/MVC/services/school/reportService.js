@@ -55,7 +55,8 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'class_attendance_present', label: 'Class Attendance Present', description: 'Class present count, or Attendance Matrix percent for each-student report periods.' }),
     Object.freeze({ key: 'class_attendance_late', label: 'Class Attendance Late', description: 'Class late count, or report-period late count for each-student reports.' }),
     Object.freeze({ key: 'class_attendance_excused', label: 'Class Attendance Excused', description: 'Class excused count, or report-period excused count for each-student reports.' }),
-    Object.freeze({ key: 'class_attendance_absent', label: 'Class Attendance Absent', description: 'Class absent count, or missing/absent report-period session count for each-student reports.' }),
+    Object.freeze({ key: 'class_attendance_absent', label: 'Class Attendance Absent', description: 'Class absent-like count (absent + ACF), or missing/absent report-period session count for each-student reports.' }),
+    Object.freeze({ key: 'class_attendance_acf', label: 'Class Attendance ACF', description: 'Class Absent Camera Off (ACF) count. Also included in class_attendance_absent.' }),
     Object.freeze({ key: 'class_attendance_na', label: 'Class Attendance N/A', description: 'Class not-applicable count, or report-period N/A count for each-student reports.' }),
     Object.freeze({ key: 'class_attendance_span_sessions', label: 'Class Attendance Span Sessions', description: 'Number of sessions in the report period.' }),
     Object.freeze({ key: 'class_attendance_span_unique_students', label: 'Class Attendance Span Unique Students', description: 'Unique students observed across sessions in the report period.' }),
@@ -63,7 +64,8 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'class_attendance_span_present', label: 'Class Attendance Span Present', description: 'Present count across report-period sessions.' }),
     Object.freeze({ key: 'class_attendance_span_late', label: 'Class Attendance Span Late', description: 'Late count across report-period sessions.' }),
     Object.freeze({ key: 'class_attendance_span_excused', label: 'Class Attendance Span Excused', description: 'Excused count across report-period sessions.' }),
-    Object.freeze({ key: 'class_attendance_span_absent', label: 'Class Attendance Span Absent', description: 'Absent count across report-period sessions.' }),
+    Object.freeze({ key: 'class_attendance_span_absent', label: 'Class Attendance Span Absent', description: 'Absent-like count (absent + ACF) across report-period sessions.' }),
+    Object.freeze({ key: 'class_attendance_span_acf', label: 'Class Attendance Span ACF', description: 'Absent Camera Off (ACF) count across report-period sessions. Also included in class_attendance_span_absent.' }),
     Object.freeze({ key: 'class_attendance_span_na', label: 'Class Attendance Span N/A', description: 'Not-applicable count across report-period sessions, excluded from attendance percent.' }),
     Object.freeze({ key: 'class_attendance_span_percent', label: 'Class Attendance Span Percent', description: 'Computed attendance percentage across report-period sessions.' })
   ]),
@@ -122,7 +124,8 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_attendance_present', label: 'Student Attendance Present', description: 'Count of present sessions for this student.' }),
     Object.freeze({ key: 'student_attendance_late', label: 'Student Attendance Late', description: 'Count of late sessions for this student.' }),
     Object.freeze({ key: 'student_attendance_excused', label: 'Student Attendance Excused', description: 'Count of excused sessions for this student.' }),
-    Object.freeze({ key: 'student_attendance_absent', label: 'Student Attendance Absent', description: 'Count of absent sessions for this student.' }),
+    Object.freeze({ key: 'student_attendance_absent', label: 'Student Attendance Absent', description: 'Count of absent-like sessions (absent + ACF) for this student.' }),
+    Object.freeze({ key: 'student_attendance_acf', label: 'Student Attendance ACF', description: 'Count of Absent Camera Off (ACF) sessions for this student. Also included in student_attendance_absent.' }),
     Object.freeze({ key: 'student_attendance_na', label: 'Student Attendance N/A', description: 'Count of not-applicable sessions for this student.' }),
     Object.freeze({ key: 'student_attendance_percent', label: 'Student Attendance Percent', description: 'Computed attendance percentage.' }),
     Object.freeze({ key: 'student_late_minutes', label: 'Student Late Minutes', description: 'Accumulated late minutes for this student.' }),
@@ -131,7 +134,8 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_attendance_span_present', label: 'Student Attendance Span Present', description: 'Present count for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_late', label: 'Student Attendance Span Late', description: 'Late count for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_excused', label: 'Student Attendance Span Excused', description: 'Excused count for this student within report period.' }),
-    Object.freeze({ key: 'student_attendance_span_absent', label: 'Student Attendance Span Absent', description: 'Absent count for this student within report period.' }),
+    Object.freeze({ key: 'student_attendance_span_absent', label: 'Student Attendance Span Absent', description: 'Absent-like count (absent + ACF) for this student within report period.' }),
+    Object.freeze({ key: 'student_attendance_span_acf', label: 'Student Attendance Span ACF', description: 'Absent Camera Off (ACF) count for this student within report period. Also included in student_attendance_span_absent.' }),
     Object.freeze({ key: 'student_attendance_span_na', label: 'Student Attendance Span N/A', description: 'Not-applicable count for this student within report period, excluded from attendance percent.' }),
     Object.freeze({ key: 'student_attendance_span_percent', label: 'Student Attendance Span Percent', description: 'Attendance percentage for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_late_minutes', label: 'Student Attendance Span Late Minutes', description: 'Late minutes for this student within report period.' }),
@@ -375,6 +379,27 @@ async function buildStudentAttendanceApplicabilityContext({ classData, sessions,
   return { notApplicableSessionIds, expectedSessionIds };
 }
 
+function incrementAttendanceStatusCount(summary, status) {
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) {
+    summary.present += 1;
+    return;
+  }
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) {
+    summary.late += 1;
+    return;
+  }
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) {
+    summary.excused += 1;
+    return;
+  }
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) {
+    summary.acf += 1;
+    summary.absent += 1;
+    return;
+  }
+  summary.absent += 1;
+}
+
 function buildClassAttendanceSummary(session, statusMap = null) {
   const roster = Array.isArray(session?.roster) ? session.roster : [];
   const summary = {
@@ -383,6 +408,7 @@ function buildClassAttendanceSummary(session, statusMap = null) {
     late: 0,
     excused: 0,
     absent: 0,
+    acf: 0,
     notApplicable: 0
   };
 
@@ -396,10 +422,7 @@ function buildClassAttendanceSummary(session, statusMap = null) {
       return;
     }
     summary.total += 1;
-    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) summary.present += 1;
-    else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) summary.late += 1;
-    else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) summary.excused += 1;
-    else summary.absent += 1;
+    incrementAttendanceStatusCount(summary, status);
   });
 
   return summary;
@@ -412,6 +435,7 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
     late: 0,
     excused: 0,
     absent: 0,
+    acf: 0,
     notApplicable: 0,
     lateMinutes: 0,
     earlyLeaveMinutes: 0
@@ -458,10 +482,7 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
     }
 
     out.totalSessions += 1;
-    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) out.present += 1;
-    else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) out.late += 1;
-    else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) out.excused += 1;
-    else out.absent += 1;
+    incrementAttendanceStatusCount(out, status);
 
     out.lateMinutes += normalizeNumber(row?.lateMinutes);
     out.earlyLeaveMinutes += normalizeNumber(row?.earlyLeaveMinutes);
@@ -642,6 +663,7 @@ async function buildClassAttendanceSpanSummary(sessions, statusMap = null) {
     late: 0,
     excused: 0,
     absent: 0,
+    acf: 0,
     notApplicable: 0,
     attendancePercent: 0
   };
@@ -667,10 +689,7 @@ async function buildClassAttendanceSpanSummary(sessions, statusMap = null) {
         return;
       }
       out.total += 1;
-      if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) out.present += 1;
-      else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) out.late += 1;
-      else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) out.excused += 1;
-      else out.absent += 1;
+      incrementAttendanceStatusCount(out, status);
     });
   });
 
@@ -803,7 +822,8 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
       if (!pid) return;
       const forceNotApplicable = sessionForcesNotApplicableAttendance(ses, effectiveStatusMap);
       const att = forceNotApplicable ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : rosterAttendanceLower(ses, pid);
-      const absent = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+      const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
+        || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       const raw = absent ? null : getScoreFromScoresMap(col.scores, pid);
       const total = col.totalScore > 0 ? col.totalScore : 0;
       let pct = null;
@@ -879,7 +899,8 @@ function computeReportPeriodGradebookStats(periodSessions, studentPersonId, stat
       if (!pid) return;
       const forceNotApplicable = sessionForcesNotApplicableAttendance(ses, effectiveStatusMap);
       const att = forceNotApplicable ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : rosterAttendanceLower(ses, pid);
-      const absent = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+      const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
+        || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       const raw = absent ? null : getScoreFromScoresMap(col.scores, pid);
       const total = col.totalScore > 0 ? col.totalScore : 0;
       let pct = null;
@@ -1111,6 +1132,9 @@ function attendanceStatusDetails(statusValue) {
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) return { status, label: 'Present' };
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) return { status, label: 'Late' };
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) return { status, label: 'Absent Excused' };
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) {
+    return { status, label: 'Absent Camera Off' };
+  }
   return { status: attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT, label: 'Absent' };
 }
 
@@ -1144,6 +1168,7 @@ function buildStudentCollectionRow({ personId, person, studentRecord, rosterName
     student_attendance_span_late: attendanceSummary.late,
     student_attendance_span_excused: attendanceSummary.excused,
     student_attendance_span_absent: attendanceSummary.absent,
+    student_attendance_span_acf: attendanceSummary.acf || 0,
     student_attendance_span_na: attendanceSummary.notApplicable,
     student_attendance_span_percent: attendanceSummary.attendancePercent,
     student_attendance_span_late_minutes: attendanceSummary.lateMinutes,
@@ -1168,6 +1193,7 @@ function buildSessionCollectionRow(session, index, statusMap = null) {
     session_attendance_late: summary.late,
     session_attendance_excused: summary.excused,
     session_attendance_absent: summary.absent,
+    session_attendance_acf: summary.acf || 0,
     session_attendance_na: summary.notApplicable,
     session_attendance_percent: percent
   };
@@ -1500,6 +1526,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
         late: studentAttendanceSpan.late,
         excused: studentAttendanceSpan.excused,
         absent: studentAttendanceSpan.absent,
+        acf: studentAttendanceSpan.acf || 0,
         notApplicable: studentAttendanceSpan.notApplicable
       }
     : classAttendance;
@@ -1579,6 +1606,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     class_attendance_late: primaryAttendance.late,
     class_attendance_excused: primaryAttendance.excused,
     class_attendance_absent: primaryAttendance.absent,
+    class_attendance_acf: primaryAttendance.acf || 0,
     class_attendance_na: primaryAttendance.notApplicable || 0,
     class_attendance_span_sessions: classAttendanceSpan.sessionCount,
     class_attendance_span_unique_students: classAttendanceSpan.uniqueStudents,
@@ -1587,6 +1615,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     class_attendance_span_late: classAttendanceSpan.late,
     class_attendance_span_excused: classAttendanceSpan.excused,
     class_attendance_span_absent: classAttendanceSpan.absent,
+    class_attendance_span_acf: classAttendanceSpan.acf || 0,
     class_attendance_span_na: classAttendanceSpan.notApplicable,
     class_attendance_span_percent: classAttendanceSpan.attendancePercent,
     student_attendance_total_sessions: studentAttendance.totalSessions,
@@ -1594,6 +1623,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_attendance_late: studentAttendance.late,
     student_attendance_excused: studentAttendance.excused,
     student_attendance_absent: studentAttendance.absent,
+    student_attendance_acf: studentAttendance.acf || 0,
     student_attendance_na: studentAttendance.notApplicable,
     student_attendance_percent: studentAttendance.attendancePercent,
     student_late_minutes: studentAttendance.lateMinutes,
@@ -1603,6 +1633,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_attendance_span_late: studentAttendanceSpan.late,
     student_attendance_span_excused: studentAttendanceSpan.excused,
     student_attendance_span_absent: studentAttendanceSpan.absent,
+    student_attendance_span_acf: studentAttendanceSpan.acf || 0,
     student_attendance_span_na: studentAttendanceSpan.notApplicable,
     student_attendance_span_percent: studentAttendanceSpan.attendancePercent,
     student_attendance_span_late_minutes: studentAttendanceSpan.lateMinutes,

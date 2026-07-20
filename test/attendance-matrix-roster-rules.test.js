@@ -53,3 +53,12 @@ test('not_applicable is not converted by late or early thresholds', () => {
   assert.equal(out.lateMinutes, 0);
   assert.equal(out.earlyLeaveMinutes, 0);
 });
+
+test('acf with late minutes stays acf (not converted to late)', () => {
+  const out = applyAttendanceMatrixRosterRules(
+    { attendance: 'acf', lateMinutes: 5, earlyLeaveMinutes: 0 },
+    policy
+  );
+  assert.equal(out.attendance, 'acf');
+  assert.equal(out.lateMinutes, 5);
+});

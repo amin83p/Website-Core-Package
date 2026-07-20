@@ -5,7 +5,7 @@
  * Per-session length: from session startTime/endTime, else durationHours, else policy scheduledMinutes.
  *
  * Rules (Option A + optional combined cap):
- * - absent → 0 credit
+ * - absent / acf (Absent Camera Off) → 0 credit
  * - excused → full session weight
  * - N/A / not_applicable -> excluded from the denominator
  * - present / late → proportional credit = weight × attendedMinutes / scheduledMinutes
@@ -19,6 +19,7 @@ const ATTENDANCE_STATUS = Object.freeze({
   LATE: 'late',
   EXCUSED: 'excused',
   ABSENT: 'absent',
+  ACF: 'acf',
   NOT_APPLICABLE: 'not_applicable'
 });
 
@@ -27,6 +28,8 @@ const ATTENDANCE_STATUS_ALIASES = Object.freeze({
   late: ATTENDANCE_STATUS.LATE,
   excused: ATTENDANCE_STATUS.EXCUSED,
   absent: ATTENDANCE_STATUS.ABSENT,
+  acf: ATTENDANCE_STATUS.ACF,
+  absent_camera_off: ATTENDANCE_STATUS.ACF,
   na: ATTENDANCE_STATUS.NOT_APPLICABLE,
   'n/a': ATTENDANCE_STATUS.NOT_APPLICABLE,
   n_a: ATTENDANCE_STATUS.NOT_APPLICABLE,
@@ -43,6 +46,11 @@ function normalizeStatus(status, fallback = '') {
 
 function isNotApplicableStatus(status) {
   return normalizeStatus(status) === ATTENDANCE_STATUS.NOT_APPLICABLE;
+}
+
+function isAbsentLikeStatus(status) {
+  const st = normalizeStatus(status);
+  return st === ATTENDANCE_STATUS.ABSENT || st === ATTENDANCE_STATUS.ACF;
 }
 
 function isEligibleAttendanceStatus(status) {
@@ -203,6 +211,9 @@ function computeSessionCredit(record, sessionWeight, policy) {
   if (st === ATTENDANCE_STATUS.ABSENT) {
     return { credit: 0, disqualified: false, reason: 'absent' };
   }
+  if (st === ATTENDANCE_STATUS.ACF) {
+    return { credit: 0, disqualified: false, reason: 'acf' };
+  }
   if (st === ATTENDANCE_STATUS.EXCUSED) {
     return { credit: sessionWeight, disqualified: false, reason: 'excused_full' };
   }
@@ -257,7 +268,7 @@ function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {
   for (const rec of eligibleRecords) {
     const st = normalizeStatus(rec?.status);
     if (st === ATTENDANCE_STATUS.PRESENT || st === ATTENDANCE_STATUS.LATE) totalPresentSessions += 1;
-    if (st === ATTENDANCE_STATUS.ABSENT) totalAbsentSessions += 1;
+    if (isAbsentLikeStatus(st)) totalAbsentSessions += 1;
 
     const { credit, disqualified } = computeSessionCredit(rec, sessionWeight, policy);
     sumCredit += credit;
@@ -282,6 +293,7 @@ module.exports = {
   ATTENDANCE_STATUS,
   normalizeStatus,
   isNotApplicableStatus,
+  isAbsentLikeStatus,
   isEligibleAttendanceStatus,
   normalizeAttendanceStatusForSave,
   resolvePolicy,

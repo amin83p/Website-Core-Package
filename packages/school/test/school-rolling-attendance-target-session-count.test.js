@@ -100,3 +100,29 @@ test('automatic completion reopens after a counted attendance correction', () =>
   });
   assert.equal(manual, null);
 });
+
+test('ACF attendance counts toward rolling enrollment target like absent', () => {
+  const period = {
+    id: 'PERIOD_ACF',
+    studentId: 'STUDENT_001',
+    status: 'active',
+    startDate: '2026-02-01',
+    endDate: '2026-02-15',
+    targetSessionCount: 2,
+    sessionCountPolicy: 'all_non_na'
+  };
+  const sessions = [
+    attendance('SES_ACF', '2026-02-01', attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF),
+    attendance('SES_PRESENT', '2026-02-08', attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT),
+    attendance('SES_AFTER', '2026-02-15', attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT)
+  ];
+  const result = applicabilityService.resolveRollingEnrollmentApplicability({
+    sessions,
+    periodRows: [period],
+    studentToPersonMap
+  });
+  const summary = result.summariesByPeriodId.get(period.id);
+  assert.equal(summary.consumedCount, 2);
+  assert.equal(summary.remainingCount, 0);
+  assert.deepEqual(summary.completionCandidate, { sessionId: 'SES_PRESENT', date: '2026-02-08' });
+});

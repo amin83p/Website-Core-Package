@@ -202,3 +202,25 @@ test('rollup excludes not_applicable from denominator and reports N/A count', ()
   assert.equal(s.totalAbsentSessions, 1);
   assert.equal(s.performancePercent, 50);
 });
+
+test('ACF aliases normalize and yield zero credit like absent', () => {
+  assert.equal(normalizeAttendanceStatusForSave('acf'), 'acf');
+  assert.equal(normalizeAttendanceStatusForSave('ACF'), 'acf');
+  assert.equal(normalizeAttendanceStatusForSave('absent_camera_off'), 'acf');
+  const credit = computeSessionCredit({ status: 'acf' }, 25, policy180);
+  assert.equal(credit.credit, 0);
+  assert.equal(credit.reason, 'acf');
+});
+
+test('rollup counts ACF in totalAbsentSessions', () => {
+  const records = [
+    { status: 'present', lateMinutes: 0, earlyLeaveMinutes: 0 },
+    { status: 'acf', lateMinutes: 0, earlyLeaveMinutes: 0 },
+    { status: 'absent', lateMinutes: 0, earlyLeaveMinutes: 0 }
+  ];
+  const s = computeStudentMatrixSummary(records, {});
+  assert.equal(s.totalEligibleSessions, 3);
+  assert.equal(s.totalPresentSessions, 1);
+  assert.equal(s.totalAbsentSessions, 2);
+  assert.equal(s.performancePercent, Math.round((100 / 3) * 100) / 100);
+});

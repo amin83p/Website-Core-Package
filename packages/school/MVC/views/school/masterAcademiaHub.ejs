@@ -381,7 +381,36 @@
   .school-master-hub .attendance-status-late { color: #f59f00; font-weight: 800; }
   .school-master-hub .attendance-status-excused { color: #0dcaf0; font-weight: 800; }
   .school-master-hub .attendance-status-absent { color: #dc3545; font-weight: 800; }
+  .school-master-hub .attendance-status-acf { color: #b02a37; font-weight: 800; }
   .school-master-hub .attendance-status-na { color: #94a3b8; }
+
+  .school-master-hub .hub-attendance-table th.hub-attendance-student {
+    overflow: visible;
+  }
+  .school-master-hub .hub-student-filter-dropdown .dropdown-toggle {
+    font-size: 0.72rem;
+    padding: 0.15rem 0.45rem;
+    line-height: 1.2;
+  }
+  .school-master-hub .hub-student-filter-dropdown .dropdown-menu {
+    max-height: 280px;
+    overflow-y: auto;
+    min-width: 250px;
+    z-index: 30;
+  }
+  .school-master-hub .hub-student-filter-dropdown .form-check-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+  }
+  .attendance-student-filter-menu-floating {
+    z-index: 2000 !important;
+    max-height: min(320px, calc(100vh - 24px));
+    overflow-y: auto;
+    min-width: 250px;
+  }
+  .school-master-hub tr.hub-attendance-student-row.is-student-hidden {
+    display: none !important;
+  }
 
   .school-master-hub .session-row {
     cursor: default;
@@ -4343,8 +4372,181 @@
   const hubAttendanceState = {
     data: null,
     batch: [],
-    activeBatchClassKey: ''
+    activeBatchClassKey: '',
+    visibilityByKey: {}
   };
+
+  function resetHubAttendanceVisibility() {
+    hubAttendanceState.visibilityByKey = {};
+  }
+
+  function ensureHubAttendanceVisibility(key, students) {
+    const mapKey = String(key || 'default').trim() || 'default';
+    if (!(hubAttendanceState.visibilityByKey[mapKey] instanceof Set)) {
+      const next = new Set();
+      (Array.isArray(students) ? students : []).forEach(function (student) {
+        const id = String(student && student.personId ? student.personId : '').trim();
+        if (id) next.add(id);
+      });
+      hubAttendanceState.visibilityByKey[mapKey] = next;
+    }
+    return hubAttendanceState.visibilityByKey[mapKey];
+  }
+
+  function buildHubStudentFilterDropdownHtml(students, visibleIds, filterId) {
+    const rows = Array.isArray(students) ? students : [];
+    const visible = visibleIds instanceof Set ? visibleIds : new Set();
+    const safeFilterId = String(filterId || 'hubAttFilter').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const total = rows.length;
+    const shown = rows.reduce(function (count, student) {
+      const id = String(student && student.personId ? student.personId : '').trim();
+      return count + (id && visible.has(id) ? 1 : 0);
+    }, 0);
+    const items = rows.map(function (student) {
+      const id = String(student && student.personId ? student.personId : '').trim();
+      if (!id) return '';
+      const name = String(student.name || id).trim() || id;
+      const inputId = safeFilterId + '_' + id.replace(/[^a-zA-Z0-9_-]/g, '_');
+      return [
+        '<li class="px-3 py-1">',
+        '<div class="form-check mb-0">',
+        '<input class="form-check-input hub-student-visibility-check" type="checkbox" value="' + escapeHtml(id) + '" id="' + escapeHtml(inputId) + '"' + (visible.has(id) ? ' checked' : '') + '>',
+        '<label class="form-check-label" for="' + escapeHtml(inputId) + '">' + escapeHtml(name) + '</label>',
+        '</div>',
+        '</li>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="d-flex flex-column align-items-start gap-1">',
+      '<div class="fw-bold">Student</div>',
+      '<div class="dropdown hub-student-filter-dropdown" data-hub-visibility-key="' + escapeHtml(String(filterId || '')) + '">',
+      '<button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">',
+      '<i class="bi bi-people me-1"></i>Students <span class="hub-student-filter-count">' + escapeHtml(String(shown)) + '/' + escapeHtml(String(total)) + '</span>',
+      '</button>',
+      '<ul class="dropdown-menu shadow-sm p-0 attendance-student-filter-menu">',
+      '<li class="px-3 py-2 border-bottom bg-light sticky-top">',
+      '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-primary btn-sm flex-fill hub-student-select-all">Select All</button>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm flex-fill hub-student-clear-all">Clear All</button>',
+      '</div>',
+      '</li>',
+      items || '<li class="px-3 py-2 text-muted small">No students loaded.</li>',
+      '</ul>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function applyHubAttendanceStudentVisibility(scopeRoot, visibilityKey, allStudents) {
+    const rootEl = scopeRoot || document;
+    const visible = ensureHubAttendanceVisibility(visibilityKey, allStudents);
+    rootEl.querySelectorAll('tr.hub-attendance-student-row[data-person-id]').forEach(function (row) {
+      const id = String(row.getAttribute('data-person-id') || '').trim();
+      row.classList.toggle('is-student-hidden', !(id && visible.has(id)));
+    });
+    const countLabel = rootEl.querySelector('.hub-student-filter-count');
+    if (countLabel) {
+      const total = Array.isArray(allStudents) ? allStudents.length : 0;
+      countLabel.textContent = String(Math.min(visible.size, total)) + '/' + String(total);
+    }
+  }
+
+  function mountHubStudentFilterDropdownOutside(dropdownRoot) {
+    const toggle = dropdownRoot && dropdownRoot.querySelector
+      ? dropdownRoot.querySelector('[data-bs-toggle="dropdown"]')
+      : null;
+    const menu = dropdownRoot && dropdownRoot.querySelector
+      ? dropdownRoot.querySelector('.dropdown-menu')
+      : null;
+    if (!toggle || !menu || typeof bootstrap === 'undefined' || !bootstrap.Dropdown) return null;
+
+    const existing = bootstrap.Dropdown.getInstance(toggle);
+    if (existing) existing.dispose();
+
+    const instance = new bootstrap.Dropdown(toggle, {
+      autoClose: 'outside',
+      popperConfig: function (defaultConfig) {
+        const config = typeof defaultConfig === 'object' && defaultConfig ? Object.assign({}, defaultConfig) : {};
+        config.strategy = 'fixed';
+        const modifiers = Array.isArray(config.modifiers) ? config.modifiers.slice() : [];
+        modifiers.push({
+          name: 'preventOverflow',
+          options: { boundary: 'viewport', padding: 8 }
+        });
+        modifiers.push({
+          name: 'flip',
+          options: { fallbackPlacements: ['bottom-start', 'top-start', 'bottom-end', 'top-end'] }
+        });
+        config.modifiers = modifiers;
+        return config;
+      }
+    });
+
+    if (toggle.dataset.studentFilterOutsideBound === '1') return instance;
+    toggle.dataset.studentFilterOutsideBound = '1';
+
+    toggle.addEventListener('show.bs.dropdown', function () {
+      if (menu.parentElement !== document.body) {
+        menu.dataset.returnToParent = '1';
+        document.body.appendChild(menu);
+      }
+      menu.classList.add('attendance-student-filter-menu-floating', 'show');
+    });
+
+    toggle.addEventListener('hidden.bs.dropdown', function () {
+      menu.classList.remove('attendance-student-filter-menu-floating', 'show');
+      if (menu.dataset.returnToParent === '1' && dropdownRoot.isConnected) {
+        dropdownRoot.appendChild(menu);
+        delete menu.dataset.returnToParent;
+      }
+    });
+
+    return instance;
+  }
+
+  function bindHubAttendanceStudentVisibility(scopeRoot, visibilityKey, allStudents, onChanged) {
+    const rootEl = scopeRoot || document;
+    const dropdown = rootEl.querySelector('.hub-student-filter-dropdown');
+    if (!dropdown) return;
+    const menu = dropdown.querySelector('.dropdown-menu') || dropdown;
+    const visible = ensureHubAttendanceVisibility(visibilityKey, allStudents);
+
+    mountHubStudentFilterDropdownOutside(dropdown);
+
+    menu.querySelectorAll('.hub-student-visibility-check').forEach(function (input) {
+      input.addEventListener('change', function () {
+        const id = String(input.value || '').trim();
+        if (!id) return;
+        if (input.checked) visible.add(id);
+        else visible.delete(id);
+        applyHubAttendanceStudentVisibility(rootEl, visibilityKey, allStudents);
+        if (typeof onChanged === 'function') onChanged();
+      });
+    });
+
+    menu.querySelector('.hub-student-select-all')?.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      const next = new Set();
+      (Array.isArray(allStudents) ? allStudents : []).forEach(function (student) {
+        const id = String(student && student.personId ? student.personId : '').trim();
+        if (id) next.add(id);
+      });
+      hubAttendanceState.visibilityByKey[String(visibilityKey || 'default')] = next;
+      menu.querySelectorAll('.hub-student-visibility-check').forEach(function (input) { input.checked = true; });
+      applyHubAttendanceStudentVisibility(rootEl, visibilityKey, allStudents);
+      if (typeof onChanged === 'function') onChanged();
+    });
+
+    menu.querySelector('.hub-student-clear-all')?.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      hubAttendanceState.visibilityByKey[String(visibilityKey || 'default')] = new Set();
+      menu.querySelectorAll('.hub-student-visibility-check').forEach(function (input) { input.checked = false; });
+      applyHubAttendanceStudentVisibility(rootEl, visibilityKey, allStudents);
+      if (typeof onChanged === 'function') onChanged();
+    });
+  }
 
   function hubAttendanceToYmd(date) {
     if (!date || Number.isNaN(date.getTime())) return '';
@@ -4675,6 +4877,7 @@
       hubAttendanceState.data = result;
       hubAttendanceState.batch = [];
       hubAttendanceState.activeBatchClassKey = '';
+      resetHubAttendanceVisibility();
       if (classNameEl) classNameEl.value = result.className || classNameEl.value || classId;
       renderHubAttendanceMatrix(result);
     } catch (error) {
@@ -4749,6 +4952,7 @@
         hubAttendanceState.data = null;
         hubAttendanceState.batch = [];
         hubAttendanceState.activeBatchClassKey = '';
+        resetHubAttendanceVisibility();
         if (status) status.innerHTML = '<div class="text-muted small"><i class="bi bi-info-circle me-1"></i>No active classes found for the active organization.</div>';
         if (output) output.innerHTML = '<div class="hub-empty"><div><i class="bi bi-easel display-6 d-block mb-3"></i><div class="fw-semibold">No active classes found.</div></div></div>';
         return;
@@ -4763,6 +4967,7 @@
       hubAttendanceState.data = null;
       hubAttendanceState.batch = results.filter(function (row) { return row && row.status !== 'skipped'; });
       hubAttendanceState.activeBatchClassKey = getHubAttendanceBatchClassKey(hubAttendanceState.batch[0], 0);
+      resetHubAttendanceVisibility();
       renderHubAttendanceBatch(hubAttendanceState.batch);
     } catch (error) {
       if (status) status.innerHTML = '<div class="text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>' + escapeHtml(error.message || 'Unable to load active classes.') + '</div>';
@@ -4782,6 +4987,7 @@
     if (value === 'late') return '<i class="bi bi-clock-fill attendance-status-late" title="Late"></i>';
     if (value === 'excused') return '<i class="bi bi-envelope-paper-fill attendance-status-excused" title="Excused"></i>';
     if (value === 'absent') return '<i class="bi bi-x-circle-fill attendance-status-absent" title="Absent"></i>';
+    if (value === 'acf') return '<i class="bi bi-camera-video-off-fill attendance-status-acf" title="Absent Camera Off"></i>';
     return '<i class="bi bi-dash attendance-status-na" title="No record"></i>';
   }
 
@@ -4796,7 +5002,12 @@
 
     const tableSearch = String(document.getElementById('hubAttendanceTableSearch')?.value || '').trim().toLowerCase();
     const sessions = Array.isArray(result.sessions) ? result.sessions : [];
-    const matrix = (Array.isArray(result.matrix) ? result.matrix : []).filter(function (student) {
+    const allStudents = Array.isArray(result.matrix) ? result.matrix : [];
+    const visibilityKey = String(result.classId || 'single').trim() || 'single';
+    const visibleIds = ensureHubAttendanceVisibility(visibilityKey, allStudents);
+    const matrix = allStudents.filter(function (student) {
+      const personId = String(student.personId || '').trim();
+      if (!personId || !visibleIds.has(personId)) return false;
       if (!tableSearch) return true;
       return [student.name, student.personId].filter(Boolean).join(' ').toLowerCase().includes(tableSearch);
     });
@@ -4808,7 +5019,7 @@
         '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">',
         '<div><div class="fw-bold">' + escapeHtml(result.className || 'Class Attendance') + '</div>',
         '<div class="text-muted small">' + escapeHtml(String(matrix.length)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions. Last loaded: ' + escapeHtml(formatHubInstant(new Date())) + '</div></div>',
-        '<div class="small text-muted"><span class="me-3"><i class="bi bi-check-circle-fill attendance-status-present"></i> Present</span><span class="me-3"><i class="bi bi-clock-fill attendance-status-late"></i> Late</span><span class="me-3"><i class="bi bi-envelope-paper-fill attendance-status-excused"></i> Excused</span><span><i class="bi bi-x-circle-fill attendance-status-absent"></i> Absent</span></div>',
+        '<div class="small text-muted"><span class="me-3"><i class="bi bi-check-circle-fill attendance-status-present"></i> Present</span><span class="me-3"><i class="bi bi-clock-fill attendance-status-late"></i> Late</span><span class="me-3"><i class="bi bi-envelope-paper-fill attendance-status-excused"></i> Excused</span><span class="me-3"><i class="bi bi-x-circle-fill attendance-status-absent"></i> Absent</span><span><i class="bi bi-camera-video-off-fill attendance-status-acf"></i> ACF</span></div>',
         '</div>'
       ].join('');
     }
@@ -4826,7 +5037,14 @@
       return '<th class="text-center small">' + escapeHtml(displayDate) + '</th>';
     }).join('');
 
-    const bodyRows = matrix.length ? matrix.map(function (student) {
+    const studentHeader = buildHubStudentFilterDropdownHtml(allStudents, visibleIds, visibilityKey);
+    const searchMatched = allStudents.filter(function (student) {
+      if (!tableSearch) return true;
+      return [student.name, student.personId].filter(Boolean).join(' ').toLowerCase().includes(tableSearch);
+    });
+
+    const bodyRows = searchMatched.length ? searchMatched.map(function (student) {
+      const personId = String(student.personId || '').trim();
       const summary = student.summary || {};
       const present = Number(summary.totalPresentSessions || 0);
       const absent = Number(summary.totalAbsentSessions || 0);
@@ -4843,7 +5061,7 @@
         ].join('');
       }).join('');
       return [
-        '<tr>',
+        '<tr class="hub-attendance-student-row" data-person-id="' + escapeHtml(personId) + '">',
         '<td class="hub-attendance-rollup text-center small"><div><span class="text-success fw-bold">' + escapeHtml(String(present)) + '</span><span class="text-muted"> / </span><span class="text-danger fw-bold">' + escapeHtml(String(absent)) + '</span></div><div class="text-primary fw-bold">' + escapeHtml(percent) + '</div></td>',
         '<td class="hub-attendance-student"><div class="fw-semibold">' + hubStudentNameHtml(student.name || 'Student', student.studentRecordId) + '</div><div class="text-muted small font-monospace">' + escapeHtml(student.personId || '') + '</div></td>',
         cells,
@@ -4852,13 +5070,31 @@
     }).join('') : '<tr><td colspan="' + escapeHtml(String(sessions.length + 2)) + '" class="text-center text-muted py-5">No matching students in the loaded matrix.</td></tr>';
 
     output.innerHTML = [
-      '<div class="hub-attendance-matrix-wrap">',
+      '<div class="hub-attendance-matrix-wrap" data-hub-attendance-scope="' + escapeHtml(visibilityKey) + '">',
       '<table class="table table-hover align-middle hub-attendance-table">',
-      '<thead><tr><th class="hub-attendance-rollup text-center small">Rollup<br><span class="text-muted fw-normal">P / A / %</span></th><th class="hub-attendance-student">Student</th>' + headerCells + '</tr></thead>',
+      '<thead><tr><th class="hub-attendance-rollup text-center small">Rollup<br><span class="text-muted fw-normal">P / A / %</span></th><th class="hub-attendance-student">' + studentHeader + '</th>' + headerCells + '</tr></thead>',
       '<tbody>' + bodyRows + '</tbody>',
       '</table>',
       '</div>'
     ].join('');
+
+    const scopeRoot = output.querySelector('[data-hub-attendance-scope]');
+    bindHubAttendanceStudentVisibility(scopeRoot, visibilityKey, allStudents, function () {
+      if (status) {
+        const visibleCount = searchMatched.filter(function (student) {
+          const id = String(student.personId || '').trim();
+          return id && ensureHubAttendanceVisibility(visibilityKey, allStudents).has(id);
+        }).length;
+        status.innerHTML = [
+          '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">',
+          '<div><div class="fw-bold">' + escapeHtml(result.className || 'Class Attendance') + '</div>',
+          '<div class="text-muted small">' + escapeHtml(String(visibleCount)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions. Last loaded: ' + escapeHtml(formatHubInstant(new Date())) + '</div></div>',
+          '<div class="small text-muted"><span class="me-3"><i class="bi bi-check-circle-fill attendance-status-present"></i> Present</span><span class="me-3"><i class="bi bi-clock-fill attendance-status-late"></i> Late</span><span class="me-3"><i class="bi bi-envelope-paper-fill attendance-status-excused"></i> Excused</span><span class="me-3"><i class="bi bi-x-circle-fill attendance-status-absent"></i> Absent</span><span><i class="bi bi-camera-video-off-fill attendance-status-acf"></i> ACF</span></div>',
+          '</div>'
+        ].join('');
+      }
+    });
+    applyHubAttendanceStudentVisibility(scopeRoot, visibilityKey, allStudents);
 
     output.querySelectorAll('[data-hub-attendance-cell]').forEach(function (cell) {
       cell.addEventListener('click', function () {
@@ -4890,10 +5126,14 @@
     const successful = rows.filter(function (row) { return row.status === 'success'; });
     const failed = rows.filter(function (row) { return row.status !== 'success'; });
     const totalSessions = successful.reduce(function (sum, row) { return sum + (Array.isArray(row.sessions) ? row.sessions.length : 0); }, 0);
-    const totalStudents = successful.reduce(function (sum, row) {
-      const matrix = Array.isArray(row.matrix) ? row.matrix : [];
-      if (!tableSearch) return sum + matrix.length;
-      return sum + matrix.filter(function (student) {
+    const totalStudents = successful.reduce(function (sum, row, index) {
+      const allStudents = Array.isArray(row.matrix) ? row.matrix : [];
+      const visibilityKey = getHubAttendanceBatchClassKey(row, index);
+      const visibleIds = ensureHubAttendanceVisibility(visibilityKey, allStudents);
+      return sum + allStudents.filter(function (student) {
+        const personId = String(student.personId || '').trim();
+        if (!personId || !visibleIds.has(personId)) return false;
+        if (!tableSearch) return true;
         return [student.name, student.personId].filter(Boolean).join(' ').toLowerCase().includes(tableSearch);
       }).length;
     }, 0);
@@ -4902,12 +5142,17 @@
       status.innerHTML = '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2"><div><div class="fw-bold">All Active Classes Attendance</div><div class="text-muted small">' + escapeHtml(String(successful.length)) + ' classes loaded, ' + escapeHtml(String(totalStudents)) + ' visible students, ' + escapeHtml(String(totalSessions)) + ' sessions. Last loaded: ' + escapeHtml(formatHubInstant(new Date())) + '</div></div>' + (failed.length ? '<span class="badge text-bg-warning">' + escapeHtml(String(failed.length)) + ' failed</span>' : '') + '</div>';
     }
 
-    function renderBatchClassPanel(row) {
+    function renderBatchClassPanel(row, index) {
       if (row.status !== 'success') {
         return '<div class="card border-danger-subtle shadow-sm mb-3"><div class="card-body"><div class="fw-bold text-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + escapeHtml(row.className || row.classId || 'Class') + '</div><div class="text-muted small mt-1">' + escapeHtml(row.message || 'Unable to load this class.') + '</div></div></div>';
       }
       const sessions = Array.isArray(row.sessions) ? row.sessions : [];
-      const matrix = (Array.isArray(row.matrix) ? row.matrix : []).filter(function (student) {
+      const allStudents = Array.isArray(row.matrix) ? row.matrix : [];
+      const visibilityKey = getHubAttendanceBatchClassKey(row, index);
+      const visibleIds = ensureHubAttendanceVisibility(visibilityKey, allStudents);
+      const matrix = allStudents.filter(function (student) {
+        const personId = String(student.personId || '').trim();
+        if (!personId || !visibleIds.has(personId)) return false;
         if (!tableSearch) return true;
         return [student.name, student.personId].filter(Boolean).join(' ').toLowerCase().includes(tableSearch);
       });
@@ -4921,7 +5166,13 @@
           : String(session.id || '');
         return '<th class="text-center small">' + escapeHtml(displayDate) + '</th>';
       }).join('');
-      const bodyRows = matrix.length ? matrix.map(function (student) {
+      const studentHeader = buildHubStudentFilterDropdownHtml(allStudents, visibleIds, visibilityKey);
+      const searchMatched = allStudents.filter(function (student) {
+        if (!tableSearch) return true;
+        return [student.name, student.personId].filter(Boolean).join(' ').toLowerCase().includes(tableSearch);
+      });
+      const bodyRows = searchMatched.length ? searchMatched.map(function (student) {
+        const personId = String(student.personId || '').trim();
         const summary = student.summary || {};
         const present = Number(summary.totalPresentSessions || 0);
         const absent = Number(summary.totalAbsentSessions || 0);
@@ -4932,9 +5183,9 @@
           const notesExist = Array.isArray(record.comments) && record.comments.length > 0;
           return '<td class="hub-attendance-cell" data-hub-attendance-cell data-class-id="' + escapeHtml(row.classId || '') + '" data-person-id="' + escapeHtml(student.personId || '') + '" data-session-id="' + escapeHtml(sessionId) + '" title="Open this attendance record in the full Attendance page">' + hubAttendanceStatusIcon(record.status) + (notesExist ? '<div class="small mt-1"><i class="bi bi-chat-dots-fill text-primary"></i></div>' : '') + '</td>';
         }).join('');
-        return '<tr><td class="hub-attendance-rollup text-center small"><div><span class="text-success fw-bold">' + escapeHtml(String(present)) + '</span><span class="text-muted"> / </span><span class="text-danger fw-bold">' + escapeHtml(String(absent)) + '</span></div><div class="text-primary fw-bold">' + escapeHtml(percent) + '</div></td><td class="hub-attendance-student"><div class="fw-semibold">' + hubStudentNameHtml(student.name || 'Student', student.studentRecordId) + '</div><div class="text-muted small font-monospace">' + escapeHtml(student.personId || '') + '</div></td>' + cells + '</tr>';
+        return '<tr class="hub-attendance-student-row" data-person-id="' + escapeHtml(personId) + '"><td class="hub-attendance-rollup text-center small"><div><span class="text-success fw-bold">' + escapeHtml(String(present)) + '</span><span class="text-muted"> / </span><span class="text-danger fw-bold">' + escapeHtml(String(absent)) + '</span></div><div class="text-primary fw-bold">' + escapeHtml(percent) + '</div></td><td class="hub-attendance-student"><div class="fw-semibold">' + hubStudentNameHtml(student.name || 'Student', student.studentRecordId) + '</div><div class="text-muted small font-monospace">' + escapeHtml(student.personId || '') + '</div></td>' + cells + '</tr>';
       }).join('') : '<tr><td colspan="' + escapeHtml(String(sessions.length + 2)) + '" class="text-center text-muted py-5">No matching students in this class matrix.</td></tr>';
-      return '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2"><div><div class="fw-bold">' + escapeHtml(row.className || row.classId || 'Class') + '</div><div class="text-muted small">' + escapeHtml(String(matrix.length)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions</div></div><a class="btn btn-outline-primary btn-sm" href="/school/attendances?classId=' + encodeURIComponent(row.classId || '') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a></div><div class="card-body p-0"><div class="hub-attendance-matrix-wrap border-0"><table class="table table-hover align-middle hub-attendance-table mb-0"><thead><tr><th class="hub-attendance-rollup text-center small">Rollup<br><span class="text-muted fw-normal">P / A / %</span></th><th class="hub-attendance-student">Student</th>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div></div></div>';
+      return '<div class="card border-0 shadow-sm mb-4" data-hub-batch-panel="' + escapeHtml(visibilityKey) + '"><div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2"><div><div class="fw-bold">' + escapeHtml(row.className || row.classId || 'Class') + '</div><div class="text-muted small hub-batch-visible-count">' + escapeHtml(String(matrix.length)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions</div></div><a class="btn btn-outline-primary btn-sm" href="/school/attendances?classId=' + encodeURIComponent(row.classId || '') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a></div><div class="card-body p-0"><div class="hub-attendance-matrix-wrap border-0" data-hub-attendance-scope="' + escapeHtml(visibilityKey) + '"><table class="table table-hover align-middle hub-attendance-table mb-0"><thead><tr><th class="hub-attendance-rollup text-center small">Rollup<br><span class="text-muted fw-normal">P / A / %</span></th><th class="hub-attendance-student">' + studentHeader + '</th>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div></div></div>';
     }
 
     if (rows.length > 1) {
@@ -4944,8 +5195,11 @@
       if (!hubAttendanceState.activeBatchClassKey || !activeKeyExists) {
         hubAttendanceState.activeBatchClassKey = getHubAttendanceBatchClassKey(rows[0], 0);
       }
+      let activeIndex = 0;
       const activeRow = rows.find(function (row, index) {
-        return getHubAttendanceBatchClassKey(row, index) === hubAttendanceState.activeBatchClassKey;
+        const matched = getHubAttendanceBatchClassKey(row, index) === hubAttendanceState.activeBatchClassKey;
+        if (matched) activeIndex = index;
+        return matched;
       }) || rows[0];
       const tabs = rows.map(function (row, index) {
         const classKey = getHubAttendanceBatchClassKey(row, index);
@@ -4975,7 +5229,7 @@
         '</div>',
         '<div class="card-body">',
         '<div id="hubAttendanceClassTabContent">',
-        renderBatchClassPanel(activeRow),
+        renderBatchClassPanel(activeRow, activeIndex),
         '</div>',
         '</div>',
         '</div>'
@@ -4988,8 +5242,34 @@
         });
       });
     } else {
-      output.innerHTML = rows.map(renderBatchClassPanel).join('');
+      output.innerHTML = rows.map(function (row, index) {
+        return renderBatchClassPanel(row, index);
+      }).join('');
     }
+
+    output.querySelectorAll('[data-hub-attendance-scope]').forEach(function (scopeRoot) {
+      const visibilityKey = String(scopeRoot.getAttribute('data-hub-attendance-scope') || '').trim();
+      const panelRow = rows.find(function (row, index) {
+        return getHubAttendanceBatchClassKey(row, index) === visibilityKey;
+      });
+      const allStudents = Array.isArray(panelRow?.matrix) ? panelRow.matrix : [];
+      bindHubAttendanceStudentVisibility(scopeRoot, visibilityKey, allStudents, function () {
+        const panel = scopeRoot.closest('[data-hub-batch-panel]');
+        const countEl = panel ? panel.querySelector('.hub-batch-visible-count') : null;
+        if (countEl) {
+          const visibleIds = ensureHubAttendanceVisibility(visibilityKey, allStudents);
+          const visibleCount = allStudents.filter(function (student) {
+            const personId = String(student.personId || '').trim();
+            if (!personId || !visibleIds.has(personId)) return false;
+            if (!tableSearch) return true;
+            return [student.name, student.personId].filter(Boolean).join(' ').toLowerCase().includes(tableSearch);
+          }).length;
+          const sessionCount = Array.isArray(panelRow?.sessions) ? panelRow.sessions.length : 0;
+          countEl.textContent = String(visibleCount) + ' visible students, ' + String(sessionCount) + ' sessions';
+        }
+      });
+      applyHubAttendanceStudentVisibility(scopeRoot, visibilityKey, allStudents);
+    });
 
     output.querySelectorAll('[data-hub-attendance-cell]').forEach(function (cell) {
       cell.addEventListener('click', function () {

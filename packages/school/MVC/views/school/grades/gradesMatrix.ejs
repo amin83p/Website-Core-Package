@@ -302,7 +302,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderCellHtml(c) {
     if (!c) return '—';
     if (c.absent) {
-      const label = c.attendanceStatus === 'not_applicable' ? 'N/A' : 'Absent';
+      const label = c.attendanceStatus === 'not_applicable'
+        ? 'N/A'
+        : (c.attendanceStatus === 'acf' ? 'ACF' : 'Absent');
       return `<span class="text-muted small">${label}</span>`;
     }
     if (c.score == null || c.score === '') return '—';
@@ -514,7 +516,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function gmPrintCellText(cell, col) {
     if (!cell) return { text: '—', cls: 'st-empty' };
     if (cell.absent) {
-      const label = cell.attendanceStatus === 'not_applicable' ? 'N/A' : 'Absent';
+      const label = cell.attendanceStatus === 'not_applicable'
+        ? 'N/A'
+        : (cell.attendanceStatus === 'acf' ? 'ACF' : 'Absent');
       return { text: label, cls: 'st-absent' };
     }
     if (cell.score == null || cell.score === '') return { text: '—', cls: 'st-empty' };
@@ -790,7 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <span class="stat">Avg Final <b>${gmPrintEscapeHtml(avgFinalLabel)}</b></span>
       <span class="stat">Avg Attend. <b>${gmPrintEscapeHtml(avgAttendLabel)}</b></span>
     </div>
-    <div class="legend">Legend: score/total · percent% · excl. = scored but excluded from category average · Absent / N/A = no score due to attendance · — = no score</div>
+    <div class="legend">Legend: score/total · percent% · excl. = scored but excluded from category average · Absent / ACF / N/A = no score due to attendance · — = no score</div>
 
     <table class="matrix">
       <thead>
