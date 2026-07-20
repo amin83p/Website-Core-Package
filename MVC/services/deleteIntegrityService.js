@@ -20,6 +20,9 @@ const deleteIntegrityService = {
   },
 
   async assertOrganizationCanBeDeleted(orgId) {
+    // Direct org delete via dataService is blocked at the controller in favor of
+    // organizationPurgeService (multi-step cascade). Keep this guard for any
+    // remaining gateway callers so linked persons cannot orphan silently.
     const linkedPersonCount = await personRepository.countByOrganizationId(orgId);
     if (linkedPersonCount <= 0) return;
 
@@ -34,7 +37,7 @@ const deleteIntegrityService = {
       .join(', ');
     const more = linkedPersonCount > 3 ? ` and ${linkedPersonCount - 3} others` : '';
     const examples = names ? ` (e.g., ${names}${more})` : '';
-    throw new Error(`<b>Constraint Violation:</b><br>Cannot delete Organization (ID: ${orgId}).<br>There are <b>${linkedPersonCount}</b> persons linked to this organization${examples}.<br>Please remove these members or delete the persons first.`);
+    throw new Error(`<b>Constraint Violation:</b><br>Cannot delete Organization (ID: ${orgId}).<br>There are <b>${linkedPersonCount}</b> persons linked to this organization${examples}.<br>Use the Organizations purge wizard to review and delete related data.`);
   }
 };
 

@@ -2,6 +2,7 @@
 //const organizationModel = require('../models/organizationModel');
 const dataService = require('../services/dataService'); 
 const organizationNameSnapshotService = require('../services/organizationNameSnapshotService');
+const organizationPurgeService = require('../services/organizationPurgeService');
 const { buildDataServiceQuery, isAjax } = require('../utils/generalTools');
 const { idsEqual } = require('../utils/idAdapter');
 const {
@@ -216,6 +217,7 @@ async function listOrganizations(req, res) {
       includeModal_Table: true,
       includeModal_FileImport: true,
       print: true,
+      pageScript: 'organizationPurge.js',
       searchableFields: ORGANIZATION_SEARCHABLE_FIELDS,
       pagination,
       filters: req.query,
@@ -367,23 +369,46 @@ async function editOrganization(req, res) {
 }
 
 async function deleteOrganization(req, res) {
-  try {
-    //await organizationModel.deleteOrganization(req.params.id);
-    const deletedObj = await dataService.deleteData('organizations', req.params.id, req.user);
+  const message = 'Use the organization purge wizard on the Organizations list. Direct delete is disabled to prevent orphaned org data.';
+  if (req.headers['x-ajax-request'] || isAjax(req)) {
+    return res.status(409).json({
+      status: 'error',
+      code: 'USE_PURGE_FLOW',
+      message
+    });
+  }
+  return res.status(409).render('error', {
+    title: 'Use Purge Wizard',
+    message,
+    user: req.user || null
+  });
+}
 
-    if (req.headers['x-ajax-request']) {
-      return res.json({ status: 'success', message: 'Organization deleted successfully.' });
-    }
-    res.redirect('/organizations');
+async function getOrganizationPurgePlan(req, res) {
+  try {
+    const plan = await organizationPurgeService.buildOrganizationPurgePlan(req.params.id, req.user);
+    return res.json({ status: 'success', plan });
   } catch (error) {
-    if (req.headers['x-ajax-request']) {
-      return res.status(500).json({ status: 'error', message: error.message });
-    }
-    res.status(500).render('error', {
-      title: 'Error',
-      error,
-      message: error.message,
-      user: req.user || null
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+}
+
+async function purgeOrganization(req, res) {
+  try {
+    const confirmName = String(req.body?.confirmName || req.body?.confirm || '').trim();
+    const result = await organizationPurgeService.executeOrganizationPurge(
+      req.params.id,
+      req.user,
+      { confirmName }
+    );
+    const httpStatus = result.status === 'success' ? 200 : (result.status === 'partial' ? 207 : 500);
+    return res.status(httpStatus).json(result);
+  } catch (error) {
+    const status = error?.code === 'CONFIRM_MISMATCH' ? 400 : 500;
+    return res.status(status).json({
+      status: 'error',
+      code: error?.code || 'PURGE_FAILED',
+      message: error.message
     });
   }
 }
@@ -394,5 +419,7 @@ module.exports = {
   addOrganization,
   showEditOrganizationForm,
   editOrganization,
-  deleteOrganization
+  deleteOrganization,
+  getOrganizationPurgePlan,
+  purgeOrganization
 };

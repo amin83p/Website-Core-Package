@@ -52,12 +52,28 @@ router.post('/edit/:id',
     ctrl.editOrganization
 );
 
-// Delete
+// Delete (legacy — blocked; use purge wizard)
 router.get('/delete/:id', 
     requireAuth, 
     requireAccess(SECTIONS.ORGANIZATIONS, OPERATIONS.DELETE), 
     trackActionState(SECTIONS.ORGANIZATIONS, OPERATIONS.DELETE), 
     ctrl.deleteOrganization
+);
+
+// Cascade purge plan + execute
+router.get('/:id/purge-plan',
+    requireAuth,
+    requireAccess(SECTIONS.ORGANIZATIONS, OPERATIONS.DELETE),
+    trackActionState(SECTIONS.ORGANIZATIONS, OPERATIONS.DELETE),
+    ctrl.getOrganizationPurgePlan
+);
+
+router.post('/:id/purge',
+    requireAuth,
+    requireAccess(SECTIONS.ORGANIZATIONS, OPERATIONS.DELETE),
+    trackActionState(SECTIONS.ORGANIZATIONS, OPERATIONS.DELETE),
+    adminApproval,
+    ctrl.purgeOrganization
 );
 
 // Export
