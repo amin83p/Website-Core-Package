@@ -12,11 +12,23 @@
     : {};
   
   const isLocked = String(instance?.status || '').toLowerCase() === 'locked';
+  const isSubmitted = String(instance?.status || '').toLowerCase() === 'submitted';
   const canUnlockReportInstanceSafe = Boolean(typeof canUnlockReportInstance !== 'undefined' && canUnlockReportInstance);
+  const canReopenReportInstanceSafe = Boolean(typeof canReopenReportInstanceToDraft !== 'undefined' && canReopenReportInstanceToDraft);
+  const canEditAnswersSafe = typeof canEditReportInstanceAnswers !== 'undefined'
+    ? Boolean(canEditReportInstanceAnswers)
+    : !isLocked;
+  const isReadOnly = !canEditAnswersSafe;
   const lifecycleMode = String(classData?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
   const parsedCycleNo = Number.parseInt(String(classData?.cycleNo || '').trim(), 10);
   const lifecycleCycleNo = Number.isFinite(parsedCycleNo) && parsedCycleNo > 0 ? parsedCycleNo : 1;
   const instStatus = String(instance?.status || '').toLowerCase() || 'draft';
+  const statusBadgeLabel = instStatus === 'submitted'
+    ? 'Submitted (awaiting review)'
+    : (instance.status || '-');
+  const statusBadgeClass = instStatus === 'locked'
+    ? 'bg-dark'
+    : (instStatus === 'submitted' ? 'bg-success' : 'bg-secondary');
   const rptStart = String(assignment?.reportStartDate || '').trim();
   const rptDue = String(assignment?.reportDueDate || '').trim();
   const tsReflect = assignment?.timesheetReflection === true;
@@ -159,7 +171,7 @@
         <% if (!isV2) { %>
           <a href="/school/reports/instances/export/<%= instance.id %>?download=1" class="btn btn-outline-dark btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
         <% } %>
-        <% if (!isLocked) { %>
+        <% if (!isReadOnly) { %>
           <button type="button" class="btn btn-outline-primary btn-sm" id="btnReviewPrefillUpdates"><i class="bi bi-arrow-repeat me-1"></i>Preview Prefill Updates</button>
         <% } %>
         <button type="button" class="btn btn-warning btn-md btn-filled ms-auto" id="btnCloseReportInstance"><i class="bi bi-x-lg me-1"></i>Close</button>
@@ -180,7 +192,7 @@
               <div class="card border h-100">
                 <div class="card-body">
                   <div class="small text-muted text-uppercase">Status</div>
-                  <div class="mt-1"><span class="badge <%= instStatus === 'locked' ? 'bg-dark' : (instStatus === 'submitted' ? 'bg-success' : 'bg-secondary') %>"><%= instance.status || '-' %></span></div>
+                  <div class="mt-1"><span class="badge <%= statusBadgeClass %>"><%= statusBadgeLabel %></span></div>
                 </div>
               </div>
             </div>
@@ -236,7 +248,7 @@
           <div class="row g-3">
             <div class="col-md-3">
               <div class="small text-muted">Status</div>
-              <span class="badge <%= instStatus === 'locked' ? 'bg-dark' : (instStatus === 'submitted' ? 'bg-success' : 'bg-secondary') %>"><%= instance.status || '-' %></span>
+              <span class="badge <%= statusBadgeClass %>"><%= statusBadgeLabel %></span>
             </div>
             <div class="col-md-3">
               <div class="small text-muted">Teacher</div>
@@ -445,25 +457,25 @@
                                   <input type="text" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= displaySelectSt %>" readonly>
                                 <% } %>
                               <% } else if (field.type === 'textarea') { %>
-                                <textarea class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" rows="4" <%= isLocked ? 'disabled' : '' %>><%= value %></textarea>
+                                <textarea class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" rows="4" <%= isReadOnly ? 'disabled' : '' %>><%= value %></textarea>
                               <% } else if (field.type === 'number') { %>
-                                <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isLocked ? 'disabled' : '' %>>
+                                <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
                               <% } else if (field.type === 'date') { %>
-                                <input type="date" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isLocked ? 'disabled' : '' %>>
+                                <input type="date" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
                               <% } else if (field.type === 'checkbox') { %>
                                 <div class="form-check border rounded p-2">
-                                  <input type="checkbox" class="form-check-input js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= isLocked ? 'disabled' : '' %>>
+                                  <input type="checkbox" class="form-check-input js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= isReadOnly ? 'disabled' : '' %>>
                                   <label class="form-check-label">Checked</label>
                                 </div>
                               <% } else if (field.type === 'select') { %>
-                                <select class="form-select js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= isLocked ? 'disabled' : '' %>>
+                                <select class="form-select js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= isReadOnly ? 'disabled' : '' %>>
                                   <option value="">Select...</option>
                                   <% (field.options || []).forEach((opt) => { %>
                                     <option value="<%= opt.value %>" <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label || opt.value %></option>
                                   <% }); %>
                                 </select>
                               <% } else { %>
-                                <input type="text" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isLocked ? 'disabled' : '' %>>
+                                <input type="text" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
                               <% } %>
 
                               <div class="small mt-1 js-field-validation" data-field-validation-for="<%= field.id %>">
@@ -561,25 +573,25 @@
                               <input type="text" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= displaySelectSt %>" readonly>
                             <% } %>
                           <% } else if (field.type === 'textarea') { %>
-                            <textarea class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" rows="4" <%= isLocked ? 'disabled' : '' %>><%= value %></textarea>
+                            <textarea class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" rows="4" <%= isReadOnly ? 'disabled' : '' %>><%= value %></textarea>
                           <% } else if (field.type === 'number') { %>
-                            <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isLocked ? 'disabled' : '' %>>
+                            <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
                           <% } else if (field.type === 'date') { %>
-                            <input type="date" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isLocked ? 'disabled' : '' %>>
+                            <input type="date" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
                           <% } else if (field.type === 'checkbox') { %>
                             <div class="form-check border rounded p-2">
-                              <input type="checkbox" class="form-check-input js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= isLocked ? 'disabled' : '' %>>
+                              <input type="checkbox" class="form-check-input js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= isReadOnly ? 'disabled' : '' %>>
                               <label class="form-check-label">Checked</label>
                             </div>
                           <% } else if (field.type === 'select') { %>
-                            <select class="form-select js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= isLocked ? 'disabled' : '' %>>
+                            <select class="form-select js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= isReadOnly ? 'disabled' : '' %>>
                               <option value="">Select...</option>
                               <% (field.options || []).forEach((opt) => { %>
                                 <option value="<%= opt.value %>" <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label || opt.value %></option>
                               <% }); %>
                             </select>
                           <% } else { %>
-                            <input type="text" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isLocked ? 'disabled' : '' %>>
+                            <input type="text" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
                           <% } %>
                           <div class="small mt-1 js-field-validation" data-field-validation-for="<%= field.id %>">
                             <% serverFieldIssues.slice(0, 2).forEach((issue) => { %>
@@ -606,18 +618,84 @@
     <div class="card border-0 shadow-sm">
       <div class="card-body py-2">
         <div class="d-flex flex-wrap align-items-center gap-2">
+          <% const saveDraftDisabled = isSubmitted || isLocked || isReadOnly; %>
+          <% const submitDisabled = isLocked || isReadOnly; %>
+          <% const lockDisabled = isLocked || isReadOnly; %>
+          <button
+            class="btn btn-primary btn-sm"
+            type="submit"
+            name="submitAction"
+            value="save"
+            <%= saveDraftDisabled ? 'disabled' : '' %>
+            title="<%= isSubmitted ? 'Submitted reports cannot be saved as draft. Reopen for teacher first, or use Submit / Lock.' : (isLocked ? 'Locked reports cannot be saved.' : 'Save as draft') %>"
+          ><i class="bi bi-save me-1"></i>Save Draft</button>
+          <button
+            class="btn btn-success btn-sm"
+            type="submit"
+            name="submitAction"
+            value="submit"
+            <%= submitDisabled ? 'disabled' : '' %>
+            title="<%= isLocked ? 'Locked reports cannot be submitted.' : (isReadOnly ? 'This report is read-only until an administrator reopens it.' : 'Submit report') %>"
+          ><i class="bi bi-send-check me-1"></i>Submit Report</button>
           <% if (!isLocked) { %>
-            <button class="btn btn-primary btn-sm" type="submit" name="submitAction" value="save"><i class="bi bi-save me-1"></i>Save Draft</button>
-            <button class="btn btn-success btn-sm" type="submit" name="submitAction" value="submit"><i class="bi bi-send-check me-1"></i>Submit Report</button>
-            <button class="btn btn-outline-dark btn-sm" formaction="/school/reports/instances/lock/<%= instance.id %>" type="submit"><i class="bi bi-lock me-1"></i>Lock Report</button>
-          <% } else if (canUnlockReportInstanceSafe) { %>
-            <form method="post" action="/school/reports/instances/unlock/<%= instance.id %>" class="d-inline js-unlock-report-instance-form" data-instance-id="<%= instance.id %>">
-              <button type="submit" class="btn btn-warning btn-sm"><i class="bi bi-unlock me-1"></i>Unlock Report</button>
-            </form>
-            <span class="badge bg-dark p-2 ms-1">Currently Locked</span>
-          <% } else { %>
-            <span class="badge bg-dark p-2">Locked Report</span>
+            <button
+              class="btn btn-outline-dark btn-sm"
+              formaction="/school/reports/instances/lock/<%= instance.id %>"
+              type="submit"
+              <%= lockDisabled ? 'disabled' : '' %>
+              title="<%= lockDisabled ? 'You cannot lock this report in its current state.' : 'Lock report' %>"
+            ><i class="bi bi-lock me-1"></i>Lock Report</button>
           <% } %>
+
+          <div class="d-flex flex-wrap align-items-center gap-2 ms-3 ms-md-4 ps-3 border-start">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span class="badge <%= isSubmitted ? 'bg-success' : 'bg-secondary-subtle text-secondary border' %> p-2">
+                <%= isSubmitted ? 'Submitted (awaiting review)' : 'Submitted' %>
+              </span>
+              <% if (canReopenReportInstanceSafe) { %>
+                <% if (isSubmitted) { %>
+                  <button
+                    type="button"
+                    class="btn btn-outline-warning btn-sm js-reopen-report-instance"
+                    data-instance-id="<%= instance.id %>"
+                    title="Return this report to draft so the teacher can edit it"
+                  >
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reopen for teacher
+                  </button>
+                <% } else { %>
+                  <button type="button" class="btn btn-outline-warning btn-sm" disabled title="Available when the report is submitted">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reopen for teacher
+                  </button>
+                <% } %>
+              <% } else if (isSubmitted && isReadOnly) { %>
+                <span class="small text-muted">Ask an administrator to reopen for edits.</span>
+              <% } %>
+            </div>
+
+            <div class="mx-2 mx-md-4 text-muted user-select-none" aria-hidden="true">&middot;</div>
+
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span class="badge <%= isLocked ? 'bg-dark' : 'bg-secondary-subtle text-secondary border' %> p-2">Locked</span>
+              <% if (canUnlockReportInstanceSafe) { %>
+                <% if (isLocked) { %>
+                  <button
+                    type="button"
+                    class="btn btn-warning btn-sm js-unlock-report-instance"
+                    data-instance-id="<%= instance.id %>"
+                    title="Unlock returns the report to submitted"
+                  >
+                    <i class="bi bi-unlock me-1"></i>Unlock Report
+                  </button>
+                <% } else { %>
+                  <button type="button" class="btn btn-warning btn-sm" disabled title="Available when the report is locked (super user)">
+                    <i class="bi bi-unlock me-1"></i>Unlock Report
+                  </button>
+                <% } %>
+              <% } else if (isLocked) { %>
+                <span class="small text-muted">Only a super user can unlock.</span>
+              <% } %>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -735,6 +813,7 @@
 </div>
 
 <%- include('partials/calculatedFieldsRuntime') %>
+<script src="/scripts/reportAssignmentDelete.js"></script>
 <script>
   (function () {
     const btnClose = document.getElementById('btnCloseReportInstance');
@@ -1825,22 +1904,64 @@
     bindReportReviewNavigatorLinks();
     bindPrefillRefreshControls();
 
-    document.querySelectorAll('.js-unlock-report-instance-form').forEach(function (form) {
-      form.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        const confirmed = typeof showMessageModal === 'function'
-          ? (await showMessageModal({
-            title: 'Unlock Report',
-            icon: 'warning',
-            message: 'Unlock this report? It will become editable again.',
-            buttons: [
-              { text: 'Cancel', class: 'btn-secondary btn-sm' },
-              { text: 'Unlock', class: 'btn-warning btn-sm' }
-            ]
-          })) === 'Unlock'
-          : window.confirm('Unlock this report? It will become editable again.');
-        if (!confirmed) return;
-        form.submit();
+    async function postReportLifecycleAction(kind, instanceId) {
+      const id = String(instanceId || '').trim();
+      if (!id) return;
+      const api = window.ReportAssignmentDelete;
+      if (!api || typeof api.reopenReportInstance !== 'function' || typeof api.unlockReportInstance !== 'function') {
+        window.alert('Unable to process this action. Please hard-refresh the page (Ctrl+F5) and try again.');
+        return;
+      }
+      const actionStateId = String(
+        document.getElementById('reportInstanceActionStateId')?.value
+        || formEl?.querySelector('input[name="actionStateId"]')?.value
+        || ''
+      ).trim();
+      const confirmFn = kind === 'reopen'
+        ? (typeof api.confirmReopen === 'function'
+          ? (msg) => api.confirmReopen(msg)
+          : async (msg) => window.confirm(String(msg || '')))
+        : (typeof api.confirmUnlock === 'function'
+          ? (msg) => api.confirmUnlock(msg)
+          : async (msg) => window.confirm(String(msg || '')));
+      try {
+        if (kind === 'reopen') {
+          const confirmed = await confirmFn(
+            'Reopen this report as draft so the teacher can edit it?'
+          );
+          if (!confirmed) return;
+          await api.withLoading('Reopening report...', function () {
+            return api.reopenReportInstance(id, { actionStateId });
+          });
+        } else {
+          const confirmed = await confirmFn(
+            'Unlock this report? Status will return to submitted.'
+          );
+          if (!confirmed) return;
+          await api.withLoading('Unlocking report...', function () {
+            return api.unlockReportInstance(id, { actionStateId });
+          });
+        }
+        window.location.reload();
+      } catch (error) {
+        if (typeof api.showError === 'function') {
+          api.showError(error?.message || (kind === 'reopen'
+            ? 'Unable to reopen report.'
+            : 'Unable to unlock report.'));
+        } else {
+          window.alert(error?.message || 'Unable to process this action.');
+        }
+      }
+    }
+
+    document.querySelectorAll('.js-reopen-report-instance').forEach(function (button) {
+      button.addEventListener('click', function () {
+        postReportLifecycleAction('reopen', button.getAttribute('data-instance-id'));
+      });
+    });
+    document.querySelectorAll('.js-unlock-report-instance').forEach(function (button) {
+      button.addEventListener('click', function () {
+        postReportLifecycleAction('unlock', button.getAttribute('data-instance-id'));
       });
     });
   })();

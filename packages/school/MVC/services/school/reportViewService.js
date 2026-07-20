@@ -4,6 +4,7 @@ const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const accessService = requireCoreModule('MVC/services/security');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
@@ -18,14 +19,57 @@ function isSchoolReportAdminViewer(reqUser) {
   });
 }
 
-async function canUnlockReportInstance(reqUser) {
+/**
+ * Admins who may edit submitted reports and reopen them to draft for teachers.
+ */
+async function isReportInstanceAdminEditor(reqUser) {
   if (adminChekersService.isSuperAdmin(reqUser)) return true;
-  return adminChekersService.isAdminForRequestAsync(
+  const assignmentAdmin = await adminChekersService.isAdminForRequestAsync(
     reqUser,
     SECTIONS.SCHOOL_REPORTS_ASSIGNMENT,
     OPERATIONS.UPDATE,
     { section: { id: SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, category: 'SCHOOL' } }
   );
+  if (assignmentAdmin) return true;
+  return adminChekersService.isAdminForRequestAsync(
+    reqUser,
+    SECTIONS.SCHOOL_REPORTS_INSTANCES,
+    OPERATIONS.UPDATE,
+    { section: { id: SECTIONS.SCHOOL_REPORTS_INSTANCES, category: 'SCHOOL' } }
+  );
+}
+
+/**
+ * Status-based editability (caller still enforces route/access).
+ * locked → nobody; submitted → admin editors only; draft → allowed.
+ */
+async function canEditReportInstanceAnswers(instance, reqUser) {
+  const status = String(instance?.status || '').trim().toLowerCase();
+  if (status === 'locked') return false;
+  if (status === 'submitted') {
+    return isReportInstanceAdminEditor(reqUser);
+  }
+  return true;
+}
+
+/** Super users only: unlock locked reports back to submitted. */
+async function canUnlockReportInstance(reqUser) {
+  return adminChekersService.isSuperAdmin(reqUser);
+}
+
+/** Admins may reopen submitted reports to draft for teachers. */
+async function canReopenReportInstanceToDraft(reqUser) {
+  return isReportInstanceAdminEditor(reqUser);
+}
+
+async function canExportReportInstance(reqUser) {
+  if (adminChekersService.isSuperAdmin(reqUser)) return true;
+  const evaluation = await accessService.evaluateAccess({
+    user: reqUser,
+    sectionId: SECTIONS.SCHOOL_REPORTS_INSTANCES,
+    operationId: OPERATIONS.EXPORT
+  }).catch(() => null);
+  return Boolean(evaluation?.allowed);
 }
 
 function parseJsonSafe(v, fallback) {
@@ -1660,5 +1704,9 @@ module.exports = {
   mapAssignmentDeletePreviewInstances,
   partitionAssignmentDeleteBlockers,
   resolveInstanceNextStatus,
-  canUnlockReportInstance
+  isReportInstanceAdminEditor,
+  canEditReportInstanceAnswers,
+  canUnlockReportInstance,
+  canReopenReportInstanceToDraft,
+  canExportReportInstance
 };

@@ -92,6 +92,21 @@
     });
   }
 
+  async function reopenReportInstance(instanceId, options = {}) {
+    const id = String(instanceId || '').trim();
+    if (!id) throw new Error('Report instance is required.');
+    let actionStateId = String(options.actionStateId || '').trim();
+    if (!actionStateId && typeof document !== 'undefined') {
+      const input = document.getElementById('hid_actionStateId')
+        || document.getElementById('reportInstanceActionStateId');
+      actionStateId = String(input?.value || '').trim();
+    }
+    return fetchJson(`/school/reports/instances/reopen/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      actionStateId: actionStateId || undefined
+    });
+  }
+
   function renderBlockersList(blockers) {
     const rows = Array.isArray(blockers) ? blockers : [];
     if (!rows.length) return '';
@@ -183,6 +198,23 @@
     return global.confirm(String(message || ''));
   }
 
+  async function confirmReopen(message, title = 'Reopen Report') {
+    if (typeof global.showMessageModal === 'function') {
+      const result = await global.showMessageModal({
+        title,
+        icon: 'warning',
+        message: String(message || ''),
+        size: 'md',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+          { text: 'Reopen', class: 'btn-warning btn-md' }
+        ]
+      });
+      return result === 'Reopen';
+    }
+    return global.confirm(String(message || ''));
+  }
+
   async function showError(message, title = 'Error') {
     const plain = stripHtml(message) || 'Something went wrong.';
     if (typeof global.showMessageModal === 'function') {
@@ -203,12 +235,14 @@
     fetchJson,
     deleteReportInstance,
     unlockReportInstance,
+    reopenReportInstance,
     fetchAssignmentDeletePreview,
     deleteReportAssignment,
     renderBlockersList,
     renderInstancesTable,
     confirmDelete,
     confirmUnlock,
+    confirmReopen,
     showError
   };
 }(window));

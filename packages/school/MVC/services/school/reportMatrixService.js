@@ -2,6 +2,8 @@ const schoolDataService = require('./schoolDataService');
 const reportService = require('./reportService');
 const reportIntegrityService = require('./reportIntegrityService');
 const reportInstanceSaveService = require('./reportInstanceSaveService');
+const sessionConductService = require('./sessionConductService');
+const reportViewService = require('./reportViewService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getPrefillValue } = require('./reportPrefillKeyUtils');
@@ -168,7 +170,15 @@ async function resolveMatrixBase({ assignmentId, assignmentRowId = '', teacherId
   return resolved;
 }
 
-async function buildStudentMatrixRow({ assignment, template, teacherId, studentId, instance, reqUser } = {}) {
+async function buildStudentMatrixRow({
+  assignment,
+  template,
+  teacherId,
+  studentId,
+  instance,
+  reqUser,
+  treatSubmittedAsLocked = false
+} = {}) {
   let effectiveInstance = instance;
   if (!effectiveInstance) {
     const prefillSnapshot = await reportService.buildPrefillSnapshot({
@@ -221,7 +231,7 @@ async function buildStudentMatrixRow({ assignment, template, teacherId, studentI
     instanceId: instanceId || '',
     isPending: !instanceId,
     status,
-    locked: status === 'locked',
+    locked: status === 'locked' || (status === 'submitted' && treatSubmittedAsLocked),
     answers: renderedAnswers,
     calculationPrefill: buildCalculationPrefill(template, prefill),
     editHref: instanceId ? `/school/reports/instances/edit-v2/${encodeURIComponent(instanceId)}` : ''
@@ -323,6 +333,13 @@ function buildProgress(rows = []) {
 async function buildMatrixContext({ assignmentId, assignmentRowId = '', teacherId = '', reqUser } = {}) {
   const resolved = await resolveMatrixBase({ assignmentId, assignmentRowId, teacherId, reqUser });
   const { assignment, assignmentRow, template, classData, teacherId: resolvedTeacherId, targetStudentIds } = resolved;
+  await sessionConductService.assertAssignmentSessionConductReadyOrThrow({
+    assignment,
+    reqUser,
+    schoolDataService
+  });
+  const isAdminEditor = await reportViewService.isReportInstanceAdminEditor(reqUser);
+  const treatSubmittedAsLocked = !isAdminEditor;
   const instances = await schoolDataService.fetchData('reportInstances', {
     assignmentId__eq: assignment.id,
     page: 1,
@@ -339,7 +356,8 @@ async function buildMatrixContext({ assignmentId, assignmentRowId = '', teacherI
       teacherId: resolvedTeacherId,
       studentId
     }),
-    reqUser
+    reqUser,
+    treatSubmittedAsLocked
   })));
   rows.sort((a, b) => a.studentName.localeCompare(b.studentName) || a.studentId.localeCompare(b.studentId));
   const fieldGroups = classifyMatrixFields(template, rows, assignment);
@@ -390,6 +408,11 @@ async function saveMatrixRow({
 } = {}) {
   const resolved = await resolveMatrixBase({ assignmentId, assignmentRowId, teacherId, studentId, reqUser });
   const { assignment, assignmentRow, template, teacherId: resolvedTeacherId } = resolved;
+  await sessionConductService.assertAssignmentSessionConductReadyOrThrow({
+    assignment,
+    reqUser,
+    schoolDataService
+  });
   const resolvedStudentId = studentId && resolved.targetStudentIds.some((targetId) => idsEqual(targetId, studentId))
     ? studentId
     : resolved.targetStudentIds[0];
@@ -405,8 +428,20 @@ async function saveMatrixRow({
     studentId: resolvedStudentId
   });
 
-  if (instance && clean(instance.status).toLowerCase() === 'locked') {
-    throw new Error('Locked report instances cannot be changed.');
+  if (instance) {
+    const allowed = await reportViewService.canEditReportInstanceAnswers(instance, reqUser);
+    if (!allowed) {
+      const status = clean(instance.status).toLowerCase();
+      if (status === 'locked') {
+        throw new Error('Locked report instances cannot be changed.');
+      }
+      if (status === 'submitted') {
+        throw new Error(
+          'Submitted report instances can only be edited by an administrator. Ask an admin to reopen as draft.'
+        );
+      }
+      throw new Error('This report instance cannot be changed.');
+    }
   }
 
   if (!instance) {
@@ -499,9 +534,20 @@ async function saveMatrixRows({
       teacherId: resolvedTeacherId,
       studentId
     });
-    if (instance && clean(instance.status).toLowerCase() === 'locked') {
-      results.push({ studentId, status: 'skipped', reportStatus: 'locked', message: 'Locked report instance was skipped.' });
-      continue;
+    if (instance) {
+      const canEdit = await reportViewService.canEditReportInstanceAnswers(instance, reqUser);
+      if (!canEdit) {
+        const reportStatus = clean(instance.status).toLowerCase() || 'unknown';
+        results.push({
+          studentId,
+          status: 'skipped',
+          reportStatus,
+          message: reportStatus === 'submitted'
+            ? 'Submitted report instance was skipped (admin reopen required).'
+            : 'Locked report instance was skipped.'
+        });
+        continue;
+      }
     }
     try {
       const saved = await saveMatrixRow({

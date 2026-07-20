@@ -788,8 +788,27 @@ const reportIntegrityService = {
 
   async getEditableInstanceOrThrow(instanceId, reqUser) {
     const instance = await this.getAccessibleInstanceOrThrow(instanceId, reqUser);
-    if (String(instance.status || '') === 'locked') {
-      throw new Error('This report is locked and cannot be edited.');
+    const reportViewService = require('./reportViewService');
+    const allowed = await reportViewService.canEditReportInstanceAnswers(instance, reqUser);
+    if (!allowed) {
+      const status = String(instance.status || '').trim().toLowerCase();
+      if (status === 'locked') {
+        const err = new Error('This report is locked and cannot be edited.');
+        err.code = 'REPORT_INSTANCE_LOCKED';
+        err.statusCode = 403;
+        throw err;
+      }
+      if (status === 'submitted') {
+        const err = new Error(
+          'This report is submitted and can only be edited by an administrator. Ask an admin to reopen it as draft.'
+        );
+        err.code = 'REPORT_INSTANCE_SUBMITTED_READONLY';
+        err.statusCode = 403;
+        throw err;
+      }
+      const err = new Error('This report cannot be edited.');
+      err.statusCode = 403;
+      throw err;
     }
     return instance;
   },
@@ -805,15 +824,22 @@ const reportIntegrityService = {
     return { allowed: true, reason: '' };
   },
 
-  resolveInstanceUnlockTargetStatus(instance) {
-    const submittedAt = String(instance?.audit?.submittedAt || '').trim();
-    return submittedAt ? 'submitted' : 'draft';
+  resolveInstanceUnlockTargetStatus(_instance) {
+    return 'submitted';
   },
 
   async assertInstanceUnlockable(instanceId, reqUser) {
     const instance = await this.getAccessibleInstanceOrThrow(instanceId, reqUser);
     if (String(instance.status || '').trim().toLowerCase() !== 'locked') {
       throw new Error('Only locked report instances can be unlocked.');
+    }
+    return instance;
+  },
+
+  async assertInstanceReopenable(instanceId, reqUser) {
+    const instance = await this.getAccessibleInstanceOrThrow(instanceId, reqUser);
+    if (String(instance.status || '').trim().toLowerCase() !== 'submitted') {
+      throw new Error('Only submitted report instances can be reopened to draft.');
     }
     return instance;
   },

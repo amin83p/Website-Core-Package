@@ -9,12 +9,28 @@
     ? matrix.sharedGroups
     : (fallbackSharedFields.length ? [{ id: 'shared-default', label: 'Shared fields', fields: fallbackSharedFields }] : []);
   const hasEditableRows = rows.some((row) => !row.locked);
+  const canUnlockReportInstanceSafe = Boolean(typeof canUnlockReportInstance !== 'undefined' && canUnlockReportInstance);
+  const canReopenReportInstanceSafe = Boolean(typeof canReopenReportInstanceToDraft !== 'undefined' && canReopenReportInstanceToDraft);
+  const startedRows = rows.filter((row) => row.instanceId && !row.isPending);
+  const uniformStatus = (() => {
+    if (!startedRows.length) return '';
+    const first = String(startedRows[0].status || '').toLowerCase();
+    if (!first) return '';
+    return startedRows.every((row) => String(row.status || '').toLowerCase() === first) ? first : '';
+  })();
+  const showBulkReopen = canReopenReportInstanceSafe && uniformStatus === 'submitted' && startedRows.length > 0;
+  const showBulkUnlock = canUnlockReportInstanceSafe && uniformStatus === 'locked' && startedRows.length > 0;
   const statusBadgeClass = (status) => {
     const token = String(status || '').toLowerCase();
     if (token === 'submitted') return 'bg-success';
     if (token === 'locked') return 'bg-dark';
     if (token === 'draft') return 'bg-warning text-dark';
     return 'bg-info-subtle text-info-emphasis border';
+  };
+  const statusBadgeLabel = (status) => {
+    const token = String(status || '').toLowerCase();
+    if (token === 'submitted') return 'Submitted (awaiting review)';
+    return status || '-';
   };
 %>
 <style>
@@ -72,8 +88,8 @@
         <% } %>
         <a href="/school/reports/instances" class="btn btn-outline-primary btn-sm"><i class="bi bi-list-check me-1"></i>Instances</a>
         <button type="button" class="btn btn-outline-warning btn-sm" id="btnMatrixPrefillPreview"><i class="bi bi-arrow-repeat me-1"></i>Preview Prefill Updates</button>
-        <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=docx" class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</a>
-        <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=json&download=1" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
+        <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=docx" class="btn btn-outline-secondary btn-sm js-export-report-instance"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</a>
+        <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=json&download=1" class="btn btn-outline-secondary btn-sm js-export-report-instance"><i class="bi bi-download me-1"></i>Export Payload</a>
       </div>
     </div>
   </div>
@@ -147,12 +163,18 @@
         </thead>
         <tbody>
           <% rows.forEach((row) => { %>
-            <tr data-student-id="<%= row.studentId %>" class="<%= row.locked ? 'table-secondary' : '' %>">
+            <tr data-student-id="<%= row.studentId %>" data-instance-id="<%= row.instanceId || '' %>" data-report-status="<%= row.status || '' %>" class="<%= row.locked ? 'table-secondary' : '' %>">
               <td class="matrix-student-col ps-3">
                 <div class="fw-bold matrix-student-name"><%= row.studentName %></div>
                 <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
-                  <span class="badge text-capitalize js-matrix-status <%= statusBadgeClass(row.status) %>"><%= row.status %></span>
+                  <span class="badge text-capitalize js-matrix-status <%= statusBadgeClass(row.status) %>"><%= statusBadgeLabel(row.status) %></span>
                   <a href="<%= row.editHref || '#' %>" class="btn btn-sm btn-outline-secondary js-matrix-open <%= row.editHref ? '' : 'd-none' %>" target="_blank" rel="noopener noreferrer" title="Open individual report"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>
+                  <% if (row.instanceId && String(row.status || '').toLowerCase() === 'submitted' && canReopenReportInstanceSafe) { %>
+                    <button type="button" class="btn btn-sm btn-outline-warning js-matrix-reopen-instance" data-instance-id="<%= row.instanceId %>" data-student-name="<%= row.studentName %>" title="Reopen as draft for the teacher"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>
+                  <% } %>
+                  <% if (row.instanceId && String(row.status || '').toLowerCase() === 'locked' && canUnlockReportInstanceSafe) { %>
+                    <button type="button" class="btn btn-sm btn-warning js-matrix-unlock-instance" data-instance-id="<%= row.instanceId %>" data-student-name="<%= row.studentName %>" title="Unlock returns the report to submitted"><i class="bi bi-unlock me-1"></i>Unlock</button>
+                  <% } %>
                 </div>
               </td>
               <% tableFields.forEach((field) => { %>
@@ -190,6 +212,15 @@
         <button type="button" class="btn btn-primary btn-sm js-matrix-bulk-action" data-action="save" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-save me-1"></i>Save All Drafts</button>
         <button type="button" class="btn btn-success btn-sm js-matrix-bulk-action" data-action="submit" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-send-check me-1"></i>Submit All Reports</button>
         <button type="button" class="btn btn-outline-dark btn-sm js-matrix-bulk-action" data-action="lock" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-lock me-1"></i>Lock All Reports</button>
+        <% if (showBulkReopen || showBulkUnlock) { %>
+          <span id="matrixLifecycleDivider" class="mx-1 text-muted d-none d-md-inline">|</span>
+        <% } %>
+        <% if (showBulkReopen) { %>
+          <button type="button" class="btn btn-outline-warning btn-sm" id="btnMatrixReopenAll" title="Reopen every submitted report in this matrix to draft"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen All for Teachers</button>
+        <% } %>
+        <% if (showBulkUnlock) { %>
+          <button type="button" class="btn btn-warning btn-sm" id="btnMatrixUnlockAll" title="Unlock every locked report in this matrix back to submitted"><i class="bi bi-unlock me-1"></i>Unlock All Reports</button>
+        <% } %>
       </div>
     </div>
   </div>
@@ -204,12 +235,16 @@
 </div>
 
 <%- include('partials/calculatedFieldsRuntime') %>
+<script src="/scripts/reportAssignmentDelete.js"></script>
 <script>
   (function () {
     const dataEl = document.getElementById('reportMatrixData');
     let matrixState = JSON.parse(dataEl?.textContent || '{}');
     const dirtyStudents = new Set();
     let sharedDirty = false;
+    window.CAN_EXPORT_REPORT_INSTANCE = <%- JSON.stringify(typeof canExportReportInstance !== 'undefined' && !!canExportReportInstance) %>;
+    window.CAN_REOPEN_REPORT_INSTANCE = <%- JSON.stringify(typeof canReopenReportInstanceToDraft !== 'undefined' && !!canReopenReportInstanceToDraft) %>;
+    window.CAN_UNLOCK_REPORT_INSTANCE = <%- JSON.stringify(typeof canUnlockReportInstance !== 'undefined' && !!canUnlockReportInstance) %>;
 
     function initializeTooltips() {
       if (typeof bootstrap === 'undefined' || !bootstrap?.Tooltip) return;
@@ -230,6 +265,19 @@
       window.alert(String(message || title || 'Fill Reports'));
       return Promise.resolve();
     }
+
+    document.addEventListener('click', function (event) {
+      const exportLink = event.target.closest('.js-export-report-instance');
+      if (!exportLink) return;
+      if (window.CAN_EXPORT_REPORT_INSTANCE) return;
+      event.preventDefault();
+      event.stopPropagation();
+      showReportMatrixMessage({
+        title: 'Access Denied',
+        icon: 'error',
+        message: 'You do not have permission to export report documents or payloads. Contact an administrator if you need Export access.'
+      });
+    });
 
     function readControl(control) {
       if (!control) return '';
@@ -300,6 +348,89 @@
       return 'badge text-capitalize js-matrix-status bg-info-subtle text-info-emphasis border';
     }
 
+    function badgeLabel(status) {
+      const token = String(status || '').toLowerCase();
+      if (token === 'submitted') return 'Submitted (awaiting review)';
+      return status || '-';
+    }
+
+    function syncRowLifecycleActions(row, rowState) {
+      if (!row) return;
+      row.querySelectorAll('.js-matrix-reopen-instance, .js-matrix-unlock-instance').forEach((el) => el.remove());
+      const instanceId = String(rowState?.instanceId || '').trim();
+      const status = String(rowState?.status || '').toLowerCase();
+      const studentName = String(rowState?.studentName || rowState?.studentId || '');
+      row.dataset.instanceId = instanceId;
+      row.dataset.reportStatus = status;
+      if (!instanceId) return;
+      const host = row.querySelector('.matrix-student-col .d-flex.flex-wrap');
+      if (!host) return;
+      if (status === 'submitted' && window.CAN_REOPEN_REPORT_INSTANCE) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-outline-warning js-matrix-reopen-instance';
+        btn.dataset.instanceId = instanceId;
+        btn.dataset.studentName = studentName;
+        btn.title = 'Reopen as draft for the teacher';
+        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise me-1"></i>Reopen';
+        host.appendChild(btn);
+      }
+      if (status === 'locked' && window.CAN_UNLOCK_REPORT_INSTANCE) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-warning js-matrix-unlock-instance';
+        btn.dataset.instanceId = instanceId;
+        btn.dataset.studentName = studentName;
+        btn.title = 'Unlock returns the report to submitted';
+        btn.innerHTML = '<i class="bi bi-unlock me-1"></i>Unlock';
+        host.appendChild(btn);
+      }
+    }
+
+    function syncBulkLifecycleActions() {
+      const started = (matrixState.rows || []).filter((row) => row.instanceId && !row.isPending);
+      const first = started.length ? String(started[0].status || '').toLowerCase() : '';
+      const uniform = first && started.every((row) => String(row.status || '').toLowerCase() === first) ? first : '';
+      const actions = document.getElementById('reportMatrixActions')?.querySelector('.d-flex');
+      if (!actions) return;
+      document.getElementById('btnMatrixReopenAll')?.remove();
+      document.getElementById('btnMatrixUnlockAll')?.remove();
+      document.getElementById('matrixLifecycleDivider')?.remove();
+      if (uniform === 'submitted' && window.CAN_REOPEN_REPORT_INSTANCE) {
+        const divider = document.createElement('span');
+        divider.id = 'matrixLifecycleDivider';
+        divider.className = 'mx-1 text-muted d-none d-md-inline';
+        divider.textContent = '|';
+        actions.appendChild(divider);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'btnMatrixReopenAll';
+        btn.className = 'btn btn-outline-warning btn-sm';
+        btn.title = 'Reopen every submitted report in this matrix to draft';
+        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise me-1"></i>Reopen All for Teachers';
+        btn.addEventListener('click', function () {
+          runMatrixLifecycleAction('reopen', collectMatrixLifecycleTargets('reopen'));
+        });
+        actions.appendChild(btn);
+      } else if (uniform === 'locked' && window.CAN_UNLOCK_REPORT_INSTANCE) {
+        const divider = document.createElement('span');
+        divider.id = 'matrixLifecycleDivider';
+        divider.className = 'mx-1 text-muted d-none d-md-inline';
+        divider.textContent = '|';
+        actions.appendChild(divider);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'btnMatrixUnlockAll';
+        btn.className = 'btn btn-warning btn-sm';
+        btn.title = 'Unlock every locked report in this matrix back to submitted';
+        btn.innerHTML = '<i class="bi bi-unlock me-1"></i>Unlock All Reports';
+        btn.addEventListener('click', function () {
+          runMatrixLifecycleAction('unlock', collectMatrixLifecycleTargets('unlock'));
+        });
+        actions.appendChild(btn);
+      }
+    }
+
     function applyMatrixState(nextMatrix, savedStudentId, options = {}) {
       const preserveStudentIds = options.preserveStudentIds instanceof Set ? options.preserveStudentIds : new Set();
       const preserveShared = options.preserveShared === true;
@@ -328,7 +459,7 @@
         const status = row.querySelector('.js-matrix-status');
         if (status) {
           status.className = badgeClass(rowState.status);
-          status.textContent = rowState.status;
+          status.textContent = badgeLabel(rowState.status);
         }
         const openLink = row.querySelector('.js-matrix-open');
         if (openLink && rowState.editHref) {
@@ -336,11 +467,13 @@
           openLink.classList.remove('d-none');
         }
         row.classList.toggle('table-secondary', Boolean(rowState.locked));
+        syncRowLifecycleActions(row, rowState);
       });
       Object.entries(nextMatrix.progress || {}).forEach(([key, value]) => {
         const target = document.querySelector(`[data-progress-key="${CSS.escape(key)}"]`);
         if (target) target.textContent = String(value);
       });
+      syncBulkLifecycleActions();
     }
 
     async function runBulkAction(button) {
@@ -508,6 +641,112 @@
     document.querySelectorAll('.js-matrix-bulk-action').forEach((button) => {
       button.addEventListener('click', () => runBulkAction(button));
     });
+
+    function matrixActionStateId() {
+      return String(document.getElementById('reportMatrixActionStateId')?.value || '').trim();
+    }
+
+    function collectMatrixLifecycleTargets(kind) {
+      const wantStatus = kind === 'reopen' ? 'submitted' : 'locked';
+      return (matrixState.rows || [])
+        .filter((row) => row.instanceId && !row.isPending && String(row.status || '').toLowerCase() === wantStatus)
+        .map((row) => ({
+          instanceId: String(row.instanceId),
+          studentName: String(row.studentName || row.studentId || row.instanceId)
+        }));
+    }
+
+    async function runMatrixLifecycleAction(kind, targets) {
+      const api = window.ReportAssignmentDelete;
+      if (!api || typeof api.reopenReportInstance !== 'function' || typeof api.unlockReportInstance !== 'function') {
+        await showReportMatrixMessage({
+          title: 'Unable to Process',
+          icon: 'error',
+          message: 'Lifecycle helpers are unavailable. Hard-refresh the page (Ctrl+F5) and try again.'
+        });
+        return;
+      }
+      const rows = Array.isArray(targets) ? targets.filter((row) => row?.instanceId) : [];
+      if (!rows.length) {
+        await showReportMatrixMessage({
+          title: kind === 'reopen' ? 'Nothing to Reopen' : 'Nothing to Unlock',
+          icon: 'info',
+          message: kind === 'reopen'
+            ? 'There are no submitted reports to reopen.'
+            : 'There are no locked reports to unlock.'
+        });
+        return;
+      }
+      const confirmFn = kind === 'reopen'
+        ? (typeof api.confirmReopen === 'function' ? (msg) => api.confirmReopen(msg) : async (msg) => window.confirm(String(msg || '')))
+        : (typeof api.confirmUnlock === 'function' ? (msg) => api.confirmUnlock(msg) : async (msg) => window.confirm(String(msg || '')));
+      const confirmMessage = kind === 'reopen'
+        ? (rows.length === 1
+          ? ('Reopen the report for ' + rows[0].studentName + ' as draft so the teacher can edit it?')
+          : ('Reopen all ' + rows.length + ' submitted reports as draft for teachers?'))
+        : (rows.length === 1
+          ? ('Unlock the report for ' + rows[0].studentName + '? Status will return to submitted.')
+          : ('Unlock all ' + rows.length + ' locked reports? Status will return to submitted.'));
+      const confirmed = await confirmFn(confirmMessage);
+      if (!confirmed) return;
+
+      const actionStateId = matrixActionStateId();
+      const failures = [];
+      await api.withLoading(kind === 'reopen' ? 'Reopening reports...' : 'Unlocking reports...', async function () {
+        for (const row of rows) {
+          try {
+            if (kind === 'reopen') {
+              await api.reopenReportInstance(row.instanceId, { actionStateId });
+            } else {
+              await api.unlockReportInstance(row.instanceId, { actionStateId });
+            }
+          } catch (error) {
+            failures.push((row.studentName || row.instanceId) + ': ' + (error?.message || 'failed'));
+          }
+        }
+      });
+
+      if (failures.length) {
+        await showReportMatrixMessage({
+          title: kind === 'reopen' ? 'Reopen Incomplete' : 'Unlock Incomplete',
+          icon: 'warning',
+          message: failures.slice(0, 5).join(' | ') + (failures.length > 5 ? (' | +' + (failures.length - 5) + ' more') : '')
+        });
+      }
+      window.location.reload();
+    }
+
+    document.addEventListener('click', function (event) {
+      const reopenBtn = event.target.closest('.js-matrix-reopen-instance');
+      if (reopenBtn) {
+        if (!window.CAN_REOPEN_REPORT_INSTANCE) return;
+        event.preventDefault();
+        runMatrixLifecycleAction('reopen', [{
+          instanceId: reopenBtn.getAttribute('data-instance-id'),
+          studentName: reopenBtn.getAttribute('data-student-name') || ''
+        }]);
+        return;
+      }
+      const unlockBtn = event.target.closest('.js-matrix-unlock-instance');
+      if (unlockBtn) {
+        if (!window.CAN_UNLOCK_REPORT_INSTANCE) return;
+        event.preventDefault();
+        runMatrixLifecycleAction('unlock', [{
+          instanceId: unlockBtn.getAttribute('data-instance-id'),
+          studentName: unlockBtn.getAttribute('data-student-name') || ''
+        }]);
+      }
+    });
+
+    document.getElementById('btnMatrixReopenAll')?.addEventListener('click', function () {
+      if (!window.CAN_REOPEN_REPORT_INSTANCE) return;
+      runMatrixLifecycleAction('reopen', collectMatrixLifecycleTargets('reopen'));
+    });
+    document.getElementById('btnMatrixUnlockAll')?.addEventListener('click', function () {
+      if (!window.CAN_UNLOCK_REPORT_INSTANCE) return;
+      runMatrixLifecycleAction('unlock', collectMatrixLifecycleTargets('unlock'));
+    });
+
     window.addEventListener('beforeunload', (event) => {
       if (!sharedDirty && dirtyStudents.size === 0) return;
       event.preventDefault();

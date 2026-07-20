@@ -323,8 +323,8 @@ router.post('/instances/matrix/:assignmentId/prefill-apply',
   ctrl.applyReportMatrixPrefill);
 
 router.get('/instances/matrix/:assignmentId/export',
-  requireReportMatrixEditorAccess,
-  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   ctrl.exportReportMatrix);
 
 router.get('/instances/start/:assignmentId',
@@ -371,9 +371,22 @@ router.post('/instances/lock/:id',
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
   ctrl.lockInstance);
 
+router.post('/instances/reopen/:id',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.reopenInstance);
+
 router.post('/instances/unlock/:id',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
-  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, { keepActive: true }),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, {
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.unlockInstance);
 
 router.get('/instances/delete/:id',
@@ -387,8 +400,8 @@ router.delete('/instances/delete/:id',
   ctrl.deleteInstance);
 
 router.get('/instances/export/:id',
-  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
-  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   ctrl.exportInstance);
 
 module.exports = router;

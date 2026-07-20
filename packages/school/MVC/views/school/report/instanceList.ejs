@@ -14,6 +14,7 @@
 <%
   const instanceStateFilters = (filters && typeof filters === 'object') ? filters : {};
   const canUnlockReportInstanceSafe = Boolean(typeof canUnlockReportInstance !== 'undefined' && canUnlockReportInstance);
+  const canReopenReportInstanceSafe = Boolean(typeof canReopenReportInstanceToDraft !== 'undefined' && canReopenReportInstanceToDraft);
   const selectedAssignmentRowId = String(instanceStateFilters?.assignmentRowId || instanceStateFilters?.rowId || '').trim();
   const selectedSessionId = String(instanceStateFilters?.sessionId || '').trim();
   const selectedSessionDate = String(instanceStateFilters?.sessionDate || '').trim();
@@ -180,7 +181,7 @@
             <% if (row.isPendingAssignment) { %>
               <span class="badge bg-info-subtle text-info-emphasis border">pending</span>
             <% } else { %>
-              <span class="badge <%= status === 'submitted' ? 'bg-success' : (status === 'locked' ? 'bg-dark' : 'bg-warning text-dark') %>"><%= status || '-' %></span>
+              <span class="badge <%= status === 'submitted' ? 'bg-success' : (status === 'locked' ? 'bg-dark' : 'bg-warning text-dark') %>"><%= status === 'submitted' ? 'Submitted (awaiting review)' : (status || '-') %></span>
             <% } %>
           </td>
           <td class="table-actions pe-4">
@@ -204,17 +205,20 @@
                   <a href="/school/reports/instances/edit-v2/<%= row.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-layout-text-window-reverse me-2"></i>Open V2</a>
                   <% if (String(row.status || '').toLowerCase() === 'locked') { %>
                     <% if (canUnlockReportInstanceSafe) { %>
-                      <button type="button" class="btn btn-outline-warning btn-sm js-unlock-report-instance" data-instance-id="<%= row.id %>" data-instance-label="<%= (row.teacherName || '') + ' / ' + (row.studentName || 'Whole class') %>"><i class="bi bi-unlock me-2"></i>Unlock</button>
+                      <button type="button" class="btn btn-outline-warning btn-sm js-unlock-report-instance" data-instance-id="<%= row.id %>" data-instance-label="<%= (row.teacherName || '') + ' / ' + (row.studentName || 'Whole class') %>" title="Unlock returns the report to submitted"><i class="bi bi-unlock me-2"></i>Unlock</button>
                     <% } else { %>
                       <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="Locked reports cannot be deleted."><i class="bi bi-lock me-2"></i>Locked</button>
                     <% } %>
                   <% } else { %>
+                    <% if (String(row.status || '').toLowerCase() === 'submitted' && canReopenReportInstanceSafe) { %>
+                      <button type="button" class="btn btn-outline-warning btn-sm js-reopen-report-instance" data-instance-id="<%= row.id %>" data-instance-label="<%= (row.teacherName || '') + ' / ' + (row.studentName || 'Whole class') %>" title="Reopen as draft for the teacher"><i class="bi bi-arrow-counterclockwise me-2"></i>Reopen</button>
+                    <% } %>
                     <button type="button" class="btn btn-outline-danger btn-sm js-delete-report-instance" data-instance-id="<%= row.id %>" data-instance-label="<%= (row.teacherName || '') + ' / ' + (row.studentName || 'Whole class') %>"><i class="bi bi-trash me-2"></i>Delete</button>
                   <% } %>
                   <% if (row.hasDocxTemplate) { %>
-                    <a href="/school/reports/instances/export/<%= row.id %>?format=docx&download=1" class="btn btn-outline-primary btn-sm"><i class="bi bi-filetype-docx me-2"></i>DOCX</a>
+                    <a href="/school/reports/instances/export/<%= row.id %>?format=docx&download=1" class="btn btn-outline-primary btn-sm js-export-report-instance"><i class="bi bi-filetype-docx me-2"></i>DOCX</a>
                   <% } %>
-                  <a href="/school/reports/instances/export/<%= row.id %>?download=1" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-2"></i>Payload</a>
+                  <a href="/school/reports/instances/export/<%= row.id %>?download=1" class="btn btn-outline-secondary btn-sm js-export-report-instance"><i class="bi bi-download me-2"></i>Payload</a>
                 <% } %>
               </div>
             </div>
@@ -232,6 +236,22 @@
 <script src="/scripts/reportAssignmentDelete.js"></script>
 <script>
 (() => {
+  window.CAN_EXPORT_REPORT_INSTANCE = <%- JSON.stringify(typeof canExportReportInstance !== 'undefined' && !!canExportReportInstance) %>;
+
+  function showReportExportDenied() {
+    const message = 'You do not have permission to export report documents or payloads. Contact an administrator if you need Export access.';
+    if (typeof showMessageModal === 'function') {
+      return showMessageModal({
+        title: 'Access Denied',
+        icon: 'error',
+        message,
+        buttons: [{ text: 'OK', class: 'btn-danger' }]
+      });
+    }
+    window.alert(message);
+    return Promise.resolve();
+  }
+
   function initCollapseToggleIcon(options = {}) {
     const collapseEl = document.getElementById(String(options.collapseId || ''));
     const buttonEl = document.getElementById(String(options.buttonId || ''));
@@ -266,6 +286,16 @@
   });
 
   document.addEventListener('click', function (event) {
+    const exportLink = event.target.closest('.js-export-report-instance');
+    if (exportLink) {
+      if (!window.CAN_EXPORT_REPORT_INSTANCE) {
+        event.preventDefault();
+        event.stopPropagation();
+        showReportExportDenied();
+      }
+      return;
+    }
+
     const unlockButton = event.target.closest('.js-unlock-report-instance');
     if (unlockButton && window.ReportAssignmentDelete) {
       event.preventDefault();
@@ -273,7 +303,7 @@
       const instanceId = String(unlockButton.getAttribute('data-instance-id') || '').trim();
       const label = String(unlockButton.getAttribute('data-instance-label') || instanceId).trim();
       if (!instanceId) return;
-      window.ReportAssignmentDelete.confirmUnlock('Unlock report instance for ' + label + '? It will become editable again.')
+      window.ReportAssignmentDelete.confirmUnlock('Unlock report instance for ' + label + '? Status will return to submitted.')
         .then(function (confirmed) {
           if (!confirmed) return null;
           return window.ReportAssignmentDelete.withLoading('Unlocking report instance...', function () {
@@ -286,6 +316,30 @@
         })
         .catch(function (error) {
           window.ReportAssignmentDelete.showError(error.message || 'Unable to unlock report instance.');
+        });
+      return;
+    }
+
+    const reopenButton = event.target.closest('.js-reopen-report-instance');
+    if (reopenButton && window.ReportAssignmentDelete) {
+      event.preventDefault();
+      event.stopPropagation();
+      const instanceId = String(reopenButton.getAttribute('data-instance-id') || '').trim();
+      const label = String(reopenButton.getAttribute('data-instance-label') || instanceId).trim();
+      if (!instanceId) return;
+      window.ReportAssignmentDelete.confirmReopen('Reopen report instance for ' + label + ' as draft so the teacher can edit it?')
+        .then(function (confirmed) {
+          if (!confirmed) return null;
+          return window.ReportAssignmentDelete.withLoading('Reopening report instance...', function () {
+            return window.ReportAssignmentDelete.reopenReportInstance(instanceId);
+          });
+        })
+        .then(function (result) {
+          if (!result) return;
+          window.location.reload();
+        })
+        .catch(function (error) {
+          window.ReportAssignmentDelete.showError(error.message || 'Unable to reopen report instance.');
         });
       return;
     }

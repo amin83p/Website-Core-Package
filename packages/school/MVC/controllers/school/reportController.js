@@ -15,6 +15,7 @@ const reportAssignmentBulkRowService = require('../../services/school/reportAssi
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
+const sessionConductService = require('../../services/school/sessionConductService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const classReferenceSyncService = require('../../services/school/classReferenceSyncService');
@@ -982,17 +983,21 @@ async function listInstances(req, res) {
     const { data, pagination } = paginate(instances, req.query);
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
 
-    const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
+  const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
+  const canReopenReportInstanceToDraft = await reportViewService.canReopenReportInstanceToDraft(req.user);
+  const canExportReportInstance = await reportViewService.canExportReportInstance(req.user);
 
-    res.render('school/report/instanceList', {
-      title: 'Report Instances',
-      tableName: 'Report_Instances',
-      data,
-      newUrl: 'school/reports/instances',
-      newLabel: null,
-      pagination,
-      filters: req.query,
-      canUnlockReportInstance,
+  res.render('school/report/instanceList', {
+    title: 'Report Instances',
+    tableName: 'Report_Instances',
+    data,
+    newUrl: 'school/reports/instances',
+    newLabel: null,
+    pagination,
+    filters: req.query,
+    canUnlockReportInstance,
+    canReopenReportInstanceToDraft,
+    canExportReportInstance,
       includeModal: true,
       includeModal_Table: true,
       print: true,
@@ -1061,6 +1066,12 @@ async function startInstance(req, res) {
       requestedTeacherId: req.query.teacherId,
       fallbackTeacherId: req.user?.personId || '',
       requestedStudentId: req.query.studentId
+    });
+
+    await sessionConductService.assertAssignmentSessionConductReadyOrThrow({
+      assignment,
+      reqUser: req.user,
+      schoolDataService
     });
 
     const createdOrResolved = [];
@@ -1138,8 +1149,16 @@ async function buildInstanceEditorRenderContext(req) {
     reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
   );
 
+  await sessionConductService.assertAssignmentSessionConductReadyOrThrow({
+    assignment: effectiveAssignment || assignment,
+    instance,
+    reqUser: req.user,
+    schoolDataService
+  });
+
   let latestInstance = await schoolDataService.getDataById('reportInstances', req.params.id, req.user);
-  if (String(latestInstance?.status || '').toLowerCase() !== 'locked') {
+  const canEditAnswers = await reportViewService.canEditReportInstanceAnswers(latestInstance, req.user);
+  if (canEditAnswers) {
     const hydrated = hydrateInitialAnswersFromPrefill(template, latestInstance);
     if (hydrated.changed) {
       latestInstance = await schoolDataService.updateData('reportInstances', latestInstance.id, {
@@ -1199,6 +1218,7 @@ async function buildInstanceEditorRenderContext(req) {
     participantOnly: req.reportInstanceParticipantAccess === true
   });
   const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
+  const canReopenReportInstanceToDraft = await reportViewService.canReopenReportInstanceToDraft(req.user);
 
   return {
     title: `Report Editor: ${template.title}`,
@@ -1211,6 +1231,8 @@ async function buildInstanceEditorRenderContext(req) {
     validationSummary,
     reportReviewNavigator,
     canUnlockReportInstance,
+    canReopenReportInstanceToDraft,
+    canEditReportInstanceAnswers: canEditAnswers,
     safeReturnUrl: resolveSafeSameOriginReturnUrl(req, latestInstance?.id),
     includeModal: true,
     user: req.user,
@@ -1223,7 +1245,8 @@ async function showInstanceEditor(req, res) {
     const renderContext = await buildInstanceEditorRenderContext(req);
     res.render('school/report/instanceEditor', renderContext);
   } catch (error) {
-    res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    const status = Number(error?.statusCode) || 500;
+    res.status(status).render('error', { title: 'Error', message: error.message, user: req.user });
   }
 }
 
@@ -1232,7 +1255,8 @@ async function showInstanceEditorV2(req, res) {
     const renderContext = await buildInstanceEditorRenderContext(req);
     res.render('school/report/instanceEditorV2', renderContext);
   } catch (error) {
-    res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    const status = Number(error?.statusCode) || 500;
+    res.status(status).render('error', { title: 'Error', message: error.message, user: req.user });
   }
 }
 
@@ -1302,9 +1326,15 @@ async function showReportMatrix(req, res) {
       teacherId: req.query.teacherId || '',
       reqUser: req.user
     });
+    const canExportReportInstance = await reportViewService.canExportReportInstance(req.user);
+    const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
+    const canReopenReportInstanceToDraft = await reportViewService.canReopenReportInstanceToDraft(req.user);
     return res.render('school/report/instanceMatrix', {
       title: `Fill Reports: ${matrix.templateTitle}`,
       matrix,
+      canExportReportInstance,
+      canUnlockReportInstance,
+      canReopenReportInstanceToDraft,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -1596,6 +1626,13 @@ async function lockInstance(req, res) {
 async function unlockInstance(req, res) {
   let guardKey = '';
   try {
+    const canUnlock = await reportViewService.canUnlockReportInstance(req.user);
+    if (!canUnlock) {
+      const message = 'Only a super user can unlock a locked report.';
+      if (isAjax(req)) return res.status(403).json({ status: 'error', message });
+      return res.status(403).render('error', { title: 'Error', message, user: req.user });
+    }
+
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     guardKey = idempotencyGuardService.createGuardKey([
       'report_instance_unlock',
@@ -1631,6 +1668,57 @@ async function unlockInstance(req, res) {
     idempotencyGuardService.completeGuard(guardKey, payloadOut);
     if (isAjax(req)) return res.json(payloadOut);
     res.redirect(`/school/reports/instances/edit/${instance.id}`);
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+async function reopenInstance(req, res) {
+  let guardKey = '';
+  try {
+    const canReopen = await reportViewService.canReopenReportInstanceToDraft(req.user);
+    if (!canReopen) {
+      const message = 'Only an administrator can reopen a submitted report to draft.';
+      if (isAjax(req)) return res.status(403).json({ status: 'error', message });
+      return res.status(403).render('error', { title: 'Error', message, user: req.user });
+    }
+
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    guardKey = idempotencyGuardService.createGuardKey([
+      'report_instance_reopen',
+      activeOrgId,
+      String(req.params.id || '').trim()
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 90000,
+      replayTtlMs: 10000
+    });
+    if (sendGuardedResponse(res, guardResult, 'Report reopen is already in progress. Please wait.')) return;
+
+    const instance = await reportIntegrityService.assertInstanceReopenable(req.params.id, req.user);
+    const now = new Date().toISOString();
+
+    await schoolDataService.updateData('reportInstances', instance.id, {
+      status: 'draft',
+      audit: {
+        lastUpdateUser: req.user?.id || '',
+        lastUpdateDateTime: now,
+        reopenedAt: now,
+        reopenedBy: toPublicId(req.user?.id || '')
+      }
+    }, req.user);
+
+    const payloadOut = {
+      status: 'success',
+      message: 'Report reopened to draft for the teacher.',
+      nextStatus: 'draft'
+    };
+    idempotencyGuardService.completeGuard(guardKey, payloadOut);
+    if (isAjax(req)) return res.json(payloadOut);
+    res.redirect(`/school/reports/instances/edit-v2/${instance.id}`);
   } catch (error) {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
@@ -1793,6 +1881,7 @@ module.exports = {
   applyInstancePrefillRefresh,
   lockInstance,
   unlockInstance,
+  reopenInstance,
   deleteInstance,
   exportInstance
 };
