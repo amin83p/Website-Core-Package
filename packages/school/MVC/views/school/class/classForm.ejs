@@ -448,8 +448,8 @@
                <table class="table table-hover table-sm mb-0 align-middle" id="sessionsGrid">
                    <thead class="table-light text-nowrap position-sticky top-0" style="z-index: 1;">
                        <tr>
-                           <th style="width:36px;" class="text-center" title="Select for bulk co-teacher assignment">
-                             <input type="checkbox" class="form-check-input" id="sessionsSelectAll" title="Select all">
+                           <th style="width:36px;" class="text-center" title="Select sessions for Co-Teacher bulk apply">
+                             <input type="checkbox" class="form-check-input" id="sessionsSelectAll" title="Select all for co-teachers">
                            </th>
                            <th style="width:40px;" class="text-center" title="Lock Session"><i class="bi bi-lock-fill"></i></th>
                            <th style="width:120px;">Date</th>
@@ -776,26 +776,16 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div class="alert alert-light border small">
-          This tool updates the teacher assignment on matching sessions <strong>in-place</strong> (no deletion/re-adding).
-          After applying, click <strong>Save Class &amp; Ledger</strong> to persist.
+        <div class="alert alert-light border small mb-3">
+          Updates apply <strong>in-place</strong> on matching sessions. After applying, click <strong>Save Class &amp; Ledger</strong> to persist.
         </div>
 
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label small">Current Teacher (to replace)</label>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label small">Current Teacher</label>
             <select class="form-select form-select-sm" id="bulk_oldTeacher"></select>
           </div>
-          <div class="col-md-6">
-            <label class="form-label small">New Teacher</label>
-            <div class="input-group input-group-sm">
-              <input type="text" class="form-control" id="bulk_newTeacherName" placeholder="Pick a teacher..." readonly>
-              <button class="btn btn-outline-secondary" type="button" id="bulk_pickNewTeacher" title="Pick teacher"><i class="bi bi-person"></i></button>
-              <button class="btn btn-outline-secondary" type="button" id="bulk_clearNewTeacher" title="Clear"><i class="bi bi-x-lg"></i></button>
-            </div>
-            <input type="hidden" id="bulk_newTeacherId">
-          </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label class="form-label small">Target Sessions</label>
             <select class="form-select form-select-sm" id="bulk_targetStatus">
               <% (availableSessionStatuses || []).forEach((row) => { %>
@@ -804,53 +794,90 @@
               <option value="all">All</option>
             </select>
           </div>
-          <div class="col-md-6 d-flex align-items-end">
+          <div class="col-md-4 d-flex align-items-end">
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" role="switch" id="bulk_includeLocked">
               <label class="form-check-label small" for="bulk_includeLocked">Include locked sessions</label>
             </div>
           </div>
-          <div class="col-md-6">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" role="switch" id="bulk_addNewInstructor" checked>
-              <label class="form-check-label small" for="bulk_addNewInstructor">Add new teacher to class instructor roster</label>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" role="switch" id="bulk_inactivateOldInstructor" checked>
-              <label class="form-check-label small" for="bulk_inactivateOldInstructor">Mark old teacher inactive when no sessions remain</label>
-            </div>
-          </div>
         </div>
 
-        <div class="mt-3 small text-muted" id="bulk_preview"></div>
+        <ul class="nav nav-tabs" id="bulkTeacherTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="bulk-tab-main-btn" data-bs-toggle="tab" data-bs-target="#bulk-tab-main" type="button" role="tab" aria-controls="bulk-tab-main" aria-selected="true">
+              <i class="bi bi-person-badge me-1"></i>Main Teacher
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="bulk-tab-co-btn" data-bs-toggle="tab" data-bs-target="#bulk-tab-co" type="button" role="tab" aria-controls="bulk-tab-co" aria-selected="false">
+              <i class="bi bi-people-fill me-1"></i>Co-Teachers
+            </button>
+          </li>
+        </ul>
 
-        <hr class="my-3">
-        <div class="fw-semibold mb-2"><i class="bi bi-people-fill me-1"></i>Co-Teachers / Teaching Assistants</div>
-        <p class="small text-muted mb-2">Select sessions in the Session Builder grid (checkboxes), pick co-teachers below, then apply. Co-teachers get full session hours on their timesheets when the session is finalized. They can view Session Manager; grant edit access later on the session page.</p>
-        <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-          <div class="flex-grow-1" style="min-width: 220px;">
-            <label class="form-label small mb-1">Add Co-Teacher</label>
-            <div class="input-group input-group-sm">
-              <input type="text" class="form-control" id="bulk_coTeacherName" placeholder="Pick a person..." readonly>
-              <button class="btn btn-outline-secondary" type="button" id="bulk_pickCoTeacher" title="Pick co-teacher"><i class="bi bi-person-plus"></i></button>
-              <button class="btn btn-outline-secondary" type="button" id="bulk_clearCoTeacherPick" title="Clear"><i class="bi bi-x-lg"></i></button>
+        <div class="tab-content border border-top-0 rounded-bottom p-3" id="bulkTeacherTabContent">
+          <div class="tab-pane fade show active" id="bulk-tab-main" role="tabpanel" aria-labelledby="bulk-tab-main-btn">
+            <p class="small text-muted mb-3">Replace the main teacher on sessions that match the filters above.</p>
+            <div class="row g-3">
+              <div class="col-md-12">
+                <label class="form-label small">New Teacher</label>
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control" id="bulk_newTeacherName" placeholder="Pick a teacher..." readonly>
+                  <button class="btn btn-outline-secondary" type="button" id="bulk_pickNewTeacher" title="Pick teacher"><i class="bi bi-person"></i></button>
+                  <button class="btn btn-outline-secondary" type="button" id="bulk_clearNewTeacher" title="Clear"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <input type="hidden" id="bulk_newTeacherId">
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" role="switch" id="bulk_addNewInstructor" checked>
+                  <label class="form-check-label small" for="bulk_addNewInstructor">Add new teacher to class instructor roster</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" role="switch" id="bulk_inactivateOldInstructor" checked>
+                  <label class="form-check-label small" for="bulk_inactivateOldInstructor">Mark old teacher inactive when no sessions remain</label>
+                </div>
+              </div>
             </div>
-            <input type="hidden" id="bulk_coTeacherId">
+            <div class="mt-3 small text-muted" id="bulk_preview"></div>
           </div>
-          <div style="min-width: 160px;">
-            <label class="form-label small mb-1">Role label</label>
-            <input type="text" class="form-control form-control-sm" id="bulk_coTeacherRole" value="Co-Teacher" maxlength="60">
+
+          <div class="tab-pane fade" id="bulk-tab-co" role="tabpanel" aria-labelledby="bulk-tab-co-btn">
+            <p class="small text-muted mb-3">
+              Check sessions in the Session Builder grid (left column, not the lock icon), add co-teachers below, then apply.
+              Co-teachers get full session hours when finalized. Grant edit access later on the session page.
+            </p>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="bulk_selectMatchingSessionsBtn" title="Check all sessions matching Current Teacher / status / locked filters">
+                <i class="bi bi-check2-square me-1"></i>Select matching sessions in grid
+              </button>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+              <div class="flex-grow-1" style="min-width: 220px;">
+                <label class="form-label small mb-1">Add Co-Teacher</label>
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control" id="bulk_coTeacherName" placeholder="Pick a person..." readonly>
+                  <button class="btn btn-outline-secondary" type="button" id="bulk_pickCoTeacher" title="Pick co-teacher"><i class="bi bi-person-plus"></i></button>
+                  <button class="btn btn-outline-secondary" type="button" id="bulk_clearCoTeacherPick" title="Clear"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <input type="hidden" id="bulk_coTeacherId">
+              </div>
+              <div style="min-width: 160px;">
+                <label class="form-label small mb-1">Role label</label>
+                <input type="text" class="form-control form-control-sm" id="bulk_coTeacherRole" value="Co-Teacher" maxlength="60">
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="bulk_addCoTeacherToList"><i class="bi bi-plus-lg me-1"></i>Add to list</button>
+            </div>
+            <div id="bulk_coTeacherList" class="border rounded p-2 bg-light small mb-2" style="min-height: 2.5rem;"></div>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-sm btn-primary" id="bulk_applyCoTeachersBtn"><i class="bi bi-check2 me-1"></i>Apply Co-Teachers to Selected Sessions</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" id="bulk_clearCoTeachersBtn"><i class="bi bi-trash me-1"></i>Clear Co-Teachers on Selected</button>
+            </div>
+            <div class="mt-2 small text-muted" id="bulk_coTeacherPreview"></div>
           </div>
-          <button type="button" class="btn btn-sm btn-outline-primary" id="bulk_addCoTeacherToList"><i class="bi bi-plus-lg me-1"></i>Add to list</button>
         </div>
-        <div id="bulk_coTeacherList" class="border rounded p-2 bg-light small mb-2" style="min-height: 2.5rem;"></div>
-        <div class="d-flex flex-wrap gap-2">
-          <button type="button" class="btn btn-sm btn-primary" id="bulk_applyCoTeachersBtn"><i class="bi bi-check2 me-1"></i>Apply Co-Teachers to Selected Sessions</button>
-          <button type="button" class="btn btn-sm btn-outline-danger" id="bulk_clearCoTeachersBtn"><i class="bi bi-trash me-1"></i>Clear Co-Teachers on Selected</button>
-        </div>
-        <div class="mt-2 small text-muted" id="bulk_coTeacherPreview"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Close</button>
@@ -3299,8 +3326,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 : '';
             const selectedAttr = ses._bulkSelected === true ? 'checked' : '';
             tr.innerHTML = `
-                <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-select-cb" data-index="${index}" ${selectedAttr} ${isLocked ? '' : ''}></td>
-                <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-lock-cb" data-index="${index}" ${isLocked ? 'checked' : ''}></td>
+                <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-select-cb" data-index="${index}" ${selectedAttr} title="Select for co-teacher apply"></td>
+                <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-lock-cb" data-index="${index}" ${isLocked ? 'checked' : ''} title="Lock session"></td>
                 <td>
                     <div class="d-flex align-items-center gap-1">
                         ${manageBtnHtml}
@@ -3344,6 +3371,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const index = e.target.getAttribute('data-index');
         if (e.target.classList.contains('session-select-cb')) {
             if (sessionsState[index]) sessionsState[index]._bulkSelected = e.target.checked;
+            if (typeof computeBulkCoTeacherPreview === 'function') computeBulkCoTeacherPreview();
             return;
         }
         if (e.target.classList.contains('session-lock-cb')) {
@@ -4325,6 +4353,13 @@ if (bulkNewTeacherName) bulkNewTeacherName.value = '';
 
     if (typeof renderBulkCoTeacherList === 'function') renderBulkCoTeacherList();
     if (typeof computeBulkCoTeacherPreview === 'function') computeBulkCoTeacherPreview();
+    if (typeof syncBulkModalFooterForTab === 'function') syncBulkModalFooterForTab(true);
+    try {
+        const mainTabBtn = document.getElementById('bulk-tab-main-btn');
+        if (mainTabBtn && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+            bootstrap.Tab.getOrCreateInstance(mainTabBtn).show();
+        }
+    } catch (_) { /* no-op */ }
 
     try {
         const modal = bootstrap?.Modal?.getOrCreateInstance(bulkModalEl);
@@ -4404,15 +4439,15 @@ async function applyBulkTeacherChange() {
 }
 
 if (bulkBtn) bulkBtn.addEventListener('click', openBulkTeacherModal);
-if (bulkOldSel) bulkOldSel.addEventListener('change', computeBulkPreview);
+if (bulkOldSel) bulkOldSel.addEventListener('change', () => { computeBulkPreview(); computeBulkCoTeacherPreview(); });
 if (bulkNewTeacherName) bulkNewTeacherName.addEventListener('change', computeBulkPreview);
-if (bulkStatusSel) bulkStatusSel.addEventListener('change', computeBulkPreview);
-if (bulkIncludeLockedCb) bulkIncludeLockedCb.addEventListener('change', computeBulkPreview);
+if (bulkStatusSel) bulkStatusSel.addEventListener('change', () => { computeBulkPreview(); computeBulkCoTeacherPreview(); });
+if (bulkIncludeLockedCb) bulkIncludeLockedCb.addEventListener('change', () => { computeBulkPreview(); computeBulkCoTeacherPreview(); });
 if (bulkAddNewInstructorCb) bulkAddNewInstructorCb.addEventListener('change', computeBulkPreview);
 if (bulkInactivateOldInstructorCb) bulkInactivateOldInstructorCb.addEventListener('change', computeBulkPreview);
 if (bulkApplyBtn) bulkApplyBtn.addEventListener('click', applyBulkTeacherChange);
 
-// --- Co-Teachers bulk assign (selected sessions) ---
+// --- Co-Teachers bulk assign (matching Current Teacher / status / locked filters) ---
 const bulkCoTeacherName = document.getElementById('bulk_coTeacherName');
 const bulkCoTeacherId = document.getElementById('bulk_coTeacherId');
 const bulkCoTeacherRole = document.getElementById('bulk_coTeacherRole');
@@ -4423,7 +4458,10 @@ const bulkCoTeacherListEl = document.getElementById('bulk_coTeacherList');
 const bulkApplyCoTeachersBtn = document.getElementById('bulk_applyCoTeachersBtn');
 const bulkClearCoTeachersBtn = document.getElementById('bulk_clearCoTeachersBtn');
 const bulkCoTeacherPreview = document.getElementById('bulk_coTeacherPreview');
+const bulkTabMainBtn = document.getElementById('bulk-tab-main-btn');
+const bulkTabCoBtn = document.getElementById('bulk-tab-co-btn');
 const sessionsSelectAllCb = document.getElementById('sessionsSelectAll');
+const bulkSelectMatchingSessionsBtn = document.getElementById('bulk_selectMatchingSessionsBtn');
 let bulkCoTeacherDraft = [];
 
 function normalizeBulkCoTeacherRow(row = {}) {
@@ -4439,6 +4477,11 @@ function normalizeBulkCoTeacherRow(row = {}) {
 
 function getSelectedSessionsForCoTeachers() {
     return (sessionsState || []).filter((s) => s && s._bulkSelected === true);
+}
+
+function syncBulkModalFooterForTab(isMainTab) {
+    if (!bulkApplyBtn) return;
+    bulkApplyBtn.classList.toggle('d-none', !isMainTab);
 }
 
 function renderBulkCoTeacherList() {
@@ -4463,8 +4506,8 @@ function computeBulkCoTeacherPreview() {
     if (!bulkCoTeacherPreview) return;
     const selected = getSelectedSessionsForCoTeachers();
     bulkCoTeacherPreview.textContent = selected.length
-        ? `${selected.length} session(s) selected · ${bulkCoTeacherDraft.length} co-teacher(s) in apply list.`
-        : 'Select sessions in the Session Builder grid (left checkboxes), then apply.';
+        ? `${selected.length} session(s) selected in the grid · ${bulkCoTeacherDraft.length} co-teacher(s) in apply list.`
+        : 'Check sessions in the Session Builder grid (left column, not the lock icon), then apply.';
 }
 
 function mergeCoTeachersOntoSession(session, incomingRows = [], { replace = false } = {}) {
@@ -4491,6 +4534,34 @@ if (sessionsSelectAllCb) {
         const checked = !!sessionsSelectAllCb.checked;
         (sessionsState || []).forEach((s) => { if (s) s._bulkSelected = checked; });
         renderSessions();
+        computeBulkCoTeacherPreview();
+    });
+}
+
+if (bulkSelectMatchingSessionsBtn) {
+    bulkSelectMatchingSessionsBtn.addEventListener('click', async () => {
+        const oldVal = bulkOldSel?.value || '';
+        if (!oldVal) {
+            await uiAlert('Pick Current Teacher in the filters above first.', 'Missing current teacher');
+            return;
+        }
+        const matched = getBulkAffectedSessions();
+        const matchedSet = new Set(matched);
+        (sessionsState || []).forEach((s) => {
+            if (s) s._bulkSelected = matchedSet.has(s);
+        });
+        renderSessions();
+        computeBulkCoTeacherPreview();
+        await uiAlert(`Selected ${matched.length} matching session(s) in the grid.`, 'Sessions selected');
+    });
+}
+
+if (bulkTabMainBtn) {
+    bulkTabMainBtn.addEventListener('shown.bs.tab', () => syncBulkModalFooterForTab(true));
+}
+if (bulkTabCoBtn) {
+    bulkTabCoBtn.addEventListener('shown.bs.tab', () => {
+        syncBulkModalFooterForTab(false);
         computeBulkCoTeacherPreview();
     });
 }
@@ -4559,7 +4630,7 @@ if (bulkApplyCoTeachersBtn) {
     bulkApplyCoTeachersBtn.addEventListener('click', async () => {
         const selected = getSelectedSessionsForCoTeachers();
         if (!selected.length) {
-            await uiAlert('Select one or more sessions in the Session Builder grid first.', 'No sessions selected');
+            await uiAlert('Check one or more sessions in the Session Builder grid first (left column, not the lock icon).', 'No sessions selected');
             return;
         }
         if (!bulkCoTeacherDraft.length) {
@@ -4569,14 +4640,14 @@ if (bulkApplyCoTeachersBtn) {
         selected.forEach((session) => mergeCoTeachersOntoSession(session, bulkCoTeacherDraft, { replace: false }));
         renderSessions();
         computeBulkCoTeacherPreview();
-        await uiAlert(`Applied ${bulkCoTeacherDraft.length} co-teacher(s) to ${selected.length} session(s). Remember to Save Class & Ledger.`, 'Co-teachers applied');
+        await uiAlert(`Applied ${bulkCoTeacherDraft.length} co-teacher(s) to ${selected.length} selected session(s). Remember to Save Class & Ledger.`, 'Co-teachers applied');
     });
 }
 if (bulkClearCoTeachersBtn) {
     bulkClearCoTeachersBtn.addEventListener('click', async () => {
         const selected = getSelectedSessionsForCoTeachers();
         if (!selected.length) {
-            await uiAlert('Select one or more sessions in the Session Builder grid first.', 'No sessions selected');
+            await uiAlert('Check one or more sessions in the Session Builder grid first (left column, not the lock icon).', 'No sessions selected');
             return;
         }
         const ok = await uiConfirm(`Clear all co-teachers from ${selected.length} selected session(s)?`, 'Clear co-teachers');

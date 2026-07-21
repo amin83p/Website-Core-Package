@@ -4,6 +4,7 @@ const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const schoolRecordAccessService = require('./schoolRecordAccessService');
 const teacherIdentityService = require('./teacherIdentityService');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -255,6 +256,7 @@ async function listSessions(req, query = {}) {
 
       const sessionTeacherId = session?.delivery?.deliveredBy;
       const resolvedTeacherPersonId = teacherIdentityService.resolveTeacherPersonId(sessionTeacherId, teacherPersonMap);
+      const coTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
       if (viewer.lockedTeacherPersonId
         && !teacherIdentityService.sessionDeliveredByMatchesPerson(session, viewer.lockedTeacherPersonId, teacherPersonMap)) {
         return;
@@ -271,6 +273,15 @@ async function listSessions(req, query = {}) {
       const statusDefinition = (Array.isArray(statusMeta) ? statusMeta : [])
         .find((row) => normalizeStatusCode(row?.code) === normalizedStatus) || null;
       const sessionId = resolveSessionId(session);
+      const matchedAsCoTeacher = Boolean(
+        filters.teacherIds.length
+        && !filters.teacherIds.some((teacherFilterId) => (
+          sessionDeliveryTeamService.isPersonSessionMainTeacher(session, teacherFilterId, teacherPersonMap)
+        ))
+        && filters.teacherIds.some((teacherFilterId) => (
+          sessionDeliveryTeamService.isPersonOnSessionDelivery(session, teacherFilterId, teacherPersonMap)
+        ))
+      );
 
       rows.push({
         id: sessionId,
@@ -285,6 +296,9 @@ async function listSessions(req, query = {}) {
         locked: session?.locked === true || String(session?.locked) === 'true',
         teacherId: resolvedTeacherPersonId || sessionTeacherId || '',
         teacherName,
+        coTeachers,
+        coTeacherCount: coTeachers.length,
+        matchedAsCoTeacher,
         room: session?.room || '',
         notes: session?.notes || '',
         makeUpRequired: statusDefinition?.makeUpRequired === true,

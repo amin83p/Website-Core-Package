@@ -1156,6 +1156,7 @@
                             ? sessionCoTeachers
                             : (Array.isArray(session?.delivery?.coTeachers) ? session.delivery.coTeachers : []);
                         const canManageCoTeachersFlag = typeof canManageCoTeachers !== 'undefined' && canManageCoTeachers === true;
+                        const canToggleCoTeacherEditFlag = typeof canToggleCoTeacherEdit !== 'undefined' && canToggleCoTeacherEdit === true;
                     %>
                     <div class="session-info-tile" style="grid-column: 1 / -1;">
                         <div class="session-info-tile-label d-flex align-items-center justify-content-between gap-2 flex-wrap">
@@ -1175,16 +1176,18 @@
                                             <span class="text-muted"> · <%= row.roleLabel || 'Co-Teacher' %></span>
                                         </div>
                                         <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                                            <% if (canManageCoTeachersFlag && !isReadOnly) { %>
+                                            <% if (canToggleCoTeacherEditFlag && !isReadOnly) { %>
                                                 <div class="form-check form-switch m-0">
                                                     <input class="form-check-input session-co-can-edit" type="checkbox" role="switch" <%= row.canEdit === true ? 'checked' : '' %> title="Allow Session Manager edits">
                                                     <label class="form-check-label small">Can edit</label>
                                                 </div>
-                                                <button type="button" class="btn btn-sm btn-outline-danger session-co-remove" title="Remove"><i class="bi bi-x"></i></button>
                                             <% } else if (row.canEdit === true) { %>
                                                 <span class="badge bg-success-subtle text-success border">Can edit</span>
                                             <% } else { %>
                                                 <span class="badge bg-light text-muted border">View only</span>
+                                            <% } %>
+                                            <% if (canManageCoTeachersFlag && !isReadOnly) { %>
+                                                <button type="button" class="btn btn-sm btn-outline-danger session-co-remove" title="Remove"><i class="bi bi-x"></i></button>
                                             <% } %>
                                         </div>
                                     </div>
@@ -1193,12 +1196,6 @@
                         </div>
                         <div class="form-text mt-1 mb-0">Co-teachers receive full session hours on their timesheets. Edit access is optional.</div>
                     </div>
-                    <% if (smIsRolling) { %>
-                    <div class="session-info-tile session-info-tile--cycle">
-                        <div class="session-info-tile-label">Cycle window</div>
-                        <div class="session-info-tile-value text-nowrap"><%= smCycleWindowLabel %></div>
-                    </div>
-                    <% } %>
                     <div class="session-info-tile session-info-tile--location">
                         <label class="session-info-tile-label mb-0" for="sessionRoom">Location</label>
                         <input type="text" id="sessionRoom" class="form-control form-control-sm" value="<%= session.room || '' %>" placeholder="Room, lab, field…" <%- disabledAttr %> autocomplete="off">
@@ -2158,6 +2155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
     const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag)) %>;
     const sessionCanManageCoTeachers = <%- jsonForScript(Boolean(typeof canManageCoTeachers !== 'undefined' && canManageCoTeachers === true)) %>;
+    const sessionCanToggleCoTeacherEdit = <%- jsonForScript(Boolean(typeof canToggleCoTeacherEdit !== 'undefined' && canToggleCoTeacherEdit === true)) %>;
     let sessionCoTeachersState = <%- jsonForScript(
         Array.isArray(typeof sessionCoTeachers !== 'undefined' ? sessionCoTeachers : null)
             ? sessionCoTeachers
@@ -4034,25 +4032,27 @@ document.addEventListener('DOMContentLoaded', () => {
             listEl.innerHTML = '<div class="text-muted" id="sessionCoTeachersEmpty">No co-teachers assigned.</div>';
             return;
         }
-        const canManage = sessionCanManageCoTeachers && !<%= JSON.stringify(!!isReadOnly) %>;
+        const readOnlyPage = <%= JSON.stringify(!!isReadOnly) %>;
+        const canToggle = sessionCanToggleCoTeacherEdit && !readOnlyPage;
+        const canManage = sessionCanManageCoTeachers && !readOnlyPage;
         listEl.innerHTML = rows.map((row) => {
-            const controls = canManage
-                ? `<div class="d-flex align-items-center gap-2 flex-shrink-0">
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input session-co-can-edit" type="checkbox" role="switch" ${row.canEdit ? 'checked' : ''} title="Allow Session Manager edits">
-                            <label class="form-check-label small">Can edit</label>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-danger session-co-remove" title="Remove"><i class="bi bi-x"></i></button>
+            const toggleHtml = canToggle
+                ? `<div class="form-check form-switch m-0">
+                        <input class="form-check-input session-co-can-edit" type="checkbox" role="switch" ${row.canEdit ? 'checked' : ''} title="Allow Session Manager edits">
+                        <label class="form-check-label small">Can edit</label>
                    </div>`
                 : (row.canEdit
                     ? '<span class="badge bg-success-subtle text-success border">Can edit</span>'
                     : '<span class="badge bg-light text-muted border">View only</span>');
+            const removeHtml = canManage
+                ? '<button type="button" class="btn btn-sm btn-outline-danger session-co-remove" title="Remove"><i class="bi bi-x"></i></button>'
+                : '';
             return `<div class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom session-co-teacher-row" data-person-id="${String(row.personId).replace(/"/g, '&quot;')}">
                 <div class="text-truncate">
                     <span class="fw-semibold">${String(row.name || row.personId).replace(/</g, '&lt;')}</span>
                     <span class="text-muted"> · ${String(row.roleLabel || 'Co-Teacher').replace(/</g, '&lt;')}</span>
                 </div>
-                ${controls}
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">${toggleHtml}${removeHtml}</div>
             </div>`;
         }).join('');
     }
@@ -4103,6 +4103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sessionCoTeachersList')?.addEventListener('change', function (event) {
         const toggle = event.target.closest('.session-co-can-edit');
         if (!toggle) return;
+        if (!sessionCanToggleCoTeacherEdit) return;
         const rowEl = toggle.closest('.session-co-teacher-row');
         const personId = String(rowEl?.getAttribute('data-person-id') || '').trim();
         sessionCoTeachersState = (sessionCoTeachersState || []).map((row) => (
@@ -4113,6 +4114,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sessionCoTeachersList')?.addEventListener('click', function (event) {
         const removeBtn = event.target.closest('.session-co-remove');
         if (!removeBtn) return;
+        if (!sessionCanManageCoTeachers) return;
         const rowEl = removeBtn.closest('.session-co-teacher-row');
         const personId = String(rowEl?.getAttribute('data-person-id') || '').trim();
         sessionCoTeachersState = (sessionCoTeachersState || []).filter((row) => String(row.personId) !== personId);
@@ -5568,7 +5570,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload.teacherId = document.getElementById('sessionTeacherId')?.value || '';
                 payload.teacherName = document.getElementById('sessionTeacherName')?.value || '';
             }
-            if (sessionCanManageCoTeachers || sessionCanEditMetadata) {
+            if (sessionCanManageCoTeachers || sessionCanToggleCoTeacherEdit || sessionCanEditMetadata) {
                 payload.coTeachers = JSON.stringify(Array.isArray(sessionCoTeachersState) ? sessionCoTeachersState : []);
             }
             if (shouldSendInstructionalPayload) {

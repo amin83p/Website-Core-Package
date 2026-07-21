@@ -1606,11 +1606,28 @@ async function previewTeacherAssignmentImpact(req, res) {
                 locked: session?.locked === true || String(session?.locked) === 'true',
                 rosterCount: Array.isArray(session?.roster) ? session.roster.length : 0,
                 gradebookCount: Array.isArray(session?.gradebook) ? session.gradebook.length : 0,
+                coTeacherCount: sessionDeliveryTeamService.getSessionCoTeachers(session).length,
                 hasAttendanceOrGradebook: Array.isArray(session?.roster) && session.roster.some((row) => (
                     String(row?.attendanceStatus || row?.attendance || row?.comment || row?.notes || '').trim()
                     || row?.classEffortPercent !== undefined
                     || row?.classParticipationPercent !== undefined
                 ))
+            }));
+
+        const oldTeacherId = cleanPersonId(criteria.oldTeacherId || criteria.oldTeacher || '');
+        const coTeacherMembershipSessions = (Array.isArray(sessions) ? sessions : [])
+            .filter((session) => {
+                if (!oldTeacherId) return false;
+                if (sessionDeliveryTeamService.isPersonSessionMainTeacher(session, oldTeacherId)) return false;
+                return sessionDeliveryTeamService.isPersonOnSessionDelivery(session, oldTeacherId);
+            })
+            .map((session) => ({
+                classId,
+                sessionId: toPublicId(session?.sessionId || session?.id),
+                date: String(session?.date || '').trim(),
+                startTime: String(session?.startTime || '').trim(),
+                endTime: String(session?.endTime || '').trim(),
+                roleLabel: sessionDeliveryTeamService.findCoTeacherEntry(session, oldTeacherId)?.roleLabel || 'Co-Teacher'
             }));
 
         const refs = affectedSessions.map((session) => ({ classId, sessionId: session.sessionId })).filter((ref) => ref.sessionId);
@@ -1622,7 +1639,6 @@ async function previewTeacherAssignmentImpact(req, res) {
             listImpactRows('tasks', 'tasks', req.user)
         ]);
 
-        const oldTeacherId = cleanPersonId(criteria.oldTeacherId);
         const newTeacherId = cleanPersonId(criteria.newTeacherId);
         const impactedAssignments = (Array.isArray(reportAssignments) ? reportAssignments : []).filter((row) => {
             if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) return false;
@@ -1677,10 +1693,15 @@ async function previewTeacherAssignmentImpact(req, res) {
                 newTeacherId,
                 newTeacherName: String(criteria.newTeacherName || newTeacherId).trim(),
                 affectedSessions,
+                coTeacherMembershipSessions,
                 summaries: {
                     timesheets: summarizeImpactRows(impactedTimesheets, 'timesheet', 5, (row) => ({
                         id: toPublicId(row?.id),
                         title: [row?.periodName || row?.periodId, row?.status].filter(Boolean).join(' | ')
+                    })),
+                    coTeacherMembership: summarizeImpactRows(coTeacherMembershipSessions, 'co-teacher session', 5, (row) => ({
+                        id: toPublicId(row?.sessionId),
+                        title: [row?.date, row?.startTime && row?.endTime ? `${row.startTime}-${row.endTime}` : '', row?.roleLabel].filter(Boolean).join(' | ')
                     })),
                     reportAssignments: summarizeImpactRows(impactedAssignments, 'report assignment', 5, (row) => ({
                         id: toPublicId(row?.id),
@@ -1940,6 +1961,7 @@ function applyAdminSessionMetadataUpdate(session = {}, body = {}, canOverrideOrO
         : { canOverride: canOverrideOrOptions === true };
     const canOverride = options.canOverride === true;
     const canManageCoTeachers = options.canManageCoTeachers === true || canOverride;
+    const canToggleCoTeacherEdit = options.canToggleCoTeacherEdit === true || canManageCoTeachers;
     if (!sessionMetadataFieldsPresentInBody(body)) {
         return { changed: false };
     }
@@ -1948,7 +1970,8 @@ function applyAdminSessionMetadataUpdate(session = {}, body = {}, canOverrideOrO
     if (hasScheduleFields && !canOverride) {
         return { changed: false };
     }
-    if (!canOverride && !(canManageCoTeachers && body.coTeachers !== undefined)) {
+    const mayUpdateCoTeachers = body.coTeachers !== undefined && (canManageCoTeachers || canToggleCoTeacherEdit);
+    if (!canOverride && !mayUpdateCoTeachers) {
         return { changed: false };
     }
 
@@ -1957,7 +1980,8 @@ function applyAdminSessionMetadataUpdate(session = {}, body = {}, canOverrideOrO
     const priorEnd = normalizeClockTime(session.endTime);
     const priorTeacherId = cleanPersonId(session?.delivery?.deliveredBy);
     const priorTeacherName = String(session?.delivery?.deliveredByName || '').trim();
-    const priorCoTeachersJson = JSON.stringify(sessionDeliveryTeamService.getSessionCoTeachers(session));
+    const priorCoTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
+    const priorCoTeachersJson = JSON.stringify(priorCoTeachers);
 
     let date = priorDate;
     let startTime = priorStart;
@@ -1992,17 +2016,35 @@ function applyAdminSessionMetadataUpdate(session = {}, body = {}, canOverrideOrO
         session.delivery = {};
     }
 
+    const mainTeacherId = teacherId || cleanPersonId(session?.delivery?.deliveredBy) || '';
     if (canManageCoTeachers && body.coTeachers !== undefined) {
         const parsedCoTeachers = typeof body.coTeachers === 'string'
             ? (() => { try { return JSON.parse(body.coTeachers); } catch (_error) { return []; } })()
             : body.coTeachers;
         session.delivery.coTeachers = sessionDeliveryTeamService.normalizeSessionCoTeachers(parsedCoTeachers, {
-            mainTeacherId: teacherId || cleanPersonId(session?.delivery?.deliveredBy) || ''
+            mainTeacherId
         });
+    } else if (canToggleCoTeacherEdit && body.coTeachers !== undefined) {
+        const parsedCoTeachers = typeof body.coTeachers === 'string'
+            ? (() => { try { return JSON.parse(body.coTeachers); } catch (_error) { return []; } })()
+            : body.coTeachers;
+        const incomingById = new Map();
+        (Array.isArray(parsedCoTeachers) ? parsedCoTeachers : []).forEach((row) => {
+            const personId = cleanPersonId(row?.personId || row?.teacherId || row?.id);
+            if (!personId) return;
+            incomingById.set(personId, row?.canEdit === true);
+        });
+        session.delivery.coTeachers = sessionDeliveryTeamService.normalizeSessionCoTeachers(
+            priorCoTeachers.map((row) => ({
+                ...row,
+                canEdit: incomingById.has(row.personId) ? incomingById.get(row.personId) === true : row.canEdit === true
+            })),
+            { mainTeacherId }
+        );
     } else {
         session.delivery.coTeachers = sessionDeliveryTeamService.normalizeSessionCoTeachers(
             session.delivery.coTeachers,
-            { mainTeacherId: teacherId || cleanPersonId(session?.delivery?.deliveredBy) || '' }
+            { mainTeacherId }
         );
     }
 
@@ -2515,6 +2557,12 @@ async function showEditForm(req, res) {
                 s.roster.forEach(r => { r.personId = cleanPersonId(r.personId); });
             }
             if (s.delivery?.deliveredBy) s.delivery.deliveredBy = cleanPersonId(s.delivery.deliveredBy);
+            if (s.delivery) {
+                s.delivery.coTeachers = sessionDeliveryTeamService.normalizeSessionCoTeachers(
+                    s.delivery.coTeachers,
+                    { mainTeacherId: s.delivery.deliveredBy || '' }
+                );
+            }
         });
     }
 
@@ -2571,6 +2619,12 @@ async function showEditWizardForm(req, res) {
                 s.roster.forEach(r => { r.personId = cleanPersonId(r.personId); });
             }
             if (s.delivery?.deliveredBy) s.delivery.deliveredBy = cleanPersonId(s.delivery.deliveredBy);
+            if (s.delivery) {
+                s.delivery.coTeachers = sessionDeliveryTeamService.normalizeSessionCoTeachers(
+                    s.delivery.coTeachers,
+                    { mainTeacherId: s.delivery.deliveredBy || '' }
+                );
+            }
         });
     }
 
@@ -3559,12 +3613,10 @@ async function manageSession(req, res) {
 
         const sessionCoTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
         const viewerPersonId = String(req.user?.personId || '').trim();
-        const canManageCoTeachers = Boolean(
-            canEditSession
-            && (
-                canOverride
-                || sessionDeliveryTeamService.isPersonSessionMainTeacher(session, viewerPersonId)
-            )
+        const canManageCoTeachers = Boolean(canOverride);
+        const canToggleCoTeacherEdit = Boolean(
+            canOverride
+            || (canEditSession && sessionDeliveryTeamService.isPersonSessionMainTeacher(session, viewerPersonId))
         );
 
         res.render('school/class/sessionManager', {
@@ -3589,6 +3641,7 @@ async function manageSession(req, res) {
             canDeleteStudentCases,
             sessionCoTeachers,
             canManageCoTeachers,
+            canToggleCoTeacherEdit,
             attendanceMatrixPolicyResolved,
             enabledAttendanceStatuses,
             conductRatingScaleResolved,
@@ -4207,14 +4260,15 @@ async function saveSession(req, res) {
             reqUser: req.user
         });
         const viewerPersonId = String(req.user?.personId || '').trim();
-        const canManageCoTeachers = Boolean(
+        const canManageCoTeachers = Boolean(canOverride);
+        const canToggleCoTeacherEdit = Boolean(
             canOverride
             || sessionDeliveryTeamService.isPersonSessionMainTeacher(originalSession, viewerPersonId)
         );
         const { changed: metadataChanged } = applyAdminSessionMetadataUpdate(
             originalSession,
             normalizedMetadataBody,
-            { canOverride, canManageCoTeachers }
+            { canOverride, canManageCoTeachers, canToggleCoTeacherEdit }
         );
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, originalSession, req.user);
         if (metadataChanged) {

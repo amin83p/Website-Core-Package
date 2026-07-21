@@ -1,6 +1,7 @@
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -446,7 +447,8 @@ function generateBatchSessionRows({
           delivery: {
             deliveredBy: teacherId || null,
             deliveredByName: teacherName || '',
-            substitute: false
+            substitute: false,
+            coTeachers: []
           },
           roster: []
         });
@@ -677,6 +679,10 @@ function sanitizeStagedSessionRow(session = {}, index = 0) {
   const sessionId = getSessionId(session, `STAGED_${String(index + 1).padStart(3, '0')}`);
   const teacherId = toPublicId(session?.delivery?.deliveredBy || session?.teacherId || '');
   const teacherName = cleanText(session?.delivery?.deliveredByName || session?.teacherName || '');
+  const coTeachers = sessionDeliveryTeamService.normalizeSessionCoTeachers(
+    session?.delivery?.coTeachers || session?.coTeachers,
+    { mainTeacherId: teacherId || '' }
+  );
   return {
     sessionId,
     date,
@@ -691,7 +697,8 @@ function sanitizeStagedSessionRow(session = {}, index = 0) {
     delivery: {
       deliveredBy: teacherId || null,
       deliveredByName: teacherName,
-      substitute: false
+      substitute: false,
+      coTeachers
     },
     roster: Array.isArray(session?.roster) ? session.roster : []
   };

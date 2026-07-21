@@ -5,6 +5,7 @@ const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const leaveRequestService = require('./leaveRequestService');
 const activityService = require('./activityService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const scheduleController = require('../../controllers/school/scheduleController');
 const schoolRepositories = require('../../repositories/school');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -50,6 +51,37 @@ function resolveSessionTeacherId(sessionRow = {}, fallbackTeacherId = '') {
     || sessionRow?.instructorId
     || fallbackTeacherId
   );
+}
+
+function resolveSessionDeliveryPersonIds(sessionRow = {}, fallbackTeacherId = '', teacherIdentityLookup = {}) {
+  const rawIds = [...sessionDeliveryTeamService.getSessionDeliveryPersonIds(sessionRow)];
+  if (!rawIds.length) {
+    const fallback = cleanPersonId(fallbackTeacherId || resolveSessionTeacherId(sessionRow, fallbackTeacherId));
+    if (fallback) rawIds.push(fallback);
+  }
+  const out = [];
+  rawIds.forEach((rawId) => {
+    const resolved = resolveTeacherPersonId(rawId, teacherIdentityLookup);
+    if (!resolved) return;
+    if (out.some((id) => idsEqual(id, resolved))) return;
+    out.push(resolved);
+  });
+  return out;
+}
+
+function resolveDeliveryPersonDisplayName(sessionRow = {}, personId = '') {
+  const normalizedPersonId = cleanPersonId(personId);
+  if (!normalizedPersonId) return '';
+  if (sessionDeliveryTeamService.isPersonSessionMainTeacher(sessionRow, normalizedPersonId)) {
+    return String(sessionRow?.delivery?.deliveredByName || normalizedPersonId).trim() || normalizedPersonId;
+  }
+  const coTeacher = sessionDeliveryTeamService.findCoTeacherEntry(sessionRow, normalizedPersonId);
+  if (coTeacher) {
+    const role = String(coTeacher.roleLabel || 'Co-Teacher').trim() || 'Co-Teacher';
+    const name = String(coTeacher.name || normalizedPersonId).trim() || normalizedPersonId;
+    return `${name} (${role})`;
+  }
+  return normalizedPersonId;
 }
 
 async function buildTeacherIdentityLookup({ activeOrgId = '', reqUser } = {}) {
@@ -240,7 +272,8 @@ async function appendActivitySessionConflicts({
     conflicts.push({
       sessionIndex,
       date,
-      teacherName: session?.delivery?.deliveredByName || teacherId,
+      teacherName: resolveDeliveryPersonDisplayName(session, teacherId) || teacherId,
+      personId: teacherId,
       conflictClass: `Activity: ${label}`,
       existTime: `${eventStart} - ${eventEnd}`,
       conflictType: 'activity_work_session',
@@ -297,7 +330,8 @@ async function appendReportAssignmentConflicts({
     conflicts.push({
       sessionIndex,
       date,
-      teacherName: session?.delivery?.deliveredByName || teacherId,
+      teacherName: resolveDeliveryPersonDisplayName(session, teacherId) || teacherId,
+      personId: teacherId,
       conflictClass: buildReportAssignmentLabel(assignment, classIdTitleMap),
       existTime: `${window.start} - ${window.end}`,
       conflictType: 'report_assignment',
@@ -347,42 +381,65 @@ async function detectSessionConflicts({
         status: sessionRow?.status,
         notes: sessionRow?.notes
       })) return;
-      const tid = resolveTeacherPersonId(resolveSessionTeacherId(sessionRow, classFallbackTeacherId), teacherIdentityLookup);
       const date = String(sessionRow?.date || '').trim();
       const startTime = String(sessionRow?.startTime || '').trim();
       const endTime = String(sessionRow?.endTime || '').trim();
-      if (!tid || !date || !startTime || !endTime) return;
-      const key = `${tid}::${date}`;
-      if (!teacherDayMap.has(key)) teacherDayMap.set(key, []);
-      teacherDayMap.get(key).push({
-        classId: sourceClassId,
-        startTime,
-        endTime
+      if (!date || !startTime || !endTime) return;
+      const deliveryPersonIds = resolveSessionDeliveryPersonIds(
+        sessionRow,
+        classFallbackTeacherId,
+        teacherIdentityLookup
+      );
+      deliveryPersonIds.forEach((tid) => {
+        if (!tid) return;
+        const key = `${tid}::${date}`;
+        if (!teacherDayMap.has(key)) teacherDayMap.set(key, []);
+        teacherDayMap.get(key).push({
+          classId: sourceClassId,
+          startTime,
+          endTime
+        });
       });
     });
   });
   const conflicts = [];
 
-  const normalizedSessions = parsedSessions.map((session, index) => ({
-    ...session,
-    _rowIndex: index,
-    resolvedPersonId: resolveTeacherPersonId(resolveSessionTeacherId(session, fallbackTeacherId), teacherIdentityLookup)
-  }));
+  const normalizedSessions = parsedSessions.map((session, index) => {
+    const resolvedDeliveryPersonIds = resolveSessionDeliveryPersonIds(
+      session,
+      fallbackTeacherId,
+      teacherIdentityLookup
+    );
+    return {
+      ...session,
+      _rowIndex: index,
+      resolvedPersonId: resolvedDeliveryPersonIds[0]
+        || resolveTeacherPersonId(resolveSessionTeacherId(session, fallbackTeacherId), teacherIdentityLookup),
+      resolvedDeliveryPersonIds
+    };
+  });
 
-  const leaveConflictWindows = normalizedSessions
+  const leaveConflictWindows = [];
+  normalizedSessions
     .filter((ses) => !sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(statusMap, {
       status: ses?.status,
       notes: ses?.notes
     }))
-    .filter((ses) => ses.resolvedPersonId && ses.date && ses.startTime && ses.endTime)
-    .map((ses) => ({
-      sessionIndex: ses._rowIndex,
-      personId: ses.resolvedPersonId,
-      personName: ses?.delivery?.deliveredByName || ses.resolvedPersonId,
-      date: ses.date,
-      startTime: ses.startTime,
-      endTime: ses.endTime
-    }));
+    .filter((ses) => ses.date && ses.startTime && ses.endTime)
+    .forEach((ses) => {
+      (Array.isArray(ses.resolvedDeliveryPersonIds) ? ses.resolvedDeliveryPersonIds : [])
+        .forEach((personId) => {
+          if (!personId) return;
+          leaveConflictWindows.push({
+            sessionIndex: ses._rowIndex,
+            personId,
+            personName: resolveDeliveryPersonDisplayName(ses, personId) || personId,
+            date: ses.date,
+            startTime: ses.startTime,
+            endTime: ses.endTime
+          });
+        });
+    });
 
   const leaveConflicts = await leaveRequestService.findApprovedLeaveConflicts({
     orgId: activeOrgId,
@@ -478,62 +535,71 @@ async function detectSessionConflicts({
       notes: ses?.notes
     })) return;
 
-    const tid = ses.resolvedPersonId;
-    if (!tid || !ses.date || !ses.startTime || !ses.endTime) return;
+    const deliveryPersonIds = Array.isArray(ses.resolvedDeliveryPersonIds)
+      ? ses.resolvedDeliveryPersonIds
+      : [ses.resolvedPersonId].filter(Boolean);
+    if (!deliveryPersonIds.length || !ses.date || !ses.startTime || !ses.endTime) return;
 
     const newStart = new Date(`${ses.date}T${ses.startTime}`);
     const newEnd = new Date(`${ses.date}T${ses.endTime}`);
     if (Number.isNaN(newStart.getTime()) || Number.isNaN(newEnd.getTime())) return;
 
-    const teacherDay = teacherDayMap.get(`${tid}::${ses.date}`) || [];
-    teacherDay.forEach((existingSes) => {
-      if (classId && idsEqual(existingSes.classId, classId)) return;
+    deliveryPersonIds.forEach((tid) => {
+      if (!tid) return;
+      const teacherDay = teacherDayMap.get(`${tid}::${ses.date}`) || [];
+      teacherDay.forEach((existingSes) => {
+        if (classId && idsEqual(existingSes.classId, classId)) return;
 
-      const existStart = new Date(`${ses.date}T${existingSes.startTime}`);
-      const existEnd = new Date(`${ses.date}T${existingSes.endTime}`);
-      if (Number.isNaN(existStart.getTime()) || Number.isNaN(existEnd.getTime())) return;
+        const existStart = new Date(`${ses.date}T${existingSes.startTime}`);
+        const existEnd = new Date(`${ses.date}T${existingSes.endTime}`);
+        if (Number.isNaN(existStart.getTime()) || Number.isNaN(existEnd.getTime())) return;
 
-      if (newStart < existEnd && newEnd > existStart) {
-        const conflictClassTitle = classIdTitleMap.get(toPublicId(existingSes.classId)) || existingSes.classId;
-        conflicts.push({
-          sessionIndex: index,
-          date: ses.date,
-          teacherName: ses?.delivery?.deliveredByName || tid,
-          personId: tid,
-          conflictClass: conflictClassTitle,
-          existTime: `${existingSes.startTime} - ${existingSes.endTime}`,
-          conflictType: 'teacher_schedule'
-        });
+        if (newStart < existEnd && newEnd > existStart) {
+          const conflictClassTitle = classIdTitleMap.get(toPublicId(existingSes.classId)) || existingSes.classId;
+          conflicts.push({
+            sessionIndex: index,
+            date: ses.date,
+            teacherName: resolveDeliveryPersonDisplayName(ses, tid) || tid,
+            personId: tid,
+            conflictClass: conflictClassTitle,
+            existTime: `${existingSes.startTime} - ${existingSes.endTime}`,
+            conflictType: 'teacher_schedule'
+          });
+        }
+      });
+
+      for (let j = 0; j < normalizedSessions.length; j++) {
+        if (index === j) continue;
+        const otherSes = normalizedSessions[j];
+
+        if (sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(statusMap, {
+          status: otherSes?.status,
+          notes: otherSes?.notes
+        })) continue;
+        const otherPersonIds = Array.isArray(otherSes.resolvedDeliveryPersonIds)
+          ? otherSes.resolvedDeliveryPersonIds
+          : [otherSes.resolvedPersonId].filter(Boolean);
+        if (!otherPersonIds.some((otherId) => idsEqual(otherId, tid))) continue;
+        if (otherSes.date !== ses.date) continue;
+        if (!otherSes.startTime || !otherSes.endTime) continue;
+
+        const otherStart = new Date(`${otherSes.date}T${otherSes.startTime}`);
+        const otherEnd = new Date(`${otherSes.date}T${otherSes.endTime}`);
+        if (Number.isNaN(otherStart.getTime()) || Number.isNaN(otherEnd.getTime())) continue;
+
+        if (newStart < otherEnd && newEnd > otherStart) {
+          conflicts.push({
+            sessionIndex: index,
+            date: ses.date,
+            teacherName: resolveDeliveryPersonDisplayName(ses, tid) || tid,
+            personId: tid,
+            conflictClass: 'Another unsaved session in this list',
+            existTime: `${otherSes.startTime} - ${otherSes.endTime}`,
+            conflictType: 'teacher_schedule'
+          });
+        }
       }
     });
-
-    for (let j = 0; j < normalizedSessions.length; j++) {
-      if (index === j) continue;
-      const otherSes = normalizedSessions[j];
-
-      if (sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(statusMap, {
-        status: otherSes?.status,
-        notes: otherSes?.notes
-      })) continue;
-      if (otherSes.resolvedPersonId !== tid || otherSes.date !== ses.date) continue;
-      if (!otherSes.startTime || !otherSes.endTime) continue;
-
-      const otherStart = new Date(`${otherSes.date}T${otherSes.startTime}`);
-      const otherEnd = new Date(`${otherSes.date}T${otherSes.endTime}`);
-      if (Number.isNaN(otherStart.getTime()) || Number.isNaN(otherEnd.getTime())) continue;
-
-      if (newStart < otherEnd && newEnd > otherStart) {
-        conflicts.push({
-          sessionIndex: index,
-          date: ses.date,
-          teacherName: ses?.delivery?.deliveredByName || tid,
-          personId: tid,
-          conflictClass: 'Another unsaved session in this list',
-          existTime: `${otherSes.startTime} - ${otherSes.endTime}`,
-          conflictType: 'teacher_schedule'
-        });
-      }
-    }
   });
 
   if (includeExternalScheduleConflicts) {
@@ -551,24 +617,32 @@ async function detectSessionConflicts({
         notes: ses?.notes
       })) continue;
 
-      // eslint-disable-next-line no-await-in-loop
-      await appendActivitySessionConflicts({
-        conflicts,
-        session: ses,
-        sessionIndex: index,
-        activeOrgId,
-        reqUser
-      });
-      // eslint-disable-next-line no-await-in-loop
-      await appendReportAssignmentConflicts({
-        conflicts,
-        session: ses,
-        sessionIndex: index,
-        activeOrgId,
-        classSessionsById,
-        classIdTitleMap,
-        teacherIdentityLookup
-      });
+      const deliveryPersonIds = Array.isArray(ses.resolvedDeliveryPersonIds)
+        ? ses.resolvedDeliveryPersonIds
+        : [ses.resolvedPersonId].filter(Boolean);
+      for (let p = 0; p < deliveryPersonIds.length; p += 1) {
+        const personId = deliveryPersonIds[p];
+        if (!personId) continue;
+        const personScopedSession = { ...ses, resolvedPersonId: personId };
+        // eslint-disable-next-line no-await-in-loop
+        await appendActivitySessionConflicts({
+          conflicts,
+          session: personScopedSession,
+          sessionIndex: index,
+          activeOrgId,
+          reqUser
+        });
+        // eslint-disable-next-line no-await-in-loop
+        await appendReportAssignmentConflicts({
+          conflicts,
+          session: personScopedSession,
+          sessionIndex: index,
+          activeOrgId,
+          classSessionsById,
+          classIdTitleMap,
+          teacherIdentityLookup
+        });
+      }
     }
   }
 
@@ -887,6 +961,8 @@ module.exports = {
   detectSessionConflicts,
   detectStudentScheduleConflicts,
   evaluateEnrollmentGapBatchConflicts,
+  resolveSessionDeliveryPersonIds,
+  resolveDeliveryPersonDisplayName,
   buildEnrollmentGapConflictReview,
   buildConflictBlockingMessage,
   buildTeacherIdentityLookup,
