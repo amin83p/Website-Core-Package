@@ -47,6 +47,30 @@ test('normalizeGradebookActivitySkills migrates legacy skillFocus when skills mi
   assert.equal(normalized.skillFocus, 'Listening, Speaking');
 });
 
+test('normalizeSessionSkillsCovered keeps unique skills with notes and drops invalid ids', () => {
+  const normalized = gradebookSkillCatalogService.normalizeSessionSkillsCovered([
+    { skillId: 'listening', note: 'Introduced short dialogues' },
+    { skillId: 'listening', note: 'Duplicate should be ignored' },
+    { skillId: 'not-a-skill', note: 'Invalid' },
+    { skillId: 'reading', note: '  Chapter 2 skim  ' },
+    { id: 'writing', notes: 'Paragraph outlines' }
+  ]);
+  assert.deepEqual(normalized, [
+    { skillId: 'listening', skillLabel: 'Listening', note: 'Introduced short dialogues' },
+    { skillId: 'reading', skillLabel: 'Reading', note: 'Chapter 2 skim' },
+    { skillId: 'writing', skillLabel: 'Writing', note: 'Paragraph outlines' }
+  ]);
+});
+
+test('normalizeSessionSkillsCovered accepts JSON string payloads', () => {
+  const normalized = gradebookSkillCatalogService.normalizeSessionSkillsCovered(
+    JSON.stringify([{ skillId: 'zoom', note: 'Breakout rooms' }])
+  );
+  assert.deepEqual(normalized, [
+    { skillId: 'zoom', skillLabel: 'ZOOM', note: 'Breakout rooms' }
+  ]);
+});
+
 test('getPrefillCatalog includes programmatic gradebook skill keys', () => {
   const catalog = reportService.getPrefillCatalog();
   assert.ok(Array.isArray(catalog.gradebookPeriodSkillsClass));

@@ -121,10 +121,10 @@ function getDocxDependencies() {
   return { PizZip, Docxtemplater };
 }
 
-async function renderReportInstanceDocx({ template, instance, placeholders, collections }) {
+async function renderReportInstanceDocx({ template, instance, placeholders, collections, docxTemplateOverride = null }) {
   if (!template || !instance) throw new Error('Template and report instance are required.');
 
-  const docxTemplate = template.docxTemplate || {};
+  const docxTemplate = docxTemplateOverride || template.docxTemplate || {};
   const filePath = resolveTemplateFilePath(docxTemplate);
   if (!filePath) {
     throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
@@ -178,7 +178,6 @@ async function renderReportInstanceDocx({ template, instance, placeholders, coll
   };
 }
 
-
 function mergeReportInstanceDocxBuffers(buffers = []) {
   const sourceBuffers = (Array.isArray(buffers) ? buffers : []).filter(Boolean);
   if (!sourceBuffers.length) throw new Error('No rendered report documents were available to combine.');
@@ -209,11 +208,38 @@ function mergeReportInstanceDocxBuffers(buffers = []) {
   return baseZip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
 
+async function zipReportInstanceDocxFiles(files = []) {
+  const entries = (Array.isArray(files) ? files : [])
+    .filter((row) => row && row.buffer)
+    .map((row, index) => {
+      const rawName = String(row.fileName || `report_${index + 1}`).trim();
+      const stem = rawName.replace(/\.docx$/i, '');
+      return {
+        fileName: sanitizeFileNamePart(stem) || `report_${index + 1}`,
+        buffer: row.buffer
+      };
+    });
+  if (!entries.length) throw new Error('No rendered report documents were available to zip.');
+  const JSZip = require('jszip');
+  const zip = new JSZip();
+  const usedNames = new Set();
+  entries.forEach((entry, index) => {
+    let name = `${entry.fileName}.docx`;
+    if (usedNames.has(name.toLowerCase())) {
+      name = `${entry.fileName}_${index + 1}.docx`;
+    }
+    usedNames.add(name.toLowerCase());
+    zip.file(name, entry.buffer);
+  });
+  return Buffer.from(await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
+}
+
 module.exports = {
   normalizeTokenKey,
   normalizeCollectionRows,
   buildRenderData,
   resolveTemplateFilePath,
   renderReportInstanceDocx,
-  mergeReportInstanceDocxBuffers
+  mergeReportInstanceDocxBuffers,
+  zipReportInstanceDocxFiles
 };

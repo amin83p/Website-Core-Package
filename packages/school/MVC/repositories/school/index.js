@@ -149,10 +149,23 @@ function isRecordAccessibleByAssignment(record = {}, scope = {}, options = {}) {
     return allowed.some((id) => idsEqual(id, personId));
   }
 
+  if (kind === 'teacherId') {
+    return idsEqual(record?.teacherId, personId);
+  }
+
   if (kind === 'personId') {
     return idsEqual(record?.personId, personId);
   }
 
+  return false;
+}
+
+function isRecordSubjectPersonMatch(record = {}, scope = {}, options = {}) {
+  const personId = toPublicId(scope?.personId);
+  if (!personId) return false;
+  const kind = String(options?.assignmentScopeKind || 'personId').trim() || 'personId';
+  if (kind === 'teacherId') return idsEqual(record?.teacherId, personId);
+  if (kind === 'personId') return idsEqual(record?.personId, personId);
   return false;
 }
 
@@ -170,9 +183,20 @@ function buildOwnerScopeFilterForUser(userId = '') {
   };
 }
 
-function buildOwnerScopeFilter(scope = {}) {
+function buildOwnerScopeFilter(scope = {}, options = {}) {
   if (!isOwnerScopeMode(scope)) return null;
-  return buildOwnerScopeFilterForUser(scope?.userId) || { id: '__NO_MATCH__' };
+  const ownerFilter = buildOwnerScopeFilterForUser(scope?.userId);
+  const personId = toPublicId(scope?.personId);
+  const kind = String(options?.assignmentScopeKind || 'personId').trim() || 'personId';
+  const subjectClauses = [];
+  if (personId && kind === 'teacherId') subjectClauses.push({ teacherId: personId });
+  if (personId && kind === 'personId') subjectClauses.push({ personId });
+  if (ownerFilter && subjectClauses.length) {
+    return { $or: [ownerFilter, ...subjectClauses] };
+  }
+  if (subjectClauses.length === 1) return subjectClauses[0];
+  if (subjectClauses.length > 1) return { $or: subjectClauses };
+  return ownerFilter || { id: '__NO_MATCH__' };
 }
 
 function buildAssignmentScopeFilter(scope = {}, options = {}) {
@@ -217,6 +241,9 @@ function buildAssignmentScopeFilter(scope = {}, options = {}) {
   }
   if (kind === 'personId') {
     return { personId };
+  }
+  if (kind === 'teacherId') {
+    return { teacherId: personId };
   }
 
   return { id: '__NO_MATCH__' };
@@ -288,7 +315,8 @@ function isRecordVisibleUnderScope(record = {}, scope = {}, options = {}) {
   if (scope?.canViewAll === true || scopeMode === SCOPE_MODES.ORG_WIDE) return true;
   if (scope?.denyAll === true || scopeMode === SCOPE_MODES.USER) return false;
   if (scopeMode === SCOPE_MODES.OWNER) {
-    return isRecordOwnedByScopeUser(record, scope);
+    // Timesheets (and similar) are keyed by teacher/person subject, not create-user ownership.
+    return isRecordOwnedByScopeUser(record, scope) || isRecordSubjectPersonMatch(record, scope, options);
   }
   if (scopeMode === SCOPE_MODES.ASSIGNMENT) {
     return isRecordAccessibleByAssignment(record, scope, options)
@@ -356,7 +384,7 @@ function buildSchoolScopeFilter(scope = {}, options = {}) {
         clauses.push({ id: '__NO_MATCH__' });
       }
     } else if (scopeMode === SCOPE_MODES.OWNER) {
-      const ownerFilter = buildOwnerScopeFilter(scope);
+      const ownerFilter = buildOwnerScopeFilter(scope, options);
       if (ownerFilter) clauses.push(ownerFilter);
     }
   }
@@ -1071,7 +1099,8 @@ const schoolRepositories = {
     defaultSearchFields: ['id', 'periodId', 'teacherId', 'status', 'orgId'],
     transformList: enrichTimesheetsWithOrg,
     transformItem: enrichTimesheetItem,
-    mongoScopeInMemory: true
+    mongoScopeInMemory: true,
+    assignmentScopeKind: 'teacherId'
   }),
   studentProgramRegistrations: createSchoolRepository({
     entityName: 'studentProgramRegistrations',

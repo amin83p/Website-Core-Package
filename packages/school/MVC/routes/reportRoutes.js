@@ -188,7 +188,7 @@ router.get('/templates/new',
 
 router.post('/templates/new',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
-  upload('school-reports').single('docxTemplate'),
+  upload('school-reports').any(),
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, reportTemplateCreateActionState),
   ctrl.saveTemplate);
 router.get('/templates/copy/:id',
@@ -203,7 +203,7 @@ router.get('/templates/edit/:id',
 
 router.post('/templates/edit/:id',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
-  upload('school-reports').single('docxTemplate'),
+  upload('school-reports').any(),
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
   ctrl.saveTemplate);
 
@@ -322,7 +322,17 @@ router.post('/instances/matrix/:assignmentId/prefill-apply',
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true }),
   ctrl.applyReportMatrixPrefill);
 
+router.get('/instances/matrix/:assignmentId/export-docx-preview',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  ctrl.previewReportMatrixDocxExport);
+
 router.get('/instances/matrix/:assignmentId/export',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  ctrl.exportReportMatrix);
+
+router.post('/instances/matrix/:assignmentId/export',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   ctrl.exportReportMatrix);
@@ -399,7 +409,17 @@ router.delete('/instances/delete/:id',
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.DELETE, { requireToken: true }),
   ctrl.deleteInstance);
 
+router.get('/instances/export/:id/docx-preview',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  ctrl.previewInstanceDocxExport);
+
 router.get('/instances/export/:id',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  ctrl.exportInstance);
+
+router.post('/instances/export/:id',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   ctrl.exportInstance);

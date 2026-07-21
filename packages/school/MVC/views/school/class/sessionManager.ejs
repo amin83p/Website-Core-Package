@@ -1429,6 +1429,50 @@
             </div>
 
             <div class="session-panel" id="session-panel-curriculum" role="tabpanel">
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="m-0 fw-bold text-primary"><i class="bi bi-bullseye me-2"></i>Skills covered</h5>
+                        <div class="small text-muted mt-1">Select gradebook skills and note what you covered in this session.</div>
+                    </div>
+                    <div class="card-body">
+                        <% if (!isReadOnly && !isMakeupRequiredInactive) { %>
+                        <div class="row g-2 align-items-end mb-3" id="skillsCoveredAddForm">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold mb-1" for="skillsCoveredSkillSelect">Skill</label>
+                                <select id="skillsCoveredSkillSelect" class="form-select">
+                                    <option value="">Select a skill…</option>
+                                    <% (gradebookSkills || []).forEach((skill) => { %>
+                                        <option value="<%= skill.id %>"><%= skill.label %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold mb-1" for="skillsCoveredNoteInput">What was covered</label>
+                                <input type="text" id="skillsCoveredNoteInput" class="form-control" maxlength="2000" placeholder="Brief note about what you covered…" autocomplete="off">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-primary w-100" id="btnAddSkillCovered"><i class="bi bi-plus-lg me-1"></i>Add</button>
+                            </div>
+                        </div>
+                        <% } %>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0" id="skillsCoveredTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col" style="width: 22%;">Skill</th>
+                                        <th scope="col">Note</th>
+                                        <% if (!isReadOnly && !isMakeupRequiredInactive) { %>
+                                        <th scope="col" class="text-end" style="width: 5rem;"></th>
+                                        <% } %>
+                                    </tr>
+                                </thead>
+                                <tbody id="skillsCoveredTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-muted small mt-2 d-none" id="skillsCoveredEmpty">No skills added for this session yet.</div>
+                    </div>
+                </div>
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white border-bottom py-3">
                         <h5 class="m-0 fw-bold text-primary"><i class="bi bi-book me-2"></i>Curriculum reference</h5>
@@ -4601,6 +4645,121 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderSessionContentList();
 
+    /* --- Curriculum: skills covered this session --- */
+    const skillsCoveredReadOnly = <%= JSON.stringify(!!isReadOnly || !!isMakeupRequiredInactive) %>;
+    const skillsCoveredCatalog = <%- jsonForScript(gradebookSkills || []) %>;
+    const skillsCoveredLabelById = new Map(skillsCoveredCatalog.map((skill) => [skill.id, skill.label]));
+    const skillsCoveredInitial = <%- jsonForScript(session.skillsCovered || []) %>;
+    let skillsCoveredState = (Array.isArray(skillsCoveredInitial) ? skillsCoveredInitial : [])
+        .map((row) => ({
+            skillId: String(row?.skillId || '').trim(),
+            skillLabel: String(row?.skillLabel || skillsCoveredLabelById.get(String(row?.skillId || '').trim()) || row?.skillId || '').trim(),
+            note: String(row?.note || '').trim()
+        }))
+        .filter((row) => row.skillId && skillsCoveredLabelById.has(row.skillId));
+
+    function renderSkillsCoveredTable() {
+        const tbody = document.getElementById('skillsCoveredTableBody');
+        const emptyEl = document.getElementById('skillsCoveredEmpty');
+        if (!tbody) return;
+        if (!skillsCoveredState.length) {
+            tbody.innerHTML = '';
+            if (emptyEl) emptyEl.classList.remove('d-none');
+            return;
+        }
+        if (emptyEl) emptyEl.classList.add('d-none');
+        tbody.innerHTML = skillsCoveredState.map((row, index) => {
+            const noteCell = skillsCoveredReadOnly
+                ? `<td class="small">${scEscapeHtml(row.note || '—')}</td>`
+                : `<td><input type="text" class="form-control form-control-sm skills-covered-note" data-index="${index}" maxlength="2000" value="${scEscapeHtml(row.note || '')}" placeholder="What was covered…"></td>`;
+            const removeCell = skillsCoveredReadOnly
+                ? ''
+                : `<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger skills-covered-remove" data-index="${index}" title="Remove" aria-label="Remove skill"><i class="bi bi-trash"></i></button></td>`;
+            return `<tr data-index="${index}">
+                <td class="fw-semibold">${scEscapeHtml(row.skillLabel || row.skillId)}</td>
+                ${noteCell}
+                ${removeCell}
+            </tr>`;
+        }).join('');
+    }
+
+    function syncSkillsCoveredSelectOptions() {
+        const select = document.getElementById('skillsCoveredSkillSelect');
+        if (!select || skillsCoveredReadOnly) return;
+        const used = new Set(skillsCoveredState.map((row) => row.skillId));
+        const current = select.value;
+        select.innerHTML = '<option value="">Select a skill…</option>' + skillsCoveredCatalog
+            .filter((skill) => !used.has(skill.id) || skill.id === current)
+            .map((skill) => `<option value="${scEscapeHtml(skill.id)}">${scEscapeHtml(skill.label)}</option>`)
+            .join('');
+        if (current && !used.has(current)) select.value = current;
+        else select.value = '';
+    }
+
+    function addSkillCoveredRow() {
+        if (skillsCoveredReadOnly) return;
+        const select = document.getElementById('skillsCoveredSkillSelect');
+        const noteInput = document.getElementById('skillsCoveredNoteInput');
+        const skillId = String(select?.value || '').trim();
+        const note = String(noteInput?.value || '').trim().slice(0, 2000);
+        if (!skillId || !skillsCoveredLabelById.has(skillId)) {
+            if (typeof showMessageModal === 'function') {
+                showMessageModal({ title: 'Skills covered', icon: 'warning', message: 'Select a skill before adding.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+            } else {
+                alert('Select a skill before adding.');
+            }
+            return;
+        }
+        if (!note) {
+            if (typeof showMessageModal === 'function') {
+                showMessageModal({ title: 'Skills covered', icon: 'warning', message: 'Add a short note about what you covered for this skill.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+            } else {
+                alert('Add a short note about what you covered for this skill.');
+            }
+            noteInput?.focus();
+            return;
+        }
+        const existingIndex = skillsCoveredState.findIndex((row) => row.skillId === skillId);
+        const entry = {
+            skillId,
+            skillLabel: skillsCoveredLabelById.get(skillId) || skillId,
+            note
+        };
+        if (existingIndex >= 0) skillsCoveredState[existingIndex] = entry;
+        else skillsCoveredState.push(entry);
+        if (noteInput) noteInput.value = '';
+        renderSkillsCoveredTable();
+        syncSkillsCoveredSelectOptions();
+        select?.focus();
+    }
+
+    document.getElementById('btnAddSkillCovered')?.addEventListener('click', addSkillCoveredRow);
+    document.getElementById('skillsCoveredNoteInput')?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            addSkillCoveredRow();
+        }
+    });
+    document.getElementById('skillsCoveredTableBody')?.addEventListener('input', (event) => {
+        const input = event.target.closest('.skills-covered-note');
+        if (!input) return;
+        const index = Number(input.getAttribute('data-index'));
+        if (!Number.isInteger(index) || !skillsCoveredState[index]) return;
+        skillsCoveredState[index].note = String(input.value || '').slice(0, 2000);
+    });
+    document.getElementById('skillsCoveredTableBody')?.addEventListener('click', (event) => {
+        const btn = event.target.closest('.skills-covered-remove');
+        if (!btn) return;
+        const index = Number(btn.getAttribute('data-index'));
+        if (!Number.isInteger(index) || index < 0 || index >= skillsCoveredState.length) return;
+        skillsCoveredState.splice(index, 1);
+        renderSkillsCoveredTable();
+        syncSkillsCoveredSelectOptions();
+    });
+
+    renderSkillsCoveredTable();
+    syncSkillsCoveredSelectOptions();
+
     /* --- Session gradebook (multiple activities per session) --- */
     const gbReadOnly = <%= JSON.stringify(!!isReadOnly || !!isMakeupRequiredInactive) %>;
     const gbClassId = sessionManagerClassId;
@@ -5254,6 +5413,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload.roster = JSON.stringify(roster);
                 payload.contentItems = JSON.stringify(Array.isArray(manualSessionContentState) ? manualSessionContentState : []);
                 payload.contentOrder = JSON.stringify(Array.isArray(sessionContentOrderState) ? sessionContentOrderState : []);
+                payload.skillsCovered = JSON.stringify(Array.isArray(skillsCoveredState) ? skillsCoveredState : []);
             }
 
             btn.disabled = true;

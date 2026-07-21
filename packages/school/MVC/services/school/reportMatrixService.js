@@ -760,7 +760,24 @@ async function buildMatrixExportPayload({ assignmentId, assignmentRowId = '', te
     const effective = instance || { id: '', status: 'pending', studentId: row.studentId, teacherId: source.resolvedTeacherId, answers: {}, prefillSnapshot: await reportService.buildPrefillSnapshot({ assignment: source.assignment, teacherId: source.resolvedTeacherId, studentId: row.studentId, reqUser }) };
     rows.push({ studentId: row.studentId, studentName: row.studentName, status: row.status, locked: row.locked, pending: row.isPending, instanceId: row.instanceId, prefillSnapshot: effective.prefillSnapshot || {}, answers: effective.answers || {}, rawAnswers: effective.answers || {}, mergedAnswers: reportService.mergeTemplateData(source.template, effective, source.assignment) });
   }
-  return { assignmentId: matrix.assignmentId, assignmentRowId: matrix.assignmentRowId, templateId: matrix.templateId, templateTitle: matrix.templateTitle, classId: matrix.classId, className: matrix.className, sessionId: matrix.sessionId, sessionDate: matrix.sessionDate, teacherId: matrix.teacherId, assignmentSharedAnswers: source.assignment.sharedAnswers || {}, sharedAnswers: source.assignment.sharedAnswers || {}, commonFields: matrix.commonFields, sharedFields: matrix.sharedFields, rows };
+  return {
+    assignmentId: matrix.assignmentId,
+    assignmentRowId: matrix.assignmentRowId,
+    templateId: matrix.templateId,
+    templateTitle: matrix.templateTitle,
+    classId: matrix.classId,
+    className: matrix.className,
+    sessionId: matrix.sessionId,
+    sessionDate: matrix.sessionDate,
+    teacherId: matrix.teacherId,
+    reportStartDate: matrix.reportStartDate,
+    reportDueDate: matrix.reportDueDate,
+    assignmentSharedAnswers: source.assignment.sharedAnswers || {},
+    sharedAnswers: source.assignment.sharedAnswers || {},
+    commonFields: matrix.commonFields,
+    sharedFields: matrix.sharedFields,
+    rows
+  };
 }
 
 module.exports = {

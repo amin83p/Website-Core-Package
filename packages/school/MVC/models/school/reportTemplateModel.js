@@ -249,6 +249,39 @@ function sanitizeDocxTemplate(v) {
   };
 }
 
+function sanitizeDocxTemplatesByFunder(rawList, existingList = []) {
+  const existingByKey = new Map(
+    (Array.isArray(existingList) ? existingList : [])
+      .map((row) => [String(row?.funderKey || '').trim().toLowerCase(), row])
+      .filter(([key]) => key)
+  );
+  const seen = new Set();
+  const out = [];
+  (Array.isArray(rawList) ? rawList : []).forEach((row) => {
+    if (!isPlainObject(row)) return;
+    const funderKeyRaw = cleanString(row.funderKey || row.funderId, { max: 80, allowEmpty: false });
+    if (!funderKeyRaw) return;
+    const funderKey = funderKeyRaw.toLowerCase() === 'self'
+      ? 'self'
+      : cleanId(funderKeyRaw, { max: 80, allowEmpty: false });
+    if (!funderKey) return;
+    const keyNorm = funderKey.toLowerCase();
+    if (seen.has(keyNorm)) return;
+    seen.add(keyNorm);
+    const existing = existingByKey.get(keyNorm) || null;
+    const docxTemplate = sanitizeDocxTemplate(row.docxTemplate)
+      || sanitizeDocxTemplate(existing?.docxTemplate);
+    if (!docxTemplate) return;
+    out.push({
+      funderKey,
+      label: cleanString(row.label || existing?.label, { max: 180, allowEmpty: true })
+        || (funderKey === 'self' ? 'Self Fund' : funderKey),
+      docxTemplate
+    });
+  });
+  return out;
+}
+
 function sanitizeAudit(v, existingAudit = {}) {
   const raw = isPlainObject(v) ? v : {};
   return {
@@ -284,6 +317,10 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
     schema,
     placeholderMap,
     docxTemplate: sanitizeDocxTemplate(input.docxTemplate) || sanitizeDocxTemplate(existing?.docxTemplate),
+    docxTemplatesByFunder: sanitizeDocxTemplatesByFunder(
+      input.docxTemplatesByFunder,
+      existing?.docxTemplatesByFunder
+    ),
     audit: sanitizeAudit(input.audit, existing?.audit || {})
   };
 
@@ -394,6 +431,9 @@ async function deleteTemplate(id) {
 module.exports = {
   TEMPLATE_STATUSES: Object.freeze([...TEMPLATE_STATUSES]),
   FIELD_TYPES: Object.freeze([...FIELD_TYPES]),
+  sanitizeDocxTemplate,
+  sanitizeDocxTemplatesByFunder,
+  sanitizeTemplate,
   getAllTemplates,
   getTemplateById,
   addTemplate,

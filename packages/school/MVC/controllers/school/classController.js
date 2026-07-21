@@ -3888,7 +3888,7 @@ async function createMakeupSession(req, res) {
 async function saveSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { status, notes, room, roster, contentItems, contentOrder } = req.body; 
+        const { status, notes, room, roster, contentItems, contentOrder, skillsCovered } = req.body; 
         const forceRemoveMakeups = parseBoolean(req.body?.forceRemoveMakeups, false);
         const forceMetadataConflicts = parseBoolean(req.body?.force, false);
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
@@ -4043,6 +4043,9 @@ async function saveSession(req, res) {
         if (!shouldSkipInstructionalPayload && contentOrder !== undefined) {
             const parsedOrder = typeof contentOrder === 'string' ? JSON.parse(contentOrder || '[]') : contentOrder;
             originalSession.contentOrder = normalizeSessionContentOrder(parsedOrder);
+        }
+        if (!shouldSkipInstructionalPayload && skillsCovered !== undefined) {
+            originalSession.skillsCovered = gradebookSkillCatalogService.normalizeSessionSkillsCovered(skillsCovered);
         }
 
         if (!shouldSkipInstructionalPayload && roster !== undefined) {

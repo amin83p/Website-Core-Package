@@ -31,7 +31,7 @@ const SECTION_DEFINITIONS = Object.freeze([
       value: 'bi bi-table'
     },
     insertAfterSectionId: '445568',
-    operations: ['OP1002', 'OP1003']
+    operations: ['OP1002', 'OP1003', 'OP1005', 'OP1006']
   }
 ]);
 

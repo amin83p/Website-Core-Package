@@ -2657,6 +2657,18 @@
           "sessionAttempts": 5,
           "sessionTime": 15,
           "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1006",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
         }
       ],
       "subsections": [],

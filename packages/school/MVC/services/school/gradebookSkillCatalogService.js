@@ -90,6 +90,36 @@ function normalizeGradebookActivitySkills(activity = {}) {
   };
 }
 
+/**
+ * Session curriculum rows: one entry per gradebook skill with an optional coverage note.
+ * @returns {{ skillId: string, skillLabel: string, note: string }[]}
+ */
+function normalizeSessionSkillsCovered(raw = []) {
+  const source = typeof raw === 'string'
+    ? (() => {
+      try { return JSON.parse(raw || '[]'); } catch (_e) { return []; }
+    })()
+    : raw;
+  if (!Array.isArray(source)) return [];
+
+  const seen = new Set();
+  const output = [];
+  source.forEach((row) => {
+    if (!row || typeof row !== 'object') return;
+    const skillId = normalizeGradebookSkillIds([row.skillId || row.id || row.skill])[0];
+    if (!skillId || seen.has(skillId)) return;
+    seen.add(skillId);
+    const skill = SKILL_BY_ID.get(skillId);
+    const note = String(row.note || row.notes || row.coverageNote || '').trim().slice(0, 2000);
+    output.push({
+      skillId,
+      skillLabel: skill?.label || String(row.skillLabel || row.label || skillId).trim().slice(0, 120),
+      note
+    });
+  });
+  return output;
+}
+
 module.exports = {
   GRADEBOOK_SKILLS,
   listGradebookSkills,
@@ -97,5 +127,6 @@ module.exports = {
   normalizeGradebookSkillIds,
   formatGradebookSkillLabels,
   matchSkillIdsFromLegacyText,
-  normalizeGradebookActivitySkills
+  normalizeGradebookActivitySkills,
+  normalizeSessionSkillsCovered
 };

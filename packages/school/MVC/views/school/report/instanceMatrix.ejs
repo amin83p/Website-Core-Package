@@ -91,7 +91,7 @@
         <% } %>
         <a href="/school/reports/instances" class="btn btn-outline-primary btn-sm"><i class="bi bi-list-check me-1"></i>Instances</a>
         <button type="button" class="btn btn-outline-warning btn-sm" id="btnMatrixPrefillPreview"><i class="bi bi-arrow-repeat me-1"></i>Preview Prefill Updates</button>
-        <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=docx" class="btn btn-outline-secondary btn-sm js-export-report-instance"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</a>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnMatrixExportDocx"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</button>
         <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=json&download=1" class="btn btn-outline-secondary btn-sm js-export-report-instance"><i class="bi bi-download me-1"></i>Export Payload</a>
       </div>
     </div>
@@ -773,6 +773,130 @@
       runMatrixLifecycleAction('unlock', collectMatrixLifecycleTargets('unlock'));
     });
 
+    const matrixDocxModalEl = document.getElementById('matrixDocxExportModal');
+    const matrixDocxModal = matrixDocxModalEl && window.bootstrap?.Modal
+      ? window.bootstrap.Modal.getOrCreateInstance(matrixDocxModalEl)
+      : null;
+
+    function buildDocxOptionHtml(options, selectedKey) {
+      return (Array.isArray(options) ? options : []).map((opt) => {
+        const key = String(opt.key || '');
+        const selected = key === String(selectedKey || '') ? ' selected' : '';
+        const label = String(opt.label || key);
+        const fileName = String(opt.fileName || '');
+        return `<option value="${key.replace(/"/g, '&quot;')}"${selected}>${label}${fileName ? ` (${fileName})` : ''}</option>`;
+      }).join('');
+    }
+
+    document.getElementById('btnMatrixExportDocx')?.addEventListener('click', async () => {
+      try {
+        const previewUrl = '/school/reports/instances/matrix/'
+          + encodeURIComponent(matrixState.assignmentId)
+          + '/export-docx-preview?assignmentRowId=' + encodeURIComponent(matrixState.assignmentRowId || '')
+          + '&teacherId=' + encodeURIComponent(matrixState.teacherId || '');
+        const response = await fetch(previewUrl, {
+          headers: { Accept: 'application/json', 'x-ajax-request': 'true' }
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.status === 'error') {
+          throw new Error(result.message || 'Unable to prepare Word export suggestions.');
+        }
+        const tbody = document.getElementById('matrixDocxExportRows');
+        tbody.innerHTML = '';
+        (result.rows || []).forEach((row) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>
+              <input type="hidden" class="js-docx-student-id" value="${String(row.studentId || '').replace(/"/g, '&quot;')}">
+              ${String(row.studentName || row.studentId || '')}
+            </td>
+            <td>${String(row.funderLabel || 'Default / unknown')}</td>
+            <td>
+              <select class="form-select form-select-sm js-docx-key">
+                ${buildDocxOptionHtml(row.availableDocxOptions || result.availableDocxOptions, row.suggestedDocxKey)}
+              </select>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+        matrixDocxModal?.show();
+      } catch (error) {
+        await showReportMatrixMessage({
+          title: 'Export DOCX',
+          icon: 'error',
+          message: error?.message || 'Unable to open export options.'
+        });
+      }
+    });
+
+    document.getElementById('btnConfirmMatrixDocxExport')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnConfirmMatrixDocxExport');
+      const original = btn?.innerHTML;
+      try {
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = 'Exporting…';
+        }
+        const selections = [...document.querySelectorAll('#matrixDocxExportRows tr')].map((tr) => ({
+          studentId: tr.querySelector('.js-docx-student-id')?.value || '',
+          docxKey: tr.querySelector('.js-docx-key')?.value || 'default'
+        })).filter((row) => row.studentId);
+        const mode = document.querySelector('input[name="matrixDocxExportMode"]:checked')?.value || 'consolidated';
+        const response = await fetch(
+          '/school/reports/instances/matrix/' + encodeURIComponent(matrixState.assignmentId) + '/export',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/octet-stream',
+              'x-ajax-request': 'true'
+            },
+            body: JSON.stringify({
+              format: 'docx',
+              mode,
+              assignmentRowId: matrixState.assignmentRowId || '',
+              teacherId: matrixState.teacherId || '',
+              selections
+            })
+          }
+        );
+        if (!response.ok) {
+          let message = 'Export failed.';
+          try {
+            const err = await response.json();
+            message = err.message || message;
+          } catch (_) {}
+          throw new Error(message);
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const fileName = match?.[1] || (mode === 'zip'
+          ? `report-matrix-${matrixState.assignmentId}.zip`
+          : `report-matrix-${matrixState.assignmentId}.docx`);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        matrixDocxModal?.hide();
+      } catch (error) {
+        await showReportMatrixMessage({
+          title: 'Export Failed',
+          icon: 'error',
+          message: error?.message || 'Unable to export Word files.'
+        });
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = original;
+        }
+      }
+    });
+
     window.addEventListener('beforeunload', (event) => {
       if (!sharedDirty && dirtyStudents.size === 0) return;
       event.preventDefault();
@@ -782,3 +906,43 @@
     initializeTooltips();
   })();
 </script>
+
+<div class="modal fade" id="matrixDocxExportModal" tabindex="-1" aria-labelledby="matrixDocxExportModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="matrixDocxExportModalLabel">Export Word reports</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <div class="fw-semibold mb-2">Export mode</div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="matrixDocxExportMode" id="matrixDocxModeConsolidated" value="consolidated" checked>
+            <label class="form-check-label" for="matrixDocxModeConsolidated">One consolidated Word file</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="matrixDocxExportMode" id="matrixDocxModeZip" value="zip">
+            <label class="form-check-label" for="matrixDocxModeZip">ZIP with one Word file per student</label>
+          </div>
+        </div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Student</th>
+                <th>Funder</th>
+                <th>Word template</th>
+              </tr>
+            </thead>
+            <tbody id="matrixDocxExportRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnConfirmMatrixDocxExport">Export</button>
+      </div>
+    </div>
+  </div>
+</div>

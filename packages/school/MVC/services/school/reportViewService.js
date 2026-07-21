@@ -10,6 +10,7 @@ const reportAssignmentModel = require('../../models/school/reportAssignmentModel
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
+const reportFunderDocxService = require('./reportFunderDocxService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function isSchoolReportAdminViewer(reqUser) {
@@ -880,7 +881,8 @@ function buildTemplateSavePayload({
   existingTemplate,
   activeOrgId,
   reqUser,
-  uploadedFile
+  uploadedFile,
+  uploadedFiles = []
 }) {
   const payload = {
     orgId: existingTemplate?.orgId || activeOrgId,
@@ -899,11 +901,64 @@ function buildTemplateSavePayload({
     }
   };
 
-  const uploadedDocx = resolveUploadedFileRecord(uploadedFile);
+  const defaultUpload = uploadedFile
+    || (Array.isArray(uploadedFiles) ? uploadedFiles : []).find((file) => String(file?.fieldname || '') === 'docxTemplate')
+    || null;
+  const uploadedDocx = resolveUploadedFileRecord(defaultUpload);
   if (uploadedDocx) payload.docxTemplate = uploadedDocx;
   else if (existingTemplate?.docxTemplate) payload.docxTemplate = existingTemplate.docxTemplate;
 
+  payload.docxTemplatesByFunder = buildDocxTemplatesByFunderFromUpload({
+    body,
+    existingTemplate,
+    uploadedFiles
+  });
+
   return payload;
+}
+
+function buildDocxTemplatesByFunderFromUpload({ body = {}, existingTemplate = null, uploadedFiles = [] } = {}) {
+  const existingByKey = new Map(
+    (Array.isArray(existingTemplate?.docxTemplatesByFunder) ? existingTemplate.docxTemplatesByFunder : [])
+      .map((row) => [String(row?.funderKey || '').trim().toLowerCase(), row])
+      .filter(([key]) => key)
+  );
+
+  let keys = body.funderDocxKeys;
+  if (typeof keys === 'string') keys = [keys];
+  if (!Array.isArray(keys)) keys = [];
+  keys = keys.map((key) => String(key || '').trim()).filter(Boolean);
+
+  let labels = body.funderDocxLabels;
+  if (typeof labels === 'string') labels = [labels];
+  if (!Array.isArray(labels)) labels = [];
+
+  const filesByField = new Map();
+  (Array.isArray(uploadedFiles) ? uploadedFiles : []).forEach((file) => {
+    const field = String(file?.fieldname || '').trim();
+    if (!field.startsWith('funderDocxFile_')) return;
+    const key = field.slice('funderDocxFile_'.length);
+    if (key) filesByField.set(key, file);
+  });
+
+  const out = [];
+  const seen = new Set();
+  keys.forEach((rawKey, index) => {
+    const funderKey = rawKey.toLowerCase() === 'self' ? 'self' : rawKey;
+    const keyNorm = funderKey.toLowerCase();
+    if (seen.has(keyNorm)) return;
+    seen.add(keyNorm);
+    const uploaded = resolveUploadedFileRecord(filesByField.get(rawKey) || filesByField.get(funderKey));
+    const existing = existingByKey.get(keyNorm) || null;
+    const docxTemplate = uploaded || existing?.docxTemplate || null;
+    if (!docxTemplate) return;
+    out.push({
+      funderKey,
+      label: String(labels[index] || existing?.label || (funderKey === 'self' ? 'Self Fund' : funderKey)).trim(),
+      docxTemplate
+    });
+  });
+  return out;
 }
 
 function parseAssignmentSaveRequest(body) {
@@ -1336,7 +1391,7 @@ async function buildInstanceListRows({
         classTitle: classItem?.title || row.classId,
         classLifecycle: buildClassLifecycleSnapshot(classItem || {}),
         templateTitle: template?.title || row.templateId,
-        hasDocxTemplate: Boolean(template?.docxTemplate?.path),
+        hasDocxTemplate: reportFunderDocxService.templateHasAnyDocx(template),
         assignmentStatus: assignment?.status || '',
         reportDueDate: resolveInstanceReportDueDate(row, assignment),
         teacherId: participants.teacherId,
@@ -1425,7 +1480,7 @@ async function buildInstanceListRows({
             classTitle: classItem?.title || assignment.classId,
             classLifecycle: buildClassLifecycleSnapshot(classItem || {}),
             templateTitle: template?.title || assignment.templateId,
-            hasDocxTemplate: Boolean(template?.docxTemplate?.path),
+            hasDocxTemplate: reportFunderDocxService.templateHasAnyDocx(template),
             assignmentStatus: assignment.status || '',
             audit: assignment.audit || {}
           });
@@ -1831,6 +1886,7 @@ module.exports = {
   filterRecordsByOrg,
   buildHomeSummary,
   buildTemplateSavePayload,
+  buildDocxTemplatesByFunderFromUpload,
   parseAssignmentSaveRequest,
   parseTargetRowsField,
   buildAssignmentListContext,

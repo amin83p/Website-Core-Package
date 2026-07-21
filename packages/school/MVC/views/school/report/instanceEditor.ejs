@@ -180,8 +180,8 @@
             <span class="badge bg-secondary ms-1"><%= reviewOlderCount %></span>
           </button>
         <% } %>
-        <% if (template?.docxTemplate?.path) { %>
-          <a href="/school/reports/instances/export/<%= instance.id %>?format=docx&download=1" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</a>
+        <% if (template?.docxTemplate?.path || (Array.isArray(template?.docxTemplatesByFunder) && template.docxTemplatesByFunder.some((row) => row?.docxTemplate?.path))) { %>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btnInstanceExportDocx"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</button>
         <% } %>
         <% if (!isV2) { %>
           <a href="/school/reports/instances/export/<%= instance.id %>?download=1" class="btn btn-outline-dark btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
@@ -1996,6 +1996,113 @@
         postReportLifecycleAction('unlock', button.getAttribute('data-instance-id'));
       });
     });
+
+    const instanceDocxModalEl = document.getElementById('instanceDocxExportModal');
+    const instanceDocxModal = instanceDocxModalEl && window.bootstrap?.Modal
+      ? window.bootstrap.Modal.getOrCreateInstance(instanceDocxModalEl)
+      : null;
+    const instanceExportId = String(<%= JSON.stringify(String(instance?.id || '')) %>);
+
+    document.getElementById('btnInstanceExportDocx')?.addEventListener('click', async () => {
+      try {
+        const response = await fetch(
+          '/school/reports/instances/export/' + encodeURIComponent(instanceExportId) + '/docx-preview',
+          { headers: { Accept: 'application/json', 'x-ajax-request': 'true' } }
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.status === 'error') {
+          throw new Error(result.message || 'Unable to prepare Word export.');
+        }
+        const row = (result.rows || [])[0] || {};
+        document.getElementById('instanceDocxFunderLabel').textContent = row.funderLabel || 'Default / unknown';
+        const select = document.getElementById('instanceDocxKeySelect');
+        select.innerHTML = '';
+        (row.availableDocxOptions || result.availableDocxOptions || []).forEach((opt) => {
+          const option = document.createElement('option');
+          option.value = opt.key;
+          option.textContent = opt.label + (opt.fileName ? ` (${opt.fileName})` : '');
+          if (String(opt.key) === String(row.suggestedDocxKey || '')) option.selected = true;
+          select.appendChild(option);
+        });
+        instanceDocxModal?.show();
+      } catch (error) {
+        if (typeof api?.showError === 'function') api.showError(error?.message || 'Unable to open export options.');
+        else window.alert(error?.message || 'Unable to open export options.');
+      }
+    });
+
+    document.getElementById('btnConfirmInstanceDocxExport')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnConfirmInstanceDocxExport');
+      const original = btn?.innerHTML;
+      try {
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = 'Exporting…';
+        }
+        const docxKey = document.getElementById('instanceDocxKeySelect')?.value || 'default';
+        const response = await fetch(
+          '/school/reports/instances/export/' + encodeURIComponent(instanceExportId),
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/octet-stream',
+              'x-ajax-request': 'true'
+            },
+            body: JSON.stringify({ format: 'docx', docxKey })
+          }
+        );
+        if (!response.ok) {
+          let message = 'Export failed.';
+          try {
+            const err = await response.json();
+            message = err.message || message;
+          } catch (_) {}
+          throw new Error(message);
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const fileName = match?.[1] || `report-${instanceExportId}.docx`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        instanceDocxModal?.hide();
+      } catch (error) {
+        if (typeof api?.showError === 'function') api.showError(error?.message || 'Unable to export Word file.');
+        else window.alert(error?.message || 'Unable to export Word file.');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = original;
+        }
+      }
+    });
   })();
 </script>
+
+<div class="modal fade" id="instanceDocxExportModal" tabindex="-1" aria-labelledby="instanceDocxExportModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="instanceDocxExportModalLabel">Export Word report</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 text-muted small">Detected funder: <strong id="instanceDocxFunderLabel">-</strong></div>
+        <label class="form-label fw-semibold" for="instanceDocxKeySelect">Word template</label>
+        <select class="form-select" id="instanceDocxKeySelect"></select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnConfirmInstanceDocxExport">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
 

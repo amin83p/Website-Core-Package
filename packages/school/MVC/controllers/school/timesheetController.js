@@ -15,6 +15,7 @@ const timesheetManualConflictService = require('../../services/school/timesheetM
 const priorPeriodAdjustmentService = require('../../services/school/timesheetPriorPeriodAdjustmentService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const timesheetManualMaterializationService = require('../../services/school/timesheetManualMaterializationService');
+const timesheetUnprocessService = require('../../services/school/timesheetUnprocessService');
 const timesheetPayrollContextService = require('../../services/school/timesheetPayrollContextService');
 const timesheetPayRateService = require('../../services/school/timesheetPayRateService');
 const taskService = require('../../services/school/taskService');
@@ -1486,6 +1487,7 @@ exports.viewTimesheet = async (req, res) => {
         const canManagerApprove = canManagerUpdate && status === 'submitted' && !managerApproved && period.status !== 'processed';
         const canSendBack = canManagerUpdate && status === 'submitted' && period.status !== 'processed';
         const canFinanceProcess = canFinanceConfigure && status === 'submitted' && managerApproved && period.status !== 'processed';
+        const canUnprocessProcessed = canFinanceConfigure && status === 'processed' && period.status !== 'processed';
         const isReadOnly = status === 'processed' || period.status === 'processed'
             || (status === 'submitted' && !canReviewerEdit);
 
@@ -1548,6 +1550,7 @@ exports.viewTimesheet = async (req, res) => {
             canManagerApprove,
             canSendBack,
             canFinanceProcess,
+            canUnprocessProcessed,
             canReviewerEdit,
             managerApproved,
             submissionDeadlineAt,
@@ -2414,17 +2417,40 @@ exports.decideManualTimesheetRow = async (req, res) => {
         if (existing.status !== 'submitted') throw new Error('Manual-row decisions are available only for submitted timesheets.');
 
         const now = new Date().toISOString();
+        const bodyStartTime = normalizeClockTime(req.body?.startTime || '');
+        const bodyEndTime = normalizeClockTime(req.body?.endTime || '');
+        const bodyRequestedHours = Number(parseFloat(req.body?.requestedHours ?? req.body?.durationHours) || 0);
         const entries = (Array.isArray(existing.entries) ? existing.entries : []).map((entry) => {
             if (!idsEqual(entry?.sessionId, entryId)) return entry;
             if (entry?.isManual !== true || entry?.activityPaid !== true) {
                 throw new Error('Only paid manual rows can receive an approval decision.');
             }
-            if (!isPendingManualApproval(entry)) {
+            const priorApprovalStatus = String(entry.approvalStatus || '').trim().toLowerCase();
+            const canDecideNow = isPendingManualApproval(entry)
+                || ['approved', 'rejected'].includes(priorApprovalStatus);
+            if (!canDecideNow) {
                 throw new Error('Only pending paid manual rows can receive an approval decision.');
             }
-            const requestedHours = Number(parseFloat(entry.requestedHours ?? entry.durationHours ?? 0) || 0);
+            let startTime = normalizeClockTime(entry.startTime || '');
+            let endTime = normalizeClockTime(entry.endTime || '');
+            let requestedHours = Number(parseFloat(entry.requestedHours ?? entry.durationHours ?? 0) || 0);
+            if (bodyStartTime && bodyEndTime) {
+                const calculatedHours = calculateHoursFromTimes(bodyStartTime, bodyEndTime);
+                if (!Number.isFinite(calculatedHours) || calculatedHours <= 0) {
+                    throw new Error('Manual row decision requires a valid time range where end time is after start time.');
+                }
+                startTime = bodyStartTime;
+                endTime = bodyEndTime;
+                requestedHours = calculatedHours;
+            } else if (Number.isFinite(bodyRequestedHours) && bodyRequestedHours > 0) {
+                requestedHours = bodyRequestedHours;
+            }
             return {
                 ...entry,
+                startTime,
+                endTime,
+                requestedHours,
+                durationHours: requestedHours,
                 approvalStatus: decision,
                 excludeFromTotals: decision === 'rejected',
                 hours: decision === 'approved' ? requestedHours : 0,
@@ -2550,6 +2576,91 @@ exports.processTimesheet = async (req, res) => {
             console.warn(`School task sync skipped for timesheet ${existing.id || ''}: ${error.message}`);
         }
         const payloadOut = { status: 'success', message: 'Timesheet processed and permanently locked.', lockSummary, materializationSummary: materialized?.summary || null };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        return res.json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.unprocessTimesheet = async (req, res) => {
+    let guardKey = '';
+    try {
+        const { periodId } = req.params;
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const teacherContext = await resolveTargetTeacherContext(req, {
+            requireTeacher: true,
+            operationId: OPERATIONS.READ_ALL,
+            managementOperationId: OPERATIONS.CONFIGURE
+        });
+        if (!await hasTimesheetManagementAuthority(req.user, OPERATIONS.CONFIGURE)) {
+            throw new Error('Timesheet Management CONFIGURE access is required to reopen a processed timesheet.');
+        }
+        guardKey = idempotencyGuardService.createGuardKey([
+            'timesheet_unprocess',
+            String(activeOrgId || '').trim(),
+            String(periodId || '').trim(),
+            String(teacherContext?.targetTeacherId || '').trim()
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({ key: guardKey, runningTtlMs: 120000, replayTtlMs: 15000 });
+        if (sendGuardedResponse(req, res, guardResult, 'Timesheet reopen is already in progress. Please wait.')) return;
+
+        const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
+        if (!period) throw new Error('Period not found.');
+        assertPeriodOrgAccess(period, activeOrgId, req.user);
+        const existing = normalizeTimesheetLifecycle(await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user));
+        if (!existing) throw new Error('Timesheet not found.');
+
+        const reopenNote = String(req.body?.note || req.body?.reopenNote || '').trim();
+        const eligibility = timesheetUnprocessService.validateUnprocessEligibility({
+            period,
+            timesheet: existing,
+            note: reopenNote
+        });
+        if (!eligibility.ok) throw new Error(eligibility.message);
+
+        const revertSummary = await timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet({
+            timesheetId: existing.id,
+            reqUser: req.user
+        });
+        await schoolDependencyService.unlockSourcesForTimesheet(existing, req.user);
+        const restoredEntries = restoreRevertedManualEntryIds(existing.entries, revertSummary);
+        const now = new Date().toISOString();
+        const totalHours = calculateTimesheetTotal(restoredEntries);
+        const submissionSnapshot = buildSubmissionSnapshot({
+            normalizedEntries: restoredEntries,
+            period,
+            reviewVersion: Number(existing.reviewVersion || 0),
+            submittedAt: String(existing.submissionSnapshot?.submittedAt || ''),
+            lastModifiedAt: now
+        });
+        const payload = {
+            ...timesheetUnprocessService.buildUnprocessTimesheetUpdate({
+                existing,
+                restoredEntries,
+                submissionSnapshot,
+                now,
+                actorId: resolveActorId(req.user),
+                actorName: resolveActorName(req.user),
+                totalHours
+            }),
+            reviewHistory: appendReviewHistory(existing, buildReviewHistoryEntry({
+                event: 'reopened',
+                reqUser: req.user,
+                note: reopenNote,
+                statusBefore: 'processed',
+                statusAfter: 'submitted',
+                submissionSnapshot,
+                totalHours,
+                entryCount: countActiveTimesheetEntries(restoredEntries)
+            }))
+        };
+        await dataService.updateData('timesheets', existing.id, payload, req.user);
+        const payloadOut = {
+            status: 'success',
+            message: 'Timesheet reopened to Manager Approved. Finance can process it again after any needed corrections.'
+        };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);
         return res.json(payloadOut);
     } catch (error) {

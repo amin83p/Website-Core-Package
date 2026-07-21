@@ -97,8 +97,61 @@
             <label class="form-label fw-bold">Description</label>
             <textarea name="description" class="form-control" rows="2" maxlength="4000"><%= template?.description || '' %></textarea>
           </div>
+
+          <div class="col-12">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <label class="form-label fw-bold mb-0">Word templates by funder</label>
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <select id="funderDocxPicker" class="form-select form-select-sm" style="min-width: 220px;">
+                  <option value="">Add funder…</option>
+                  <% (funderPickerOptions || []).forEach((opt) => { %>
+                    <option value="<%= opt.id %>" data-label="<%= opt.label %>"><%= opt.label %></option>
+                  <% }); %>
+                </select>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddFunderDocxRow">
+                  <i class="bi bi-plus-lg me-1"></i>Add
+                </button>
+              </div>
+            </div>
+            <div class="table-responsive border rounded">
+              <table class="table table-sm align-middle mb-0" id="funderDocxTable">
+                <thead class="table-light">
+                  <tr>
+                    <th style="min-width: 160px;">Funder</th>
+                    <th>Word file</th>
+                    <th style="width: 90px;"></th>
+                  </tr>
+                </thead>
+                <tbody id="funderDocxTableBody">
+                  <% (Array.isArray(template?.docxTemplatesByFunder) ? template.docxTemplatesByFunder : []).forEach((row) => { %>
+                    <tr data-funder-key="<%= row.funderKey %>">
+                      <td>
+                        <input type="hidden" name="funderDocxKeys" value="<%= row.funderKey %>">
+                        <input type="hidden" name="funderDocxLabels" value="<%= row.label || row.funderKey %>">
+                        <span class="fw-semibold"><%= row.label || row.funderKey %></span>
+                      </td>
+                      <td>
+                        <input type="file" class="form-control form-control-sm" name="funderDocxFile_<%= row.funderKey %>" accept=".docx">
+                        <% if (row?.docxTemplate?.url) { %>
+                          <div class="small text-muted mt-1">
+                            Current:
+                            <a href="<%= row.docxTemplate.url %>" target="_blank"><%= row.docxTemplate.originalName || row.docxTemplate.fileName %></a>
+                          </div>
+                        <% } %>
+                      </td>
+                      <td class="text-end">
+                        <button type="button" class="btn btn-outline-danger btn-sm btn-remove-funder-docx">Remove</button>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+            <div class="form-text">Map a Word file for Self Fund and each registered funder. Students without a mapping use the default Word file below.</div>
+          </div>
+
           <div class="col-md-8">
-            <label class="form-label fw-bold">DOCX Template File</label>
+            <label class="form-label fw-bold">Default DOCX Template File</label>
             <input type="file" name="docxTemplate" class="form-control" accept=".docx">
             <% if (template?.docxTemplate?.url) { %>
               <div class="small text-muted mt-1">
@@ -2155,6 +2208,66 @@ num(value) <= 95</code></pre>
         }
       }
     });
+
+    function syncFunderDocxPickerDisabled() {
+      const picker = document.getElementById('funderDocxPicker');
+      if (!picker) return;
+      const used = new Set(
+        [...document.querySelectorAll('#funderDocxTableBody tr[data-funder-key]')]
+          .map((row) => String(row.getAttribute('data-funder-key') || '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+      [...picker.options].forEach((opt) => {
+        if (!opt.value) return;
+        opt.disabled = used.has(String(opt.value).trim().toLowerCase());
+      });
+    }
+
+    function addFunderDocxRow(funderKey, funderLabel) {
+      const tbody = document.getElementById('funderDocxTableBody');
+      if (!tbody || !funderKey) return;
+      const key = String(funderKey).trim();
+      const label = String(funderLabel || funderKey).trim() || key;
+      if ([...tbody.querySelectorAll('tr[data-funder-key]')].some((row) => (
+        String(row.getAttribute('data-funder-key') || '').toLowerCase() === key.toLowerCase()
+      ))) return;
+
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-funder-key', key);
+      tr.innerHTML = `
+        <td>
+          <input type="hidden" name="funderDocxKeys" value="${key.replace(/"/g, '&quot;')}">
+          <input type="hidden" name="funderDocxLabels" value="${label.replace(/"/g, '&quot;')}">
+          <span class="fw-semibold"></span>
+        </td>
+        <td>
+          <input type="file" class="form-control form-control-sm" name="funderDocxFile_${key.replace(/"/g, '&quot;')}" accept=".docx">
+        </td>
+        <td class="text-end">
+          <button type="button" class="btn btn-outline-danger btn-sm btn-remove-funder-docx">Remove</button>
+        </td>
+      `;
+      tr.querySelector('.fw-semibold').textContent = label;
+      tbody.appendChild(tr);
+      syncFunderDocxPickerDisabled();
+    }
+
+    document.getElementById('btnAddFunderDocxRow')?.addEventListener('click', () => {
+      const picker = document.getElementById('funderDocxPicker');
+      if (!picker || !picker.value) return;
+      const opt = picker.options[picker.selectedIndex];
+      addFunderDocxRow(picker.value, opt?.dataset?.label || opt?.textContent || picker.value);
+      picker.value = '';
+    });
+
+    document.getElementById('funderDocxTableBody')?.addEventListener('click', (event) => {
+      const btn = event.target.closest('.btn-remove-funder-docx');
+      if (!btn) return;
+      btn.closest('tr')?.remove();
+      syncFunderDocxPickerDisabled();
+    });
+
+    syncFunderDocxPickerDisabled();
 
     initializeState();
     renderFieldRows();

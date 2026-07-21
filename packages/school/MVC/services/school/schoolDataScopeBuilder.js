@@ -158,7 +158,7 @@ function buildSchoolListScope(requestingUser, options = {}) {
     scopeName: resolvedScopeName,
     scopeMode,
     userId: (scopeMode === SCOPE_MODES.OWNER || scopeMode === SCOPE_MODES.ASSIGNMENT) ? userId : null,
-    personId: scopeMode === SCOPE_MODES.ASSIGNMENT ? personId : null,
+    personId: (scopeMode === SCOPE_MODES.OWNER || scopeMode === SCOPE_MODES.ASSIGNMENT) ? personId : null,
     ownerScoped: scopeMode === SCOPE_MODES.OWNER,
     linkedAccountIds: []
   };

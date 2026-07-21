@@ -100,6 +100,11 @@ router.post('/editor/:periodId/process',
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.CONFIGURE, timesheetEditorMutationActionState),
   ctrl.processTimesheet);
 
+router.post('/editor/:periodId/unprocess',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.CONFIGURE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.CONFIGURE, timesheetEditorMutationActionState),
+  ctrl.unprocessTimesheet);
+
 router.post('/editor/:periodId/return',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),

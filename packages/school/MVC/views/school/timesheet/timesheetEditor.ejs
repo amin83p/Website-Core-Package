@@ -4,6 +4,7 @@
   const adminCanApprove = typeof canManagerApprove !== 'undefined' ? canManagerApprove : Boolean(typeof canAdminApprove !== 'undefined' && canAdminApprove);
   const adminCanReopen = typeof canSendBack !== 'undefined' ? canSendBack : Boolean(typeof canAdminReopen !== 'undefined' && canAdminReopen);
   const financeCanProcess = typeof canFinanceProcess !== 'undefined' && canFinanceProcess === true;
+  const financeCanUnprocess = typeof canUnprocessProcessed !== 'undefined' && canUnprocessProcessed === true;
   const managerReviewApproved = typeof managerApproved !== 'undefined' ? managerApproved === true : String(timesheet?.managerReview?.status || '').toLowerCase() === 'approved';
   const isReviewerEditing = reviewerCanEdit && currentTimesheetStatus === 'submitted';
   const pageIsReadOnly = currentTimesheetStatus === 'processed' || period.status === 'processed' || (currentTimesheetStatus === 'submitted' && !reviewerCanEdit);
@@ -68,6 +69,13 @@
   }
   #incompleteSessionsToggle.collapsed .incomplete-sessions-chevron,
   #incompleteSessionsToggle[aria-expanded="false"] .incomplete-sessions-chevron {
+    transform: rotate(-90deg);
+  }
+  #timesheetReviewHistoryToggle .review-history-chevron {
+    transition: transform 0.2s ease;
+  }
+  #timesheetReviewHistoryToggle.collapsed .review-history-chevron,
+  #timesheetReviewHistoryToggle[aria-expanded="false"] .review-history-chevron {
     transform: rotate(-90deg);
   }
 
@@ -181,9 +189,89 @@
     font-size: 0.95rem;
     font-weight: 500;
   }
-  .ts-day-add-row > * {
-    border-top: 1px dashed rgba(13, 110, 253, 0.25) !important;
-    background-color: rgba(13, 110, 253, 0.03) !important;
+  #tsTable th.ts-col-status,
+  #tsTable td.ts-col-status {
+    width: 56px;
+    max-width: 56px;
+    text-align: center;
+  }
+  #tsTable td.ts-col-status .ts-status-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .ts-status-chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    padding: 0;
+    border-radius: 0.5rem;
+    border: 1.5px solid transparent;
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: default;
+    vertical-align: middle;
+  }
+  .ts-status-chip:focus-visible {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+  }
+  .ts-status-tip {
+    position: fixed;
+    z-index: 2000;
+    pointer-events: none;
+    max-width: min(280px, calc(100vw - 1.5rem));
+    padding: 0.55rem 0.9rem;
+    border-radius: 0.6rem;
+    border: 2px solid transparent;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+    white-space: normal;
+    text-align: center;
+    box-shadow:
+      0 14px 34px rgba(15, 23, 42, 0.38),
+      0 0 0 1px rgba(255, 255, 255, 0.18),
+      0 0 28px rgba(13, 110, 253, 0.28);
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 14px)) scale(0.96);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+  }
+  .ts-status-tip.is-visible {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 10px)) scale(1);
+  }
+  .ts-status-tip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: var(--ts-tip-arrow, #0f172a);
+  }
+  .ts-status-makeup-link {
+    font-size: 0.7rem;
+    line-height: 1.1;
+    max-width: 4.5rem;
+    white-space: normal;
+  }
+  #tsTable th.ts-col-time,
+  #tsTable td.ts-col-time {
+    width: 180px;
+    min-width: 180px;
+  }
+  #tsTable tbody tr.ts-day-group-end > td {
+    border-bottom: 3px solid #0d6efd !important;
+  }
+  .ts-date-add-btn {
+    display: block;
+    width: 100%;
   }
   .ts-comment-trigger {
     min-height: 31px;
@@ -280,36 +368,44 @@
     <% const reviewHistoryRows = Array.isArray(reviewHistory) ? reviewHistory : []; %>
     <% if (reviewHistoryRows.length) { %>
         <div class="card border-0 shadow-sm mb-4" id="timesheetReviewHistoryPanel">
-            <div class="card-header bg-light border-bottom py-3">
-                <div class="fw-bold"><i class="bi bi-clock-history me-2 text-primary"></i>Review History</div>
-                <div class="small text-muted">Submission and approval cycles for this timesheet.</div>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-4">When</th>
-                                <th>Event</th>
-                                <th>By</th>
-                                <th>Status</th>
-                                <th class="text-end">Hours</th>
-                                <th class="pe-4">Note</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% reviewHistoryRows.slice().reverse().forEach((row) => { %>
+            <button type="button" class="card-header bg-light border-bottom d-flex align-items-center justify-content-between py-3 w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#timesheetReviewHistoryCollapse" aria-expanded="false" aria-controls="timesheetReviewHistoryCollapse" id="timesheetReviewHistoryToggle">
+                <div>
+                    <div class="fw-bold">
+                        <i class="bi bi-clock-history me-2 text-primary"></i>Review History
+                        <span class="badge bg-secondary-subtle text-secondary-emphasis border ms-2"><%= reviewHistoryRows.length %></span>
+                    </div>
+                    <div class="small text-muted">Submission and approval cycles for this timesheet.</div>
+                </div>
+                <i class="bi bi-chevron-down review-history-chevron flex-shrink-0 ms-3" aria-hidden="true"></i>
+            </button>
+            <div id="timesheetReviewHistoryCollapse" class="collapse">
+                <div class="card-body p-0 border-top">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <td class="ps-4 small text-muted"><%= row.at ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.at) : row.at) : '-' %></td>
-                                    <td><span class="badge bg-light text-dark border text-uppercase"><%= row.event || '-' %></span></td>
-                                    <td class="small"><%= row.byName || row.by || '-' %></td>
-                                    <td class="small text-muted"><%= row.statusBefore ? row.statusBefore + ' → ' + (row.statusAfter || '-') : (row.statusAfter || '-') %></td>
-                                    <td class="text-end small fw-semibold"><%= Number(row.totalHours || 0).toFixed(2) %></td>
-                                    <td class="pe-4 small"><%= row.note || '-' %></td>
+                                    <th class="ps-4">When</th>
+                                    <th>Event</th>
+                                    <th>By</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Hours</th>
+                                    <th class="pe-4">Note</th>
                                 </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <% reviewHistoryRows.slice().reverse().forEach((row) => { %>
+                                    <tr>
+                                        <td class="ps-4 small text-muted"><%= row.at ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.at) : row.at) : '-' %></td>
+                                        <td><span class="badge bg-light text-dark border text-uppercase"><%= row.event || '-' %></span></td>
+                                        <td class="small"><%= row.byName || row.by || '-' %></td>
+                                        <td class="small text-muted"><%= row.statusBefore ? row.statusBefore + ' → ' + (row.statusAfter || '-') : (row.statusAfter || '-') %></td>
+                                        <td class="text-end small fw-semibold"><%= Number(row.totalHours || 0).toFixed(2) %></td>
+                                        <td class="pe-4 small"><%= row.note || '-' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -356,9 +452,9 @@
                             <th class="ps-4" style="width: 140px;">Date</th>
                             <th>Class / Description</th>
                             <th style="width: 160px;">Student Name</th>
-                            <th>Time</th>
-                            <th style="width: 120px;">Status</th>
-                            <th>Comment</th>
+                            <th class="ts-col-time" style="width: 180px;">Time</th>
+                            <th class="ts-col-status" style="width: 56px;">Status</th>
+                            <th style="min-width: 220px;">Comment</th>
                             <th class="text-end" style="width: 90px;">Hours</th>
                             <% if (!isEditorLocked) { %><th class="text-center" style="width: 90px;">Act</th><% } %>
                         </tr>
@@ -387,12 +483,14 @@
                     <thead class="table-light">
                         <tr>
                             <th class="ps-4">Department</th>
-                            <th class="text-end pe-4" style="width: 140px;">Hours</th>
+                            <th class="text-end pe-4" style="width: 140px;">Session Hours</th>
+                            <th class="text-end pe-4" style="width: 140px;">Pending Hours</th>
+                            <th class="text-end pe-4" style="width: 140px;">Total</th>
                         </tr>
                     </thead>
                     <tbody id="tsDepartmentTotalsBody">
                         <tr>
-                            <td colspan="2" class="text-center text-muted py-3">No payable hours yet.</td>
+                            <td colspan="4" class="text-center text-muted py-3">No department hours yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -400,7 +498,7 @@
         </div>
     </div>
 
-    <% if (!isEditorLocked || adminCanApprove || adminCanReopen || financeCanProcess) { %>
+    <% if (!isEditorLocked || adminCanApprove || adminCanReopen || financeCanProcess || financeCanUnprocess) { %>
         <div class="d-flex justify-content-end gap-2 border-top pt-3">
             <% if (!isEditorLocked) { %>
                 <button class="btn btn-light border fw-bold px-4" id="btnSaveDraft"><%= isReviewerEditing ? 'Save Review Changes' : 'Save Draft' %></button>
@@ -414,6 +512,9 @@
             <% } %>
             <% if (financeCanProcess) { %>
                 <button class="btn btn-primary fw-bold px-4" id="btnProcessTimesheet"><i class="bi bi-lock-fill me-1"></i> Process Timesheet</button>
+            <% } %>
+            <% if (financeCanUnprocess) { %>
+                <button class="btn btn-outline-warning fw-bold px-4" id="btnUnprocessTimesheet"><i class="bi bi-unlock-fill me-1"></i> Reopen to Manager Approved</button>
             <% } %>
         </div>
     <% } %>
@@ -538,6 +639,27 @@
   </div>
 </div>
 
+<div class="modal fade" id="unprocessTimesheetModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-warning-subtle border-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-unlock-fill me-2"></i>Reopen to Manager Approved</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">This undoes finance processing: materialized manual rows are reverted and source locks are cleared. The timesheet returns to <strong>Submitted</strong> with <strong>Manager Approved</strong> intact so it can be corrected and processed again.</p>
+        <label class="form-label fw-bold" for="unprocessTimesheetNote">Reason for reopen *</label>
+        <textarea id="unprocessTimesheetNote" class="form-control" rows="4" maxlength="2000" placeholder="Explain why this processed timesheet is being unlocked..." required></textarea>
+        <div class="form-text">This note is stored in the review history.</div>
+      </div>
+      <div class="modal-footer bg-light border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-warning fw-bold" id="btnConfirmUnprocessTimesheet">Reopen Timesheet</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="manualRowRejectModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog">
     <div class="modal-content border-0 shadow">
@@ -558,7 +680,7 @@
   </div>
 </div>
 
-<div class="modal" id="timesheetCommentModal" tabindex="-1" aria-hidden="true" data-bs-focus="true">
+<div class="modal" id="timesheetCommentModal" tabindex="-1" aria-hidden="true" data-bs-focus="false">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
       <div class="modal-header bg-light border-0">
@@ -635,6 +757,22 @@
     const PAYROLL_DEFAULT_ROLE = "<%= typeof payrollDefaultRole !== 'undefined' ? payrollDefaultRole : 'teacher' %>";
     const PAYROLL_WARNINGS = <%- JSON.stringify(typeof payrollWarnings !== 'undefined' ? payrollWarnings : []) %>;
     let actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+
+    const liveSessionById = new Map();
+    const liveDepartmentByClassId = new Map();
+    (Array.isArray(LIVE_SESSIONS) ? LIVE_SESSIONS : []).forEach((ls) => {
+        const sessionId = String(ls?.sessionId || '').trim();
+        if (sessionId) liveSessionById.set(sessionId, ls);
+        const classId = String(ls?.classId || '').trim();
+        const deptName = String(ls?.deliveryDepartmentName || ls?.departmentName || '').trim();
+        const deptId = String(ls?.deliveryDepartmentId || ls?.departmentId || '').trim();
+        if (classId && (deptName || deptId) && !liveDepartmentByClassId.has(classId)) {
+            liveDepartmentByClassId.set(classId, {
+                deliveryDepartmentId: deptId,
+                deliveryDepartmentName: deptName || deptId
+            });
+        }
+    });
 
     function buildMutationQuery() {
         const params = new URLSearchParams();
@@ -957,27 +1095,86 @@ document.addEventListener('DOMContentLoaded', () => {
         if (entry.isFinalStatus === false) return false;
         return normalizeStatusCode(entry.status) === 'completed';
     };
+    const STATUS_ICON_BY_CODE = {
+        scheduled: 'bi-calendar2-event-fill',
+        completed: 'bi-check-circle-fill',
+        cancelled: 'bi-x-octagon-fill',
+        holiday: 'bi-balloon-fill',
+        missed_informed24: 'bi-clock-history',
+        pending_approval: 'bi-hourglass-split',
+        manual: 'bi-person-fill'
+    };
+    const resolveStatusIcon = (statusCode, { warn = false } = {}) => {
+        if (warn) return 'bi-exclamation-triangle-fill';
+        return STATUS_ICON_BY_CODE[normalizeStatusCode(statusCode)] || 'bi-circle-fill';
+    };
+    const buildStatusChipHtml = ({ icon, label, colorBg, colorText, colorBorder }) => {
+        const tip = escapeHtml(label);
+        return `<span class="ts-status-chip" style="background:${escapeHtml(colorBg)};color:${escapeHtml(colorText)};border-color:${escapeHtml(colorBorder)};" data-tip="${tip}" data-tip-bg="${escapeHtml(colorBg)}" data-tip-fg="${escapeHtml(colorText)}" data-tip-border="${escapeHtml(colorBorder)}" aria-label="${tip}" tabindex="0"><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i></span>`;
+    };
     const buildStatusBadgeHtml = (entry) => {
         if (entry?.isPriorPeriodAdjustment === true) {
-            return `<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-arrow-left-right me-1"></i> Prior Period Adjustment</span>`;
+            return buildStatusChipHtml({
+                icon: 'bi-arrow-left-right',
+                label: 'Prior Period Adjustment',
+                colorBg: '#fff3cd',
+                colorText: '#664d03',
+                colorBorder: '#ffc107'
+            });
         }
         if (entry?.isManual) {
             if (isPendingApprovalEntry(entry)) {
-                return `<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-hourglass-split me-1"></i> Pending Approval</span>`;
+                return buildStatusChipHtml({
+                    icon: 'bi-hourglass-split',
+                    label: 'Pending Approval',
+                    colorBg: '#fff3cd',
+                    colorText: '#664d03',
+                    colorBorder: '#ffc107'
+                });
             }
             if (isRejectedApprovalEntry(entry)) {
-                return `<span class="badge bg-danger border border-danger"><i class="bi bi-x-circle me-1"></i> Rejected</span>`;
+                return buildStatusChipHtml({
+                    icon: 'bi-x-circle-fill',
+                    label: 'Rejected',
+                    colorBg: '#f8d7da',
+                    colorText: '#842029',
+                    colorBorder: '#dc3545'
+                });
             }
             if (String(entry?.approvalStatus || '').toLowerCase() === 'approved' && entry?.activityPaid === true) {
-                return `<span class="badge bg-success border border-success"><i class="bi bi-check-circle me-1"></i> Approved Manual Row</span>`;
+                return buildStatusChipHtml({
+                    icon: 'bi-check-circle-fill',
+                    label: 'Approved Manual Row',
+                    colorBg: '#d1e7dd',
+                    colorText: '#0f5132',
+                    colorBorder: '#198754'
+                });
             }
             if (entry?.activityId && entry?.activityPaid === false) {
-                return `<span class="badge bg-secondary border"><i class="bi bi-slash-circle me-1"></i> Unpaid Activity</span>`;
+                return buildStatusChipHtml({
+                    icon: 'bi-slash-circle',
+                    label: 'Unpaid Activity',
+                    colorBg: '#e2e3e5',
+                    colorText: '#41464b',
+                    colorBorder: '#adb5bd'
+                });
             }
-            return `<span class="badge bg-info text-dark border border-info"><i class="bi bi-person-fill me-1"></i> Manual</span>`;
+            return buildStatusChipHtml({
+                icon: 'bi-person-fill',
+                label: 'Manual',
+                colorBg: '#cff4fc',
+                colorText: '#055160',
+                colorBorder: '#0dcaf0'
+            });
         }
         if (entry?.isReportReflection === true) {
-            return `<span class="badge bg-secondary border"><i class="bi bi-file-earmark-text me-1"></i> Report task</span>`;
+            return buildStatusChipHtml({
+                icon: 'bi-file-earmark-text-fill',
+                label: 'Report task',
+                colorBg: '#e2e3e5',
+                colorText: '#41464b',
+                colorBorder: '#adb5bd'
+            });
         }
         const normalized = normalizeStatusCode(entry?.status);
         const statusMeta = resolveStatusMeta(normalized);
@@ -985,10 +1182,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const colorBg = statusMeta?.colorBg || '#fff3cd';
         const colorText = statusMeta?.colorText || '#664d03';
         const colorBorder = statusMeta?.colorBorder || '#ffe69c';
-        if (!isFinalAutoStatus(entry)) {
-            return `<span class="badge border" style="background:${colorBg};color:${colorText};border-color:${colorBorder} !important;"><i class="bi bi-exclamation-triangle-fill me-1"></i>${statusLabel}</span>`;
-        }
-        return `<span class="badge border" style="background:${colorBg};color:${colorText};border-color:${colorBorder} !important;">${statusLabel}</span>`;
+        const warn = !isFinalAutoStatus(entry);
+        return buildStatusChipHtml({
+            icon: resolveStatusIcon(normalized, { warn }),
+            label: statusLabel,
+            colorBg,
+            colorText,
+            colorBorder
+        });
     };
 
     // Wire up Generic Picker for Classes
@@ -1186,23 +1387,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const modalEl = document.getElementById('timesheetCommentModal');
         const inputEl = document.getElementById('timesheetCommentInput');
         if (!modalEl || !inputEl) return;
-        if (modalEl.classList.contains('show')) return;
 
-        activeCommentSessionId = String(sessionId || '').trim();
-        const contextEl = document.getElementById('timesheetCommentContext');
-        if (contextEl) {
-            const bits = [entry.className, entry.activityName, entry.date].map((value) => String(value || '').trim()).filter(Boolean);
-            contextEl.textContent = bits.join(' • ') || activeCommentSessionId;
+        const showForEntry = () => {
+            const current = activeEntries.find((row) => String(row?.sessionId || '') === String(sessionId || ''));
+            if (!current || IS_READONLY || current.isPriorPeriodAdjustment === true) return;
+            activeCommentSessionId = String(sessionId || '').trim();
+            const contextEl = document.getElementById('timesheetCommentContext');
+            if (contextEl) {
+                const bits = [current.className, current.activityName, current.date].map((value) => String(value || '').trim()).filter(Boolean);
+                contextEl.textContent = bits.join(' • ') || activeCommentSessionId;
+            }
+            inputEl.value = String(current.comment || '');
+            if (!timesheetCommentModal && window.bootstrap) {
+                timesheetCommentModal = window.bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, focus: false });
+            }
+            if (timesheetCommentModal) timesheetCommentModal.show();
+            setTimeout(() => inputEl.focus(), 0);
+        };
+
+        if (modalEl.classList.contains('show') || modalEl.classList.contains('showing')) {
+            const onHidden = () => {
+                modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                showForEntry();
+            };
+            modalEl.addEventListener('hidden.bs.modal', onHidden);
+            if (timesheetCommentModal) timesheetCommentModal.hide();
+            else if (window.bootstrap) {
+                timesheetCommentModal = window.bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, focus: false });
+                timesheetCommentModal.hide();
+            }
+            return;
         }
-        inputEl.value = String(entry.comment || '');
-        if (!timesheetCommentModal && window.bootstrap) {
-            timesheetCommentModal = window.bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, focus: true });
-        }
-        if (timesheetCommentModal) timesheetCommentModal.show();
-        setTimeout(() => inputEl.focus(), 0);
+
+        showForEntry();
     };
-
-    const TABLE_COL_COUNT = IS_READONLY ? 7 : 8;
 
     function buildMakeupOriginalSessionLabel(entry) {
         const dateStr = String(entry?.makeupOriginalDate || '').trim();
@@ -1221,22 +1439,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const originalSessionId = String(entry?.makeupOriginalSessionId || '').trim();
         const originalClassId = String(entry?.makeupOriginalClassId || '').trim();
         const forLabel = buildMakeupOriginalSessionLabel(entry);
-        const badgeHtml = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"><i class="bi bi-arrow-return-left me-1"></i>Make-up</span>';
-        if (!originalSessionId || !originalClassId) {
-            return `<div class="d-flex flex-column gap-1 align-items-start">${badgeHtml}<span class="small text-muted">${escapeHtml(forLabel)}</span></div>`;
-        }
+        const badgeHtml = buildStatusChipHtml({
+            icon: 'bi-arrow-return-left',
+            label: `Make-up · ${forLabel}`,
+            colorBg: '#fff3cd',
+            colorText: '#664d03',
+            colorBorder: '#ffc107'
+        });
+        if (!originalSessionId || !originalClassId) return badgeHtml;
         const href = `/school/classes/${encodeURIComponent(originalClassId)}/sessions/${encodeURIComponent(originalSessionId)}`;
-        const linkHtml = `<a href="${escapeHtml(href)}" class="small text-decoration-none" target="_blank" rel="noopener noreferrer" title="Open original session in Session Manager">${escapeHtml(forLabel)} <i class="bi bi-box-arrow-up-right"></i></a>`;
-        return `<div class="d-flex flex-column gap-1 align-items-start">${badgeHtml}${linkHtml}</div>`;
-    }
-
-    function buildDayAddRowHtml(dateStr, bgClass) {
-        if (IS_READONLY) return '';
-        return `<tr class="${bgClass} row-hover ts-day-add-row border-bottom border-2">
-            <td colspan="${TABLE_COL_COUNT}" class="p-2">
-                <button type="button" class="btn btn-outline-primary w-100 fw-semibold" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg me-1"></i> Add</button>
-            </td>
-        </tr>`;
+        const linkHtml = `<a href="${escapeHtml(href)}" class="ts-status-makeup-link text-decoration-none" target="_blank" rel="noopener noreferrer" title="Open original session in Session Manager"><i class="bi bi-box-arrow-up-right"></i></a>`;
+        return `${badgeHtml}${linkHtml}`;
     }
 
     function buildDateCellHtml(dateStr, dayName, isHoliday, hol) {
@@ -1244,10 +1457,14 @@ document.addEventListener('DOMContentLoaded', () => {
             ? `<div class="ts-holiday-label small text-danger fw-semibold mt-1"><i class="bi bi-balloon-fill me-1"></i>${holidayName(hol)}</div>`
             : '';
         const dayClass = isHoliday ? 'text-danger' : '';
+        const addBtn = IS_READONLY
+            ? ''
+            : `<button type="button" class="btn btn-primary btn-sm text-white ts-date-add-btn mt-2 fw-semibold" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg me-1"></i>Add</button>`;
         return `
             <div class="ts-date-label">${formatTimesheetDateLabel(dateStr)}</div>
             <div class="ts-day-name ${dayClass}">${dayName}</div>
-            ${holidayLine}`;
+            ${holidayLine}
+            ${addBtn}`;
     }
 
     function buildStudentNameCellHtml(ses) {
@@ -1257,7 +1474,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resolveDepartmentLabel(entry) {
-        return String(entry?.deliveryDepartmentName || entry?.deliveryDepartmentId || '').trim() || 'No Department';
+        const direct = String(
+            entry?.deliveryDepartmentName
+            || entry?.departmentName
+            || entry?.deliveryDepartmentId
+            || entry?.departmentId
+            || ''
+        ).trim();
+        if (direct) return direct;
+
+        const sessionId = String(entry?.sessionId || '').trim();
+        const liveBySession = sessionId ? liveSessionById.get(sessionId) : null;
+        const fromLiveSession = String(
+            liveBySession?.deliveryDepartmentName
+            || liveBySession?.departmentName
+            || liveBySession?.deliveryDepartmentId
+            || liveBySession?.departmentId
+            || ''
+        ).trim();
+        if (fromLiveSession) return fromLiveSession;
+
+        const classId = String(entry?.classId || liveBySession?.classId || '').trim();
+        const fromClass = classId ? liveDepartmentByClassId.get(classId) : null;
+        const fromLiveClass = String(
+            fromClass?.deliveryDepartmentName
+            || fromClass?.deliveryDepartmentId
+            || ''
+        ).trim();
+        if (fromLiveClass) return fromLiveClass;
+
+        const activityId = String(entry?.activityId || '').trim();
+        const activity = activityId && typeof manualActivityMap !== 'undefined'
+            ? manualActivityMap.get(activityId)
+            : null;
+        const fromActivity = String(
+            activity?.departmentName
+            || activity?.deliveryDepartmentName
+            || activity?.departmentId
+            || activity?.deliveryDepartmentId
+            || ''
+        ).trim();
+        if (fromActivity) return fromActivity;
+
+        return 'No Department';
     }
 
     function renderDepartmentTotals() {
@@ -1266,22 +1525,45 @@ document.addEventListener('DOMContentLoaded', () => {
         const buckets = new Map();
         activeEntries.forEach((entry) => {
             if (entry?.isDeleted) return;
-            const hrs = resolveEntryHours(entry);
-            if (!Number.isFinite(hrs) || hrs <= 0) return;
+            const sessionHours = Number(resolveEntryHours(entry) || 0);
+            const pendingHours = isPendingApprovalEntry(entry) ? Number(resolveRequestedHours(entry) || 0) : 0;
+            if ((!Number.isFinite(sessionHours) || sessionHours === 0)
+                && (!Number.isFinite(pendingHours) || pendingHours === 0)) {
+                return;
+            }
             const dept = resolveDepartmentLabel(entry);
-            buckets.set(dept, Number((buckets.get(dept) || 0) + hrs));
+            const current = buckets.get(dept) || { sessionHours: 0, pendingHours: 0 };
+            current.sessionHours = Number((current.sessionHours + (Number.isFinite(sessionHours) ? sessionHours : 0)).toFixed(2));
+            current.pendingHours = Number((current.pendingHours + (Number.isFinite(pendingHours) ? pendingHours : 0)).toFixed(2));
+            buckets.set(dept, current);
         });
         const rows = Array.from(buckets.entries()).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
         if (!rows.length) {
-            totalsBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-3">No payable hours yet.</td></tr>';
+            totalsBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No department hours yet.</td></tr>';
             return;
         }
-        let total = 0;
+        let totalSession = 0;
+        let totalPending = 0;
         const html = rows.map(([dept, hrs]) => {
-            total += hrs;
-            return `<tr><td class="ps-4">${dept}</td><td class="text-end pe-4 fw-semibold">${hrs.toFixed(2)}</td></tr>`;
+            const sessionHours = Number(hrs.sessionHours || 0);
+            const pendingHours = Number(hrs.pendingHours || 0);
+            const rowTotal = Number((sessionHours + pendingHours).toFixed(2));
+            totalSession += sessionHours;
+            totalPending += pendingHours;
+            return `<tr>
+                <td class="ps-4">${dept}</td>
+                <td class="text-end pe-4 fw-semibold">${sessionHours.toFixed(2)}</td>
+                <td class="text-end pe-4 fw-semibold">${pendingHours.toFixed(2)}</td>
+                <td class="text-end pe-4 fw-semibold">${rowTotal.toFixed(2)}</td>
+            </tr>`;
         }).join('');
-        totalsBody.innerHTML = `${html}<tr class="table-light"><td class="ps-4 fw-bold">Total</td><td class="text-end pe-4 fw-bold text-success">${total.toFixed(2)}</td></tr>`;
+        const grandTotal = Number((totalSession + totalPending).toFixed(2));
+        totalsBody.innerHTML = `${html}<tr class="table-light">
+            <td class="ps-4 fw-bold">Total</td>
+            <td class="text-end pe-4 fw-bold text-success">${totalSession.toFixed(2)}</td>
+            <td class="text-end pe-4 fw-bold text-warning">${totalPending.toFixed(2)}</td>
+            <td class="text-end pe-4 fw-bold text-success">${grandTotal.toFixed(2)}</td>
+        </tr>`;
     }
 
     function renderTable() {
@@ -1299,26 +1581,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const bgClass = resolveBgClass(isHoliday, isWeekend, dateStr);
 
             const dayEntries = activeEntries.filter(e => e.date === dateStr);
-            const dayRowSpan = Math.max(1, dayEntries.length) + (IS_READONLY ? 0 : 1);
+            const dayRowSpan = Math.max(1, dayEntries.length);
 
             if (dayEntries.length === 0) {
                 const dateCell = buildDateCellHtml(dateStr, dayName, isHoliday, hol);
                 if (isHoliday) {
-                    tbody.innerHTML += `<tr class="${bgClass} row-hover">
+                    tbody.innerHTML += `<tr class="${bgClass} row-hover ts-day-group-end">
                         <td class="ps-4 align-middle border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
                         <td colspan="5" class="align-middle text-danger fw-bold"><i class="bi bi-calendar-x-fill me-1"></i> Holiday: ${holidayName(hol)}</td>
                         <td class="text-end align-middle fw-bold">0.00</td>
                         ${IS_READONLY ? '' : '<td></td>'}
                     </tr>`;
                 } else {
-                    tbody.innerHTML += `<tr class="${bgClass} row-hover">
+                    tbody.innerHTML += `<tr class="${bgClass} row-hover ts-day-group-end">
                         <td class="ps-4 align-middle border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
                         <td colspan="5" class="text-muted fst-italic align-middle">No sessions logged.</td>
                         <td class="text-end align-middle fw-bold">0.00</td>
                         ${IS_READONLY ? '' : '<td></td>'}
                     </tr>`;
                 }
-                tbody.innerHTML += buildDayAddRowHtml(dateStr, bgClass);
             } else {
                 dayEntries.forEach((ses, sIdx) => {
                     const hrs = resolveEntryHours(ses);
@@ -1333,9 +1614,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     const isPriorAdj = ses.isPriorPeriodAdjustment === true;
-                    const rowClass = isPriorAdj
-                        ? `${bgClass} row-hover row-prior-adjustment`
-                        : `${bgClass} row-hover`;
+                    const isDayEnd = sIdx === dayEntries.length - 1;
+                    const rowClass = [
+                        bgClass,
+                        'row-hover',
+                        isPriorAdj ? 'row-prior-adjustment' : '',
+                        isDayEnd ? 'ts-day-group-end' : ''
+                    ].filter(Boolean).join(' ');
 
                     const commentInput = buildCommentCellHtml(ses);
 
@@ -1384,15 +1669,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${dateCell}
                             <td><div class="fw-bold text-primary">${ses.className || ''}${payrollRoleBadge(ses.personRole)}</div>${classMeta}</td>
                             <td>${buildStudentNameCellHtml(ses)}</td>
-                            <td>${timeLabel}</td>
-                            <td><div class="d-flex flex-column gap-1">${statusBadge}${buildMakeupSessionStatusHtml(ses)}</div></td>
+                            <td class="ts-col-time">${timeLabel}</td>
+                            <td class="ts-col-status"><div class="ts-status-stack">${statusBadge}${buildMakeupSessionStatusHtml(ses)}</div></td>
                             <td>${commentInput}</td>
                             <td class="text-end fw-bold align-middle">${hoursDisplay}</td>
                             ${actHtml}
                         </tr>
                     `;
                 });
-                tbody.innerHTML += buildDayAddRowHtml(dateStr, bgClass);
             }
         });
 
@@ -1432,9 +1716,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const timesheetCommentModalEl = document.getElementById('timesheetCommentModal');
     if (timesheetCommentModalEl) {
-        timesheetCommentModalEl.addEventListener('hide.bs.modal', persistTimesheetCommentModal);
-        timesheetCommentModalEl.addEventListener('hidden.bs.modal', releaseStrayModalShell);
+        timesheetCommentModalEl.addEventListener('hidden.bs.modal', () => {
+            persistTimesheetCommentModal();
+            releaseStrayModalShell();
+        });
     }
+
+    const statusTipEl = document.createElement('div');
+    statusTipEl.className = 'ts-status-tip';
+    statusTipEl.setAttribute('role', 'tooltip');
+    statusTipEl.hidden = true;
+    document.body.appendChild(statusTipEl);
+
+    const hideStatusTip = () => {
+        statusTipEl.classList.remove('is-visible');
+        statusTipEl.hidden = true;
+    };
+    const showStatusTip = (chip) => {
+        const label = String(chip?.getAttribute('data-tip') || '').trim();
+        if (!label) {
+            hideStatusTip();
+            return;
+        }
+        const tipBg = chip.getAttribute('data-tip-bg') || '#0f172a';
+        const tipFg = chip.getAttribute('data-tip-fg') || '#ffffff';
+        const tipBorder = chip.getAttribute('data-tip-border') || tipBg;
+        statusTipEl.textContent = label;
+        statusTipEl.style.background = tipBg;
+        statusTipEl.style.color = tipFg;
+        statusTipEl.style.borderColor = tipBorder;
+        statusTipEl.style.setProperty('--ts-tip-arrow', tipBg);
+        statusTipEl.hidden = false;
+        const rect = chip.getBoundingClientRect();
+        let left = rect.left + (rect.width / 2);
+        const tipWidth = statusTipEl.offsetWidth || 120;
+        const pad = 10;
+        left = Math.max(pad + tipWidth / 2, Math.min(left, window.innerWidth - pad - tipWidth / 2));
+        statusTipEl.style.left = `${left}px`;
+        statusTipEl.style.top = `${Math.max(8, rect.top)}px`;
+        statusTipEl.classList.add('is-visible');
+    };
+
+    tbody.addEventListener('pointerover', (event) => {
+        const chip = event.target.closest('.ts-status-chip');
+        if (!chip || !tbody.contains(chip)) return;
+        showStatusTip(chip);
+    });
+    tbody.addEventListener('pointerout', (event) => {
+        const chip = event.target.closest('.ts-status-chip');
+        if (!chip) return;
+        const next = event.relatedTarget;
+        if (next && chip.contains(next)) return;
+        hideStatusTip();
+    });
+    tbody.addEventListener('focusin', (event) => {
+        const chip = event.target.closest('.ts-status-chip');
+        if (chip) showStatusTip(chip);
+    });
+    tbody.addEventListener('focusout', (event) => {
+        const chip = event.target.closest('.ts-status-chip');
+        if (!chip) return;
+        const next = event.relatedTarget;
+        if (next && chip.contains(next)) return;
+        hideStatusTip();
+    });
+    window.addEventListener('scroll', hideStatusTip, true);
+    window.addEventListener('resize', hideStatusTip);
 
     window.updateComment = function(sesId, val) {
         const e = activeEntries.find(x => x.sessionId === sesId);
@@ -1966,11 +2313,20 @@ document.addEventListener('DOMContentLoaded', () => {
             note: 'Please wait while the decision and payable total are updated...',
             operation: 'Manual row decision'
         });
+        const local = activeEntries.find((row) => String(row?.sessionId || '') === String(entryId || ''));
         try {
             const res = await fetch(`/school/timesheets/editor/${PERIOD_ID}/manual-entries/${encodeURIComponent(entryId)}/decision${buildMutationQuery()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
-                body: JSON.stringify({ decision, note, actionStateId })
+                body: JSON.stringify({
+                    decision,
+                    note,
+                    actionStateId,
+                    startTime: local?.startTime || '',
+                    endTime: local?.endTime || '',
+                    requestedHours: local?.requestedHours,
+                    durationHours: local?.durationHours
+                })
             });
             const result = await res.json();
             const guarded = typeof window.applyGuardedApiResult === 'function'
@@ -2123,6 +2479,41 @@ document.addEventListener('DOMContentLoaded', () => {
             message: 'Return this submitted timesheet to Draft for author revision?',
             confirmText: 'Send Back',
             successTitle: 'Timesheet Returned'
+        }));
+    }
+
+    const btnUnprocessTimesheet = document.getElementById('btnUnprocessTimesheet');
+    const unprocessModalEl = document.getElementById('unprocessTimesheetModal');
+    const unprocessNoteInput = document.getElementById('unprocessTimesheetNote');
+    const btnConfirmUnprocessTimesheet = document.getElementById('btnConfirmUnprocessTimesheet');
+    if (btnUnprocessTimesheet && unprocessModalEl && window.bootstrap && window.bootstrap.Modal) {
+        const unprocessModal = window.bootstrap.Modal.getOrCreateInstance(unprocessModalEl);
+        btnUnprocessTimesheet.addEventListener('click', () => {
+            if (unprocessNoteInput) unprocessNoteInput.value = '';
+            unprocessModal.show();
+        });
+        if (btnConfirmUnprocessTimesheet) {
+            btnConfirmUnprocessTimesheet.addEventListener('click', async () => {
+                const note = String(unprocessNoteInput?.value || '').trim();
+                if (!note) {
+                    await messageBox({ title: 'Note Required', icon: 'warning', message: 'Please explain why this processed timesheet is being reopened.' });
+                    unprocessNoteInput?.focus();
+                    return;
+                }
+                unprocessModal.hide();
+                await executeAdminTimesheetAction('unprocess', {
+                    successTitle: 'Timesheet Reopened',
+                    requestBody: { note }
+                });
+            });
+        }
+    } else if (btnUnprocessTimesheet) {
+        btnUnprocessTimesheet.addEventListener('click', () => executeAdminTimesheetAction('unprocess', {
+            title: 'Reopen to Manager Approved',
+            message: 'Undo finance processing and restore this timesheet to Submitted with Manager Approved?',
+            confirmText: 'Reopen',
+            successTitle: 'Timesheet Reopened',
+            requestBody: { note: 'Reopened to manager approved.' }
         }));
     }
 

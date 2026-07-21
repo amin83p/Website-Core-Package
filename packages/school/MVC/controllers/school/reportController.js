@@ -15,6 +15,7 @@ const reportAssignmentBulkRowService = require('../../services/school/reportAssi
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
+const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const sessionConductService = require('../../services/school/sessionConductService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
@@ -471,7 +472,8 @@ function buildCopiedTemplateDraft(sourceTemplate = {}, templates = [], activeOrg
     description: String(sourceTemplate?.description || '').trim(),
     schema: clonePlainValue(sourceTemplate?.schema, { version: 1, fields: [] }),
     placeholderMap: clonePlainValue(sourceTemplate?.placeholderMap, {}),
-    docxTemplate: clonePlainValue(sourceTemplate?.docxTemplate, null)
+    docxTemplate: clonePlainValue(sourceTemplate?.docxTemplate, null),
+    docxTemplatesByFunder: clonePlainValue(sourceTemplate?.docxTemplatesByFunder, [])
   };
 }
 async function showTemplateForm(req, res) {
@@ -479,16 +481,22 @@ async function showTemplateForm(req, res) {
     const id = String(req.params.id || '').trim();
     const isEdit = Boolean(id);
     let template = null;
+    let activeOrgId = '';
 
     if (isEdit) {
       template = await reportIntegrityService.assertTemplateAccessible(id, req.user);
+      activeOrgId = String(template?.orgId || getActiveOrgIdOrThrow(req.user) || '').trim();
     } else {
-      await assertCreateOrgContextOrThrow(req.user);
+      activeOrgId = await assertCreateOrgContextOrThrow(req.user);
     }
+
+    const activeFunders = await reportFunderDocxService.loadActiveFunderOptions(req.user, activeOrgId);
+    const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);
 
     res.render('school/report/templateForm', {
       title: isEdit ? 'Edit Report Template' : 'New Report Template',
       template,
+      funderPickerOptions,
       fieldTypes: reportTemplateModel.FIELD_TYPES,
       templateStatuses: reportTemplateModel.TEMPLATE_STATUSES,
       prefillCatalog: reportService.getPrefillCatalog(),
@@ -510,11 +518,14 @@ async function showTemplateCopyForm(req, res) {
     }
     const allTemplates = await schoolDataService.fetchData('reportTemplates', {}, req.user);
     const template = buildCopiedTemplateDraft(sourceTemplate, allTemplates, activeOrgId);
+    const activeFunders = await reportFunderDocxService.loadActiveFunderOptions(req.user, activeOrgId);
+    const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);
 
     res.render('school/report/templateForm', {
       title: 'Copy Report Template',
       template,
       copySourceTemplate: sourceTemplate,
+      funderPickerOptions,
       fieldTypes: reportTemplateModel.FIELD_TYPES,
       templateStatuses: reportTemplateModel.TEMPLATE_STATUSES,
       prefillCatalog: reportService.getPrefillCatalog(),
@@ -547,12 +558,17 @@ async function saveTemplate(req, res) {
       }
     }
 
+    const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+    const defaultFile = req.file
+      || uploadedFiles.find((file) => String(file?.fieldname || '') === 'docxTemplate')
+      || null;
     const payload = reportViewService.buildTemplateSavePayload({
       body: req.body,
       existingTemplate: existing,
       activeOrgId,
       reqUser: req.user,
-      uploadedFile: req.file
+      uploadedFile: defaultFile,
+      uploadedFiles
     });
     reportRuleEngineService.ensureTemplateDocxAliases(payload);
     reportRuleEngineService.validateCalculatedFieldExpressions(payload, { strict: true });
@@ -560,8 +576,12 @@ async function saveTemplate(req, res) {
     // Validate prefill keys against catalog whitelist before saving template
     // This prevents templates from referencing undefined/non-existent prefill values
     // Audit test (school.report.shared-fields.test.js) ensures all catalog keys are produced by buildPrefillSnapshot
-    if (!isEdit && copySourceTemplate && !req.file && copySourceTemplate.docxTemplate) {
+    if (!isEdit && copySourceTemplate && !defaultFile && copySourceTemplate.docxTemplate) {
       payload.docxTemplate = clonePlainValue(copySourceTemplate.docxTemplate, null);
+    }
+    if (!isEdit && copySourceTemplate && !(Array.isArray(payload.docxTemplatesByFunder) && payload.docxTemplatesByFunder.length)
+      && Array.isArray(copySourceTemplate.docxTemplatesByFunder) && copySourceTemplate.docxTemplatesByFunder.length) {
+      payload.docxTemplatesByFunder = clonePlainValue(copySourceTemplate.docxTemplatesByFunder, []);
     }
 
     const invalidPrefillKeys = reportService.validateTemplatePrefillKeys(payload.schema);
@@ -1785,12 +1805,15 @@ async function exportInstance(req, res) {
       schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user)
     ]);
     if (!template) throw new Error('Template not found.');
+    if (!reportFunderDocxService.templateHasAnyDocx(template)) {
+      throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
+    }
 
     const effectiveAssignment = reportViewService.applyAssignmentRow(
       assignment,
       reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
     );
-    const format = String(req.query.format || 'json').trim().toLowerCase();
+    const format = String(req.query.format || req.body?.format || 'json').trim().toLowerCase();
     const placeholderBundle = format === 'docx'
       ? reportService.buildDocxPlaceholderPayloadDetailed(template, instance, effectiveAssignment)
       : reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
@@ -1821,11 +1844,25 @@ async function exportInstance(req, res) {
     };
 
     if (format === 'docx') {
+      const selectedDocxKey = String(
+        req.body?.docxKey
+        || req.body?.selections?.[0]?.docxKey
+        || req.query.docxKey
+        || ''
+      ).trim();
+      const resolved = reportFunderDocxService.resolveDocxTemplateForFunder({
+        template,
+        funderKey: selectedDocxKey || 'default'
+      });
+      if (!resolved.docxTemplate) {
+        throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
+      }
       const rendered = await reportDocxRenderService.renderReportInstanceDocx({
         template,
         instance,
         placeholders,
-        collections
+        collections,
+        docxTemplateOverride: resolved.docxTemplate
       });
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="${rendered.fileName}"`);
@@ -1846,12 +1883,53 @@ async function exportInstance(req, res) {
   }
 }
 
+async function previewInstanceDocxExport(req, res) {
+  try {
+    const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(req.params.id, req.user);
+    const [template, assignment] = await Promise.all([
+      schoolDataService.getDataById('reportTemplates', instance.templateId, req.user),
+      schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user)
+    ]);
+    if (!template) throw new Error('Template not found.');
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+    );
+    const studentName = String(
+      instance?.prefillSnapshot?.student_full_name
+      || instance?.studentName
+      || instance?.studentId
+      || ''
+    ).trim();
+    const suggestions = await reportFunderDocxService.buildExportDocxSuggestions({
+      template,
+      assignment: effectiveAssignment,
+      reqUser: req.user,
+      students: [{
+        studentId: instance.studentId,
+        personId: instance.personId || '',
+        instanceId: instance.id,
+        studentName
+      }]
+    });
+    return res.json({ status: 'success', ...suggestions });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
 
 async function previewReportMatrixPrefill(req, res) {
   try {
-    const preview = await reportMatrixService.buildMatrixPrefillPreview({ assignmentId: req.params.assignmentId, assignmentRowId: req.query.assignmentRowId || req.query.rowId || '', teacherId: req.query.teacherId || '', reqUser: req.user });
+    const preview = await reportMatrixService.buildMatrixPrefillPreview({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: req.query.assignmentRowId || req.query.rowId || '',
+      teacherId: req.query.teacherId || '',
+      reqUser: req.user
+    });
     return res.json(preview);
-  } catch (error) { return res.status(400).json({ status: 'error', message: error.message }); }
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
 }
 
 async function applyReportMatrixPrefill(req, res) {
@@ -1859,11 +1937,34 @@ async function applyReportMatrixPrefill(req, res) {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    guardKey = idempotencyGuardService.createGuardKey(['report_matrix_prefill_apply', activeOrgId, req.params.assignmentId, body.assignmentRowId || '', body.teacherId || '', body.updates || []]);
-    const guardResult = idempotencyGuardService.beginGuard({ key: guardKey, runningTtlMs: 120000, replayTtlMs: 15000 });
+    guardKey = idempotencyGuardService.createGuardKey([
+      'report_matrix_prefill_apply',
+      activeOrgId,
+      req.params.assignmentId,
+      body.assignmentRowId || '',
+      body.teacherId || '',
+      body.updates || []
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 120000,
+      replayTtlMs: 15000
+    });
     if (sendGuardedResponse(res, guardResult, 'This prefill update is already in progress. Please wait.')) return;
-    const result = await reportMatrixService.applyMatrixPrefill({ assignmentId: req.params.assignmentId, assignmentRowId: body.assignmentRowId || '', teacherId: body.teacherId || '', updates: Array.isArray(body.updates) ? body.updates : [], reqUser: req.user });
-    const payload = { status: result.summary.failed ? 'partial' : 'success', message: String(result.summary.succeeded) + ' student report(s) updated; ' + String(result.summary.skipped) + ' skipped.', summary: result.summary, results: result.results, matrix: result.matrix };
+    const result = await reportMatrixService.applyMatrixPrefill({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: body.assignmentRowId || '',
+      teacherId: body.teacherId || '',
+      updates: Array.isArray(body.updates) ? body.updates : [],
+      reqUser: req.user
+    });
+    const payload = {
+      status: result.summary.failed ? 'partial' : 'success',
+      message: String(result.summary.succeeded) + ' student report(s) updated; ' + String(result.summary.skipped) + ' skipped.',
+      summary: result.summary,
+      results: result.results,
+      matrix: result.matrix
+    };
     idempotencyGuardService.completeGuard(guardKey, payload);
     return res.json(payload);
   } catch (error) {
@@ -1872,25 +1973,161 @@ async function applyReportMatrixPrefill(req, res) {
   }
 }
 
+async function previewReportMatrixDocxExport(req, res) {
+  try {
+    const payload = await reportMatrixService.buildMatrixExportPayload({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: req.query.assignmentRowId || req.query.rowId || req.body?.assignmentRowId || '',
+      teacherId: req.query.teacherId || req.body?.teacherId || '',
+      reqUser: req.user
+    });
+    const [template, assignment] = await Promise.all([
+      schoolDataService.getDataById('reportTemplates', payload.templateId, req.user),
+      schoolDataService.getDataById('reportAssignments', payload.assignmentId, req.user)
+    ]);
+    if (!template) throw new Error('Template not found.');
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, payload.assignmentRowId)
+    );
+    const suggestions = await reportFunderDocxService.buildExportDocxSuggestions({
+      template,
+      assignment: {
+        ...effectiveAssignment,
+        reportStartDate: payload.reportStartDate || effectiveAssignment?.reportStartDate,
+        reportDueDate: payload.reportDueDate || effectiveAssignment?.reportDueDate,
+        classId: payload.classId || effectiveAssignment?.classId
+      },
+      reqUser: req.user,
+      students: (payload.rows || []).map((row) => ({
+        studentId: row.studentId,
+        personId: row.personId || '',
+        instanceId: row.instanceId || '',
+        studentName: row.studentName || row.name || row.studentId
+      }))
+    });
+    return res.json({
+      status: 'success',
+      assignmentId: payload.assignmentId,
+      assignmentRowId: payload.assignmentRowId || '',
+      teacherId: payload.teacherId || '',
+      ...suggestions
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function exportReportMatrix(req, res) {
   try {
-    const payload = await reportMatrixService.buildMatrixExportPayload({ assignmentId: req.params.assignmentId, assignmentRowId: req.query.assignmentRowId || req.query.rowId || '', teacherId: req.query.teacherId || '', reqUser: req.user });
-    const format = String(req.query.format || 'json').trim().toLowerCase();
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const payload = await reportMatrixService.buildMatrixExportPayload({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: req.query.assignmentRowId || req.query.rowId || body.assignmentRowId || '',
+      teacherId: req.query.teacherId || body.teacherId || '',
+      reqUser: req.user
+    });
+    const format = String(req.query.format || body.format || 'json').trim().toLowerCase();
     if (format !== 'docx') {
       const output = JSON.stringify({ status: 'success', payload }, null, 2);
-      if (String(req.query.download || '') === '1') { res.setHeader('Content-Type', 'application/json'); res.setHeader('Content-Disposition', 'attachment; filename="report-matrix-' + payload.assignmentId + '-payload.json"'); return res.send(output); }
+      if (String(req.query.download || '') === '1') {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', 'attachment; filename="report-matrix-' + payload.assignmentId + '-payload.json"');
+        return res.send(output);
+      }
       return res.json({ status: 'success', payload });
     }
-    const [template, assignment] = await Promise.all([schoolDataService.getDataById('reportTemplates', payload.templateId, req.user), schoolDataService.getDataById('reportAssignments', payload.assignmentId, req.user)]);
-    if (!template?.docxTemplate?.path) throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
-    const effectiveAssignment = reportViewService.applyAssignmentRow(assignment, reportViewService.findAssignmentRow(assignment, payload.assignmentRowId));
+    const [template, assignment] = await Promise.all([
+      schoolDataService.getDataById('reportTemplates', payload.templateId, req.user),
+      schoolDataService.getDataById('reportAssignments', payload.assignmentId, req.user)
+    ]);
+    if (!reportFunderDocxService.templateHasAnyDocx(template)) {
+      throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
+    }
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, payload.assignmentRowId)
+    );
+    const mode = String(body.mode || req.query.mode || 'consolidated').trim().toLowerCase() === 'zip'
+      ? 'zip'
+      : 'consolidated';
+    const selectionByStudent = new Map(
+      (Array.isArray(body.selections) ? body.selections : [])
+        .map((row) => [String(row?.studentId || '').trim(), String(row?.docxKey || '').trim()])
+        .filter(([studentId]) => studentId)
+    );
+
+    const suggestions = await reportFunderDocxService.buildExportDocxSuggestions({
+      template,
+      assignment: {
+        ...effectiveAssignment,
+        reportStartDate: payload.reportStartDate || effectiveAssignment?.reportStartDate,
+        reportDueDate: payload.reportDueDate || effectiveAssignment?.reportDueDate,
+        classId: payload.classId || effectiveAssignment?.classId
+      },
+      reqUser: req.user,
+      students: (payload.rows || []).map((row) => ({
+        studentId: row.studentId,
+        personId: row.personId || '',
+        instanceId: row.instanceId || '',
+        studentName: row.studentName || row.name || row.studentId
+      }))
+    });
+    const suggestedByStudent = new Map(
+      suggestions.rows.map((row) => [String(row.studentId), row.suggestedDocxKey])
+    );
+
     const rendered = [];
     for (const row of payload.rows) {
-      const instance = { id: row.instanceId || ('pending-' + row.studentId), assignmentId: payload.assignmentId, assignmentRowId: payload.assignmentRowId, templateId: payload.templateId, teacherId: payload.teacherId, studentId: row.studentId, status: row.status, answers: row.answers, prefillSnapshot: row.prefillSnapshot };
+      const instance = {
+        id: row.instanceId || ('pending-' + row.studentId),
+        assignmentId: payload.assignmentId,
+        assignmentRowId: payload.assignmentRowId,
+        templateId: payload.templateId,
+        teacherId: payload.teacherId,
+        studentId: row.studentId,
+        status: row.status,
+        answers: row.answers,
+        prefillSnapshot: row.prefillSnapshot
+      };
+      const docxKey = selectionByStudent.get(String(row.studentId))
+        || suggestedByStudent.get(String(row.studentId))
+        || 'default';
+      const resolved = reportFunderDocxService.resolveDocxTemplateForFunder({ template, funderKey: docxKey });
+      if (!resolved.docxTemplate) {
+        throw new Error(`No Word template available for student ${row.studentName || row.studentId}.`);
+      }
       const placeholderBundle = reportService.buildDocxPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
-      const collections = await reportService.buildReportDocxCollections({ template, instance, assignment: effectiveAssignment, reqUser: req.user });
-      rendered.push(await reportDocxRenderService.renderReportInstanceDocx({ template, instance, placeholders: placeholderBundle.placeholders, collections }));
+      const collections = await reportService.buildReportDocxCollections({
+        template,
+        instance,
+        assignment: effectiveAssignment,
+        reqUser: req.user
+      });
+      const file = await reportDocxRenderService.renderReportInstanceDocx({
+        template,
+        instance,
+        placeholders: placeholderBundle.placeholders,
+        collections,
+        docxTemplateOverride: resolved.docxTemplate
+      });
+      const safeName = String(row.studentName || row.studentId || file.fileName)
+        .trim()
+        .replace(/[^A-Za-z0-9_-]+/g, '_')
+        .slice(0, 60);
+      rendered.push({
+        ...file,
+        fileName: `${safeName || 'student'}_report.docx`
+      });
     }
+
+    if (mode === 'zip') {
+      const zipBuffer = await reportDocxRenderService.zipReportInstanceDocxFiles(rendered);
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', 'attachment; filename="report-matrix-' + payload.assignmentId + '.zip"');
+      return res.send(zipBuffer);
+    }
+
     const buffer = reportDocxRenderService.mergeReportInstanceDocxBuffers(rendered.map((item) => item.buffer));
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', 'attachment; filename="report-matrix-' + payload.assignmentId + '.docx"');
@@ -1925,6 +2162,7 @@ module.exports = {
   saveReportMatrixRows,
   previewReportMatrixPrefill,
   applyReportMatrixPrefill,
+  previewReportMatrixDocxExport,
   exportReportMatrix,
   saveInstance,
   previewInstancePrefillRefresh,
@@ -1933,6 +2171,7 @@ module.exports = {
   unlockInstance,
   reopenInstance,
   deleteInstance,
+  previewInstanceDocxExport,
   exportInstance
 };
 
