@@ -18,6 +18,51 @@
     .hour-label { position: absolute; bottom: -20px; left: -10px; font-size: 0.65rem; color: #adb5bd; }
     .event-block { position: absolute; min-height: 48px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-size: 0.7rem; line-height: 1.1; padding: 4px 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: transform 0.1s; border-left: 4px solid rgba(0,0,0,0.3); z-index: 10; cursor: pointer; display: flex; flex-direction: column; gap: 2px;}
     .event-block:hover { transform: scale(1.02); z-index: 20; }
+    .sch-event-tip {
+        position: fixed;
+        z-index: 2000;
+        pointer-events: none;
+        max-width: min(340px, calc(100vw - 1.5rem));
+        padding: 0.7rem 1rem;
+        border-radius: 0.7rem;
+        border: 2px solid transparent;
+        font-size: 1.08rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        line-height: 1.3;
+        white-space: normal;
+        text-align: center;
+        box-shadow:
+            0 14px 34px rgba(15, 23, 42, 0.38),
+            0 0 0 1px rgba(255, 255, 255, 0.18),
+            0 0 28px rgba(13, 110, 253, 0.28);
+        opacity: 0;
+        transform: translate(-50%, calc(-100% - 14px)) scale(0.96);
+        transition: opacity 0.12s ease, transform 0.12s ease;
+    }
+    .sch-event-tip.is-visible {
+        opacity: 1;
+        transform: translate(-50%, calc(-100% - 10px)) scale(1);
+    }
+    .sch-event-tip::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 100%;
+        transform: translateX(-50%);
+        border: 7px solid transparent;
+        border-top-color: var(--sch-tip-arrow, #0f172a);
+    }
+    .sch-event-tip .sch-tip-line {
+        display: block;
+    }
+    .sch-event-tip .sch-tip-sub {
+        display: block;
+        margin-top: 0.28rem;
+        font-size: 0.95rem;
+        font-weight: 650;
+        opacity: 0.92;
+    }
     .report-priority-marker { display: inline-flex; align-items: center; color: #dc3545; font-size: 1.05rem; line-height: 1; filter: drop-shadow(0 0 4px rgba(220, 53, 69, 0.35)); animation: reportPriorityBlink 1s ease-in-out infinite; }
     .report-priority-marker .bi { filter: drop-shadow(0 1px 1px rgba(120, 0, 0, 0.35)); }
     .event-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
@@ -1025,11 +1070,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     : '';
                 const openHint = detailsUrl ? 'Open item details' : 'No linked details';
                 const scanLabel = scan?.scanLabel || formatStatusLabel(ev.status);
-                
+                const rollingNote = String(ev?.classLifecycle?.registrationMode || '').trim().toLowerCase() === 'rolling' ? ' | Rolling' : '';
+                const tipLabel = `${openHint}: ${eventTitle} | ${ev.start} - ${ev.end} | ${scanLabel}${rollingNote}`;
+                const statusMeta = getStatusMeta(ev.status);
+                const tipBg = String(statusMeta?.colorBg || (leaveEvent ? '#ffd43b' : '#0f172a')).trim() || '#0f172a';
+                const tipFg = String(statusMeta?.colorText || (leaveEvent ? '#4d3200' : '#ffffff')).trim() || '#ffffff';
+                const tipBorder = String(statusMeta?.colorBorder || tipBg).trim() || tipBg;
+
                 html += `
                         <div class="${blockClasses}" 
                              style="left: ${ev.pos.left}%; width: ${ev.pos.width}%; top: ${topPos}px;"
-                             title="${escapeHtml(openHint)}: ${escapeHtml(eventTitle)} | ${escapeHtml(ev.start)} - ${escapeHtml(ev.end)} | ${escapeHtml(scanLabel)}${String(ev?.classLifecycle?.registrationMode || '').trim().toLowerCase() === 'rolling' ? ' | Rolling' : ''}"
+                             data-tip="${escapeHtml(tipLabel)}"
+                             data-tip-bg="${escapeHtml(tipBg)}"
+                             data-tip-fg="${escapeHtml(tipFg)}"
+                             data-tip-border="${escapeHtml(tipBorder)}"
+                             aria-label="${escapeHtml(tipLabel)}"
+                             tabindex="0"
                              ${clickHandler}>
                              ${scanIcon}
                              <div class="fw-bold text-truncate">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
@@ -1132,6 +1188,73 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    const scheduleTipEl = document.createElement('div');
+    scheduleTipEl.className = 'sch-event-tip';
+    scheduleTipEl.setAttribute('role', 'tooltip');
+    scheduleTipEl.hidden = true;
+    document.body.appendChild(scheduleTipEl);
+
+    const hideScheduleTip = () => {
+        scheduleTipEl.classList.remove('is-visible');
+        scheduleTipEl.hidden = true;
+    };
+    const showScheduleTip = (target) => {
+        const label = String(target?.getAttribute('data-tip') || '').trim();
+        if (!label) {
+            hideScheduleTip();
+            return;
+        }
+        const tipBg = target.getAttribute('data-tip-bg') || '#0f172a';
+        const tipFg = target.getAttribute('data-tip-fg') || '#ffffff';
+        const tipBorder = target.getAttribute('data-tip-border') || tipBg;
+        const parts = label.split(' | ').map((part) => String(part || '').trim()).filter(Boolean);
+        const primary = parts[0] || label;
+        const secondary = parts.slice(1).join(' · ');
+        scheduleTipEl.innerHTML = `<span class="sch-tip-line">${escapeHtml(primary)}</span>${
+            secondary ? `<span class="sch-tip-sub">${escapeHtml(secondary)}</span>` : ''
+        }`;
+        scheduleTipEl.style.background = tipBg;
+        scheduleTipEl.style.color = tipFg;
+        scheduleTipEl.style.borderColor = tipBorder;
+        scheduleTipEl.style.setProperty('--sch-tip-arrow', tipBg);
+        scheduleTipEl.hidden = false;
+        const rect = target.getBoundingClientRect();
+        let left = rect.left + (rect.width / 2);
+        const tipWidth = scheduleTipEl.offsetWidth || 160;
+        const pad = 10;
+        left = Math.max(pad + tipWidth / 2, Math.min(left, window.innerWidth - pad - tipWidth / 2));
+        scheduleTipEl.style.left = `${left}px`;
+        scheduleTipEl.style.top = `${Math.max(8, rect.top)}px`;
+        scheduleTipEl.classList.add('is-visible');
+    };
+
+    const visualArea = document.getElementById('visualDisplayArea');
+    visualArea.addEventListener('pointerover', (event) => {
+        const target = event.target.closest('.event-block[data-tip]');
+        if (!target || !visualArea.contains(target)) return;
+        showScheduleTip(target);
+    });
+    visualArea.addEventListener('pointerout', (event) => {
+        const target = event.target.closest('.event-block[data-tip]');
+        if (!target) return;
+        const next = event.relatedTarget;
+        if (next && target.contains(next)) return;
+        hideScheduleTip();
+    });
+    visualArea.addEventListener('focusin', (event) => {
+        const target = event.target.closest('.event-block[data-tip]');
+        if (target) showScheduleTip(target);
+    });
+    visualArea.addEventListener('focusout', (event) => {
+        const target = event.target.closest('.event-block[data-tip]');
+        if (!target) return;
+        const next = event.relatedTarget;
+        if (next && target.contains(next)) return;
+        hideScheduleTip();
+    });
+    window.addEventListener('scroll', hideScheduleTip, true);
+    window.addEventListener('resize', hideScheduleTip);
 
     // --- 3. Deep Link Auto-Loader (Moved to BOTTOM) ---
     // Pure Javascript URL parsing avoids EJS syntax breaks!

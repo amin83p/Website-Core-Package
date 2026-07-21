@@ -15,6 +15,53 @@
     .hour-label { position: absolute; bottom: -20px; left: -10px; font-size: 0.65rem; color: #adb5bd; }
     .event-block { position: absolute; height: 36px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-size: 0.7rem; line-height: 1.1; padding: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: transform 0.1s; color: #fff; z-index: 10; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); }
     .event-block:hover { transform: scale(1.02); z-index: 20; }
+    .schedule-event-tooltip {
+        position: fixed;
+        z-index: 12050;
+        display: none;
+        max-width: min(22rem, calc(100vw - 1.5rem));
+        padding: 0.85rem 1rem;
+        border-radius: 12px;
+        border: 2px solid #0d6efd;
+        background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+        color: #f8fafc;
+        box-shadow: 0 16px 36px rgba(15, 23, 42, 0.35);
+        pointer-events: none;
+        font-size: 0.95rem;
+        line-height: 1.35;
+    }
+    .schedule-event-tooltip.is-visible { display: block; }
+    .schedule-event-tooltip .tt-person {
+        font-size: 1.05rem;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        margin-bottom: 0.35rem;
+        color: #fff;
+    }
+    .schedule-event-tooltip .tt-class {
+        font-weight: 650;
+        color: #dbeafe;
+        margin-bottom: 0.45rem;
+        white-space: normal;
+        word-break: break-word;
+    }
+    .schedule-event-tooltip .tt-time {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #0f172a;
+        background: #93c5fd;
+        border-radius: 999px;
+        padding: 0.2rem 0.65rem;
+    }
+    .schedule-event-tooltip .tt-meta {
+        margin-top: 0.45rem;
+        font-size: 0.85rem;
+        color: #cbd5e1;
+        white-space: normal;
+    }
     .single-day-list .day-card { border: 1px solid #dee2e6; border-radius: 12px; background: #fff; margin-bottom: 0.9rem; overflow: hidden; box-shadow: 0 0.2rem 0.6rem rgba(15, 23, 42, 0.05); }
     .single-day-list .day-card-header { padding: 0.65rem 0.9rem; border-bottom: 1px solid #e9ecef; background: #f8f9fa; font-weight: 700; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
     .single-day-list .day-card-header.conflict { background: #f8d7da; color: #842029; }
@@ -226,6 +273,70 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
     }
+
+    const scheduleTooltipEl = document.createElement('div');
+    scheduleTooltipEl.className = 'schedule-event-tooltip';
+    scheduleTooltipEl.setAttribute('role', 'tooltip');
+    document.body.appendChild(scheduleTooltipEl);
+
+    function hideScheduleEventTooltip() {
+        scheduleTooltipEl.classList.remove('is-visible');
+        scheduleTooltipEl.innerHTML = '';
+    }
+
+    function positionScheduleEventTooltip(clientX, clientY) {
+        const pad = 14;
+        const tipWidth = scheduleTooltipEl.offsetWidth || 280;
+        const tipHeight = scheduleTooltipEl.offsetHeight || 120;
+        let left = clientX + 16;
+        let top = clientY + 16;
+        if (left + tipWidth + pad > window.innerWidth) left = clientX - tipWidth - 12;
+        if (top + tipHeight + pad > window.innerHeight) top = clientY - tipHeight - 12;
+        if (left < pad) left = pad;
+        if (top < pad) top = pad;
+        scheduleTooltipEl.style.left = `${left}px`;
+        scheduleTooltipEl.style.top = `${top}px`;
+    }
+
+    function showScheduleEventTooltip(blockEl, clientX, clientY) {
+        if (!blockEl) return;
+        const person = String(blockEl.getAttribute('data-tt-person') || '').trim();
+        const className = String(blockEl.getAttribute('data-tt-class') || '').trim();
+        const time = String(blockEl.getAttribute('data-tt-time') || '').trim();
+        const meta = String(blockEl.getAttribute('data-tt-meta') || '').trim();
+        if (!person && !className && !time) return;
+        scheduleTooltipEl.innerHTML = `
+            <div class="tt-person"><i class="bi bi-person-fill me-1"></i>${escapeHtml(person || 'Person')}</div>
+            <div class="tt-class">${escapeHtml(className || 'Session')}</div>
+            <div class="tt-time"><i class="bi bi-clock me-1"></i>${escapeHtml(time || '-')}</div>
+            ${meta ? `<div class="tt-meta"><i class="bi bi-exclamation-triangle-fill me-1 text-warning"></i>${escapeHtml(meta)}</div>` : ''}
+        `;
+        scheduleTooltipEl.classList.add('is-visible');
+        positionScheduleEventTooltip(clientX, clientY);
+    }
+
+    const visualDisplayAreaEl = document.getElementById('visualDisplayArea');
+    if (visualDisplayAreaEl) {
+        visualDisplayAreaEl.addEventListener('pointerover', (event) => {
+            const block = event.target.closest('.event-block');
+            if (!block || !visualDisplayAreaEl.contains(block)) return;
+            showScheduleEventTooltip(block, event.clientX, event.clientY);
+        });
+        visualDisplayAreaEl.addEventListener('pointermove', (event) => {
+            const block = event.target.closest('.event-block');
+            if (!block || !scheduleTooltipEl.classList.contains('is-visible')) return;
+            positionScheduleEventTooltip(event.clientX, event.clientY);
+        });
+        visualDisplayAreaEl.addEventListener('pointerout', (event) => {
+            const related = event.relatedTarget;
+            const leavingBlock = event.target.closest('.event-block');
+            if (!leavingBlock) return;
+            if (related && leavingBlock.contains(related)) return;
+            hideScheduleEventTooltip();
+        });
+        visualDisplayAreaEl.addEventListener('scroll', hideScheduleEventTooltip, true);
+    }
+    window.addEventListener('scroll', hideScheduleEventTooltip, true);
 
     function buildSessionCaseBadgeHtml(caseSummary) {
         if (!caseSummary || !caseSummary.hasCases) return '';
@@ -721,7 +832,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     html += `
                         <div class="event-block ${ev.hasOverlap ? 'border-danger border-3 shadow' : ''}"
                              style="left: ${ev.pos.left}%; width: ${ev.pos.width}%; top: ${topPos}px; background-color: ${eventColor};"
-                             title="${escapeHtml(ev.personName)} | ${escapeHtml(ev.className)} | ${escapeHtml(ev.start)} - ${escapeHtml(ev.end)}"
+                             data-tt-person="${escapeHtml(ev.personName)}"
+                             data-tt-class="${escapeHtml(ev.className)}"
+                             data-tt-time="${escapeHtml(ev.start)} – ${escapeHtml(ev.end)}"
+                             data-tt-meta="${ev.hasOverlap ? 'Double booking overlap' : ''}"
                              ${clickHandler}>
                              <div class="fw-bold text-truncate"><i class="bi bi-person-fill"></i> ${escapeHtml(ev.personName)}</div>
                              <div class="x-small text-truncate">${escapeHtml(ev.className)} (${escapeHtml(ev.start)}-${escapeHtml(ev.end)})</div>
