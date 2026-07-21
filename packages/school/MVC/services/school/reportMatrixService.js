@@ -362,6 +362,13 @@ async function buildMatrixContext({ assignmentId, assignmentRowId = '', teacherI
   rows.sort((a, b) => a.studentName.localeCompare(b.studentName) || a.studentId.localeCompare(b.studentId));
   const fieldGroups = classifyMatrixFields(template, rows, assignment);
   const teacherName = clean(rows[0]?.answers?.teacher_name || rows[0]?.answers?.instructor_name || resolvedTeacherId);
+  const sharedFieldsGate = reportViewService.evaluateSharedFieldsEditability({
+    assignment,
+    template,
+    instances,
+    currentInstanceId: '',
+    allowAdminOverride: isAdminEditor
+  });
 
   return {
     assignmentId: toPublicId(assignment.id),
@@ -377,6 +384,9 @@ async function buildMatrixContext({ assignmentId, assignmentRowId = '', teacherI
     teacherId: clean(resolvedTeacherId),
     teacherName,
     scope: clean(assignment.reportScope).toLowerCase(),
+    sharedFieldsEditable: sharedFieldsGate.sharedFieldsEditable,
+    sharedFieldsLockReason: sharedFieldsGate.reason || '',
+    sharedFieldsBlockingSiblingCount: sharedFieldsGate.blockingSiblingCount || 0,
     ...fieldGroups,
     rows,
     progress: buildProgress(rows)

@@ -211,7 +211,7 @@
                     <% } %>
                   <% } else { %>
                     <% if (String(row.status || '').toLowerCase() === 'submitted' && canReopenReportInstanceSafe) { %>
-                      <button type="button" class="btn btn-outline-warning btn-sm js-reopen-report-instance" data-instance-id="<%= row.id %>" data-instance-label="<%= (row.teacherName || '') + ' / ' + (row.studentName || 'Whole class') %>" title="Reopen as draft for the teacher"><i class="bi bi-arrow-counterclockwise me-2"></i>Reopen</button>
+                      <button type="button" class="btn btn-outline-warning btn-sm js-reopen-report-instance" data-instance-id="<%= row.id %>" data-instance-label="<%= (row.teacherName || '') + ' / ' + (row.studentName || 'Whole class') %>" data-shared-will-lock="<%= row.sharedFieldsWillBeLockedOnReopen ? '1' : '0' %>" data-shared-reopen-warning="<%= String(row.sharedFieldsReopenWarning || '').replace(/"/g, '&quot;') %>" title="Reopen as draft for the teacher"><i class="bi bi-arrow-counterclockwise me-2"></i>Reopen</button>
                     <% } %>
                     <button type="button" class="btn btn-outline-danger btn-sm js-delete-report-instance" data-instance-id="<%= row.id %>" data-instance-label="<%= (row.teacherName || '') + ' / ' + (row.studentName || 'Whole class') %>"><i class="bi bi-trash me-2"></i>Delete</button>
                   <% } %>
@@ -327,7 +327,14 @@
       const instanceId = String(reopenButton.getAttribute('data-instance-id') || '').trim();
       const label = String(reopenButton.getAttribute('data-instance-label') || instanceId).trim();
       if (!instanceId) return;
-      window.ReportAssignmentDelete.confirmReopen('Reopen report instance for ' + label + ' as draft so the teacher can edit it?')
+      const sharedWillLock = String(reopenButton.getAttribute('data-shared-will-lock') || '') === '1';
+      const sharedWarning = String(reopenButton.getAttribute('data-shared-reopen-warning') || '').trim();
+      let reopenMessage = 'Reopen report instance for ' + label + ' as draft so the teacher can edit it?';
+      if (sharedWillLock) {
+        reopenMessage += '\n\nImportant: this assignment has shared fields. Other student reports are still not draft, so after reopen only private fields will be editable. Shared fields stay read-only until those other reports are also reopened to draft.';
+        if (sharedWarning) reopenMessage += '\n\n' + sharedWarning;
+      }
+      window.ReportAssignmentDelete.confirmReopen(reopenMessage)
         .then(function (confirmed) {
           if (!confirmed) return null;
           return window.ReportAssignmentDelete.withLoading('Reopening report instance...', function () {

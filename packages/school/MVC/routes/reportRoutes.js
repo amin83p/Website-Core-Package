@@ -381,8 +381,8 @@ router.post('/instances/reopen/:id',
   ctrl.reopenInstance);
 
 router.post('/instances/unlock/:id',
-  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
-  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, {
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
     keepActive: true,
     allowOperationTokenFallback: true,
     allowInactiveTokenFallback: true

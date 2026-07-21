@@ -62,6 +62,136 @@ async function canReopenReportInstanceToDraft(reqUser) {
   return isReportInstanceAdminEditor(reqUser);
 }
 
+function isVisualOnlyReportField(field = {}) {
+  const type = String(field?.type || '').trim().toLowerCase();
+  return type === 'section' || type === 'subheader' || type === 'row_break';
+}
+
+/** Teacher-modifiable status for shared-field sibling gates (draft only). */
+function isTeacherModifiableInstanceStatus(status) {
+  return String(status || '').trim().toLowerCase() === 'draft';
+}
+
+function templateHasSharedStudentFields(template) {
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  return fields.some((field) => (
+    field?.sharedAcrossStudents === true
+    && field?.id
+    && !isVisualOnlyReportField(field)
+  ));
+}
+
+/**
+ * Shared assignment answers may be written only when every other instance
+ * on the assignment is draft (or there are no siblings / no shared fields).
+ */
+function evaluateSharedFieldsEditability({
+  assignment,
+  template,
+  instances,
+  currentInstanceId = '',
+  allowAdminOverride = false
+} = {}) {
+  const reportService = require('./reportService');
+  const studentTargeted = reportService.isStudentTargetedScope(assignment?.reportScope);
+  const hasSharedFields = studentTargeted && templateHasSharedStudentFields(template);
+  const empty = {
+    hasSharedFields: Boolean(hasSharedFields),
+    sharedFieldsEditable: true,
+    blockingSiblingCount: 0,
+    blockingSiblings: [],
+    reason: '',
+    adminOverride: false
+  };
+  if (!hasSharedFields) return empty;
+
+  const currentId = String(currentInstanceId || '').trim();
+  const assignmentId = toPublicId(assignment?.id || '');
+  const siblings = (Array.isArray(instances) ? instances : []).filter((inst) => {
+    const id = String(inst?.id || '').trim();
+    if (!id) return false;
+    if (currentId && idsEqual(id, currentId)) return false;
+    if (assignmentId && toPublicId(inst?.assignmentId) && !idsEqual(inst.assignmentId, assignmentId)) {
+      return false;
+    }
+    return true;
+  });
+
+  const blockingSiblings = siblings
+    .filter((inst) => !isTeacherModifiableInstanceStatus(inst?.status))
+    .map((inst) => ({
+      id: String(inst.id || '').trim(),
+      status: String(inst.status || '').trim().toLowerCase() || 'unknown',
+      studentId: toPublicId(inst.studentId || '')
+    }));
+
+  if (!blockingSiblings.length) {
+    return {
+      ...empty,
+      hasSharedFields: true,
+      sharedFieldsEditable: true
+    };
+  }
+
+  // Admins may edit shared values on submitted/locked sibling sets; teachers stay gated to draft-only peers.
+  if (allowAdminOverride === true) {
+    return {
+      hasSharedFields: true,
+      sharedFieldsEditable: true,
+      blockingSiblingCount: blockingSiblings.length,
+      blockingSiblings,
+      reason: '',
+      adminOverride: true
+    };
+  }
+
+  const statuses = [...new Set(blockingSiblings.map((row) => row.status))].join(', ');
+  const reason = blockingSiblings.length === 1
+    ? `Shared fields are read-only because another student report on this assignment is ${blockingSiblings[0].status}. Reopen that report to draft (or Reopen All) before editing shared values.`
+    : `Shared fields are read-only because ${blockingSiblings.length} other student reports on this assignment are not draft (${statuses}). Reopen those reports to draft before editing shared values.`;
+
+  return {
+    hasSharedFields: true,
+    sharedFieldsEditable: false,
+    blockingSiblingCount: blockingSiblings.length,
+    blockingSiblings,
+    reason,
+    adminOverride: false
+  };
+}
+
+async function loadAssignmentInstancesForSharedGate(assignmentId, reqUser) {
+  const id = toPublicId(assignmentId);
+  if (!id) return [];
+  const rows = await schoolDataService.fetchData('reportInstances', {
+    assignmentId__eq: id,
+    page: 1,
+    limit: 10000
+  }, reqUser);
+  return Array.isArray(rows) ? rows : [];
+}
+
+/**
+ * Preview whether shared fields will stay locked after reopening one submitted instance to draft.
+ */
+function evaluateSharedFieldsLockAfterReopen({
+  assignment,
+  template,
+  instances,
+  reopeningInstanceId = ''
+} = {}) {
+  const evaluation = evaluateSharedFieldsEditability({
+    assignment,
+    template,
+    instances,
+    currentInstanceId: reopeningInstanceId
+  });
+  return {
+    ...evaluation,
+    sharedFieldsWillBeLocked: evaluation.hasSharedFields && !evaluation.sharedFieldsEditable
+  };
+}
+
 async function canExportReportInstance(reqUser) {
   if (adminChekersService.isSuperAdmin(reqUser)) return true;
   const evaluation = await accessService.evaluateAccess({
@@ -1192,6 +1322,14 @@ async function buildInstanceListRows({
         participantNames,
         personToStudentMap
       });
+      const assignmentInstances = filterRecordsByOrg(allInstances, reqUser)
+        .filter((inst) => idsEqual(inst?.assignmentId, row?.assignmentId));
+      const sharedReopenPreview = evaluateSharedFieldsLockAfterReopen({
+        assignment,
+        template,
+        instances: assignmentInstances,
+        reopeningInstanceId: row?.id || ''
+      });
       return {
         ...row,
         isPendingAssignment: false,
@@ -1205,7 +1343,11 @@ async function buildInstanceListRows({
         teacherName: participants.teacherName,
         studentId: participants.studentId,
         studentName: participants.studentName,
-        studentRecordId: participants.studentRecordId
+        studentRecordId: participants.studentRecordId,
+        sharedFieldsWillBeLockedOnReopen: Boolean(sharedReopenPreview.sharedFieldsWillBeLocked),
+        sharedFieldsReopenWarning: sharedReopenPreview.sharedFieldsWillBeLocked
+          ? (sharedReopenPreview.reason || '')
+          : ''
       };
     });
 
@@ -1708,5 +1850,10 @@ module.exports = {
   canEditReportInstanceAnswers,
   canUnlockReportInstance,
   canReopenReportInstanceToDraft,
-  canExportReportInstance
+  canExportReportInstance,
+  isTeacherModifiableInstanceStatus,
+  templateHasSharedStudentFields,
+  evaluateSharedFieldsEditability,
+  evaluateSharedFieldsLockAfterReopen,
+  loadAssignmentInstancesForSharedGate
 };

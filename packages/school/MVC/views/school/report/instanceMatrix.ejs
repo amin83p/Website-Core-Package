@@ -20,6 +20,9 @@
   })();
   const showBulkReopen = canReopenReportInstanceSafe && uniformStatus === 'submitted' && startedRows.length > 0;
   const showBulkUnlock = canUnlockReportInstanceSafe && uniformStatus === 'locked' && startedRows.length > 0;
+  const sharedFieldsEditableSafe = matrix?.sharedFieldsEditable !== false;
+  const sharedFieldsLockReasonSafe = String(matrix?.sharedFieldsLockReason || '').trim();
+  const hasSharedFieldsBlock = sharedFields.length > 0;
   const statusBadgeClass = (status) => {
     const token = String(status || '').toLowerCase();
     if (token === 'submitted') return 'bg-success';
@@ -118,16 +121,22 @@
     <div class="card border-0 shadow-sm mb-4" id="reportMatrixSharedFields">
       <div class="card-header bg-white py-3"><h5 class="m-0 fw-bold"><i class="bi bi-people me-2 text-primary"></i>Shared report fields</h5><div class="small text-muted mt-1">Editable values are saved once and used by every student report.</div></div>
       <div class="card-body">
+        <% if (hasSharedFieldsBlock && !sharedFieldsEditableSafe && sharedFieldsLockReasonSafe) { %>
+          <div class="alert alert-warning small mb-3" role="alert">
+            <div class="fw-semibold"><i class="bi bi-lock-fill me-1"></i>Shared fields are read-only</div>
+            <div class="mb-0"><%= sharedFieldsLockReasonSafe %></div>
+          </div>
+        <% } %>
         <% if (sharedFields.some((field) => field.hasConflictingInitialValues)) { %><div class="alert alert-warning small">One or more shared fields have different initial values. Choose the common value explicitly.</div><% } %>
         <div class="accordion" id="reportMatrixSharedSections">
           <% sharedGroups.forEach((group, groupIndex) => { const collapseId = 'reportMatrixSharedGroup' + groupIndex; %>
             <div class="accordion-item"><h2 class="accordion-header" id="<%= collapseId %>Heading"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#<%= collapseId %>" aria-expanded="true"><%= group.label %> <span class="badge bg-info-subtle text-info-emphasis border ms-2"><%= group.fields.length %> field(s)</span></button></h2>
               <div id="<%= collapseId %>" class="accordion-collapse collapse show"><div class="accordion-body"><div class="row g-3">
-                <% (group.fields || []).forEach((field) => { const value = field.value === undefined || field.value === null ? '' : field.value; const col = field.fullPageWidth ? 'col-12' : 'col-12 col-md-6 col-xl-4'; %>
+                <% (group.fields || []).forEach((field) => { const value = field.value === undefined || field.value === null ? '' : field.value; const col = field.fullPageWidth ? 'col-12' : 'col-12 col-md-6 col-xl-4'; const sharedDisabled = !sharedFieldsEditableSafe; %>
                   <div class="<%= col %>"><label class="form-label fw-bold"><%= field.label %> <span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span></label>
-                    <% if (field.type === 'textarea') { %><textarea class="form-control js-matrix-shared-field" rows="3" data-field-id="<%= field.id %>"><%= value %></textarea>
-                    <% } else if (field.type === 'select') { %><select class="form-select js-matrix-shared-field" data-field-id="<%= field.id %>"><option value="">Select...</option><% (field.options || []).forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %></select>
-                    <% } else { %><input type="<%= field.type === 'number' || field.type === 'date' ? field.type : 'text' %>" class="form-control js-matrix-shared-field" data-field-id="<%= field.id %>" value="<%= value %>"><% } %>
+                    <% if (field.type === 'textarea') { %><textarea class="form-control js-matrix-shared-field" rows="3" data-field-id="<%= field.id %>" <%= sharedDisabled ? 'readonly' : '' %>><%= value %></textarea>
+                    <% } else if (field.type === 'select') { %><select class="form-select js-matrix-shared-field" data-field-id="<%= field.id %>" <%= sharedDisabled ? 'disabled' : '' %>><option value="">Select...</option><% (field.options || []).forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %></select>
+                    <% } else { %><input type="<%= field.type === 'number' || field.type === 'date' ? field.type : 'text' %>" class="form-control js-matrix-shared-field" data-field-id="<%= field.id %>" value="<%= value %>" <%= sharedDisabled ? 'readonly' : '' %>><% } %>
                   </div>
                 <% }); %>
               </div></div></div>
@@ -244,6 +253,7 @@
     let sharedDirty = false;
     window.CAN_EXPORT_REPORT_INSTANCE = <%- JSON.stringify(typeof canExportReportInstance !== 'undefined' && !!canExportReportInstance) %>;
     window.CAN_REOPEN_REPORT_INSTANCE = <%- JSON.stringify(typeof canReopenReportInstanceToDraft !== 'undefined' && !!canReopenReportInstanceToDraft) %>;
+    window.MATRIX_HAS_SHARED_FIELDS = <%- JSON.stringify(hasSharedFieldsBlock) %>;
     window.CAN_UNLOCK_REPORT_INSTANCE = <%- JSON.stringify(typeof canUnlockReportInstance !== 'undefined' && !!canUnlockReportInstance) %>;
 
     function initializeTooltips() {
@@ -680,13 +690,27 @@
       const confirmFn = kind === 'reopen'
         ? (typeof api.confirmReopen === 'function' ? (msg) => api.confirmReopen(msg) : async (msg) => window.confirm(String(msg || '')))
         : (typeof api.confirmUnlock === 'function' ? (msg) => api.confirmUnlock(msg) : async (msg) => window.confirm(String(msg || '')));
-      const confirmMessage = kind === 'reopen'
+      let confirmMessage = kind === 'reopen'
         ? (rows.length === 1
           ? ('Reopen the report for ' + rows[0].studentName + ' as draft so the teacher can edit it?')
           : ('Reopen all ' + rows.length + ' submitted reports as draft for teachers?'))
         : (rows.length === 1
           ? ('Unlock the report for ' + rows[0].studentName + '? Status will return to submitted.')
           : ('Unlock all ' + rows.length + ' locked reports? Status will return to submitted.'));
+      if (kind === 'reopen' && window.MATRIX_HAS_SHARED_FIELDS) {
+        const reopenIds = new Set(rows.map((row) => String(row.instanceId || '').trim()).filter(Boolean));
+        const remainingBlocking = (matrixState.rows || []).filter((row) => {
+          const id = String(row.instanceId || '').trim();
+          if (!id || reopenIds.has(id) || row.isPending) return false;
+          const status = String(row.status || '').toLowerCase();
+          return status && status !== 'draft';
+        });
+        if (remainingBlocking.length) {
+          confirmMessage += '\n\nImportant: shared fields will stay read-only after this reopen because ' + remainingBlocking.length + ' other student report(s) remain submitted/locked/archived. Only private fields will be editable until those reports are also reopened to draft.';
+        } else if (rows.length > 1) {
+          confirmMessage += '\n\nAfter reopen, shared fields become editable because all student reports in this matrix will be draft.';
+        }
+      }
       const confirmed = await confirmFn(confirmMessage);
       if (!confirmed) return;
 
@@ -707,10 +731,12 @@
       });
 
       if (failures.length) {
+        const failureText = failures.slice(0, 5).join(' | ') + (failures.length > 5 ? (' | +' + (failures.length - 5) + ' more') : '');
+        const isActionStateFailure = /security violation|action state/i.test(failureText);
         await showReportMatrixMessage({
           title: kind === 'reopen' ? 'Reopen Incomplete' : 'Unlock Incomplete',
-          icon: 'warning',
-          message: failures.slice(0, 5).join(' | ') + (failures.length > 5 ? (' | +' + (failures.length - 5) + ' more') : '')
+          icon: isActionStateFailure ? 'error' : 'warning',
+          message: failureText
         });
       }
       window.location.reload();

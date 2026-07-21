@@ -43,13 +43,34 @@ async function persistInstanceAnswers({
     });
   }
 
+  let sharedAnswersSkipped = false;
+  let sharedAnswersSkipReason = '';
+  if (studentTargeted && sharedFieldIds.length > 0 && assignment?.id) {
+    const siblingInstances = await reportViewService.loadAssignmentInstancesForSharedGate(assignment.id, reqUser);
+    const allowAdminOverride = await reportViewService.isReportInstanceAdminEditor(reqUser);
+    const sharedGate = reportViewService.evaluateSharedFieldsEditability({
+      assignment,
+      template,
+      instances: siblingInstances,
+      currentInstanceId: instance.id,
+      allowAdminOverride
+    });
+    if (!sharedGate.sharedFieldsEditable) {
+      sharedAnswersSkipped = true;
+      sharedAnswersSkipReason = sharedGate.reason || 'Shared fields are locked while other reports are not draft.';
+    }
+  }
+
+  const effectiveSharedForValidation = sharedAnswersSkipped
+    ? ((assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object') ? assignment.sharedAnswers : {})
+    : {
+        ...((assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object') ? assignment.sharedAnswers : {}),
+        ...nextShared
+      };
   const assignmentForValidation = studentTargeted
     ? {
         ...(assignment || {}),
-        sharedAnswers: {
-          ...((assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object') ? assignment.sharedAnswers : {}),
-          ...nextShared
-        }
+        sharedAnswers: effectiveSharedForValidation
       }
     : assignment;
   const mergedForValidation = reportService.mergeTemplateData(
@@ -79,9 +100,11 @@ async function persistInstanceAnswers({
   }
 
   if (studentTargeted && sharedFieldIds.length > 0 && assignment?.id) {
-    await schoolDataService.updateData('reportAssignments', assignment.id, {
-      sharedAnswers: nextShared
-    }, reqUser);
+    if (!sharedAnswersSkipped) {
+      await schoolDataService.updateData('reportAssignments', assignment.id, {
+        sharedAnswers: nextShared
+      }, reqUser);
+    }
   }
 
   const updatedInstance = await schoolDataService.updateData('reportInstances', instance.id, {
@@ -100,7 +123,11 @@ async function persistInstanceAnswers({
     updatedInstance,
     nextStatus,
     studentAnswers,
-    sharedAnswers: nextShared,
+    sharedAnswers: sharedAnswersSkipped
+      ? ((assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object') ? assignment.sharedAnswers : {})
+      : nextShared,
+    sharedAnswersSkipped,
+    sharedAnswersSkipReason,
     validationSummary,
     mergedAnswers: mergedForValidation
   };

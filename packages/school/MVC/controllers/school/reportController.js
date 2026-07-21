@@ -1158,6 +1158,7 @@ async function buildInstanceEditorRenderContext(req) {
 
   let latestInstance = await schoolDataService.getDataById('reportInstances', req.params.id, req.user);
   const canEditAnswers = await reportViewService.canEditReportInstanceAnswers(latestInstance, req.user);
+  const isAdminEditor = await reportViewService.isReportInstanceAdminEditor(req.user);
   if (canEditAnswers) {
     const hydrated = hydrateInitialAnswersFromPrefill(template, latestInstance);
     if (hydrated.changed) {
@@ -1219,6 +1220,22 @@ async function buildInstanceEditorRenderContext(req) {
   });
   const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
   const canReopenReportInstanceToDraft = await reportViewService.canReopenReportInstanceToDraft(req.user);
+  const assignmentInstances = latestInstance?.assignmentId
+    ? await reportViewService.loadAssignmentInstancesForSharedGate(latestInstance.assignmentId, req.user)
+    : [];
+  const sharedFieldsGate = reportViewService.evaluateSharedFieldsEditability({
+    assignment: effectiveAssignment || assignment,
+    template,
+    instances: assignmentInstances,
+    currentInstanceId: latestInstance?.id || '',
+    allowAdminOverride: isAdminEditor
+  });
+  const sharedFieldsLockAfterReopen = reportViewService.evaluateSharedFieldsLockAfterReopen({
+    assignment: effectiveAssignment || assignment,
+    template,
+    instances: assignmentInstances,
+    reopeningInstanceId: latestInstance?.id || ''
+  });
 
   return {
     title: `Report Editor: ${template.title}`,
@@ -1233,6 +1250,13 @@ async function buildInstanceEditorRenderContext(req) {
     canUnlockReportInstance,
     canReopenReportInstanceToDraft,
     canEditReportInstanceAnswers: canEditAnswers,
+    sharedFieldsEditable: sharedFieldsGate.sharedFieldsEditable,
+    sharedFieldsLockReason: sharedFieldsGate.reason || '',
+    sharedFieldsWillBeLockedOnReopen: sharedFieldsLockAfterReopen.sharedFieldsWillBeLocked,
+    sharedFieldsReopenWarning: sharedFieldsLockAfterReopen.sharedFieldsWillBeLocked
+      ? sharedFieldsLockAfterReopen.reason
+      : '',
+    sharedFieldsBlockingSiblingCount: sharedFieldsGate.blockingSiblingCount || 0,
     safeReturnUrl: resolveSafeSameOriginReturnUrl(req, latestInstance?.id),
     includeModal: true,
     user: req.user,
@@ -1701,6 +1725,22 @@ async function reopenInstance(req, res) {
     const instance = await reportIntegrityService.assertInstanceReopenable(req.params.id, req.user);
     const now = new Date().toISOString();
 
+    const [template, assignment, siblingInstances] = await Promise.all([
+      schoolDataService.getDataById('reportTemplates', instance.templateId, req.user),
+      schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user),
+      reportViewService.loadAssignmentInstancesForSharedGate(instance.assignmentId, req.user)
+    ]);
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+    );
+    const sharedLockPreview = reportViewService.evaluateSharedFieldsLockAfterReopen({
+      assignment: effectiveAssignment || assignment,
+      template,
+      instances: siblingInstances,
+      reopeningInstanceId: instance.id
+    });
+
     await schoolDataService.updateData('reportInstances', instance.id, {
       status: 'draft',
       audit: {
@@ -1711,10 +1751,20 @@ async function reopenInstance(req, res) {
       }
     }, req.user);
 
+    let message = 'Report reopened to draft for the teacher.';
+    if (sharedLockPreview.sharedFieldsWillBeLocked) {
+      message += ' Shared fields remain read-only until other student reports on this assignment are also draft.';
+    }
+
     const payloadOut = {
       status: 'success',
-      message: 'Report reopened to draft for the teacher.',
-      nextStatus: 'draft'
+      message,
+      nextStatus: 'draft',
+      sharedFieldsWillBeLocked: Boolean(sharedLockPreview.sharedFieldsWillBeLocked),
+      sharedFieldsLockReason: sharedLockPreview.sharedFieldsWillBeLocked
+        ? (sharedLockPreview.reason || '')
+        : '',
+      blockingSiblingCount: sharedLockPreview.blockingSiblingCount || 0
     };
     idempotencyGuardService.completeGuard(guardKey, payloadOut);
     if (isAjax(req)) return res.json(payloadOut);

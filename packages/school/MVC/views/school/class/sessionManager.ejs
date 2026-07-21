@@ -737,8 +737,25 @@
     .session-manager-nav-item.active { background: #e0ecff; color: #1d4ed8; }
     .session-manager-nav-item:disabled { opacity: 0.45; cursor: not-allowed; }
     .session-manager-sidebar.collapsed .session-manager-nav-label { display: none; }
-    .session-manager-sidebar.collapsed .session-manager-nav-item { justify-content: center; padding: 0.65rem; }
+    .session-manager-sidebar.collapsed .session-manager-nav-item { justify-content: center; padding: 0.65rem; position: relative; }
     .session-manager-sidebar.collapsed .session-manager-sidebar-head .session-manager-nav-label { display: none; }
+    .session-manager-nav-item .session-reports-nav-badge {
+        margin-left: auto;
+        min-width: 1.35rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        line-height: 1.2;
+        padding: 0.2rem 0.4rem;
+    }
+    .session-manager-sidebar.collapsed .session-manager-nav-item .session-reports-nav-badge {
+        position: absolute;
+        top: 0.2rem;
+        right: 0.2rem;
+        margin-left: 0;
+        min-width: 1.1rem;
+        padding: 0.12rem 0.28rem;
+        font-size: 0.65rem;
+    }
 
     .session-manager-main {
         flex: 1;
@@ -1228,6 +1245,7 @@
                 </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="assignments" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-clipboard-check fs-5"></i><span class="session-manager-nav-label">Reports</span>
+                    <span id="sessionReportsNavBadge" class="badge rounded-pill session-reports-nav-badge d-none" aria-hidden="true"></span>
                 </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="student-cases" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-folder-check fs-5"></i><span class="session-manager-nav-label">Student Cases</span>
@@ -3755,7 +3773,31 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(message.replace(/<[^>]*>/g, ''));
         }
     }
+    function syncSessionReportsNavBadge() {
+        const badge = document.getElementById('sessionReportsNavBadge');
+        if (!badge) return;
+        const rows = Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : [];
+        const total = rows.length;
+        if (!total) {
+            badge.classList.add('d-none');
+            badge.classList.remove('bg-danger', 'bg-success');
+            badge.textContent = '';
+            badge.removeAttribute('title');
+            badge.setAttribute('aria-hidden', 'true');
+            return;
+        }
+        const pending = getUnsubmittedSessionReports().length;
+        const allSubmitted = pending === 0;
+        badge.classList.remove('d-none', 'bg-danger', 'bg-success');
+        badge.classList.add(allSubmitted ? 'bg-success' : 'bg-danger');
+        badge.textContent = String(total);
+        badge.setAttribute('aria-hidden', 'false');
+        badge.title = allSubmitted
+            ? `${total} report instance(s) — all submitted`
+            : `${total} report instance(s) — ${pending} pending`;
+    }
     function syncPendingReportsHint() {
+        syncSessionReportsNavBadge();
         const hint = document.getElementById('sessionPendingReportsHint');
         if (!hint) return;
         const pending = getUnsubmittedSessionReports();

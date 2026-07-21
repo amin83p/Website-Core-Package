@@ -18,7 +18,22 @@
   const canEditAnswersSafe = typeof canEditReportInstanceAnswers !== 'undefined'
     ? Boolean(canEditReportInstanceAnswers)
     : !isLocked;
+  const sharedFieldsEditableSafe = typeof sharedFieldsEditable !== 'undefined'
+    ? Boolean(sharedFieldsEditable)
+    : true;
+  const sharedFieldsLockReasonSafe = String(typeof sharedFieldsLockReason !== 'undefined' ? sharedFieldsLockReason : '').trim();
+  const sharedFieldsWillBeLockedOnReopenSafe = Boolean(
+    typeof sharedFieldsWillBeLockedOnReopen !== 'undefined' && sharedFieldsWillBeLockedOnReopen
+  );
+  const sharedFieldsReopenWarningSafe = String(
+    typeof sharedFieldsReopenWarning !== 'undefined' ? sharedFieldsReopenWarning : ''
+  ).trim();
   const isReadOnly = !canEditAnswersSafe;
+  const fieldIsDisabled = (field) => {
+    if (isReadOnly) return true;
+    if (hasSharedFields && field?.sharedAcrossStudents === true && !sharedFieldsEditableSafe) return true;
+    return false;
+  };
   const lifecycleMode = String(classData?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
   const parsedCycleNo = Number.parseInt(String(classData?.cycleNo || '').trim(), 10);
   const lifecycleCycleNo = Number.isFinite(parsedCycleNo) && parsedCycleNo > 0 ? parsedCycleNo : 1;
@@ -178,6 +193,14 @@
       </div>
     </div>
   </div>
+
+  <% if (hasSharedFields && !isReadOnly && !sharedFieldsEditableSafe && sharedFieldsLockReasonSafe) { %>
+    <div class="alert alert-warning border-warning-subtle mb-4" role="alert">
+      <div class="fw-semibold mb-1"><i class="bi bi-lock-fill me-1"></i>Shared fields are read-only</div>
+      <div class="small mb-0"><%= sharedFieldsLockReasonSafe %></div>
+      <div class="small mt-1 mb-0">You can still edit student-specific (private) fields on this report.</div>
+    </div>
+  <% } %>
 
   <div class="card border-0 shadow-sm mb-4">
     <button type="button" class="card-header bg-white border-0 w-100 d-flex justify-content-between align-items-center py-3 text-start rounded-top" data-bs-toggle="collapse" data-bs-target="#reportInstanceDetailsCollapse" aria-expanded="true" aria-controls="reportInstanceDetailsCollapse" id="reportInstanceDetailsToggle">
@@ -457,25 +480,25 @@
                                   <input type="text" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= displaySelectSt %>" readonly>
                                 <% } %>
                               <% } else if (field.type === 'textarea') { %>
-                                <textarea class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" rows="4" <%= isReadOnly ? 'disabled' : '' %>><%= value %></textarea>
+                                <textarea class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" rows="4" <%= fieldIsDisabled(field) ? 'disabled' : '' %>><%= value %></textarea>
                               <% } else if (field.type === 'number') { %>
-                                <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
+                                <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                               <% } else if (field.type === 'date') { %>
-                                <input type="date" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
+                                <input type="date" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                               <% } else if (field.type === 'checkbox') { %>
                                 <div class="form-check border rounded p-2">
-                                  <input type="checkbox" class="form-check-input js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= isReadOnly ? 'disabled' : '' %>>
+                                  <input type="checkbox" class="form-check-input js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                                   <label class="form-check-label">Checked</label>
                                 </div>
                               <% } else if (field.type === 'select') { %>
-                                <select class="form-select js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= isReadOnly ? 'disabled' : '' %>>
+                                <select class="form-select js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                                   <option value="">Select...</option>
                                   <% (field.options || []).forEach((opt) => { %>
                                     <option value="<%= opt.value %>" <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label || opt.value %></option>
                                   <% }); %>
                                 </select>
                               <% } else { %>
-                                <input type="text" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
+                                <input type="text" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                               <% } %>
 
                               <div class="small mt-1 js-field-validation" data-field-validation-for="<%= field.id %>">
@@ -573,25 +596,25 @@
                               <input type="text" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= displaySelectSt %>" readonly>
                             <% } %>
                           <% } else if (field.type === 'textarea') { %>
-                            <textarea class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" rows="4" <%= isReadOnly ? 'disabled' : '' %>><%= value %></textarea>
+                            <textarea class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" rows="4" <%= fieldIsDisabled(field) ? 'disabled' : '' %>><%= value %></textarea>
                           <% } else if (field.type === 'number') { %>
-                            <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
+                            <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                           <% } else if (field.type === 'date') { %>
-                            <input type="date" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
+                            <input type="date" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                           <% } else if (field.type === 'checkbox') { %>
                             <div class="form-check border rounded p-2">
-                              <input type="checkbox" class="form-check-input js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= isReadOnly ? 'disabled' : '' %>>
+                              <input type="checkbox" class="form-check-input js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                               <label class="form-check-label">Checked</label>
                             </div>
                           <% } else if (field.type === 'select') { %>
-                            <select class="form-select js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= isReadOnly ? 'disabled' : '' %>>
+                            <select class="form-select js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                               <option value="">Select...</option>
                               <% (field.options || []).forEach((opt) => { %>
                                 <option value="<%= opt.value %>" <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label || opt.value %></option>
                               <% }); %>
                             </select>
                           <% } else { %>
-                            <input type="text" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= isReadOnly ? 'disabled' : '' %>>
+                            <input type="text" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                           <% } %>
                           <div class="small mt-1 js-field-validation" data-field-validation-for="<%= field.id %>">
                             <% serverFieldIssues.slice(0, 2).forEach((issue) => { %>
@@ -658,6 +681,8 @@
                     type="button"
                     class="btn btn-outline-warning btn-sm js-reopen-report-instance"
                     data-instance-id="<%= instance.id %>"
+                    data-shared-will-lock="<%= sharedFieldsWillBeLockedOnReopenSafe ? '1' : '0' %>"
+                    data-shared-reopen-warning="<%= sharedFieldsReopenWarningSafe.replace(/"/g, '&quot;') %>"
                     title="Return this report to draft so the teacher can edit it"
                   >
                     <i class="bi bi-arrow-counterclockwise me-1"></i>Reopen for teacher
@@ -1926,9 +1951,16 @@
           : async (msg) => window.confirm(String(msg || '')));
       try {
         if (kind === 'reopen') {
-          const confirmed = await confirmFn(
-            'Reopen this report as draft so the teacher can edit it?'
-          );
+          const reopenBtn = document.querySelector('.js-reopen-report-instance[data-instance-id="' + CSS.escape(id) + '"]')
+            || document.querySelector('.js-reopen-report-instance');
+          const sharedWillLock = String(reopenBtn?.getAttribute('data-shared-will-lock') || '') === '1';
+          const sharedWarning = String(reopenBtn?.getAttribute('data-shared-reopen-warning') || '').trim();
+          let reopenMessage = 'Reopen this report as draft so the teacher can edit it?';
+          if (sharedWillLock) {
+            reopenMessage += '\n\nImportant: this assignment has shared fields. Other student reports are still submitted/locked/archived, so after reopen only private fields will be editable. Shared fields stay read-only until those other reports are also reopened to draft.';
+            if (sharedWarning) reopenMessage += '\n\n' + sharedWarning;
+          }
+          const confirmed = await confirmFn(reopenMessage);
           if (!confirmed) return;
           await api.withLoading('Reopening report...', function () {
             return api.reopenReportInstance(id, { actionStateId });
