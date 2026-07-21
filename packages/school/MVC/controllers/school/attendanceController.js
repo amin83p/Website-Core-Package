@@ -11,6 +11,7 @@ const classEnrollmentReadService = require('../../services/school/classEnrollmen
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
+const attendanceExcelExportService = require('../../services/school/attendanceExcelExportService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const schoolFileService = require('../../services/school/schoolFileService');
@@ -18,6 +19,141 @@ const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attend
 const accessService = requireCoreModule('MVC/services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+
+function resolveClassTeacherName(classData = {}) {
+    const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
+    const primary = instructors.find((row) => row && (row.primary === true || row.isPrimary === true))
+        || instructors[0]
+        || null;
+    return String(primary?.name || primary?.displayName || '').trim();
+}
+
+function readPersonEmail(person = {}) {
+    const emails = Array.isArray(person?.contact?.emails) ? person.contact.emails : [];
+    return String(
+        person?.contact?.email
+        || person?.contact?.primaryEmail
+        || person?.email
+        || emails[0]?.email
+        || ''
+    ).trim();
+}
+
+function readUserEmail(user = {}) {
+    return String(user?.email || user?.identity?.email || user?.profile?.email || '').trim();
+}
+
+function normalizeCommentMentions(mentions = []) {
+    return (Array.isArray(mentions) ? mentions : [])
+        .map((mention) => ({
+            id: String(mention?.id || mention?.userId || '').trim(),
+            name: String(mention?.name || mention?.displayName || '').trim(),
+            email: String(mention?.email || '').trim()
+        }))
+        .filter((mention) => mention.id);
+}
+
+function buildUserContactLookup(users = []) {
+    const byId = new Map();
+    (Array.isArray(users) ? users : []).forEach((user) => {
+        const id = String(user?.id || user?.userId || '').trim();
+        if (!id) return;
+        byId.set(id, {
+            name: String(user?.displayName || user?.name || user?.username || '').trim(),
+            email: readUserEmail(user)
+        });
+    });
+    return byId;
+}
+
+function enrichAttendanceComments(comments = [], userById = new Map()) {
+    return (Array.isArray(comments) ? comments : []).map((comment) => {
+        if (!comment || typeof comment === 'string') return comment;
+        const authorId = String(comment.authorId || '').trim();
+        const lookup = authorId ? userById.get(authorId) : null;
+        const mentions = normalizeCommentMentions(comment.mentions).map((mention) => {
+            const mentionLookup = userById.get(mention.id);
+            return {
+                ...mention,
+                name: mention.name || mentionLookup?.name || '',
+                email: mention.email || mentionLookup?.email || ''
+            };
+        });
+        return {
+            ...comment,
+            authorName: String(comment.authorName || lookup?.name || '').trim(),
+            authorEmail: String(comment.authorEmail || lookup?.email || '').trim(),
+            mentions
+        };
+    });
+}
+
+function getLatestClbLevelEntry(studentRecord = {}) {
+    const history = Array.isArray(studentRecord?.clbLevelHistory) ? studentRecord.clbLevelHistory : [];
+    return [...history].sort((a, b) => {
+        const dateCmp = String(b?.recordedAt || '').localeCompare(String(a?.recordedAt || ''));
+        if (dateCmp !== 0) return dateCmp;
+        return String(b?.id || '').localeCompare(String(a?.id || ''));
+    })[0] || null;
+}
+
+function resolveEnrollmentDatesForPerson({
+    periodRows = [],
+    studentToPersonMap,
+    personId = '',
+    studentRecordId = '',
+    windowStart = '',
+    windowEnd = ''
+} = {}) {
+    const targetPersonId = String(personId || '').trim();
+    const targetStudentId = String(studentRecordId || '').trim();
+    const matches = (Array.isArray(periodRows) ? periodRows : []).filter((row) => {
+        const sid = String(row?.studentId || '').trim();
+        if (!sid) return false;
+        if (targetStudentId && sid === targetStudentId) return true;
+        const mappedPerson = String(studentToPersonMap?.get(sid) || '').trim();
+        return (mappedPerson && mappedPerson === targetPersonId) || sid === targetPersonId;
+    });
+    if (!matches.length) {
+        return { enrollmentStartDate: '', enrollmentEndDate: '', funderType: '', funderId: '' };
+    }
+
+    const ws = normalizeDateOnly(windowStart) || '0000-01-01';
+    const we = normalizeDateOnly(windowEnd) || '9999-12-31';
+    const overlapping = matches.filter((row) => {
+        const start = normalizeDateOnly(row?.startDate);
+        if (!start) return false;
+        const effectiveEnd = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(row) || '9999-12-31';
+        return start <= we && effectiveEnd >= ws;
+    });
+    const pool = (overlapping.length ? overlapping : matches).slice().sort((a, b) => (
+        String(b?.startDate || '').localeCompare(String(a?.startDate || ''))
+    ));
+    const chosen = pool[0] || null;
+    if (!chosen) return { enrollmentStartDate: '', enrollmentEndDate: '', funderType: '', funderId: '' };
+
+    const enrollmentStartDate = normalizeDateOnly(chosen.startDate);
+    const rawEnd = normalizeDateOnly(chosen.endDate)
+        || normalizeDateOnly(chosen.completionDate);
+    const enrollmentEndDate = rawEnd && rawEnd !== '9999-12-31' ? rawEnd : '';
+    return {
+        enrollmentStartDate,
+        enrollmentEndDate,
+        funderType: String(chosen.funderType || '').trim(),
+        funderId: String(chosen.funderId || '').trim()
+    };
+}
+
+function resolveClbMapsForStudent(studentRecord = null) {
+    const latest = getLatestClbLevelEntry(studentRecord || {});
+    if (!latest) {
+        return { clbCurrent: {}, clbGoal: {} };
+    }
+    return {
+        clbCurrent: latest.current && typeof latest.current === 'object' ? latest.current : {},
+        clbGoal: latest.goal && typeof latest.goal === 'object' ? latest.goal : {}
+    };
+}
 
 function normalizeDateOnly(value) {
     const token = String(value || '').trim();
@@ -263,8 +399,7 @@ async function saveAttendanceMatrixSettings(req, res) {
     }
 }
 
-async function getAttendanceData(req, res) {
-    try {
+async function buildAttendanceMatrixPayload(req) {
         const { classId, startDate, endDate } = req.query;
         if (!classId) throw new Error('Class ID is required.');
 
@@ -288,14 +423,21 @@ async function getAttendanceData(req, res) {
         });
         filteredSessions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-        const [persons, students] = await Promise.all([
+        const [persons, students, taggableUsersPayload] = await Promise.all([
             schoolIdentityLookupService.listSchoolPersonRecords({
                 reqUser: req.user,
                 requireSchoolRole: false,
                 query: { limit: 1000 }
             }).then((payload) => payload.allRows || payload.rows || []),
-            schoolDataService.fetchData('students', {}, req.user)
+            schoolDataService.fetchData('students', {}, req.user),
+            schoolIdentityLookupService.listTaggableUsers({
+                reqUser: req.user,
+                query: { limit: 1000 }
+            }).catch(() => ({ allRows: [], rows: [] }))
         ]);
+        const userContactById = buildUserContactLookup(
+            taggableUsersPayload.allRows || taggableUsersPayload.rows || []
+        );
 
         const studentToPersonMap = new Map(
             (Array.isArray(students) ? students : [])
@@ -320,11 +462,13 @@ async function getAttendanceData(req, res) {
         const registrationMode = String(classData?.registrationMode || '').trim().toLowerCase();
         const activePersonIds = new Set();
         let rollingApplicability = null;
+        const enrollmentPeriodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user)
+            .then((rows) => (Array.isArray(rows) ? rows : []))
+            .catch(() => []);
         let rollingPeriodRows = [];
 
         if (registrationMode === 'rolling') {
-            const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user);
-            rollingPeriodRows = Array.isArray(periodRows) ? periodRows : [];
+            rollingPeriodRows = enrollmentPeriodRows;
             rollingApplicability = await classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicabilityWithLeaves({
                 sessions: filteredSessions,
                 periodRows: rollingPeriodRows,
@@ -348,17 +492,48 @@ async function getAttendanceData(req, res) {
         }
 
         const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(students, activeOrgId);
+        const studentsById = new Map(
+            (Array.isArray(students) ? students : [])
+                .map((row) => [String(row?.id || '').trim(), row])
+                .filter(([id]) => id)
+        );
+        const exportWindowStart = String(startDate || '').trim() || (sessionDates[0] || '');
+        const exportWindowEnd = String(endDate || '').trim() || (sessionDates[sessionDates.length - 1] || '');
 
         let studentList = Array.from(activePersonIds).map(uid => {
             const person = persons.find(p => String(p.id) === uid);
-            const name = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : `Person ${uid}`;
+            const firstName = String(person?.name?.first || '').trim();
+            const lastName = String(person?.name?.last || '').trim();
+            const name = person
+                ? `${firstName} ${lastName}`.trim() || `Person ${uid}`
+                : `Person ${uid}`;
+            const studentRecordId = schoolStudentProfileLinkService.resolveStudentRecordId({
+                personId: uid,
+                personToStudentMap
+            });
+            const studentRecord = studentsById.get(String(studentRecordId || '').trim()) || null;
+            const { enrollmentStartDate, enrollmentEndDate, funderType, funderId } = resolveEnrollmentDatesForPerson({
+                periodRows: enrollmentPeriodRows,
+                studentToPersonMap,
+                personId: uid,
+                studentRecordId,
+                windowStart: exportWindowStart,
+                windowEnd: exportWindowEnd
+            });
+            const { clbCurrent, clbGoal } = resolveClbMapsForStudent(studentRecord);
             return {
                 personId: uid,
                 name,
-                studentRecordId: schoolStudentProfileLinkService.resolveStudentRecordId({
-                    personId: uid,
-                    personToStudentMap
-                })
+                firstName,
+                lastName,
+                email: readPersonEmail(person || {}),
+                studentRecordId,
+                enrollmentStartDate,
+                enrollmentEndDate,
+                funderType,
+                funderId,
+                clbCurrent,
+                clbGoal
             };
         });
         studentList.sort((a, b) => a.name.localeCompare(b.name));
@@ -438,7 +613,7 @@ async function getAttendanceData(req, res) {
                     rosterStudentNotes: rosterRecord?.notes || '',
                     sessionLevelNote: ses.notes || '',
                     sessionLocked,
-                    comments: rosterRecord?.comments || [],
+                    comments: enrichAttendanceComments(rosterRecord?.comments || [], userContactById),
                     scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(
                         ses,
                         attendancePolicy.scheduledMinutes
@@ -449,10 +624,12 @@ async function getAttendanceData(req, res) {
             return { ...stu, records, summary };
         });
 
-        res.json({ 
-            status: 'success', 
+        return {
             classId: classId,
             className: classData.title,
+            teacherName: resolveClassTeacherName(classData),
+            startDate: String(startDate || '').trim(),
+            endDate: String(endDate || '').trim(),
             sessions: filteredSessions.map(s => ({ id: s.sessionId, date: s.date, status: s.status })),
             matrix,
             attendancePolicy,
@@ -461,10 +638,40 @@ async function getAttendanceData(req, res) {
                 ? 'canonical_active_only_rolling'
                 : String(enrollmentSnapshot?.source || 'legacy'),
             enrollmentUsedFallback: Boolean(enrollmentSnapshot?.usedFallback)
-        });
+        };
+}
 
+async function getAttendanceData(req, res) {
+    try {
+        const payload = await buildAttendanceMatrixPayload(req);
+        res.json({
+            status: 'success',
+            ...payload
+        });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function exportAttendanceExcel(req, res) {
+    try {
+        const payload = await buildAttendanceMatrixPayload(req);
+        const filteredPayload = attendanceExcelExportService.filterMatrixByPersonIds(
+            payload,
+            req.query?.personIds
+        );
+        const { buffer, filename } = await attendanceExcelExportService.buildAttendanceExcelWorkbook(filteredPayload);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', buffer.length);
+        return res.status(200).send(buffer);
+    } catch (error) {
+        const wantsJson = String(req.headers.accept || '').includes('application/json')
+            || String(req.headers['x-ajax-request'] || '') === 'true';
+        if (wantsJson) {
+            return res.status(400).json({ status: 'error', message: error.message });
+        }
+        return res.status(400).send(error.message || 'Unable to export attendance Excel.');
     }
 }
 
@@ -499,13 +706,15 @@ async function addAttendanceComment(req, res) {
 
         if (!rosterRecord.comments) rosterRecord.comments = [];
 
+        const normalizedMentions = normalizeCommentMentions(mentions);
         const newComment = {
             id: 'cmt_' + Date.now(),
             authorId: req.user.id,
             authorName: req.user.identity?.displayName || req.user.name || req.user.username || 'Admin',
+            authorEmail: readUserEmail(req.user),
             text: text.trim(),
             timestamp: new Date().toISOString(),
-            mentions: mentions || [],
+            mentions: normalizedMentions,
             attachment: attachment && typeof attachment === 'object' ? attachment : null
         };
 
@@ -515,7 +724,7 @@ async function addAttendanceComment(req, res) {
         // =========================================================================
         // NEW: AUTOMATIC CHAT MESSAGE ENGINE
         // =========================================================================
-        if (mentions && mentions.length > 0) {
+        if (normalizedMentions.length > 0) {
             const className = classData ? classData.title : 'a class';
             
             // Format the message with HTML to include a styled, clickable link!
@@ -532,7 +741,7 @@ async function addAttendanceComment(req, res) {
                 </a>
             `;
 
-            for (const mention of mentions) {
+            for (const mention of normalizedMentions) {
                 try {
                     // FIX 1: Strictly convert IDs to Strings to prevent "Unknown User" and duplicate chat bugs!
                     const authorIdStr = String(req.user.id);
@@ -715,6 +924,7 @@ module.exports = {
     saveAttendanceMatrixSettings,
     listActiveAttendanceClasses,
     getAttendanceData,
+    exportAttendanceExcel,
     uploadAttendanceFile,
     addAttendanceComment,
     updateAttendanceRosterCell

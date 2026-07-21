@@ -44,6 +44,11 @@ router.get('/api/data',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
   ctrl.getAttendanceData);
 
+router.get('/api/export.xlsx',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
+  ctrl.exportAttendanceExcel);
+
 router.get('/api/active-classes',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),

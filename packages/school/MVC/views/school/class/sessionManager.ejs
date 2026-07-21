@@ -3976,7 +3976,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const mentionId = item.userId || item.id;
                     const name = item.displayName || item.name || item.email || mentionId;
                     if (mentionId && mentionId !== 'undefined' && !currentMentions.find(m => m.id === mentionId)) {
-                        currentMentions.push({ id: mentionId, name: name });
+                        currentMentions.push({
+                            id: mentionId,
+                            name: name,
+                            email: item.email || ''
+                        });
                         renderMentions();
                     }
                 }

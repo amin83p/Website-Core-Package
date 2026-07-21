@@ -104,6 +104,7 @@
   btn_export: false,
   print: false,
   optionalBtnsBeforePrint: [
+    '<button type="button" id="btn_exportAttendanceExcel" class="btn btn-filled btn-success btn-md me-2 mb-2" disabled title="Load the matrix first"><i class="bi bi-cloud-download me-1"></i> Export</button>',
     '<button type="button" id="btn_printAttendanceMatrix" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Load the matrix first">🖨 Print</button>'
   ],
   headerManageBtns: [
@@ -733,10 +734,46 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function setAttendancePrintEnabled(enabled) {
-        const btn = document.getElementById('btn_printAttendanceMatrix');
-        if (!btn) return;
-        btn.disabled = !enabled;
-        btn.title = enabled ? 'Print attendance matrix for the loaded range' : 'Load the matrix first';
+        const printBtn = document.getElementById('btn_printAttendanceMatrix');
+        if (printBtn) {
+            printBtn.disabled = !enabled;
+            printBtn.title = enabled ? 'Print attendance matrix for the loaded range' : 'Load the matrix first';
+        }
+        const exportBtn = document.getElementById('btn_exportAttendanceExcel');
+        if (exportBtn) {
+            exportBtn.disabled = !enabled;
+            exportBtn.title = enabled ? 'Export attendance matrix to Excel for the loaded range' : 'Load the matrix first';
+        }
+    }
+
+    function exportAttendanceExcel() {
+        if (!window.currentMatrixData || window.currentMatrixData.status !== 'success') {
+            showAttendanceMatrixMessage({
+                title: 'Nothing to export',
+                icon: 'warning',
+                message: 'Load an attendance matrix for a class first.',
+                buttons: [{ text: 'Close', class: 'btn-secondary' }]
+            });
+            return;
+        }
+        const classId = String(document.getElementById('filter_classId')?.value || window.currentMatrixData.classId || '').trim();
+        const startDate = String(document.getElementById('filter_startDate')?.value || '').trim();
+        const endDate = String(document.getElementById('filter_endDate')?.value || '').trim();
+        if (!classId) {
+            showAttendanceMatrixMessage({
+                title: 'Class required',
+                icon: 'warning',
+                message: 'Select a class and load the matrix before exporting.',
+                buttons: [{ text: 'Close', class: 'btn-secondary' }]
+            });
+            return;
+        }
+        const params = new URLSearchParams({ classId });
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+        const visibleIds = Array.from(getAttendanceVisiblePersonIds() || []).filter(Boolean);
+        params.set('personIds', visibleIds.join(','));
+        window.location.href = `/school/attendances/api/export.xlsx?${params.toString()}`;
     }
 
     document.getElementById('btn_clearClass')?.addEventListener('click', () => {
@@ -786,7 +823,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mentionId = item.userId || item.id;
                 const name = item.displayName || item.name || item.email || mentionId;
                 if (mentionId && mentionId !== 'undefined' && !currentMentions.find(m => m.id === mentionId)) {
-                    currentMentions.push({ id: mentionId, name: name });
+                    currentMentions.push({
+                        id: mentionId,
+                        name: name,
+                        email: item.email || ''
+                    });
                     renderMentions();
                 } else if (!mentionId || mentionId === 'undefined') {
                     showAttendanceMatrixMessage({
@@ -1467,6 +1508,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('btn_printAttendanceMatrix')?.addEventListener('click', () => openAttendancePrint());
+    document.getElementById('btn_exportAttendanceExcel')?.addEventListener('click', () => exportAttendanceExcel());
 
     // --- 4. Interactive Note Saving Logic ---
     document.getElementById('btn_saveComment').addEventListener('click', async () => {
