@@ -19,6 +19,7 @@ const REVIEW_HISTORY_EVENTS = new Set([
     'reviewer_edited',
     'manager_approved',
     'returned',
+    'late_submission_allowed',
     'manual_row_approved',
     'manual_row_rejected',
     'processed',
@@ -94,6 +95,15 @@ function cleanMoney(v) {
 function normalizeTimesheetStatus(value) {
     const token = cleanString(value, { max: 30, allowEmpty: true }).toLowerCase() || 'draft';
     return token === 'approved' ? 'submitted' : token;
+}
+
+function cleanBoolean(value, fallback = false) {
+    if (value === undefined || value === null || value === '') return fallback === true;
+    if (value === true || value === false) return value;
+    const token = String(value).trim().toLowerCase();
+    if (token === 'true' || token === '1' || token === 'yes') return true;
+    if (token === 'false' || token === '0' || token === 'no') return false;
+    return fallback === true;
 }
 
 function cleanNonNegativeInteger(value, fallback = 0) {
@@ -466,6 +476,9 @@ function sanitizeTimesheetPayload(input) {
     optionalStrings.forEach(([key, max]) => {
         if (input[key] !== undefined) result[key] = cleanString(input[key], { max, allowEmpty: true });
     });
+    if (input.allowLateSubmission !== undefined) {
+        result.allowLateSubmission = cleanBoolean(input.allowLateSubmission, false);
+    }
     if (input.materializationSummary !== undefined) {
         result.materializationSummary = input.materializationSummary && typeof input.materializationSummary === 'object'
             ? JSON.parse(JSON.stringify(input.materializationSummary))
@@ -549,6 +562,9 @@ async function saveTimesheet(data) {
             if (sanitized.returnedAt === undefined && existing.returnedAt) merged.returnedAt = existing.returnedAt;
             if (sanitized.returnedBy === undefined && existing.returnedBy) merged.returnedBy = existing.returnedBy;
             if (sanitized.returnReason === undefined && existing.returnReason) merged.returnReason = existing.returnReason;
+            if (sanitized.allowLateSubmission === undefined && existing.allowLateSubmission === true) {
+                merged.allowLateSubmission = true;
+            }
             if (sanitized.lockedSourceRefs === undefined && existing.lockedSourceRefs) {
                 merged.lockedSourceRefs = existing.lockedSourceRefs;
             }

@@ -494,6 +494,16 @@ function resolvePeriodSubmissionDeadlineAt(period, orgTimeZone = '') {
     return zonedWallClockToIso(deadline, time, orgTimeZone) || '';
 }
 
+function isPeriodSubmissionDeadlinePassed(period, orgTimeZone = '', now = new Date()) {
+    const deadlineAt = resolvePeriodSubmissionDeadlineAt(period, orgTimeZone);
+    if (!deadlineAt) return false;
+    const deadlineMs = Date.parse(deadlineAt);
+    if (!Number.isFinite(deadlineMs)) return false;
+    const nowMs = now instanceof Date ? now.getTime() : Date.parse(String(now || ''));
+    if (!Number.isFinite(nowMs)) return false;
+    return nowMs > deadlineMs;
+}
+
 function formatHourlyRateLabel(value) {
     return timesheetPayRateService.formatHourlyRateLabel(value);
 }
@@ -1532,6 +1542,18 @@ exports.viewTimesheet = async (req, res) => {
             period,
             req.orgTimeZone || req.user?.activeOrgTimeZone || ''
         );
+        const isSubmissionDeadlinePassed = isPeriodSubmissionDeadlinePassed(
+            period,
+            req.orgTimeZone || req.user?.activeOrgTimeZone || ''
+        );
+        const allowLateSubmission = timesheet?.allowLateSubmission === true;
+        const canAllowLateSubmission = Boolean(
+            canManagerUpdate
+            && isSubmissionDeadlinePassed
+            && !allowLateSubmission
+            && status === 'draft'
+            && period.status !== 'processed'
+        );
 
         res.render('school/timesheet/timesheetEditor', {
             title: `Timesheet: ${period.name}`,
@@ -1567,6 +1589,9 @@ exports.viewTimesheet = async (req, res) => {
             canReviewerEdit,
             managerApproved,
             submissionDeadlineAt,
+            isSubmissionDeadlinePassed,
+            allowLateSubmission,
+            canAllowLateSubmission,
             reviewHistory: getReviewHistory(timesheet)
         });
     } catch (error) {
@@ -1901,6 +1926,16 @@ exports.saveTimesheet = async (req, res) => {
         }
 
         if (nextStatus === 'submitted' && !reviewerEdit) {
+            const orgTimeZone = req.orgTimeZone || req.user?.activeOrgTimeZone || '';
+            if (
+                isPeriodSubmissionDeadlinePassed(period, orgTimeZone)
+                && existing?.allowLateSubmission !== true
+            ) {
+                throw new Error(
+                    'The submission deadline for this timesheet period has passed. '
+                    + 'Ask a timesheet manager to allow late submission before you can submit.'
+                );
+            }
             const hasNonFinalAutoSession = payrollStampedEntries.some((entry) => {
                 if (!entry || entry.isDeleted || entry.isManual) return false;
                 if (entry.isPriorPeriodAdjustment === true) return false;
@@ -1969,9 +2004,14 @@ exports.saveTimesheet = async (req, res) => {
                 payload.returnedAt = '';
                 payload.returnedBy = '';
                 payload.returnReason = '';
+                payload.allowLateSubmission = false;
             }
         } else if (existing && Array.isArray(existing.reviewHistory)) {
             payload.reviewHistory = existing.reviewHistory;
+        }
+
+        if (nextStatus === 'draft' && existing?.allowLateSubmission === true) {
+            payload.allowLateSubmission = true;
         }
 
         if (existing?.priorPeriodAdjustmentsAppliedFrom) {
@@ -2743,6 +2783,8 @@ exports.returnTimesheet = async (req, res) => {
             };
         });
         const now = new Date().toISOString();
+        const orgTimeZone = req.orgTimeZone || req.user?.activeOrgTimeZone || '';
+        const grantLateSubmission = isPeriodSubmissionDeadlinePassed(period, orgTimeZone);
         const payload = {
             ...existing,
             status: 'draft',
@@ -2756,6 +2798,7 @@ exports.returnTimesheet = async (req, res) => {
             returnedAt: now,
             returnedBy: resolveActorId(req.user),
             returnReason: returnNote,
+            allowLateSubmission: grantLateSubmission ? true : (existing.allowLateSubmission === true),
             reviewHistory: appendReviewHistory(existing, buildReviewHistoryEntry({
                 event: 'returned',
                 reqUser: req.user,
@@ -2785,4 +2828,98 @@ exports.returnTimesheet = async (req, res) => {
 
 // Temporary compatibility alias for clients using the former endpoint/controller name.
 exports.reopenTimesheet = exports.returnTimesheet;
+
+exports.allowLateSubmission = async (req, res) => {
+    let guardKey = '';
+    try {
+        const { periodId } = req.params;
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const teacherContext = await resolveTargetTeacherContext(req, {
+            requireTeacher: true,
+            operationId: OPERATIONS.UPDATE,
+            managementOperationId: OPERATIONS.UPDATE
+        });
+        if (!await hasTimesheetManagementAuthority(req.user, OPERATIONS.UPDATE)) {
+            throw new Error('Timesheet Management UPDATE access is required to allow late submission.');
+        }
+        guardKey = idempotencyGuardService.createGuardKey([
+            'timesheet_allow_late_submission',
+            String(activeOrgId || '').trim(),
+            String(periodId || '').trim(),
+            String(teacherContext?.targetTeacherId || '').trim()
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({ key: guardKey, runningTtlMs: 120000, replayTtlMs: 15000 });
+        if (sendGuardedResponse(req, res, guardResult, 'Allow late submission is already in progress. Please wait.')) return;
+
+        const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
+        if (!period) throw new Error('Period not found.');
+        assertPeriodOrgAccess(period, activeOrgId, req.user);
+        if (period.status === 'processed') throw new Error('This period has been processed and is locked.');
+
+        const orgTimeZone = req.orgTimeZone || req.user?.activeOrgTimeZone || '';
+        if (!isPeriodSubmissionDeadlinePassed(period, orgTimeZone)) {
+            throw new Error('Late submission is only needed after the period submission deadline has passed.');
+        }
+
+        const existing = normalizeTimesheetLifecycle(
+            await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user)
+        );
+        const status = String(existing?.status || 'draft').toLowerCase();
+        if (existing?.id && status === 'processed') {
+            throw new Error('Processed timesheets are permanently locked and cannot be opened for late submission.');
+        }
+        if (existing?.id && status !== 'draft') {
+            throw new Error('Only draft timesheets can be opened for late submission. Send the timesheet back for revision first.');
+        }
+        if (existing?.allowLateSubmission === true) {
+            const payloadOut = { status: 'success', message: 'Late submission is already allowed for this timesheet.' };
+            idempotencyGuardService.completeGuard(guardKey, payloadOut);
+            return res.json(payloadOut);
+        }
+
+        const historyEntry = buildReviewHistoryEntry({
+            event: 'late_submission_allowed',
+            reqUser: req.user,
+            note: String(req.body?.note || '').trim() || 'Late submission allowed by manager.',
+            statusBefore: status || 'draft',
+            statusAfter: 'draft',
+            totalHours: Number(existing?.totalHours || 0),
+            entryCount: countActiveTimesheetEntries(existing?.entries || [])
+        });
+
+        let saved;
+        if (existing?.id) {
+            const payload = {
+                ...existing,
+                status: 'draft',
+                allowLateSubmission: true,
+                reviewHistory: appendReviewHistory(existing, historyEntry)
+            };
+            saved = await dataService.updateData('timesheets', existing.id, payload, req.user);
+        } else {
+            const payload = {
+                orgId: period.orgId || activeOrgId,
+                periodId: String(periodId),
+                teacherId: String(teacherContext.targetTeacherId),
+                status: 'draft',
+                entries: [],
+                totalHours: 0,
+                allowLateSubmission: true,
+                reviewHistory: appendReviewHistory(null, historyEntry)
+            };
+            saved = await dataService.addData('timesheets', payload, req.user);
+        }
+
+        const payloadOut = {
+            status: 'success',
+            message: 'Late submission is now allowed. The author can submit this timesheet once.',
+            timesheetId: saved?.id || existing?.id || null
+        };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        return res.json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+};
 

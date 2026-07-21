@@ -5,11 +5,15 @@
   const adminCanReopen = typeof canSendBack !== 'undefined' ? canSendBack : Boolean(typeof canAdminReopen !== 'undefined' && canAdminReopen);
   const financeCanProcess = typeof canFinanceProcess !== 'undefined' && canFinanceProcess === true;
   const financeCanUnprocess = typeof canUnprocessProcessed !== 'undefined' && canUnprocessProcessed === true;
+  const canAllowLateSubmissionFlag = typeof canAllowLateSubmission !== 'undefined' && canAllowLateSubmission === true;
+  const isSubmissionDeadlinePassedFlag = typeof isSubmissionDeadlinePassed !== 'undefined' && isSubmissionDeadlinePassed === true;
+  const allowLateSubmissionFlag = typeof allowLateSubmission !== 'undefined' && allowLateSubmission === true;
   const managerReviewApproved = typeof managerApproved !== 'undefined' ? managerApproved === true : String(timesheet?.managerReview?.status || '').toLowerCase() === 'approved';
   const isReviewerEditing = reviewerCanEdit && currentTimesheetStatus === 'submitted';
   const pageIsReadOnly = currentTimesheetStatus === 'processed' || period.status === 'processed' || (currentTimesheetStatus === 'submitted' && !reviewerCanEdit);
   const isEditorLocked = pageIsReadOnly;
   const isManuallyEdited = timesheet.entries && timesheet.entries.some(e => e.isManual || e.isDeleted);
+  const submitBlockedByDeadline = isSubmissionDeadlinePassedFlag && !allowLateSubmissionFlag && !isReviewerEditing;
 %>
 
 <%
@@ -498,11 +502,21 @@
         </div>
     </div>
 
-    <% if (!isEditorLocked || adminCanApprove || adminCanReopen || financeCanProcess || financeCanUnprocess) { %>
-        <div class="d-flex justify-content-end gap-2 border-top pt-3">
+    <% if (!isEditorLocked || adminCanApprove || adminCanReopen || financeCanProcess || financeCanUnprocess || canAllowLateSubmissionFlag) { %>
+        <div class="d-flex justify-content-end gap-2 border-top pt-3 flex-wrap">
             <% if (!isEditorLocked) { %>
                 <button class="btn btn-light border fw-bold px-4" id="btnSaveDraft"><%= isReviewerEditing ? 'Save Review Changes' : 'Save Draft' %></button>
-                <% if (!isReviewerEditing) { %><button class="btn btn-primary fw-bold px-4" id="btnSubmit">Submit for Payroll</button><% } %>
+                <% if (!isReviewerEditing) { %>
+                    <button
+                        class="btn <%= submitBlockedByDeadline ? 'btn-secondary' : 'btn-primary' %> fw-bold px-4"
+                        id="btnSubmit"
+                        <%= submitBlockedByDeadline ? 'disabled' : '' %>
+                        title="<%= submitBlockedByDeadline ? 'Submission deadline has passed. A timesheet manager must allow late submission.' : '' %>"
+                    ><%= submitBlockedByDeadline ? 'Deadline Passed' : 'Submit for Payroll' %></button>
+                <% } %>
+            <% } %>
+            <% if (canAllowLateSubmissionFlag) { %>
+                <button class="btn btn-outline-primary fw-bold px-4" id="btnAllowLateSubmission"><i class="bi bi-unlock me-1"></i> Allow Late Submission</button>
             <% } %>
             <% if (adminCanApprove) { %>
                 <button class="btn btn-success fw-bold px-4" id="btnApproveTimesheet"><i class="bi bi-check-circle me-1"></i> Manager Approve</button>
@@ -517,6 +531,13 @@
                 <button class="btn btn-outline-warning fw-bold px-4" id="btnUnprocessTimesheet"><i class="bi bi-unlock-fill me-1"></i> Reopen to Manager Approved</button>
             <% } %>
         </div>
+        <% if (submitBlockedByDeadline && !canAllowLateSubmissionFlag) { %>
+            <div class="text-end small text-danger mt-2">Submission deadline has passed. Ask a timesheet manager to allow late submission.</div>
+        <% } else if (submitBlockedByDeadline && canAllowLateSubmissionFlag) { %>
+            <div class="text-end small text-muted mt-2">Deadline has passed. Allow late submission so the author can submit once.</div>
+        <% } else if (allowLateSubmissionFlag && isSubmissionDeadlinePassedFlag && !isReviewerEditing && !isEditorLocked) { %>
+            <div class="text-end small text-success mt-2">Late submission is allowed for one submit.</div>
+        <% } %>
     <% } %>
 </div>
 
@@ -748,6 +769,8 @@
     const IS_READONLY = <%= isEditorLocked %>;
     const IS_ADMIN = <%= isAdmin %>;
     const CAN_MANAGER_REVIEW = <%= (typeof canSendBack !== 'undefined' && canSendBack) ? 'true' : 'false' %>;
+    const IS_SUBMISSION_DEADLINE_PASSED = <%= isSubmissionDeadlinePassedFlag ? 'true' : 'false' %>;
+    const ALLOW_LATE_SUBMISSION = <%= allowLateSubmissionFlag ? 'true' : 'false' %>;
     const SHOW_PRIOR_ADJUSTMENT_REVIEW = <%= showPriorAdjustmentReview ? 'true' : 'false' %>;
     const PERIOD_ID = "<%= period.id %>";
     const TARGET_TEACHER_ID = "<%= targetTeacherId %>";
@@ -1691,14 +1714,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const btnSubmit = document.getElementById('btnSubmit');
         if (btnSubmit) {
+            const blockedByDeadline = IS_SUBMISSION_DEADLINE_PASSED && !ALLOW_LATE_SUBMISSION;
             if (hasUncompletedSessions) {
                 btnSubmit.disabled = true;
                 btnSubmit.innerHTML = '<i class="bi bi-lock-fill me-1"></i> Finalize Session Statuses to Submit';
                 btnSubmit.classList.replace('btn-primary', 'btn-secondary');
+                btnSubmit.title = '';
+            } else if (blockedByDeadline) {
+                btnSubmit.disabled = true;
+                btnSubmit.innerHTML = '<i class="bi bi-lock-fill me-1"></i> Deadline Passed';
+                btnSubmit.classList.replace('btn-primary', 'btn-secondary');
+                btnSubmit.title = 'Submission deadline has passed. A timesheet manager must allow late submission.';
             } else {
                 btnSubmit.disabled = false;
                 btnSubmit.innerHTML = 'Submit for Payroll';
                 btnSubmit.classList.replace('btn-secondary', 'btn-primary');
+                btnSubmit.title = '';
             }
         }
 
@@ -2299,7 +2330,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('btnSubmit')) {
         document.getElementById('btnSubmit').addEventListener('click', async () => {
             if (hasUncompletedSessions) return;
-            
+            if (IS_SUBMISSION_DEADLINE_PASSED && !ALLOW_LATE_SUBMISSION) {
+                await messageBox({
+                    title: 'Deadline Passed',
+                    icon: 'warning',
+                    message: 'The submission deadline has passed. Ask a timesheet manager to allow late submission.'
+                });
+                return;
+            }
+
             const ok = await confirmAction({
                 title: 'Submit Timesheet',
                 message: 'Are you sure? Once submitted, you cannot edit this timesheet unless a reviewer sends it back to Draft for revision.',
@@ -2451,6 +2490,16 @@ document.addEventListener('DOMContentLoaded', () => {
             message: 'Process this manager-approved timesheet, materialize approved manual rows, and permanently lock linked sources?',
             confirmText: 'Process and Lock',
             successTitle: 'Timesheet Processed'
+        }));
+    }
+
+    const btnAllowLateSubmission = document.getElementById('btnAllowLateSubmission');
+    if (btnAllowLateSubmission) {
+        btnAllowLateSubmission.addEventListener('click', () => executeAdminTimesheetAction('allow-late-submission', {
+            title: 'Allow Late Submission',
+            message: 'Allow the author to submit this timesheet once after the deadline?',
+            confirmText: 'Allow Once',
+            successTitle: 'Late Submission Allowed'
         }));
     }
 

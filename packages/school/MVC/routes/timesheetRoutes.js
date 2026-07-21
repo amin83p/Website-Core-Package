@@ -115,4 +115,9 @@ router.post('/editor/:periodId/reopen',
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
   ctrl.returnTimesheet);
 
+router.post('/editor/:periodId/allow-late-submission',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.allowLateSubmission);
+
 module.exports = router;
