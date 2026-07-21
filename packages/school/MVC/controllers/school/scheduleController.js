@@ -13,6 +13,7 @@ const classEnrollmentReadService = require('../../services/school/classEnrollmen
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const activityService = require('../../services/school/activityService');
 const teacherIdentityService = require('../../services/school/teacherIdentityService');
+const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
@@ -585,12 +586,8 @@ function hasInstructorMatchWithTeacherLink(classRow, personId, teacherPersonMap 
 }
 
 function hasSessionDeliveryMatch(classRow, personId, teacherPersonMap = new Map()) {
-    const normalizedPersonId = normalizeId(personId);
     const sessions = Array.isArray(classRow?.sessions) ? classRow.sessions : [];
-    return sessions.some((session) => {
-        const deliveredBy = resolveLinkedPersonId(session?.delivery?.deliveredBy, teacherPersonMap);
-        return deliveredBy && idsEqual(deliveredBy, normalizedPersonId);
-    });
+    return sessions.some((session) => sessionDeliveryTeamService.isPersonOnSessionDelivery(session, personId, teacherPersonMap));
 }
 
 function buildPersonDisplayName(person, fallbackId = '') {
@@ -1138,9 +1135,14 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
                 status: session?.status,
                 notes: session?.notes
             });
+            const isOnDeliveryTeam = sessionDeliveryTeamService.isPersonOnSessionDelivery(
+                session,
+                normalizedPersonId,
+                teacherPersonMap
+            );
             const isInstructorEvent = !excludeTeacher && (
-                deliveredBy
-                    ? idsEqual(deliveredBy, normalizedPersonId)
+                deliveredBy || sessionDeliveryTeamService.getSessionCoTeachers(session).length
+                    ? isOnDeliveryTeam
                     : classHasInstructor
             );
             const isStudentEvent = !excludeStudent && (await isStudentActiveOnDate({

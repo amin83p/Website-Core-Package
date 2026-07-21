@@ -221,13 +221,17 @@ function buildAssignmentScopeFilter(scope = {}, options = {}) {
         .map((id) => toPublicId(id))
         .filter(Boolean)
     )];
-    const deliveryClause = aliasIds.length === 1
+    const deliveredByClause = aliasIds.length === 1
       ? { 'sessions.delivery.deliveredBy': aliasIds[0] }
       : { 'sessions.delivery.deliveredBy': { $in: aliasIds } };
+    const coTeacherClause = aliasIds.length === 1
+      ? { 'sessions.delivery.coTeachers.personId': aliasIds[0] }
+      : { 'sessions.delivery.coTeachers.personId': { $in: aliasIds } };
     return {
       $or: [
         { 'instructors.personId': personId },
-        deliveryClause
+        deliveredByClause,
+        coTeacherClause
       ]
     };
   }

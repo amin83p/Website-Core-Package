@@ -983,6 +983,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<span class="badge ${klass} ms-1">${label}</span>`;
     }
 
+    function coTeacherBadge(entry) {
+        if (!entry?.isCoTeacherSession) return '';
+        const label = String(entry.coTeacherRoleLabel || 'Co-Teacher').trim() || 'Co-Teacher';
+        return `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1">${escapeHtml(label)}</span>`;
+    }
+
     const manualActivityMap = new Map((Array.isArray(MANUAL_ACTIVITIES) ? MANUAL_ACTIVITIES : [])
         .map((row) => [String(row?.id || '').trim(), row])
         .filter(([id]) => Boolean(id)));
@@ -1667,7 +1673,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     tbody.innerHTML += `
                         <tr class="${rowClass}">
                             ${dateCell}
-                            <td><div class="fw-bold text-primary">${ses.className || ''}${payrollRoleBadge(ses.personRole)}</div>${classMeta}</td>
+                            <td><div class="fw-bold text-primary">${ses.className || ''}${payrollRoleBadge(ses.personRole)}${coTeacherBadge(ses)}</div>${classMeta}</td>
                             <td>${buildStudentNameCellHtml(ses)}</td>
                             <td class="ts-col-time">${timeLabel}</td>
                             <td class="ts-col-status"><div class="ts-status-stack">${statusBadge}${buildMakeupSessionStatusHtml(ses)}</div></td>

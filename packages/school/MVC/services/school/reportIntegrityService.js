@@ -7,6 +7,7 @@ const {
   isRecordAccessibleByOrg,
   canBypassOrgScope
 } = require('./schoolDataScopeBuilder');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function inferAssignmentReportScope(row) {
@@ -419,8 +420,8 @@ async function assertNoAssignmentScheduleConflicts({
         for (const session of classSessions) {
           const sessionDate = String(session?.date || '').trim();
           if (!sessionDate || sessionDate !== target.date) continue;
-          const deliveredBy = String(session?.delivery?.deliveredBy || '').trim();
-          const teacherAssigned = deliveredBy ? deliveredBy === teacherId : instructorSet.has(teacherId);
+          const teacherAssigned = sessionDeliveryTeamService.isPersonOnSessionDelivery(session, teacherId)
+            || (!sessionDeliveryTeamService.getSessionMainTeacherId(session) && instructorSet.has(teacherId));
           if (!teacherAssigned) continue;
 
           const sessionStart = normalizeTimeValue(session?.startTime);

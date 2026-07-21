@@ -3,6 +3,7 @@ const schoolRepositories = require('../../repositories/school');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const leaveRequestService = require('./leaveRequestService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
@@ -230,7 +231,10 @@ function shouldIncludeSessionForLeaveConflict({
     notes: session?.notes
   })) return false;
   const deliveredBy = resolveSessionDeliveredBy(session);
-  if (!idsEqual(deliveredBy, requesterPersonId)) return false;
+  if (!idsEqual(deliveredBy, requesterPersonId)
+    && !sessionDeliveryTeamService.isPersonOnSessionDelivery(session, requesterPersonId)) {
+    return false;
+  }
   return sessionOverlapsLeaveWindow(leaveWindow, session);
 }
 
@@ -513,7 +517,10 @@ async function applySessionResolutions({ requestId, resolutions = [], reqUser })
       }
 
       const currentTeacherId = resolveSessionDeliveredBy(session);
-      if (!idsEqual(currentTeacherId, requesterPersonId)) {
+      const isMainTeacherLeave = idsEqual(currentTeacherId, requesterPersonId);
+      const isCoTeacherLeave = !isMainTeacherLeave
+        && sessionDeliveryTeamService.isPersonOnSessionDelivery(session, requesterPersonId);
+      if (!isMainTeacherLeave && !isCoTeacherLeave) {
         throw new Error(`Session ${resolution.sessionId} is no longer assigned to the leave requester. Refresh and try again.`);
       }
       if (!sessionOverlapsLeaveWindow(leaveWindow, session)) {
@@ -539,15 +546,35 @@ async function applySessionResolutions({ requestId, resolutions = [], reqUser })
         );
       }
 
-      session.delivery = {
-        ...(session.delivery && typeof session.delivery === 'object' ? session.delivery : {}),
-        deliveredBy: resolution.substituteTeacherId,
-        deliveredByName: resolution.substituteTeacherName || resolution.substituteTeacherId,
-        substitute: true,
-        originalDeliveredBy: requesterPersonId,
-        originalDeliveredByName: requesterName,
-        leaveRequestId: toPublicId(requestId)
-      };
+      if (isMainTeacherLeave) {
+        session.delivery = {
+          ...(session.delivery && typeof session.delivery === 'object' ? session.delivery : {}),
+          deliveredBy: resolution.substituteTeacherId,
+          deliveredByName: resolution.substituteTeacherName || resolution.substituteTeacherId,
+          substitute: true,
+          originalDeliveredBy: requesterPersonId,
+          originalDeliveredByName: requesterName,
+          leaveRequestId: toPublicId(requestId)
+        };
+      } else {
+        const priorCoTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
+        const nextCoTeachers = priorCoTeachers.map((row) => {
+          if (!idsEqual(row.personId, requesterPersonId)) return row;
+          return {
+            ...row,
+            personId: resolution.substituteTeacherId,
+            name: resolution.substituteTeacherName || resolution.substituteTeacherId
+          };
+        });
+        session.delivery = sessionDeliveryTeamService.applyCoTeachersToDelivery(
+          {
+            ...(session.delivery && typeof session.delivery === 'object' ? session.delivery : {}),
+            leaveRequestId: toPublicId(requestId)
+          },
+          nextCoTeachers,
+          { mainTeacherId: currentTeacherId }
+        );
+      }
       session.audit = {
         ...(session.audit || {}),
         lastUpdateUser: actorId,

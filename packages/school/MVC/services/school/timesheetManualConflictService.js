@@ -2,6 +2,7 @@ const schoolDataService = require('./schoolDataService');
 const activityService = require('./activityService');
 const leaveRequestService = require('./leaveRequestService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -151,7 +152,7 @@ async function listClassSessionScheduleEvents({ activeOrgId, personId, activeRol
         notes: sessionRow?.notes
       });
 
-      if (roles.includes('teacher') && !teacherExcluded && idsEqual(sessionRow?.delivery?.deliveredBy, personId)) {
+      if (roles.includes('teacher') && !teacherExcluded && sessionDeliveryTeamService.isPersonOnSessionDelivery(sessionRow, personId)) {
         events.push({
           id: `teacher-${normalizeId(classRow?.id)}-${normalizeId(sessionRow?.sessionId || sessionRow?.id)}`,
           role: 'teacher',

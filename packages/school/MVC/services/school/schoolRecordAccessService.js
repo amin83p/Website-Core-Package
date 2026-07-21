@@ -6,6 +6,7 @@ const {
   getScopedUserId
 } = require('./schoolDataScopeBuilder');
 const teacherIdentityService = require('./teacherIdentityService');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 const SESSION_ACCESS_DENIED = 'You do not have access to this session.';
@@ -52,10 +53,7 @@ function classHasSessionDeliveredByPerson(classRow, personId) {
 function isSessionDeliveredByPerson(session, personId, teacherPersonMap = null) {
   const normalizedPersonId = toPublicId(personId);
   if (!normalizedPersonId || !session) return false;
-  if (teacherPersonMap instanceof Map) {
-    return teacherIdentityService.sessionDeliveredByMatchesPerson(session, normalizedPersonId, teacherPersonMap);
-  }
-  return idsEqual(session?.delivery?.deliveredBy, normalizedPersonId);
+  return sessionDeliveryTeamService.isPersonOnSessionDelivery(session, normalizedPersonId, teacherPersonMap);
 }
 
 function isRecordOwnedByUser(record, userId) {
@@ -123,12 +121,24 @@ function isSessionAccessible({ classRow, session, access = {}, context = 'list',
 
   if (context === 'manageSession' || context === 'mutation') {
     if (access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
-      return isSessionDeliveredByPerson(session, access.personId, teacherPersonMap);
+      return sessionDeliveryTeamService.isPersonSessionEditor(session, access.personId, teacherPersonMap);
     }
     if (access?.scopeMode === SCOPE_MODES.OWNER) {
       return isSessionOwnedByUser(session, access.userId);
     }
     return isOrgWideScope(access);
+  }
+
+  if (context === 'viewSession') {
+    if (access?.scopeMode === SCOPE_MODES.OWNER) {
+      return isSessionOwnedByUser(session, access.userId)
+        || isRecordOwnedByUser(classRow, access.userId);
+    }
+    if (access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
+      return sessionDeliveryTeamService.isPersonSessionViewer(session, access.personId, teacherPersonMap)
+        || isActiveInstructor(access.personId, classRow);
+    }
+    return true;
   }
 
   if (access?.scopeMode === SCOPE_MODES.OWNER) {

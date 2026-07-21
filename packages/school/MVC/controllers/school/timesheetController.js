@@ -8,6 +8,7 @@ const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModu
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { assertOrgAccess } = requireCoreModule('MVC/utils/orgContextUtils');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
+const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const { buildReportReflectionLiveSessions } = require('../../services/school/reportTimesheetReflectionService');
 const activityService = require('../../services/school/activityService');
@@ -919,7 +920,7 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
         sessionsByClassId.set(String(classRow.id || '').trim(), Array.isArray(sessions) ? sessions : []);
         (Array.isArray(sessions) ? sessions : [])
             .filter((sessionRow) =>
-                idsEqual(sessionRow?.delivery?.deliveredBy, personId) &&
+                sessionDeliveryTeamService.isPersonOnSessionDelivery(sessionRow, personId) &&
                 String(sessionRow?.date || '') >= String(period.startDate || '') &&
                 String(sessionRow?.date || '') <= String(period.endDate || '')
             )
@@ -937,6 +938,8 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
                     durationHours: rawDurationHours,
                     session: sessionRow
                 });
+                const isCoTeacherSession = !sessionDeliveryTeamService.isPersonSessionMainTeacher(sessionRow, personId)
+                    && sessionDeliveryTeamService.isPersonOnSessionDelivery(sessionRow, personId);
                 liveSessionBuilders.push({
                     classId: String(classRow?.id || ''),
                     sessionRow,
@@ -954,6 +957,10 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
                         status: normalizedStatus,
                         isFinalStatus,
                         isManual: false,
+                        isCoTeacherSession,
+                        coTeacherRoleLabel: isCoTeacherSession
+                            ? String(sessionDeliveryTeamService.findCoTeacherEntry(sessionRow, personId)?.roleLabel || 'Co-Teacher')
+                            : '',
                         ...buildTimesheetMakeupMeta(sessionRow, classRow, sessionsByClassId)
                     }
                 });
@@ -1330,7 +1337,7 @@ exports.viewTimesheet = async (req, res) => {
             const sessions = await dataService.getClassSessions(c.id, req.user);
             sessionsByClassId.set(String(c.id || '').trim(), Array.isArray(sessions) ? sessions : []);
             const myClassSessions = sessions.filter((s) =>
-                idsEqual(s.delivery?.deliveredBy, teacherContext.targetTeacherId) &&
+                sessionDeliveryTeamService.isPersonOnSessionDelivery(s, teacherContext.targetTeacherId) &&
                 s.date >= period.startDate &&
                 s.date <= period.endDate
             );
@@ -1362,6 +1369,8 @@ exports.viewTimesheet = async (req, res) => {
                     durationHours: rawDurationHours,
                     session: s
                 });
+                const isCoTeacherSession = !sessionDeliveryTeamService.isPersonSessionMainTeacher(s, teacherContext.targetTeacherId)
+                    && sessionDeliveryTeamService.isPersonOnSessionDelivery(s, teacherContext.targetTeacherId);
                 liveSessionBuilders.push({
                     classId: String(c.id || ''),
                     sessionRow: s,
@@ -1380,6 +1389,10 @@ exports.viewTimesheet = async (req, res) => {
                         isFinalStatus,
                         notes: s.notes || '',
                         room: s.room || '',
+                        isCoTeacherSession,
+                        coTeacherRoleLabel: isCoTeacherSession
+                            ? String(sessionDeliveryTeamService.findCoTeacherEntry(s, teacherContext.targetTeacherId)?.roleLabel || 'Co-Teacher')
+                            : '',
                         ...buildTimesheetMakeupMeta(s, c, sessionsByClassId)
                     }
                 });
@@ -1409,7 +1422,7 @@ exports.viewTimesheet = async (req, res) => {
         for (const c of scopedClasses) {
             const sessions = await dataService.getClassSessions(c.id, req.user);
             (Array.isArray(sessions) ? sessions : []).forEach((s) => {
-                if (!idsEqual(s.delivery?.deliveredBy, teacherContext.targetTeacherId)) return;
+                if (!sessionDeliveryTeamService.isPersonOnSessionDelivery(s, teacherContext.targetTeacherId)) return;
                 const duePeriodId = String(s?.attendanceDuePeriodId || '').trim();
                 if (!duePeriodId || !idsEqual(duePeriodId, period.id)) return;
                 const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(s.status, s.notes);
@@ -1631,7 +1644,7 @@ exports.saveTimesheet = async (req, res) => {
         for (const classRow of scopedClasses || []) {
             const sessions = await dataService.getClassSessions(classRow.id, req.user);
             (sessions || []).forEach((sessionRow) => {
-                if (!idsEqual(sessionRow?.delivery?.deliveredBy, teacherContext.targetTeacherId)) return;
+                if (!sessionDeliveryTeamService.isPersonOnSessionDelivery(sessionRow, teacherContext.targetTeacherId)) return;
                 if (sessionRow.date < period.startDate || sessionRow.date > period.endDate) return;
                 const key = String(sessionRow?.sessionId || '').trim();
                 if (!key) return;

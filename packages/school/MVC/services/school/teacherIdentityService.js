@@ -24,10 +24,8 @@ function resolveTeacherPersonId(rawId, teacherPersonMap = new Map()) {
 }
 
 function sessionDeliveredByMatchesPerson(session, personId, teacherPersonMap = new Map()) {
-  const normalizedPersonId = toPublicId(personId);
-  if (!normalizedPersonId || !session) return false;
-  const deliveredBy = resolveTeacherPersonId(session?.delivery?.deliveredBy, teacherPersonMap);
-  return deliveredBy ? idsEqual(deliveredBy, normalizedPersonId) : false;
+  const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
+  return sessionDeliveryTeamService.isPersonOnSessionDelivery(session, personId, teacherPersonMap);
 }
 
 function collectTeacherRecordIdsForPerson(personId, teacherPersonMap = new Map()) {

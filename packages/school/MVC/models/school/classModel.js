@@ -158,7 +158,8 @@ function generateInitialSessions(schedule) {
               delivery: {
                   deliveredBy: null,
                   substitute: false,
-                  notes: ""
+                  notes: "",
+                  coTeachers: []
               },
               roster: []
           });

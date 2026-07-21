@@ -4,6 +4,7 @@
  */
 const dataService = require('./schoolDataService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { buildReportReflectionLiveSessions } = require('./reportTimesheetReflectionService');
 const activityService = require('./activityService');
 const { sanitizeSnapshotEntry } = require('../../models/school/timesheetModel');
@@ -72,7 +73,7 @@ async function buildCurrentPayableIndex({ teacherId, periodStartDate, periodEndD
         // eslint-disable-next-line no-await-in-loop
         const sessions = await dataService.getClassSessions(classRow.id, reqUser);
         (Array.isArray(sessions) ? sessions : []).forEach((sessionRow) => {
-            if (!idsEqual(sessionRow?.delivery?.deliveredBy, teacherId)) return;
+            if (!sessionDeliveryTeamService.isPersonOnSessionDelivery(sessionRow, teacherId)) return;
             const sessionId = normalizeId(sessionRow?.sessionId);
             if (!sessionId) return;
             const rawDurationHours = parseFloat(sessionRow?.durationHours) || 0;

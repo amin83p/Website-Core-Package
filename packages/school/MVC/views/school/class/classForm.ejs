@@ -448,6 +448,9 @@
                <table class="table table-hover table-sm mb-0 align-middle" id="sessionsGrid">
                    <thead class="table-light text-nowrap position-sticky top-0" style="z-index: 1;">
                        <tr>
+                           <th style="width:36px;" class="text-center" title="Select for bulk co-teacher assignment">
+                             <input type="checkbox" class="form-check-input" id="sessionsSelectAll" title="Select all">
+                           </th>
                            <th style="width:40px;" class="text-center" title="Lock Session"><i class="bi bi-lock-fill"></i></th>
                            <th style="width:120px;">Date</th>
                            <th style="width:110px;">Time</th>
@@ -822,11 +825,37 @@
         </div>
 
         <div class="mt-3 small text-muted" id="bulk_preview"></div>
+
+        <hr class="my-3">
+        <div class="fw-semibold mb-2"><i class="bi bi-people-fill me-1"></i>Co-Teachers / Teaching Assistants</div>
+        <p class="small text-muted mb-2">Select sessions in the Session Builder grid (checkboxes), pick co-teachers below, then apply. Co-teachers get full session hours on their timesheets when the session is finalized. They can view Session Manager; grant edit access later on the session page.</p>
+        <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+          <div class="flex-grow-1" style="min-width: 220px;">
+            <label class="form-label small mb-1">Add Co-Teacher</label>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" id="bulk_coTeacherName" placeholder="Pick a person..." readonly>
+              <button class="btn btn-outline-secondary" type="button" id="bulk_pickCoTeacher" title="Pick co-teacher"><i class="bi bi-person-plus"></i></button>
+              <button class="btn btn-outline-secondary" type="button" id="bulk_clearCoTeacherPick" title="Clear"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <input type="hidden" id="bulk_coTeacherId">
+          </div>
+          <div style="min-width: 160px;">
+            <label class="form-label small mb-1">Role label</label>
+            <input type="text" class="form-control form-control-sm" id="bulk_coTeacherRole" value="Co-Teacher" maxlength="60">
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="bulk_addCoTeacherToList"><i class="bi bi-plus-lg me-1"></i>Add to list</button>
+        </div>
+        <div id="bulk_coTeacherList" class="border rounded p-2 bg-light small mb-2" style="min-height: 2.5rem;"></div>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-sm btn-primary" id="bulk_applyCoTeachersBtn"><i class="bi bi-check2 me-1"></i>Apply Co-Teachers to Selected Sessions</button>
+          <button type="button" class="btn btn-sm btn-outline-danger" id="bulk_clearCoTeachersBtn"><i class="bi bi-trash me-1"></i>Clear Co-Teachers on Selected</button>
+        </div>
+        <div class="mt-2 small text-muted" id="bulk_coTeacherPreview"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Close</button>
         <button type="button" class="btn btn-primary" id="bulk_applyBtn">
-          <i class="bi bi-check2-circle me-1"></i> Apply Changes
+          <i class="bi bi-check2-circle me-1"></i> Apply Main Teacher Changes
         </button>
       </div>
     </div>
@@ -3264,7 +3293,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const tr = document.createElement('tr');
             tr.className = rowAppearance.className;
             tr.style.cssText = rowAppearance.style;
+            const coTeachers = Array.isArray(ses?.delivery?.coTeachers) ? ses.delivery.coTeachers : [];
+            const coTeacherHint = coTeachers.length
+                ? `<div class="small text-muted mt-1"><i class="bi bi-people me-1"></i>${coTeachers.length} co-teacher${coTeachers.length === 1 ? '' : 's'}: ${coTeachers.map((row) => row.name || row.personId).filter(Boolean).slice(0, 3).join(', ')}${coTeachers.length > 3 ? '…' : ''}</div>`
+                : '';
+            const selectedAttr = ses._bulkSelected === true ? 'checked' : '';
             tr.innerHTML = `
+                <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-select-cb" data-index="${index}" ${selectedAttr} ${isLocked ? '' : ''}></td>
                 <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-lock-cb" data-index="${index}" ${isLocked ? 'checked' : ''}></td>
                 <td>
                     <div class="d-flex align-items-center gap-1">
@@ -3287,6 +3322,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <input type="text" class="form-control border-0 bg-transparent session-input fw-bold" data-index="${index}" data-field="deliveredByName" value="${tName}" placeholder="Teacher Name" readonly ${lockedAttr}>
                         <button class="btn btn-outline-secondary btn-pick-teacher" data-index="${index}" type="button" ${lockedAttr}><i class="bi bi-person"></i></button>
                     </div>
+                    ${coTeacherHint}
                     ${conflictHtml}
                 </td>
                 <td><input type="text" class="form-control form-control-sm border-0 bg-transparent session-input" data-index="${index}" data-field="notes" value="${ses.notes || ''}" placeholder="Notes..." ${lockedAttr}></td>
@@ -3306,6 +3342,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tbody.addEventListener('change', (e) => {
         const index = e.target.getAttribute('data-index');
+        if (e.target.classList.contains('session-select-cb')) {
+            if (sessionsState[index]) sessionsState[index]._bulkSelected = e.target.checked;
+            return;
+        }
         if (e.target.classList.contains('session-lock-cb')) {
             sessionsState[index].locked = e.target.checked;
             renderSessions(); return;
@@ -3401,6 +3441,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!String(normalized.delivery.deliveredByName || '').trim() && fallbackTeacherName) {
                 normalized.delivery.deliveredByName = fallbackTeacherName;
             }
+            const mainId = String(normalized.delivery.deliveredBy || '').trim();
+            const coTeachers = Array.isArray(normalized.delivery.coTeachers) ? normalized.delivery.coTeachers : [];
+            const seen = new Set();
+            normalized.delivery.coTeachers = coTeachers
+                .map((entry) => {
+                    if (!entry || typeof entry !== 'object') return null;
+                    const personId = String(entry.personId || entry.teacherId || '').trim();
+                    if (!personId || personId === mainId || seen.has(personId)) return null;
+                    seen.add(personId);
+                    return {
+                        personId,
+                        name: String(entry.name || entry.teacherName || personId).trim() || personId,
+                        roleLabel: String(entry.roleLabel || entry.role || 'Co-Teacher').trim() || 'Co-Teacher',
+                        canEdit: entry.canEdit === true
+                    };
+                })
+                .filter(Boolean)
+                .slice(0, 10);
+            delete normalized._bulkSelected;
+            delete normalized._isSaved;
+            delete normalized.conflictMsg;
             return normalized;
         });
     }
@@ -4262,6 +4323,9 @@ if (bulkNewTeacherName) bulkNewTeacherName.value = '';
         };
     }
 
+    if (typeof renderBulkCoTeacherList === 'function') renderBulkCoTeacherList();
+    if (typeof computeBulkCoTeacherPreview === 'function') computeBulkCoTeacherPreview();
+
     try {
         const modal = bootstrap?.Modal?.getOrCreateInstance(bulkModalEl);
         modal?.show();
@@ -4347,6 +4411,186 @@ if (bulkIncludeLockedCb) bulkIncludeLockedCb.addEventListener('change', computeB
 if (bulkAddNewInstructorCb) bulkAddNewInstructorCb.addEventListener('change', computeBulkPreview);
 if (bulkInactivateOldInstructorCb) bulkInactivateOldInstructorCb.addEventListener('change', computeBulkPreview);
 if (bulkApplyBtn) bulkApplyBtn.addEventListener('click', applyBulkTeacherChange);
+
+// --- Co-Teachers bulk assign (selected sessions) ---
+const bulkCoTeacherName = document.getElementById('bulk_coTeacherName');
+const bulkCoTeacherId = document.getElementById('bulk_coTeacherId');
+const bulkCoTeacherRole = document.getElementById('bulk_coTeacherRole');
+const bulkPickCoTeacherBtn = document.getElementById('bulk_pickCoTeacher');
+const bulkClearCoTeacherPickBtn = document.getElementById('bulk_clearCoTeacherPick');
+const bulkAddCoTeacherToListBtn = document.getElementById('bulk_addCoTeacherToList');
+const bulkCoTeacherListEl = document.getElementById('bulk_coTeacherList');
+const bulkApplyCoTeachersBtn = document.getElementById('bulk_applyCoTeachersBtn');
+const bulkClearCoTeachersBtn = document.getElementById('bulk_clearCoTeachersBtn');
+const bulkCoTeacherPreview = document.getElementById('bulk_coTeacherPreview');
+const sessionsSelectAllCb = document.getElementById('sessionsSelectAll');
+let bulkCoTeacherDraft = [];
+
+function normalizeBulkCoTeacherRow(row = {}) {
+    const personId = String(row?.personId || '').trim();
+    if (!personId) return null;
+    return {
+        personId,
+        name: String(row?.name || personId).trim() || personId,
+        roleLabel: String(row?.roleLabel || 'Co-Teacher').trim() || 'Co-Teacher',
+        canEdit: row?.canEdit === true
+    };
+}
+
+function getSelectedSessionsForCoTeachers() {
+    return (sessionsState || []).filter((s) => s && s._bulkSelected === true);
+}
+
+function renderBulkCoTeacherList() {
+    if (!bulkCoTeacherListEl) return;
+    if (!bulkCoTeacherDraft.length) {
+        bulkCoTeacherListEl.innerHTML = '<span class="text-muted">No co-teachers in the apply list yet.</span>';
+        return;
+    }
+    bulkCoTeacherListEl.innerHTML = bulkCoTeacherDraft.map((row, idx) => `
+        <div class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom border-white">
+          <div>
+            <span class="fw-semibold">${row.name || row.personId}</span>
+            <span class="text-muted"> · ${row.roleLabel || 'Co-Teacher'}</span>
+            ${row.canEdit ? '<span class="badge bg-success-subtle text-success border ms-1">Can edit</span>' : ''}
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-danger bulk-co-remove" data-index="${idx}" title="Remove"><i class="bi bi-x"></i></button>
+        </div>
+    `).join('');
+}
+
+function computeBulkCoTeacherPreview() {
+    if (!bulkCoTeacherPreview) return;
+    const selected = getSelectedSessionsForCoTeachers();
+    bulkCoTeacherPreview.textContent = selected.length
+        ? `${selected.length} session(s) selected · ${bulkCoTeacherDraft.length} co-teacher(s) in apply list.`
+        : 'Select sessions in the Session Builder grid (left checkboxes), then apply.';
+}
+
+function mergeCoTeachersOntoSession(session, incomingRows = [], { replace = false } = {}) {
+    if (!session.delivery || typeof session.delivery !== 'object') session.delivery = {};
+    const mainId = String(session.delivery.deliveredBy || '').trim();
+    const existing = replace ? [] : (Array.isArray(session.delivery.coTeachers) ? session.delivery.coTeachers : []);
+    const map = new Map();
+    existing.forEach((row) => {
+        const normalized = normalizeBulkCoTeacherRow(row);
+        if (!normalized || normalized.personId === mainId) return;
+        map.set(normalized.personId, normalized);
+    });
+    (Array.isArray(incomingRows) ? incomingRows : []).forEach((row) => {
+        const normalized = normalizeBulkCoTeacherRow(row);
+        if (!normalized || normalized.personId === mainId) return;
+        map.set(normalized.personId, { ...map.get(normalized.personId), ...normalized });
+    });
+    session.delivery.coTeachers = Array.from(map.values()).slice(0, 10);
+    session._isSaved = false;
+}
+
+if (sessionsSelectAllCb) {
+    sessionsSelectAllCb.addEventListener('change', () => {
+        const checked = !!sessionsSelectAllCb.checked;
+        (sessionsState || []).forEach((s) => { if (s) s._bulkSelected = checked; });
+        renderSessions();
+        computeBulkCoTeacherPreview();
+    });
+}
+
+if (bulkPickCoTeacherBtn) {
+    bulkPickCoTeacherBtn.addEventListener('click', () => {
+        try {
+            GenericPicker.open(GenericPickerPresets.teacher({
+                title: 'Select Co-Teacher',
+                icon: 'bi-people',
+                placeholder: 'Search Teachers...',
+                renderer: teacherPickerRenderer,
+                onSelect: (item) => {
+                    const teacher = resolveTeacherPickerSelection(item);
+                    if (bulkCoTeacherId) bulkCoTeacherId.value = teacher.personId;
+                    if (bulkCoTeacherName) bulkCoTeacherName.value = teacher.displayName || teacher.personId || '';
+                }
+            }));
+        } catch (e) {
+            uiAlert('Teacher picker is not available on this page.', 'Picker error');
+        }
+    });
+}
+if (bulkClearCoTeacherPickBtn) {
+    bulkClearCoTeacherPickBtn.addEventListener('click', () => {
+        if (bulkCoTeacherId) bulkCoTeacherId.value = '';
+        if (bulkCoTeacherName) bulkCoTeacherName.value = '';
+    });
+}
+if (bulkAddCoTeacherToListBtn) {
+    bulkAddCoTeacherToListBtn.addEventListener('click', async () => {
+        const personId = String(bulkCoTeacherId?.value || '').trim();
+        const name = String(bulkCoTeacherName?.value || personId).trim();
+        const roleLabel = String(bulkCoTeacherRole?.value || 'Co-Teacher').trim() || 'Co-Teacher';
+        if (!personId) {
+            await uiAlert('Pick a co-teacher first.', 'Missing co-teacher');
+            return;
+        }
+        if (bulkCoTeacherDraft.some((row) => row.personId === personId)) {
+            await uiAlert('That person is already in the apply list.', 'Already added');
+            return;
+        }
+        if (bulkCoTeacherDraft.length >= 10) {
+            await uiAlert('A session can have at most 10 co-teachers.', 'Limit reached');
+            return;
+        }
+        bulkCoTeacherDraft.push({ personId, name, roleLabel, canEdit: false });
+        if (bulkCoTeacherId) bulkCoTeacherId.value = '';
+        if (bulkCoTeacherName) bulkCoTeacherName.value = '';
+        renderBulkCoTeacherList();
+        computeBulkCoTeacherPreview();
+    });
+}
+if (bulkCoTeacherListEl) {
+    bulkCoTeacherListEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('.bulk-co-remove');
+        if (!btn) return;
+        const idx = Number(btn.getAttribute('data-index'));
+        if (!Number.isFinite(idx)) return;
+        bulkCoTeacherDraft.splice(idx, 1);
+        renderBulkCoTeacherList();
+        computeBulkCoTeacherPreview();
+    });
+}
+if (bulkApplyCoTeachersBtn) {
+    bulkApplyCoTeachersBtn.addEventListener('click', async () => {
+        const selected = getSelectedSessionsForCoTeachers();
+        if (!selected.length) {
+            await uiAlert('Select one or more sessions in the Session Builder grid first.', 'No sessions selected');
+            return;
+        }
+        if (!bulkCoTeacherDraft.length) {
+            await uiAlert('Add at least one co-teacher to the apply list.', 'Empty list');
+            return;
+        }
+        selected.forEach((session) => mergeCoTeachersOntoSession(session, bulkCoTeacherDraft, { replace: false }));
+        renderSessions();
+        computeBulkCoTeacherPreview();
+        await uiAlert(`Applied ${bulkCoTeacherDraft.length} co-teacher(s) to ${selected.length} session(s). Remember to Save Class & Ledger.`, 'Co-teachers applied');
+    });
+}
+if (bulkClearCoTeachersBtn) {
+    bulkClearCoTeachersBtn.addEventListener('click', async () => {
+        const selected = getSelectedSessionsForCoTeachers();
+        if (!selected.length) {
+            await uiAlert('Select one or more sessions in the Session Builder grid first.', 'No sessions selected');
+            return;
+        }
+        const ok = await uiConfirm(`Clear all co-teachers from ${selected.length} selected session(s)?`, 'Clear co-teachers');
+        if (!ok) return;
+        selected.forEach((session) => {
+            if (!session.delivery) session.delivery = {};
+            session.delivery.coTeachers = [];
+            session._isSaved = false;
+        });
+        renderSessions();
+        computeBulkCoTeacherPreview();
+        await uiAlert(`Cleared co-teachers on ${selected.length} session(s). Remember to Save Class & Ledger.`, 'Co-teachers cleared');
+    });
+}
 
     if (window.location.hash === '#inp_capacity') {
         const capacityInput = document.getElementById('inp_capacity');

@@ -27,6 +27,7 @@ const {
 const transactionDefinitionPreviewService = require('../../services/school/transactionDefinitionPreviewService');
 const programRegistrationDraftService = require('../../services/school/programRegistrationDraftService');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
+const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
@@ -1461,6 +1462,10 @@ function normalizeIncomingSessions(rawSessions = []) {
         if (resolvedDeliveredByName) {
             normalized.delivery.deliveredByName = resolvedDeliveredByName;
         }
+        normalized.delivery.coTeachers = sessionDeliveryTeamService.normalizeSessionCoTeachers(
+            normalized.delivery?.coTeachers || normalized.coTeachers,
+            { mainTeacherId: resolvedDeliveredBy || '' }
+        );
         if (Array.isArray(normalized.roster)) {
             normalized.roster = normalized.roster.map((row) => ({ ...row, personId: cleanPersonId(row?.personId) }));
         }
@@ -1926,11 +1931,24 @@ function calculateSessionDurationHours(startTime = '', endTime = '', fallback = 
 }
 
 function sessionMetadataFieldsPresentInBody(body = {}) {
-    return ['date', 'startTime', 'endTime', 'teacherId', 'teacherName'].some((key) => body[key] !== undefined);
+    return ['date', 'startTime', 'endTime', 'teacherId', 'teacherName', 'coTeachers'].some((key) => body[key] !== undefined);
 }
 
-function applyAdminSessionMetadataUpdate(session = {}, body = {}, canOverride = false) {
-    if (!canOverride || !sessionMetadataFieldsPresentInBody(body)) {
+function applyAdminSessionMetadataUpdate(session = {}, body = {}, canOverrideOrOptions = false) {
+    const options = (canOverrideOrOptions && typeof canOverrideOrOptions === 'object')
+        ? canOverrideOrOptions
+        : { canOverride: canOverrideOrOptions === true };
+    const canOverride = options.canOverride === true;
+    const canManageCoTeachers = options.canManageCoTeachers === true || canOverride;
+    if (!sessionMetadataFieldsPresentInBody(body)) {
+        return { changed: false };
+    }
+    const hasScheduleFields = ['date', 'startTime', 'endTime', 'teacherId', 'teacherName']
+        .some((key) => body[key] !== undefined);
+    if (hasScheduleFields && !canOverride) {
+        return { changed: false };
+    }
+    if (!canOverride && !(canManageCoTeachers && body.coTeachers !== undefined)) {
         return { changed: false };
     }
 
@@ -1939,35 +1957,62 @@ function applyAdminSessionMetadataUpdate(session = {}, body = {}, canOverride = 
     const priorEnd = normalizeClockTime(session.endTime);
     const priorTeacherId = cleanPersonId(session?.delivery?.deliveredBy);
     const priorTeacherName = String(session?.delivery?.deliveredByName || '').trim();
+    const priorCoTeachersJson = JSON.stringify(sessionDeliveryTeamService.getSessionCoTeachers(session));
 
-    const date = body.date !== undefined ? normalizeDateOnlyValue(body.date) : priorDate;
-    const startTime = body.startTime !== undefined ? normalizeClockTime(body.startTime) : priorStart;
-    const endTime = body.endTime !== undefined ? normalizeClockTime(body.endTime) : priorEnd;
-    if (!date) throw new Error('Session date is required.');
-    if (!startTime || !endTime || startTime >= endTime) {
-        throw new Error('Session start time must be before end time.');
+    let date = priorDate;
+    let startTime = priorStart;
+    let endTime = priorEnd;
+    let teacherId = priorTeacherId;
+    let teacherName = priorTeacherName || priorTeacherId || '';
+
+    if (canOverride) {
+        date = body.date !== undefined ? normalizeDateOnlyValue(body.date) : priorDate;
+        startTime = body.startTime !== undefined ? normalizeClockTime(body.startTime) : priorStart;
+        endTime = body.endTime !== undefined ? normalizeClockTime(body.endTime) : priorEnd;
+        if (!date) throw new Error('Session date is required.');
+        if (!startTime || !endTime || startTime >= endTime) {
+            throw new Error('Session start time must be before end time.');
+        }
+
+        teacherId = body.teacherId !== undefined
+            ? cleanPersonId(body.teacherId)
+            : priorTeacherId;
+        teacherName = body.teacherName !== undefined
+            ? String(body.teacherName || teacherId || '').trim().slice(0, 180)
+            : (priorTeacherName || teacherId || '');
+
+        session.date = date;
+        session.startTime = startTime;
+        session.endTime = endTime;
+        session.durationHours = calculateSessionDurationHours(startTime, endTime, session.durationHours);
+        if (!session.delivery || typeof session.delivery !== 'object') session.delivery = {};
+        session.delivery.deliveredBy = teacherId;
+        session.delivery.deliveredByName = teacherName;
+    } else if (!session.delivery || typeof session.delivery !== 'object') {
+        session.delivery = {};
     }
 
-    const teacherId = body.teacherId !== undefined
-        ? cleanPersonId(body.teacherId)
-        : priorTeacherId;
-    const teacherName = body.teacherName !== undefined
-        ? String(body.teacherName || teacherId || '').trim().slice(0, 180)
-        : (priorTeacherName || teacherId || '');
+    if (canManageCoTeachers && body.coTeachers !== undefined) {
+        const parsedCoTeachers = typeof body.coTeachers === 'string'
+            ? (() => { try { return JSON.parse(body.coTeachers); } catch (_error) { return []; } })()
+            : body.coTeachers;
+        session.delivery.coTeachers = sessionDeliveryTeamService.normalizeSessionCoTeachers(parsedCoTeachers, {
+            mainTeacherId: teacherId || cleanPersonId(session?.delivery?.deliveredBy) || ''
+        });
+    } else {
+        session.delivery.coTeachers = sessionDeliveryTeamService.normalizeSessionCoTeachers(
+            session.delivery.coTeachers,
+            { mainTeacherId: teacherId || cleanPersonId(session?.delivery?.deliveredBy) || '' }
+        );
+    }
 
-    session.date = date;
-    session.startTime = startTime;
-    session.endTime = endTime;
-    session.durationHours = calculateSessionDurationHours(startTime, endTime, session.durationHours);
-    if (!session.delivery || typeof session.delivery !== 'object') session.delivery = {};
-    session.delivery.deliveredBy = teacherId;
-    session.delivery.deliveredByName = teacherName;
-
+    const nextCoTeachersJson = JSON.stringify(sessionDeliveryTeamService.getSessionCoTeachers(session));
     const changed = date !== priorDate
         || startTime !== priorStart
         || endTime !== priorEnd
         || !idsEqual(teacherId, priorTeacherId)
-        || teacherName !== priorTeacherName;
+        || teacherName !== priorTeacherName
+        || nextCoTeachersJson !== priorCoTeachersJson;
 
     return { changed };
 }
@@ -2066,7 +2111,11 @@ function buildMakeupSession({ originalSession, classId, input, reqUser, defaultS
         delivery: {
             ...(originalSession?.delivery && typeof originalSession.delivery === 'object' ? originalSession.delivery : {}),
             deliveredBy: teacherId,
-            deliveredByName: teacherName
+            deliveredByName: teacherName,
+            coTeachers: sessionDeliveryTeamService.normalizeSessionCoTeachers(
+                originalSession?.delivery?.coTeachers,
+                { mainTeacherId: teacherId || '' }
+            )
         },
         roster: resetRosterForMakeup(originalSession?.roster),
         contentItems: normalizeSessionContentItems(originalSession?.contentItems || []),
@@ -3288,7 +3337,24 @@ async function manageSession(req, res) {
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const { session } = findSessionInList(sessions, sessionId);
         if (!session) throw new Error('Session not found');
-        assertSessionScopeForRequest(req, classData, session);
+        const sessionAccess = schoolRecordAccessService.resolveAccessFromRequest(req);
+        let canEditSession = true;
+        try {
+            schoolRecordAccessService.assertSessionAccessible({
+                classRow: classData,
+                session,
+                access: sessionAccess,
+                context: 'manageSession'
+            });
+        } catch (manageError) {
+            schoolRecordAccessService.assertSessionAccessible({
+                classRow: classData,
+                session,
+                access: sessionAccess,
+                context: 'viewSession'
+            });
+            canEditSession = false;
+        }
         const sortedSessions = [...sessions].sort((a, b) => new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`));
         const currentIndex = sortedSessions.findIndex(s => s.sessionId === sessionId);
         
@@ -3310,7 +3376,7 @@ async function manageSession(req, res) {
             { section: { id: SECTIONS.SCHOOL_SESSIONS } }
         );
         
-        const isReadOnly = isSessionLocked && !canOverride;
+        const isReadOnly = !canEditSession || (isSessionLocked && !canOverride);
 
         // 2. Resolve effective session roster (same rules as Manage Session display)
         session.roster = await buildEnrichedSessionRosterForMutation({
@@ -3491,6 +3557,16 @@ async function manageSession(req, res) {
             reqUser: req.user
         });
 
+        const sessionCoTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
+        const viewerPersonId = String(req.user?.personId || '').trim();
+        const canManageCoTeachers = Boolean(
+            canEditSession
+            && (
+                canOverride
+                || sessionDeliveryTeamService.isPersonSessionMainTeacher(session, viewerPersonId)
+            )
+        );
+
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
             classData,
@@ -3511,6 +3587,8 @@ async function manageSession(req, res) {
             canEditSessionMetadata: canOverride,
             canManageConductRatingScale: canOverride,
             canDeleteStudentCases,
+            sessionCoTeachers,
+            canManageCoTeachers,
             attendanceMatrixPolicyResolved,
             enabledAttendanceStatuses,
             conductRatingScaleResolved,
@@ -4128,10 +4206,15 @@ async function saveSession(req, res) {
             activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
             reqUser: req.user
         });
+        const viewerPersonId = String(req.user?.personId || '').trim();
+        const canManageCoTeachers = Boolean(
+            canOverride
+            || sessionDeliveryTeamService.isPersonSessionMainTeacher(originalSession, viewerPersonId)
+        );
         const { changed: metadataChanged } = applyAdminSessionMetadataUpdate(
             originalSession,
             normalizedMetadataBody,
-            canOverride
+            { canOverride, canManageCoTeachers }
         );
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, originalSession, req.user);
         if (metadataChanged) {

@@ -11,6 +11,7 @@ const classEnrollmentReadService = require('./classEnrollmentReadService');
 const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const reportFunderDocxService = require('./reportFunderDocxService');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function isSchoolReportAdminViewer(reqUser) {
@@ -1188,11 +1189,13 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
     });
   }
   sessions.forEach((session) => {
-    const deliveredBy = toPublicId(session?.delivery?.deliveredBy);
-    if (!deliveredBy || teacherOptionsMap.has(deliveredBy)) return;
-    teacherOptionsMap.set(deliveredBy, {
-      id: deliveredBy,
-      name: personMap.get(deliveredBy) || deliveredBy
+    sessionDeliveryTeamService.getSessionDeliveryPersonIds(session).forEach((personId) => {
+      const id = toPublicId(personId);
+      if (!id || teacherOptionsMap.has(id)) return;
+      teacherOptionsMap.set(id, {
+        id,
+        name: personMap.get(id) || id
+      });
     });
   });
 

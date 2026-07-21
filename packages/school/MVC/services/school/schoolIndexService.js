@@ -1,6 +1,7 @@
 // MVC/services/school/schoolIndexService.js
 const schoolDataService = require('./schoolDataService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 
 function normalizeDateOnly(value) {
     const token = String(value || '').trim();
@@ -106,8 +107,10 @@ async function rebuildIndexesForClass(classId) {
                 status: session?.status,
                 notes: session?.notes
             });
-            if (!excludeFromTeacherIndex && session.delivery?.deliveredBy) {
-                const tid = session.delivery.deliveredBy;
+            if (excludeFromTeacherIndex) return;
+            const deliveryPersonIds = sessionDeliveryTeamService.getSessionDeliveryPersonIds(session);
+            deliveryPersonIds.forEach((tid) => {
+                if (!tid) return;
                 const date = session.date;
 
                 if (!teacherIndex[tid]) teacherIndex[tid] = {};
@@ -120,7 +123,7 @@ async function rebuildIndexesForClass(classId) {
                     endTime: session.endTime,
                     durationHours: session.durationHours
                 });
-            }
+            });
         });
     }
 

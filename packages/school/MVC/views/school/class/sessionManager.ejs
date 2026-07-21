@@ -1151,6 +1151,48 @@
                         <div class="session-info-tile-value text-truncate" title="<%= smTeacherLabel %>"><%= smTeacherLabel %></div>
                     </div>
                     <% } %>
+                    <%
+                        const smCoTeachers = Array.isArray(typeof sessionCoTeachers !== 'undefined' ? sessionCoTeachers : null)
+                            ? sessionCoTeachers
+                            : (Array.isArray(session?.delivery?.coTeachers) ? session.delivery.coTeachers : []);
+                        const canManageCoTeachersFlag = typeof canManageCoTeachers !== 'undefined' && canManageCoTeachers === true;
+                    %>
+                    <div class="session-info-tile" style="grid-column: 1 / -1;">
+                        <div class="session-info-tile-label d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                            <span><i class="bi bi-people-fill me-1"></i>Co-Teachers</span>
+                            <% if (canManageCoTeachersFlag && !isReadOnly) { %>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="sessionAddCoTeacherBtn"><i class="bi bi-person-plus me-1"></i>Add</button>
+                            <% } %>
+                        </div>
+                        <div id="sessionCoTeachersList" class="small">
+                            <% if (!smCoTeachers.length) { %>
+                                <div class="text-muted" id="sessionCoTeachersEmpty">No co-teachers assigned.</div>
+                            <% } else { %>
+                                <% smCoTeachers.forEach((row) => { %>
+                                    <div class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom session-co-teacher-row" data-person-id="<%= row.personId %>">
+                                        <div class="text-truncate">
+                                            <span class="fw-semibold"><%= row.name || row.personId %></span>
+                                            <span class="text-muted"> · <%= row.roleLabel || 'Co-Teacher' %></span>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <% if (canManageCoTeachersFlag && !isReadOnly) { %>
+                                                <div class="form-check form-switch m-0">
+                                                    <input class="form-check-input session-co-can-edit" type="checkbox" role="switch" <%= row.canEdit === true ? 'checked' : '' %> title="Allow Session Manager edits">
+                                                    <label class="form-check-label small">Can edit</label>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-outline-danger session-co-remove" title="Remove"><i class="bi bi-x"></i></button>
+                                            <% } else if (row.canEdit === true) { %>
+                                                <span class="badge bg-success-subtle text-success border">Can edit</span>
+                                            <% } else { %>
+                                                <span class="badge bg-light text-muted border">View only</span>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                <% }); %>
+                            <% } %>
+                        </div>
+                        <div class="form-text mt-1 mb-0">Co-teachers receive full session hours on their timesheets. Edit access is optional.</div>
+                    </div>
                     <% if (smIsRolling) { %>
                     <div class="session-info-tile session-info-tile--cycle">
                         <div class="session-info-tile-label">Cycle window</div>
@@ -2115,6 +2157,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionReportRosterRows = <%- jsonForScript(Array.isArray(session.roster) ? session.roster : []) %>;
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
     const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag)) %>;
+    const sessionCanManageCoTeachers = <%- jsonForScript(Boolean(typeof canManageCoTeachers !== 'undefined' && canManageCoTeachers === true)) %>;
+    let sessionCoTeachersState = <%- jsonForScript(
+        Array.isArray(typeof sessionCoTeachers !== 'undefined' ? sessionCoTeachers : null)
+            ? sessionCoTeachers
+            : (Array.isArray(session?.delivery?.coTeachers) ? session.delivery.coTeachers : [])
+    ) %>;
     const sessionCanToggleLock = <%- jsonForScript(Boolean(canToggleSessionLock)) %>;
     const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     const sessionStatusMap = new Map((sessionStatusMeta || []).map((row) => [normalizeStatusCode(row.code), row]));
@@ -3960,6 +4008,117 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
     });
 
+    function normalizeSessionCoTeacherRow(row = {}) {
+        const personId = String(row?.personId || '').trim();
+        if (!personId) return null;
+        return {
+            personId,
+            name: String(row?.name || personId).trim() || personId,
+            roleLabel: String(row?.roleLabel || 'Co-Teacher').trim() || 'Co-Teacher',
+            canEdit: row?.canEdit === true
+        };
+    }
+
+    function getSessionMainTeacherIdForCoTeachers() {
+        return String(document.getElementById('sessionTeacherId')?.value || sessionDefaultTeacherId || '').trim();
+    }
+
+    function renderSessionCoTeachersList() {
+        const listEl = document.getElementById('sessionCoTeachersList');
+        if (!listEl) return;
+        const rows = (Array.isArray(sessionCoTeachersState) ? sessionCoTeachersState : [])
+            .map(normalizeSessionCoTeacherRow)
+            .filter(Boolean);
+        sessionCoTeachersState = rows;
+        if (!rows.length) {
+            listEl.innerHTML = '<div class="text-muted" id="sessionCoTeachersEmpty">No co-teachers assigned.</div>';
+            return;
+        }
+        const canManage = sessionCanManageCoTeachers && !<%= JSON.stringify(!!isReadOnly) %>;
+        listEl.innerHTML = rows.map((row) => {
+            const controls = canManage
+                ? `<div class="d-flex align-items-center gap-2 flex-shrink-0">
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input session-co-can-edit" type="checkbox" role="switch" ${row.canEdit ? 'checked' : ''} title="Allow Session Manager edits">
+                            <label class="form-check-label small">Can edit</label>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger session-co-remove" title="Remove"><i class="bi bi-x"></i></button>
+                   </div>`
+                : (row.canEdit
+                    ? '<span class="badge bg-success-subtle text-success border">Can edit</span>'
+                    : '<span class="badge bg-light text-muted border">View only</span>');
+            return `<div class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom session-co-teacher-row" data-person-id="${String(row.personId).replace(/"/g, '&quot;')}">
+                <div class="text-truncate">
+                    <span class="fw-semibold">${String(row.name || row.personId).replace(/</g, '&lt;')}</span>
+                    <span class="text-muted"> · ${String(row.roleLabel || 'Co-Teacher').replace(/</g, '&lt;')}</span>
+                </div>
+                ${controls}
+            </div>`;
+        }).join('');
+    }
+
+    document.getElementById('sessionAddCoTeacherBtn')?.addEventListener('click', function () {
+        if (!sessionCanManageCoTeachers) return;
+        if (!window.GenericPicker || !window.GenericPickerPresets) {
+            if (typeof showMessageModal === 'function') {
+                showMessageModal({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+            }
+            return;
+        }
+        window.GenericPicker.open(window.GenericPickerPresets.teacher({
+            title: 'Add co-teacher',
+            placeholder: 'Search teachers...',
+            context: window.GenericPickerContexts
+                ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+                : undefined,
+            onSelect: function (item) {
+                const personId = String(item?.personId || item?.id || item?.value || '').trim();
+                const name = String(item?.name || item?.label || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || personId).trim();
+                if (!personId) return;
+                const mainId = getSessionMainTeacherIdForCoTeachers();
+                if (mainId && personId === mainId) {
+                    if (typeof showMessageModal === 'function') {
+                        showMessageModal({ title: 'Co-Teacher', icon: 'warning', message: 'The main teacher cannot also be listed as a co-teacher.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+                    }
+                    return;
+                }
+                if ((sessionCoTeachersState || []).some((row) => String(row.personId) === personId)) {
+                    if (typeof showMessageModal === 'function') {
+                        showMessageModal({ title: 'Co-Teacher', icon: 'info', message: 'That person is already a co-teacher on this session.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+                    }
+                    return;
+                }
+                if ((sessionCoTeachersState || []).length >= 10) {
+                    if (typeof showMessageModal === 'function') {
+                        showMessageModal({ title: 'Co-Teacher', icon: 'warning', message: 'A session can have at most 10 co-teachers.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+                    }
+                    return;
+                }
+                sessionCoTeachersState = [...(sessionCoTeachersState || []), { personId, name, roleLabel: 'Co-Teacher', canEdit: false }];
+                renderSessionCoTeachersList();
+            }
+        }));
+    });
+
+    document.getElementById('sessionCoTeachersList')?.addEventListener('change', function (event) {
+        const toggle = event.target.closest('.session-co-can-edit');
+        if (!toggle) return;
+        const rowEl = toggle.closest('.session-co-teacher-row');
+        const personId = String(rowEl?.getAttribute('data-person-id') || '').trim();
+        sessionCoTeachersState = (sessionCoTeachersState || []).map((row) => (
+            String(row.personId) === personId ? { ...row, canEdit: toggle.checked === true } : row
+        ));
+    });
+
+    document.getElementById('sessionCoTeachersList')?.addEventListener('click', function (event) {
+        const removeBtn = event.target.closest('.session-co-remove');
+        if (!removeBtn) return;
+        const rowEl = removeBtn.closest('.session-co-teacher-row');
+        const personId = String(rowEl?.getAttribute('data-person-id') || '').trim();
+        sessionCoTeachersState = (sessionCoTeachersState || []).filter((row) => String(row.personId) !== personId);
+        renderSessionCoTeachersList();
+    });
+
     function styleSessionStatusSelect() {
         if (!statusSelect || !statusButton) return;
         const opt = statusSelect.selectedOptions && statusSelect.selectedOptions[0];
@@ -5408,6 +5567,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload.endTime = document.getElementById('sessionEndTime')?.value || '';
                 payload.teacherId = document.getElementById('sessionTeacherId')?.value || '';
                 payload.teacherName = document.getElementById('sessionTeacherName')?.value || '';
+            }
+            if (sessionCanManageCoTeachers || sessionCanEditMetadata) {
+                payload.coTeachers = JSON.stringify(Array.isArray(sessionCoTeachersState) ? sessionCoTeachersState : []);
             }
             if (shouldSendInstructionalPayload) {
                 payload.roster = JSON.stringify(roster);
