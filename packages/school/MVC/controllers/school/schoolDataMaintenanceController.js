@@ -220,10 +220,15 @@ exports.clearAll = async (req, res) => {
 
     const result = await schoolDataMaintenanceService.clearCollectionForOrg({
       entityType,
-      orgId: activeOrgId
+      orgId: activeOrgId,
+      reqUser: req.user
     });
 
-    const removed = Number(result?.result?.removed || 0);
+    const removed = Number(
+      result?.result?.removed
+      ?? result?.result?.removedSessions
+      ?? 0
+    );
     const payloadOut = {
       status: 'success',
       message: `Cleared ${removed} record(s) from ${result.catalogLabel}.`,

@@ -151,10 +151,49 @@ async function removePolicyForOrg(activeOrgId) {
   }, 'school.conductRatingScalePolicy.removePolicyForOrg');
 }
 
+async function readPolicyDocument() {
+  return runByRepositoryBackend({}, {
+    json: async () => readFileParsed(),
+    mongo: async () => readMongoDoc()
+  }, 'school.conductRatingScalePolicy.readDocument');
+}
+
+async function hasStoredPolicyForOrg(activeOrgId) {
+  const key = orgKey(activeOrgId);
+  const doc = await readPolicyDocument();
+  const byOrg = doc?.byOrgId && typeof doc.byOrgId === 'object' ? doc.byOrgId : {};
+  return Object.prototype.hasOwnProperty.call(byOrg, key)
+    && byOrg[key]
+    && typeof byOrg[key] === 'object';
+}
+
+async function getStoredPolicyRowForOrg(activeOrgId) {
+  const key = orgKey(activeOrgId);
+  const doc = await readPolicyDocument();
+  const byOrg = doc?.byOrgId && typeof doc.byOrgId === 'object' ? doc.byOrgId : {};
+  const stored = byOrg[key];
+  if (!stored || typeof stored !== 'object') return null;
+  const resolved = conductRatingScaleService.resolvePolicy(
+    conductRatingScaleService.normalizePolicyFromStored(pickStoredPolicyFields(stored))
+  );
+  const levels = Array.isArray(resolved?.levels) ? resolved.levels : [];
+  return {
+    id: key,
+    orgId: key,
+    levels,
+    levelCount: levels.length,
+    status: 'stored',
+    updatedAt: String(stored?.audit?.lastUpdateDateTime || '').trim(),
+    audit: stored.audit || null
+  };
+}
+
 module.exports = {
   DEFAULT_POLICY,
   getPolicyForOrg,
   savePolicyForOrg,
   removePolicyForOrg,
+  hasStoredPolicyForOrg,
+  getStoredPolicyRowForOrg,
   orgKey
 };

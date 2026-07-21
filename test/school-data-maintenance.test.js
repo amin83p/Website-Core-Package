@@ -116,7 +116,156 @@ test('maintenance catalog covers registry entities and withdrawals', () => {
   assert.ok(entityTypes.has('reportInstances'));
   assert.ok(entityTypes.has('withdrawals'));
   assert.ok(entityTypes.has('globalTransactions'));
+  assert.ok(entityTypes.has('classSessions'));
+  assert.ok(entityTypes.has('attendanceMatrixPolicy'));
+  assert.ok(entityTypes.has('conductRatingScalePolicy'));
+  assert.ok(entityTypes.has('studentEnrollments'));
+  assert.ok(entityTypes.has('teacherSchedules'));
   assert.equal(getCatalogEntry('feeDefinitions'), null, 'aliases should not be duplicated');
+
+  const schoolDataServicePath = require.resolve('../packages/school/MVC/services/school/schoolDataService');
+  const schoolDataServiceSource = fs.readFileSync(schoolDataServicePath, 'utf8');
+  const registryStart = schoolDataServiceSource.indexOf('const SCHOOL_ENTITY_REGISTRY');
+  const registryEnd = schoolDataServiceSource.indexOf('});', registryStart);
+  assert.ok(registryStart >= 0 && registryEnd > registryStart);
+  const registryBlock = schoolDataServiceSource.slice(registryStart, registryEnd);
+  const registryKeys = [...registryBlock.matchAll(/^\s{2}([A-Za-z][A-Za-z0-9_]*):\s*\{/gm)].map((match) => match[1]);
+  const aliasKeys = new Set(
+    [...registryBlock.matchAll(/^\s{2}([A-Za-z][A-Za-z0-9_]*):\s*\{\s*alias:/gm)].map((match) => match[1])
+  );
+  registryKeys.forEach((key) => {
+    if (aliasKeys.has(key)) return;
+    assert.ok(entityTypes.has(key), `catalog should include registry entity ${key}`);
+  });
+});
+
+test('class session composite ids round-trip', () => {
+  const service = require('../packages/school/MVC/services/school/schoolDataMaintenanceService');
+  const composite = service.buildClassSessionCompositeId('CLS-1', 'SES-9');
+  assert.equal(composite, 'CLS-1::SES-9');
+  assert.deepEqual(service.parseClassSessionCompositeId(composite), {
+    classId: 'CLS-1',
+    sessionId: 'SES-9'
+  });
+  assert.equal(service.parseClassSessionCompositeId('bad-id'), null);
+});
+
+test('class session maintenance delete removes one session from class', async () => {
+  const servicePath = require.resolve('../packages/school/MVC/services/school/schoolDataMaintenanceService');
+  const originals = new Map();
+  const saved = [];
+  const classes = [{ id: 'CLS-1', orgId: 'ORG-1', title: 'Math', sessions: [] }];
+  const sessionsByClass = new Map([
+    ['CLS-1', [
+      { sessionId: 'SES-1', date: '2026-01-01', status: 'planned' },
+      { sessionId: 'SES-2', date: '2026-01-02', status: 'planned' }
+    ]]
+  ]);
+
+  setRequireStub('../packages/school/MVC/services/school/schoolDataService', {
+    fetchData: async (entityType) => (entityType === 'classes' ? classes : []),
+    getDataById: async (_type, id) => classes.find((row) => row.id === id) || null,
+    getClassSessions: async (classId) => sessionsByClass.get(String(classId)) || [],
+    saveClassSessions: async (classId, sessions) => {
+      saved.push({ classId, sessions });
+      sessionsByClass.set(String(classId), sessions);
+      return sessions;
+    },
+    getTeacherIndex: async () => ({}),
+    getStudentIndex: async () => ({})
+  }, originals);
+  setRequireStub('../packages/school/MVC/repositories/school', {}, originals);
+  setRequireStub('../packages/school/MVC/repositories/school/withdrawalRepository', {}, originals);
+  setRequireStub('../packages/school/MVC/services/school/classDeleteCascadeService', {
+    cascadeDeleteClassSessionAssets: async () => ({})
+  }, originals);
+  setRequireStub('../packages/school/MVC/models/school/attendanceMatrixPolicyModel', {
+    hasStoredPolicyForOrg: async () => false,
+    getStoredPolicyRowForOrg: async () => null,
+    removePolicyForOrg: async () => ({ removed: 0 }),
+    orgKey: (id) => String(id || '')
+  }, originals);
+  setRequireStub('../packages/school/MVC/models/school/conductRatingScalePolicyModel', {
+    hasStoredPolicyForOrg: async () => false,
+    getStoredPolicyRowForOrg: async () => null,
+    removePolicyForOrg: async () => ({ removed: 0 }),
+    orgKey: (id) => String(id || '')
+  }, originals);
+
+  delete require.cache[servicePath];
+  const service = require('../packages/school/MVC/services/school/schoolDataMaintenanceService');
+  const result = await service.deleteSelectedRows({
+    entityType: 'classSessions',
+    orgId: 'ORG-1',
+    ids: ['CLS-1::SES-1'],
+    reqUser: { activeOrgId: 'ORG-1' }
+  });
+
+  assert.equal(result.summary.success, 1);
+  assert.equal(saved.length, 1);
+  assert.deepEqual(saved[0].sessions.map((row) => row.sessionId), ['SES-2']);
+
+  delete require.cache[servicePath];
+  originals.forEach((original, resolved) => {
+    if (original) require.cache[resolved] = original;
+    else delete require.cache[resolved];
+  });
+});
+
+test('attendance matrix policy maintenance delete clears org override', async () => {
+  const servicePath = require.resolve('../packages/school/MVC/services/school/schoolDataMaintenanceService');
+  const originals = new Map();
+  const removeCalls = [];
+
+  setRequireStub('../packages/school/MVC/services/school/schoolDataService', {
+    getDataById: async () => null,
+    fetchData: async () => [],
+    getTeacherIndex: async () => ({}),
+    getStudentIndex: async () => ({})
+  }, originals);
+  setRequireStub('../packages/school/MVC/repositories/school', {}, originals);
+  setRequireStub('../packages/school/MVC/repositories/school/withdrawalRepository', {}, originals);
+  setRequireStub('../packages/school/MVC/services/school/classDeleteCascadeService', {
+    cascadeDeleteClassSessionAssets: async () => ({})
+  }, originals);
+  setRequireStub('../packages/school/MVC/models/school/attendanceMatrixPolicyModel', {
+    hasStoredPolicyForOrg: async () => true,
+    getStoredPolicyRowForOrg: async (orgId) => ({
+      id: orgId,
+      orgId,
+      status: 'stored',
+      scheduledMinutes: 180
+    }),
+    removePolicyForOrg: async (orgId) => {
+      removeCalls.push(orgId);
+      return { removed: 1 };
+    },
+    orgKey: (id) => String(id || '')
+  }, originals);
+  setRequireStub('../packages/school/MVC/models/school/conductRatingScalePolicyModel', {
+    hasStoredPolicyForOrg: async () => false,
+    getStoredPolicyRowForOrg: async () => null,
+    removePolicyForOrg: async () => ({ removed: 0 }),
+    orgKey: (id) => String(id || '')
+  }, originals);
+
+  delete require.cache[servicePath];
+  const service = require('../packages/school/MVC/services/school/schoolDataMaintenanceService');
+  const result = await service.deleteSelectedRows({
+    entityType: 'attendanceMatrixPolicy',
+    orgId: 'ORG-1',
+    ids: ['ORG-1'],
+    reqUser: { activeOrgId: 'ORG-1' }
+  });
+
+  assert.equal(result.summary.success, 1);
+  assert.deepEqual(removeCalls, ['ORG-1']);
+
+  delete require.cache[servicePath];
+  originals.forEach((original, resolved) => {
+    if (original) require.cache[resolved] = original;
+    else delete require.cache[resolved];
+  });
 });
 
 test('classifyRowForDelete protects head school accounts', () => {
@@ -380,7 +529,11 @@ test('data maintenance exposes a protected, text-only JSON record viewer', () =>
   assert.ok(view.includes('if (payload.actionStateId) actionStateId'));
   assert.ok(view.includes('formatMessageMarkup(rawMessage)'));
   assert.ok(view.includes('loadRowsWithWaiting'));
+  assert.ok(view.includes('loadSummaryWithWaiting'));
+  assert.ok(view.includes('bootDataMaintenancePage'));
+  assert.ok(view.includes('DOMContentLoaded'));
   assert.ok(view.includes('window.showLoading'));
+  assert.ok(view.includes('Loading Collections'));
   assert.ok(view.includes('Deleting Selected Records'));
   assert.ok(view.includes('deleteLoadingToken'));
   assert.ok(view.includes('clearLoadingToken'));
@@ -457,4 +610,14 @@ test('pay rates catalog entry is list-only unsupported delete', () => {
   assert.ok(entry);
   assert.equal(entry.deleteStrategy, DELETE_STRATEGIES.UNSUPPORTED);
   assert.equal(entry.listOnly, true);
+});
+
+test('index catalog entries are list-only', () => {
+  for (const entityType of ['studentEnrollments', 'teacherSchedules']) {
+    const entry = getCatalogEntry(entityType);
+    assert.ok(entry, entityType);
+    assert.equal(entry.listOnly, true);
+    assert.equal(entry.deleteStrategy, DELETE_STRATEGIES.UNSUPPORTED);
+    assert.equal(entry.supportsClearAll, false);
+  }
 });

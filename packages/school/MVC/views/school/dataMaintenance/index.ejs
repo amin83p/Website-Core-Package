@@ -259,11 +259,33 @@
   }
 
   async function runWithWaiting(options, work) {
-    const token = typeof window.showLoading === 'function' ? window.showLoading(options || {}) : null;
+    const loadingOptions = options && typeof options === 'object'
+      ? options
+      : { note: String(options || 'Please wait...') };
+    let token = typeof window.showLoading === 'function'
+      ? window.showLoading(loadingOptions)
+      : null;
+
+    // Protect against main.js page-load failsafes that call hideLoading({ force: true })
+    // on window "load" and a 2s DOMContentLoaded timer.
+    const originalHideLoading = typeof window.hideLoading === 'function' ? window.hideLoading : null;
+    if (originalHideLoading) {
+      window.hideLoading = function protectedHideLoading(tokenOrOptions = null) {
+        const isForce = tokenOrOptions && typeof tokenOrOptions === 'object' && tokenOrOptions.force === true;
+        if (isForce) return;
+        return originalHideLoading(tokenOrOptions);
+      };
+    }
+
     try {
       return await work();
     } finally {
-      if (token && typeof window.hideLoading === 'function') window.hideLoading(token);
+      if (originalHideLoading) {
+        window.hideLoading = originalHideLoading;
+      }
+      if (token && typeof window.hideLoading === 'function') {
+        window.hideLoading(token);
+      }
     }
   }
   function hideModalBeforeAdminVerification(modalInstance, modalEl) {
@@ -349,7 +371,7 @@
         state.selectedIds = new Set();
         rowSearchInputEl.value = '';
         renderCollectionNav();
-        loadRowsWithWaiting();
+        loadRowsWithWaiting().catch((error) => showOperationResult('error', error.message));
       });
     });
   }
@@ -555,8 +577,8 @@
 
   function loadSummaryWithWaiting(selectFirst = false) {
     return runWithWaiting({
-      title: 'Loading Data Maintenance',
-      note: 'Retrieving collection information...',
+      title: 'Loading Collections',
+      note: 'Retrieving school collection counts for the active organization. This may take a moment...',
       operation: 'School Data Maintenance'
     }, () => loadSummary(selectFirst));
   }
@@ -788,9 +810,19 @@
     loadSummaryWithWaiting(false).catch((error) => showOperationResult('error', error.message));
   });
 
-  loadSummaryWithWaiting(true).catch((error) => {
-    renderCollectionNavError(error.message);
-    showOperationResult('error', error.message);
-  });
+  function bootDataMaintenancePage() {
+    loadSummaryWithWaiting(true).catch((error) => {
+      renderCollectionNavError(error.message);
+      showOperationResult('error', error.message);
+    });
+  }
+
+  // Page body scripts run before layout loads main.js / the global loading modal.
+  // Defer the first collection load so the waiting modal is available.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootDataMaintenancePage, { once: true });
+  } else {
+    window.setTimeout(bootDataMaintenancePage, 0);
+  }
 })();
 </script>

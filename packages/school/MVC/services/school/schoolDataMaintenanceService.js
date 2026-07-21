@@ -2,6 +2,8 @@ const schoolDataService = require('./schoolDataService');
 const schoolRepositories = require('../../repositories/school');
 const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
 const classDeleteCascadeService = require('./classDeleteCascadeService');
+const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
+const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const { isVoidPolicy } = require('./schoolDeletionPolicyRegistry');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { getActiveDataBackendMode } = requireCoreModule('MVC/infrastructure/runtime/dataBackendRuntime');
@@ -16,6 +18,7 @@ const {
 } = require('../../config/schoolDataMaintenanceCatalog');
 
 const MAINTENANCE_LIST_SCOPE = Object.freeze({ canViewAll: true });
+const CLASS_SESSION_ID_SEPARATOR = '::';
 
 function normalizeIdList(input) {
   const rows = Array.isArray(input) ? input : (input === undefined || input === null ? [] : [input]);
@@ -47,9 +50,232 @@ function resolveRepository(entityType, catalogEntry) {
   return repo || null;
 }
 
+function resolvePolicyModel(catalogEntry) {
+  if (catalogEntry?.policyModel === 'attendanceMatrix') return attendanceMatrixPolicyModel;
+  if (catalogEntry?.policyModel === 'conductRatingScale') return conductRatingScalePolicyModel;
+  return null;
+}
+
+function buildClassSessionCompositeId(classId, sessionId) {
+  return `${toPublicId(classId)}${CLASS_SESSION_ID_SEPARATOR}${toPublicId(sessionId)}`;
+}
+
+function parseClassSessionCompositeId(compositeId) {
+  const raw = toPublicId(compositeId);
+  const separatorIndex = raw.indexOf(CLASS_SESSION_ID_SEPARATOR);
+  if (separatorIndex <= 0) return null;
+  const classId = raw.slice(0, separatorIndex).trim();
+  const sessionId = raw.slice(separatorIndex + CLASS_SESSION_ID_SEPARATOR.length).trim();
+  if (!classId || !sessionId) return null;
+  return { classId, sessionId };
+}
+
+function sessionMatchesSearch(row, search) {
+  const needle = String(search || '').trim().toLowerCase();
+  if (!needle) return true;
+  const haystack = [
+    row?.id,
+    row?.sessionId,
+    row?.classId,
+    row?.classTitle,
+    row?.classCode,
+    row?.date,
+    row?.startTime,
+    row?.endTime,
+    row?.status,
+    row?.delivery?.deliveredByName,
+    row?.delivery?.deliveredBy
+  ].map((value) => String(value || '').toLowerCase()).join(' ');
+  return haystack.includes(needle);
+}
+
+function paginateRows(rows, query = {}) {
+  const page = Math.max(1, Number.parseInt(String(query.page || 1), 10) || 1);
+  const limit = Math.min(10000, Math.max(1, Number.parseInt(String(query.limit || 50), 10) || 50));
+  const start = (page - 1) * limit;
+  return rows.slice(start, start + limit);
+}
+
+async function listOrgClasses(orgId, reqUser) {
+  const rows = await schoolDataService.fetchData('classes', {
+    orgId__eq: toPublicId(orgId),
+    page: 1,
+    limit: 10000
+  }, reqUser, { includeVoided: true });
+  return (Array.isArray(rows) ? rows : []).filter((row) => isRowInOrg(row, orgId));
+}
+
+async function collectClassSessionRows(orgId, reqUser, { search = '' } = {}) {
+  const targetOrgId = toPublicId(orgId);
+  const classes = await listOrgClasses(targetOrgId, reqUser);
+  const out = [];
+
+  for (const classRow of classes) {
+    const classId = toPublicId(classRow?.id);
+    if (!classId) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const sessions = await schoolDataService.getClassSessions(classId, reqUser);
+    (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+      const sessionId = toPublicId(session?.sessionId || session?.id);
+      if (!sessionId) return;
+      const row = {
+        ...session,
+        id: buildClassSessionCompositeId(classId, sessionId),
+        sessionId,
+        classId,
+        classTitle: String(classRow?.title || classRow?.name || '').trim(),
+        classCode: String(classRow?.code || '').trim(),
+        orgId: targetOrgId,
+        status: String(session?.status || '').trim(),
+        date: String(session?.date || '').trim(),
+        startTime: String(session?.startTime || '').trim(),
+        endTime: String(session?.endTime || '').trim(),
+        updatedAt: String(
+          session?.updatedAt
+          || session?.audit?.lastUpdateDateTime
+          || classRow?.audit?.lastUpdateDateTime
+          || ''
+        ).trim()
+      };
+      if (!sessionMatchesSearch(row, search)) return;
+      out.push(row);
+    });
+  }
+
+  out.sort((left, right) => {
+    const dateCmp = String(left.date || '').localeCompare(String(right.date || ''));
+    if (dateCmp !== 0) return dateCmp;
+    const timeCmp = String(left.startTime || '').localeCompare(String(right.startTime || ''));
+    if (timeCmp !== 0) return timeCmp;
+    return String(left.id || '').localeCompare(String(right.id || ''));
+  });
+
+  return out;
+}
+
+async function getClassSessionRow(compositeId, orgId, reqUser) {
+  const parsed = parseClassSessionCompositeId(compositeId);
+  if (!parsed) return null;
+  const classRow = await schoolDataService.getDataById('classes', parsed.classId, reqUser);
+  if (!classRow || !isRowInOrg(classRow, orgId)) return null;
+  const sessions = await schoolDataService.getClassSessions(parsed.classId, reqUser);
+  const session = (Array.isArray(sessions) ? sessions : []).find((row) => (
+    idsEqual(row?.sessionId || row?.id, parsed.sessionId)
+  ));
+  if (!session) return null;
+  return {
+    ...session,
+    id: buildClassSessionCompositeId(parsed.classId, parsed.sessionId),
+    sessionId: parsed.sessionId,
+    classId: parsed.classId,
+    classTitle: String(classRow?.title || classRow?.name || '').trim(),
+    classCode: String(classRow?.code || '').trim(),
+    orgId: toPublicId(orgId),
+    status: String(session?.status || '').trim(),
+    date: String(session?.date || '').trim(),
+    startTime: String(session?.startTime || '').trim(),
+    endTime: String(session?.endTime || '').trim()
+  };
+}
+
+async function deleteClassSessionRow(compositeId, orgId, reqUser) {
+  const parsed = parseClassSessionCompositeId(compositeId);
+  if (!parsed) throw new Error('Invalid class session id.');
+  const classRow = await schoolDataService.getDataById('classes', parsed.classId, reqUser);
+  if (!classRow || !isRowInOrg(classRow, orgId)) throw new Error('Class session not found in active organization.');
+  const sessions = await schoolDataService.getClassSessions(parsed.classId, reqUser);
+  const nextSessions = (Array.isArray(sessions) ? sessions : []).filter((row) => (
+    !idsEqual(row?.sessionId || row?.id, parsed.sessionId)
+  ));
+  if (nextSessions.length === (Array.isArray(sessions) ? sessions.length : 0)) {
+    throw new Error('Class session not found.');
+  }
+  await schoolDataService.saveClassSessions(parsed.classId, nextSessions, reqUser);
+  return { removed: 1, classId: parsed.classId, sessionId: parsed.sessionId };
+}
+
+async function clearAllClassSessionsForOrg(orgId, reqUser) {
+  const classes = await listOrgClasses(orgId, reqUser);
+  let clearedClasses = 0;
+  let removedSessions = 0;
+  for (const classRow of classes) {
+    const classId = toPublicId(classRow?.id);
+    if (!classId) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const sessions = await schoolDataService.getClassSessions(classId, reqUser);
+    const count = Array.isArray(sessions) ? sessions.length : 0;
+    if (!count) continue;
+    // eslint-disable-next-line no-await-in-loop
+    await schoolDataService.saveClassSessions(classId, [], reqUser);
+    clearedClasses += 1;
+    removedSessions += count;
+  }
+  return { clearedClasses, removedSessions };
+}
+
+async function listOrgPolicyRows(entityType, orgId, query = {}) {
+  const catalogEntry = getCatalogEntry(entityType);
+  const policyModel = resolvePolicyModel(catalogEntry);
+  if (!policyModel) return [];
+  const row = await policyModel.getStoredPolicyRowForOrg(orgId);
+  if (!row) return [];
+  const search = String(query.search || '').trim().toLowerCase();
+  if (search) {
+    const haystack = `${row.id} ${row.orgId} ${row.status}`.toLowerCase();
+    if (!haystack.includes(search)) return [];
+  }
+  return paginateRows([row], query);
+}
+
+async function listIndexRows(entityType, orgId, query = {}) {
+  const catalogEntry = getCatalogEntry(entityType);
+  const indexKey = String(catalogEntry?.indexKey || '').trim();
+  const indexDoc = indexKey === 'teachers'
+    ? await schoolDataService.getTeacherIndex()
+    : await schoolDataService.getStudentIndex();
+  const map = indexDoc && typeof indexDoc === 'object' && !Array.isArray(indexDoc) ? indexDoc : {};
+  const search = String(query.search || '').trim().toLowerCase();
+  const targetOrgId = toPublicId(orgId);
+  const rows = Object.keys(map).sort().map((key) => ({
+    id: key,
+    key,
+    orgId: targetOrgId,
+    status: 'index',
+    updatedAt: '',
+    valueType: Array.isArray(map[key]) ? 'array' : typeof map[key]
+  })).filter((row) => {
+    if (!search) return true;
+    return String(row.key || '').toLowerCase().includes(search);
+  });
+  return paginateRows(rows, query);
+}
+
+async function countIndexRows(entityType) {
+  const catalogEntry = getCatalogEntry(entityType);
+  const indexKey = String(catalogEntry?.indexKey || '').trim();
+  const indexDoc = indexKey === 'teachers'
+    ? await schoolDataService.getTeacherIndex()
+    : await schoolDataService.getStudentIndex();
+  const map = indexDoc && typeof indexDoc === 'object' && !Array.isArray(indexDoc) ? indexDoc : {};
+  return Object.keys(map).length;
+}
+
 async function listOrgRows(entityType, orgId, reqUser, query = {}) {
   const catalogEntry = getCatalogEntry(entityType);
   if (!catalogEntry) throw new Error(`Unknown maintenance collection: ${entityType}`);
+
+  if (catalogEntry.storage === 'classSessions') {
+    const rows = await collectClassSessionRows(orgId, reqUser, { search: query.search || '' });
+    return paginateRows(rows, query);
+  }
+
+  if (catalogEntry.storage === 'orgPolicy') {
+    return listOrgPolicyRows(entityType, orgId, query);
+  }
+
+  if (catalogEntry.storage === 'index') {
+    return listIndexRows(entityType, orgId, query);
+  }
 
   if (catalogEntry.externalRepository === 'withdrawals') {
     return withdrawalRepository.list({
@@ -74,6 +300,21 @@ async function listOrgRows(entityType, orgId, reqUser, query = {}) {
 async function countOrgRows(entityType, orgId, reqUser) {
   const catalogEntry = getCatalogEntry(entityType);
   if (!catalogEntry) return 0;
+
+  if (catalogEntry.storage === 'classSessions') {
+    const rows = await collectClassSessionRows(orgId, reqUser);
+    return rows.length;
+  }
+
+  if (catalogEntry.storage === 'orgPolicy') {
+    const policyModel = resolvePolicyModel(catalogEntry);
+    if (!policyModel) return 0;
+    return (await policyModel.hasStoredPolicyForOrg(orgId)) ? 1 : 0;
+  }
+
+  if (catalogEntry.storage === 'index') {
+    return countIndexRows(entityType);
+  }
 
   const repository = resolveRepository(entityType, catalogEntry);
   if (repository && typeof repository.count === 'function') {
@@ -202,6 +443,24 @@ async function getRowForMaintenance(entityType, id, orgId, reqUser) {
   if (!targetOrgId) throw new Error('Active organization is required.');
   if (!targetId) throw new Error('Record id is required.');
 
+  if (catalogEntry.storage === 'classSessions') {
+    return getClassSessionRow(targetId, targetOrgId, reqUser);
+  }
+
+  if (catalogEntry.storage === 'orgPolicy') {
+    const policyModel = resolvePolicyModel(catalogEntry);
+    if (!policyModel) return null;
+    if (!idsEqual(targetId, targetOrgId) && !idsEqual(targetId, policyModel.orgKey(targetOrgId))) {
+      return null;
+    }
+    return policyModel.getStoredPolicyRowForOrg(targetOrgId);
+  }
+
+  if (catalogEntry.storage === 'index') {
+    const rows = await listIndexRows(entityType, targetOrgId, { page: 1, limit: 100000 });
+    return rows.find((row) => idsEqual(row?.id, targetId)) || null;
+  }
+
   let row = null;
   if (catalogEntry.externalRepository === 'withdrawals') {
     row = await withdrawalRepository.getById(targetId, { scope: MAINTENANCE_LIST_SCOPE });
@@ -226,6 +485,7 @@ async function getCollectionRow({ entityType, id, orgId, reqUser } = {}) {
     record
   };
 }
+
 function classifyRowForDelete(entityType, row, catalogEntry = null) {
   const entry = catalogEntry || getCatalogEntry(entityType);
   if (!entry) return { canDelete: false, reason: 'Unknown collection.' };
@@ -284,6 +544,16 @@ async function buildDeletePreview({ entityType, orgId, ids, reqUser }) {
 async function maintenanceDeleteRow(entityType, id, orgId, reqUser, catalogEntry) {
   const entry = catalogEntry || getCatalogEntry(entityType);
   if (!entry) throw new Error(`Unknown maintenance collection: ${entityType}`);
+
+  if (entry.storage === 'classSessions') {
+    return deleteClassSessionRow(id, orgId, reqUser);
+  }
+
+  if (entry.storage === 'orgPolicy') {
+    const policyModel = resolvePolicyModel(entry);
+    if (!policyModel) throw new Error(`Policy model not found for ${entityType}.`);
+    return policyModel.removePolicyForOrg(orgId);
+  }
 
   const repository = resolveRepository(entityType, entry);
   if (!repository) throw new Error(`Repository not found for ${entityType}.`);
@@ -368,7 +638,17 @@ async function deleteSelectedRows({ entityType, orgId, ids, reqUser }) {
   };
 }
 
-function resolveClearAllHandler(entityType, catalogEntry) {
+function resolveClearAllHandler(entityType, catalogEntry, reqUser) {
+  if (catalogEntry.storage === 'classSessions') {
+    return (orgId) => clearAllClassSessionsForOrg(orgId, reqUser);
+  }
+
+  if (catalogEntry.storage === 'orgPolicy') {
+    const policyModel = resolvePolicyModel(catalogEntry);
+    if (!policyModel) return null;
+    return (orgId) => policyModel.removePolicyForOrg(orgId);
+  }
+
   const repository = resolveRepository(entityType, catalogEntry);
   if (!repository) return null;
 
@@ -383,7 +663,7 @@ function resolveClearAllHandler(entityType, catalogEntry) {
   return null;
 }
 
-async function clearCollectionForOrg({ entityType, orgId }) {
+async function clearCollectionForOrg({ entityType, orgId, reqUser }) {
   const catalogEntry = getCatalogEntry(entityType);
   if (!catalogEntry) throw new Error(`Unknown maintenance collection: ${entityType}`);
   if (catalogEntry.supportsClearAll !== true) {
@@ -393,7 +673,7 @@ async function clearCollectionForOrg({ entityType, orgId }) {
   const targetOrgId = toPublicId(orgId);
   if (!targetOrgId) throw new Error('Active organization is required.');
 
-  const clearHandler = resolveClearAllHandler(entityType, catalogEntry);
+  const clearHandler = resolveClearAllHandler(entityType, catalogEntry, reqUser);
   if (!clearHandler) {
     throw new Error(`Clear all handler is not available for ${catalogEntry.label}.`);
   }
@@ -416,5 +696,7 @@ module.exports = {
   clearCollectionForOrg,
   normalizeIdList,
   classifyRowForDelete,
-  isHeadSchoolAccount
+  isHeadSchoolAccount,
+  buildClassSessionCompositeId,
+  parseClassSessionCompositeId
 };

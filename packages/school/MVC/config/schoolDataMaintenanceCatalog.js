@@ -25,6 +25,7 @@ const LABEL_FIELDS = Object.freeze({
   staff: ['employeeNumber', 'personId'],
   schoolAccounts: ['name', 'partyId'],
   classes: ['title', 'code'],
+  classSessions: ['date', 'classTitle', 'sessionId'],
   subjects: ['name', 'code'],
   programs: ['name', 'code'],
   terms: ['name', 'code'],
@@ -45,7 +46,11 @@ const LABEL_FIELDS = Object.freeze({
   leaveRequests: ['studentId'],
   tasks: ['title', 'subject'],
   payRates: ['name'],
-  withdrawals: ['type', 'studentId']
+  withdrawals: ['type', 'studentId'],
+  attendanceMatrixPolicy: ['orgId'],
+  conductRatingScalePolicy: ['orgId'],
+  studentEnrollments: ['key'],
+  teacherSchedules: ['key']
 });
 
 const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
@@ -59,6 +64,7 @@ const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
   { entityType: 'departments', label: 'Departments', group: 'academics', collectionName: 'schoolDepartments', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false },
   { entityType: 'subjects', label: 'Subjects', group: 'academics', collectionName: 'schoolSubjects', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false },
   { entityType: 'classes', label: 'Classes', group: 'academics', collectionName: 'schoolClasses', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false, cascadeClassSessionAssets: true },
+  { entityType: 'classSessions', label: 'Class Sessions', group: 'academics', collectionName: 'schoolClassSessions', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'classSessions' },
   { entityType: 'holidays', label: 'Holidays', group: 'academics', collectionName: 'schoolHolidays', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false },
   { entityType: 'classEnrollmentPeriods', label: 'Class Enrollment Periods', group: 'academics', collectionName: 'schoolClassEnrollmentPeriods', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
 
@@ -91,11 +97,15 @@ const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
   { entityType: 'activities', label: 'Activities', group: 'operations', collectionName: 'schoolActivities', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'activityCategories', label: 'Activity Categories', group: 'operations', collectionName: 'schoolActivityCategories', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'sessionStatuses', label: 'Session Statuses', group: 'operations', collectionName: 'schoolSessionStatuses', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false },
+  { entityType: 'attendanceMatrixPolicy', label: 'Attendance Matrix Policies', group: 'operations', collectionName: 'schoolAttendanceMatrixPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'attendanceMatrix' },
+  { entityType: 'conductRatingScalePolicy', label: 'Conduct Rating Scale Policies', group: 'operations', collectionName: 'schoolConductRatingScalePolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'conductRatingScale' },
   { entityType: 'leaveRequests', label: 'Leave Requests', group: 'operations', collectionName: 'schoolLeaveRequests', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'tasks', label: 'Tasks', group: 'operations', collectionName: 'schoolTasks', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'taskRoutingRules', label: 'Task Routing Rules', group: 'operations', collectionName: 'schoolTaskRoutingRules', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'sessionStudentCases', label: 'Session Student Cases', group: 'operations', collectionName: 'schoolSessionStudentCases', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
-  { entityType: 'payRates', label: 'Pay Rates', group: 'operations', collectionName: 'schoolPayRates', deleteStrategy: DELETE_STRATEGIES.UNSUPPORTED, supportsClearAll: false, listOnly: true }
+  { entityType: 'payRates', label: 'Pay Rates', group: 'operations', collectionName: 'schoolPayRates', deleteStrategy: DELETE_STRATEGIES.UNSUPPORTED, supportsClearAll: false, listOnly: true },
+  { entityType: 'studentEnrollments', label: 'Student Enrollments Index', group: 'operations', collectionName: 'schoolStudentEnrollments', deleteStrategy: DELETE_STRATEGIES.UNSUPPORTED, supportsClearAll: false, listOnly: true, storage: 'index', indexKey: 'students' },
+  { entityType: 'teacherSchedules', label: 'Teacher Schedules Index', group: 'operations', collectionName: 'schoolTeacherSchedules', deleteStrategy: DELETE_STRATEGIES.UNSUPPORTED, supportsClearAll: false, listOnly: true, storage: 'index', indexKey: 'teachers' }
 ]);
 
 const CATALOG_BY_ENTITY_TYPE = new Map(
@@ -130,6 +140,7 @@ function resolveListFields(entityType) {
     teachers: ['employeeNumber', 'personId'],
     staff: ['employeeNumber', 'personId'],
     classes: ['title', 'code', 'termId'],
+    classSessions: ['classId', 'classTitle', 'date', 'startTime', 'endTime', 'status'],
     reportInstances: ['classId', 'assignmentId', 'studentId'],
     reportAssignments: ['classId', 'templateId'],
     examAllocations: ['classId', 'templateId'],
@@ -139,7 +150,11 @@ function resolveListFields(entityType) {
     globalTransactions: ['accountId', 'direction', 'amount'],
     academicLedger: ['studentId', 'classId', 'entryType'],
     withdrawals: ['studentId', 'type', 'status'],
-    schoolAccounts: ['name', 'headCategory', 'partyId']
+    schoolAccounts: ['name', 'headCategory', 'partyId'],
+    attendanceMatrixPolicy: ['scheduledMinutes'],
+    conductRatingScalePolicy: ['levelCount'],
+    studentEnrollments: ['key'],
+    teacherSchedules: ['key']
   };
   const merged = new Set([...common, ...(extras[entityType] || [])]);
   return [...merged];
