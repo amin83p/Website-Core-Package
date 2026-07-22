@@ -535,6 +535,10 @@ exports.listStudents = async (req, res) => {
         delete fetchQuery.q;
         delete fetchQuery.type;
         delete fetchQuery.searchFields;
+        // Enrichment search must scan the full student set, then paginate in memory.
+        // Leaving page/limit here makes Mongo return only one page before name matching.
+        delete fetchQuery.page;
+        delete fetchQuery.limit;
 
         const allStudents = await dataService.fetchData('students', fetchQuery, req.user, dataService.buildRouteAccessContext(req));
         const personById = await schoolPersonAccessService.buildPersonByIdMap({

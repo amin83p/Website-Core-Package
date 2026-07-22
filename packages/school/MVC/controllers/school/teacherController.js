@@ -488,6 +488,9 @@ exports.listTeachers = async (req, res) => {
     delete fetchQuery.q;
     delete fetchQuery.type;
     delete fetchQuery.searchFields;
+    // Enrichment search must scan the full teacher set, then paginate in memory.
+    delete fetchQuery.page;
+    delete fetchQuery.limit;
     const canCreateTeachers = await canCreateOrgScopedItem(req.user, { scopeLabel: 'teachers' });
     if (String(query.status || '').trim().toLowerCase() === 'archived') {
       delete query.status;
@@ -557,6 +560,9 @@ exports.listArchivedTeachers = async (req, res) => {
     delete archivedQuery.q;
     delete archivedQuery.type;
     delete archivedQuery.searchFields;
+    // Enrichment search must scan the full archived set, then paginate in memory.
+    delete archivedQuery.page;
+    delete archivedQuery.limit;
     const allTeachers = await dataService.fetchData('teachers', archivedQuery, req.user, routeAccess(req));
     const personById = await schoolPersonAccessService.buildPersonByIdMap({
       reqUser: req.user,
