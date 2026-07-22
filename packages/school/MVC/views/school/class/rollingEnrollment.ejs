@@ -3339,6 +3339,9 @@
     periodCount.textContent = `${rows.length} row${rows.length === 1 ? '' : 's'}`;
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="' + String(periodTableColspan) + '" class="text-center py-4 text-muted">No enrollment periods found.</td></tr>';
+      if (typeof window.reapplyCurrentTableSettings === 'function') {
+        window.reapplyCurrentTableSettings(document.getElementById('first-table'));
+      }
       return;
     }
 
@@ -3425,6 +3428,9 @@
         </tr>
       `;
     }).join('');
+    if (typeof window.reapplyCurrentTableSettings === 'function') {
+      window.reapplyCurrentTableSettings(document.getElementById('first-table'));
+    }
   }
 
   function pickStudent() {

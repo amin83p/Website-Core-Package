@@ -638,108 +638,164 @@ function getDefaultSettings(tableElement) {
 //  APPLY SETTINGS TO TABLE
 // ============================================
 
-function applySettings(table, settings) {
-  const columns = settings.columns.sort((a, b) => a.order - b.order);
+function getOrderedColumns(settings) {
+  const columns = Array.isArray(settings?.columns) ? settings.columns.slice() : [];
+  columns.sort((a, b) => Number(a?.order || 0) - Number(b?.order || 0));
+  return columns;
+}
 
-  const headerRow = table.querySelector("thead tr");
-  const bodyRows = table.querySelectorAll("tbody tr");
+function applyColumnHeaderPresentation(headerCell, col) {
+  if (!headerCell || !col) return;
 
-  // === Reorder columns (header + body) ===
-  columns.forEach((col, newIndex) => {
-    const cellIndex = findColumnIndex(table, col.key);
-    if (cellIndex === -1) return;
+  headerCell.style.display = col.visible ? '' : 'none';
 
-    moveColumn(headerRow, cellIndex, newIndex);
-    bodyRows.forEach(row => moveColumn(row, cellIndex, newIndex));
-  });
+  if (col.width && String(col.width).trim() !== '') {
+    let widthValue = String(col.width).trim();
+    if (/^\d+$/.test(widthValue)) widthValue += 'px';
+    headerCell.style.width = widthValue;
+    headerCell.style.minWidth = widthValue;
+  } else {
+    headerCell.style.width = '';
+    headerCell.style.minWidth = '';
+  }
 
-  // === Apply visibility, label, and sort markup ===
-  columns.forEach((col, index) => {
-    const headerCell = table.querySelector(`thead th:nth-child(${index + 1})`);
-
-    if (headerCell) {
-      headerCell.style.display = col.visible ? "" : "none";
-      // --- NEW WIDTH LOGIC ---
-      if (col.width && col.width.trim() !== "") {
-        let widthValue = col.width.trim();
-
-        // If the user typed ONLY numbers (e.g., "120"), add "px" automatically
-        if (/^\d+$/.test(widthValue)) {
-          widthValue += "px";
-        }
-
-        headerCell.style.width = widthValue;
-        headerCell.style.minWidth = widthValue; // Forces the column to respect the size
-      } else {
-        headerCell.style.width = "";
-        headerCell.style.minWidth = "";
-      }
-      // -----------------------      
-      
-      headerCell.dataset.column = col.key;
-
-      // Preserve select-all checkbox column; do not replace its content
-      if (col.key === 'select') {
-        headerCell.classList.remove('draggable');
-        // Ensure checkbox exists and is wired; do not overwrite innerHTML
-        const existingCheckbox = headerCell.querySelector('#selectAll');
-        if (!existingCheckbox) {
-          const label = document.createElement('label');
-          label.className = 'd-flex flex-column align-items-center gap-0 mb-0';
-          label.style.cursor = 'pointer';
-          label.htmlFor = 'selectAll';
-          const cb = document.createElement('input');
-          cb.type = 'checkbox';
-          cb.className = 'form-check-input';
-          cb.id = 'selectAll';
-          cb.onclick = function () {
-            document.querySelectorAll('.session-checkbox').forEach(c => { c.checked = cb.checked; });
-            const sa = document.getElementById('selectAll');
-            if (sa) sa.indeterminate = false;
-            if (typeof updateCompareState === 'function') updateCompareState();
-          };
-          const span = document.createElement('span');
-          span.className = 'small text-muted';
-          span.textContent = 'Select all';
-          label.appendChild(cb);
-          label.appendChild(span);
-          headerCell.innerHTML = '';
-          headerCell.appendChild(label);
-        }
-      } else {
-        headerCell.classList.add("sortable", "draggable");
-        headerCell.innerHTML = "";
-        const labelSpan = document.createElement("span");
-        labelSpan.classList.add("header-label");
-        labelSpan.textContent = col.label || col.defaultLabel;
-        const sortSpan = document.createElement("span");
-        sortSpan.classList.add("sort-icon");
-        sortSpan.textContent = "";
-        headerCell.appendChild(labelSpan);
-        headerCell.appendChild(sortSpan);
-      }
+  // Preserve select-all checkbox column; do not replace its content
+  if (col.key === 'select') {
+    headerCell.classList.remove('draggable');
+    const existingCheckbox = headerCell.querySelector('#selectAll');
+    if (!existingCheckbox) {
+      const label = document.createElement('label');
+      label.className = 'd-flex flex-column align-items-center gap-0 mb-0';
+      label.style.cursor = 'pointer';
+      label.htmlFor = 'selectAll';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'form-check-input';
+      cb.id = 'selectAll';
+      cb.onclick = function () {
+        document.querySelectorAll('.session-checkbox').forEach((c) => { c.checked = cb.checked; });
+        const sa = document.getElementById('selectAll');
+        if (sa) sa.indeterminate = false;
+        if (typeof updateCompareState === 'function') updateCompareState();
+      };
+      const span = document.createElement('span');
+      span.className = 'small text-muted';
+      span.textContent = 'Select all';
+      label.appendChild(cb);
+      label.appendChild(span);
+      headerCell.innerHTML = '';
+      headerCell.appendChild(label);
     }
+    return;
+  }
 
-    // Apply body visibility cell-by-cell
-    table.querySelectorAll(`tbody tr td:nth-child(${index + 1})`)
-      .forEach(cell => cell.style.display = col.visible ? "" : "none");
+  headerCell.classList.add('sortable', 'draggable');
+  headerCell.innerHTML = '';
+  const labelSpan = document.createElement('span');
+  labelSpan.classList.add('header-label');
+  labelSpan.textContent = col.label || col.defaultLabel;
+  const sortSpan = document.createElement('span');
+  sortSpan.classList.add('sort-icon');
+  sortSpan.textContent = '';
+  headerCell.appendChild(labelSpan);
+  headerCell.appendChild(sortSpan);
+}
+
+function applySettings(table, settings) {
+  if (!table || !settings) return;
+
+  // Stable keys on headers (never reassign existing data-column values).
+  getDefaultSettings(table);
+
+  const columns = getOrderedColumns(settings);
+  const orderedKeys = columns.map((col) => String(col?.key || '').trim()).filter(Boolean);
+  const headerRow = table.querySelector('thead tr');
+  if (!headerRow) return;
+
+  const headerCells = [...headerRow.children];
+  const headerByKey = new Map(
+    headerCells
+      .map((cell) => [String(cell.dataset.column || '').trim(), cell])
+      .filter(([key]) => key)
+  );
+
+  // Snapshot body cells by the key of the header currently at the same index
+  // (before any reordering), so data stays tied to the correct column identity.
+  const bodyRows = [...table.querySelectorAll('tbody tr')];
+  const bodyMaps = bodyRows.map((row) => {
+    const map = new Map();
+    const cells = [...row.children];
+    if (cells.length < headerCells.length) return map; // colspan / placeholder rows
+    headerCells.forEach((headerCell, index) => {
+      const key = String(headerCell.dataset.column || '').trim();
+      if (key && cells[index]) map.set(key, cells[index]);
+    });
+    return map;
   });
 
-  // === Update Search Dropdown Once ===
-  updateSearchDropdown(columns);
+  // Reorder header by desired key order
+  orderedKeys.forEach((key) => {
+    const cell = headerByKey.get(key);
+    if (cell) headerRow.appendChild(cell);
+  });
 
-  // === re assign the action buttons ===
-  //btns_Assignments();
+  // Reorder body cells to match the same key order
+  bodyRows.forEach((row, rowIndex) => {
+    const map = bodyMaps[rowIndex];
+    if (!map || map.size < orderedKeys.length) return;
+    orderedKeys.forEach((key) => {
+      const cell = map.get(key);
+      if (cell) row.appendChild(cell);
+    });
+  });
+
+  // Visibility / labels / widths by column key (not nth-child position)
+  const headerIndexByKey = new Map(
+    [...headerRow.children].map((cell, index) => [String(cell.dataset.column || '').trim(), index])
+  );
+
+  columns.forEach((col) => {
+    const key = String(col?.key || '').trim();
+    if (!key) return;
+    const headerCell = headerByKey.get(key);
+    if (!headerCell) return;
+
+    applyColumnHeaderPresentation(headerCell, col);
+
+    const index = headerIndexByKey.get(key);
+    if (index === undefined) return;
+    bodyRows.forEach((row) => {
+      if (row.children.length <= index) return;
+      const cell = row.children[index];
+      if (cell) cell.style.display = col.visible ? '' : 'none';
+    });
+  });
+
+  updateSearchDropdown(columns);
 }
 
 function moveColumn(row, fromIndex, toIndex) {
   const cells = [...row.children];
-  row.insertBefore(cells[fromIndex], cells[toIndex]);
+  if (fromIndex < 0 || toIndex < 0 || fromIndex >= cells.length || toIndex >= cells.length) return;
+  if (fromIndex === toIndex) return;
+  const node = cells[fromIndex];
+  const reference = cells[toIndex > fromIndex ? toIndex + 1 : toIndex] || null;
+  row.insertBefore(node, reference);
 }
 
 function findColumnIndex(table, key) {
-  return [...table.querySelectorAll("thead th")]
-    .findIndex(h => h.dataset.column === key);
+  return [...table.querySelectorAll('thead th')]
+    .findIndex((h) => h.dataset.column === key);
+}
+
+function reapplyCurrentTableSettings(tableElement) {
+  const table = tableElement || document.getElementById('first-table');
+  if (!table) return;
+  const tableNameEl = document.getElementById('tableName');
+  const tableId = tableNameEl ? tableNameEl.getAttribute('data-id') : '';
+  const settings = (tableId && window.__tableSettings && window.__tableSettings[tableId])
+    || getDefaultSettings(table);
+  applySettings(table, settings);
 }
 
 function updateSearchDropdown(columns) {
@@ -775,8 +831,8 @@ function openSettingsModal(table, settings, tableId, userId) {
 
   tbody.innerHTML = "";
 
-  // Build table rows
-  settings.columns.forEach(col => {
+  // Build table rows (stable order by settings.order)
+  getOrderedColumns(settings).forEach(col => {
     const row = document.createElement("tr");
     row.draggable = true;
     row.dataset.key = col.key;
@@ -943,4 +999,6 @@ function closeModal(modal) {
 
 window.initTableSettings = initTableSettings;
 window.openSettingsModal = openSettingsModal;
+window.applyTableSettings = applySettings;
+window.reapplyCurrentTableSettings = reapplyCurrentTableSettings;
 window.defaulTableSettings = defaulTableSettings;

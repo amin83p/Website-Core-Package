@@ -1,4 +1,4 @@
-﻿// MVC/controllers/school/classRollingEnrollmentController.js
+// MVC/controllers/school/classRollingEnrollmentController.js
 const fs = require('fs').promises;
 const path = require('path');
 const schoolDataService = require('../../services/school/schoolDataService');
