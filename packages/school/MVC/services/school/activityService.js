@@ -816,6 +816,97 @@ async function listManualEntryActivitiesForPerson({ orgId, personId, reqUser } =
   });
 }
 
+function buildManualWorkSessionLabel(activity = {}, entry = {}) {
+  const entryId = normalizeId(entry?.entryId || entry?.id);
+  const date = normalizeId(entry?.date);
+  const start = normalizeId(entry?.startTime);
+  const end = normalizeId(entry?.endTime);
+  const title = normalizeId(entry?.title);
+  const activityTitle = normalizeId(activity?.title || activity?.name);
+  const namePart = title && title !== activityTitle
+    ? `${activityTitle}: ${title}`
+    : (title || activityTitle || entryId || 'Work session');
+  const timePart = start && end ? `${start}–${end}` : '';
+  return [entryId, date, timePart, namePart].filter(Boolean).join(' · ');
+}
+
+/**
+ * Posted work sessions on a public activity that the person may claim for a manual timesheet row.
+ */
+async function listManualEntryWorkSessionsForPerson({
+  orgId,
+  activityId,
+  personId,
+  periodStartDate = '',
+  periodEndDate = '',
+  reqUser
+} = {}) {
+  const targetActivityId = normalizeId(activityId);
+  const targetPersonId = normalizeId(personId);
+  if (!targetActivityId || !targetPersonId) return [];
+
+  const activity = await getActivity(targetActivityId, reqUser);
+  if (!activity || !belongsToOrg(activity, orgId)) return [];
+  if (normalizeStatus(activity.status) !== 'posted') return [];
+  if (!isActiveManualEntryActivityRow(activity)) return [];
+  if (!isPersonEligibleForActivity(activity, targetPersonId)) return [];
+
+  const visibilityScope = normalizeActivityVisibilityScope(
+    activity.visibilityScope || activity.calendarScope || activity.scope
+  );
+  if (visibilityScope !== 'school') return [];
+
+  const periodStart = normalizeId(periodStartDate);
+  const periodEnd = normalizeId(periodEndDate);
+
+  return getActivityEntries(activity)
+    .filter((entry) => normalizeStatus(entry.status, 'posted') === 'posted')
+    .filter((entry) => isPersonEligibleForEntry(activity, entry, targetPersonId))
+    .filter((entry) => {
+      const date = normalizeId(entry?.date);
+      if (!date) return false;
+      if (periodStart && date < periodStart) return false;
+      if (periodEnd && date > periodEnd) return false;
+      return Boolean(normalizeId(entry?.startTime) && normalizeId(entry?.endTime));
+    })
+    .map((entry) => {
+      const entryId = normalizeId(entry?.entryId || entry?.id);
+      const date = normalizeId(entry?.date);
+      const startTime = normalizeId(entry?.startTime);
+      const endTime = normalizeId(entry?.endTime);
+      const hours = Number(parseFloat(entry?.durationHours) || 0);
+      const sessionName = normalizeId(entry?.title)
+        || normalizeId(activity.title || activity.name)
+        || entryId
+        || 'Work session';
+      const timeLabel = startTime && endTime ? `${startTime} – ${endTime}` : '';
+      const summaryTitle = [date, timeLabel, sessionName].filter(Boolean).join(' · ');
+      return {
+        id: entryId,
+        entryId,
+        activityId: targetActivityId,
+        activityName: normalizeId(activity.title || activity.name),
+        sessionName,
+        title: summaryTitle,
+        name: sessionName,
+        date,
+        startTime,
+        endTime,
+        durationHours: hours,
+        hours,
+        status: normalizeStatus(entry?.status, 'posted'),
+        visibilityScope: 'school',
+        inPeriod: true
+      };
+    })
+    .filter((row) => row.entryId)
+    .sort((a, b) => {
+      const dateCmp = String(a.date || '').localeCompare(String(b.date || ''));
+      if (dateCmp !== 0) return dateCmp;
+      return String(a.startTime || '').localeCompare(String(b.startTime || ''));
+    });
+}
+
 async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, periodEndDate, reqUser } = {}) {
   const activities = await listActivities({ orgId, reqUser });
   const targetPersonId = normalizeId(personId);
@@ -967,6 +1058,7 @@ module.exports = {
   getScheduleEventsForPerson,
   buildActivityScheduleCompletionScan,
   listManualEntryActivitiesForPerson,
+  listManualEntryWorkSessionsForPerson,
   getTimesheetEntriesForPerson,
   getIncompleteActivityWorkSessionsForPerson,
   buildIncompleteActivityStatusLabel,

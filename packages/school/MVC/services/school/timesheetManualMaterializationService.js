@@ -113,9 +113,12 @@ async function materializeActivityManualEntry({
     throw new Error('Teacher is no longer eligible for the selected activity.');
   }
 
+  const visibilityScope = activityService.normalizeActivityVisibilityScope(
+    activity.visibilityScope || activity.calendarScope || activity.scope
+  );
+  const existingEntryId = normalizeId(entry?.activityEntryId);
   const entries = activityService.getActivityEntries(activity);
   const mutableEntries = [...entries];
-  const entryId = nextActivityEntryId(mutableEntries);
   const hours = Number(parseFloat(entry?.durationHours ?? entry?.requestedHours ?? entry?.hours) || 0);
   const evaluationType = activityService.normalizeEvaluationType(activity.evaluationType);
   const paid = activity.paid === true && entry?.activityPaid !== false;
@@ -146,6 +149,53 @@ async function materializeActivityManualEntry({
     };
   }
 
+  // Public activities link an existing work session; individual suggests create a new ENTRY.
+  if (existingEntryId) {
+    if (visibilityScope === 'individual') {
+      throw new Error('Individual activity manual rows cannot materialize against an existing work session.');
+    }
+    const index = mutableEntries.findIndex((row) => normalizeId(row?.entryId || row?.id) === existingEntryId);
+    if (index < 0) {
+      throw new Error(`Work session ${existingEntryId} is no longer available on activity ${activityId}.`);
+    }
+    const workEntry = { ...mutableEntries[index] };
+    if (normalizeId(workEntry.status || 'posted').toLowerCase() !== 'posted') {
+      throw new Error(`Work session ${existingEntryId} must be posted before timesheet processing.`);
+    }
+    if (!activityService.isPersonEligibleForEntry(activity, workEntry, teacherId)) {
+      throw new Error('Teacher is no longer eligible for the selected work session.');
+    }
+    const assignees = activityService.normalizeActivityAssigneeRows(workEntry.assignees);
+    const assigneeIndex = assignees.findIndex((row) => idsEqual(row.personId, teacherId));
+    if (assigneeIndex >= 0) {
+      assignees[assigneeIndex] = {
+        ...assignees[assigneeIndex],
+        ...assignee,
+        personId: normalizeId(teacherId),
+        personName: assignees[assigneeIndex].personName || assignee.personName || ''
+      };
+    } else {
+      assignees.push(assignee);
+    }
+    mutableEntries[index] = {
+      ...workEntry,
+      assignees
+    };
+    const updated = {
+      ...activity,
+      entries: mutableEntries,
+      attendees: activityService.flattenActivityAssignees(mutableEntries)
+    };
+    await schoolDataService.updateData('activities', activityId, updated, reqUser);
+    const sessionId = `act-${activityId}-${existingEntryId}-${normalizeId(teacherId)}`;
+    return { activityId, activityEntryId: existingEntryId, sessionId, assignee, linkedExisting: true };
+  }
+
+  if (visibilityScope === 'school') {
+    throw new Error('Public activity manual rows must select an existing work session before processing.');
+  }
+
+  const entryId = nextActivityEntryId(mutableEntries);
   const workEntry = {
     entryId,
     title: String(entry?.description || entry?.className || activity.title || '').trim(),
@@ -165,7 +215,7 @@ async function materializeActivityManualEntry({
   };
   await schoolDataService.updateData('activities', activityId, updated, reqUser);
   const sessionId = `act-${activityId}-${entryId}-${normalizeId(teacherId)}`;
-  return { activityId, activityEntryId: entryId, sessionId, assignee };
+  return { activityId, activityEntryId: entryId, sessionId, assignee, linkedExisting: false };
 }
 
 async function materializeApprovedTimesheetManualEntries({ timesheet = {}, period = {}, reqUser } = {}) {
@@ -279,6 +329,106 @@ async function materializeApprovedTimesheetManualEntries({ timesheet = {}, perio
   };
 }
 
+function clearActivityMaterializationMarkers(entry = {}) {
+  const next = { ...entry };
+  delete next.materializedAt;
+  delete next.materializedSessionId;
+  delete next.materializedFromTimesheetId;
+  delete next.materializedFromTimesheetEntryId;
+  return next;
+}
+
+/**
+ * Stamp approve-time activity materialization onto a timesheet row.
+ * Keeps the stable MAN_* sessionId so decide/UI APIs keep working; process skips via materializedAt.
+ */
+function applyActivityMaterializationMarkers(entry = {}, result = {}, timesheet = {}) {
+  const originalManualEntryId = normalizeId(entry?.sessionId);
+  const payableHours = Number(parseFloat(entry?.requestedHours ?? entry?.durationHours ?? entry?.hours) || 0);
+  return {
+    ...entry,
+    activityEntryId: normalizeId(result?.activityEntryId) || normalizeId(entry?.activityEntryId),
+    materializedAt: new Date().toISOString(),
+    materializedSessionId: normalizeId(result?.sessionId),
+    materializedFromTimesheetId: normalizeId(timesheet?.id),
+    materializedFromTimesheetEntryId: originalManualEntryId,
+    approvalStatus: 'approved',
+    excludeFromTotals: false,
+    hours: Number.isFinite(payableHours) ? payableHours : Number(entry?.hours || 0),
+    timesheetHours: Number.isFinite(payableHours) ? payableHours : Number(entry?.timesheetHours || 0),
+    isManual: true
+  };
+}
+
+/**
+ * Revert activity side-effects for one manual timesheet row (approve-time or process materialization).
+ * Public: remove assignees tagged with this timesheet + manual entry id.
+ * Individual: drop created ENTRY when it becomes empty after removing those assignees.
+ */
+async function revertMaterializedActivityManualEntry({
+  timesheetId,
+  timesheetEntryId,
+  activityId,
+  activityEntryId,
+  reqUser
+} = {}) {
+  const timesheetToken = normalizeId(timesheetId);
+  const manualEntryToken = normalizeId(timesheetEntryId);
+  const activityToken = normalizeId(activityId);
+  if (!timesheetToken || !manualEntryToken || !activityToken) {
+    return { reverted: false, revertedAssignees: 0, removedEntry: false };
+  }
+
+  const activity = await schoolDataService.getDataById('activities', activityToken, reqUser);
+  if (!activity) return { reverted: false, revertedAssignees: 0, removedEntry: false };
+
+  const preferredEntryId = normalizeId(activityEntryId);
+  const entries = activityService.getActivityEntries(activity);
+  let revertedAssignees = 0;
+  let removedEntry = false;
+  const nextEntries = [];
+
+  entries.forEach((entry) => {
+    const entryToken = normalizeId(entry?.entryId || entry?.id);
+    const priorAssignees = Array.isArray(entry.assignees) ? entry.assignees : [];
+    const shouldScan = !preferredEntryId || preferredEntryId === entryToken;
+    if (!shouldScan) {
+      nextEntries.push(entry);
+      return;
+    }
+    const assignees = priorAssignees.filter((assignee) => {
+      const fromTimesheet = normalizeId(assignee?.materializedFromTimesheetId) === timesheetToken;
+      const fromEntry = normalizeId(assignee?.materializedFromTimesheetEntryId) === manualEntryToken;
+      if (fromTimesheet && fromEntry) {
+        revertedAssignees += 1;
+        return false;
+      }
+      return true;
+    });
+    if (assignees.length !== priorAssignees.length && !assignees.length) {
+      removedEntry = true;
+      return;
+    }
+    if (assignees.length !== priorAssignees.length) {
+      nextEntries.push({ ...entry, assignees });
+      return;
+    }
+    nextEntries.push(entry);
+  });
+
+  if (!revertedAssignees) {
+    return { reverted: false, revertedAssignees: 0, removedEntry: false };
+  }
+
+  await schoolDataService.updateData('activities', activityToken, {
+    ...activity,
+    entries: nextEntries,
+    attendees: activityService.flattenActivityAssignees(nextEntries)
+  }, reqUser);
+
+  return { reverted: true, revertedAssignees, removedEntry };
+}
+
 async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = {}) {
   const token = normalizeId(timesheetId);
   if (!token) return { revertedClassSessions: 0, revertedActivityEntries: 0, entryRestorations: [] };
@@ -352,6 +502,10 @@ async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = 
 module.exports = {
   isManualMaterializationCandidate,
   resolveNextTimesheetPeriodId,
+  materializeActivityManualEntry,
+  applyActivityMaterializationMarkers,
+  clearActivityMaterializationMarkers,
   materializeApprovedTimesheetManualEntries,
+  revertMaterializedActivityManualEntry,
   revertMaterializedRecordsForTimesheet
 };

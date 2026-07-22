@@ -231,6 +231,139 @@ function isActiveClassForManualEntry(row) {
     return status === 'active';
 }
 
+/**
+ * Manual class sessions are frozen pending further behavior work.
+ * Grandfather rows that already exist on the stored timesheet with the same sessionId + classId.
+ */
+function assertManualClassEntryAllowed({ entry = {}, existingEntries = [] } = {}) {
+    const classId = String(entry?.classId || '').trim();
+    const activityId = String(entry?.activityId || '').trim();
+    if (!classId || activityId) return;
+    const sessionId = String(entry?.sessionId || '').trim();
+    const prior = (Array.isArray(existingEntries) ? existingEntries : []).find((row) => (
+        String(row?.sessionId || '').trim() === sessionId
+        && String(row?.classId || '').trim()
+        && !String(row?.activityId || '').trim()
+    ));
+    if (prior) return;
+    throw new Error('Manual class sessions are temporarily disabled. Use a structured activity entry.');
+}
+
+/**
+ * Manual rows must be structured activities (or a grandfathered class row).
+ * Free-text / description-only manuals are not allowed.
+ */
+function assertManualStructuredEntryRequired({ entry = {}, existingEntries = [] } = {}) {
+    const activityId = String(entry?.activityId || '').trim();
+    if (activityId) return;
+    const classId = String(entry?.classId || '').trim();
+    if (classId) {
+        assertManualClassEntryAllowed({ entry, existingEntries });
+        return;
+    }
+    throw new Error('Manual entries require selecting an activity.');
+}
+
+/**
+ * Public activities require an existing work session; individual activities suggest a new one (no activityEntryId).
+ * Returns binding fields to apply on the manual row (date/times overwritten from the session for public).
+ */
+function resolveManualActivityWorkSessionBinding({
+    activityRow = null,
+    activityEntryId = '',
+    teacherId = '',
+    entrySessionId = '',
+    allManualEntries = []
+} = {}) {
+    if (!activityRow) {
+        return {
+            activityEntryId: '',
+            visibilityScope: '',
+            date: '',
+            startTime: '',
+            endTime: '',
+            durationHours: null,
+            className: '',
+            description: ''
+        };
+    }
+
+    const visibilityScope = activityService.normalizeActivityVisibilityScope(
+        activityRow.visibilityScope || activityRow.calendarScope || activityRow.scope
+    );
+    const requestedEntryId = String(activityEntryId || '').trim();
+
+    if (visibilityScope === 'individual') {
+        if (requestedEntryId) {
+            throw new Error('Individual activities use a suggested work session. Do not pick an existing work session.');
+        }
+        return {
+            activityEntryId: '',
+            visibilityScope,
+            date: '',
+            startTime: '',
+            endTime: '',
+            durationHours: null,
+            className: '',
+            description: ''
+        };
+    }
+
+    // Public / school scope — require existing work session.
+    if (!requestedEntryId) {
+        throw new Error('Public activities require selecting an existing work session.');
+    }
+
+    const workEntry = activityService.getActivityEntries(activityRow)
+        .find((row) => String(row?.entryId || row?.id || '').trim() === requestedEntryId);
+    if (!workEntry) {
+        throw new Error('Selected work session was not found on this activity.');
+    }
+    if (String(workEntry?.status || 'posted').trim().toLowerCase() !== 'posted') {
+        throw new Error('Selected work session must be posted.');
+    }
+    if (!activityService.isPersonEligibleForEntry(activityRow, workEntry, teacherId)) {
+        throw new Error('You are not eligible for the selected work session.');
+    }
+
+    const duplicate = (Array.isArray(allManualEntries) ? allManualEntries : []).find((row) => {
+        if (!row || row.isDeleted === true) return false;
+        if (String(row.sessionId || '').trim() === String(entrySessionId || '').trim()) return false;
+        return String(row.activityId || '').trim() === String(activityRow.id || '').trim()
+            && String(row.activityEntryId || '').trim() === requestedEntryId;
+    });
+    if (duplicate) {
+        throw new Error('This work session is already on the timesheet.');
+    }
+
+    const startTime = normalizeClockTime(workEntry.startTime || '');
+    const endTime = normalizeClockTime(workEntry.endTime || '');
+    if (!startTime || !endTime) {
+        throw new Error('Selected work session is missing a valid start/end time.');
+    }
+    const durationHours = calculateHoursFromTimes(startTime, endTime);
+    if (!Number.isFinite(durationHours) || durationHours <= 0) {
+        throw new Error('Selected work session has an invalid time range.');
+    }
+
+    const activityTitle = String(activityRow.title || activityRow.name || '').trim();
+    const entryTitle = String(workEntry.title || '').trim();
+    const className = entryTitle && entryTitle !== activityTitle
+        ? `${activityTitle}: ${entryTitle}`
+        : (entryTitle || activityTitle || requestedEntryId);
+
+    return {
+        activityEntryId: requestedEntryId,
+        visibilityScope,
+        date: normalizeDateOnly(workEntry.date),
+        startTime,
+        endTime,
+        durationHours,
+        className,
+        description: entryTitle || className
+    };
+}
+
 async function runTimesheetConflictValidation({
     activeOrgId,
     personId,
@@ -584,7 +717,10 @@ function shapeManualActivityRows(activityRows = []) {
             categoryId: String(row.categoryId || ''),
             categoryName: String(row.categoryName || ''),
             departmentId: String(row.departmentId || ''),
-            departmentName: String(row.departmentName || '')
+            departmentName: String(row.departmentName || ''),
+            visibilityScope: activityService.normalizeActivityVisibilityScope(
+                row.visibilityScope || row.calendarScope || row.scope
+            )
         }))
         .sort((a, b) => String(a.name).localeCompare(String(b.name)));
 }
@@ -1722,6 +1858,10 @@ exports.saveTimesheet = async (req, res) => {
                 if (!sessionId) throw new Error('Manual entry session id is required.');
                 const classId = String(entry.classId || '').trim();
                 const activityId = String(entry.activityId || '').trim();
+                assertManualStructuredEntryRequired({
+                    entry: { sessionId, classId, activityId },
+                    existingEntries: Array.isArray(existing?.entries) ? existing.entries : []
+                });
                 const activityRow = activityId ? activityById.get(activityId) : null;
                 if (activityId && !activityRow) {
                     throw new Error('Selected activity is not active or no longer available. Please reselect the activity.');
@@ -1733,7 +1873,20 @@ exports.saveTimesheet = async (req, res) => {
                     throw new Error('Selected activity must be posted before it can be used on a timesheet.');
                 }
 
-                const dateValue = normalizeDateOnly(entry.date);
+                const workSessionBinding = activityRow
+                    ? resolveManualActivityWorkSessionBinding({
+                        activityRow,
+                        activityEntryId: entry.activityEntryId,
+                        teacherId: teacherContext.targetTeacherId,
+                        entrySessionId: sessionId,
+                        allManualEntries: entryRows
+                    })
+                    : null;
+
+                let dateValue = normalizeDateOnly(entry.date);
+                if (workSessionBinding?.activityEntryId && workSessionBinding.date) {
+                    dateValue = workSessionBinding.date;
+                }
                 if (!dateValue || dateValue < period.startDate || dateValue > period.endDate) {
                     throw new Error('Manual entry date must be within the selected timesheet period.');
                 }
@@ -1741,6 +1894,11 @@ exports.saveTimesheet = async (req, res) => {
                 let startTime = normalizeClockTime(entry.startTime || '');
                 let endTime = normalizeClockTime(entry.endTime || '');
                 let requestedHours = Number(parseFloat(entry.requestedHours ?? entry.durationHours ?? entry.hours) || 0);
+                if (workSessionBinding?.activityEntryId) {
+                    startTime = workSessionBinding.startTime;
+                    endTime = workSessionBinding.endTime;
+                    requestedHours = workSessionBinding.durationHours;
+                }
                 if (classId || activityId) {
                     if (!startTime || !endTime) {
                         throw new Error('Manual entries with a class or activity require start and end time.');
@@ -1771,8 +1929,16 @@ exports.saveTimesheet = async (req, res) => {
                 const payableHours = excludeFromTotals ? 0 : requestedHours;
 
                 const classNameRaw = String(entry.className || '').trim();
-                const description = String(entry.description || '').trim();
-                const resolvedClassName = classNameRaw || description || activityName || 'Manual Activity';
+                const description = String(
+                    (workSessionBinding?.activityEntryId ? workSessionBinding.description : '')
+                    || entry.description
+                    || ''
+                ).trim();
+                const resolvedClassName = (workSessionBinding?.activityEntryId && workSessionBinding.className)
+                    || classNameRaw
+                    || description
+                    || activityName
+                    || 'Manual Activity';
                 const requestedRole = timesheetPayrollContextService.normalizePayrollRole(entry.personRole);
                 if (payrollContext.roles.length > 1 && !requestedRole) {
                     throw new Error('Manual entries require a payroll role when the person has multiple teacher/staff roles.');
@@ -1799,8 +1965,15 @@ exports.saveTimesheet = async (req, res) => {
                     comment: String(entry.comment || '').trim(),
                     isManual: true,
                     activityId: activityId || '',
+                    activityEntryId: workSessionBinding?.activityEntryId || '',
                     activityName,
                     activityPaid: activityId ? activityPaid : (entry.activityPaid === true),
+                    visibilityScope: workSessionBinding?.visibilityScope
+                        || (activityRow
+                            ? activityService.normalizeActivityVisibilityScope(
+                                activityRow.visibilityScope || activityRow.calendarScope || activityRow.scope
+                            )
+                            : ''),
                     approvalStatus,
                     excludeFromTotals,
                     decisionAt: reviewerEdit ? String(entry.decisionAt || '').trim() : '',
@@ -1815,6 +1988,8 @@ exports.saveTimesheet = async (req, res) => {
                 };
                 if (!activityId) {
                     normalizedManual.activityPaid = false;
+                    normalizedManual.activityEntryId = '';
+                    normalizedManual.visibilityScope = '';
                 }
                 return normalizedManual;
             }
@@ -2312,6 +2487,65 @@ exports.listManualEntryClasses = async (req, res) => {
     }
 };
 
+exports.listManualEntryWorkSessions = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.READ_ALL });
+        const query = await buildDataServiceQuery(req.query);
+        const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
+        if (query.q === searchDefaultKeyword) query.q = '';
+        const searchTerm = String(query.q || '').trim().toLowerCase();
+        const activityId = String(req.query.activityId || query.activityId || '').trim();
+        if (!activityId) throw new Error('Activity id is required.');
+
+        const periodId = String(req.query.periodId || '').trim();
+        let periodStartDate = String(req.query.periodStartDate || req.query.startDate || '').trim();
+        let periodEndDate = String(req.query.periodEndDate || req.query.endDate || '').trim();
+        if (periodId && (!periodStartDate || !periodEndDate)) {
+            const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
+            if (period) {
+                assertPeriodOrgAccess(period, activeOrgId, req.user);
+                periodStartDate = periodStartDate || String(period.startDate || '').trim();
+                periodEndDate = periodEndDate || String(period.endDate || '').trim();
+            }
+        }
+
+        let results = await activityService.listManualEntryWorkSessionsForPerson({
+            orgId: activeOrgId,
+            activityId,
+            personId: teacherContext.targetTeacherId,
+            periodStartDate,
+            periodEndDate,
+            reqUser: req.user
+        });
+
+        if (searchTerm) {
+            results = results.filter((row) =>
+                String(row.id || '').toLowerCase().includes(searchTerm)
+                || String(row.entryId || '').toLowerCase().includes(searchTerm)
+                || String(row.title || '').toLowerCase().includes(searchTerm)
+                || String(row.name || '').toLowerCase().includes(searchTerm)
+                || String(row.sessionName || '').toLowerCase().includes(searchTerm)
+                || String(row.date || '').toLowerCase().includes(searchTerm)
+                || String(row.startTime || '').toLowerCase().includes(searchTerm)
+                || String(row.endTime || '').toLowerCase().includes(searchTerm)
+            );
+        }
+
+        const { data, pagination } = paginate(results, query);
+        return res.json({
+            status: 'success',
+            results: data,
+            data,
+            items: data,
+            pagination,
+            total: pagination?.totalItems || data.length
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+};
+
 exports.validateManualTimesheetRow = async (req, res) => {
     try {
         const { periodId } = req.params;
@@ -2327,10 +2561,43 @@ exports.validateManualTimesheetRow = async (req, res) => {
         const timesheetEntries = Array.isArray(body.timesheetEntries) ? body.timesheetEntries : draftEntries;
         const ignoreSessionId = String(body.editSessionId || proposed?.editSessionId || '').trim();
 
+        const stored = normalizeTimesheetLifecycle(
+            await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user)
+        );
+        assertManualStructuredEntryRequired({
+            entry: {
+                sessionId: ignoreSessionId || proposed?.sessionId || '',
+                classId: proposed?.classId || '',
+                activityId: proposed?.activityId || ''
+            },
+            existingEntries: Array.isArray(stored?.entries) ? stored.entries : []
+        });
+
         if (String(proposed?.activityId || '').trim()) {
             const activityRow = await activityService.getActivity(proposed.activityId, req.user);
             if (!activityRow || !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {
                 throw new Error('You are not eligible for the selected activity.');
+            }
+            const binding = resolveManualActivityWorkSessionBinding({
+                activityRow,
+                activityEntryId: proposed.activityEntryId,
+                teacherId: teacherContext.targetTeacherId,
+                entrySessionId: ignoreSessionId || proposed?.sessionId || '',
+                allManualEntries: [...draftEntries, ...timesheetEntries]
+            });
+            if (binding.activityEntryId) {
+                proposed.activityEntryId = binding.activityEntryId;
+                proposed.date = binding.date || proposed.date;
+                proposed.startTime = binding.startTime;
+                proposed.endTime = binding.endTime;
+                proposed.durationHours = binding.durationHours;
+                proposed.requestedHours = binding.durationHours;
+                proposed.className = binding.className || proposed.className;
+                proposed.description = binding.description || proposed.description;
+                proposed.visibilityScope = binding.visibilityScope;
+            } else {
+                proposed.activityEntryId = '';
+                proposed.visibilityScope = binding.visibilityScope || 'individual';
             }
         }
         if (String(proposed?.classId || '').trim()) {
@@ -2473,50 +2740,85 @@ exports.decideManualTimesheetRow = async (req, res) => {
         const bodyStartTime = normalizeClockTime(req.body?.startTime || '');
         const bodyEndTime = normalizeClockTime(req.body?.endTime || '');
         const bodyRequestedHours = Number(parseFloat(req.body?.requestedHours ?? req.body?.durationHours) || 0);
-        const entries = (Array.isArray(existing.entries) ? existing.entries : []).map((entry) => {
-            if (!idsEqual(entry?.sessionId, entryId)) return entry;
-            if (entry?.isManual !== true || entry?.activityPaid !== true) {
-                throw new Error('Only paid manual rows can receive an approval decision.');
+        const sourceEntries = Array.isArray(existing.entries) ? existing.entries : [];
+        const targetEntry = sourceEntries.find((entry) => idsEqual(entry?.sessionId, entryId));
+        if (!targetEntry) throw new Error('Manual row not found.');
+        if (targetEntry?.isManual !== true || targetEntry?.activityPaid !== true) {
+            throw new Error('Only paid manual rows can receive an approval decision.');
+        }
+        const priorApprovalStatus = String(targetEntry.approvalStatus || '').trim().toLowerCase();
+        const canDecideNow = isPendingManualApproval(targetEntry)
+            || ['approved', 'rejected'].includes(priorApprovalStatus);
+        if (!canDecideNow) {
+            throw new Error('Only pending paid manual rows can receive an approval decision.');
+        }
+
+        let startTime = normalizeClockTime(targetEntry.startTime || '');
+        let endTime = normalizeClockTime(targetEntry.endTime || '');
+        let requestedHours = Number(parseFloat(targetEntry.requestedHours ?? targetEntry.durationHours ?? 0) || 0);
+        if (bodyStartTime && bodyEndTime) {
+            const calculatedHours = calculateHoursFromTimes(bodyStartTime, bodyEndTime);
+            if (!Number.isFinite(calculatedHours) || calculatedHours <= 0) {
+                throw new Error('Manual row decision requires a valid time range where end time is after start time.');
             }
-            const priorApprovalStatus = String(entry.approvalStatus || '').trim().toLowerCase();
-            const canDecideNow = isPendingManualApproval(entry)
-                || ['approved', 'rejected'].includes(priorApprovalStatus);
-            if (!canDecideNow) {
-                throw new Error('Only pending paid manual rows can receive an approval decision.');
+            startTime = bodyStartTime;
+            endTime = bodyEndTime;
+            requestedHours = calculatedHours;
+        } else if (Number.isFinite(bodyRequestedHours) && bodyRequestedHours > 0) {
+            requestedHours = bodyRequestedHours;
+        }
+
+        let decided = {
+            ...targetEntry,
+            startTime,
+            endTime,
+            requestedHours,
+            durationHours: requestedHours,
+            approvalStatus: decision,
+            excludeFromTotals: decision === 'rejected',
+            hours: decision === 'approved' ? requestedHours : 0,
+            timesheetHours: decision === 'approved' ? requestedHours : 0,
+            status: decision === 'approved' ? 'manual' : 'rejected',
+            decisionAt: now,
+            decisionBy: resolveActorId(req.user),
+            decisionByName: resolveActorName(req.user),
+            decisionNote: note
+        };
+
+        const activityId = String(decided.activityId || '').trim();
+        const alreadyMaterialized = Boolean(decided.materializedAt || decided.materializedSessionId);
+        if (decision === 'approved' && activityId && !alreadyMaterialized) {
+            const materializeResult = await timesheetManualMaterializationService.materializeActivityManualEntry({
+                entry: decided,
+                timesheet: existing,
+                teacherId: teacherContext.targetTeacherId,
+                reqUser: req.user
+            });
+            if (materializeResult) {
+                decided = timesheetManualMaterializationService.applyActivityMaterializationMarkers(
+                    decided,
+                    materializeResult,
+                    existing
+                );
             }
-            let startTime = normalizeClockTime(entry.startTime || '');
-            let endTime = normalizeClockTime(entry.endTime || '');
-            let requestedHours = Number(parseFloat(entry.requestedHours ?? entry.durationHours ?? 0) || 0);
-            if (bodyStartTime && bodyEndTime) {
-                const calculatedHours = calculateHoursFromTimes(bodyStartTime, bodyEndTime);
-                if (!Number.isFinite(calculatedHours) || calculatedHours <= 0) {
-                    throw new Error('Manual row decision requires a valid time range where end time is after start time.');
-                }
-                startTime = bodyStartTime;
-                endTime = bodyEndTime;
-                requestedHours = calculatedHours;
-            } else if (Number.isFinite(bodyRequestedHours) && bodyRequestedHours > 0) {
-                requestedHours = bodyRequestedHours;
+        } else if (decision === 'rejected' && activityId && alreadyMaterialized) {
+            await timesheetManualMaterializationService.revertMaterializedActivityManualEntry({
+                timesheetId: existing.id,
+                timesheetEntryId: String(decided.sessionId || entryId).trim(),
+                activityId,
+                activityEntryId: String(decided.activityEntryId || '').trim(),
+                reqUser: req.user
+            });
+            decided = timesheetManualMaterializationService.clearActivityMaterializationMarkers(decided);
+            // Public rows keep their selected work session id; individual creates drop the created ENTRY id.
+            if (!String(targetEntry.activityEntryId || '').trim()) {
+                decided.activityEntryId = '';
             }
-            return {
-                ...entry,
-                startTime,
-                endTime,
-                requestedHours,
-                durationHours: requestedHours,
-                approvalStatus: decision,
-                excludeFromTotals: decision === 'rejected',
-                hours: decision === 'approved' ? requestedHours : 0,
-                timesheetHours: decision === 'approved' ? requestedHours : 0,
-                status: decision === 'approved' ? 'manual' : 'rejected',
-                decisionAt: now,
-                decisionBy: resolveActorId(req.user),
-                decisionByName: resolveActorName(req.user),
-                decisionNote: note
-            };
-        });
-        const decided = entries.find((entry) => idsEqual(entry?.sessionId, entryId));
-        if (!decided) throw new Error('Manual row not found.');
+        }
+
+        const entries = sourceEntries.map((entry) => (
+            idsEqual(entry?.sessionId, entryId) ? decided : entry
+        ));
         const reviewVersion = Math.max(1, Number(existing.reviewVersion || 0) + 1);
         const submissionSnapshot = buildSubmissionSnapshot({
             normalizedEntries: entries,

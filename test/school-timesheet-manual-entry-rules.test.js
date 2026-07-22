@@ -10,14 +10,17 @@ function read(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
 }
 
-test('timesheet editor manual modal uses activity definitions and class time inputs', () => {
+test('timesheet editor manual modal uses activity definitions and freezes class manuals', () => {
   const source = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
   assert.match(source, /manualActivities/);
   assert.match(source, /data-paid=/);
+  assert.match(source, /data-visibility-scope=/);
   assert.match(source, /id="man_startTime"/);
   assert.match(source, /id="man_endTime"/);
-  assert.match(source, /Activity-based manual rows require both start time and end time/);
-  assert.match(source, /materialized session/);
+  assert.match(source, /id="man_activityEntryId"/);
+  assert.match(source, /btnPickWorkSession/);
+  assert.match(source, /Work Session Required/);
+  assert.match(source, /Public activities require selecting an existing work session/);
   assert.match(source, /id="btnViewDaySchedule"/);
   assert.match(source, /buildManualEntryScheduleUrl/);
   assert.match(source, /\/school\/schedules\/my\?/);
@@ -37,22 +40,38 @@ test('timesheet editor manual modal uses activity definitions and class time inp
   assert.match(source, /\/school\/classes\/\$\{encodeURIComponent\(classId\)\}\/sessions\//);
   assert.match(source, /modal-dialog modal-lg/);
   assert.match(source, /validateManualRowBeforeSave/);
-  assert.match(source, /\/school\/timesheets\/api\/manual-entry-classes/);
+  assert.match(source, /Select activity/);
+  assert.doesNotMatch(source, /Other \/ description/);
+  assert.match(source, /Description-only manual entries are no longer allowed/);
+  assert.match(source, /Class Manuals Frozen/);
+  assert.match(source, /Manual class sessions are temporarily disabled/);
+  assert.match(source, /openCopyManualRowModal/);
+  assert.match(source, /isIndividualManualActivityRow/);
+  assert.match(source, /copyManualRowModal/);
+  assert.match(source, /isCopyTargetDayEligible/);
+  assert.match(source, /\/school\/timesheets\/api\/manual-entry-work-sessions/);
   assert.match(source, /api\/validate-manual-row/);
 });
 
 test('timesheet routes expose manual entry picker and validation APIs', () => {
   const source = read('packages/school/MVC/routes/timesheetRoutes.js');
   assert.match(source, /api\/manual-entry-classes/);
+  assert.match(source, /api\/manual-entry-work-sessions/);
   assert.match(source, /api\/validate-manual-row/);
   assert.match(source, /listManualEntryClasses/);
+  assert.match(source, /listManualEntryWorkSessions/);
   assert.match(source, /validateManualTimesheetRow/);
 });
 
 test('timesheet controller wires activity-based manual options and incomplete warnings', () => {
   const source = read('packages/school/MVC/controllers/school/timesheetController.js');
   assert.match(source, /listManualEntryActivitiesForPerson/);
+  assert.match(source, /listManualEntryWorkSessionsForPerson/);
   assert.match(source, /listManualEntryClasses/);
+  assert.match(source, /listManualEntryWorkSessions/);
+  assert.match(source, /resolveManualActivityWorkSessionBinding/);
+  assert.match(source, /Public activities require selecting an existing work session/);
+  assert.match(source, /visibilityScope/);
   assert.match(source, /buildDataServiceQuery\(req\.query\)/);
   assert.match(source, /paginate\(results, query\)/);
   assert.match(source, /searchTerm/);
@@ -341,7 +360,7 @@ test('timesheet editor uses stacked header, readable table layout, and no day/we
   assert.match(editor, /buildDateCellHtml/);
   assert.match(editor, /ts-day-name/);
   assert.match(editor, /weekday: 'long'/);
-  assert.match(editor, /<th>Time<\/th>/);
+  assert.match(editor, /<th class="ts-col-time"[^>]*>Time<\/th>/);
   assert.match(editor, /table-light border-bottom/);
   assert.doesNotMatch(editor, /Daily Total:/);
   assert.doesNotMatch(editor, /End of Week Total:/);

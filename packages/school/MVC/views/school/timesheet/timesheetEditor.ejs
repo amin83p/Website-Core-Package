@@ -460,7 +460,7 @@
                             <th class="ts-col-status" style="width: 56px;">Status</th>
                             <th style="min-width: 220px;">Comment</th>
                             <th class="text-end" style="width: 90px;">Hours</th>
-                            <% if (!isEditorLocked) { %><th class="text-center" style="width: 90px;">Act</th><% } %>
+                            <% if (!isEditorLocked) { %><th class="text-center" style="width: 120px;">Act</th><% } %>
                         </tr>
                     </thead>
                     <tbody id="tsBody">
@@ -564,20 +564,21 @@
           
           <div class="mb-3">
               <label class="form-label fw-bold">Activity Type *</label>
-              <select id="man_type" class="form-select" onchange="toggleManualType()">
-                  <option value="">Class-based entry</option>
+              <select id="man_type" class="form-select" onchange="toggleManualType()" required>
+                  <option value="" disabled selected>Select activity…</option>
                   <% (manualActivities || []).forEach((activity) => { %>
                     <option
                       value="<%= activity.id || '' %>"
                       data-name="<%= activity.name || activity.id || '' %>"
                       data-paid="<%= activity.paid ? 'true' : 'false' %>"
                       data-category="<%= activity.categoryName || '' %>"
-                      data-department="<%= activity.departmentName || '' %>">
-                      <%= activity.name || activity.id || 'Activity' %>
+                      data-department="<%= activity.departmentName || '' %>"
+                      data-visibility-scope="<%= activity.visibilityScope || 'school' %>">
+                      <%= activity.name || activity.id || 'Activity' %><%= activity.visibilityScope === 'individual' ? ' (individual)' : '' %>
                     </option>
                   <% }) %>
               </select>
-              <div class="form-text">Select an activity definition, or leave blank for class-based entry.</div>
+              <div class="form-text">Public activities require picking an existing work session. Individual activities suggest a new work session for approval. Manual class sessions are temporarily disabled.</div>
           </div>
 
           <div class="mb-3 <%= (typeof payrollRoles !== 'undefined' && payrollRoles.length > 1) ? '' : 'd-none' %>" id="div_man_payrollRole">
@@ -590,13 +591,24 @@
               <div class="form-text">Choose whether this work should be paid under your teacher or staff profile.</div>
           </div>
 
-          <div class="mb-3" id="div_man_classPicker">
+          <div class="mb-3 d-none" id="div_man_classPicker">
               <label class="form-label fw-bold">Select Class *</label>
               <div class="input-group">
                   <input type="hidden" id="man_classId">
-                  <input type="text" id="man_className" class="form-control bg-white" placeholder="Choose a class..." readonly>
-                  <button type="button" class="btn btn-outline-primary" id="btnPickClass"><i class="bi bi-search"></i></button>
+                  <input type="text" id="man_className" class="form-control bg-white" placeholder="Class manuals are frozen" readonly>
+                  <button type="button" class="btn btn-outline-primary" id="btnPickClass" disabled><i class="bi bi-search"></i></button>
               </div>
+              <div class="form-text text-warning" id="man_classFrozenNotice">Manual class sessions are temporarily disabled pending further processing.</div>
+          </div>
+
+          <div class="mb-3 d-none" id="div_man_workSessionPicker">
+              <label class="form-label fw-bold">Work Session *</label>
+              <div class="input-group">
+                  <input type="hidden" id="man_activityEntryId">
+                  <input type="text" id="man_activityEntryLabel" class="form-control bg-white" placeholder="Choose a work session..." readonly>
+                  <button type="button" class="btn btn-outline-primary" id="btnPickWorkSession"><i class="bi bi-search"></i></button>
+              </div>
+              <div class="form-text">Required for public activities. Date and hours are taken from the selected work session.</div>
           </div>
           
           <div class="mb-3" id="div_man_desc">
@@ -696,6 +708,27 @@
       <div class="modal-footer bg-light border-0">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-danger fw-bold" id="btnConfirmManualRowReject">Reject Row</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="copyManualRowModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-copy me-2 text-primary"></i>Copy Manual Row</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="copyManualSourceSessionId">
+        <p class="small text-muted mb-3" id="copyManualRowSummary">Select days to copy this individual activity row onto. Only days without schedule conflicts are listed.</p>
+        <div id="copyManualDaysEmpty" class="alert alert-warning d-none mb-0">No eligible days are available to copy this row onto.</div>
+        <div id="copyManualDaysList" class="d-flex flex-column gap-2" style="max-height: 320px; overflow-y: auto;"></div>
+      </div>
+      <div class="modal-footer bg-light border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary fw-bold" id="btnConfirmCopyManualRow" disabled>Copy to Selected Days</button>
       </div>
     </div>
   </div>
@@ -900,29 +933,94 @@
 </script>
 
 <script>
+function resolveManualActivityVisibilityScope() {
+    const typeSelect = document.getElementById('man_type');
+    const selected = typeSelect?.selectedOptions?.[0] || null;
+    const activityId = String(typeSelect?.value || '').trim();
+    if (!activityId) return '';
+    const fromOption = String(selected?.dataset?.visibilityScope || '').trim().toLowerCase();
+    if (fromOption === 'individual' || fromOption === 'school') return fromOption;
+    const fromList = (Array.isArray(typeof MANUAL_ACTIVITIES !== 'undefined' ? MANUAL_ACTIVITIES : [])
+        ? MANUAL_ACTIVITIES
+        : []).find((row) => String(row?.id || '').trim() === activityId);
+    const fromMap = String(fromList?.visibilityScope || '').trim().toLowerCase();
+    return fromMap === 'individual' ? 'individual' : 'school';
+}
+
+function clearManualWorkSessionPicker() {
+    const idInput = document.getElementById('man_activityEntryId');
+    const labelInput = document.getElementById('man_activityEntryLabel');
+    if (idInput) idInput.value = '';
+    if (labelInput) labelInput.value = '';
+}
+
 function toggleManualType() {
     const type = document.getElementById('man_type').value;
     const classPickerWrap = document.getElementById('div_man_classPicker');
+    const workSessionWrap = document.getElementById('div_man_workSessionPicker');
     const classIdInput = document.getElementById('man_classId');
     const classNameInput = document.getElementById('man_className');
     const classButton = document.getElementById('btnPickClass');
     const startInput = document.getElementById('man_startTime');
     const endInput = document.getElementById('man_endTime');
     const hoursInput = document.getElementById('man_hours');
+    const descWrap = document.getElementById('div_man_desc');
+    const descInput = document.getElementById('man_desc');
     const usingActivity = Boolean(String(type || '').trim());
-    document.getElementById('div_man_desc').classList.remove('d-none');
-    classPickerWrap.classList.toggle('opacity-50', usingActivity);
-    if (classNameInput) {
-        classNameInput.disabled = usingActivity;
-        classNameInput.placeholder = usingActivity ? 'Disabled for activity-based entry' : 'Choose a class...';
+    const visibilityScope = resolveManualActivityVisibilityScope();
+    const isPublicActivity = usingActivity && visibilityScope !== 'individual';
+    const isIndividualActivity = usingActivity && visibilityScope === 'individual';
+    const existingClassId = String(classIdInput?.value || '').trim();
+    const showFrozenClassRow = !usingActivity && Boolean(existingClassId);
+
+    if (workSessionWrap) workSessionWrap.classList.toggle('d-none', !isPublicActivity);
+    if (!isPublicActivity) {
+        clearManualWorkSessionPicker();
+        if (workSessionWrap) delete workSessionWrap.dataset.activityId;
+    } else {
+        const prevActivityId = String(workSessionWrap?.dataset?.activityId || '');
+        if (prevActivityId && prevActivityId !== String(type || '').trim()) {
+            clearManualWorkSessionPicker();
+        }
+        if (workSessionWrap) workSessionWrap.dataset.activityId = String(type || '').trim();
     }
-    if (classButton) classButton.disabled = usingActivity;
-    if (startInput) startInput.disabled = false;
-    if (endInput) endInput.disabled = false;
-    const classId = String(classIdInput?.value || '').trim();
-    const usesTimedEntry = usingActivity || Boolean(classId);
+
+    document.getElementById('div_man_desc').classList.remove('d-none');
+    if (descWrap) {
+        const descLabel = descWrap.querySelector('label');
+        if (descLabel) {
+            descLabel.textContent = isPublicActivity ? 'Description' : 'Description *';
+        }
+    }
+    if (descInput) {
+        descInput.placeholder = isPublicActivity
+            ? 'Filled from the selected work session (optional notes go below)'
+            : (isIndividualActivity
+                ? 'Short description for the suggested work session...'
+                : 'e.g. Extra prep, admin work, meeting...');
+        descInput.readOnly = isPublicActivity;
+    }
+
+    if (classPickerWrap) {
+        classPickerWrap.classList.toggle('d-none', !showFrozenClassRow);
+        classPickerWrap.classList.add('opacity-50');
+    }
+    if (classNameInput) {
+        classNameInput.disabled = true;
+        classNameInput.placeholder = 'Class manuals are frozen';
+    }
+    if (classButton) classButton.disabled = true;
+    if (startInput) {
+        startInput.disabled = isPublicActivity || showFrozenClassRow;
+        startInput.readOnly = isPublicActivity || showFrozenClassRow;
+    }
+    if (endInput) {
+        endInput.disabled = isPublicActivity || showFrozenClassRow;
+        endInput.readOnly = isPublicActivity || showFrozenClassRow;
+    }
+    const usesTimedEntry = usingActivity || showFrozenClassRow;
     if (hoursInput) {
-        hoursInput.readOnly = usesTimedEntry;
+        hoursInput.readOnly = usesTimedEntry || isPublicActivity || showFrozenClassRow;
         hoursInput.placeholder = usesTimedEntry ? 'Calculated from start/end time' : 'e.g. 1.5';
     }
     if (usingActivity) {
@@ -1221,20 +1319,85 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Wire up Generic Picker for Classes
+    // Class manuals are frozen — picker stays disabled.
     const cBtn = document.getElementById('btnPickClass');
     if (cBtn) {
-        cBtn.addEventListener('click', () => {
-            GenericPicker.open(GenericPickerPresets.class({
-                title: 'Select Class',
-                icon: 'bi-journal-bookmark',
-                apiEndpoint: '/school/timesheets/api/manual-entry-classes',
+        cBtn.addEventListener('click', async () => {
+            await messageBox({
+                title: 'Class Manuals Frozen',
+                icon: 'warning',
+                message: 'Manual class sessions are temporarily disabled pending further processing. Use an activity or a description-only entry.'
+            });
+        });
+    }
+
+    const workSessionBtn = document.getElementById('btnPickWorkSession');
+    if (workSessionBtn) {
+        workSessionBtn.addEventListener('click', () => {
+            const activityId = String(document.getElementById('man_type')?.value || '').trim();
+            if (!activityId) {
+                messageBox({ title: 'Select Activity', icon: 'warning', message: 'Choose a public activity before picking a work session.' });
+                return;
+            }
+            if (resolveManualActivityVisibilityScope() === 'individual') {
+                messageBox({
+                    title: 'Suggested Session',
+                    icon: 'info',
+                    message: 'Individual activities suggest a new work session. Enter the date and times instead of picking an existing session.'
+                });
+                return;
+            }
+            const params = new URLSearchParams();
+            params.set('activityId', activityId);
+            params.set('periodId', PERIOD_ID);
+            if (TARGET_TEACHER_ID) params.set('teacherId', TARGET_TEACHER_ID);
+            GenericPicker.open({
+                title: 'Select Work Session',
+                icon: 'bi-calendar-event',
+                apiEndpoint: '/school/timesheets/api/manual-entry-work-sessions?' + params.toString(),
+                placeholder: 'Type aaa to list all, or search by date/name...',
+                renderer: function (item) {
+                    function esc(value) {
+                        return String(value ?? '').replace(/[&<>"']/g, function (character) {
+                            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character];
+                        });
+                    }
+                    const dateLabel = String(item?.date || '').trim() || '—';
+                    const startTime = String(item?.startTime || '').trim();
+                    const endTime = String(item?.endTime || '').trim();
+                    const timeLabel = startTime && endTime ? (startTime + ' – ' + endTime) : (startTime || endTime || '—');
+                    const sessionName = String(item?.sessionName || item?.name || item?.title || item?.entryId || 'Work session').trim();
+                    return ''
+                        + '<div class="w-100">'
+                        +   '<div class="fw-bold text-dark">' + esc(dateLabel) + '</div>'
+                        +   '<div class="text-muted small">' + esc(timeLabel) + '</div>'
+                        +   '<div class="mt-1 text-break">' + esc(sessionName) + '</div>'
+                        + '</div>';
+                },
                 onSelect: (item) => {
-                    document.getElementById('man_classId').value = item.id;
-                    document.getElementById('man_className').value = item.title || item.name || item.id;
+                    const entryId = String(item?.entryId || item?.id || '').trim();
+                    const sessionName = String(item?.sessionName || item?.name || item?.title || entryId).trim();
+                    document.getElementById('man_activityEntryId').value = entryId;
+                    document.getElementById('man_activityEntryLabel').value = sessionName;
+                    const sessionDate = String(item?.date || '').trim();
+                    if (sessionDate) {
+                        document.getElementById('man_date').value = sessionDate;
+                        document.getElementById('man_date_display').innerText = sessionDate;
+                    }
+                    document.getElementById('man_startTime').value = normalizeClock(item?.startTime || '');
+                    document.getElementById('man_endTime').value = normalizeClock(item?.endTime || '');
+                    const hours = Number(parseFloat(item?.durationHours ?? item?.hours) || calculateHoursFromRange(
+                        document.getElementById('man_startTime').value,
+                        document.getElementById('man_endTime').value
+                    ) || 0);
+                    document.getElementById('man_hours').value = hours > 0 ? hours.toFixed(2) : '';
+                    const descInput = document.getElementById('man_desc');
+                    if (descInput && !String(descInput.value || '').trim()) {
+                        descInput.value = sessionName;
+                    }
                     toggleManualType();
                 }
-            }));
+            });
         });
     }
     const viewDayScheduleBtn = document.getElementById('btnViewDaySchedule');
@@ -1662,7 +1825,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ? `<button class="btn btn-sm btn-outline-success py-0 px-1 me-1" title="Approve paid manual row" onclick="decideManualRow('${ses.sessionId}', 'approved')"><i class="bi bi-check-lg"></i></button>
                                    <button class="btn btn-sm btn-outline-danger py-0 px-1 me-1" title="Reject paid manual row" onclick="decideManualRow('${ses.sessionId}', 'rejected')"><i class="bi bi-x-lg"></i></button>`
                                 : '';
+                            const copyBtn = isIndividualManualActivityRow(ses)
+                                ? `<button class="btn btn-sm btn-outline-primary py-0 px-1 ms-1" title="Copy to other days" onclick="openCopyManualRowModal('${ses.sessionId}')"><i class="bi bi-copy"></i></button>`
+                                : '';
                             actBtns = `${reviewBtns}<button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit" onclick="openManualModal('${dateStr}', '${ses.sessionId}')"><i class="bi bi-pencil"></i></button>
+                                       ${copyBtn}
                                        <button class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" title="Remove" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`;
                         } else {
                             actBtns = `<button class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove Auto-Pulled Session" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`;
@@ -1820,6 +1987,218 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('scroll', hideStatusTip, true);
     window.addEventListener('resize', hideStatusTip);
 
+    function isIndividualManualActivityRow(entry = {}) {
+        if (!entry || entry.isManual !== true) return false;
+        const activityId = String(entry.activityId || '').trim();
+        if (!activityId || String(entry.classId || '').trim()) return false;
+        const scope = String(entry.visibilityScope || '').trim().toLowerCase();
+        if (scope === 'individual') return true;
+        if (scope === 'school') return false;
+        const meta = manualActivityMap.get(activityId);
+        return String(meta?.visibilityScope || '').trim().toLowerCase() === 'individual';
+    }
+
+    function createManualSessionId() {
+        return 'MAN_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    }
+
+    function listPeriodDatesExcluding(sourceDate) {
+        const source = String(sourceDate || '').trim();
+        return (Array.isArray(dates) ? dates : []).filter((dateStr) => String(dateStr || '').trim() && String(dateStr) !== source);
+    }
+
+    async function isCopyTargetDayEligible(sourceEntry, targetDate) {
+        const hrs = Number(resolveRequestedHours(sourceEntry) || 0);
+        if (!Number.isFinite(hrs) || hrs <= 0) return false;
+        const existingHours = activeEntries
+            .filter((row) => String(row?.date || '') === String(targetDate || ''))
+            .reduce((sum, row) => sum + resolveRequestedHours(row), 0);
+        if (existingHours + hrs > MAX_DAILY_HOURS) return false;
+
+        const proposedRow = {
+            sessionId: `MAN_COPY_PREVIEW_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            date: targetDate,
+            activityId: String(sourceEntry.activityId || '').trim(),
+            activityName: String(sourceEntry.activityName || '').trim(),
+            activityEntryId: '',
+            visibilityScope: 'individual',
+            className: String(sourceEntry.className || sourceEntry.description || sourceEntry.activityName || '').trim(),
+            description: String(sourceEntry.description || sourceEntry.className || '').trim(),
+            startTime: String(sourceEntry.startTime || '').trim(),
+            endTime: String(sourceEntry.endTime || '').trim(),
+            personRole: String(sourceEntry.personRole || PAYROLL_DEFAULT_ROLE || 'teacher').trim(),
+            durationHours: hrs,
+            requestedHours: hrs,
+            isManual: true
+        };
+        try {
+            const response = await fetch(`/school/timesheets/editor/${encodeURIComponent(PERIOD_ID)}/api/validate-manual-row${buildMutationQuery()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    proposed: proposedRow,
+                    draftEntries: activeEntries,
+                    timesheetEntries: activeEntries,
+                    editSessionId: ''
+                })
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) return false;
+            if (result.status === 'warning' || (Array.isArray(result.conflicts) && result.conflicts.length)) return false;
+            return result.status === 'success';
+        } catch (_error) {
+            return false;
+        }
+    }
+
+    function syncCopyManualConfirmButton() {
+        const btn = document.getElementById('btnConfirmCopyManualRow');
+        const checked = document.querySelectorAll('#copyManualDaysList input.js-copy-day:checked');
+        if (btn) btn.disabled = !checked.length;
+    }
+
+    window.openCopyManualRowModal = async function(sessionId) {
+        const source = activeEntries.find((row) => String(row?.sessionId || '') === String(sessionId || ''));
+        if (!source || !isIndividualManualActivityRow(source)) {
+            await messageBox({
+                title: 'Copy Not Available',
+                icon: 'warning',
+                message: 'Only individual activity manual rows can be copied to other days.'
+            });
+            return;
+        }
+
+        const sourceDate = String(source.date || '').trim();
+        const candidateDates = listPeriodDatesExcluding(sourceDate);
+        const listEl = document.getElementById('copyManualDaysList');
+        const emptyEl = document.getElementById('copyManualDaysEmpty');
+        const summaryEl = document.getElementById('copyManualRowSummary');
+        const confirmBtn = document.getElementById('btnConfirmCopyManualRow');
+        document.getElementById('copyManualSourceSessionId').value = String(sessionId || '');
+        if (listEl) listEl.innerHTML = '<div class="text-muted small">Checking eligible days…</div>';
+        if (emptyEl) emptyEl.classList.add('d-none');
+        if (confirmBtn) confirmBtn.disabled = true;
+        if (summaryEl) {
+            summaryEl.textContent = `Copy “${source.className || source.activityName || 'manual row'}” (${source.startTime || ''}–${source.endTime || ''}) to other days without conflicts.`;
+        }
+
+        const modalEl = document.getElementById('copyManualRowModal');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        const loadingToken = showTimesheetWaitingModal({
+            title: 'Checking days',
+            note: 'Finding eligible days without conflicts…',
+            operation: 'copy_manual_probe'
+        });
+        const eligible = [];
+        try {
+            for (const dateStr of candidateDates) {
+                // eslint-disable-next-line no-await-in-loop
+                const ok = await isCopyTargetDayEligible(source, dateStr);
+                if (ok) eligible.push(dateStr);
+            }
+        } finally {
+            hideTimesheetWaitingModal(loadingToken);
+        }
+
+        if (!listEl) return;
+        if (!eligible.length) {
+            listEl.innerHTML = '';
+            if (emptyEl) emptyEl.classList.remove('d-none');
+            if (confirmBtn) confirmBtn.disabled = true;
+            return;
+        }
+        if (emptyEl) emptyEl.classList.add('d-none');
+        listEl.innerHTML = eligible.map((dateStr) => {
+            const { dayName } = dateKeyWeekday(dateStr);
+            const hol = holidayMap.get(dateStr);
+            const labelExtra = hol ? ` · Holiday` : '';
+            return `<label class="form-check border rounded px-3 py-2 mb-0">
+                <input class="form-check-input js-copy-day" type="checkbox" value="${escapeHtml(dateStr)}">
+                <span class="form-check-label ms-1">${escapeHtml(dateStr)} <span class="text-muted">(${escapeHtml(dayName)}${labelExtra})</span></span>
+            </label>`;
+        }).join('');
+        listEl.querySelectorAll('input.js-copy-day').forEach((input) => {
+            input.addEventListener('change', syncCopyManualConfirmButton);
+        });
+        syncCopyManualConfirmButton();
+    };
+
+    document.getElementById('btnConfirmCopyManualRow')?.addEventListener('click', async () => {
+        const sourceId = String(document.getElementById('copyManualSourceSessionId')?.value || '').trim();
+        const source = activeEntries.find((row) => String(row?.sessionId || '') === sourceId);
+        if (!source || !isIndividualManualActivityRow(source)) {
+            await messageBox({ title: 'Copy Failed', icon: 'error', message: 'Source individual manual row was not found.' });
+            return;
+        }
+        const selectedDates = Array.from(document.querySelectorAll('#copyManualDaysList input.js-copy-day:checked'))
+            .map((input) => String(input.value || '').trim())
+            .filter(Boolean);
+        if (!selectedDates.length) {
+            await messageBox({ title: 'Select Days', icon: 'warning', message: 'Select at least one eligible day to copy onto.' });
+            return;
+        }
+
+        const hrs = Number(resolveRequestedHours(source) || 0);
+        const paid = source.activityPaid === true;
+        const approvalStatus = paid ? 'pending_approval' : 'unpaid';
+        const excludeFromTotals = true;
+        let copied = 0;
+        for (const dateStr of selectedDates) {
+            // Re-check eligibility in case the table changed while the modal was open.
+            // eslint-disable-next-line no-await-in-loop
+            const stillOk = await isCopyTargetDayEligible(source, dateStr);
+            if (!stillOk) continue;
+            activeEntries.push({
+                sessionId: createManualSessionId(),
+                date: dateStr,
+                className: String(source.className || source.description || source.activityName || '').trim(),
+                classId: null,
+                activityId: String(source.activityId || '').trim(),
+                activityName: String(source.activityName || '').trim(),
+                activityEntryId: '',
+                visibilityScope: 'individual',
+                activityPaid: paid,
+                approvalStatus,
+                excludeFromTotals,
+                startTime: String(source.startTime || '').trim(),
+                endTime: String(source.endTime || '').trim(),
+                deliveryDepartmentId: String(source.deliveryDepartmentId || '').trim(),
+                deliveryDepartmentName: String(source.deliveryDepartmentName || '').trim(),
+                categoryName: String(source.categoryName || '').trim(),
+                description: String(source.description || source.className || '').trim(),
+                personRole: String(source.personRole || PAYROLL_DEFAULT_ROLE || 'teacher').trim(),
+                requestedHours: hrs,
+                hours: 0,
+                durationHours: hrs,
+                timesheetHours: 0,
+                status: approvalStatus === 'pending_approval' ? 'pending_approval' : 'manual',
+                comment: String(source.comment || '').trim(),
+                isManual: true
+            });
+            copied += 1;
+        }
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('copyManualRowModal')).hide();
+        if (!copied) {
+            await messageBox({
+                title: 'Nothing Copied',
+                icon: 'warning',
+                message: 'None of the selected days remained eligible. Please try again.'
+            });
+            return;
+        }
+        isEdited = true;
+        document.getElementById('badge_manualEdit')?.classList.remove('d-none');
+        renderTable();
+        await messageBox({
+            title: 'Rows Copied',
+            icon: 'success',
+            message: `Copied to ${copied} day${copied === 1 ? '' : 's'}. Save draft or submit when ready.`
+        });
+    });
+
     window.updateComment = function(sesId, val) {
         const e = activeEntries.find(x => x.sessionId === sesId);
         if (e) e.comment = val;
@@ -1864,6 +2243,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('man_type').value = e.activityId;
                 document.getElementById('man_classId').value = '';
                 document.getElementById('man_className').value = '';
+                document.getElementById('btnSaveManualEntry').disabled = false;
+                document.getElementById('btnSaveManualEntry').title = '';
+                const workSessionWrap = document.getElementById('div_man_workSessionPicker');
+                if (workSessionWrap) workSessionWrap.dataset.activityId = String(e.activityId || '');
+                document.getElementById('man_activityEntryId').value = e.activityEntryId || '';
+                document.getElementById('man_activityEntryLabel').value = e.activityEntryId
+                    ? (e.className || e.description || e.activityEntryId)
+                    : '';
                 document.getElementById('man_desc').value = e.description || e.className || '';
                 document.getElementById('man_startTime').value = normalizeClock(e.startTime || '');
                 document.getElementById('man_endTime').value = normalizeClock(e.endTime || '');
@@ -1871,13 +2258,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('man_type').value = '';
                 document.getElementById('man_classId').value = e.classId;
                 document.getElementById('man_className').value = e.className;
+                clearManualWorkSessionPicker();
                 document.getElementById('man_desc').value = e.description || '';
                 document.getElementById('man_startTime').value = normalizeClock(e.startTime || '');
                 document.getElementById('man_endTime').value = normalizeClock(e.endTime || '');
+                document.getElementById('btnSaveManualEntry').disabled = true;
+                document.getElementById('btnSaveManualEntry').title = 'Manual class sessions are frozen';
             } else {
                 document.getElementById('man_type').value = '';
                 document.getElementById('man_classId').value = '';
                 document.getElementById('man_className').value = '';
+                document.getElementById('btnSaveManualEntry').disabled = false;
+                document.getElementById('btnSaveManualEntry').title = '';
+                clearManualWorkSessionPicker();
                 document.getElementById('man_desc').value = e.className;
                 document.getElementById('man_startTime').value = '';
                 document.getElementById('man_endTime').value = '';
@@ -1889,9 +2282,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             document.getElementById('modalTitle').innerHTML = '<i class="bi bi-plus-circle me-2 text-primary"></i>Add Manual Entry';
             document.getElementById('btnSaveManualEntry').innerText = 'Add Entry';
-            document.getElementById('man_type').value = '';
+            document.getElementById('btnSaveManualEntry').disabled = false;
+            document.getElementById('btnSaveManualEntry').title = '';
+            document.getElementById('man_type').selectedIndex = 0;
             document.getElementById('man_classId').value = '';
             document.getElementById('man_className').value = '';
+            clearManualWorkSessionPicker();
             document.getElementById('man_desc').value = '';
             document.getElementById('man_startTime').value = '';
             document.getElementById('man_endTime').value = '';
@@ -1983,7 +2379,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // SAVE MANUAL ENTRY LOGIC WITH MODAL ALERTS
     document.getElementById('btnSaveManualEntry').addEventListener('click', async () => {
-        const d = document.getElementById('man_date').value;
+        let d = document.getElementById('man_date').value;
         const editId = document.getElementById('man_editSessionId').value;
         const type = document.getElementById('man_type').value;
         const typeSelect = document.getElementById('man_type');
@@ -1992,6 +2388,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const activityName = activityId ? String(selectedActivityOption?.dataset?.name || selectedActivityOption?.textContent || activityId).trim() : '';
         const activityPaid = activityId ? String(selectedActivityOption?.dataset?.paid || '').trim().toLowerCase() === 'true' : false;
         const activityMeta = manualActivityMap.get(activityId) || null;
+        const visibilityScope = activityId
+            ? (resolveManualActivityVisibilityScope() || String(activityMeta?.visibilityScope || 'school'))
+            : '';
+        const isPublicActivity = activityId && visibilityScope !== 'individual';
+        const activityEntryId = isPublicActivity
+            ? String(document.getElementById('man_activityEntryId')?.value || '').trim()
+            : '';
         
         const classId = document.getElementById('man_classId').value;
         const className = document.getElementById('man_className').value;
@@ -2006,6 +2409,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let finalActivityId = activityId;
         let finalActivityName = activityName;
         let finalActivityPaid = activityPaid;
+        let finalActivityEntryId = activityEntryId;
+        let finalVisibilityScope = visibilityScope;
         let finalApprovalStatus = 'approved';
         let finalExcludeFromTotals = false;
         let finalStartTime = '';
@@ -2015,8 +2420,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const finalCategoryName = String(activityMeta?.categoryName || '').trim();
 
         if (activityId) {
-            if (!descInput) {
-                await messageBox({ title: 'Missing Information', icon: 'warning', message: 'Please provide a short description for the selected activity.' });
+            if (isPublicActivity && !activityEntryId) {
+                await messageBox({
+                    title: 'Work Session Required',
+                    icon: 'warning',
+                    message: 'Public activities require selecting an existing work session before saving this manual row.'
+                });
+                return;
+            }
+            if (!isPublicActivity && !descInput) {
+                await messageBox({ title: 'Missing Information', icon: 'warning', message: 'Please provide a short description for the suggested work session.' });
                 return;
             }
             finalClassName = descInput || finalActivityName;
@@ -2024,7 +2437,13 @@ document.addEventListener('DOMContentLoaded', () => {
             finalStartTime = normalizeClock(startTimeRaw);
             finalEndTime = normalizeClock(endTimeRaw);
             if (!finalStartTime || !finalEndTime) {
-                await messageBox({ title: 'Missing Time', icon: 'warning', message: 'Activity-based manual rows require both start time and end time.' });
+                await messageBox({
+                    title: 'Missing Time',
+                    icon: 'warning',
+                    message: isPublicActivity
+                        ? 'Select a work session with a valid start and end time.'
+                        : 'Activity-based manual rows require both start time and end time.'
+                });
                 return;
             }
             hrs = calculateHoursFromRange(finalStartTime, finalEndTime);
@@ -2033,6 +2452,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             document.getElementById('man_hours').value = hrs.toFixed(2);
+            if (isPublicActivity) {
+                d = String(document.getElementById('man_date')?.value || d).trim();
+                finalClassName = String(document.getElementById('man_activityEntryLabel')?.value || '').trim()
+                    || descInput
+                    || finalActivityName;
+            }
             if (finalActivityPaid) {
                 const proceed = await confirmAction({
                     title: 'Paid Activity Requires Approval',
@@ -2054,34 +2479,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 finalApprovalStatus = 'unpaid';
                 finalExcludeFromTotals = true;
             }
-        } else {
+        } else if (classId) {
+            const existingClassRow = editId
+                ? activeEntries.find((row) => String(row?.sessionId || '') === String(editId || ''))
+                : null;
+            const grandfatheredClass = Boolean(
+                existingClassRow
+                && String(existingClassRow.classId || '').trim() === classId
+                && !String(existingClassRow.activityId || '').trim()
+            );
+            if (!grandfatheredClass) {
+                await messageBox({
+                    title: 'Class Manuals Frozen',
+                    icon: 'warning',
+                    message: 'Manual class sessions are temporarily disabled. Select a structured activity instead.'
+                });
+                return;
+            }
             finalActivityId = '';
             finalActivityName = '';
             finalActivityPaid = false;
+            finalActivityEntryId = '';
+            finalVisibilityScope = '';
             finalApprovalStatus = 'approved';
-            if (classId) {
-                finalStartTime = normalizeClock(startTimeRaw);
-                finalEndTime = normalizeClock(endTimeRaw);
-                if (!finalStartTime || !finalEndTime) {
-                    await messageBox({ title: 'Missing Time', icon: 'warning', message: 'Class-based manual rows require both start time and end time.' });
-                    return;
-                }
-                hrs = calculateHoursFromRange(finalStartTime, finalEndTime);
-                if (!hrs || hrs <= 0) {
-                    await messageBox({ title: 'Invalid Time Range', icon: 'warning', message: 'End time must be later than start time for class-based manual rows.' });
-                    return;
-                }
-                document.getElementById('man_hours').value = hrs.toFixed(2);
-            } else {
-                if (!descInput) {
-                    await messageBox({ title: 'Missing Information', icon: 'warning', message: 'Please select a class or provide a description for manual work.' });
-                    return;
-                }
-                finalClassName = descInput;
-                finalClassId = null;
-                finalStartTime = '';
-                finalEndTime = '';
+            finalStartTime = normalizeClock(startTimeRaw);
+            finalEndTime = normalizeClock(endTimeRaw);
+            if (!finalStartTime || !finalEndTime) {
+                await messageBox({ title: 'Missing Time', icon: 'warning', message: 'Class-based manual rows require both start time and end time.' });
+                return;
             }
+            hrs = calculateHoursFromRange(finalStartTime, finalEndTime);
+            if (!hrs || hrs <= 0) {
+                await messageBox({ title: 'Invalid Time Range', icon: 'warning', message: 'End time must be later than start time for class-based manual rows.' });
+                return;
+            }
+            document.getElementById('man_hours').value = hrs.toFixed(2);
+        } else {
+            await messageBox({
+                title: 'Activity Required',
+                icon: 'warning',
+                message: 'Please select an activity. Description-only manual entries are no longer allowed.'
+            });
+            return;
         }
 
         if (isNaN(hrs) || hrs <= 0) {
@@ -2129,6 +2568,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 date: d,
                 activityId: finalActivityId,
                 activityName: finalActivityName,
+                activityEntryId: finalActivityEntryId,
+                visibilityScope: finalVisibilityScope,
                 className: finalClassName,
                 startTime: finalStartTime,
                 endTime: finalEndTime,
@@ -2165,10 +2606,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (editId) {
             const e = activeEntries.find(x => x.sessionId === editId);
+            e.date = d;
             e.className = finalClassName;
             e.classId = finalClassId;
             e.activityId = finalActivityId;
             e.activityName = finalActivityName;
+            e.activityEntryId = finalActivityEntryId || '';
+            e.visibilityScope = finalVisibilityScope || '';
             e.activityPaid = finalActivityPaid;
             e.approvalStatus = finalApprovalStatus;
             e.excludeFromTotals = finalExcludeFromTotals;
@@ -2187,12 +2631,14 @@ document.addEventListener('DOMContentLoaded', () => {
             e.comment = comment;
         } else {
             activeEntries.push({
-                sessionId: 'MAN_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+                sessionId: createManualSessionId(),
                 date: d,
                 className: finalClassName,
                 classId: finalClassId,
                 activityId: finalActivityId,
                 activityName: finalActivityName,
+                activityEntryId: finalActivityEntryId || '',
+                visibilityScope: finalVisibilityScope || '',
                 activityPaid: finalActivityPaid,
                 approvalStatus: finalApprovalStatus,
                 excludeFromTotals: finalExcludeFromTotals,

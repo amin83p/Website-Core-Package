@@ -196,6 +196,8 @@ function sanitizeSnapshotEntry(entry) {
     if (activityId) row.activityId = activityId;
     if (activityEntryId) row.activityEntryId = activityEntryId;
     if (activityName) row.activityName = activityName;
+    const visibilityScope = cleanString(entry.visibilityScope, { max: 40, allowEmpty: true }).toLowerCase();
+    if (visibilityScope === 'school' || visibilityScope === 'individual') row.visibilityScope = visibilityScope;
     if (entry.isReportReflection === true || sessionId.startsWith('rptref-')) row.isReportReflection = true;
     if (entry.isSchoolActivity === true || sessionId.startsWith('act-')) row.isSchoolActivity = true;
     if (entry.isFinalStatus === true) row.isFinalStatus = true;
@@ -365,6 +367,8 @@ function sanitizeEntry(entry) {
         row.activityId = cleanString(entry.activityId, { max: 80, allowEmpty: true });
         row.activityEntryId = cleanString(entry.activityEntryId, { max: 80, allowEmpty: true });
         row.activityName = cleanString(entry.activityName, { max: 220, allowEmpty: true });
+        const visibilityScope = cleanString(entry.visibilityScope, { max: 40, allowEmpty: true }).toLowerCase();
+        if (visibilityScope === 'school' || visibilityScope === 'individual') row.visibilityScope = visibilityScope;
         row.activityPaid = entry.activityPaid === true;
         row.approvalStatus = approvalStatus || (row.activityId ? (row.activityPaid ? 'pending_approval' : 'unpaid') : 'approved');
         row.excludeFromTotals = excludeFromTotals;
