@@ -40,6 +40,7 @@ const sessionConflictDetectionService = require('../../services/school/sessionCo
 const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
 const classEnrollmentDeleteService = require('../../services/school/classEnrollmentDeleteService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
+const { buildVoidPatch } = require('../../models/school/voidRecordMetadata');
 const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');

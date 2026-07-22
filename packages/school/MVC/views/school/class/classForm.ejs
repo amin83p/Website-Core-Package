@@ -3279,6 +3279,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const isCompleted = statusMeta ? statusMeta.isFinal === true : statusCode === 'completed';
             const isCancelled = statusMeta ? statusMeta.excludeFromTeacherIndex === true : statusCode === 'cancelled';
             const isLocked = !!ses.locked;
+            const isTimesheetLock = isTimesheetApprovedLock(ses);
             const rowAppearance = buildSessionRowAppearance(statusCode, { locked: isLocked, conflict: Boolean(ses.conflictMsg) });
             
             let conflictHtml = '';
@@ -3302,6 +3303,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const lockedAttr = isLocked ? 'disabled' : '';
+            const lockCbDisabled = isTimesheetLock ? 'disabled' : '';
+            const lockTitle = isTimesheetLock
+                ? 'Locked by an approved timesheet. Reopen the timesheet to unlock.'
+                : 'Lock session';
             const tName = ses.delivery?.deliveredByName || ses.delivery?.deliveredBy || '';
             
             const isUnsaved = !ses._isSaved;
@@ -3327,7 +3332,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectedAttr = ses._bulkSelected === true ? 'checked' : '';
             tr.innerHTML = `
                 <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-select-cb" data-index="${index}" ${selectedAttr} title="Select for co-teacher apply"></td>
-                <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-lock-cb" data-index="${index}" ${isLocked ? 'checked' : ''} title="Lock session"></td>
+                <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-lock-cb" data-index="${index}" ${isLocked ? 'checked' : ''} ${lockCbDisabled} title="${lockTitle}"></td>
                 <td>
                     <div class="d-flex align-items-center gap-1">
                         ${manageBtnHtml}
@@ -3375,7 +3380,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (e.target.classList.contains('session-lock-cb')) {
+            if (isTimesheetApprovedLock(sessionsState[index])) {
+                e.target.checked = true;
+                return;
+            }
             sessionsState[index].locked = e.target.checked;
+            if (!e.target.checked) {
+                delete sessionsState[index].lockReason;
+                delete sessionsState[index].lockedTimesheetId;
+            } else if (!sessionsState[index].lockReason) {
+                sessionsState[index].lockReason = 'admin_locked';
+            }
             renderSessions(); return;
         }
 
@@ -3434,14 +3449,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 await uiAlert('There are no sessions to delete.', 'Session Ledger');
                 return;
             }
+            const protectedRows = sessionsState.filter((row) => isTimesheetApprovedLock(row));
+            const removableCount = sessionsState.length - protectedRows.length;
+            if (!removableCount) {
+                await uiAlert(
+                    'All sessions in this ledger are locked by approved timesheets. Reopen those timesheets before deleting sessions.',
+                    'Delete All Sessions'
+                );
+                return;
+            }
             const confirmed = await uiConfirm(
-                `Delete all ${sessionsState.length} session(s) from this ledger? This only affects the in-memory class form until you save.`,
+                protectedRows.length
+                    ? `Delete ${removableCount} unlocked session(s)? ${protectedRows.length} timesheet-locked session(s) will be kept. This only affects the in-memory class form until you save.`
+                    : `Delete all ${sessionsState.length} session(s) from this ledger? This only affects the in-memory class form until you save.`,
                 'Delete All Sessions'
             );
             if (!confirmed) return;
 
-            sessionsState = [];
+            sessionsState = protectedRows.slice();
             renderSessions();
+            if (protectedRows.length) {
+                await uiAlert(
+                    `Kept ${protectedRows.length} session(s) locked by approved timesheets.`,
+                    'Delete All Sessions'
+                );
+            }
         });
     }
 
@@ -4095,6 +4127,9 @@ function statusMatches(s, target) {
 }
 
 function isLocked(s) { return !!s?.locked; }
+function isTimesheetApprovedLock(s) {
+    return isLocked(s) && String(s?.lockReason || '').trim() === 'timesheet_approved';
+}
 
 function getBulkTargetStatus() {
     const raw = String(bulkStatusSel?.value || '').trim();

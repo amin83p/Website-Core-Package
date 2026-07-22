@@ -123,6 +123,63 @@ test('assertActivityNotTimesheetLocked rejects timesheet-locked activities', () 
   }, /locked by an approved timesheet/i);
 });
 
+test('assertClassSessionLedgerPreservesTimesheetLocks blocks removing timesheet-locked sessions', async () => {
+  await assert.rejects(async () => {
+    await schoolDependencyService.assertClassSessionLedgerPreservesTimesheetLocks({
+      classId: 'CLS_1',
+      orgId: '900000',
+      existingSessions: [
+        { sessionId: 'SES_LOCK', locked: true, lockReason: 'timesheet_approved', date: '2026-07-01' },
+        { sessionId: 'SES_OPEN', locked: false, date: '2026-07-02' }
+      ],
+      incomingSessions: [
+        { sessionId: 'SES_OPEN', locked: false, date: '2026-07-02' }
+      ],
+      reqUser: { id: 'U1' }
+    });
+  }, /timesheet-locked session\(s\) were removed/i);
+});
+
+test('assertClassSessionLedgerPreservesTimesheetLocks blocks unlocking timesheet-locked sessions', async () => {
+  await assert.rejects(async () => {
+    await schoolDependencyService.assertClassSessionLedgerPreservesTimesheetLocks({
+      classId: 'CLS_1',
+      orgId: '900000',
+      existingSessions: [
+        { sessionId: 'SES_LOCK', locked: true, lockReason: 'timesheet_approved', date: '2026-07-01' }
+      ],
+      incomingSessions: [
+        { sessionId: 'SES_LOCK', locked: false, date: '2026-07-01' }
+      ],
+      reqUser: { id: 'U1' }
+    });
+  }, /timesheet-locked session\(s\) were unlocked/i);
+});
+
+test('assertClassSessionLedgerPreservesTimesheetLocks allows preserving locked sessions', async () => {
+  await schoolDependencyService.assertClassSessionLedgerPreservesTimesheetLocks({
+    classId: 'CLS_1',
+    orgId: '900000',
+    existingSessions: [
+      { sessionId: 'SES_LOCK', locked: true, lockReason: 'timesheet_approved', date: '2026-07-01' }
+    ],
+    incomingSessions: [
+      { sessionId: 'SES_LOCK', locked: true, lockReason: 'timesheet_approved', date: '2026-07-01' },
+      { sessionId: 'SES_NEW', locked: false, date: '2026-07-03' }
+    ],
+    reqUser: { id: 'U1' }
+  });
+});
+
+test('class edit save and form guard timesheet-locked session ledger changes', () => {
+  const controllerSource = read('packages/school/MVC/controllers/school/classController.js');
+  const formSource = read('packages/school/MVC/views/school/class/classForm.ejs');
+  assert.match(controllerSource, /assertClassSessionLedgerPreservesTimesheetLocks/);
+  assert.match(formSource, /function isTimesheetApprovedLock/);
+  assert.match(formSource, /timesheet-locked session\(s\) will be kept/);
+  assert.match(formSource, /Locked by an approved timesheet/);
+});
+
 test('meetsMinTimesheetStatus treats approved as guarded status', () => {
   assert.equal(schoolDependencyService.meetsMinTimesheetStatus('submitted', 'approved'), false);
   assert.equal(schoolDependencyService.meetsMinTimesheetStatus('approved', 'approved'), true);

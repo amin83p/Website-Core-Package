@@ -596,6 +596,86 @@ function isSessionTimesheetApprovedLock(session = {}) {
     && String(session?.lockReason || '') === 'timesheet_approved';
 }
 
+function sessionLedgerId(session = {}) {
+  return normalizeId(session?.sessionId || session?.id);
+}
+
+/**
+ * Prevent class-form session ledger saves from dropping or unlocking
+ * sessions that are locked by approved timesheets.
+ */
+async function assertClassSessionLedgerPreservesTimesheetLocks({
+  classId,
+  orgId,
+  existingSessions = [],
+  incomingSessions = [],
+  reqUser,
+  label = 'This class session ledger'
+} = {}) {
+  const existing = Array.isArray(existingSessions) ? existingSessions : [];
+  const incoming = Array.isArray(incomingSessions) ? incomingSessions : [];
+  const incomingById = new Map();
+  incoming.forEach((row) => {
+    const id = sessionLedgerId(row);
+    if (!id) return;
+    incomingById.set(id, row);
+  });
+
+  const missingLocked = [];
+  const unlocked = [];
+
+  for (const session of existing) {
+    if (!isSessionTimesheetApprovedLock(session)) continue;
+    const sessionId = sessionLedgerId(session);
+    if (!sessionId) continue;
+    const next = incomingById.get(sessionId);
+    if (!next) {
+      missingLocked.push(sessionId);
+      continue;
+    }
+    if (!isSessionTimesheetApprovedLock(next)) {
+      unlocked.push(sessionId);
+    }
+  }
+
+  if (missingLocked.length || unlocked.length) {
+    const parts = [];
+    if (missingLocked.length) {
+      parts.push(`${missingLocked.length} timesheet-locked session(s) were removed`);
+    }
+    if (unlocked.length) {
+      parts.push(`${unlocked.length} timesheet-locked session(s) were unlocked`);
+    }
+    throw new Error(
+      `${label} cannot be saved because ${parts.join(' and ')}. `
+      + 'Reopen the approved timesheet first, then try again.'
+    );
+  }
+
+  // Also block removing sessions still referenced by approved/processed timesheets
+  // even if the stored lock flags were cleared client-side.
+  const missingApprovedRefs = [];
+  for (const session of existing) {
+    const sessionId = sessionLedgerId(session);
+    if (!sessionId || incomingById.has(sessionId)) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const blockers = await buildTimesheetBlockers({
+      orgId,
+      sourceType: 'classSession',
+      sourceRef: { classId: normalizeId(classId), sessionId },
+      reqUser
+    });
+    if (blockers.length) missingApprovedRefs.push(sessionId);
+  }
+
+  if (!missingApprovedRefs.length) return;
+
+  throw new Error(
+    `${label} cannot be saved because ${missingApprovedRefs.length} session(s) referenced by approved timesheets were removed. `
+    + 'Reopen the approved timesheet first, then try again.'
+  );
+}
+
 function applySessionAdminLock(session = {}, locked, reqUser = {}) {
   if (!session || typeof session !== 'object') {
     throw new Error('Session is required.');
@@ -691,6 +771,7 @@ module.exports = {
   assertPeriodHasNoTimesheets,
   assertClassHasNoLockedSessions,
   assertClassSessionsNotReferencedByApprovedTimesheets,
+  assertClassSessionLedgerPreservesTimesheetLocks,
   assertSessionStatusNotReferenced,
   assertActivityNotTimesheetLocked,
   assertSessionNotTimesheetLocked,

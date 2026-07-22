@@ -2835,6 +2835,15 @@ async function editClass(req, res) {
     assertRollingClassHasAllowedProgramOrThrow(updates);
     assertRollingClassConfigAllowed(req, updates, existing?.orgId || activeOrgId);
     await assertClassSessionsWithinDateWindowOrThrow(updates, sessions, req.user);
+    const existingSessions = await schoolDataService.getClassSessions(classId, req.user);
+    await schoolDependencyService.assertClassSessionLedgerPreservesTimesheetLocks({
+      classId,
+      orgId: existing?.orgId || activeOrgId,
+      existingSessions,
+      incomingSessions: sessions,
+      reqUser: req.user,
+      label: 'This class session ledger'
+    });
     if (updates.billingMode === 'chargeable') {
         validateChargeablePostingTemplatesOrThrow(updates.postingTemplates);
         updates.postingTemplates = await resolvePostingPoliciesOrThrow(updates.postingTemplates, existing?.orgId || activeOrgId, req.user);
