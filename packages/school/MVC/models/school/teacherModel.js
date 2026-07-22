@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const { generateRoleSystemIdCandidate } = require('../../services/school/roleSystemIdGenerator');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/teachers.json');
 
@@ -184,11 +185,7 @@ function sanitizeTeacherInput(input, { isUpdate = false } = {}) {
 }
 
 function generateTeacherId(existingIdsSet) {
-  for (let i = 0; i < 50; i++) {
-    const candidate = `TCH${Math.floor(10000 + Math.random() * 90000)}`;
-    if (!existingIdsSet.has(candidate)) return candidate;
-  }
-  return `TCH${Date.now()}`;
+  return generateRoleSystemIdCandidate('teacher', existingIdsSet);
 }
 
 async function getAllTeachers() {

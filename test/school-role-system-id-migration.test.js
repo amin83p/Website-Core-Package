@@ -4,12 +4,28 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const service = require('../packages/school/MVC/services/school/schoolRoleSystemIdMigrationService');
+const { generateRoleSystemIdCandidate } = require('../packages/school/MVC/services/school/roleSystemIdGenerator');
 const ROOT = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
 test('Teacher and Staff generators use their five-digit System Record ID formats', () => {
+  assert.match(generateRoleSystemIdCandidate('teacher'), /^TCH\d{5}$/);
+  assert.match(generateRoleSystemIdCandidate('staff'), /^STF\d{5}$/);
   assert.match(service.generateCandidate('teacher'), /^TCH\d{5}$/);
   assert.match(service.generateCandidate('staff'), /^STF\d{5}$/);
+});
+
+test('Teacher and Staff create paths share the prefixed System Record ID generator', () => {
+  const repository = read('packages/school/MVC/repositories/school/index.js');
+  const teacherModel = read('packages/school/MVC/models/school/teacherModel.js');
+  const staffModel = read('packages/school/MVC/models/school/staffModel.js');
+  const migration = read('packages/school/MVC/services/school/schoolRoleSystemIdMigrationService.js');
+
+  assert.match(repository, /generateMongoCreateId:[\s\S]*?generateRoleSystemIdCandidate\('teacher'/);
+  assert.match(repository, /generateMongoCreateId:[\s\S]*?generateRoleSystemIdCandidate\('staff'/);
+  assert.match(teacherModel, /generateRoleSystemIdCandidate\('teacher'/);
+  assert.match(staffModel, /generateRoleSystemIdCandidate\('staff'/);
+  assert.match(migration, /generateCandidate = generateRoleSystemIdCandidate/);
 });
 
 test('Teacher migration replaces exact legacy role aliases without changing canonical Person IDs', () => {

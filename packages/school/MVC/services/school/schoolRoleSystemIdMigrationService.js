@@ -5,6 +5,7 @@ const { requireCoreModule, resolveCoreRoot } = require('./schoolCoreModuleResolv
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { runByRepositoryBackend } = requireCoreModule('MVC/repositories/backend/repositoryBackendSelector');
 const { getMongoCollection, withMongoTransaction, getMongoTransactionCapability } = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');
+const { generateRoleSystemIdCandidate } = require('./roleSystemIdGenerator');
 
 const DATA_DIR = path.join(resolveCoreRoot(), 'data/school');
 const ID_PATTERN = /^(TCH|STF)\d{5}$/;
@@ -29,6 +30,7 @@ const REFERENCE_KEYS = Object.freeze({
   teacher: new Set(['teacherId', 'teacherIds', 'teacherPersonId', 'deliveredBy', 'substituteTeacherId', 'personId', 'assignedPersonId', 'targetPersonId']),
   staff: new Set(['staffId', 'staffIds', 'staffPersonId', 'requesterPersonId', 'personId', 'assignedPersonId', 'targetPersonId'])
 });
+const generateCandidate = generateRoleSystemIdCandidate;
 
 function configFor(roleType) {
   const config = ROLE_CONFIG[String(roleType || '').trim().toLowerCase()];
@@ -42,19 +44,6 @@ function clone(value) {
   if (!value || typeof value !== 'object') return value;
   if (value instanceof Date || value._bsontype || typeof value.toHexString === 'function') return value;
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, clone(item)]));
-}
-
-function generateCandidate(roleType, existingIds = new Set()) {
-  const { prefix } = configFor(roleType);
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const id = prefix + Math.floor(10000 + Math.random() * 90000);
-    if (!existingIds.has(id)) return id;
-  }
-  for (let number = 10000; number <= 99999; number += 1) {
-    const id = prefix + number;
-    if (!existingIds.has(id)) return id;
-  }
-  throw new Error(`No available ${prefix}##### System Record IDs remain.`);
 }
 
 function transformValue(value, roleType, oldId, newId, countRef) {

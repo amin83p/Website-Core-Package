@@ -42,6 +42,7 @@ const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseM
 const { SCOPE_MODES } = require('../../services/school/schoolDataScopeBuilder');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { generateStudentSystemIdCandidate } = require('../../services/school/studentSystemIdGenerator');
+const { generateRoleSystemIdCandidate } = require('../../services/school/roleSystemIdGenerator');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { getEntityQueryExecutor } = requireCoreModule('MVC/models/queryExecutionBridge');
@@ -1042,6 +1043,10 @@ const schoolRepositories = {
     create: teacherModel.addTeacher,
     update: teacherModel.updateTeacher,
     remove: teacherModel.deleteTeacher,
+    generateMongoCreateId: async (collection) => {
+      const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
+      return generateRoleSystemIdCandidate('teacher', new Set(rows.map((row) => String(row.id || ''))));
+    },
     defaultSearchFields: ['id', 'personId', 'status', 'employmentType'],
     assignmentScopeKind: 'personId'
   }),
@@ -1053,6 +1058,10 @@ const schoolRepositories = {
     create: staffModel.addStaff,
     update: staffModel.updateStaff,
     remove: staffModel.deleteStaff,
+    generateMongoCreateId: async (collection) => {
+      const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
+      return generateRoleSystemIdCandidate('staff', new Set(rows.map((row) => String(row.id || ''))));
+    },
     defaultSearchFields: ['id', 'personId', 'status', 'employmentType'],
     assignmentScopeKind: 'personId'
   }),
