@@ -82,11 +82,23 @@ function parseBoolean(value, fallback = false) {
     return fallback;
 }
 
-function normalizeSessionRatingPercent(value, fallback = 100) {
-    const fallbackNumber = Number(fallback);
-    const safeFallback = Number.isFinite(fallbackNumber) ? fallbackNumber : 100;
+function normalizeSessionRatingPercent(value, fallback = null) {
+    if (value === null || value === undefined || value === '') {
+        if (fallback === null || fallback === undefined || fallback === '') return null;
+        return normalizeSessionRatingPercent(fallback, null);
+    }
+    const token = String(value).trim().toLowerCase();
+    if (token === 'n/a' || token === 'na' || token === 'null') {
+        if (fallback === null || fallback === undefined || fallback === '') return null;
+        return normalizeSessionRatingPercent(fallback, null);
+    }
     const n = Number(value);
-    if (!Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(safeFallback * 100) / 100));
+    if (!Number.isFinite(n)) {
+        if (fallback === null || fallback === undefined || fallback === '') return null;
+        const fallbackNumber = Number(fallback);
+        if (!Number.isFinite(fallbackNumber)) return null;
+        return Math.max(0, Math.min(100, Math.round(fallbackNumber * 100) / 100));
+    }
     return Math.max(0, Math.min(100, Math.round(n * 100) / 100));
 }
 

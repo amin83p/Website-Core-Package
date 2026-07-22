@@ -5,6 +5,7 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 function getActiveOrgIdOrThrow(reqUser = {}) {
@@ -105,6 +106,8 @@ exports.showCreateForm = async (req, res) => {
       title: 'New School Activity',
       activity: { status: 'draft', paid: false, evaluationType: 'attendance', visibilityScope: 'school', attendees: [], allowedPersonIds: [], excludedPersonIds: [] },
       isEdit: false,
+      canForceUnlockTimesheetLocks: false,
+      orphanTimesheetLockedWorkSessions: [],
       ...lookups,
       user: req.user,
       actionStateId: req.actionStateId
@@ -121,10 +124,21 @@ exports.showEditForm = async (req, res) => {
     if (!activity) throw new Error('School activity not found.');
     assertOrgAccess(activity, orgId);
     const lookups = await loadFormLookups(req);
+    const canForceUnlockTimesheetLocks = adminChekersService.isSuperAdmin(req.user);
+    let orphanTimesheetLockedWorkSessions = [];
+    if (canForceUnlockTimesheetLocks) {
+      orphanTimesheetLockedWorkSessions = await activityService.listOrphanActivityTimesheetLocks({
+        activity,
+        reqUser: req.user,
+        orgId
+      });
+    }
     res.render('school/activity/activityForm', {
       title: 'Edit School Activity',
       activity,
       isEdit: true,
+      canForceUnlockTimesheetLocks,
+      orphanTimesheetLockedWorkSessions,
       ...lookups,
       user: req.user,
       actionStateId: req.actionStateId
@@ -470,6 +484,71 @@ exports.deleteWorkSession = async (req, res) => {
     });
   } catch (error) {
     logWorkSessionMutationError('delete', error, req);
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.forceUnlockWorkSessionTimesheet = async (req, res) => {
+  try {
+    if (!adminChekersService.isSuperAdmin(req.user)) {
+      const message = 'Only a super user can force unlock timesheet locks on activity work sessions.';
+      return res.status(403).json({ status: 'error', message });
+    }
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const activityId = String(req.params.activityId || '').trim();
+    const entryId = String(req.params.entryId || '').trim();
+    const note = String(req.body?.note || req.body?.reason || '').trim();
+    const existing = await activityService.getActivity(activityId, req.user, schoolDataService.buildRouteAccessContext(req));
+    if (!existing) throw new Error('School activity not found.');
+    assertOrgAccess(existing, orgId);
+    const result = await activityService.forceUnlockActivityWorkSessionTimesheetLocks({
+      activityId,
+      entryId,
+      unlockAll: false,
+      note,
+      reqUser: req.user,
+      accessContext: schoolDataService.buildRouteAccessContext(req)
+    });
+    return res.json({
+      status: 'success',
+      message: result.message,
+      changed: result.changed,
+      entryId: result.entryId || entryId
+    });
+  } catch (error) {
+    logWorkSessionMutationError('force-unlock-entry', error, req);
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.forceUnlockActivityTimesheetLocks = async (req, res) => {
+  try {
+    if (!adminChekersService.isSuperAdmin(req.user)) {
+      const message = 'Only a super user can force unlock timesheet locks on activities.';
+      return res.status(403).json({ status: 'error', message });
+    }
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const activityId = String(req.params.activityId || '').trim();
+    const note = String(req.body?.note || req.body?.reason || '').trim();
+    const existing = await activityService.getActivity(activityId, req.user, schoolDataService.buildRouteAccessContext(req));
+    if (!existing) throw new Error('School activity not found.');
+    assertOrgAccess(existing, orgId);
+    const result = await activityService.forceUnlockActivityWorkSessionTimesheetLocks({
+      activityId,
+      unlockAll: true,
+      note,
+      reqUser: req.user,
+      accessContext: schoolDataService.buildRouteAccessContext(req)
+    });
+    return res.json({
+      status: 'success',
+      message: result.message,
+      changed: result.changed,
+      unlockedEntryIds: result.unlockedEntryIds || [],
+      skippedLiveLockEntryIds: result.skippedLiveLockEntryIds || []
+    });
+  } catch (error) {
+    logWorkSessionMutationError('force-unlock-activity', error, req);
     return res.status(400).json({ status: 'error', message: error.message });
   }
 };

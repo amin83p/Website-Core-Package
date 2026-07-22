@@ -868,6 +868,89 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
   });
 }
 
+async function listOrphanActivityTimesheetLocks({
+  activityId = '',
+  activity = null,
+  reqUser = null,
+  accessContext = {},
+  orgId = ''
+} = {}) {
+  const row = activity || (activityId
+    ? await getActivity(String(activityId || '').trim(), reqUser, accessContext)
+    : null);
+  if (!row) return [];
+  const resolvedOrgId = String(orgId || row.orgId || '').trim();
+  const existingTimesheetIds = await schoolDependencyService.listExistingTimesheetIds(reqUser, resolvedOrgId);
+  return schoolDependencyService.listOrphanTimesheetLockedActivityEntries(row, existingTimesheetIds);
+}
+
+async function forceUnlockActivityWorkSessionTimesheetLocks({
+  activityId,
+  entryId = '',
+  unlockAll = false,
+  note = '',
+  reqUser = null,
+  accessContext = {}
+} = {}) {
+  const id = String(activityId || '').trim();
+  if (!id) throw new Error('Activity id is required.');
+  const reason = String(note || '').trim();
+  if (reason.length < 3) throw new Error('A short reason is required to force unlock (at least 3 characters).');
+
+  const activity = await getActivity(id, reqUser, accessContext);
+  if (!activity) throw new Error('School activity not found.');
+
+  let result;
+  if (unlockAll) {
+    const existingTimesheetIds = await schoolDependencyService.listExistingTimesheetIds(
+      reqUser,
+      activity.orgId
+    );
+    result = schoolDependencyService.forceUnlockAllActivityTimesheetLocks({
+      activity,
+      reqUser,
+      note: reason,
+      existingTimesheetIds
+    });
+  } else {
+    result = schoolDependencyService.forceUnlockActivityEntryTimesheetLocks({
+      activity,
+      entryId,
+      reqUser,
+      note: reason
+    });
+  }
+
+  if (!result.changed) {
+    return {
+      activity: result.activity,
+      changed: false,
+      unlockedEntryIds: result.unlockedEntryIds || [],
+      skippedLiveLockEntryIds: result.skippedLiveLockEntryIds || [],
+      message: unlockAll
+        ? 'No orphan timesheet locks found on this activity.'
+        : 'This work session is not timesheet-locked.'
+    };
+  }
+
+  const saved = await schoolDataService.updateData('activities', id, {
+    ...result.activity,
+    allowEmptyEntries: true
+  }, reqUser);
+
+  const unlockedCount = Array.isArray(result.unlockedEntryIds) ? result.unlockedEntryIds.length : 0;
+  return {
+    activity: saved || result.activity,
+    changed: true,
+    entryId: result.entryId || '',
+    unlockedEntryIds: result.unlockedEntryIds || [],
+    skippedLiveLockEntryIds: result.skippedLiveLockEntryIds || [],
+    message: unlockAll
+      ? `Unlocked ${unlockedCount} orphan work session(s).`
+      : `Unlocked work session ${result.entryId}.`
+  };
+}
+
 module.exports = {
   listActivityCategories,
   listActivities,
@@ -896,7 +979,9 @@ module.exports = {
   isAssigneeTimesheetLocked,
   activityHasLockedAssigneeRows,
   isAssigneeEligibleForTimesheet,
-  enforceActivityLockRules
+  enforceActivityLockRules,
+  listOrphanActivityTimesheetLocks,
+  forceUnlockActivityWorkSessionTimesheetLocks
 };
 
 

@@ -549,6 +549,220 @@ async function unlockActivitySourcesForTimesheet({ timesheetId, reqUser }) {
   }
 }
 
+function clearTimesheetApprovedLockFields(row = {}, reqUser = null, note = '') {
+  const next = { ...row };
+  next.locked = false;
+  delete next.lockReason;
+  delete next.lockedTimesheetId;
+  next.unlockedAt = new Date().toISOString();
+  next.unlockedBy = toPublicId(reqUser?.id);
+  const reason = String(note || '').trim();
+  if (reason) next.forceUnlockReason = reason.slice(0, 500);
+  return next;
+}
+
+function assigneeHasTimesheetApprovedLock(assignee = {}) {
+  if (isAssigneeTimesheetLocked(assignee)) return true;
+  if (!(assignee?.locked === true || String(assignee?.locked) === 'true')) return false;
+  return String(assignee?.lockReason || '') === 'timesheet_approved' || Boolean(normalizeId(assignee?.lockedTimesheetId));
+}
+
+function entryHasTimesheetApprovedLock(entry = {}) {
+  if (isActivityEntryTimesheetLocked(entry) && (
+    String(entry?.lockReason || '') === 'timesheet_approved' || Boolean(normalizeId(entry?.lockedTimesheetId))
+  )) {
+    return true;
+  }
+  return (Array.isArray(entry?.assignees) ? entry.assignees : []).some(assigneeHasTimesheetApprovedLock);
+}
+
+function toExistingTimesheetIdSet(existingTimesheetIds) {
+  if (existingTimesheetIds instanceof Set) return existingTimesheetIds;
+  return new Set(
+    (Array.isArray(existingTimesheetIds) ? existingTimesheetIds : [])
+      .map((id) => normalizeId(id))
+      .filter(Boolean)
+  );
+}
+
+/**
+ * Orphan = timesheet-approved lock whose lockedTimesheetId is empty or not in the live timesheet set.
+ */
+function isOrphanTimesheetLock(row = {}, existingTimesheetIds = []) {
+  const locked = row?.locked === true || String(row?.locked) === 'true';
+  const reasonApproved = String(row?.lockReason || '') === 'timesheet_approved';
+  const timesheetId = normalizeId(row?.lockedTimesheetId);
+  if (!locked || (!reasonApproved && !timesheetId)) return false;
+  if (!timesheetId) return true;
+  return !toExistingTimesheetIdSet(existingTimesheetIds).has(timesheetId);
+}
+
+function entryHasOrphanTimesheetLock(entry = {}, existingTimesheetIds = []) {
+  if (isOrphanTimesheetLock(entry, existingTimesheetIds)) return true;
+  return (Array.isArray(entry?.assignees) ? entry.assignees : [])
+    .some((assignee) => isOrphanTimesheetLock(assignee, existingTimesheetIds));
+}
+
+function buildOrphanWorkSessionLabel(entry = {}) {
+  const entryId = normalizeId(entry?.entryId || entry?.id) || 'work session';
+  const date = String(entry?.date || '').trim();
+  const title = String(entry?.title || entry?.label || '').trim();
+  if (date && title) return `${entryId} — ${date} — ${title}`;
+  if (date) return `${entryId} — ${date}`;
+  if (title) return `${entryId} — ${title}`;
+  return entryId;
+}
+
+function collectEntryOrphanTimesheetIds(entry = {}, existingTimesheetIds = []) {
+  const ids = [];
+  const pushId = (row) => {
+    if (!isOrphanTimesheetLock(row, existingTimesheetIds)) return;
+    const id = normalizeId(row?.lockedTimesheetId);
+    if (id && !ids.includes(id)) ids.push(id);
+  };
+  pushId(entry);
+  (Array.isArray(entry?.assignees) ? entry.assignees : []).forEach(pushId);
+  return ids;
+}
+
+function listOrphanTimesheetLockedActivityEntries(activity = {}, existingTimesheetIds = []) {
+  const existing = toExistingTimesheetIdSet(existingTimesheetIds);
+  return (Array.isArray(activity?.entries) ? activity.entries : [])
+    .filter((entry) => entryHasOrphanTimesheetLock(entry, existing))
+    .map((entry) => {
+      const orphanIds = collectEntryOrphanTimesheetIds(entry, existing);
+      return {
+        entryId: normalizeId(entry?.entryId || entry?.id),
+        label: buildOrphanWorkSessionLabel(entry),
+        lockedTimesheetId: orphanIds[0] || '',
+        lockedTimesheetIds: orphanIds
+      };
+    })
+    .filter((row) => row.entryId);
+}
+
+async function listExistingTimesheetIds(reqUser, orgId) {
+  const rows = await listTimesheets(reqUser, orgId);
+  return rows.map((row) => normalizeId(row?.id)).filter(Boolean);
+}
+
+function forceClearEntryTimesheetLocks(entry = {}, reqUser = null, note = '', options = {}) {
+  const orphansOnly = options.orphansOnly === true;
+  const existingTimesheetIds = toExistingTimesheetIdSet(options.existingTimesheetIds || []);
+  let changed = false;
+  const assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).map((assignee) => {
+    if (!assigneeHasTimesheetApprovedLock(assignee)) return assignee;
+    if (orphansOnly && !isOrphanTimesheetLock(assignee, existingTimesheetIds)) return assignee;
+    changed = true;
+    return clearTimesheetApprovedLockFields(assignee, reqUser, note);
+  });
+  let nextEntry = { ...entry, assignees };
+  const entryLocked = isActivityEntryTimesheetLocked(entry)
+    || String(entry?.lockReason || '') === 'timesheet_approved'
+    || Boolean(normalizeId(entry?.lockedTimesheetId));
+  if (entryLocked) {
+    if (!orphansOnly || isOrphanTimesheetLock(entry, existingTimesheetIds)) {
+      changed = true;
+      nextEntry = clearTimesheetApprovedLockFields(nextEntry, reqUser, note);
+      nextEntry.assignees = assignees;
+    }
+  }
+  return { entry: nextEntry, changed };
+}
+
+function recomputeActivityTimesheetLocked(activity = {}, entries = []) {
+  const entryList = Array.isArray(entries) ? entries : [];
+  const stillLocked = entryList.some(entryHasTimesheetApprovedLock);
+  const next = { ...activity, entries: entryList, locked: stillLocked };
+  if (!stillLocked) {
+    if (String(next.lockReason || '') === 'timesheet_approved') delete next.lockReason;
+    if (next.lockedTimesheetId) delete next.lockedTimesheetId;
+  }
+  return next;
+}
+
+/**
+ * Force-clear timesheet locks on one work session (entry + assignees), even if the timesheet is gone.
+ * @returns {{ activity: object, changed: boolean, entryId: string }}
+ */
+function forceUnlockActivityEntryTimesheetLocks({ activity, entryId, reqUser = null, note = '' } = {}) {
+  if (!activity || typeof activity !== 'object') throw new Error('Activity is required.');
+  const targetEntryId = normalizeId(entryId);
+  if (!targetEntryId) throw new Error('Work session id is required.');
+  let found = false;
+  let changed = false;
+  const entries = (Array.isArray(activity.entries) ? activity.entries : []).map((entry) => {
+    const currentId = normalizeId(entry?.entryId || entry?.id);
+    if (currentId !== targetEntryId) return entry;
+    found = true;
+    const result = forceClearEntryTimesheetLocks(entry, reqUser, note);
+    if (result.changed) changed = true;
+    return result.entry;
+  });
+  if (!found) throw new Error('Work session not found.');
+  return {
+    activity: recomputeActivityTimesheetLocked(activity, entries),
+    changed,
+    entryId: targetEntryId
+  };
+}
+
+/**
+ * Force-clear orphan timesheet locks on an activity (locks whose timesheet is missing).
+ * Live timesheet locks are left intact.
+ * @returns {{ activity: object, changed: boolean, unlockedEntryIds: string[], skippedLiveLockEntryIds: string[] }}
+ */
+function forceUnlockAllActivityTimesheetLocks({
+  activity,
+  reqUser = null,
+  note = '',
+  existingTimesheetIds = []
+} = {}) {
+  if (!activity || typeof activity !== 'object') throw new Error('Activity is required.');
+  const existing = toExistingTimesheetIdSet(existingTimesheetIds);
+  const unlockedEntryIds = [];
+  const skippedLiveLockEntryIds = [];
+  let changed = false;
+  const entries = (Array.isArray(activity.entries) ? activity.entries : []).map((entry) => {
+    const entryId = normalizeId(entry?.entryId || entry?.id);
+    if (!entryHasTimesheetApprovedLock(entry)) return entry;
+    if (!entryHasOrphanTimesheetLock(entry, existing)) {
+      if (entryId) skippedLiveLockEntryIds.push(entryId);
+      return entry;
+    }
+    const result = forceClearEntryTimesheetLocks(entry, reqUser, note, {
+      orphansOnly: true,
+      existingTimesheetIds: existing
+    });
+    if (result.changed) {
+      changed = true;
+      if (entryId) unlockedEntryIds.push(entryId);
+    }
+    if (entryHasTimesheetApprovedLock(result.entry)) {
+      if (entryId && !skippedLiveLockEntryIds.includes(entryId)) skippedLiveLockEntryIds.push(entryId);
+    }
+    return result.entry;
+  });
+  let nextActivity = recomputeActivityTimesheetLocked(activity, entries);
+  const activityOrphanLocked = (activity?.locked === true || String(activity?.locked) === 'true')
+    && String(activity?.lockReason || '') === 'timesheet_approved'
+    && isOrphanTimesheetLock(activity, existing);
+  if (activityOrphanLocked && !nextActivity.locked) {
+    changed = true;
+    nextActivity = {
+      ...nextActivity,
+      unlockedAt: new Date().toISOString(),
+      unlockedBy: toPublicId(reqUser?.id)
+    };
+    delete nextActivity.lockReason;
+    delete nextActivity.lockedTimesheetId;
+    if (String(note || '').trim()) {
+      nextActivity.forceUnlockReason = String(note).trim().slice(0, 500);
+    }
+  }
+  return { activity: nextActivity, changed, unlockedEntryIds, skippedLiveLockEntryIds };
+}
+
 async function unlockReportAssignmentsForTimesheet({ timesheetId, reqUser }) {
   const token = normalizeId(timesheetId);
   if (!token) return;
@@ -784,5 +998,12 @@ module.exports = {
   lockActivityAssignees,
   lockActivitySources,
   lockSourcesForApprovedTimesheet,
-  unlockSourcesForTimesheet
+  unlockSourcesForTimesheet,
+  entryHasTimesheetApprovedLock,
+  isOrphanTimesheetLock,
+  entryHasOrphanTimesheetLock,
+  listOrphanTimesheetLockedActivityEntries,
+  listExistingTimesheetIds,
+  forceUnlockActivityEntryTimesheetLocks,
+  forceUnlockAllActivityTimesheetLocks
 };

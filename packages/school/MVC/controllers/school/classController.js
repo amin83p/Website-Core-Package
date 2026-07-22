@@ -159,12 +159,44 @@ function assertLateAttendanceMinutesPresent(record = {}) {
     }
 }
 
-function normalizeSessionRatingPercent(value, fallback = 100) {
-    const fallbackNumber = Number(fallback);
-    const safeFallback = Number.isFinite(fallbackNumber) ? fallbackNumber : 100;
+function normalizeSessionRatingPercent(value, fallback = null) {
+    if (value === null || value === undefined || value === '') {
+        if (fallback === null || fallback === undefined || fallback === '') return null;
+        return normalizeSessionRatingPercent(fallback, null);
+    }
+    const token = String(value).trim().toLowerCase();
+    if (token === 'n/a' || token === 'na' || token === 'null') {
+        if (fallback === null || fallback === undefined || fallback === '') return null;
+        return normalizeSessionRatingPercent(fallback, null);
+    }
     const n = Number(value);
-    if (!Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(safeFallback * 100) / 100));
+    if (!Number.isFinite(n)) {
+        if (fallback === null || fallback === undefined || fallback === '') return null;
+        const fallbackNumber = Number(fallback);
+        if (!Number.isFinite(fallbackNumber)) return null;
+        return Math.max(0, Math.min(100, Math.round(fallbackNumber * 100) / 100));
+    }
     return Math.max(0, Math.min(100, Math.round(n * 100) / 100));
+}
+
+function emptyConductPercents() {
+    return {
+        classEffortPercent: null,
+        classParticipationPercent: null,
+        respectsTeachersPercent: null,
+        respectsStudentsPercent: null
+    };
+}
+
+function resolveConductSavedAtForRosterMerge(incRec, existRec) {
+    const conductTouched = [
+        'classEffortPercent',
+        'classParticipationPercent',
+        'respectsTeachersPercent',
+        'respectsStudentsPercent'
+    ].some((key) => Object.prototype.hasOwnProperty.call(incRec || {}, key));
+    if (conductTouched) return new Date().toISOString();
+    return existRec?.conductSavedAt || null;
 }
 
 function toArrayOfStrings(value) {
@@ -1326,10 +1358,7 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
                 attendance: (forceSessionNotApplicable || hasApprovedLeaveFor(pid)) ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : 'present',
                 notes: '',
                 comments: [],
-                classEffortPercent: 100,
-                classParticipationPercent: 100,
-                respectsTeachersPercent: 100,
-                respectsStudentsPercent: 100
+                ...emptyConductPercents()
             });
         }
     });
@@ -1366,10 +1395,10 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
                 personId: pid,
                 personToStudentMap
             }),
-            classEffortPercent: normalizeSessionRatingPercent(r.classEffortPercent),
-            classParticipationPercent: normalizeSessionRatingPercent(r.classParticipationPercent),
-            respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent),
-            respectsStudentsPercent: normalizeSessionRatingPercent(r.respectsStudentsPercent)
+            classEffortPercent: normalizeSessionRatingPercent(r.classEffortPercent, null),
+            classParticipationPercent: normalizeSessionRatingPercent(r.classParticipationPercent, null),
+            respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent, null),
+            respectsStudentsPercent: normalizeSessionRatingPercent(r.respectsStudentsPercent, null)
         };
     });
 
@@ -2084,10 +2113,7 @@ function resetRosterForMakeup(roster = []) {
                 excuseAttachment: null,
                 notes: '',
                 comments: [],
-                classEffortPercent: 100,
-                classParticipationPercent: 100,
-                respectsTeachersPercent: 100,
-                respectsStudentsPercent: 100
+                ...emptyConductPercents()
             };
         })
         .filter(Boolean);
@@ -3225,10 +3251,7 @@ async function manageSession1(req, res) {
                     attendance: 'present',
                     notes: '',
                     comments: [],
-                    classEffortPercent: 100,
-                    classParticipationPercent: 100,
-                    respectsTeachersPercent: 100,
-                    respectsStudentsPercent: 100
+                    ...emptyConductPercents()
                 }); 
             }
         });
@@ -3250,10 +3273,10 @@ async function manageSession1(req, res) {
                     personId: pid,
                     personToStudentMap
                 }),
-                classEffortPercent: normalizeSessionRatingPercent(r.classEffortPercent),
-                classParticipationPercent: normalizeSessionRatingPercent(r.classParticipationPercent),
-                respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent),
-                respectsStudentsPercent: normalizeSessionRatingPercent(r.respectsStudentsPercent)
+                classEffortPercent: normalizeSessionRatingPercent(r.classEffortPercent, null),
+                classParticipationPercent: normalizeSessionRatingPercent(r.classParticipationPercent, null),
+                respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent, null),
+                respectsStudentsPercent: normalizeSessionRatingPercent(r.respectsStudentsPercent, null)
             };
         });
 
@@ -3337,10 +3360,10 @@ async function saveSession1(req, res) {
                     personId: incomingPersonId,
                     attendance
                 });
-                const existingClassEffort = normalizeSessionRatingPercent(existRec.classEffortPercent);
-                const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent);
-                const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent);
-                const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent);
+                const existingClassEffort = normalizeSessionRatingPercent(existRec.classEffortPercent, null);
+                const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent, null);
+                const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent, null);
+                const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent, null);
                 return {
                     personId: incomingPersonId,
                     attendance,
@@ -3350,16 +3373,17 @@ async function saveSession1(req, res) {
                     excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
                     classEffortPercent: incRec.classEffortPercent === undefined
                         ? existingClassEffort
-                        : normalizeSessionRatingPercent(incRec.classEffortPercent, existingClassEffort),
+                        : normalizeSessionRatingPercent(incRec.classEffortPercent, null),
                     classParticipationPercent: incRec.classParticipationPercent === undefined
                         ? existingClassParticipation
-                        : normalizeSessionRatingPercent(incRec.classParticipationPercent, existingClassParticipation),
+                        : normalizeSessionRatingPercent(incRec.classParticipationPercent, null),
                     respectsTeachersPercent: incRec.respectsTeachersPercent === undefined
                         ? existingRespectsTeachers
-                        : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, existingRespectsTeachers),
+                        : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, null),
                     respectsStudentsPercent: incRec.respectsStudentsPercent === undefined
                         ? existingRespectsStudents
-                        : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, existingRespectsStudents),
+                        : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null),
+                    conductSavedAt: resolveConductSavedAtForRosterMerge(incRec, existRec),
                     notes: existRec.notes || '',       // Preserve existing student-specific notes if any
                     comments: existRec.comments || []  // PRESERVE the interactive admin comments!
                 };
@@ -3605,6 +3629,20 @@ async function manageSession(req, res) {
             ipAddress: req.ip
         }).catch(() => null);
 
+        const sessionConductReportPeriod = sessionConductService.resolveReportPeriodForSession(
+            sessionReportViewerContext.assignmentMap,
+            sessionId
+        );
+        const conductPrefillByPersonId = Object.fromEntries(
+            sessionConductService.buildConductPrefillMap({
+                roster: session.roster,
+                currentSession: sessions.find((row) => idsEqual(row?.sessionId, sessionId)) || session,
+                allSessions: sessions,
+                periodStart: sessionConductReportPeriod.startDate,
+                periodDue: sessionConductReportPeriod.dueDate
+            })
+        );
+
 
         const orgPolicyLayerMs = await attendanceMatrixPolicyModel.getPolicyForOrg(
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
@@ -3639,6 +3677,8 @@ async function manageSession(req, res) {
             combinedSessionContent,
             sessionReportInstanceRows,
             canAssignSessionReports: Boolean(reportAssignmentCreateAccess?.allowed),
+            conductPrefillByPersonId,
+            sessionConductReportPeriod,
             sessionStatusMeta: getActiveSessionStatusMeta(sessionStatusMeta),
             defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
             prevSessionId,    
@@ -4227,10 +4267,10 @@ async function saveSession(req, res) {
                     personId: incomingPersonId,
                     attendance
                 });
-                const existingClassEffort = normalizeSessionRatingPercent(existRec.classEffortPercent);
-                const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent);
-                const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent);
-                const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent);
+                const existingClassEffort = normalizeSessionRatingPercent(existRec.classEffortPercent, null);
+                const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent, null);
+                const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent, null);
+                const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent, null);
                 const merged = {
                     personId: incomingPersonId,
                     attendance,
@@ -4240,16 +4280,17 @@ async function saveSession(req, res) {
                     excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
                     classEffortPercent: incRec.classEffortPercent === undefined
                         ? existingClassEffort
-                        : normalizeSessionRatingPercent(incRec.classEffortPercent, existingClassEffort),
+                        : normalizeSessionRatingPercent(incRec.classEffortPercent, null),
                     classParticipationPercent: incRec.classParticipationPercent === undefined
                         ? existingClassParticipation
-                        : normalizeSessionRatingPercent(incRec.classParticipationPercent, existingClassParticipation),
+                        : normalizeSessionRatingPercent(incRec.classParticipationPercent, null),
                     respectsTeachersPercent: incRec.respectsTeachersPercent === undefined
                         ? existingRespectsTeachers
-                        : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, existingRespectsTeachers),
+                        : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, null),
                     respectsStudentsPercent: incRec.respectsStudentsPercent === undefined
                         ? existingRespectsStudents
-                        : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, existingRespectsStudents),
+                        : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null),
+                    conductSavedAt: resolveConductSavedAtForRosterMerge(incRec, existRec),
                     notes: existRec.notes || '',
                     comments: existRec.comments || []
                 };
@@ -4581,16 +4622,19 @@ async function saveSessionConduct(req, res) {
         }
 
         sessionConductService.applyConductRosterToSession(session, incomingRoster, {
-            ready: true,
+            ready: sessionConductService.parseConductReadyFlag(req.body?.ready, true),
             userId: req.user?.id
         });
         sessions[sessionIndex] = session;
         await schoolDataService.saveClassSessions(classId, sessions, req.user);
 
+        const ready = sessionConductService.isSessionConductReady(session);
         return res.json({
             status: 'success',
-            message: 'Class conduct saved. You can now fill reports for this session.',
-            conductReadyForReports: true,
+            message: ready
+                ? 'Class conduct saved. You can now fill reports for this session.'
+                : 'Optional class conduct saved for the selected students.',
+            conductReadyForReports: ready,
             conductReadyAt: session.conductReadyAt || null
         });
     } catch (error) {

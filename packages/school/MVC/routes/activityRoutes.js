@@ -130,6 +130,26 @@ router.post('/:activityId/work-sessions/:entryId/pending',
     allowSectionTokenFallback: true
   }),
   ctrl.resetWorkSessionAssigneeCompletion);
+router.post('/:activityId/force-unlock-timesheet',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true,
+    allowSectionTokenFallback: true
+  }),
+  ctrl.forceUnlockActivityTimesheetLocks);
+router.post('/:activityId/work-sessions/:entryId/force-unlock-timesheet',
+  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true,
+    allowSectionTokenFallback: true
+  }),
+  ctrl.forceUnlockWorkSessionTimesheet);
 router.delete('/:activityId/work-sessions/:entryId',
   requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.DELETE),
   trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),

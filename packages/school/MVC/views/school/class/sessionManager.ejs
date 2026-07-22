@@ -959,6 +959,17 @@
             ? sessionReportInstanceRows
             : [];
         const hasSessionReportsAssigned = sessionReportRowsInitial.length > 0;
+        const conductPrefillMap = (typeof conductPrefillByPersonId !== 'undefined' && conductPrefillByPersonId && typeof conductPrefillByPersonId === 'object')
+            ? conductPrefillByPersonId
+            : {};
+        const resolveConductPrefillValue = (student, valueKey) => {
+            const pid = String(student?.personId || '').trim();
+            const prefill = pid && conductPrefillMap[pid] ? conductPrefillMap[pid] : null;
+            if (prefill && Object.prototype.hasOwnProperty.call(prefill, valueKey)) {
+                return sessionRatingValue(prefill[valueKey]);
+            }
+            return sessionRatingValue(student?.[valueKey]);
+        };
         const conductDimensions = [
             { key: 'classEffort', className: 'conduct-class-effort', label: 'Class Effort', valueKey: 'classEffortPercent', peClass: '' },
             { key: 'classParticipation', className: 'conduct-class-participation', label: 'Class Participation', valueKey: 'classParticipationPercent', peClass: '' },
@@ -1273,6 +1284,9 @@
                 <button type="button" class="session-manager-nav-item active" data-session-panel="attendance" role="tab" aria-selected="true">
                     <i class="bi bi-people-fill fs-5"></i><span class="session-manager-nav-label">Attendance</span>
                 </button>
+                <button type="button" class="session-manager-nav-item" data-session-panel="conduct" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
+                    <i class="bi bi-emoji-smile fs-5"></i><span class="session-manager-nav-label">Class Conduct</span>
+                </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="session" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-journal-text fs-5"></i><span class="session-manager-nav-label">Session &amp; notes</span>
                 </button>
@@ -1301,7 +1315,7 @@
                     <i class="bi bi-calendar-plus fs-1 text-warning d-block mb-3"></i>
                     <h5 class="fw-bold text-dark mb-2">Instructional work is paused for this original session</h5>
                     <p class="text-muted mb-3">
-                        Attendance, gradebook, content, assignments, and student cases belong on the make-up session, not this original session.
+                        Attendance, class conduct, gradebook, content, assignments, and student cases belong on the make-up session, not this original session.
                     </p>
                     <% if (canCreateMakeupSession) { %>
                         <button type="button" class="btn btn-warning fw-bold" id="btnCreateMakeupSessionInline"><i class="bi bi-calendar-plus me-1"></i>Create make-up session</button>
@@ -1449,6 +1463,75 @@
                 </div>
             </div>
 
+            <div class="session-panel" id="session-panel-conduct" role="tabpanel">
+                <div class="card border-0 shadow-sm mb-3" id="sessionOptionalConductStep">
+                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+                        <div>
+                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-emoji-smile me-2"></i>Class Conduct</h5>
+                            <div class="conduct-rating-help mt-1">Optionally rate selected students for this session. These ratings are used later in reports. Changes are saved with <strong>Save session</strong>.</div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <% conductPickerLevels.forEach((level) => { %>
+                                    <span class="conduct-legend-chip" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>">
+                                        <strong><%= level.displayCode || level.code %></strong>
+                                        <span class="text-muted"><%= level.label %></span>
+                                    </span>
+                                <% }) %>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                            <% if (canManageConductRatingScaleFlag) { %>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnOpenOptionalConductScaleSettings"><i class="bi bi-sliders me-1"></i>Scale settings</button>
+                            <% } %>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <% if (session.roster.length === 0) { %>
+                            <div class="text-muted small">No active students enrolled.</div>
+                        <% } else { %>
+                            <div class="row g-2 align-items-end mb-3">
+                                <div class="col-md-8">
+                                    <label class="form-label fw-semibold mb-1" for="optionalConductStudentSelect">Student</label>
+                                    <select id="optionalConductStudentSelect" class="form-select" <%- disabledAttr %>>
+                                        <option value="">Select a student…</option>
+                                        <% session.roster.forEach((student) => { %>
+                                            <option value="<%= student.personId %>" data-student-name="<%= student.name %>"><%= student.name %></option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <% if (!isReadOnly) { %>
+                                        <button type="button" class="btn btn-outline-primary w-100" id="btnAddOptionalConductStudents"><i class="bi bi-plus-lg me-1"></i>Add to table</button>
+                                    <% } %>
+                                </div>
+                            </div>
+                            <div class="table-responsive" style="max-height: min(50vh, 520px); overflow-y: auto;">
+                                <table class="table table-hover align-middle mb-0" id="optionalConductTable">
+                                    <thead class="table-light position-sticky top-0" style="z-index: 1;">
+                                        <tr>
+                                            <th class="ps-3">Student Name</th>
+                                            <% conductDimensions.forEach((dim) => { %>
+                                                <th class="text-center <%= dim.peClass %>"><div><%= dim.label %></div></th>
+                                            <% }) %>
+                                            <% if (!isReadOnly) { %>
+                                                <th class="text-end pe-3" style="width: 4.5rem;"></th>
+                                            <% } %>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="optionalConductTableBody">
+                                        <tr id="optionalConductEmptyRow"><td colspan="<%= isReadOnly ? 5 : 6 %>" class="text-center py-4 text-muted">Add one or more students to rate class conduct.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <% if (!isReadOnly) { %>
+                                <div class="d-flex justify-content-end mt-3">
+                                    <button type="button" class="btn btn-outline-primary" id="btnOpenOptionalConductBulkModal" disabled><i class="bi bi-lightning-charge me-1"></i>Quick rate</button>
+                                </div>
+                            <% } %>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
             <div class="session-panel" id="session-panel-session" role="tabpanel">
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white border-bottom py-3">
@@ -1571,7 +1654,7 @@
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
                         <div>
                             <h5 class="m-0 fw-bold text-primary"><i class="bi bi-1-circle me-2"></i>Step 1 — Class Conduct</h5>
-                            <div class="conduct-rating-help mt-1">Complete class conduct for this session before filling reports. Use <strong>S</strong>, <strong>Sat</strong>, <strong>NI</strong>, <strong>U</strong>, or <strong>N/A</strong>.</div>
+                            <div class="conduct-rating-help mt-1">Complete class conduct for this session before filling reports. Early Class Conduct ratings are prefilled when available; other students default to <strong>N/A</strong>. Use <strong>S</strong>, <strong>Sat</strong>, <strong>NI</strong>, <strong>U</strong>, or <strong>N/A</strong>.</div>
                             <div class="d-flex flex-wrap gap-2 mt-2">
                                 <% conductPickerLevels.forEach((level) => { %>
                                     <span class="conduct-legend-chip" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>">
@@ -1622,7 +1705,7 @@
                                                                     <button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="<%= level.code %>" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>"><%= level.displayCode || level.code %></button>
                                                                 <% }) %>
                                                             </div>
-                                                            <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= sessionRatingValue(student[dim.valueKey]) %>" <%- disabledAttr %>>
+                                                            <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= resolveConductPrefillValue(student, dim.valueKey) %>" <%- disabledAttr %>>
                                                         </div>
                                                     </td>
                                                 <% }) %>
@@ -2481,6 +2564,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;
     let sessionConductReadyForReports = <%- jsonForScript(Boolean(conductReadyForReports)) %>;
     const sessionHasReportsForConduct = <%- jsonForScript(Boolean(hasSessionReportsAssigned)) %>;
+    const optionalConductRosterSeed = <%- jsonForScript((session.roster || []).map((student) => ({
+        personId: String(student.personId || ''),
+        name: String(student.name || ''),
+        classEffortPercent: student.classEffortPercent == null ? null : student.classEffortPercent,
+        classParticipationPercent: student.classParticipationPercent == null ? null : student.classParticipationPercent,
+        respectsTeachersPercent: student.respectsTeachersPercent == null ? null : student.respectsTeachersPercent,
+        respectsStudentsPercent: student.respectsStudentsPercent == null ? null : student.respectsStudentsPercent,
+        conductSavedAt: student.conductSavedAt || null
+    }))) %>;
 
     function conductEscapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (ch) => ({
@@ -2506,10 +2598,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return String(level.displayCode || level.code || '').trim();
     }
 
-    function normalizeConductPercent(value, fallback = 100) {
+    function normalizeConductPercent(value, fallback = null) {
         if (value === null || value === undefined || value === '') {
             if (fallback === null || fallback === undefined) return null;
-            return normalizeConductPercent(fallback, 100);
+            return normalizeConductPercent(fallback, null);
         }
         const token = String(value).trim().toLowerCase();
         if (token === 'n/a' || token === 'na') return null;
@@ -2646,8 +2738,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return Promise.resolve();
     }
 
-    function collectConductRosterPayload() {
-        return Array.from(document.querySelectorAll('#conductTable .conduct-row')).map((row) => {
+    function collectConductRosterPayload(rootSelector = '#conductTable') {
+        return Array.from(document.querySelectorAll(`${rootSelector} .conduct-row`)).map((row) => {
             const personId = String(row.dataset.personid || '').trim();
             const payload = { personId };
             (conductDimensionMeta || []).forEach((dim) => {
@@ -2659,28 +2751,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }).filter((row) => row.personId);
     }
 
+    async function postSessionConductRoster({ roster, ready, loadingMessage }) {
+        const body = new URLSearchParams();
+        body.set('roster', JSON.stringify(roster));
+        body.set('ready', ready ? 'true' : 'false');
+        body.set('actionStateId', actionStateId);
+        const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/conduct`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-AJAX-Request': 'true',
+                'Accept': 'application/json'
+            },
+            body: body.toString()
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok || result.status !== 'success') {
+            throw new Error(result.message || loadingMessage || 'Failed to save class conduct.');
+        }
+        return result;
+    }
+
     async function saveSessionConductForReports() {
         if (sessionConductReadOnly) return;
         const btn = document.getElementById('btnSaveSessionConduct');
         if (btn) btn.disabled = true;
         if (typeof window.showLoading === 'function') window.showLoading('Saving class conduct...');
         try {
-            const body = new URLSearchParams();
-            body.set('roster', JSON.stringify(collectConductRosterPayload()));
-            body.set('actionStateId', actionStateId);
-            const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/conduct`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-AJAX-Request': 'true',
-                    'Accept': 'application/json'
-                },
-                body: body.toString()
+            const result = await postSessionConductRoster({
+                roster: collectConductRosterPayload('#conductTable'),
+                ready: true,
+                loadingMessage: 'Failed to save class conduct.'
             });
-            const result = await res.json().catch(() => ({}));
-            if (!res.ok || result.status !== 'success') {
-                throw new Error(result.message || 'Failed to save class conduct.');
-            }
             setConductReadyUi(true);
             if (typeof showMessageModal === 'function') {
                 await showMessageModal({
@@ -2707,8 +2809,133 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    const optionalConductTablePersonIds = new Set();
+    const optionalConductEmptyColspan = sessionConductReadOnly ? 5 : 6;
+
+    function studentHasSavedOptionalConduct(student) {
+        if (!student) return false;
+        if (student.conductSavedAt) return true;
+        return (conductDimensionMeta || []).some((dim) => {
+            const value = normalizeConductPercent(student?.[dim.valueKey], null);
+            return value !== null;
+        });
+    }
+
+    function buildOptionalConductRowHtml(student) {
+        const personId = String(student?.personId || '').trim();
+        const name = String(student?.name || personId);
+        const cells = (conductDimensionMeta || []).map((dim) => {
+            const percent = normalizeConductPercent(student?.[dim.valueKey], null);
+            const valueAttr = percent === null ? '' : String(percent);
+            return `<td class="text-center ${conductEscapeHtml(dim.peClass || '')}">
+                <div class="conduct-rating-cell" data-dimension="${conductEscapeHtml(dim.key)}">
+                    <div class="conduct-emoji-picker" role="group" aria-label="${conductEscapeHtml(dim.label)} rating">
+                        ${getConductPickerLevels().map((level) => {
+                            const title = level.code === 'NA'
+                                ? conductEscapeHtml(level.label)
+                                : `${conductEscapeHtml(level.label)} (${level.minPercent}%–${level.maxPercent}%)`;
+                            return `<button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="${conductEscapeHtml(level.code)}" title="${title}">${conductEscapeHtml(conductDisplayCode(level))}</button>`;
+                        }).join('')}
+                    </div>
+                    <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input ${conductEscapeHtml(dim.className || '')}" min="0" max="100" step="0.5" value="${conductEscapeHtml(valueAttr)}"${sessionConductReadOnly ? ' disabled' : ''}>
+                </div>
+            </td>`;
+        }).join('');
+        const removeCell = sessionConductReadOnly
+            ? ''
+            : `<td class="text-end pe-3"><button type="button" class="btn btn-sm btn-outline-secondary btn-remove-optional-conduct" data-personid="${conductEscapeHtml(personId)}" title="Remove from table"><i class="bi bi-x-lg"></i></button></td>`;
+        return `<tr class="conduct-row" data-personid="${conductEscapeHtml(personId)}" data-student-name="${conductEscapeHtml(name)}">
+            <td class="ps-3 fw-bold align-middle">${conductEscapeHtml(name)}</td>
+            ${cells}
+            ${removeCell}
+        </tr>`;
+    }
+
+    function getOptionalConductStudentsInTable() {
+        return Array.from(optionalConductTablePersonIds).map((personId) => {
+            const seed = optionalConductRosterSeed.find((row) => String(row.personId) === String(personId));
+            return seed || { personId, name: personId };
+        }).filter((row) => row.personId);
+    }
+
+    function updateOptionalConductActionButtons(hasRows) {
+        const bulkBtn = document.getElementById('btnOpenOptionalConductBulkModal');
+        if (bulkBtn) bulkBtn.disabled = sessionConductReadOnly || !hasRows;
+    }
+
+    function syncOptionalConductPickerOptions() {
+        const select = document.getElementById('optionalConductStudentSelect');
+        if (!select) return;
+        Array.from(select.options).forEach((option) => {
+            const personId = String(option.value || '').trim();
+            if (!personId) return;
+            const alreadyInTable = optionalConductTablePersonIds.has(personId);
+            option.disabled = alreadyInTable;
+            if (alreadyInTable && option.selected) select.value = '';
+        });
+    }
+
+    function renderOptionalConductTable() {
+        const body = document.getElementById('optionalConductTableBody');
+        if (!body) return;
+        const selected = getOptionalConductStudentsInTable();
+        updateOptionalConductActionButtons(selected.length > 0);
+        syncOptionalConductPickerOptions();
+        if (!selected.length) {
+            body.innerHTML = `<tr id="optionalConductEmptyRow"><td colspan="${optionalConductEmptyColspan}" class="text-center py-4 text-muted">Add one or more students to rate class conduct.</td></tr>`;
+            return;
+        }
+        body.innerHTML = selected.map((student) => buildOptionalConductRowHtml(student)).join('');
+        initAllConductRatingCells(body);
+    }
+
+    function addSelectedOptionalConductStudents() {
+        const select = document.getElementById('optionalConductStudentSelect');
+        if (!select) return;
+        const personId = String(select.value || '').trim();
+        if (!personId) return;
+        optionalConductTablePersonIds.add(personId);
+        select.value = '';
+        renderOptionalConductTable();
+    }
+
+    function removeOptionalConductStudentFromTable(personId) {
+        const id = String(personId || '').trim();
+        if (!id) return;
+        const row = document.querySelector(`#optionalConductTable .conduct-row[data-personid="${CSS.escape(id)}"]`);
+        if (row) {
+            const seed = optionalConductRosterSeed.find((entry) => String(entry.personId) === id);
+            if (seed) {
+                (conductDimensionMeta || []).forEach((dim) => {
+                    const cell = row.querySelector(`.conduct-rating-cell[data-dimension="${dim.key}"]`);
+                    seed[dim.valueKey] = readConductPercentFromCell(cell, null);
+                });
+            }
+        }
+        optionalConductTablePersonIds.delete(id);
+        renderOptionalConductTable();
+    }
+
+    function initOptionalConductTableFromSavedStudents() {
+        optionalConductTablePersonIds.clear();
+        (optionalConductRosterSeed || []).forEach((student) => {
+            if (studentHasSavedOptionalConduct(student)) {
+                optionalConductTablePersonIds.add(String(student.personId || '').trim());
+            }
+        });
+        renderOptionalConductTable();
+    }
+
     document.getElementById('btnSaveSessionConduct')?.addEventListener('click', () => {
         saveSessionConductForReports();
+    });
+    document.getElementById('btnAddOptionalConductStudents')?.addEventListener('click', () => {
+        addSelectedOptionalConductStudents();
+    });
+    document.getElementById('optionalConductTableBody')?.addEventListener('click', (event) => {
+        const btn = event.target.closest('.btn-remove-optional-conduct');
+        if (!btn) return;
+        removeOptionalConductStudentFromTable(btn.dataset.personid);
     });
 
     document.addEventListener('click', function (event) {
@@ -2720,21 +2947,19 @@ document.addEventListener('DOMContentLoaded', () => {
         showConductRequiredModal();
     }, true);
 
-    function getConductTableCell(personId, dimensionKey) {
-        const row = document.querySelector(`.conduct-row[data-personid="${CSS.escape(String(personId || ''))}"]`);
+    function getConductTableCell(personId, dimensionKey, rootSelector = '#conductTable') {
+        const row = document.querySelector(`${rootSelector} .conduct-row[data-personid="${CSS.escape(String(personId || ''))}"]`);
         return row?.querySelector(`.conduct-rating-cell[data-dimension="${dimensionKey}"]`) || null;
     }
 
-    function syncConductModalFromTable() {
+    function syncConductModalFromTable(rootSelector = '#conductTable') {
         const body = document.getElementById('conductBulkRatingBody');
         if (!body) return;
-        const rows = Array.from(document.querySelectorAll('.conduct-row'));
+        const rows = Array.from(document.querySelectorAll(`${rootSelector} .conduct-row`));
         body.innerHTML = rows.map((row) => {
             const personId = row.getAttribute('data-personid') || '';
             const studentName = row.getAttribute('data-student-name') || personId;
             const cells = conductDimensionMeta.map((dim) => {
-                const tableCell = getConductTableCell(personId, dim.key);
-                const percent = readConductPercentFromCell(tableCell, 100);
                 return `<td class="text-center"><div class="conduct-bulk-cell" data-personid="${conductEscapeHtml(personId)}" data-dimension="${conductEscapeHtml(dim.key)}">${buildConductEmojiPickerHtml(dim.key, personId)}</div></td>`;
             }).join('');
             return `<tr data-personid="${conductEscapeHtml(personId)}"><td class="conduct-bulk-student-name ps-3 fw-semibold">${conductEscapeHtml(studentName)}</td>${cells}</tr>`;
@@ -2742,21 +2967,24 @@ document.addEventListener('DOMContentLoaded', () => {
         body.querySelectorAll('.conduct-rating-cell').forEach((cell) => {
             const personId = cell.closest('.conduct-bulk-cell')?.dataset.personid || cell.dataset.personid;
             const dimensionKey = cell.closest('.conduct-bulk-cell')?.dataset.dimension || cell.dataset.dimension;
-            const tableCell = getConductTableCell(personId, dimensionKey);
-            const percent = readConductPercentFromCell(tableCell, 100);
+            const tableCell = getConductTableCell(personId, dimensionKey, rootSelector);
+            const percent = readConductPercentFromCell(tableCell, null);
             applyConductPercent(cell, percent);
             initConductRatingCell(cell);
         });
+        body.dataset.conductSyncRoot = rootSelector;
     }
 
     function syncConductTableFromModal() {
+        const body = document.getElementById('conductBulkRatingBody');
+        const rootSelector = body?.dataset?.conductSyncRoot || '#conductTable';
         document.querySelectorAll('#conductBulkRatingBody .conduct-bulk-cell').forEach((bulkCell) => {
             const personId = bulkCell.dataset.personid;
             const dimensionKey = bulkCell.dataset.dimension;
             const modalCell = bulkCell.querySelector('.conduct-rating-cell');
-            const tableCell = getConductTableCell(personId, dimensionKey);
+            const tableCell = getConductTableCell(personId, dimensionKey, rootSelector);
             if (!modalCell || !tableCell) return;
-            applyConductPercent(tableCell, readConductPercentFromCell(modalCell, 100));
+            applyConductPercent(tableCell, readConductPercentFromCell(modalCell, null));
         });
     }
 
@@ -2807,8 +3035,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btnOpenConductBulkModal')?.addEventListener('click', () => {
         renderConductBulkLegend();
-        syncConductModalFromTable();
+        syncConductModalFromTable('#conductTable');
         conductBulkModalInstance?.show();
+    });
+    document.getElementById('btnOpenOptionalConductBulkModal')?.addEventListener('click', () => {
+        renderConductBulkLegend();
+        syncConductModalFromTable('#optionalConductTable');
+        conductBulkModalInstance?.show();
+    });
+    document.getElementById('btnOpenOptionalConductScaleSettings')?.addEventListener('click', () => {
+        refreshConductScaleUi();
+        conductScaleSettingsModalInstance?.show();
     });
     conductBulkModalEl?.addEventListener('hidden.bs.modal', () => syncConductTableFromModal());
     document.querySelectorAll(".conduct-bulk-set-all-level").forEach((button) => button.addEventListener("click", () => setAllConductCellsToLevel(button.dataset.code, document.getElementById("conductBulkRatingBody"))));
@@ -2861,6 +3098,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     initAllConductRatingCells();
+    initOptionalConductTableFromSavedStudents();
     renderConductBulkLegend();
 
     let studentCasesState = <%- jsonForScript(Array.isArray(sessionStudentCases) ? sessionStudentCases : []) %>;
@@ -5524,14 +5762,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const shouldSendInstructionalPayload = !sessionInstructionalInactive && !selectedStatusRequiresMakeup;
 
             const roster = [];
-            const conductRowsByPersonId = new Map(Array.from(document.querySelectorAll('.conduct-row')).map((row) => [row.getAttribute('data-personid'), row]));
+            const conductRowsByPersonId = new Map();
+            document.querySelectorAll('#conductTable .conduct-row, #optionalConductTable .conduct-row').forEach((row) => {
+                const personId = row.getAttribute('data-personid');
+                if (!personId || conductRowsByPersonId.has(personId)) return;
+                // Prefer Step 1 table when both exist for the same student.
+                conductRowsByPersonId.set(personId, row);
+            });
+            // Re-apply Step 1 rows so they win over optional rows for the same person.
+            document.querySelectorAll('#conductTable .conduct-row').forEach((row) => {
+                const personId = row.getAttribute('data-personid');
+                if (personId) conductRowsByPersonId.set(personId, row);
+            });
             const readConductRating = (conductRow, selector) => {
-                if (!conductRow) return 100;
+                if (!conductRow) return undefined;
                 const input = conductRow.querySelector(selector);
-                if (!input) return 100;
+                if (!input) return undefined;
                 const cell = input.closest('.conduct-rating-cell');
-                if (cell) return readConductPercentFromCell(cell, 100);
-                return normalizeConductPercent(input.value, 100);
+                if (cell) return readConductPercentFromCell(cell, null);
+                return normalizeConductPercent(input.value, null);
             };
             document.querySelectorAll('.roster-row').forEach(row => {
                 const personId = row.getAttribute('data-personid');
@@ -5541,20 +5790,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 const excuseRef = row.querySelector('.att-excuse').value || '';
                 const excuseAttachment = parseAttendanceAttachment(row.querySelector('.att-excuse-attachment')?.value);
                 const conductRow = conductRowsByPersonId.get(personId);
+                const classEffortPercent = readConductRating(conductRow, '.conduct-class-effort');
+                const classParticipationPercent = readConductRating(conductRow, '.conduct-class-participation');
+                const respectsTeachersPercent = readConductRating(conductRow, '.conduct-respects-teachers');
+                const respectsStudentsPercent = readConductRating(conductRow, '.conduct-respects-students');
 
-                roster.push({
+                const rosterRow = {
                     personId,
                     attendance,
                     lateMinutes,
                     earlyLeaveMinutes,
                     excuseRef,
                     excuseAttachment,
-                    notes: '',
-                    classEffortPercent: readConductRating(conductRow, '.conduct-class-effort'),
-                    classParticipationPercent: readConductRating(conductRow, '.conduct-class-participation'),
-                    respectsTeachersPercent: readConductRating(conductRow, '.conduct-respects-teachers'),
-                    respectsStudentsPercent: readConductRating(conductRow, '.conduct-respects-students')
-                });
+                    notes: ''
+                };
+                if (classEffortPercent !== undefined) rosterRow.classEffortPercent = classEffortPercent;
+                if (classParticipationPercent !== undefined) rosterRow.classParticipationPercent = classParticipationPercent;
+                if (respectsTeachersPercent !== undefined) rosterRow.respectsTeachersPercent = respectsTeachersPercent;
+                if (respectsStudentsPercent !== undefined) rosterRow.respectsStudentsPercent = respectsStudentsPercent;
+                roster.push(rosterRow);
             });
 
             const payload = {

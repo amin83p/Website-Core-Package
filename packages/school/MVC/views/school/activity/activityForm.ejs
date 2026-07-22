@@ -53,11 +53,28 @@
   </div>
 
   <% const activityTimesheetLocked = (row.locked === true || String(row.locked) === 'true') && String(row.lockReason || '') === 'timesheet_approved'
-    || (Array.isArray(row.entries) ? row.entries : []).some((entry) => (entry.locked === true || String(entry.locked) === 'true') && String(entry.lockReason || '') === 'timesheet_approved'); %>
+    || (Array.isArray(row.entries) ? row.entries : []).some((entry) => (entry.locked === true || String(entry.locked) === 'true') && String(entry.lockReason || '') === 'timesheet_approved'
+      || (Array.isArray(entry.assignees) ? entry.assignees : []).some((assignee) => (assignee.locked === true || String(assignee.locked) === 'true') && String(assignee.lockReason || '') === 'timesheet_approved')); %>
+  <% const canForceUnlockTimesheetLocksFlag = typeof canForceUnlockTimesheetLocks !== 'undefined' && canForceUnlockTimesheetLocks === true; %>
+  <% const orphanTimesheetLockedWorkSessionsForView = Array.isArray(typeof orphanTimesheetLockedWorkSessions !== 'undefined' ? orphanTimesheetLockedWorkSessions : null)
+    ? orphanTimesheetLockedWorkSessions
+    : []; %>
   <% if (activityTimesheetLocked) { %>
-    <div class="alert alert-warning border-warning shadow-sm mb-4">
-      <i class="bi bi-lock-fill me-2"></i>
-      <strong>Timesheet locked.</strong> One or more work sessions on this activity are locked by an approved timesheet. Reopen the timesheet before making structural changes.
+    <div class="alert alert-warning border-warning shadow-sm mb-4" id="activityTimesheetLockAlert">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+          <i class="bi bi-lock-fill me-2"></i>
+          <strong>Timesheet locked.</strong> One or more work sessions on this activity are locked by an approved timesheet. Reopen the timesheet before making structural changes.
+          <% if (canForceUnlockTimesheetLocksFlag) { %>
+            <div class="small mt-1">As a super user you can force unlock orphaned locks when the timesheet is already gone.</div>
+          <% } %>
+        </div>
+        <% if (canForceUnlockTimesheetLocksFlag && isEdit) { %>
+          <button type="button" class="btn btn-sm btn-outline-danger" id="btnForceUnlockAllActivityTimesheetLocks">
+            <i class="bi bi-unlock me-1"></i>Unlock orphan work sessions
+          </button>
+        <% } %>
+      </div>
     </div>
   <% } %>
 
@@ -924,7 +941,20 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  function isEntryTimesheetLocked(entry) {
+    if (!entry) return false;
+    if ((entry.locked === true || String(entry.locked) === 'true')
+      && (String(entry.lockReason || '') === 'timesheet_approved' || entry.lockedTimesheetId)) {
+      return true;
+    }
+    return (Array.isArray(entry.assignees) ? entry.assignees : []).some(function (assignee) {
+      return (assignee.locked === true || String(assignee.locked) === 'true')
+        && (String(assignee.lockReason || '') === 'timesheet_approved' || assignee.lockedTimesheetId);
+    });
+  }
+
   function buildEntryRowsHtml() {
+    const canForceUnlock = <%- JSON.stringify(!!canForceUnlockTimesheetLocksFlag) %>;
     return entries.map(function (entry, entryIndex) {
       const status = String(entry.status || 'posted').toLowerCase();
       const statusClass = status === 'posted' ? 'bg-success' : (status === 'cancelled' ? 'bg-secondary' : 'bg-info text-dark');
@@ -935,12 +965,19 @@ document.addEventListener('DOMContentLoaded', function () {
       const extraAssignees = assignees.length > assigneeNames.length ? ' +' + (assignees.length - assigneeNames.length) : '';
       const rowClass = selectedEntryIndex === entryIndex ? 'table-primary' : '';
       const rowActionId = 'activity-entry-' + escapeHtml(entry.entryId || entryIndex);
+      const locked = isEntryTimesheetLocked(entry);
+      const lockBadge = locked
+        ? '<div class="x-small text-warning mt-1"><i class="bi bi-lock-fill me-1"></i>Timesheet locked</div>'
+        : '';
+      const unlockBtn = (canForceUnlock && locked)
+        ? '<button type="button" class="btn btn-outline-danger btn-sm js-entry-force-unlock" data-index="' + entryIndex + '" data-entry-id="' + escapeHtml(entry.entryId || '') + '"><i class="bi bi-unlock me-2"></i>Force unlock</button>'
+        : '';
       return [
         '<tr class="' + rowClass + '" data-entry-index="' + entryIndex + '">',
         '<td><div class="fw-bold text-dark">' + escapeHtml(entry.date || '-') + '</div></td>',
         '<td><div class="small text-dark">' + escapeHtml(entry.startTime || '-') + ' - ' + escapeHtml(entry.endTime || '-') + '</div></td>',
         '<td><span class="badge bg-light text-dark border">' + escapeHtml(Number(entry.durationHours || 0).toFixed(2)) + '</span></td>',
-        '<td><div class="fw-bold text-dark">' + escapeHtml(entry.title || 'Work Session ' + (entryIndex + 1)) + '</div><div class="x-small text-muted">' + escapeHtml(entry.notes || 'No notes') + '</div></td>',
+        '<td><div class="fw-bold text-dark">' + escapeHtml(entry.title || 'Work Session ' + (entryIndex + 1)) + '</div><div class="x-small text-muted">' + escapeHtml(entry.notes || 'No notes') + '</div>' + lockBadge + '</td>',
         '<td><div class="small text-dark">' + escapeHtml(assigneeNames.join(', ') || 'No people') + escapeHtml(extraAssignees) + '</div><div class="x-small text-muted">' + assignees.length + ' assigned</div></td>',
         '<td><span class="badge ' + statusClass + ' text-capitalize">' + escapeHtml(status) + '</span></td>',
         '<td><div class="small text-muted">' + escapeHtml(entry.location || '-') + '</div></td>',
@@ -951,6 +988,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<button type="button" class="btn btn-outline-primary btn-sm js-entry-edit" data-index="' + entryIndex + '"><i class="bi bi-pencil-square me-2"></i>Edit details</button>',
         '<button type="button" class="btn btn-outline-primary btn-sm js-entry-add-person" data-index="' + entryIndex + '"><i class="bi bi-person-plus me-2"></i>Add person</button>',
         '<button type="button" class="btn btn-outline-secondary btn-sm js-entry-duplicate" data-index="' + entryIndex + '"><i class="bi bi-files me-2"></i>Duplicate</button>',
+        unlockBtn,
         '<button type="button" class="btn btn-outline-danger btn-sm js-entry-remove" data-index="' + entryIndex + '" ' + (entries.length <= 1 ? 'disabled' : '') + '><i class="bi bi-trash me-2"></i>Remove</button>',
         '</div>',
         '</div>',
@@ -1384,7 +1422,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   document.addEventListener('click', function (event) {
-    const actionButton = event.target.closest('.js-entry-edit, .js-entry-add-person, .js-entry-duplicate, .js-entry-remove');
+    const actionButton = event.target.closest('.js-entry-edit, .js-entry-add-person, .js-entry-duplicate, .js-entry-remove, .js-entry-force-unlock');
     if (!actionButton) return;
     const actionMenu = actionButton.closest('.row-actions-menu');
     if (!actionMenu || !String(actionMenu.dataset.rowActionsId || '').startsWith('activity-entry-')) return;
@@ -1411,6 +1449,12 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
+    if (actionButton.classList.contains('js-entry-force-unlock')) {
+      const entryId = String(actionButton.getAttribute('data-entry-id') || entries[entryIndex].entryId || '').trim();
+      forceUnlockActivityTimesheetLocks({ entryId: entryId });
+      return;
+    }
+
     if (actionButton.classList.contains('js-entry-remove')) {
       if (entries.length <= 1) return;
       entries.splice(entryIndex, 1);
@@ -1420,6 +1464,151 @@ document.addEventListener('DOMContentLoaded', function () {
         renderEntryModal();
       }
     }
+  });
+
+  const activityForceUnlockId = <%- JSON.stringify(isEdit ? String(row.id || '') : '') %>;
+  const activityForceUnlockActionStateId = <%- JSON.stringify(String(actionStateId || '')) %>;
+  const orphanTimesheetLockedWorkSessions = <%- JSON.stringify(orphanTimesheetLockedWorkSessionsForView) %>;
+
+  async function promptForceUnlockReason({ scopeLabel, orphanListHtml = '' } = {}) {
+    const defaultReason = 'Orphaned timesheet lock after timesheet removal';
+    const listBlock = orphanListHtml
+      ? ('<div class="mb-3"><div class="fw-semibold mb-1">Orphan work sessions</div>' + orphanListHtml + '</div>')
+      : '';
+    const message = '<p class="mb-3">Force unlock <strong>' + escapeHtml(scopeLabel) + '</strong>?</p>'
+      + '<p class="small text-muted mb-3">This bypasses timesheet protection. Use only when the locking timesheet is already removed. Live timesheet locks are not cleared by Unlock orphan work sessions.</p>'
+      + listBlock
+      + '<label class="form-label" for="activityForceUnlockReason">Reason (at least 3 characters)</label>'
+      + '<textarea class="form-control" id="activityForceUnlockReason" rows="3" maxlength="500">'
+      + escapeHtml(defaultReason)
+      + '</textarea>';
+    const decision = await safeShowMessage({
+      title: 'Force unlock timesheet locks',
+      icon: 'warning',
+      size: 'lg',
+      message: message,
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Unlock', class: 'btn-danger' }
+      ]
+    });
+    if (decision !== 'Unlock') return null;
+    const trimmed = String(document.getElementById('activityForceUnlockReason')?.value || '').trim();
+    if (trimmed.length < 3) {
+      await safeShowMessage({
+        title: 'Reason required',
+        icon: 'warning',
+        message: 'Enter a reason with at least 3 characters.',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return null;
+    }
+    return trimmed;
+  }
+
+  function buildOrphanListHtml(orphans) {
+    const rows = Array.isArray(orphans) ? orphans : [];
+    if (!rows.length) {
+      return '<p class="mb-0 text-muted">No orphan timesheet locks found on this activity.</p>';
+    }
+    return '<ul class="mb-0 ps-3">' + rows.map(function (row) {
+      const label = escapeHtml(row.label || row.entryId || 'work session');
+      const tsId = String(row.lockedTimesheetId || '').trim();
+      const tsLabel = tsId
+        ? (' <span class="text-muted font-monospace small">(timesheet ' + escapeHtml(tsId) + ' missing)</span>')
+        : ' <span class="text-muted small">(no timesheet id)</span>';
+      return '<li>' + label + tsLabel + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  async function forceUnlockActivityTimesheetLocks({ entryId = '', unlockAll = false } = {}) {
+    if (!activityForceUnlockId) {
+      await safeShowMessage({
+        title: 'Save activity first',
+        icon: 'warning',
+        message: 'Force unlock is only available for saved activities.',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+
+    if (unlockAll) {
+      const orphans = Array.isArray(orphanTimesheetLockedWorkSessions) ? orphanTimesheetLockedWorkSessions : [];
+      if (!orphans.length) {
+        await safeShowMessage({
+          title: 'No orphan locks',
+          icon: 'info',
+          message: 'There are no orphan timesheet locks on this activity. Work sessions still linked to an existing timesheet stay locked — reopen that timesheet instead.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        return;
+      }
+      const note = await promptForceUnlockReason({
+        scopeLabel: 'orphan work sessions on this activity',
+        orphanListHtml: buildOrphanListHtml(orphans)
+      });
+      if (!note) return;
+      await postForceUnlock({
+        url: '/school/activities/' + encodeURIComponent(activityForceUnlockId) + '/force-unlock-timesheet',
+        note: note
+      });
+      return;
+    }
+
+    const note = await promptForceUnlockReason({
+      scopeLabel: 'work session ' + (entryId || '')
+    });
+    if (!note) return;
+    await postForceUnlock({
+      url: '/school/activities/' + encodeURIComponent(activityForceUnlockId)
+        + '/work-sessions/' + encodeURIComponent(entryId) + '/force-unlock-timesheet',
+      note: note
+    });
+  }
+
+  async function postForceUnlock({ url, note }) {
+    try {
+      if (typeof window.showLoading === 'function') window.showLoading('Unlocking...');
+      const body = new URLSearchParams();
+      body.set('note', note);
+      body.set('actionStateId', activityForceUnlockActionStateId);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true',
+          Accept: 'application/json'
+        },
+        body: body.toString(),
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unlock failed.' };
+      });
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Unable to force unlock.');
+      }
+      await safeShowMessage({
+        title: 'Unlocked',
+        icon: 'success',
+        message: payload.message || 'Timesheet locks cleared.',
+        buttons: [{ text: 'OK', class: 'btn-success' }]
+      });
+      window.location.reload();
+    } catch (error) {
+      await safeShowMessage({
+        title: 'Unlock failed',
+        icon: 'error',
+        message: error?.message || 'Unable to force unlock.',
+        buttons: [{ text: 'OK', class: 'btn-danger' }]
+      });
+    } finally {
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+    }
+  }
+
+  document.getElementById('btnForceUnlockAllActivityTimesheetLocks')?.addEventListener('click', function () {
+    forceUnlockActivityTimesheetLocks({ unlockAll: true });
   });
 
   entryModalEl?.addEventListener('hidden.bs.modal', function () {
