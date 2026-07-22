@@ -2921,6 +2921,7 @@ async function saveClassEnrollmentDraft(req, res) {
       funderId: req.body?.funderId !== undefined ? req.body?.funderId : period?.funderId,
       funderType: req.body?.funderType !== undefined ? req.body?.funderType : period?.funderType
     });
+    rollingEnrollmentFunderService.assertEnrollmentFunderChangeAllowed(period, funderSelection);
     if (!rollingEnrollmentFunderService.isSelfFund(funderSelection.funderId)) {
       await loadFunderRecordOrThrow(req.user, classData.orgId, funderSelection.funderId);
     }
@@ -3336,6 +3337,7 @@ async function approveClassEnrollmentDraft(req, res) {
       funderId: req.body?.funderId !== undefined ? req.body?.funderId : period?.funderId,
       funderType: req.body?.funderType !== undefined ? req.body?.funderType : period?.funderType
     });
+    rollingEnrollmentFunderService.assertEnrollmentFunderChangeAllowed(period, funderSelection);
     if (!rollingEnrollmentFunderService.isSelfFund(funderSelection.funderId)) {
       await loadFunderRecordOrThrow(req.user, classData.orgId, funderSelection.funderId);
     }
@@ -3538,6 +3540,7 @@ async function editClassEnrollmentPeriod(req, res) {
       funderId: req.body?.funderId !== undefined ? req.body?.funderId : periodRow?.funderId,
       funderType: req.body?.funderType !== undefined ? req.body?.funderType : periodRow?.funderType
     });
+    rollingEnrollmentFunderService.assertEnrollmentFunderChangeAllowed(periodRow, funderSelection);
     if (!rollingEnrollmentFunderService.isSelfFund(funderSelection.funderId)) {
       await loadFunderRecordOrThrow(req.user, classData.orgId, funderSelection.funderId);
     }

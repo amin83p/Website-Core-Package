@@ -96,6 +96,60 @@ function appendStudentDetailToDraftMemos(items = [], studentDetail = {}) {
   });
 }
 
+function collectIdsFromList(list = []) {
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(list) ? list : []).forEach((value) => {
+    const id = toPublicId(value) || String(value || '').trim();
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  });
+  return out;
+}
+
+/**
+ * Collect draft/posted finance transaction IDs attached to an enrollment period.
+ */
+function collectAttachedEnrollmentTransactionIds(period = {}) {
+  const summary = (period?.transactionSummary && typeof period.transactionSummary === 'object')
+    ? period.transactionSummary
+    : {};
+  return collectIdsFromList([
+    ...(Array.isArray(summary.postedTransactionIds) ? summary.postedTransactionIds : []),
+    ...(Array.isArray(summary.draftTransactionIds) ? summary.draftTransactionIds : []),
+    ...(Array.isArray(summary.transactionIds) ? summary.transactionIds : [])
+  ]);
+}
+
+function enrollmentHasAttachedTransactions(period = {}) {
+  return collectAttachedEnrollmentTransactionIds(period).length > 0;
+}
+
+function isSameEnrollmentFunderSelection(left = {}, right = {}) {
+  const a = normalizeEnrollmentFunderSelection(left);
+  const b = normalizeEnrollmentFunderSelection(right);
+  return a.funderId === b.funderId && a.funderType === b.funderType;
+}
+
+/**
+ * Block funder changes when the period already has draft or posted finance transactions.
+ * Same-funder re-saves are allowed.
+ */
+function assertEnrollmentFunderChangeAllowed(period = {}, nextFunderSelection = {}) {
+  const next = normalizeEnrollmentFunderSelection(nextFunderSelection);
+  const current = normalizeEnrollmentFunderSelection({
+    funderId: period?.funderId,
+    funderType: period?.funderType
+  });
+  if (isSameEnrollmentFunderSelection(current, next)) return;
+  if (!enrollmentHasAttachedTransactions(period)) return;
+  throw new Error(
+    'Funder cannot be changed because this enrollment already has financial transactions. '
+    + 'Reverse/rollback or void those transactions first, then change funder (or create a new period).'
+  );
+}
+
 module.exports = {
   SELF_FUNDER_ID,
   SELF_FUNDER_TYPE,
@@ -105,5 +159,9 @@ module.exports = {
   resolveEnrollmentFunderLabel,
   resolveEnrollmentBillingAccountId,
   buildStudentDetailMemoSuffix,
-  appendStudentDetailToDraftMemos
+  appendStudentDetailToDraftMemos,
+  collectAttachedEnrollmentTransactionIds,
+  enrollmentHasAttachedTransactions,
+  isSameEnrollmentFunderSelection,
+  assertEnrollmentFunderChangeAllowed
 };

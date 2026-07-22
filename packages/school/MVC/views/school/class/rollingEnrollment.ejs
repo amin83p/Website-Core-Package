@@ -680,7 +680,7 @@
               <option value="<%= String(funder.id || '') %>"><%= String(funder.label || funder.id || '') %></option>
               <% }); %>
             </select>
-            <div class="form-text compact-help">Self Fund posts to the student account. Other funders post to the funder account with student detail.</div>
+            <div class="form-text compact-help" id="edit_funder_help">Self Fund posts to the student account. Other funders post to the funder account with student detail.</div>
           </div>
           <div class="col-12">
             <label class="form-label">Reason Start</label>
@@ -891,6 +891,39 @@
       return;
     }
     el.value = 'self';
+  }
+
+  function collectAttachedEnrollmentTransactionIds(periodRow) {
+    const summary = (periodRow?.transactionSummary && typeof periodRow.transactionSummary === 'object')
+      ? periodRow.transactionSummary
+      : {};
+    const ids = [];
+    const seen = new Set();
+    [
+      ...(Array.isArray(summary.postedTransactionIds) ? summary.postedTransactionIds : []),
+      ...(Array.isArray(summary.draftTransactionIds) ? summary.draftTransactionIds : []),
+      ...(Array.isArray(summary.transactionIds) ? summary.transactionIds : [])
+    ].forEach((value) => {
+      const id = String(value || '').trim();
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      ids.push(id);
+    });
+    return ids;
+  }
+
+  function enrollmentHasAttachedTransactions(periodRow) {
+    return collectAttachedEnrollmentTransactionIds(periodRow).length > 0;
+  }
+
+  const EDIT_FUNDER_HELP_DEFAULT = 'Self Fund posts to the student account. Other funders post to the funder account with student detail.';
+  const EDIT_FUNDER_HELP_LOCKED = 'Funder is locked because this enrollment already has financial transactions. Reverse/rollback or void those transactions first, then change funder (or create a new period).';
+
+  function setEditFunderLocked(locked) {
+    const el = qs('edit_funder');
+    const help = qs('edit_funder_help');
+    if (el) el.disabled = !!locked;
+    if (help) help.textContent = locked ? EDIT_FUNDER_HELP_LOCKED : EDIT_FUNDER_HELP_DEFAULT;
   }
 
   function resolveFunderDisplayLabel(row) {
@@ -3616,6 +3649,7 @@
     qs('edit_endDate').value = String(row?.endDate || '').trim();
     qs('edit_status').value = String(row?.status || 'active').trim().toLowerCase() || 'active';
     setFunderSelectValue('edit_funder', row);
+    setEditFunderLocked(enrollmentHasAttachedTransactions(row));
     qs('edit_reasonStart').value = String(row?.reasonStart || '').trim();
     if (qs('edit_targetSessionCount')) qs('edit_targetSessionCount').value = row?.targetSessionCount ? String(row.targetSessionCount) : '';
     editModal.show();
@@ -3751,7 +3785,16 @@
     }
     try {
       showBusy('Saving enrollment period changes...');
-      const funder = resolveFunderSelectionFromSelect('edit_funder');
+      const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === periodId);
+      const funderLocked = enrollmentHasAttachedTransactions(row);
+      const funder = funderLocked
+        ? {
+            funderId: String(row?.funderId || 'self').trim() || 'self',
+            funderType: (!row?.funderId || String(row.funderId).trim().toLowerCase() === 'self')
+              ? 'self'
+              : (String(row?.funderType || 'funder').trim() || 'funder')
+          }
+        : resolveFunderSelectionFromSelect('edit_funder');
       const editPayload = {
         startDate,
         endDate: String(qs('edit_endDate')?.value || '').trim(),
