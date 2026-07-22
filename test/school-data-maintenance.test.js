@@ -283,18 +283,22 @@ test('classifyRowForDelete protects head school accounts', () => {
   assert.equal(allowed.canDelete, true);
 });
 
-test('academic ledger maintenance purge only allows void entries', () => {
+test('academic ledger maintenance purge allows any status', () => {
   const service = require('../packages/school/MVC/services/school/schoolDataMaintenanceService');
 
-  assert.equal(service.classifyRowForDelete('academicLedger', { status: 'void' }).canDelete, true);
-  for (const status of ['posted', 'draft', '', 'VOIDED']) {
+  for (const status of ['void', 'posted', 'draft', '', 'VOIDED']) {
     const result = service.classifyRowForDelete('academicLedger', { status });
-    assert.equal(result.canDelete, false, (status || 'blank') + ' should be protected');
-    assert.match(result.reason, /Only void academic ledger entries/);
+    assert.equal(result.canDelete, true, (status || 'blank') + ' should be deletable');
   }
 });
 
-test('academic ledger mixed maintenance delete purges only void rows', async () => {
+test('void-policy entities can be purged without void status', () => {
+  const service = require('../packages/school/MVC/services/school/schoolDataMaintenanceService');
+  const result = service.classifyRowForDelete('classes', { id: 'CLS-1', status: 'active' });
+  assert.equal(result.canDelete, true);
+});
+
+test('academic ledger mixed maintenance delete purges any status in org', async () => {
   const servicePath = require.resolve('../packages/school/MVC/services/school/schoolDataMaintenanceService');
   const originals = new Map();
   const rows = new Map([
@@ -326,9 +330,9 @@ test('academic ledger mixed maintenance delete purges only void rows', async () 
     reqUser: { activeOrgId: 'ORG-1' }
   });
 
-  assert.deepEqual(purgeCalls, ['ALD-VOID']);
-  assert.equal(result.summary.success, 1);
-  assert.equal(result.summary.skipped, 2);
+  assert.deepEqual(purgeCalls, ['ALD-VOID', 'ALD-POSTED', 'ALD-DRAFT']);
+  assert.equal(result.summary.success, 3);
+  assert.equal(result.summary.skipped, 0);
   assert.equal(result.summary.error, 1);
 
   delete require.cache[servicePath];

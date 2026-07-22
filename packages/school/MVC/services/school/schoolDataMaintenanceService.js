@@ -4,7 +4,6 @@ const withdrawalRepository = require('../../repositories/school/withdrawalReposi
 const classDeleteCascadeService = require('./classDeleteCascadeService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
-const { isVoidPolicy } = require('./schoolDeletionPolicyRegistry');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { getActiveDataBackendMode } = requireCoreModule('MVC/infrastructure/runtime/dataBackendRuntime');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -494,12 +493,6 @@ function classifyRowForDelete(entityType, row, catalogEntry = null) {
   }
   if (entry.protectHeadAccounts && isHeadSchoolAccount(row)) {
     return { canDelete: false, reason: 'Head account is protected.' };
-  }
-  if (entityType === 'academicLedger' && String(row?.status || '').trim().toLowerCase() !== 'void') {
-    return { canDelete: false, reason: 'Only void academic ledger entries can be permanently deleted. Void this entry first.' };
-  }
-  if (isVoidPolicy(entityType) && String(row?.status || '').trim().toLowerCase() !== 'void') {
-    return { canDelete: false, reason: 'Only void records can be permanently purged. Void this record from its School screen first.' };
   }
   return { canDelete: true, reason: '' };
 }
