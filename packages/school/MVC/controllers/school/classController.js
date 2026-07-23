@@ -73,6 +73,7 @@ const attendanceMatrixMetricsService = require('../../services/school/attendance
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
+const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
 
 function isSafeChildPath(basePath, targetPath) {
     const normalizedBase = path.resolve(basePath);
@@ -3301,11 +3302,20 @@ async function manageSession1(req, res) {
             };
         });
 
-        const orgPolicyLayerSm1 = await attendanceMatrixPolicyModel.getPolicyForOrg(
+        const orgPolicyItemsSm1 = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
+        );
+        const sessionMinutesSm1 = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+            session,
+            attendanceMatrixPolicyModel.DEFAULT_POLICY.scheduledMinutes
+        );
+        const orgPolicyLayerSm1 = attendanceMatrixMetricsService.pickOrgPolicyLayerForMinutes(
+            { items: orgPolicyItemsSm1 },
+            sessionMinutesSm1
         );
         const attendanceMatrixPolicyResolved = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSm1);
         const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
+        const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
 
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
@@ -3315,7 +3325,9 @@ async function manageSession1(req, res) {
             prevSessionId,    // Passed to EJS
             nextSessionId,    // Passed to EJS
             attendanceMatrixPolicyResolved,
+            attendanceMatrixPolicyItems: orgPolicyItemsSm1,
             enabledAttendanceStatuses,
+            canManageAttendanceMatrixPolicy,
             user: req.user
         });
     } catch (error) {
@@ -3644,11 +3656,20 @@ async function manageSession(req, res) {
         );
 
 
-        const orgPolicyLayerMs = await attendanceMatrixPolicyModel.getPolicyForOrg(
+        const orgPolicyItemsMs = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
+        );
+        const sessionMinutesMs = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+            session,
+            attendanceMatrixPolicyModel.DEFAULT_POLICY.scheduledMinutes
+        );
+        const orgPolicyLayerMs = attendanceMatrixMetricsService.pickOrgPolicyLayerForMinutes(
+            { items: orgPolicyItemsMs },
+            sessionMinutesMs
         );
         const attendanceMatrixPolicyResolved = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerMs);
         const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
+        const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
         const conductRatingScaleResolved = await conductRatingScalePolicyModel.getPolicyForOrg(
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
         );
@@ -3692,7 +3713,9 @@ async function manageSession(req, res) {
             canManageCoTeachers,
             canToggleCoTeacherEdit,
             attendanceMatrixPolicyResolved,
+            attendanceMatrixPolicyItems: orgPolicyItemsMs,
             enabledAttendanceStatuses,
+            canManageAttendanceMatrixPolicy,
             conductRatingScaleResolved,
             sessionStudentCases,
             studentCaseDetailPresets: getPresetConfig(),
@@ -4246,8 +4269,16 @@ async function saveSession(req, res) {
                 reqUser: req.user
             });
             const existingRoster = originalSession.roster || [];
-            const orgPolicyLayerSave = await attendanceMatrixPolicyModel.getPolicyForOrg(
+            const orgPolicyItemsSave = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(
                 classData?.orgId || getActiveOrgIdOrThrow(req.user)
+            );
+            const sessionMinutesSave = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+                sessionForAttendanceWindow,
+                attendanceMatrixPolicyModel.DEFAULT_POLICY.scheduledMinutes
+            );
+            const orgPolicyLayerSave = attendanceMatrixMetricsService.pickOrgPolicyLayerForMinutes(
+                { items: orgPolicyItemsSave },
+                sessionMinutesSave
             );
             const matrixPolicySave = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSave);
             const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);

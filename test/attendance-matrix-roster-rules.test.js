@@ -62,3 +62,20 @@ test('acf with late minutes stays acf (not converted to late)', () => {
   assert.equal(out.attendance, 'acf');
   assert.equal(out.lateMinutes, 5);
 });
+
+test('empty unmarked attendance stays empty when under thresholds', () => {
+  const out = applyAttendanceMatrixRosterRules(
+    { attendance: '', lateMinutes: 5, earlyLeaveMinutes: 0 },
+    policy
+  );
+  assert.equal(out.attendance, '');
+  assert.equal(out.lateMinutes, 5);
+});
+
+test('empty unmarked attendance becomes absent at late threshold', () => {
+  const out = applyAttendanceMatrixRosterRules(
+    { attendance: '', lateMinutes: 30, earlyLeaveMinutes: 0 },
+    policy
+  );
+  assert.equal(out.attendance, 'absent');
+});

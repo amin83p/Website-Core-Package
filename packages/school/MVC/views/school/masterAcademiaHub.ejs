@@ -955,9 +955,11 @@
       <button type="button" class="hub-section-segment" data-hub-workspace-section="schedule">
         <span><i class="bi bi-calendar-check-fill me-1"></i> Schedule</span>
       </button>
+      <% if (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) { %>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="attendance">
         <span><i class="bi bi-clipboard-check-fill me-1"></i> Attendance</span>
       </button>
+      <% } %>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="timesheet-periods">
         <span><i class="bi bi-calendar-week-fill me-1"></i> Timesheet Periods</span>
       </button>
@@ -4988,7 +4990,8 @@
     if (value === 'excused') return '<i class="bi bi-envelope-paper-fill attendance-status-excused" title="Excused"></i>';
     if (value === 'absent') return '<i class="bi bi-x-circle-fill attendance-status-absent" title="Absent"></i>';
     if (value === 'acf') return '<i class="bi bi-camera-video-off-fill attendance-status-acf" title="Absent Camera Off"></i>';
-    return '<i class="bi bi-dash attendance-status-na" title="No record"></i>';
+    if (value === 'not_applicable') return '<i class="bi bi-dash-circle-fill attendance-status-na" title="N/A"></i>';
+    return '<i class="bi bi-dash text-muted" title="Not marked yet"></i>';
   }
 
   function buildHubAttendanceLegendHtml(enabledStatuses) {

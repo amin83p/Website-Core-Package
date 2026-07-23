@@ -1003,7 +1003,9 @@
             <div class="collapse" id="sessionManagerClassNavCollapse">
                 <div class="session-manager-class-nav-links">
                     <a href="<%= finalGradesNavHref %>" class="session-manager-class-nav-link session-manager-class-nav-link--outcomes session-manager-nav-away" id="linkFinalGradesNav" data-confirm-title="Leave session manager?" data-confirm-message="Open <%= finalGradesNavLabel %>? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-award"></i><%= finalGradesNavLabel %></a>
+                    <% if (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) { %>
                     <a href="<%= attendanceMatrixHref %>" class="session-manager-class-nav-link session-manager-nav-away" id="linkAttendanceMatrix" data-matrix-href="<%= attendanceMatrixHref %>" data-confirm-title="Open attendance matrix?" data-confirm-message="Open the attendance matrix? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-grid-3x3"></i>Attendance matrix</a>
+                    <% } %>
                     <a href="<%= gradesMatrixHref %>" class="session-manager-class-nav-link session-manager-nav-away" id="linkGradesMatrix" data-matrix-href="<%= gradesMatrixHref %>" data-confirm-title="Open grades matrix?" data-confirm-message="Open the grades matrix? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-table"></i>Grades matrix</a>
                 </div>
             </div>
@@ -1380,6 +1382,7 @@
                                     <% } %>
                                     <button type="button" class="btn btn-outline-danger" id="btnAllAbsent">All Absent</button>
                                     <button type="button" class="btn btn-outline-secondary" id="btnAllNotApplicable">All N/A</button>
+                                    <button type="button" class="btn btn-outline-dark" id="btnAllResetAttendance" title="Clear attendance back to unmarked">Reset</button>
                                 </div>
                             <% } %>
                             <span class="badge bg-light text-dark border"><%= session.roster.length %> Students</span>
@@ -2556,6 +2559,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.__attendanceMatrixPolicy = <%- JSON.stringify(typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved ? attendanceMatrixPolicyResolved : { disqualifyLateMinutes: 30, disqualifyEarlyLeaveMinutes: 30, disqualifyCombinedMissedMinutes: null, scheduledMinutes: 180 }) %>;
+    window.__attendanceMatrixPolicyItems = <%- JSON.stringify(typeof attendanceMatrixPolicyItems !== 'undefined' && Array.isArray(attendanceMatrixPolicyItems) ? attendanceMatrixPolicyItems : []) %>;
+    window.CAN_MANAGE_ATTENDANCE_MATRIX_POLICY = <%= (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) ? 'true' : 'false' %>;
     window.__conductRatingScale = <%- JSON.stringify(typeof conductRatingScaleResolved !== 'undefined' && conductRatingScaleResolved ? conductRatingScaleResolved : { levels: conductScaleDefaultLevels }) %>;
     const sessionConductReadOnly = <%= JSON.stringify(!!isReadOnly) %>;
     const canManageConductRatingScaleClient = <%- jsonForScript(Boolean(canManageConductRatingScaleFlag)) %>;
@@ -3871,7 +3876,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pol = window.__attendanceMatrixPolicy || {};
         const late = parseNonNegAttendanceMins(row.querySelector('.att-late')?.value);
         const early = parseNonNegAttendanceMins(row.querySelector('.att-leave')?.value);
-        let att = row.querySelector('.att-radio:checked')?.value || 'absent';
+        let att = row.querySelector('.att-radio:checked')?.value || '';
         if (att === 'not_applicable') {
             const lateInput = row.querySelector('.att-late');
             const leaveInput = row.querySelector('.att-leave');
@@ -3893,6 +3898,10 @@ document.addEventListener('DOMContentLoaded', () => {
             setAttendanceRadio(row, 'absent');
             return;
         }
+        // Unmarked (white): do not coerce to Absent or Late from empty selection alone.
+        if (!att) {
+            return;
+        }
         if ((late > 0 || early > 0) && (att === 'present' || att === 'excused')) {
             setAttendanceRadio(row, 'late');
         }
@@ -3901,6 +3910,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function refreshAttendanceMatrixHint() {
         const el = document.getElementById('attendanceMatrixThresholdHint');
         if (!el) return;
+        if (window.CAN_MANAGE_ATTENDANCE_MATRIX_POLICY !== true) {
+            el.textContent = '';
+            el.classList.add('d-none');
+            return;
+        }
+        el.classList.remove('d-none');
         const pol = window.__attendanceMatrixPolicy || {};
         const lateCut = pol.disqualifyLateMinutes;
         const earlyCut = pol.disqualifyEarlyLeaveMinutes;
@@ -4637,6 +4652,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function resetBulkAttendance() {
+        document.querySelectorAll('.roster-row').forEach((row) => {
+            row.querySelectorAll('.att-radio').forEach((radio) => {
+                if (!radio.disabled) radio.checked = false;
+            });
+            const lateInput = row.querySelector('.att-late');
+            const leaveInput = row.querySelector('.att-leave');
+            if (lateInput && !lateInput.disabled) lateInput.value = '';
+            if (leaveInput && !leaveInput.disabled) leaveInput.value = '';
+            updateLateMissingMinuteState(row);
+        });
+    }
+
     /* --- Session content stream (manual content + linked exams) --- */
     const contentReadOnly = <%= JSON.stringify(!!isReadOnly || !!isMakeupRequiredInactive) %>;
     let manualSessionContentState = <%- jsonForScript(sessionContentItems || []) %>;
@@ -5180,8 +5208,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function gbAttendanceStatus(personId) {
         const row = document.querySelector(`.roster-row[data-personid="${gbCssEscape(personId)}"]`);
-        if (!row) return 'absent';
-        return row.querySelector('.att-radio:checked')?.value || 'absent';
+        if (!row) return '';
+        return row.querySelector('.att-radio:checked')?.value || '';
     }
 
     function gbIsPersonAbsent(personId) {
@@ -5710,6 +5738,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnAllAbsentGb) btnAllAbsentGb.addEventListener('click', () => { applyBulkAttendance('absent'); gbOnAttendanceChanged(); });
     const btnAllNotApplicableGb = document.getElementById('btnAllNotApplicable');
     if (btnAllNotApplicableGb) btnAllNotApplicableGb.addEventListener('click', () => { applyBulkAttendance('not_applicable'); gbOnAttendanceChanged(); });
+    const btnAllResetAttendanceGb = document.getElementById('btnAllResetAttendance');
+    if (btnAllResetAttendanceGb) btnAllResetAttendanceGb.addEventListener('click', () => { resetBulkAttendance(); gbOnAttendanceChanged(); });
 
     const btnSaveGradebooks = document.getElementById('btnSaveGradebooks');
     if (btnSaveGradebooks) {
@@ -5784,7 +5814,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             document.querySelectorAll('.roster-row').forEach(row => {
                 const personId = row.getAttribute('data-personid');
-                const attendance = row.querySelector('.att-radio:checked')?.value || 'absent';
+                const attendance = row.querySelector('.att-radio:checked')?.value || '';
                 const lateMinutes = row.querySelector('.att-late').value || null;
                 const earlyLeaveMinutes = row.querySelector('.att-leave').value || null;
                 const excuseRef = row.querySelector('.att-excuse').value || '';

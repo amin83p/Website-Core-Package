@@ -208,6 +208,24 @@ test('rollup excludes not_applicable from denominator and reports N/A count', ()
   assert.equal(s.performancePercent, 50);
 });
 
+test('rollup excludes unmarked empty status from denominator and does not count as absent', () => {
+  const records = [
+    { status: 'present', lateMinutes: 0, earlyLeaveMinutes: 0 },
+    { status: '', lateMinutes: 0, earlyLeaveMinutes: 0 },
+    { status: 'absent', lateMinutes: 0, earlyLeaveMinutes: 0 },
+    { status: 'not_applicable', lateMinutes: 0, earlyLeaveMinutes: 0 }
+  ];
+  const s = computeStudentMatrixSummary(records, {});
+  assert.equal(s.totalEligibleSessions, 2);
+  assert.equal(s.totalNotApplicableSessions, 1);
+  assert.equal(s.totalPresentSessions, 1);
+  assert.equal(s.totalAbsentSessions, 1);
+  assert.equal(s.performancePercent, 50);
+  const emptyCredit = computeSessionCredit({ status: '' }, 50, policy180);
+  assert.equal(emptyCredit.reason, 'no_record');
+  assert.equal(emptyCredit.credit, 0);
+});
+
 test('ACF aliases normalize and yield zero credit like absent', () => {
   assert.equal(normalizeAttendanceStatusForSave('acf'), 'acf');
   assert.equal(normalizeAttendanceStatusForSave('ACF'), 'acf');
@@ -275,9 +293,28 @@ test('assertAttendanceStatusAllowedForSave always allows N/A and historical valu
   );
 });
 
+test('assertAttendanceStatusAllowedForSave allows empty unmarked status', () => {
+  assert.equal(
+    assertAttendanceStatusAllowedForSave({
+      status: '',
+      enabledStatuses: ['present', 'absent']
+    }),
+    ''
+  );
+  assert.equal(
+    assertAttendanceStatusAllowedForSave({
+      status: null,
+      enabledStatuses: ['present', 'absent'],
+      previousStatus: 'present'
+    }),
+    ''
+  );
+});
+
 test('coerceAttendanceStatusToEnabled maps disabled late to absent but keeps N/A', () => {
   const enabled = ['present', 'absent', 'not_applicable'];
   assert.equal(coerceAttendanceStatusToEnabled('late', enabled), 'absent');
   assert.equal(coerceAttendanceStatusToEnabled('not_applicable', enabled), 'not_applicable');
   assert.equal(coerceAttendanceStatusToEnabled('present', enabled), 'present');
+  assert.equal(coerceAttendanceStatusToEnabled('', enabled), '');
 });

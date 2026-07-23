@@ -162,13 +162,15 @@ function buildLegendEntries(enabledAttendanceStatuses = []) {
 }
 
 function statusToExportCode(status) {
-  const normalized = normalizeAttendanceStatusForSave(status, ATTENDANCE_STATUS.ABSENT);
-  return STATUS_EXPORT_META[normalized]?.code || STATUS_EXPORT_META[ATTENDANCE_STATUS.ABSENT].code;
+  const normalized = normalizeAttendanceStatusForSave(status, '');
+  if (!normalized) return '';
+  return STATUS_EXPORT_META[normalized]?.code || '';
 }
 
 function statusFillArgb(status, { forLegend = false } = {}) {
-  const normalized = normalizeAttendanceStatusForSave(status, ATTENDANCE_STATUS.ABSENT);
-  return STATUS_FILL_ARGB[normalized] || STATUS_FILL_ARGB[ATTENDANCE_STATUS.ABSENT];
+  const normalized = normalizeAttendanceStatusForSave(status, '');
+  if (!normalized) return '';
+  return STATUS_FILL_ARGB[normalized] || '';
 }
 
 function applySolidFill(cell, argb) {
@@ -200,7 +202,7 @@ function applyLegendCellStyle(cell, status) {
 }
 
 function applyStatusCellStyle(cell, status) {
-  const normalized = normalizeAttendanceStatusForSave(status, ATTENDANCE_STATUS.ABSENT);
+  const normalized = normalizeAttendanceStatusForSave(status, '');
   const fillArgb = statusFillArgb(normalized, { forLegend: false });
   if (fillArgb) applySolidFill(cell, fillArgb);
   cell.font = {
@@ -408,7 +410,8 @@ function countStatusesFromRecords(records = []) {
     [ATTENDANCE_STATUS.NOT_APPLICABLE]: 0
   };
   (Array.isArray(records) ? records : []).forEach((record) => {
-    const status = normalizeAttendanceStatusForSave(record?.status, ATTENDANCE_STATUS.ABSENT);
+    const status = normalizeAttendanceStatusForSave(record?.status, '');
+    if (!status) return;
     if (Object.prototype.hasOwnProperty.call(counts, status)) {
       counts[status] += 1;
     }

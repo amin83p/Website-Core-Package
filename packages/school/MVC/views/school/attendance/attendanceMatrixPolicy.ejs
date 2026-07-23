@@ -3,7 +3,8 @@
     <div>
       <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-sliders me-2"></i> Attendance matrix thresholds</h1>
       <p class="text-muted small mb-0 mt-1">
-        These values apply to the <strong>time-based efficiency %</strong> on the Attendance Matrix for your active organization
+        Create one threshold set per session duration. The matrix uses an <strong>exact match</strong> on session minutes;
+        unmatched sessions use the <strong>default</strong> item (or built-in defaults).
         <span class="badge bg-light text-secondary border ms-1">Org: <%= policyOrgKey %></span>
       </p>
     </div>
@@ -24,67 +25,192 @@
     <div class="alert alert-danger border-0 shadow-sm"><%= errorMessage %></div>
   <% } %>
 
-  <div class="card border-0 shadow-sm">
-    <div class="card-body">
-      <form method="post" action="/school/attendances/settings" class="row g-4">
-        <% if (typeof actionStateId !== 'undefined' && actionStateId) { %>
-          <input type="hidden" name="actionStateId" value="<%= actionStateId %>">
-        <% } %>
+  <form method="post" action="/school/attendances/settings" id="attendanceMatrixPolicyForm">
+    <% if (typeof actionStateId !== 'undefined' && actionStateId) { %>
+      <input type="hidden" name="actionStateId" value="<%= actionStateId %>">
+    <% } %>
+    <input type="hidden" name="items" id="policyItemsJson" value="">
 
-        <div class="col-12">
-          <label class="form-label fw-bold" for="scheduledMinutes">Default scheduled minutes (fallback)</label>
-          <input type="number" class="form-control" id="scheduledMinutes" name="scheduledMinutes" min="1" max="1440" step="1"
-            value="<%= policy.scheduledMinutes %>">
-          <div class="form-text">Each session normally uses its <code>startTime</code>/<code>endTime</code> or <code>durationHours</code> from the class session. This value is used only when those are missing or invalid.</div>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="fw-bold text-primary"><i class="bi bi-clock-history me-1"></i> Duration items</div>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddPolicyItem">
+          <i class="bi bi-plus-lg me-1"></i> Add duration
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0" id="policyItemsTable">
+            <thead class="table-light">
+              <tr>
+                <th style="min-width: 110px;">Duration (min)</th>
+                <th style="min-width: 110px;">Late ≥</th>
+                <th style="min-width: 110px;">Early leave ≥</th>
+                <th style="min-width: 160px;">Combined late+early</th>
+                <th class="text-center" style="min-width: 90px;">Default</th>
+                <th style="width: 70px;"></th>
+              </tr>
+            </thead>
+            <tbody id="policyItemsBody"></tbody>
+          </table>
         </div>
-
-        <div class="col-md-6">
-          <label class="form-label fw-bold" for="disqualifyLateMinutes">Disqualify if late ≥ (minutes)</label>
-          <input type="number" class="form-control" id="disqualifyLateMinutes" name="disqualifyLateMinutes" min="0" max="1440" step="1"
-            value="<%= policy.disqualifyLateMinutes %>">
-          <div class="form-text">Session credit becomes 0% if lateness reaches or exceeds this (independent rule).</div>
-        </div>
-
-        <div class="col-md-6">
-          <label class="form-label fw-bold" for="disqualifyEarlyLeaveMinutes">Disqualify if early leave ≥ (minutes)</label>
-          <input type="number" class="form-control" id="disqualifyEarlyLeaveMinutes" name="disqualifyEarlyLeaveMinutes" min="0" max="1440" step="1"
-            value="<%= policy.disqualifyEarlyLeaveMinutes %>">
-          <div class="form-text">Session credit becomes 0% if early departure reaches or exceeds this (independent rule).</div>
-        </div>
-
-        <div class="col-12">
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" id="useCombinedThreshold" name="useCombinedThreshold" value="on"
-              <%= policy.disqualifyCombinedMissedMinutes != null ? 'checked' : '' %>>
-            <label class="form-check-label fw-bold" for="useCombinedThreshold">
-              Also disqualify when combined late + early leave exceeds a limit
-            </label>
-          </div>
-          <label class="form-label" for="disqualifyCombinedMissedMinutes">Combined missed minutes threshold</label>
-          <input type="number" class="form-control" style="max-width: 220px;" id="disqualifyCombinedMissedMinutes" name="disqualifyCombinedMissedMinutes"
-            min="1" max="1440" step="1"
-            value="<%= policy.disqualifyCombinedMissedMinutes != null ? policy.disqualifyCombinedMissedMinutes : '' %>"
-            placeholder="e.g. 45">
-          <div class="form-text">If enabled, when <code>late + early leave</code> ≥ this value, the session scores 0%. Leave unchecked to disable.</div>
-        </div>
-
-        <div class="col-12 border-top pt-3">
-          <button type="submit" class="btn btn-primary fw-bold">
-            <i class="bi bi-save me-1"></i> Save settings
-          </button>
-        </div>
-      </form>
+      </div>
+      <div class="card-footer bg-white border-top">
+        <button type="submit" class="btn btn-primary fw-bold">
+          <i class="bi bi-save me-1"></i> Save settings
+        </button>
+      </div>
     </div>
-  </div>
+  </form>
 
   <div class="card border-0 bg-light mt-4">
     <div class="card-body small text-muted">
       <div class="fw-bold text-secondary mb-1">How this is applied</div>
       <ul class="mb-0 ps-3">
-        <li>Class-level <code>attendancePolicy</code> on a class record still overrides these org defaults when set (including this fallback length).</li>
-        <li>Which optional student attendance statuses are available (Late, Excused, ACF) is configured per class on the Attendance Statuses tab. Present, Absent, and N/A are always available.</li>
-        <li>Absent / ACF (Absent Camera Off) → 0%; excused → full session weight; present/late → proportional minutes unless a cutoff applies.</li>
+        <li>Each class session length comes from <code>startTime</code>/<code>endTime</code> or <code>durationHours</code>.</li>
+        <li>The system picks the item whose duration minutes match exactly; otherwise the default item; otherwise built-in 180 / 30 / 30.</li>
+        <li>Class-level <code>attendancePolicy</code> on a class record still overrides org item fields when set.</li>
+        <li>Absent / ACF → 0%; excused → full weight; present/late → proportional minutes unless a cutoff applies.</li>
       </ul>
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  const initialItems = <%- JSON.stringify(Array.isArray(policyItems) ? policyItems : []) %>;
+  const tbody = document.getElementById('policyItemsBody');
+  const form = document.getElementById('attendanceMatrixPolicyForm');
+  const hidden = document.getElementById('policyItemsJson');
+  const btnAdd = document.getElementById('btnAddPolicyItem');
+  let items = (Array.isArray(initialItems) ? initialItems : []).map((row, idx) => ({
+    id: String(row.id || ''),
+    scheduledMinutes: Number(row.scheduledMinutes) || 180,
+    disqualifyLateMinutes: Number(row.disqualifyLateMinutes) || 0,
+    disqualifyEarlyLeaveMinutes: Number(row.disqualifyEarlyLeaveMinutes) || 0,
+    disqualifyCombinedMissedMinutes: row.disqualifyCombinedMissedMinutes == null || row.disqualifyCombinedMissedMinutes === ''
+      ? null
+      : Number(row.disqualifyCombinedMissedMinutes),
+    isDefault: row.isDefault === true || (idx === 0 && !initialItems.some((r) => r.isDefault))
+  }));
+  if (!items.length) {
+    items = [{
+      id: '',
+      scheduledMinutes: 180,
+      disqualifyLateMinutes: 30,
+      disqualifyEarlyLeaveMinutes: 30,
+      disqualifyCombinedMissedMinutes: null,
+      isDefault: true
+    }];
+  }
+
+  function escapeAttr(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;');
+  }
+
+  function readFromDom() {
+    const rows = Array.from(tbody.querySelectorAll('tr[data-item-index]'));
+    items = rows.map((tr, idx) => {
+      const combinedOn = tr.querySelector('.item-combined-on')?.checked === true;
+      const combinedVal = tr.querySelector('.item-combined')?.value;
+      return {
+        id: tr.getAttribute('data-item-id') || '',
+        scheduledMinutes: Number(tr.querySelector('.item-scheduled')?.value) || 0,
+        disqualifyLateMinutes: Number(tr.querySelector('.item-late')?.value) || 0,
+        disqualifyEarlyLeaveMinutes: Number(tr.querySelector('.item-early')?.value) || 0,
+        disqualifyCombinedMissedMinutes: combinedOn && combinedVal !== '' ? Number(combinedVal) : null,
+        useCombinedThreshold: combinedOn,
+        isDefault: tr.querySelector('.item-default')?.checked === true
+      };
+    });
+    if (items.length && !items.some((item) => item.isDefault)) {
+      items[0].isDefault = true;
+    }
+  }
+
+  function render() {
+    tbody.innerHTML = items.map((item, idx) => {
+      const combinedOn = item.disqualifyCombinedMissedMinutes != null && item.disqualifyCombinedMissedMinutes !== '';
+      return `
+        <tr data-item-index="${idx}" data-item-id="${escapeAttr(item.id || '')}">
+          <td>
+            <input type="number" class="form-control form-control-sm item-scheduled" min="1" max="1440" step="1"
+              value="${escapeAttr(item.scheduledMinutes)}">
+          </td>
+          <td>
+            <input type="number" class="form-control form-control-sm item-late" min="0" max="1440" step="1"
+              value="${escapeAttr(item.disqualifyLateMinutes)}">
+          </td>
+          <td>
+            <input type="number" class="form-control form-control-sm item-early" min="0" max="1440" step="1"
+              value="${escapeAttr(item.disqualifyEarlyLeaveMinutes)}">
+          </td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <input type="checkbox" class="form-check-input item-combined-on" ${combinedOn ? 'checked' : ''} title="Enable combined">
+              <input type="number" class="form-control form-control-sm item-combined" min="1" max="1440" step="1"
+                value="${combinedOn ? escapeAttr(item.disqualifyCombinedMissedMinutes) : ''}"
+                placeholder="e.g. 45" ${combinedOn ? '' : 'disabled'}>
+            </div>
+          </td>
+          <td class="text-center">
+            <input type="radio" class="form-check-input item-default" name="defaultPolicyItem" ${item.isDefault ? 'checked' : ''}>
+          </td>
+          <td>
+            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-item" title="Remove" ${items.length <= 1 ? 'disabled' : ''}>
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.item-combined-on').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const input = cb.closest('td')?.querySelector('.item-combined');
+        if (input) input.disabled = !cb.checked;
+      });
+    });
+    tbody.querySelectorAll('.btn-remove-item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        readFromDom();
+        const tr = btn.closest('tr');
+        const idx = Number(tr?.getAttribute('data-item-index'));
+        if (!Number.isFinite(idx) || items.length <= 1) return;
+        items.splice(idx, 1);
+        if (!items.some((item) => item.isDefault)) items[0].isDefault = true;
+        render();
+      });
+    });
+  }
+
+  if (btnAdd) {
+    btnAdd.addEventListener('click', () => {
+      readFromDom();
+      const used = new Set(items.map((item) => Number(item.scheduledMinutes)));
+      let next = 60;
+      while (used.has(next) && next < 1440) next += 30;
+      items.push({
+        id: '',
+        scheduledMinutes: next,
+        disqualifyLateMinutes: 15,
+        disqualifyEarlyLeaveMinutes: 15,
+        disqualifyCombinedMissedMinutes: null,
+        isDefault: false
+      });
+      render();
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', () => {
+      readFromDom();
+      if (hidden) hidden.value = JSON.stringify(items);
+    });
+  }
+
+  render();
+})();
+</script>

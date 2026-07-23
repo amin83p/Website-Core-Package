@@ -658,6 +658,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
     window.ATTENDANCE_ACTION_STATE_ID = actionStateId;
     window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
+    window.CAN_MANAGE_ATTENDANCE_MATRIX_POLICY = <%= (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) ? 'true' : 'false' %>;
     window.CAN_OVERRIDE_SESSION_LOCK = <%= (typeof canOverrideSessionLock !== 'undefined' && canOverrideSessionLock) ? 'true' : 'false' %>;
 
     if (typeof bootstrap !== 'undefined') {
@@ -900,14 +901,17 @@ document.addEventListener('DOMContentLoaded', () => {
             headers.innerHTML = ''; tbody.innerHTML = '';
 
             const ap = result.attendancePolicy || {};
-            const policyTitle = [
-              `Scheduled ${ap.scheduledMinutes ?? 180} min/session`,
-              `late ≥ ${ap.disqualifyLateMinutes ?? 30} min → 0%`,
-              `early leave ≥ ${ap.disqualifyEarlyLeaveMinutes ?? 30} min → 0%`,
-              ap.disqualifyCombinedMissedMinutes != null
-                ? `combined late+leave ≥ ${ap.disqualifyCombinedMissedMinutes} min → 0%`
-                : null
-            ].filter(Boolean).join(' · ');
+            const canSeeThresholds = window.CAN_MANAGE_ATTENDANCE_MATRIX_POLICY === true && result.attendancePolicy;
+            const policyTitle = canSeeThresholds
+              ? [
+                  `Scheduled ${ap.scheduledMinutes ?? 180} min/session`,
+                  `late ≥ ${ap.disqualifyLateMinutes ?? 30} min → 0%`,
+                  `early leave ≥ ${ap.disqualifyEarlyLeaveMinutes ?? 30} min → 0%`,
+                  ap.disqualifyCombinedMissedMinutes != null
+                    ? `combined late+leave ≥ ${ap.disqualifyCombinedMissedMinutes} min → 0%`
+                    : null
+                ].filter(Boolean).join(' · ')
+              : 'Attendance rollup';
 
             const studentHeaderHtml = buildAttendanceStudentFilterDropdownHtml(
                 result.matrix,
@@ -967,8 +971,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   <td class="ps-3 matrix-sticky-name">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(stu.name, stu.studentRecordId, { className: 'text-decoration-none fw-bold' }) : stu.name}</td>`;
                 
                 stu.records.forEach(rec => {
-                    let icon = '<i class="bi bi-dash status-na"></i>';
-                    let tooltip = 'No Record';
+                    let icon = '<i class="bi bi-dash text-muted"></i>';
+                    let tooltip = 'Not marked yet';
 
                     if (rec.status === 'present') { icon = '<i class="bi bi-check-circle-fill status-present"></i>'; tooltip = 'Present'; }
                     else if (rec.status === 'late') { icon = `<i class="bi bi-clock-fill status-late"></i>`; tooltip = `Late`; }
@@ -982,6 +986,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             : (rec.applicability === 'approved_leave'
                             ? 'N/A - approved leave'
                             : (rec.applicability === 'makeup_required' ? 'N/A - make-up session required' : 'N/A'));
+                    } else if (!rec.status) {
+                        icon = '<i class="bi bi-dash text-muted"></i>';
+                        tooltip = 'Not marked yet';
                     }
 
                     // UPDATED: Badge now strictly checks the comments array (ignores general teacherNotes)

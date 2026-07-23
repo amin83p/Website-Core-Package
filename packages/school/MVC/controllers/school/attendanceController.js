@@ -363,13 +363,22 @@ async function listActiveAttendanceClasses(req, res) {
 async function showAttendanceMatrixSettings(req, res) {
     try {
         const activeOrgId = String(req.user?.activeOrgId || '').trim();
+        let policyItems = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(activeOrgId);
+        if (!policyItems.length) {
+            policyItems = [{
+                ...attendanceMatrixPolicyModel.DEFAULT_POLICY,
+                id: '',
+                isDefault: true
+            }];
+        }
         const policy = await attendanceMatrixPolicyModel.getPolicyForOrg(activeOrgId);
         res.render('school/attendance/attendanceMatrixPolicy', {
-            title: 'Attendance Matrix â€” Threshold Settings',
+            title: 'Attendance Matrix — Threshold Settings',
             includeModal: true,
             user: req.user,
             actionStateId: req.actionStateId,
             policy,
+            policyItems,
             policyOrgKey: attendanceMatrixPolicyModel.orgKey(activeOrgId),
             saved: req.query.saved === '1',
             errorMessage: null
@@ -382,16 +391,31 @@ async function showAttendanceMatrixSettings(req, res) {
 async function saveAttendanceMatrixSettings(req, res) {
     try {
         const activeOrgId = String(req.user?.activeOrgId || '').trim();
-        await attendanceMatrixPolicyModel.savePolicyForOrg(activeOrgId, req.body, req.user?.id);
+        const rawItems = attendanceMatrixPolicyModel.parsePolicyItemsFromBody(req.body || {});
+        await attendanceMatrixPolicyModel.savePolicyItemsForOrg(activeOrgId, rawItems, req.user?.id);
         res.redirect('/school/attendances/settings?saved=1');
     } catch (error) {
-        const policy = await attendanceMatrixPolicyModel.getPolicyForOrg(String(req.user?.activeOrgId || '').trim());
+        const activeOrgId = String(req.user?.activeOrgId || '').trim();
+        let policyItems = [];
+        try {
+            policyItems = attendanceMatrixPolicyModel.normalizePolicyItemsForSave(
+                attendanceMatrixPolicyModel.parsePolicyItemsFromBody(req.body || {})
+            );
+        } catch (_) {
+            policyItems = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(activeOrgId);
+        }
+        const policy = await attendanceMatrixPolicyModel.getPolicyForOrg(activeOrgId);
         res.status(400).render('school/attendance/attendanceMatrixPolicy', {
-            title: 'Attendance Matrix â€” Threshold Settings',
+            title: 'Attendance Matrix — Threshold Settings',
             includeModal: true,
             user: req.user,
             actionStateId: req.actionStateId,
             policy,
+            policyItems: policyItems.length ? policyItems : [{
+                ...attendanceMatrixPolicyModel.DEFAULT_POLICY,
+                id: '',
+                isDefault: true
+            }],
             policyOrgKey: attendanceMatrixPolicyModel.orgKey(req.user?.activeOrgId),
             saved: false,
             errorMessage: error.message || 'Could not save settings.'
@@ -541,6 +565,10 @@ async function buildAttendanceMatrixPayload(req) {
         const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(
             String(req.user?.activeOrgId || classData?.orgId || '').trim()
         );
+        const orgPolicyItems = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(
+            String(req.user?.activeOrgId || classData?.orgId || '').trim()
+        );
+        const orgPolicyCatalog = { items: orgPolicyItems };
         const attendancePolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
         const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
 
@@ -585,8 +613,8 @@ async function buildAttendanceMatrixPayload(req) {
                     : (forceNotApplicable
                     ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
                     : (rosterRecord
-                        ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
-                        : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE)));
+                        ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
+                        : (expectedForSession ? '' : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE)));
                 let applicability = !withinEnrollmentWindow
                     ? 'not_enrolled'
                     : (forceNotApplicable ? 'makeup_required' : (rosterRecord ? 'manual' : (expectedForSession ? 'expected_missing' : (applicabilityState.reason || 'not_enrolled'))));
@@ -620,11 +648,16 @@ async function buildAttendanceMatrixPayload(req) {
                     )
                 };
             });
-            const summary = attendanceMatrixMetricsService.computeStudentMatrixSummary(records, classData, orgPolicyLayer);
+            const summary = attendanceMatrixMetricsService.computeStudentMatrixSummary(
+                records,
+                classData,
+                orgPolicyCatalog
+            );
             return { ...stu, records, summary };
         });
 
-        return {
+        const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
+        const payload = {
             classId: classId,
             className: classData.title,
             teacherName: resolveClassTeacherName(classData),
@@ -632,13 +665,18 @@ async function buildAttendanceMatrixPayload(req) {
             endDate: String(endDate || '').trim(),
             sessions: filteredSessions.map(s => ({ id: s.sessionId, date: s.date, status: s.status })),
             matrix,
-            attendancePolicy,
             enabledAttendanceStatuses,
             enrollmentSource: registrationMode === 'rolling'
                 ? 'canonical_active_only_rolling'
                 : String(enrollmentSnapshot?.source || 'legacy'),
             enrollmentUsedFallback: Boolean(enrollmentSnapshot?.usedFallback)
         };
+        // Threshold numbers are admin-only; matrix itself is also admin-gated at the route.
+        if (canManageAttendanceMatrixPolicy) {
+            payload.attendancePolicy = attendancePolicy;
+            payload.attendancePolicyItems = orgPolicyItems;
+        }
+        return payload;
 }
 
 async function getAttendanceData(req, res) {
@@ -880,7 +918,15 @@ async function updateAttendanceRosterCell(req, res) {
         }
         if (!rosterRecord.comments) rosterRecord.comments = [];
 
-        const orgPolicyLayerCell = await attendanceMatrixPolicyModel.getPolicyForOrg(classData?.orgId || '');
+        const orgPolicyItemsCell = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(classData?.orgId || '');
+        const sessionScheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+            session,
+            attendanceMatrixPolicyModel.DEFAULT_POLICY.scheduledMinutes
+        );
+        const orgPolicyLayerCell = attendanceMatrixMetricsService.pickOrgPolicyLayerForMinutes(
+            { items: orgPolicyItemsCell },
+            sessionScheduledMinutes
+        );
         const matrixPolicyCell = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerCell);
         Object.assign(
             rosterRecord,

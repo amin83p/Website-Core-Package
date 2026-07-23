@@ -81,13 +81,18 @@ function isNotApplicableStatus(status) {
   return normalizeStatus(status) === ATTENDANCE_STATUS.NOT_APPLICABLE;
 }
 
+function isUnmarkedAttendanceStatus(status) {
+  return !normalizeStatus(status);
+}
+
 function isAbsentLikeStatus(status) {
   const st = normalizeStatus(status);
   return st === ATTENDANCE_STATUS.ABSENT || st === ATTENDANCE_STATUS.ACF;
 }
 
+/** Counted toward attendance % — excludes N/A and unmarked (not yet decided). */
 function isEligibleAttendanceStatus(status) {
-  return !isNotApplicableStatus(status);
+  return !isNotApplicableStatus(status) && !isUnmarkedAttendanceStatus(status);
 }
 
 function normalizeAttendanceStatusForSave(status, fallback = ATTENDANCE_STATUS.ABSENT) {
@@ -180,8 +185,9 @@ function assertAttendanceStatusAllowedForSave(opts = {}) {
     ? normalizeEnabledAttendanceStatuses(opts.enabledStatuses)
     : resolveEnabledAttendanceStatuses(opts.classData || {});
   const normalized = normalizeAttendanceStatusForSave(opts.status, '');
+  // Empty = unmarked (white / not marked yet); allowed so Manage Session can reset.
   if (!normalized) {
-    throw new Error('Invalid attendance status.');
+    return '';
   }
   if (enabled.includes(normalized)) {
     return normalized;
@@ -210,7 +216,8 @@ function assertAttendanceStatusAllowedForSave(opts = {}) {
  */
 function coerceAttendanceStatusToEnabled(status, enabledStatuses) {
   const enabled = normalizeEnabledAttendanceStatuses(enabledStatuses);
-  const normalized = normalizeAttendanceStatusForSave(status, ATTENDANCE_STATUS.ABSENT);
+  const normalized = normalizeAttendanceStatusForSave(status, '');
+  if (!normalized) return '';
   if (enabled.includes(normalized)) return normalized;
   if (normalized === ATTENDANCE_STATUS.NOT_APPLICABLE) {
     // System N/A may exist even when toggle is off; keep it.
@@ -285,7 +292,7 @@ function applyAttendanceMatrixRosterRules(record, policy) {
   const pol = policy && typeof policy === 'object' ? policy : resolvePolicy({}, {});
   const base = record && typeof record === 'object' ? { ...record } : {};
 
-  const attendance = normalizeAttendanceStatusForSave(base.attendance, ATTENDANCE_STATUS.ABSENT);
+  const attendance = normalizeAttendanceStatusForSave(base.attendance, '');
 
   const late = parseNonNegIntRoster(base.lateMinutes);
   const early = parseNonNegIntRoster(base.earlyLeaveMinutes);
@@ -306,6 +313,11 @@ function applyAttendanceMatrixRosterRules(record, policy) {
     : Number(combRaw);
   if (comb != null && Number.isFinite(comb) && late + early >= comb) {
     return { ...base, attendance: 'absent', lateMinutes: late, earlyLeaveMinutes: early };
+  }
+
+  // Unmarked (white): keep empty unless minutes forced absent above.
+  if (!attendance) {
+    return { ...base, attendance: '', lateMinutes: late, earlyLeaveMinutes: early };
   }
 
   let next = attendance;
@@ -344,6 +356,33 @@ function resolvePolicy(classData = {}, orgPolicyLayer = {}) {
     disqualifyEarlyLeaveMinutes: disqualifyEarly >= 0 ? disqualifyEarly : 30,
     disqualifyCombinedMissedMinutes: combined
   };
+}
+
+/**
+ * When orgPolicyLayer is a catalog `{ items: [...] }` (or a bare items array), pick the
+ * exact scheduledMinutes item, else the default item, else {}.
+ * Flat legacy layers are returned unchanged.
+ */
+function pickOrgPolicyLayerForMinutes(orgPolicyLayer, scheduledMinutes) {
+  if (!orgPolicyLayer || typeof orgPolicyLayer !== 'object') return {};
+  const items = Array.isArray(orgPolicyLayer.items)
+    ? orgPolicyLayer.items
+    : (Array.isArray(orgPolicyLayer) ? orgPolicyLayer : null);
+  if (!items) return orgPolicyLayer;
+  if (!items.length) return {};
+  const mins = Number(scheduledMinutes);
+  if (Number.isFinite(mins) && mins > 0) {
+    const exact = items.find((item) => Number(item?.scheduledMinutes) === mins);
+    if (exact) return exact;
+  }
+  const def = items.find((item) => item && item.isDefault)
+    || items.find((item) => Number(item?.scheduledMinutes) === 180)
+    || items[0];
+  return def && typeof def === 'object' ? def : {};
+}
+
+function resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, scheduledMinutes) {
+  return resolvePolicy(classData, pickOrgPolicyLayerForMinutes(orgPolicyLayer, scheduledMinutes));
 }
 
 /**
@@ -397,13 +436,13 @@ function computeSessionCredit(record, sessionWeight, policy) {
 /**
  * @param {Array<{ status: string, lateMinutes?: number, earlyLeaveMinutes?: number, scheduledMinutes?: number }>} records — one per session column
  * @param {object} classData — optional attendancePolicy
+ * @param {object|Array} orgPolicyLayer — flat org policy OR catalog `{ items }` for per-session exact match
  */
 function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {}) {
-  const policy = resolvePolicy(classData, orgPolicyLayer);
   const allRecords = Array.isArray(records) ? records : [];
   const eligibleRecords = allRecords.filter((rec) => isEligibleAttendanceStatus(rec?.status));
   const n = eligibleRecords.length;
-  const notApplicableSessionCount = allRecords.length - n;
+  const notApplicableSessionCount = allRecords.filter((rec) => isNotApplicableStatus(rec?.status)).length;
   if (!n) {
     return {
       totalPresentSessions: 0,
@@ -427,6 +466,7 @@ function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {
     if (st === ATTENDANCE_STATUS.PRESENT || st === ATTENDANCE_STATUS.LATE) totalPresentSessions += 1;
     if (isAbsentLikeStatus(st)) totalAbsentSessions += 1;
 
+    const policy = resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, rec?.scheduledMinutes);
     const { credit, disqualified } = computeSessionCredit(rec, sessionWeight, policy);
     sumCredit += credit;
     if (disqualified) disqualifiedSessionCount += 1;
@@ -454,6 +494,7 @@ module.exports = {
   ATTENDANCE_STATUS_META,
   normalizeStatus,
   isNotApplicableStatus,
+  isUnmarkedAttendanceStatus,
   isAbsentLikeStatus,
   isEligibleAttendanceStatus,
   normalizeAttendanceStatusForSave,
@@ -463,6 +504,8 @@ module.exports = {
   assertAttendanceStatusAllowedForSave,
   coerceAttendanceStatusToEnabled,
   resolvePolicy,
+  pickOrgPolicyLayerForMinutes,
+  resolvePolicyForScheduledMinutes,
   parseTimeToMinutes,
   scheduledMinutesFromSession,
   computeSessionCredit,

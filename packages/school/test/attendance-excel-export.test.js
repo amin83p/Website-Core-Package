@@ -32,11 +32,11 @@ test('attendance viewer uses shared Export button look and wires xlsx after load
   assert.match(viewer, /exportBtn\.disabled = !enabled/);
 });
 
-test('attendance routes expose export.xlsx with same read gate as matrix data', () => {
+test('attendance routes expose export.xlsx with same admin gate as matrix data', () => {
   const routes = read('MVC/routes/attendanceRoutes.js');
   assert.match(routes, /\/api\/export\.xlsx/);
   assert.match(routes, /exportAttendanceExcel/);
-  assert.match(routes, /OPERATIONS\.READ_ALL/);
+  assert.match(routes, /requireAttendanceMatrixPolicyAdmin\(\)/);
 });
 
 test('matrix payload builder enriches enrollment dates and CLB maps', () => {
@@ -118,12 +118,15 @@ test('day-cell codes and fills use Fatima-derived palette', () => {
   assert.equal(attendanceExcelExportService.statusToExportCode('late'), 'L');
   assert.equal(attendanceExcelExportService.statusToExportCode('excused'), 'E');
   assert.equal(attendanceExcelExportService.statusToExportCode('acf'), 'ACF');
+  assert.equal(attendanceExcelExportService.statusToExportCode(''), '');
+  assert.equal(attendanceExcelExportService.statusToExportCode(null), '');
   assert.equal(attendanceExcelExportService.statusFillArgb('present'), 'FFA9CE91');
   assert.equal(attendanceExcelExportService.statusFillArgb('late'), 'FFFFC000');
   assert.equal(attendanceExcelExportService.statusFillArgb('excused'), 'FF0DCAF0');
   assert.equal(attendanceExcelExportService.statusFillArgb('absent'), 'FFFF0000');
   assert.equal(attendanceExcelExportService.statusFillArgb('acf'), 'FFED7D31');
   assert.equal(attendanceExcelExportService.statusFillArgb('not_applicable'), 'FFD9D9D9');
+  assert.equal(attendanceExcelExportService.statusFillArgb(''), '');
   assert.equal(
     attendanceExcelExportService.statusFillArgb('not_applicable', { forLegend: true }),
     'FFD9D9D9'

@@ -14,6 +14,7 @@ const attendanceMatrixMetricsService = require('../../services/school/attendance
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
+const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -228,6 +229,8 @@ async function showGradesMatrixPage(req, res) {
       }
     }
 
+    const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
+
     res.render('school/grades/gradesMatrix', {
       title: 'Grades Matrix',
       includeModal: true,
@@ -238,7 +241,8 @@ async function showGradesMatrixPage(req, res) {
       initialClassName,
       initialStartDate,
       initialEndDate,
-      initialRange
+      initialRange,
+      canManageAttendanceMatrixPolicy
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -347,9 +351,10 @@ async function buildGradesMatrixPayload(req, query) {
   });
   studentList.sort((a, b) => a.name.localeCompare(b.name));
 
-  const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(
-    String(req.user?.activeOrgId || classData?.orgId || '').trim()
-  );
+  const orgIdForPolicy = String(req.user?.activeOrgId || classData?.orgId || '').trim();
+  const orgPolicyItems = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(orgIdForPolicy);
+  const orgPolicyCatalog = { items: orgPolicyItems };
+  const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(orgIdForPolicy);
   const attendancePolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
 
   const sessionById = new Map(filteredSessions.map((s) => [s.sessionId, s]));
@@ -380,8 +385,8 @@ async function buildGradesMatrixPayload(req, query) {
       let status = forceNotApplicable
         ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
         : (rosterRecord
-          ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
-          : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
+          ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
+          : (expectedForSession ? '' : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
       if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(status))) {
         status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       }
@@ -394,7 +399,7 @@ async function buildGradesMatrixPayload(req, query) {
         scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(ses, attendancePolicy.scheduledMinutes)
       };
     });
-    const attSummary = attendanceMatrixMetricsService.computeStudentMatrixSummary(attendanceRecords, classData, orgPolicyLayer);
+    const attSummary = attendanceMatrixMetricsService.computeStudentMatrixSummary(attendanceRecords, classData, orgPolicyCatalog);
     const attendancePct = attSummary.performancePercent;
 
     const cells = columns.map((col) => {
@@ -411,8 +416,8 @@ async function buildGradesMatrixPayload(req, query) {
       let att = forceNotApplicable
         ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
         : (rosterRecord
-          ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance)
-          : (expectedForSession ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
+          ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
+          : (expectedForSession ? '' : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
       if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(att))) {
         att = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       }
