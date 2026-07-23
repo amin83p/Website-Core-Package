@@ -161,6 +161,41 @@ app.use(expressSession({
 
 // CSRF Protection
 const csrfSecret = crypto.createHash('md5').update(SESSION_SECRET).digest('hex');
+
+// Map header to body for tiny-csrf
+app.use((req, res, next) => {
+  if (req.headers['csrf-token']) {
+    if (!req.body) req.body = {};
+    req.body._csrf = req.headers['csrf-token'];
+  }
+  next();
+});
+
+// #region agent log
+app.use((req, res, next) => {
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    try {
+      // fs.appendFileSync('C:\\Users\\Amin\\myWebsite\\Website-Core-Package\\debug-5dda46.log', JSON.stringify({
+      //   sessionId: '5dda46',
+      //   location: 'app.js:before-csrf',
+      //   message: 'CSRF Debug',
+      //   data: {
+      //     url: req.originalUrl,
+      //     method: req.method,
+      //     bodyCsrf: req.body?._csrf,
+      //     headerCsrf: req.headers['csrf-token'],
+      //     signedCookies: req.signedCookies,
+      //     cookies: req.cookies
+      //   },
+      //   timestamp: Date.now(),
+      //   hypothesisId: 'H1'
+      // }) + '\n');
+    } catch (e) {}
+  }
+  next();
+});
+// #endregion
+
 app.use(csrf(
   csrfSecret,
   ['POST', 'PUT', 'DELETE', 'PATCH'],
