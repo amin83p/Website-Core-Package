@@ -174,7 +174,7 @@ app.use((req, res, next) => {
 app.use(csrf(
   csrfSecret,
   ['POST', 'PUT', 'DELETE', 'PATCH'],
-  ['/internal/file-gateway/.*', '^/styles/.*', '^/scripts/.*', '^/uploads/.*', '^/site.webmanifest'] // Exclude static assets from CSRF token generation
+  ['/internal/file-gateway/.*', '^/styles/.*', '^/scripts/.*', '^/uploads/.*', '^/site.webmanifest', '/styles/.*', '/scripts/.*', '/uploads/.*', '/site.webmanifest'] // Exclude static assets from CSRF token generation
 ));
 
 app.use((req, res, next) => {
