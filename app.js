@@ -149,8 +149,8 @@ const isProduction = String(process.env.NODE_ENV || '').trim().toLowerCase() ===
 app.use(expressSession({
   name: 'admin_flow.sid',
   secret: SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
+  resave: true,
+  saveUninitialized: true,
   cookie: {
     httpOnly: true,
     secure: isProduction,
@@ -174,7 +174,7 @@ app.use((req, res, next) => {
 app.use(csrf(
   csrfSecret,
   ['POST', 'PUT', 'DELETE', 'PATCH'],
-  ['/internal/file-gateway/.*'] // Exclude internal routes from CSRF if necessary
+  ['/internal/file-gateway/.*', '^/styles/.*', '^/scripts/.*', '^/uploads/.*', '^/site.webmanifest'] // Exclude static assets from CSRF token generation
 ));
 
 app.use((req, res, next) => {
