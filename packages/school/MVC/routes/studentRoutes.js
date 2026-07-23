@@ -26,24 +26,18 @@ router.get('/archived',
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL),
   ctrl.listArchivedStudents);
 
-router.post('/import',
+router.post('/import/preview',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.IMPORT),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.IMPORT, { requireToken: false }),
   adminApproval,
   upload('imports').single('importFile'),
-  studentImportCtrl.startImport);
+  studentImportCtrl.previewImport);
 
-router.get('/import/stream/:jobId',
-  requireAuth,
-  studentImportCtrl.streamImportStatus);
-
-router.post('/import/abort/:jobId',
-  requireAuth,
-  studentImportCtrl.abortImport);
-
-router.get('/import/report/:jobId',
-  requireAuth,
-  studentImportCtrl.downloadImportReport);
+router.post('/import/process',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.IMPORT),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.IMPORT, { requireToken: false }),
+  adminApproval,
+  studentImportCtrl.processImport);
 
 router.get('/api/eligible-persons',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE),

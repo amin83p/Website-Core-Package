@@ -92,6 +92,9 @@
   <% if (typeof includeModal_FileImport !== 'undefined' && includeModal_FileImport!== null && includeModal_FileImport) { %>
     <%- include('../partials/modal_FileImport') %>
   <% } %>
+  <% if (typeof includeModal_StudentImport !== 'undefined' && includeModal_StudentImport!== null && includeModal_StudentImport) { %>
+    <%- include('../../packages/school/MVC/views/school/student/modal_StudentImport') %>
+  <% } %>
   <%- include('../partials/modal_FileExport') %>
 
   <%- include('../partials/adminVerificationModal') %>

@@ -7,30 +7,17 @@
  * customStudentId, academicStatus, notes, ...]
  */
 
+const fs = require('fs');
+const { parse } = require('csv-parse');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
-const createImportController = requireCoreModule('MVC/controllers/importControllerFactory');
-const {
-  getActiveOrgIdOrThrow
-} = requireCoreModule('MVC/utils/orgContextUtils');
+const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
 const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const {
   validateImportRecord,
-  admitNewPersonAndStudentFromRecord
+  admitNewPersonAndStudentFromRecord,
+  applyImportDefaults
 } = require('../../services/school/studentPersonAdmissionService');
-
-async function validateStudentImportRecord(record, context) {
-  validateImportRecord(record, context);
-}
-
-async function processStudentImportRecord(record, context) {
-  const result = await admitNewPersonAndStudentFromRecord(record, context);
-  // Help import report labeling
-  if (record && typeof record === 'object') {
-    record.name = result.name;
-    record.email = result.email;
-  }
-  return result;
-}
+const schoolPersonNameDuplicateService = require('../../services/school/schoolPersonNameDuplicateService');
 
 function buildContext(req) {
   const reqUser = req.user || null;
@@ -59,11 +46,97 @@ function buildContext(req) {
   };
 }
 
-const studentImportController = createImportController({
-  downloadRouteBase: '/school/students/import/report',
-  processRecord: processStudentImportRecord,
-  validateRecord: validateStudentImportRecord,
-  buildContext
-});
+async function previewImport(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ status: 'error', message: 'No file uploaded.' });
+    }
 
-module.exports = studentImportController;
+    const context = buildContext(req);
+    const fileContent = fs.readFileSync(req.file.path, 'utf8');
+
+    parse(
+      fileContent,
+      { columns: true, skip_empty_lines: true, trim: true },
+      async (err, records) => {
+        if (err) {
+          return res.status(400).json({ status: 'error', message: 'CSV Parse Error: ' + err.message });
+        }
+
+        const previewRows = [];
+        for (let i = 0; i < records.length; i++) {
+          const rawRow = records[i];
+          let rowData = null;
+          let error = null;
+          let duplicates = [];
+
+          try {
+            rowData = applyImportDefaults(rawRow, context);
+            validateImportRecord(rowData, context);
+            
+            // Check for duplicates
+            duplicates = await schoolPersonNameDuplicateService.findExactNamePersonMatches({
+              reqUser: req.user,
+              firstName: rowData.firstName,
+              lastName: rowData.lastName
+            });
+          } catch (e) {
+            error = e.message;
+          }
+
+          previewRows.push({
+            index: i,
+            raw: rawRow,
+            data: rowData,
+            error,
+            duplicates
+          });
+        }
+
+        return res.json({ status: 'success', rows: previewRows });
+      }
+    );
+  } catch (error) {
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+}
+
+async function processImport(req, res) {
+  try {
+    const { rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ status: 'error', message: 'No rows selected for import.' });
+    }
+
+    const context = buildContext(req);
+    const results = [];
+
+    for (const row of rows) {
+      try {
+        validateImportRecord(row, context);
+        const result = await admitNewPersonAndStudentFromRecord(row, context);
+        results.push({
+          success: true,
+          name: result.name,
+          email: result.email,
+          studentId: result.studentId
+        });
+      } catch (e) {
+        results.push({
+          success: false,
+          name: `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'Unknown',
+          error: e.message
+        });
+      }
+    }
+
+    return res.json({ status: 'success', results });
+  } catch (error) {
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+}
+
+module.exports = {
+  previewImport,
+  processImport
+};

@@ -1,0 +1,408 @@
+<style>
+  #studentImportPreviewTable th, #studentImportPreviewTable td {
+    vertical-align: middle;
+  }
+  .duplicate-warning {
+    color: #856404;
+    background-color: #fff3cd;
+    border-color: #ffeeba;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    display: inline-block;
+    margin-top: 4px;
+  }
+</style>
+
+<div class="modal fade" id="studentImportModal" tabindex="-100" aria-labelledby="studentImportModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+
+      <div class="modal-header border-bottom-0 pb-0 bg-white">
+        <h5 class="modal-title fw-bold text-primary" id="studentImportModalLabel">
+            <i class="bi bi-person-plus-fill me-2"></i>Import Students
+        </h5>
+        <button type="button" class="btn-close close-on-complete" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body pt-2">
+        <form id="studentImportForm" enctype="multipart/form-data">
+          
+          <!-- Step 1: Upload -->
+          <div id="studentImportSetupContent">
+            <div class="alert alert-light border shadow-sm d-flex align-items-center p-3 mb-4 rounded-3">
+              <div class="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center me-3" 
+                   style="width: 48px; height: 48px; min-width: 48px;">
+                <i class="bi bi-file-earmark-spreadsheet fs-4"></i>
+              </div>
+              <div>
+                <div class="small text-muted text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                    Step 1
+                </div>
+                <div class="fw-bold fs-5 text-dark">Upload CSV File</div>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label for="studentImportFile" class="form-label fw-bold text-secondary small text-uppercase">Select File</label>
+              <div class="input-group input-group-lg">
+                  <input class="form-control" type="file" id="studentImportFile" name="importFile" accept=".csv" required>
+              </div>
+              <div class="form-text text-muted fst-italic ps-1">
+                  Supported format: .csv
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Preview -->
+          <div id="studentImportPreviewContent" style="display:none;">
+            <div class="alert alert-light border shadow-sm d-flex align-items-center p-3 mb-4 rounded-3">
+              <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center me-3" 
+                   style="width: 48px; height: 48px; min-width: 48px;">
+                <i class="bi bi-list-check fs-4"></i>
+              </div>
+              <div>
+                <div class="small text-muted text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                    Step 2
+                </div>
+                <div class="fw-bold fs-5 text-dark">Review & Select Students</div>
+              </div>
+            </div>
+
+            <div class="table-responsive border rounded" style="max-height: 400px;">
+              <table class="table table-sm table-hover mb-0" id="studentImportPreviewTable">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th style="width: 40px;" class="text-center">
+                      <input class="form-check-input" type="checkbox" id="studentImportSelectAll" checked>
+                    </th>
+                    <th>Name</th>
+                    <th>Gender</th>
+                    <th>Email</th>
+                    <th>CLB Current</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="studentImportPreviewBody">
+                  <!-- Rows will be populated here -->
+                </tbody>
+              </table>
+            </div>
+            <div class="mt-2 text-end small text-muted">
+              <span id="studentImportSelectedCount">0</span> students selected
+            </div>
+          </div>
+
+          <!-- Step 3: Results -->
+          <div id="studentImportResultContent" style="display:none;">
+            <div class="alert alert-light border shadow-sm d-flex align-items-center p-3 mb-4 rounded-3">
+              <div class="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center me-3" 
+                   style="width: 48px; height: 48px; min-width: 48px;">
+                <i class="bi bi-check-circle fs-4"></i>
+              </div>
+              <div>
+                <div class="small text-muted text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                    Step 3
+                </div>
+                <div class="fw-bold fs-5 text-dark">Import Results</div>
+              </div>
+            </div>
+
+            <div class="table-responsive border rounded" style="max-height: 400px;">
+              <table class="table table-sm table-hover mb-0">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Result</th>
+                  </tr>
+                </thead>
+                <tbody id="studentImportResultBody">
+                  <!-- Results will be populated here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </form>
+      </div>
+
+      <div class="modal-footer bg-light border-top-0 py-3">
+        <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4 close-on-complete" data-bs-dismiss="modal" id="studentImportCloseBtn">Close</button>
+        <button type="button" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm" id="studentImportPreviewBtn">Preview Import</button>
+        <button type="button" class="btn btn-success btn-sm rounded-pill px-4 shadow-sm" id="studentImportProcessBtn" style="display:none;">Process Selected</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const modalEl = document.getElementById('studentImportModal');
+  if (!modalEl) return;
+  
+  const modal = new bootstrap.Modal(modalEl);
+  const openBtn = document.getElementById('openBatchModalBtn');
+  
+  const setupContent = document.getElementById('studentImportSetupContent');
+  const previewContent = document.getElementById('studentImportPreviewContent');
+  const resultContent = document.getElementById('studentImportResultContent');
+  
+  const previewBtn = document.getElementById('studentImportPreviewBtn');
+  const processBtn = document.getElementById('studentImportProcessBtn');
+  const closeBtn = document.getElementById('studentImportCloseBtn');
+  
+  const fileInput = document.getElementById('studentImportFile');
+  const previewBody = document.getElementById('studentImportPreviewBody');
+  const selectAllCb = document.getElementById('studentImportSelectAll');
+  const selectedCountEl = document.getElementById('studentImportSelectedCount');
+  const resultBody = document.getElementById('studentImportResultBody');
+  
+  let parsedRows = [];
+  
+  if (openBtn) {
+    openBtn.addEventListener('click', () => {
+      resetModal();
+      modal.show();
+    });
+  }
+  
+  function resetModal() {
+    document.getElementById('studentImportForm').reset();
+    setupContent.style.display = 'block';
+    previewContent.style.display = 'none';
+    resultContent.style.display = 'none';
+    
+    previewBtn.style.display = 'block';
+    processBtn.style.display = 'none';
+    
+    previewBtn.disabled = false;
+    processBtn.disabled = false;
+    
+    parsedRows = [];
+    previewBody.innerHTML = '';
+    resultBody.innerHTML = '';
+  }
+  
+  function updateSelectedCount() {
+    const checked = previewBody.querySelectorAll('.row-checkbox:checked').length;
+    selectedCountEl.textContent = checked;
+    processBtn.disabled = checked === 0;
+  }
+  
+  selectAllCb.addEventListener('change', (e) => {
+    const isChecked = e.target.checked;
+    previewBody.querySelectorAll('.row-checkbox:not(:disabled)').forEach(cb => {
+      cb.checked = isChecked;
+    });
+    updateSelectedCount();
+  });
+  
+  previewBtn.addEventListener('click', async () => {
+    if (!fileInput.files[0]) {
+      if (typeof window.showMessageModal === 'function') {
+        window.showMessageModal({ title: 'File Required', icon: 'warning', message: 'Please select a file first.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      } else {
+        alert('Please select a file first.');
+      }
+      return;
+    }
+    
+    previewBtn.disabled = true;
+    previewBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
+    
+    const formData = new FormData();
+    formData.append('importFile', fileInput.files[0]);
+    
+    try {
+      const response = await fetch('/school/students/import/preview', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (response.status === 403 && result.status === "admin_required") {
+        if (typeof window.requestProtectedAction === 'function') {
+          window.requestProtectedAction(() => {
+            previewBtn.click();
+          });
+        } else {
+          console.error("Admin modal function not loaded");
+        }
+        previewBtn.disabled = false;
+        previewBtn.innerHTML = 'Preview Import';
+        return;
+      }
+      
+      if (result.status === 'success') {
+        parsedRows = result.rows;
+        renderPreview();
+        
+        setupContent.style.display = 'none';
+        previewContent.style.display = 'block';
+        previewBtn.style.display = 'none';
+        processBtn.style.display = 'block';
+      } else {
+        if (typeof window.showMessageModal === 'function') {
+          window.showMessageModal({ title: 'Error', icon: 'error', message: result.message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+        } else {
+          alert('Error: ' + result.message);
+        }
+        previewBtn.disabled = false;
+        previewBtn.innerHTML = 'Preview Import';
+      }
+    } catch (error) {
+      if (typeof window.showMessageModal === 'function') {
+        window.showMessageModal({ title: 'Network Error', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      } else {
+        alert('Network error: ' + error.message);
+      }
+      previewBtn.disabled = false;
+      previewBtn.innerHTML = 'Preview Import';
+    }
+  });
+  
+  function renderPreview() {
+    previewBody.innerHTML = '';
+    let validCount = 0;
+    
+    parsedRows.forEach((row, idx) => {
+      const tr = document.createElement('tr');
+      
+      const hasError = !!row.error;
+      const hasDuplicates = row.duplicates && row.duplicates.length > 0;
+      
+      // Default to checked if no errors and no duplicates
+      const isChecked = !hasError && !hasDuplicates;
+      if (isChecked) validCount++;
+      
+      let statusHtml = '';
+      if (hasError) {
+        statusHtml = `<span class="text-danger"><i class="bi bi-x-circle"></i> ${row.error}</span>`;
+      } else if (hasDuplicates) {
+        statusHtml = `<span class="text-success"><i class="bi bi-check-circle"></i> Valid</span><br>
+                      <div class="duplicate-warning"><i class="bi bi-exclamation-triangle"></i> Potential Duplicate: ${row.duplicates[0].displayName} (${row.duplicates[0].email})</div>`;
+      } else {
+        statusHtml = `<span class="text-success"><i class="bi bi-check-circle"></i> Valid</span>`;
+      }
+      
+      let clbDisplay = '';
+      if (row.data && row.data.clbCurrent) {
+        clbDisplay = typeof row.data.clbCurrent === 'string' ? row.data.clbCurrent : JSON.stringify(row.data.clbCurrent);
+      }
+      
+      tr.innerHTML = `
+        <td class="text-center">
+          <input class="form-check-input row-checkbox" type="checkbox" data-index="${idx}" ${isChecked ? 'checked' : ''} ${hasError ? 'disabled' : ''}>
+        </td>
+        <td>${row.data ? (row.data.firstName + ' ' + row.data.lastName) : 'N/A'}</td>
+        <td>${row.data ? row.data.gender : 'N/A'}</td>
+        <td>${row.data ? row.data.email : 'N/A'}</td>
+        <td><small>${clbDisplay}</small></td>
+        <td>${statusHtml}</td>
+      `;
+      
+      previewBody.appendChild(tr);
+    });
+    
+    selectAllCb.checked = validCount === parsedRows.length && parsedRows.length > 0;
+    updateSelectedCount();
+    
+    previewBody.querySelectorAll('.row-checkbox').forEach(cb => {
+      cb.addEventListener('change', updateSelectedCount);
+    });
+  }
+  
+  processBtn.addEventListener('click', async () => {
+    const selectedIndexes = Array.from(previewBody.querySelectorAll('.row-checkbox:checked'))
+                                 .map(cb => parseInt(cb.dataset.index, 10));
+                                 
+    if (selectedIndexes.length === 0) return;
+    
+    const rowsToProcess = selectedIndexes.map(idx => parsedRows[idx].data);
+    
+    processBtn.disabled = true;
+    processBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+    
+    try {
+      const response = await fetch('/school/students/import/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ rows: rowsToProcess })
+      });
+      
+      const result = await response.json();
+      
+      if (response.status === 403 && result.status === "admin_required") {
+        if (typeof window.requestProtectedAction === 'function') {
+          window.requestProtectedAction(() => {
+            processBtn.click();
+          });
+        } else {
+          console.error("Admin modal function not loaded");
+        }
+        processBtn.disabled = false;
+        processBtn.innerHTML = 'Process Selected';
+        return;
+      }
+      
+      if (result.status === 'success') {
+        renderResults(result.results);
+        
+        previewContent.style.display = 'none';
+        resultContent.style.display = 'block';
+        processBtn.style.display = 'none';
+      } else {
+        if (typeof window.showMessageModal === 'function') {
+          window.showMessageModal({ title: 'Error', icon: 'error', message: result.message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+        } else {
+          alert('Error: ' + result.message);
+        }
+        processBtn.disabled = false;
+        processBtn.innerHTML = 'Process Selected';
+      }
+    } catch (error) {
+      if (typeof window.showMessageModal === 'function') {
+        window.showMessageModal({ title: 'Network Error', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      } else {
+        alert('Network error: ' + error.message);
+      }
+      processBtn.disabled = false;
+      processBtn.innerHTML = 'Process Selected';
+    }
+  });
+  
+  function renderResults(results) {
+    resultBody.innerHTML = '';
+    
+    results.forEach(res => {
+      const tr = document.createElement('tr');
+      
+      let resultHtml = '';
+      if (res.success) {
+        resultHtml = `<span class="badge bg-success">Success</span>`;
+      } else {
+        resultHtml = `<span class="badge bg-danger">Failed</span> <small class="text-danger">${res.error}</small>`;
+      }
+      
+      tr.innerHTML = `
+        <td>${res.name || 'Unknown'}</td>
+        <td>${res.email || 'N/A'}</td>
+        <td>${resultHtml}</td>
+      `;
+      
+      resultBody.appendChild(tr);
+    });
+  }
+  
+  modalEl.addEventListener('hidden.bs.modal', () => {
+    // If we finished importing, reload the page to show new students
+    if (resultContent.style.display === 'block') {
+      window.location.reload();
+    }
+  });
+});
+</script>

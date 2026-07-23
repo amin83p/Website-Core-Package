@@ -14,19 +14,19 @@ function read(relativePath) {
 test('student import routes use IMPORT access, upload, and import controller', () => {
   const routes = read('packages/school/MVC/routes/studentRoutes.js');
   assert.match(routes, /studentImportController/);
-  assert.match(routes, /router\.post\('\/import'/);
+  assert.match(routes, /router\.post\('\/import\/preview'/);
+  assert.match(routes, /router\.post\('\/import\/process'/);
   assert.match(routes, /OPERATIONS\.IMPORT/);
   assert.match(routes, /adminApproval/);
   assert.match(routes, /upload\('imports'\)\.single\('importFile'\)/);
-  assert.match(routes, /startImport/);
-  assert.match(routes, /import\/stream\/:jobId/);
-  assert.match(routes, /import\/abort\/:jobId/);
-  assert.match(routes, /import\/report\/:jobId/);
+  assert.match(routes, /previewImport/);
+  assert.match(routes, /processImport/);
 });
 
-test('studentImportController uses createImportController and admission service', () => {
+test('studentImportController uses preview and process endpoints and admission service', () => {
   const source = read('packages/school/MVC/controllers/school/studentImportController.js');
-  assert.match(source, /createImportController/);
+  assert.match(source, /previewImport/);
+  assert.match(source, /processImport/);
   assert.match(source, /admitNewPersonAndStudentFromRecord/);
   assert.match(source, /validateImportRecord/);
   assert.match(source, /buildContext/);
@@ -55,7 +55,7 @@ test('studentPersonAdmissionService rejects personId and applies create defaults
 
 test('student directory enables file import modal like other core list pages', () => {
   const controller = read('packages/school/MVC/controllers/school/studentController.js');
-  assert.match(controller, /includeModal_FileImport:\s*Boolean\(canCreateStudents\)/);
+  assert.match(controller, /includeModal_StudentImport:\s*Boolean\(canCreateStudents\)/);
   assert.match(controller, /newUrl:\s*'school\/students'/);
   assert.match(controller, /newLabel:\s*canCreateStudents\s*\?\s*'Admit Student'/);
 

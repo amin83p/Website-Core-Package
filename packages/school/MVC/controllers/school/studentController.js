@@ -619,7 +619,7 @@ exports.listStudents = async (req, res) => {
             searchableFields,
             includeModal: true,
             includeModal_Table: true,
-            includeModal_FileImport: Boolean(canCreateStudents),
+            includeModal_StudentImport: Boolean(canCreateStudents),
             print: true,
             pagination,
             filters: req.query,

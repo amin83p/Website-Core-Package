@@ -1,0 +1,4 @@
+{"sessionId":"77fde1","location":"dataMaintenance/index.ejs:init","message":"page script initialized","data":{"hasBootstrap":false,"deleteModalReady":false,"clearAllModalReady":false},"timestamp":1783986786554,"hypothesisId":"A"}
+{"sessionId":"77fde1","location":"dataMaintenance/index.ejs:loadSummary:start","message":"loading summary","data":{"selectFirst":true},"timestamp":1783986786556,"hypothesisId":"B"}
+{"sessionId":"77fde1","location":"schoolDataMaintenanceController.js:getSummary:entry","message":"summary request","data":{"userId":"ROOT_001","activeOrgId":"900000","isAjax":true},"timestamp":1783986787369,"hypothesisId":"B"}
+{"sessionId":"77fde1","location":"schoolDataMaintenanceController.js:getSummary:success","message":"summary built","data":{"collectionCount":40,"backendMode":"mongo"},"timestamp":1783986787886,"hypothesisId":"D"}

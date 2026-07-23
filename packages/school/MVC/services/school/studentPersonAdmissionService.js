@@ -266,6 +266,37 @@ async function createStudentSubAccount({ student, person, accessibleAccounts, re
   }, reqUser, options);
 }
 
+function parseClbString(str) {
+  if (!str || typeof str !== 'string') return {};
+  const result = {};
+  const parts = str.trim().split(/\s+/);
+  for (const part of parts) {
+    const match = part.match(/^([LSRW])(.*)$/i);
+    if (match) {
+      const type = match[1].toUpperCase();
+      const val = match[2];
+      if (type === 'L') result.listening = val;
+      if (type === 'S') result.speaking = val;
+      if (type === 'R') result.reading = val;
+      if (type === 'W') result.writing = val;
+    }
+  }
+  return result;
+}
+
+function parseClbData(data) {
+  if (!data) return {};
+  if (typeof data === 'object') return data;
+  if (typeof data === 'string') {
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      return parseClbString(data);
+    }
+  }
+  return {};
+}
+
 /**
  * @param {object} record CSV row
  * @param {object} context { reqUser, orgToday, userId }
@@ -313,6 +344,21 @@ async function admitNewPersonAndStudentFromRecord(record, context = {}) {
     attachments: [],
     clbLevelHistory: []
   };
+
+  const clbCurrent = parseClbData(row.clbCurrent);
+  const clbGoal = parseClbData(row.clbGoal);
+  const clbResult = parseClbData(row.clbResult);
+
+  if (Object.keys(clbCurrent).length > 0 || Object.keys(clbGoal).length > 0 || Object.keys(clbResult).length > 0) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    studentPayload.clbLevelHistory.push({
+      id: `clb_${Date.now()}_0`,
+      recordedAt: todayStr,
+      current: clbCurrent,
+      goal: clbGoal,
+      result: clbResult
+    });
+  }
 
   const savedStudent = await schoolDataService.addData('students', studentPayload, reqUser);
   const createdStudentId = toPublicId(savedStudent?.id);
