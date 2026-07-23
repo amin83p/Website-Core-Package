@@ -259,9 +259,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
       const response = await fetch('/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-AJAX-Request': 'true',
+          'csrf-token': csrfToken
+        },
         body: JSON.stringify(payload)
       });
 
@@ -333,10 +338,15 @@ window.killSessionAndLogin = async function(sessionId, authProvider = 'password'
     if(btn) { btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; btn.disabled = true; }
 
     try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
         const res = await fetch('/force-login', {
             method: 'POST',
             credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-AJAX-Request': 'true',
+              'csrf-token': csrfToken
+            },
             body: JSON.stringify({ username, password, sessionIdToKill: sessionId, authProvider })
         });
         const json = await res.json().catch(() => ({ status: 'error', message: 'Request failed (' + res.status + ').' }));
