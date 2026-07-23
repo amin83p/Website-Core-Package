@@ -6,6 +6,8 @@ const { requireAuth } = require('../middleware/authMiddleware');
 const { timeCheckMiddleware } = require('../middleware/timeCheckMiddleware');
 const rateLimit = require('express-rate-limit');
 const svgCaptcha = require('svg-captcha');
+const validateRequest = require('../middleware/validateRequest');
+const authValidators = require('../validators/authValidators');
 
 // 1. Define a Limiter (Hard block for spamming IPs)
 const loginLimiter = rateLimit({
@@ -61,17 +63,17 @@ router.get('/login', ctrl.showLogin);
 router.get('/auth/microsoft', microsoftLoginLimiter, ctrl.startMicrosoftLogin);
 router.get('/auth/microsoft/callback', microsoftLoginLimiter, ctrl.microsoftCallback);
 router.get('/password-reset', ctrl.showPasswordReset);
-router.post('/login', loginLimiter, ctrl.login);
-router.post('/force-login', loginLimiter, ctrl.forceLogin);
+router.post('/login', loginLimiter, validateRequest(authValidators.loginSchema), ctrl.login);
+router.post('/force-login', loginLimiter, validateRequest(authValidators.forceLoginSchema), ctrl.forceLogin);
 router.get('/logout', requireAuth ,ctrl.logout);
 router.get('/membership-status', requireAuth, ctrl.showMembershipStatus);
 router.get('/updates', requireAuth, ctrl.showUpdates);
-router.post('/switch-org', requireAuth, ctrl.switchOrg);
-router.post('/switch-mode', requireAuth, ctrl.switchProfileMode);
-router.post('/password-reset/request', passwordResetRequestLimiter, ctrl.requestPasswordReset);
-router.post('/password-reset/sms/start', passwordResetSmsStartLimiter, ctrl.startPasswordResetSms);
-router.post('/password-reset/verify', passwordResetVerifyLimiter, ctrl.verifyPasswordReset);
-router.post('/password-reset/complete', ctrl.completePasswordReset);
+router.post('/switch-org', requireAuth, validateRequest(authValidators.switchOrgSchema), ctrl.switchOrg);
+router.post('/switch-mode', requireAuth, validateRequest(authValidators.switchModeSchema), ctrl.switchProfileMode);
+router.post('/password-reset/request', passwordResetRequestLimiter, validateRequest(authValidators.requestPasswordResetSchema), ctrl.requestPasswordReset);
+router.post('/password-reset/sms/start', passwordResetSmsStartLimiter, validateRequest(authValidators.startPasswordResetSmsSchema), ctrl.startPasswordResetSms);
+router.post('/password-reset/verify', passwordResetVerifyLimiter, validateRequest(authValidators.verifyPasswordResetSchema), ctrl.verifyPasswordReset);
+router.post('/password-reset/complete', validateRequest(authValidators.completePasswordResetSchema), ctrl.completePasswordReset);
 
 //tempo
 router.get('/amin-dash', requireAuth, ctrl.dashboard);

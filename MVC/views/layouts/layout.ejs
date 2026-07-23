@@ -19,6 +19,7 @@
   <meta name="theme-color" content="<%= layoutThemeColor %>" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="<%= layoutShortName %>" />
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" />
 
   <script>
     (function () {

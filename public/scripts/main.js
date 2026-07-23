@@ -39,6 +39,26 @@
         return token || '';
     }
 
+    function resolveCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return String(meta?.content || '').trim();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const csrfToken = resolveCsrfToken();
+        if (csrfToken) {
+            document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(form => {
+                if (!form.querySelector('input[name="_csrf"]')) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = '_csrf';
+                    input.value = csrfToken;
+                    form.appendChild(input);
+                }
+            });
+        }
+    });
+
     function mergeHeaders(input, init) {
         const headers = new Headers();
         if (input && typeof input === 'object' && input.headers) {
@@ -68,6 +88,12 @@
             }
 
             const headers = mergeHeaders(input, init);
+            
+            const csrfToken = resolveCsrfToken();
+            if (csrfToken && !headers.has('csrf-token')) {
+                headers.set('csrf-token', csrfToken);
+            }
+
             if (headers.has('x-skip-action-state-token') || headers.has('x-skip-action-state-bridge')) {
                 return nativeFetch(input, init);
             }

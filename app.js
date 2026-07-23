@@ -6,6 +6,9 @@ const { randomUUID } = require('crypto');
 const expressLayouts = require('express-ejs-layouts');
 const cookieParser = require('cookie-parser'); // ADD THIS
 const expressSession = require('express-session');
+const helmet = require('helmet');
+const csrf = require('tiny-csrf');
+const crypto = require('crypto');
 
 function loadLocalEnvFile() {
   try {
@@ -119,13 +122,29 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'MVC/views'))
 app.use(expressLayouts);
 app.set('layout', 'layouts/layout');
-//
+
+// Helmet for HTTP Security Headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://code.jquery.com", "https://cdnjs.cloudflare.com", "https://unpkg.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com", "https://unpkg.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "data:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+      connectSrc: ["'self'", "ws:", "wss:", "https:", "http:"],
+      frameSrc: ["'self'", "https:"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
 // Increase limit to 50MB (or more if needed)
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
-// app.use(express.urlencoded({ extended: true })); // ADD: For POST forms (login)
-// app.use(express.json()); // ADD: For JSON requests (if needed)
-app.use(cookieParser()); // ADD: For cookies (JWT storage)
+app.use(cookieParser(SESSION_SECRET)); // Use session secret for signed cookies if needed
 const isProduction = String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
 app.use(expressSession({
   name: 'admin_flow.sid',
@@ -139,6 +158,24 @@ app.use(expressSession({
     maxAge: 10 * 60 * 1000
   }
 }));
+
+// CSRF Protection
+const csrfSecret = crypto.createHash('md5').update(SESSION_SECRET).digest('hex');
+app.use(csrf(
+  csrfSecret,
+  ['POST', 'PUT', 'DELETE', 'PATCH'],
+  ['/internal/file-gateway/.*'] // Exclude internal routes from CSRF if necessary
+));
+
+app.use((req, res, next) => {
+  if (req.csrfToken) {
+    res.locals.csrfToken = req.csrfToken();
+  } else {
+    res.locals.csrfToken = '';
+  }
+  next();
+});
+
 // 3. Enforce Session Limits (Reads cookies)
 app.use(sessionEnforcement);
 

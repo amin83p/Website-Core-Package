@@ -645,21 +645,21 @@ async function login(req, res) {
   try {
     const { username, password, captcha } = req.body;
     
-    // ✅ SAFETY CHECK: If session middleware is missing, skip CAPTCHA to prevent crash
+    // ✅ SAFETY CHECK: If session middleware is missing, fail closed to prevent CAPTCHA bypass
     if (!req.session) {
-        console.warn("⚠️ WARNING: express-session is not configured. Skipping CAPTCHA checks.");
+        console.error("⚠️ CRITICAL: express-session is not configured or missing. Failing closed to prevent CAPTCHA bypass.");
+        return res.status(500).json({ status: 'error', message: 'Authentication service is temporarily unavailable.' });
     } 
-    else {
-        // 1. CAPTCHA ENFORCEMENT
-        if (req.session.loginFailures === undefined) req.session.loginFailures = 0;
+    
+    // 1. CAPTCHA ENFORCEMENT
+    if (req.session.loginFailures === undefined) req.session.loginFailures = 0;
 
-        if (req.session.loginFailures >= 3) {
-            if (!captcha) {
-                return res.status(400).json({ status: 'captcha_required', message: 'Security check required.' });
-            }
-            if (req.session.captcha !== captcha) {
-                return res.status(400).json({ status: 'error', message: 'Incorrect CAPTCHA code.' });
-            }
+    if (req.session.loginFailures >= 3) {
+        if (!captcha) {
+            return res.status(400).json({ status: 'captcha_required', message: 'Security check required.' });
+        }
+        if (req.session.captcha !== captcha) {
+            return res.status(400).json({ status: 'error', message: 'Incorrect CAPTCHA code.' });
         }
     }
 

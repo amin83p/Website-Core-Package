@@ -12,6 +12,8 @@ const { SECTIONS, OPERATIONS } = require('../../config/accessConstants'); // ✅
 const adminApproval = require('../middleware/adminApproval');
 const upload = require('../middleware/upload');
 const generalExportCtrl = require('../controllers/generalExportController');
+const validateRequest = require('../middleware/validateRequest');
+const userValidators = require('../validators/userValidators');
 
 // CRUD
 
@@ -41,6 +43,7 @@ router.post('/new',
     requireAuth, 
     requireAccess(SECTIONS.USERS, OPERATIONS.CREATE), 
     trackActionState(SECTIONS.USERS, OPERATIONS.CREATE), 
+    validateRequest(userValidators.userSchema),
     ctrl.addUser
 );
 
@@ -57,6 +60,7 @@ router.post('/edit/:id',
     requireAuth, 
     requireAccess(SECTIONS.USERS, OPERATIONS.UPDATE), 
     trackActionState(SECTIONS.USERS, OPERATIONS.UPDATE), 
+    validateRequest(userValidators.editUserSchema),
     ctrl.editUser
 );
 
