@@ -7,7 +7,6 @@ const expressLayouts = require('express-ejs-layouts');
 const cookieParser = require('cookie-parser'); // ADD THIS
 const expressSession = require('express-session');
 const helmet = require('helmet');
-const csrf = require('tiny-csrf');
 const crypto = require('crypto');
 
 function loadLocalEnvFile() {
@@ -160,36 +159,33 @@ app.use(expressSession({
 }));
 
 // CSRF Protection
-const csrfSecret = crypto.createHash('md5').update(SESSION_SECRET).digest('hex');
-
-// Map header to body for tiny-csrf
 app.use((req, res, next) => {
-  if (req.headers['csrf-token']) {
-    if (!req.body) req.body = {};
-    req.body._csrf = req.headers['csrf-token'];
+  // 1. Generate token if it doesn't exist in session
+  if (req.session && !req.session.csrfToken) {
+    req.session.csrfToken = crypto.randomBytes(24).toString('hex');
   }
-  next();
-});
+  
+  // 2. Expose to locals for views
+  res.locals.csrfToken = req.session ? req.session.csrfToken : '';
 
-app.use(csrf(
-  csrfSecret,
-  ['POST', 'PUT', 'DELETE', 'PATCH'],
-  [
-    /^\/internal\/file-gateway\/.*/,
-    /^\/styles\/.*/,
-    /^\/scripts\/.*/,
-    /^\/uploads\/.*/,
-    /^\/site\.webmanifest$/,
-    /^\/captcha.*/
-  ] // Exclude static assets from CSRF token generation
-));
+  // 3. Check token for mutating methods
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    // Exclude specific routes if needed
+    if (req.originalUrl.startsWith('/internal/file-gateway/')) {
+      return next();
+    }
 
-app.use((req, res, next) => {
-  if (req.csrfToken) {
-    res.locals.csrfToken = req.csrfToken();
-  } else {
-    res.locals.csrfToken = '';
+    const tokenSent = req.headers['csrf-token'] || (req.body && req.body._csrf) || (req.query && req.query._csrf);
+    
+    if (!req.session || !tokenSent || tokenSent !== req.session.csrfToken) {
+      const isAjax = req.headers['x-ajax-request'] || req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+      if (isAjax) {
+        return res.status(403).json({ status: 'error', message: 'Invalid or missing CSRF token.' });
+      }
+      return res.status(403).send('Invalid or missing CSRF token.');
+    }
   }
+  
   next();
 });
 
