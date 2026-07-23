@@ -1,6 +1,39 @@
 const multer = require('multer');
 const path = require('path');
 const coreFilesService = require('../services/coreFilesService');
+const adminAuthorityService = require('../services/adminAuthorityService');
+
+// Define a strict allowlist of safe extensions and MIME types
+const ALLOWED_EXTENSIONS = new Set([
+  // Images
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic',
+  // Documents
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.rtf',
+  // Archives (if needed, though often risky, keeping common ones)
+  '.zip', '.rar', '.7z', '.tar', '.gz'
+]);
+
+const ALLOWED_MIME_TYPES = new Set([
+  // Images
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic',
+  // Documents
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'application/rtf',
+  // Archives
+  'application/zip',
+  'application/x-rar-compressed',
+  'application/x-7z-compressed',
+  'application/x-tar',
+  'application/gzip'
+]);
 
 function formatUploadMiddlewareError(error) {
   if (!error) return 'Upload failed.';
@@ -42,7 +75,25 @@ function upload(fixedCategory = 'misc', isDynamic = false, forceGlobal = false) 
 
   const uploader = multer({
     storage,
-    limits: { fileSize: coreFilesService.getMaxUploadFileMb() * 1024 * 1024 }
+    limits: { fileSize: coreFilesService.getMaxUploadFileMb() * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      // Check if user is a super admin
+      const isSuperAdmin = adminAuthorityService.isSuperAdmin(req.user);
+      
+      if (isSuperAdmin) {
+        // Super admins can upload anything
+        return cb(null, true);
+      }
+
+      const ext = path.extname(file.originalname).toLowerCase();
+      const mimeType = file.mimetype;
+
+      if (ALLOWED_EXTENSIONS.has(ext) && ALLOWED_MIME_TYPES.has(mimeType)) {
+        return cb(null, true);
+      }
+
+      return cb(new Error(`File type not allowed. Allowed types: Images, Documents, Archives. Attempted to upload: ${ext} (${mimeType})`));
+    }
   });
 
   const originalUploadMethods = {
