@@ -666,11 +666,13 @@
             controller = new AbortController();
             timeoutHandle = setTimeout(() => controller.abort(), 45000);
             
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
             const response = await fetch('/switch-org', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-AJAX-Request': 'true'
+                    'X-AJAX-Request': 'true',
+                    'csrf-token': csrfToken
                 },
                 body: JSON.stringify({ orgId: orgId }),
                 signal: controller.signal
