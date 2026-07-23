@@ -1,8 +1,7 @@
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const schoolCalendarService = require('../../services/school/schoolCalendarService');
 const scheduleController = require('./scheduleController');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
 
 function normalizeId(value) {
   return String(value == null ? '' : value).trim();
@@ -33,10 +32,7 @@ function getActiveOrgId(reqUser = {}) {
 }
 
 function isCalendarAdminViewer(reqUser) {
-  return Boolean(adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_CALENDAR, OPERATIONS.READ_ALL, {
-    orgId: reqUser?.activeOrgId,
-    section: { id: SECTIONS.SCHOOL_CALENDAR, category: 'SCHOOL' }
-  }));
+  return schoolAdminAccessService.isCalendarAdminViewer(reqUser);
 }
 
 function jsonError(res, error, fallback = 'Unable to load School Calendar data.') {

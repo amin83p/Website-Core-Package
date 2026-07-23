@@ -4,7 +4,7 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const schoolRepositories = require('../../repositories/school');
 const globalTransactionLedgerModel = require('../../models/school/globalTransactionLedgerModel');
 const transactionDefinitionPreviewService = require('../../services/school/transactionDefinitionPreviewService');
@@ -73,7 +73,7 @@ async function fetchAccountsForOrg(orgId, reqUser) {
   const scopeOrgId = toPublicId(orgId || reqUser?.activeOrgId);
   if (!scopeOrgId) return [];
 
-  const isSystemScopedSuperAdmin = adminChekersService.isSuperAdmin(reqUser)
+  const isSystemScopedSuperAdmin = adminAuthorityService.isSuperAdmin(reqUser)
     && String(toPublicId(reqUser?.activeOrgId)).toUpperCase() === 'SYSTEM';
 
   if (isSystemScopedSuperAdmin) {
@@ -150,7 +150,7 @@ async function renderTransactionDefinitionFormView(req, res, viewName, titleOver
     const postingAccounts = transactionDefinitionPreviewService.filterPostingAccountsForForm(
       allAccounts,
       activeOrgId,
-      adminChekersService.isSuperAdmin(req.user)
+      adminAuthorityService.isSuperAdmin(req.user)
     );
 
     res.render(viewName, {

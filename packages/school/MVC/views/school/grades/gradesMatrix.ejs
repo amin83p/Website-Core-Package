@@ -48,7 +48,7 @@
     ? schoolSectionDashboardHref
     : '/dashboard/section-nav/SCHOOL';
   const gmManageBtns = [];
-  if (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) {
+  if (typeof canOpenAttendanceMatrix !== 'undefined' && canOpenAttendanceMatrix) {
     gmManageBtns.push('<a href="/school/attendances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-grid-3x3 me-1"></i> Attendance Matrix</a>');
   }
 %>

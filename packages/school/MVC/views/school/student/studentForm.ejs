@@ -4,6 +4,11 @@
   const hasCustomStudentId = Object.prototype.hasOwnProperty.call(s, 'customStudentId');
   const customStudentIdValue = hasCustomStudentId ? (s.customStudentId || '') : (isEdit ? s.id : '');
   const routeId = (s.id || s.personId || '');
+  const orgTodayToken = String((typeof orgToday !== 'undefined' && orgToday) ? orgToday : '').trim();
+  const admissionYear = (/^\d{4}/.test(orgTodayToken) ? orgTodayToken.slice(0, 4) : String(new Date().getFullYear()));
+  const defaultAdmissionDate = `${admissionYear}-01-01`;
+  const defaultCountryOfOrigin = 'Canada';
+  const defaultFeeCategory = 'Domestic';
 
   // actionStateId is injected by actionState middleware/controller (anti-tamper token)
   const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
@@ -137,7 +142,7 @@
                        </div>
                        <div class="col-md-6">
                          <label class="form-label fw-bold">Date of Birth *</label>
-                         <input type="date" name="newPersonDateOfBirth" id="inp_newPersonDateOfBirth" class="form-control size-md">
+                         <input type="date" name="newPersonDateOfBirth" id="inp_newPersonDateOfBirth" class="form-control size-md" value="2000-01-01">
                        </div>
                      </div>
                    </div>
@@ -222,7 +227,7 @@
                      <select name="countryOfOrigin" class="form-select size-md">
                          <option value="">-- Select Country --</option>
                          <% countries.forEach(c => { %>
-                             <option value="<%= c %>" <%= s.countryOfOrigin === c ? 'selected' : '' %>><%= c %></option>
+                             <option value="<%= c %>" <%= (s.countryOfOrigin || defaultCountryOfOrigin) === c ? 'selected' : '' %>><%= c %></option>
                          <% }); %>
                      </select>
                   </div>
@@ -231,7 +236,7 @@
                <div class="row">
                   <div class="col-md-6 mb-3">
                      <label class="form-label fw-bold">Admission Date *</label>
-                     <input type="date" name="enrollmentDate" class="form-control size-md" value="<%= s.enrollmentDate || orgToday || new Date().toISOString().split('T')[0] %>" required>
+                     <input type="date" name="enrollmentDate" class="form-control size-md" value="<%= s.enrollmentDate || defaultAdmissionDate %>" required>
                   </div>
                   <div class="col-md-6 mb-3">
                      <label class="form-label fw-bold">Global Academic Status</label>
@@ -340,9 +345,9 @@
                   <div class="col-md-4 mb-3">
                      <label class="form-label fw-bold text-success"><i class="bi bi-cash-coin me-1"></i> Default Fee Category *</label>
                      <select name="feeCategory" class="form-select size-md border-success fw-bold" required>
-                         <option value="" disabled <%= !s.feeCategory ? 'selected' : '' %>>-- Select Category --</option>
+                         <option value="" disabled>-- Select Category --</option>
                          <% feeCategories.forEach(cat => { %>
-                             <option value="<%= cat %>" <%= s.feeCategory === cat ? 'selected' : '' %>><%= cat %></option>
+                             <option value="<%= cat %>" <%= (s.feeCategory || defaultFeeCategory) === cat ? 'selected' : '' %>><%= cat %></option>
                          <% }); %>
                      </select>
                   </div>
@@ -488,7 +493,35 @@
   let editingClbEntryId = '';
   let newFileObjectUrls = [];
   let currentWizardStep = 0;
-  let newPersonEmails = [{ type: 'primary', email: '', isPrimary: true }];
+  function createRandomEquilibriumEmail() {
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let local = '';
+    for (let i = 0; i < 14; i += 1) {
+      local += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+    }
+    return `${local}@equilibrium.ab.ca`;
+  }
+  function ensurePrimaryNewPersonEmailIfEmpty() {
+    if (!Array.isArray(newPersonEmails) || !newPersonEmails.length) {
+      newPersonEmails = [{ type: 'primary', email: createRandomEquilibriumEmail(), isPrimary: true }];
+      return true;
+    }
+    const primary = newPersonEmails.find((row) => row && row.isPrimary) || newPersonEmails[0];
+    if (!primary) {
+      newPersonEmails = [{ type: 'primary', email: createRandomEquilibriumEmail(), isPrimary: true }];
+      return true;
+    }
+    if (!String(primary.email || '').trim()) {
+      primary.email = createRandomEquilibriumEmail();
+      return true;
+    }
+    return false;
+  }
+  let newPersonEmails = [{
+    type: 'primary',
+    email: '',
+    isPrimary: true
+  }];
   let newPersonPhones = [];
   let newPersonAddresses = [];
   let newPersonAddressDebounceTimer = null;
@@ -646,6 +679,8 @@
       if (personIdInput) personIdInput.required = false;
       if (personNameInput) personNameInput.required = false;
       newPersonRequiredFields.forEach((el) => { el.required = true; });
+      ensurePrimaryNewPersonEmailIfEmpty();
+      renderNewPersonEmails();
       return;
     }
 
@@ -959,6 +994,8 @@
         const input = getClbEditorInput(group, skill);
         if (input) input.value = '';
       });
+      const firstSkillInput = getClbEditorInput(group, CLB_SKILLS[0]);
+      if (firstSkillInput) firstSkillInput.value = '-';
     });
   }
 

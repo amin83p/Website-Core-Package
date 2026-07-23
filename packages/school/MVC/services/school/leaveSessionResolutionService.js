@@ -6,7 +6,7 @@ const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
@@ -446,7 +446,7 @@ async function getResolutionState(request, reqUser) {
 }
 
 async function assertCanOverrideLockedSession(reqUser) {
-  return adminChekersService.isAdminForRequestAsync(
+  return adminAuthorityService.isAdminForRequestAsync(
     reqUser,
     SECTIONS.SCHOOL_CLASSES,
     OPERATIONS.UPDATE,

@@ -32,11 +32,12 @@ test('attendance viewer uses shared Export button look and wires xlsx after load
   assert.match(viewer, /exportBtn\.disabled = !enabled/);
 });
 
-test('attendance routes expose export.xlsx with same admin gate as matrix data', () => {
+test('attendance routes expose export.xlsx with same access gate as matrix data', () => {
   const routes = read('MVC/routes/attendanceRoutes.js');
   assert.match(routes, /\/api\/export\.xlsx/);
   assert.match(routes, /exportAttendanceExcel/);
-  assert.match(routes, /requireAttendanceMatrixPolicyAdmin\(\)/);
+  assert.match(routes, /\/api\/export\.xlsx'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routes, /\/settings'[\s\S]*?requireAttendanceMatrixPolicyAdmin\(\)/);
 });
 
 test('matrix payload builder enriches enrollment dates and CLB maps', () => {

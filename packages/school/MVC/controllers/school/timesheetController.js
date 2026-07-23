@@ -5,7 +5,7 @@ const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
-const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
+const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
 const { assertOrgAccess } = requireCoreModule('MVC/utils/orgContextUtils');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
@@ -843,21 +843,11 @@ async function resolveSelfTeacherOrThrow(req) {
 }
 
 async function isTimesheetSectionAdmin(reqUser, operationId = OPERATIONS.READ_ALL) {
-    return adminAuthorityService.isAdminForRequestAsync(
-        reqUser,
-        SECTIONS.SCHOOL_TIMESHEETS,
-        operationId,
-        { section: { id: SECTIONS.SCHOOL_TIMESHEETS } }
-    );
+    return schoolAdminAccessService.isTimesheetsAdminViewerAsync(reqUser, operationId);
 }
 
 async function hasTimesheetManagementAuthority(reqUser, operationId) {
-    return adminAuthorityService.isAdminForRequestAsync(
-        reqUser,
-        SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT,
-        operationId,
-        { section: { id: SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT } }
-    );
+    return schoolAdminAccessService.isTimesheetManagementAdminViewerAsync(reqUser, operationId);
 }
 
 async function resolveTargetTeacherContext(req, {

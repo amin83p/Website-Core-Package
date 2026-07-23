@@ -2,7 +2,7 @@ const { requireCoreModule } = require('../schoolCoreContracts');
 const schoolDataService = require('../schoolDataService');
 const schoolRepositories = require('../../../repositories/school');
 const withdrawalRepository = require('../../../repositories/school/withdrawalRepository');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../../config/accessConstants');
 const classWithdrawalService = require('./classWithdrawalService');
 const termWithdrawalService = require('./termWithdrawalService');
@@ -22,7 +22,7 @@ function appendNotes(existing, addition) {
 }
 
 function isPrivilegedFinalizer(reqUser) {
-  return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_WITHDRAWAL, OPERATIONS.UPDATE, {
+  return adminAuthorityService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_WITHDRAWAL, OPERATIONS.UPDATE, {
     orgId: reqUser?.activeOrgId,
     section: { id: SECTIONS.SCHOOL_WITHDRAWAL, category: 'SCHOOL' }
   });

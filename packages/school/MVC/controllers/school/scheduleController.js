@@ -5,8 +5,7 @@ const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreMo
 const schoolDataService = require('../../services/school/schoolDataService'); 
 const schoolRepositories = require('../../repositories/school');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
@@ -29,10 +28,7 @@ function normalizeId(value) {
 }
 
 function isScheduleAdminViewer(reqUser) {
-    return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, {
-        orgId: reqUser?.activeOrgId,
-        section: { id: SECTIONS.SCHOOL_SCHEDULES, category: 'SCHOOL' }
-    });
+    return schoolAdminAccessService.isSchedulesAdminViewer(reqUser);
 }
 
 function normalizeTime(value) {

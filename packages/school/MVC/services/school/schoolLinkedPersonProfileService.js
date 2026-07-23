@@ -5,7 +5,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const coreDataService = requireCoreModule('MVC/services/dataService');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getActiveOrgIdOrThrow, assertOrgAccess } = requireCoreModule('MVC/utils/orgContextUtils');
 const publicRegistrationService = requireCoreModule('MVC/services/person/publicRegistrationService');
@@ -53,14 +53,14 @@ function getLinkConfig(linkType) {
 }
 
 function hasSectionPermission(reqUser, sectionId, operationId) {
-  return Boolean(adminChekersService.isAdminForRequest(reqUser, sectionId, operationId, {
+  return Boolean(adminAuthorityService.isAdminForRequest(reqUser, sectionId, operationId, {
     section: { id: sectionId }
   }));
 }
 
 async function hasSectionPermissionAsync(reqUser, sectionId, operationId) {
-  if (typeof adminChekersService.isAdminForRequestAsync === 'function') {
-    return Boolean(await adminChekersService.isAdminForRequestAsync(reqUser, sectionId, operationId, {
+  if (typeof adminAuthorityService.isAdminForRequestAsync === 'function') {
+    return Boolean(await adminAuthorityService.isAdminForRequestAsync(reqUser, sectionId, operationId, {
       section: { id: sectionId }
     }));
   }

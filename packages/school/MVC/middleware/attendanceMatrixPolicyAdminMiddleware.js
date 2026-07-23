@@ -1,32 +1,40 @@
+'use strict';
+
+const schoolAdminAccessService = require('../services/school/schoolAdminAccessService');
 const { requireCoreModule } = require('../services/school/schoolCoreContracts');
 const accessService = requireCoreModule('MVC/services/security');
-const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
-async function userCanManageAttendanceMatrixPolicy(user, ipAddress) {
+/** Section admins only — Matrix Thresholds settings / policy numbers. */
+async function userCanManageAttendanceMatrixPolicy(user) {
   if (!user) return false;
-  if (await adminAuthorityService.isAdminForRequestAsync(user, SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_ATTENDANCES } })) return true;
+  return schoolAdminAccessService.isAttendancesAdminViewerAsync(user);
+}
 
-  for (const operationId of [OPERATIONS.UPDATE, OPERATIONS.VIEW_DASHBOARD]) {
-    try {
-      const evaluation = await accessService.evaluateAccess({
-        user,
-        sectionId: SECTIONS.SCHOOL_ATTENDANCES,
-        operationId,
-        ipAddress: ipAddress || ''
-      });
-      if (evaluation?.allowed) return true;
-    } catch (_) {
-      /* continue */
-    }
+/**
+ * Anyone allowed to open the Attendance Matrix page (matches requireAccess UPDATE).
+ * Used for nav links; distinct from policy-admin / thresholds manage.
+ */
+async function userCanOpenAttendanceMatrix(user, ipAddress) {
+  if (!user) return false;
+  if (await schoolAdminAccessService.isAttendancesAdminViewerAsync(user)) return true;
+  try {
+    const evaluation = await accessService.evaluateAccess({
+      user,
+      sectionId: SECTIONS.SCHOOL_ATTENDANCES,
+      operationId: OPERATIONS.UPDATE,
+      ipAddress
+    });
+    return evaluation?.allowed === true;
+  } catch (_) {
+    return false;
   }
-  return false;
 }
 
 function requireAttendanceMatrixPolicyAdmin() {
   return async (req, res, next) => {
     try {
-      const ok = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
+      const ok = await userCanManageAttendanceMatrixPolicy(req.user);
       if (!ok) {
         if (req.headers['x-ajax-request'] || req.xhr || req.headers.accept?.includes('application/json')) {
           return res.status(403).json({ status: 'error', message: 'You do not have permission to manage attendance matrix settings.' });
@@ -47,5 +55,6 @@ function requireAttendanceMatrixPolicyAdmin() {
 
 module.exports = {
   userCanManageAttendanceMatrixPolicy,
+  userCanOpenAttendanceMatrix,
   requireAttendanceMatrixPolicyAdmin
 };

@@ -6,8 +6,7 @@ const personDisplayNameService = require('./personDisplayNameService');
 const taskRoutingRuleService = require('./taskRoutingRuleService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 
 const OPEN_STATUSES = new Set(['open', 'in_progress']);
 const CLOSED_STATUSES = new Set(['resolved', 'dismissed']);
@@ -116,10 +115,7 @@ async function resolvePersonName(personId, fallback = '') {
 }
 
 function isAdminViewer(user) {
-  return Boolean(adminChekersService.isAdminForRequest(user, SECTIONS.SCHOOL_TASKS, OPERATIONS.READ_ALL, {
-    orgId: getActiveOrgId(user),
-    section: { id: SECTIONS.SCHOOL_TASKS, category: 'SCHOOL' }
-  }));
+  return schoolAdminAccessService.isTasksAdminViewer(user);
 }
 
 function canManageTaskWorkflow(user, task) {

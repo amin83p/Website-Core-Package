@@ -3,8 +3,7 @@ const routingRuleModel = require('../../models/school/taskRoutingRuleModel');
 const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 
 function cleanString(value, max = 5000) {
   if (value === undefined || value === null) return '';
@@ -26,10 +25,7 @@ function getActorId(user) {
 }
 
 function isAdminViewer(user) {
-  return Boolean(adminChekersService.isAdminForRequest(user, SECTIONS.SCHOOL_TASKS, OPERATIONS.CONFIGURE, {
-    orgId: getActiveOrgId(user),
-    section: { id: SECTIONS.SCHOOL_TASKS, category: 'SCHOOL' }
-  }));
+  return schoolAdminAccessService.isTaskRoutingAdminViewer(user);
 }
 
 function assertAdmin(user) {

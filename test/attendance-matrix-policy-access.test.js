@@ -14,7 +14,7 @@ function read(relativePath) {
 
 test('matrix API only attaches attendancePolicy when user can manage policy', () => {
   const controller = read('packages/school/MVC/controllers/school/attendanceController.js');
-  assert.match(controller, /userCanManageAttendanceMatrixPolicy\(req\.user,\s*req\.ip\)/);
+  assert.match(controller, /userCanManageAttendanceMatrixPolicy\(req\.user/);
   assert.match(
     controller,
     /if\s*\(\s*canManageAttendanceMatrixPolicy\s*\)\s*\{\s*payload\.attendancePolicy\s*=\s*attendancePolicy/
@@ -32,16 +32,32 @@ test('attendance viewer hides rollup threshold tooltip for non-managers', () => 
   assert.match(viewer, /Matrix Thresholds/);
 });
 
-test('session manager passes canManage flag and hides threshold hint for others', () => {
+test('session manager shows Attendance matrix link for page access, not only policy admins', () => {
   const classCtrl = read('packages/school/MVC/controllers/school/classController.js');
+  assert.match(classCtrl, /userCanOpenAttendanceMatrix/);
+  assert.match(classCtrl, /canOpenAttendanceMatrix/);
   assert.match(classCtrl, /userCanManageAttendanceMatrixPolicy/);
   assert.match(classCtrl, /canManageAttendanceMatrixPolicy/);
 
   const sessionManager = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.match(sessionManager, /canOpenAttendanceMatrix/);
+  assert.match(sessionManager, /id="linkAttendanceMatrix"/);
+  assert.doesNotMatch(
+    sessionManager,
+    /canManageAttendanceMatrixPolicy[\s\S]{0,80}linkAttendanceMatrix/
+  );
   assert.match(sessionManager, /CAN_MANAGE_ATTENDANCE_MATRIX_POLICY/);
   assert.match(
     sessionManager,
     /CAN_MANAGE_ATTENDANCE_MATRIX_POLICY\s*!==\s*true/
   );
   assert.match(sessionManager, /attendanceMatrixThresholdHint/);
+});
+
+test('open-matrix helper is distinct from policy-admin manage helper', () => {
+  const middleware = read('packages/school/MVC/middleware/attendanceMatrixPolicyAdminMiddleware.js');
+  assert.match(middleware, /userCanOpenAttendanceMatrix/);
+  assert.match(middleware, /userCanManageAttendanceMatrixPolicy/);
+  assert.match(middleware, /evaluateAccess/);
+  assert.match(middleware, /isAttendancesAdminViewerAsync/);
 });

@@ -11,7 +11,8 @@ const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModu
 const settingService = requireCoreModule('MVC/services/settingService'); // أ¢إ“â€¦ Use Dynamic Service
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
+const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
 const { ALL_FEE_CATEGORIES_KEY } = require('../../models/school/feeCategoryCatalog');
 const {
     getFeeCategories,
@@ -214,10 +215,7 @@ function getClassRegistrationModeKey(classData) {
 }
 
 function isSchoolRequestAdmin(reqUser, sectionId, operationId = OPERATIONS.READ_ALL) {
-    return adminChekersService.isAdminForRequest(reqUser, sectionId, operationId, {
-        orgId: reqUser?.activeOrgId,
-        section: { id: sectionId, category: 'SCHOOL' }
-    });
+    return schoolAdminAccessService.isAdminForRequest(reqUser, sectionId, operationId);
 }
 
 /**

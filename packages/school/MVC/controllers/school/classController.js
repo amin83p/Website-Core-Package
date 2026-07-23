@@ -12,7 +12,8 @@ const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModu
 const settingService = requireCoreModule('MVC/services/settingService'); // أ¢إ“â€¦ Use Dynamic Service
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
+const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
 const { ALL_FEE_CATEGORIES_KEY } = require('../../models/school/feeCategoryCatalog');
 const {
     getFeeCategories,
@@ -73,7 +74,10 @@ const attendanceMatrixMetricsService = require('../../services/school/attendance
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
-const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
+const {
+    userCanManageAttendanceMatrixPolicy,
+    userCanOpenAttendanceMatrix
+} = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
 
 function isSafeChildPath(basePath, targetPath) {
     const normalizedBase = path.resolve(basePath);
@@ -308,10 +312,7 @@ function getClassRegistrationModeKey(classData) {
 }
 
 function isSchoolRequestAdmin(reqUser, sectionId, operationId = OPERATIONS.READ_ALL) {
-    return adminChekersService.isAdminForRequest(reqUser, sectionId, operationId, {
-        orgId: reqUser?.activeOrgId,
-        section: { id: sectionId, category: 'SCHOOL' }
-    });
+    return schoolAdminAccessService.isAdminForRequest(reqUser, sectionId, operationId);
 }
 
 /**
@@ -3316,6 +3317,7 @@ async function manageSession1(req, res) {
         const attendanceMatrixPolicyResolved = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSm1);
         const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
         const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
+        const canOpenAttendanceMatrix = await userCanOpenAttendanceMatrix(req.user, req.ip);
 
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
@@ -3328,6 +3330,7 @@ async function manageSession1(req, res) {
             attendanceMatrixPolicyItems: orgPolicyItemsSm1,
             enabledAttendanceStatuses,
             canManageAttendanceMatrixPolicy,
+            canOpenAttendanceMatrix,
             user: req.user
         });
     } catch (error) {
@@ -3462,13 +3465,13 @@ async function manageSession(req, res) {
 
         // --- Lock Security Check ---
         const isSessionLocked = session.locked === true || String(session.locked) === 'true';
-        let canOverride = await adminChekersService.isAdminForRequestAsync(
+        let canOverride = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_CLASSES,
             OPERATIONS.UPDATE,
             { section: { id: SECTIONS.SCHOOL_CLASSES } }
         );
-        const canDeleteStudentCases = await adminChekersService.isAdminForRequestAsync(
+        const canDeleteStudentCases = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_SESSIONS,
             OPERATIONS.DELETE,
@@ -3670,6 +3673,7 @@ async function manageSession(req, res) {
         const attendanceMatrixPolicyResolved = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerMs);
         const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
         const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
+        const canOpenAttendanceMatrix = await userCanOpenAttendanceMatrix(req.user, req.ip);
         const conductRatingScaleResolved = await conductRatingScalePolicyModel.getPolicyForOrg(
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
         );
@@ -3716,6 +3720,7 @@ async function manageSession(req, res) {
             attendanceMatrixPolicyItems: orgPolicyItemsMs,
             enabledAttendanceStatuses,
             canManageAttendanceMatrixPolicy,
+            canOpenAttendanceMatrix,
             conductRatingScaleResolved,
             sessionStudentCases,
             studentCaseDetailPresets: getPresetConfig(),
@@ -3871,7 +3876,7 @@ async function updateSessionStudentCaseStatus(req, res) {
 async function deleteSessionStudentCase(req, res) {
     try {
         const { id: classId, sessionId, caseId } = req.params;
-        const isAdmin = await adminChekersService.isAdminForRequestAsync(
+        const isAdmin = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_SESSIONS,
             OPERATIONS.DELETE,
@@ -4108,7 +4113,7 @@ async function saveSession(req, res) {
         // --- Backend Save Protection ---
         const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
         schoolDependencyService.assertSessionNotTimesheetLocked(sessions[sessionIndex], 'This session');
-        let canOverride = await adminChekersService.isAdminForRequestAsync(
+        let canOverride = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_CLASSES,
             OPERATIONS.UPDATE,
@@ -4440,7 +4445,7 @@ async function saveSessionGradebooks(req, res) {
 
         const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
         schoolDependencyService.assertSessionNotTimesheetLocked(sessions[sessionIndex], 'This session');
-        let canOverride = await adminChekersService.isAdminForRequestAsync(
+        let canOverride = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_CLASSES,
             OPERATIONS.UPDATE,
@@ -4630,7 +4635,7 @@ async function saveSessionConduct(req, res) {
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, session, req.user);
 
         const isLocked = session.locked === true || String(session.locked) === 'true';
-        const canOverride = await adminChekersService.isAdminForRequestAsync(
+        const canOverride = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_CLASSES,
             OPERATIONS.UPDATE,
@@ -4682,7 +4687,7 @@ async function setSessionLock(req, res) {
             return res.status(400).json({ status: 'error', message: 'locked is required (true or false).' });
         }
 
-        const canOverride = await adminChekersService.isAdminForRequestAsync(
+        const canOverride = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_CLASSES,
             OPERATIONS.UPDATE,

@@ -6,8 +6,7 @@ const schoolRecordAccessService = require('./schoolRecordAccessService');
 const teacherIdentityService = require('./teacherIdentityService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -46,10 +45,7 @@ function isActiveSchoolIdentityRow(row = {}) {
 }
 
 function isSessionAdminViewer(reqUser) {
-  return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL, {
-    orgId: reqUser?.activeOrgId,
-    section: { id: SECTIONS.SCHOOL_SESSIONS, category: 'SCHOOL' }
-  });
+  return schoolAdminAccessService.isSessionsAdminViewer(reqUser);
 }
 
 async function hasLinkedTeacherRole(reqUser = {}) {

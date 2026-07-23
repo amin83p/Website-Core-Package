@@ -5,7 +5,7 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 function getActiveOrgIdOrThrow(reqUser = {}) {
@@ -124,7 +124,7 @@ exports.showEditForm = async (req, res) => {
     if (!activity) throw new Error('School activity not found.');
     assertOrgAccess(activity, orgId);
     const lookups = await loadFormLookups(req);
-    const canForceUnlockTimesheetLocks = adminChekersService.isSuperAdmin(req.user);
+    const canForceUnlockTimesheetLocks = adminAuthorityService.isSuperAdmin(req.user);
     let orphanTimesheetLockedWorkSessions = [];
     if (canForceUnlockTimesheetLocks) {
       orphanTimesheetLockedWorkSessions = await activityService.listOrphanActivityTimesheetLocks({
@@ -490,7 +490,7 @@ exports.deleteWorkSession = async (req, res) => {
 
 exports.forceUnlockWorkSessionTimesheet = async (req, res) => {
   try {
-    if (!adminChekersService.isSuperAdmin(req.user)) {
+    if (!adminAuthorityService.isSuperAdmin(req.user)) {
       const message = 'Only a super user can force unlock timesheet locks on activity work sessions.';
       return res.status(403).json({ status: 'error', message });
     }
@@ -523,7 +523,7 @@ exports.forceUnlockWorkSessionTimesheet = async (req, res) => {
 
 exports.forceUnlockActivityTimesheetLocks = async (req, res) => {
   try {
-    if (!adminChekersService.isSuperAdmin(req.user)) {
+    if (!adminAuthorityService.isSuperAdmin(req.user)) {
       const message = 'Only a super user can force unlock timesheet locks on activities.';
       return res.status(403).json({ status: 'error', message });
     }

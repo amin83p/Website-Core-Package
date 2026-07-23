@@ -3,7 +3,7 @@ const reportRuleEngineService = require('./reportRuleEngineService');
 const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 const accessService = requireCoreModule('MVC/services/security');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
@@ -15,29 +15,24 @@ const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function isSchoolReportAdminViewer(reqUser) {
-  return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL, {
-    orgId: reqUser?.activeOrgId,
-    section: { id: SECTIONS.SCHOOL_REPORTS_INSTANCES, category: 'SCHOOL' }
-  });
+  return schoolAdminAccessService.isReportsInstancesAdminViewer(reqUser);
 }
 
 /**
  * Admins who may edit submitted reports and reopen them to draft for teachers.
  */
 async function isReportInstanceAdminEditor(reqUser) {
-  if (adminChekersService.isSuperAdmin(reqUser)) return true;
-  const assignmentAdmin = await adminChekersService.isAdminForRequestAsync(
+  if (schoolAdminAccessService.isSuperAdmin(reqUser)) return true;
+  const assignmentAdmin = await schoolAdminAccessService.isAdminForRequestAsync(
     reqUser,
     SECTIONS.SCHOOL_REPORTS_ASSIGNMENT,
-    OPERATIONS.UPDATE,
-    { section: { id: SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, category: 'SCHOOL' } }
+    OPERATIONS.UPDATE
   );
   if (assignmentAdmin) return true;
-  return adminChekersService.isAdminForRequestAsync(
+  return schoolAdminAccessService.isAdminForRequestAsync(
     reqUser,
     SECTIONS.SCHOOL_REPORTS_INSTANCES,
-    OPERATIONS.UPDATE,
-    { section: { id: SECTIONS.SCHOOL_REPORTS_INSTANCES, category: 'SCHOOL' } }
+    OPERATIONS.UPDATE
   );
 }
 
@@ -56,7 +51,7 @@ async function canEditReportInstanceAnswers(instance, reqUser) {
 
 /** Super users only: unlock locked reports back to submitted. */
 async function canUnlockReportInstance(reqUser) {
-  return adminChekersService.isSuperAdmin(reqUser);
+  return schoolAdminAccessService.isSuperAdmin(reqUser);
 }
 
 /** Admins may reopen submitted reports to draft for teachers. */
@@ -195,7 +190,7 @@ function evaluateSharedFieldsLockAfterReopen({
 }
 
 async function canExportReportInstance(reqUser) {
-  if (adminChekersService.isSuperAdmin(reqUser)) return true;
+  if (schoolAdminAccessService.isSuperAdmin(reqUser)) return true;
   const evaluation = await accessService.evaluateAccess({
     user: reqUser,
     sectionId: SECTIONS.SCHOOL_REPORTS_INSTANCES,
@@ -512,7 +507,7 @@ function getActiveOrgRoleSet(reqUser) {
 
 function canBypassOrgScope(reqUser) {
   if (!reqUser) return false;
-  if (!adminChekersService.isSuperAdmin(reqUser)) return false;
+  if (!schoolAdminAccessService.isSuperAdmin(reqUser)) return false;
   return String(getScopedActiveOrgId(reqUser) || '').toUpperCase() === 'SYSTEM';
 }
 

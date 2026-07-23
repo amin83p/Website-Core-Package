@@ -4,7 +4,7 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields, normalizeSearchKeyword } = requireCoreModule('MVC/utils/generalTools');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { COMPENSATION_METHODS } = require('../../models/school/teacherModel');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
@@ -18,7 +18,7 @@ function getActiveOrgIdOrThrow(reqUser) {
 
 function assertOwnerOrgAccess(owner, activeOrgId, reqUser) {
   if (!owner) return;
-  if (adminChekersService.isSuperAdmin(reqUser)) return;
+  if (adminAuthorityService.isSuperAdmin(reqUser)) return;
   if (owner.orgId && !idsEqual(owner.orgId, activeOrgId)) {
     throw new Error('<b>Security Violation</b><br>Unauthorized organization access.');
   }

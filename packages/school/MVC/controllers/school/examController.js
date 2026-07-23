@@ -8,8 +8,7 @@ const { resolveOrgTodayFromRequest } = requireCoreModule('MVC/utils/timezoneUtil
 const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
 const schoolDataService = require('../../services/school/schoolDataService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const examValidationService = require('../../services/school/examValidationService');
@@ -32,10 +31,7 @@ function hasOwn(obj, key) {
 }
 
 function isExamAdminViewer(reqUser) {
-  return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_EXAMS, OPERATIONS.READ_ALL, {
-    orgId: reqUser?.activeOrgId,
-    section: { id: SECTIONS.SCHOOL_EXAMS, category: 'SCHOOL' }
-  });
+  return schoolAdminAccessService.isExamsAdminViewer(reqUser);
 }
 
 function normalizeSelectedOptionIds(value) {

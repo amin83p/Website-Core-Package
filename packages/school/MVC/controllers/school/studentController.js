@@ -33,7 +33,7 @@ const schoolLinkedPersonProfileService = require('../../services/school/schoolLi
 const personDenormalizedNameSyncService = require('../../services/school/personDenormalizedNameSyncService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const studentSystemIdMigrationService = require('../../services/school/studentSystemIdMigrationService');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { ACADEMIC_STATUSES } = require('../../models/school/studentModel');
 const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
@@ -43,7 +43,7 @@ function routeAccess(req) {
 }
 
 async function canChangeStudentSystemIdForUser(reqUser) {
-    return Boolean(await adminChekersService.isAdminForRequestAsync(
+    return Boolean(await adminAuthorityService.isAdminForRequestAsync(
         reqUser,
         SECTIONS.SCHOOL_STUDENTS,
         OPERATIONS.UPDATE,
@@ -602,6 +602,7 @@ exports.listStudents = async (req, res) => {
             searchableFields,
             includeModal: true,
             includeModal_Table: true,
+            includeModal_FileImport: Boolean(canCreateStudents),
             print: true,
             pagination,
             filters: req.query,

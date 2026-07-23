@@ -18,7 +18,7 @@ const schoolFileService = require('../../services/school/schoolFileService');
 const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
 const accessService = requireCoreModule('MVC/services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 
 function resolveClassTeacherName(classData = {}) {
     const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
@@ -166,7 +166,7 @@ function normalizeDateOnly(value) {
 
 async function assertAttendanceMatrixSessionEditable(req, classData, session) {
     const isSessionLocked = session.locked === true || String(session.locked) === 'true';
-    const canOverride = await adminChekersService.isAdminForRequestAsync(
+    const canOverride = await adminAuthorityService.isAdminForRequestAsync(
         req.user,
         SECTIONS.SCHOOL_ATTENDANCES,
         OPERATIONS.UPDATE,
@@ -283,7 +283,7 @@ async function showAttendancePage(req, res) {
             ipAddress: req.ip
         });
         const canEditAttendanceRoster = Boolean(editEval?.allowed);
-        let canOverrideSessionLock = await adminChekersService.isAdminForRequestAsync(
+        let canOverrideSessionLock = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_ATTENDANCES,
             OPERATIONS.UPDATE,

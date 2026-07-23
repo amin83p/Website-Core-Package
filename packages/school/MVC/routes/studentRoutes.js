@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/school/studentController');
+const studentImportCtrl = require('../controllers/school/studentImportController');
 const { requireCoreModule } = require('../services/school/schoolCoreContracts');
 const {
   requireAuth,
@@ -11,6 +12,7 @@ const {
 } = require('./schoolRouteDependencies');
 
 const upload = requireCoreModule('MVC/middleware/upload');
+const adminApproval = requireCoreModule('MVC/middleware/adminApproval');
 
 router.use(requireAuth);
 
@@ -23,6 +25,25 @@ router.get('/archived',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL),
   ctrl.listArchivedStudents);
+
+router.post('/import',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.IMPORT),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.IMPORT, { requireToken: false }),
+  adminApproval,
+  upload('imports').single('importFile'),
+  studentImportCtrl.startImport);
+
+router.get('/import/stream/:jobId',
+  requireAuth,
+  studentImportCtrl.streamImportStatus);
+
+router.post('/import/abort/:jobId',
+  requireAuth,
+  studentImportCtrl.abortImport);
+
+router.get('/import/report/:jobId',
+  requireAuth,
+  studentImportCtrl.downloadImportReport);
 
 router.get('/api/eligible-persons',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE),

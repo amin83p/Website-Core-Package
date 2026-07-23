@@ -14,7 +14,10 @@ const attendanceMatrixMetricsService = require('../../services/school/attendance
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
-const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
+const {
+  userCanManageAttendanceMatrixPolicy,
+  userCanOpenAttendanceMatrix
+} = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -230,6 +233,7 @@ async function showGradesMatrixPage(req, res) {
     }
 
     const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
+    const canOpenAttendanceMatrix = await userCanOpenAttendanceMatrix(req.user, req.ip);
 
     res.render('school/grades/gradesMatrix', {
       title: 'Grades Matrix',
@@ -242,7 +246,8 @@ async function showGradesMatrixPage(req, res) {
       initialStartDate,
       initialEndDate,
       initialRange,
-      canManageAttendanceMatrixPolicy
+      canManageAttendanceMatrixPolicy,
+      canOpenAttendanceMatrix
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

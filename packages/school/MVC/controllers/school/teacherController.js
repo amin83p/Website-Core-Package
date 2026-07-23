@@ -15,7 +15,7 @@ const personDenormalizedNameSyncService = require('../../services/school/personD
 const schoolRoleSystemIdMigrationService = require('../../services/school/schoolRoleSystemIdMigrationService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const schoolPersonAttachmentService = require('../../services/school/schoolPersonAttachmentService');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
@@ -892,7 +892,7 @@ exports.saveTeacher = async (req, res) => {
 };
 
 async function assertCanChangeTeacherSystemId(req) {
-  const allowed = await adminChekersService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_TEACHERS } });
+  const allowed = await adminAuthorityService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_TEACHERS } });
   if (!allowed) { const error = new Error('Only administrators can change a Teacher System Record ID.'); error.status = 403; throw error; }
 }
 

@@ -1,8 +1,10 @@
 const schoolDataService = require('./schoolDataService');
 const schoolRecordAccessService = require('./schoolRecordAccessService');
 const activityService = require('./activityService');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { OPERATIONS } = require('../../../config/accessConstants');
 
 function normalizeId(value) {
   return String(value || '').trim();
@@ -72,13 +74,13 @@ function normalizeAssigneeRows(rows = []) {
     .filter(Boolean);
 }
 
-function isOrgWideAccess(access = {}) {
-  return schoolRecordAccessService.isOrgWideScope(access);
+function canManageAllActivityWorkSessions(reqUser, operationId = OPERATIONS.UPDATE) {
+  return schoolAdminAccessService.isActivitiesAdminViewer(reqUser, operationId);
 }
 
 function isAssigneeRowEditable({ assignee, reqUser, access, targetPersonId }) {
   if (!assignee || activityService.isAssigneeTimesheetLocked(assignee)) return false;
-  if (isOrgWideAccess(access)) return true;
+  if (canManageAllActivityWorkSessions(reqUser)) return true;
   const scopedPersonId = normalizeId(access?.personId || reqUser?.personId);
   return scopedPersonId && idsEqual(assignee.personId, targetPersonId || scopedPersonId);
 }
@@ -102,7 +104,7 @@ function assertCanManageWorkSession(activity, entry, reqUser, accessContext = {}
   }
   const access = schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext);
   const entryStatus = normalizeStatus(entry.status, 'posted');
-  const adminCanViewCancelled = isOrgWideAccess(access) && entryStatus === 'cancelled';
+  const adminCanViewCancelled = canManageAllActivityWorkSessions(reqUser) && entryStatus === 'cancelled';
   if (entryStatus !== 'posted' && !adminCanViewCancelled) {
     throw new Error('This work session is not posted.');
   }
@@ -216,7 +218,7 @@ async function getWorkSessionsOverview(activityId, reqUser, accessContext = {}) 
   }
   const access = schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext);
   const scopedPersonId = normalizeId(access.personId || reqUser?.personId);
-  const canManageAll = isOrgWideAccess(access);
+  const canManageAll = canManageAllActivityWorkSessions(reqUser);
   const postedEntries = listAccessiblePostedEntries(activity, access);
   if (!postedEntries.length) {
     throw new Error('No accessible posted work sessions found for this activity.');
@@ -302,7 +304,7 @@ async function getWorkSessionContext(activityId, entryId, reqUser, accessContext
   assertCanManageWorkSession(activity, entry, reqUser, accessContext);
   const evaluationType = activityService.normalizeEvaluationType(activity.evaluationType);
   const scopedPersonId = normalizeId(access.personId || reqUser?.personId);
-  const canManageAll = isOrgWideAccess(access);
+  const canManageAll = canManageAllActivityWorkSessions(reqUser);
   const assignees = normalizeAssigneeRows(entry.assignees)
     .map((assignee) => enrichAssigneeRow(activity, assignee, { reqUser, access, scopedPersonId }))
     .filter((assignee) => canManageAll || assignee.isSelf);
@@ -402,7 +404,7 @@ async function saveWorkSessionMetadata({
   const entry = findEntry(activity, entryId);
   if (!entry) throw new Error('Work session not found.');
   const access = schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext);
-  if (!isOrgWideAccess(access)) throw new Error('You cannot edit this work session.');
+  if (!canManageAllActivityWorkSessions(reqUser)) throw new Error('You cannot edit this work session.');
   assertCanManageWorkSession(activity, entry, reqUser, accessContext);
 
   const status = normalizeStatus(input.status || entry.status, 'posted');

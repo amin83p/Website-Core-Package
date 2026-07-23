@@ -303,3 +303,21 @@ test('student form includes CLB history UI and hidden JSON field', () => {
   assert.doesNotMatch(source, /text: 'Delete'.*onClick/);
   assert.match(reportTemplateSource, /student_clb_entries/);
 });
+
+test('student form create defaults cover DOB, email, admission, country, fee, and CLB dash', () => {
+  const source = read('packages/school/MVC/views/school/student/studentForm.ejs');
+  assert.match(source, /inp_newPersonDateOfBirth[^>]*value="2000-01-01"/);
+  assert.match(source, /defaultAdmissionDate\s*=\s*`\$\{admissionYear\}-01-01`/);
+  assert.match(source, /s\.enrollmentDate\s*\|\|\s*defaultAdmissionDate/);
+  assert.match(source, /defaultCountryOfOrigin\s*=\s*'Canada'/);
+  assert.match(source, /s\.countryOfOrigin\s*\|\|\s*defaultCountryOfOrigin/);
+  assert.match(source, /defaultFeeCategory\s*=\s*'Domestic'/);
+  assert.match(source, /s\.feeCategory\s*\|\|\s*defaultFeeCategory/);
+  assert.match(source, /createRandomEquilibriumEmail/);
+  assert.match(source, /ensurePrimaryNewPersonEmailIfEmpty/);
+  assert.match(source, /@equilibrium\.ab\.ca/);
+  assert.match(source, /for\s*\(\s*let\s+i\s*=\s*0;\s*i\s*<\s*14;/);
+  assert.match(source, /selectedMode === 'new'[\s\S]*?ensurePrimaryNewPersonEmailIfEmpty\(\)/);
+  assert.match(source, /firstSkillInput\.value\s*=\s*'-'/);
+  assert.match(source, /getClbEditorInput\(group,\s*CLB_SKILLS\[0\]\)/);
+});

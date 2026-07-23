@@ -130,17 +130,21 @@ test('pickOrgPolicyLayerForMinutes and resolvePolicyForScheduledMinutes helpers'
   assert.equal(policy.disqualifyLateMinutes, 12);
 });
 
-test('attendance routes gate matrix page and APIs with policy admin middleware', () => {
+test('attendance routes gate matrix page with requireAccess; settings with policy admin', () => {
   const routes = read('packages/school/MVC/routes/attendanceRoutes.js');
-  assert.match(routes, /requireAttendanceMatrixPolicyAdmin\(\)/);
-  assert.match(routes, /router\.get\('\/',\s*\r?\n\s*requireAttendanceMatrixPolicyAdmin\(\)/);
-  assert.match(routes, /router\.get\('\/settings',\s*\r?\n\s*requireAttendanceMatrixPolicyAdmin\(\)/);
+  assert.match(routes, /\/settings'[\s\S]*?requireAttendanceMatrixPolicyAdmin\(\)/);
+  assert.match(routes, /router\.get\('\/'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routes, /\/api\/data'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
 });
 
-test('matrix policy admin gate allows section admin, UPDATE, or VIEW_DASHBOARD', () => {
+test('matrix policy admin gate is section-admin only via schoolAdminAccessService', () => {
   const middleware = read('packages/school/MVC/middleware/attendanceMatrixPolicyAdminMiddleware.js');
-  assert.match(middleware, /isAdminForRequestAsync/);
-  assert.match(middleware, /evaluateAccess/);
-  assert.match(middleware, /VIEW_DASHBOARD/);
-  assert.match(middleware, /OPERATIONS\.UPDATE/);
+  assert.match(middleware, /schoolAdminAccessService/);
+  assert.match(middleware, /isAttendancesAdminViewerAsync/);
+  assert.doesNotMatch(middleware, /VIEW_DASHBOARD/);
+  const manageFn = middleware.slice(
+    middleware.indexOf('async function userCanManageAttendanceMatrixPolicy'),
+    middleware.indexOf('async function userCanOpenAttendanceMatrix')
+  );
+  assert.doesNotMatch(manageFn, /evaluateAccess/);
 });

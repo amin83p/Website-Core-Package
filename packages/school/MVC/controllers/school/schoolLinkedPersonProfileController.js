@@ -3,7 +3,7 @@ const personDenormalizedNameSyncService = require('../../services/school/personD
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
@@ -57,9 +57,9 @@ async function syncDenormalizedNames(req, res) {
     const personId = toPublicId(req.body?.personId || req.query?.personId || '');
     const linkType = String(req.body?.linkType || req.query?.linkType || '').trim().toLowerCase();
     const canSync = await Promise.all([
-      adminChekersService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_TEACHERS } }),
-      adminChekersService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_STAFF, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_STAFF } }),
-      adminChekersService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_STUDENTS } })
+      adminAuthorityService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_TEACHERS } }),
+      adminAuthorityService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_STAFF, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_STAFF } }),
+      adminAuthorityService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { section: { id: SECTIONS.SCHOOL_STUDENTS } })
     ]);
     const isIntegratedBulk = !personId;
     if ((isIntegratedBulk && !canSync.every(Boolean)) || (!isIntegratedBulk && !canSync.some(Boolean))) {

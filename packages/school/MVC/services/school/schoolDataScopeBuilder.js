@@ -1,6 +1,6 @@
 const { requireCoreModule } = require('./schoolCoreContracts');
 
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 const SCOPE_MODES = Object.freeze({
@@ -74,7 +74,7 @@ function getScopedPersonId(requestingUser) {
 
 function isScopedSuperAdmin(requestingUser) {
   if (!requestingUser) return false;
-  if (!adminChekersService.isSuperAdmin(requestingUser)) return false;
+  if (!adminAuthorityService.isSuperAdmin(requestingUser)) return false;
   const activeOrgId = getScopedActiveOrgId(requestingUser);
   return toPublicId(activeOrgId).toUpperCase() === 'SYSTEM';
 }
@@ -130,7 +130,7 @@ function buildSchoolListScope(requestingUser, options = {}) {
     };
   }
 
-  const allowSystemFallback = allowSystemFallbackRequested && !adminChekersService.isSuperAdmin(requestingUser);
+  const allowSystemFallback = allowSystemFallbackRequested && !adminAuthorityService.isSuperAdmin(requestingUser);
   const resolvedScopeName = scopeName || 'ORGANIZATION';
   const scopeMode = resolveScopeModeFromName(resolvedScopeName);
   const userId = getScopedUserId(requestingUser);

@@ -13,7 +13,7 @@ const {
   ALL_FEE_CATEGORIES_LABEL
 } = require('../../models/school/feeCategoryCatalog');
 const { PROGRAM_STATUSES, SUBJECT_TYPES } = require('../../models/school/programModel');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const postingPolicyService = require('../../services/school/postingPolicyService');
 const programTransactionService = require('../../services/school/programTransactionService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
@@ -211,7 +211,7 @@ function assertProgramOrgAccess(program, activeOrgId, reqUser) {
 
 function buildOrgScopedListScope(orgId, reqUser, { allowSystemFallback = false } = {}) {
   const scopeOrgId = toPublicId(orgId || reqUser?.activeOrgId);
-  const isSystemScopedSuperAdmin = adminChekersService.isSuperAdmin(reqUser)
+  const isSystemScopedSuperAdmin = adminAuthorityService.isSuperAdmin(reqUser)
     && String(toPublicId(reqUser?.activeOrgId)).toUpperCase() === 'SYSTEM';
 
   if (isSystemScopedSuperAdmin) {
@@ -364,7 +364,7 @@ exports.listPrograms = async (req, res) => {
 exports.listEligibleAdministrators = async (req, res) => {
   try {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    const isSuperAdmin = adminChekersService.isSuperAdmin(req.user);
+    const isSuperAdmin = adminAuthorityService.isSuperAdmin(req.user);
     const requestedOrgId = String(req.query.orgId || '').trim();
     if (requestedOrgId && !isSuperAdmin && !idsEqual(requestedOrgId, activeOrgId)) {
       throw new Error('Not allowed to view administrators for another organization.');

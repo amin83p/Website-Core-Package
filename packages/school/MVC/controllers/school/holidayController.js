@@ -7,7 +7,7 @@ const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
 const settingService = requireCoreModule('MVC/services/settingService'); 
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 const { resolveOrgYearFromRequest, resolveOrgTodayFromRequest } = requireCoreModule('MVC/utils/timezoneUtils');
 
@@ -19,7 +19,7 @@ function getActiveOrgIdOrThrow(reqUser) {
 
 function assertHolidayOrgAccess(holiday, activeOrgId, reqUser) {
     if (!holiday) return;
-    if (adminChekersService.isSuperAdmin(reqUser)) return;
+    if (adminAuthorityService.isSuperAdmin(reqUser)) return;
     if (holiday.orgId && !idsEqual(holiday.orgId, activeOrgId)) {
         throw new Error('<b>Security Violation</b><br>Unauthorized organization access.');
     }

@@ -9,9 +9,8 @@ const schoolRecordAccessService = require('./schoolRecordAccessService');
 const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const ACTIVE_REVIEW_STATUSES = new Set(['submitted', 'pending_reapproval']);
 const FINAL_STATUSES = new Set(['rejected', 'cancelled']);
@@ -84,10 +83,7 @@ async function resolveActorName(user) {
 }
 
 function isAdminViewer(user) {
-  return Boolean(adminChekersService.isAdminForRequest(user, SECTIONS.SCHOOL_LEAVE_REQUESTS, OPERATIONS.READ_ALL, {
-    orgId: getActiveOrgId(user),
-    section: { id: SECTIONS.SCHOOL_LEAVE_REQUESTS, category: 'SCHOOL' }
-  }));
+  return schoolAdminAccessService.isLeaveRequestsAdminViewer(user);
 }
 
 function resolveLeaveAccess(reqUser, accessContext = {}) {
