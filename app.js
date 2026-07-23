@@ -130,7 +130,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://code.jquery.com", "https://cdnjs.cloudflare.com", "https://unpkg.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com", "https://unpkg.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "data:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "data:"],
       imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
       connectSrc: ["'self'", "ws:", "wss:", "https:", "http:"],
       frameSrc: ["'self'", "https:"],
@@ -174,7 +174,14 @@ app.use((req, res, next) => {
 app.use(csrf(
   csrfSecret,
   ['POST', 'PUT', 'DELETE', 'PATCH'],
-  ['/internal/file-gateway/.*', '^/styles/.*', '^/scripts/.*', '^/uploads/.*', '^/site.webmanifest', '/styles/.*', '/scripts/.*', '/uploads/.*', '/site.webmanifest'] // Exclude static assets from CSRF token generation
+  [
+    /^\/internal\/file-gateway\/.*/,
+    /^\/styles\/.*/,
+    /^\/scripts\/.*/,
+    /^\/uploads\/.*/,
+    /^\/site\.webmanifest$/,
+    /^\/captcha.*/
+  ] // Exclude static assets from CSRF token generation
 ));
 
 app.use((req, res, next) => {
