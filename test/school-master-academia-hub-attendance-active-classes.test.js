@@ -9,12 +9,11 @@ function read(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
 }
 
-test('attendance routes expose active classes endpoint with attendance read-all access', () => {
+test('attendance routes expose active classes endpoint with matrix admin access', () => {
   const routeSource = read('packages/school/MVC/routes/attendanceRoutes.js');
 
   assert.match(routeSource, /router\.get\('\/api\/active-classes'/);
-  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.READ_ALL\)/);
-  assert.match(routeSource, /trackActionState\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAttendanceMatrixPolicyAdmin\(\)/);
   assert.match(routeSource, /ctrl\.listActiveAttendanceClasses/);
 });
 

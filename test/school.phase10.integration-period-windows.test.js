@@ -279,6 +279,7 @@ test('attendance matrix includes only students active in selected period window'
   assert.equal(res.payload.enrollmentSource, 'canonical');
   assert.ok(res.payload.matrix[0].summary);
   assert.equal(typeof res.payload.matrix[0].summary.performancePercent, 'number');
-  assert.ok(res.payload.attendancePolicy);
+  // Threshold numbers are omitted for non-managers (default mock user has no manage access).
+  assert.equal(res.payload.attendancePolicy, undefined);
 });
 

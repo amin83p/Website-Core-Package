@@ -35,23 +35,23 @@ router.post('/settings',
   ctrl.saveAttendanceMatrixSettings);
 
 router.get('/',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
+  requireAttendanceMatrixPolicyAdmin(),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
   ctrl.showAttendancePage);
 
 router.get('/api/data',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
+  requireAttendanceMatrixPolicyAdmin(),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
   ctrl.getAttendanceData);
 
 router.get('/api/export.xlsx',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
+  requireAttendanceMatrixPolicyAdmin(),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
   ctrl.exportAttendanceExcel);
 
 router.get('/api/active-classes',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
+  requireAttendanceMatrixPolicyAdmin(),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
   ctrl.listActiveAttendanceClasses);
 
 router.post('/api/comment',

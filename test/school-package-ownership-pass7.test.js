@@ -140,7 +140,7 @@ test('school package pass10 owns attendanceRoutes implementation', () => {
   assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/attendanceRoutes')"), false);
   assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/attendanceController'\)/);
   assert.match(routeSource, /require\('\.\.\/middleware\/attendanceMatrixPolicyAdminMiddleware'\)/);
-  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAttendanceMatrixPolicyAdmin\(\)/);
   assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
   assert.match(routeSource, /ctrl\.showAttendanceMatrixSettings/);
   assert.match(routeSource, /ctrl\.saveAttendanceMatrixSettings/);

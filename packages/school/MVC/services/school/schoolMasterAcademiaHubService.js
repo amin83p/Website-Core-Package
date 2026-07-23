@@ -18,6 +18,7 @@ const { buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const accessService = requireCoreModule('MVC/services/security');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
 
 const PEOPLE_MODULES = Object.freeze([
   {
@@ -1199,11 +1200,8 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
   }
 
   if (key === 'attendance') {
-    const access = await evaluateModuleAccess(req, {
-      label: 'Attendance',
-      sectionId: SECTIONS.SCHOOL_ATTENDANCES
-    });
-    if (!access.allowed) {
+    const allowed = await userCanManageAttendanceMatrixPolicy(req?.user, req?.ip);
+    if (!allowed) {
       const error = new Error('You do not have access to Attendance.');
       error.statusCode = 403;
       throw error;

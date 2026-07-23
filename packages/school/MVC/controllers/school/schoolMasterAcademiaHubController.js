@@ -1,16 +1,19 @@
 const masterAcademiaHubService = require('../../services/school/schoolMasterAcademiaHubService');
 const taskService = require('../../services/school/taskService');
+const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
 
 exports.showMasterAcademiaHubPage = async (req, res) => {
   try {
     const modules = await masterAcademiaHubService.resolveAccessibleModules(req);
     const defaultModule = modules[0] || null;
+    const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
 
     res.render('school/masterAcademiaHub', {
       title: 'Master Academia Hub',
       modules,
       defaultType: defaultModule ? defaultModule.type : '',
       canManageAllTasks: taskService.isAdminViewer(req.user),
+      canManageAttendanceMatrixPolicy,
       orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
       orgToday: req.orgToday || req.user?.orgToday || '',
       user: req.user

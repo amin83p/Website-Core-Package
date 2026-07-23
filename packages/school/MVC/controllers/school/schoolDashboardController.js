@@ -4,6 +4,7 @@ const accessService = requireCoreModule('MVC/services/security');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { getDashboardSection } = requireCoreModule('MVC/controllers/dashboardController');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
 
 const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/programs\/term-registrations(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TERM_REGISTRATIONS },
@@ -84,6 +85,15 @@ async function filterAccessibleDashboardSections(user, sections, ipAddress) {
     const allowed = [];
 
     for (const row of rows) {
+        const href = String(row?.href || '').trim();
+        // Attendance Matrix: same gate as matrix policy admin (UPDATE / VIEW_DASHBOARD / section admin).
+        if (/^\/school\/attendances(?:\/|$)/i.test(href)) {
+            if (await userCanManageAttendanceMatrixPolicy(user, ipAddress)) {
+                allowed.push({ ...row, sectionId: SECTIONS.SCHOOL_ATTENDANCES });
+            }
+            continue;
+        }
+
         const sectionId = String(row?.sectionId || inferDashboardSectionId(row?.href)).trim();
         if (!sectionId) continue;
 
