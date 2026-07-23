@@ -51,9 +51,8 @@ function assertProgramRegistrationDateWithinCycle({ classRow, registrationDate }
   const regDate = normalizeDateOnly(registrationDate);
   if (!regDate) return;
 
-  if (window.cycleStartDate && regDate < window.cycleStartDate) {
-    throw new Error(`Program registration date (${regDate}) cannot be before the class cycle start (${window.cycleStartDate}).`);
-  }
+  // Existing program registrations often predate a later class cycle. Only reject
+  // registrations that happen after the cycle has already ended.
   if (window.cycleEndDate && regDate > window.cycleEndDate) {
     throw new Error(`Program registration date (${regDate}) cannot be after the class cycle end (${window.cycleEndDate}).`);
   }

@@ -50,6 +50,11 @@ router.get('/api/eligible-persons',
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
   ctrl.listEligiblePersons);
 
+router.get('/api/name-matches',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
+  ctrl.listNameMatches);
+
 router.post('/recover/:id',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }),

@@ -29,6 +29,11 @@ router.get('/api/eligible-persons',
   trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
   ctrl.listEligiblePersons);
 
+router.get('/api/name-matches',
+  requireAccess(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
+  ctrl.listNameMatches);
+
 router.get('/:id/attachments/:attId/download',
   requireAccess(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.DOWNLOAD_FILE),
   trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.DOWNLOAD_FILE),

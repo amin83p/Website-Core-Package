@@ -340,6 +340,53 @@
     });
   }
 
+  function escapeTeacherHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function buildNameDuplicateWarningHtml(matches = []) {
+    const rows = (Array.isArray(matches) ? matches : []).slice(0, 5).map((row) => {
+      const name = escapeTeacherHtml(row?.displayName || [row?.firstName, row?.lastName].filter(Boolean).join(' ') || 'Unknown');
+      const email = escapeTeacherHtml(row?.email || '—');
+      const personId = escapeTeacherHtml(row?.personId || '—');
+      return `<li class="mb-1"><b>${name}</b><br><span class="text-muted">Email: ${email} · Person ID: ${personId}</span></li>`;
+    }).join('');
+    const extra = (Array.isArray(matches) ? matches.length : 0) > 5
+      ? `<div class="small text-muted mt-1">…and ${(matches.length - 5)} more</div>`
+      : '';
+    return (
+      `A person with this exact first and last name already exists.<br>` +
+      `Continuing will create another person record.<br><br>` +
+      `<ul class="mb-0 ps-3">${rows || '<li>Existing match found.</li>'}</ul>${extra}<br>` +
+      `Do you want to continue anyway?`
+    );
+  }
+
+  async function confirmNameDuplicateMatches(matches = []) {
+    if (!Array.isArray(matches) || !matches.length) return true;
+    return askYesNo({
+      title: 'Similar Person Found',
+      message: buildNameDuplicateWarningHtml(matches),
+      yesText: 'Create Anyway',
+      noText: 'Cancel'
+    });
+  }
+
+  async function fetchExactNameMatches(firstName, lastName) {
+    const first = String(firstName || '').trim();
+    const last = String(lastName || '').trim();
+    if (!first || !last) return [];
+    const url = `/school/teachers/api/name-matches?first=${encodeURIComponent(first)}&last=${encodeURIComponent(last)}`;
+    const response = await fetch(url, { headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' } });
+    if (!response.ok) return [];
+    const payload = await response.json().catch(() => ({}));
+    return Array.isArray(payload?.matches) ? payload.matches : [];
+  }
+
   function readJsonSafe(rawValue, fallback) {
     if (!rawValue) return fallback;
     try {
@@ -780,6 +827,7 @@
 
       try {
         const personMode = document.querySelector('input[name="personMode"]:checked')?.value || 'existing';
+        let acknowledgeNameDuplicate = false;
         if (personMode === 'existing') {
           const personId = document.getElementById('inp_personId')?.value?.trim();
           if (!personId) throw new Error('Please select a Person before saving.');
@@ -795,37 +843,75 @@
           if (!emails.length) {
             throw new Error('At least one email is required for the new person.');
           }
+          const nameMatches = await fetchExactNameMatches(firstName, lastName);
+          if (nameMatches.length) {
+            const proceed = await confirmNameDuplicateMatches(nameMatches);
+            if (!proceed) {
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = originalText;
+              return;
+            }
+            acknowledgeNameDuplicate = true;
+          }
         }
 
         syncNewPersonHiddenState();
         syncCompensationHiddenState();
         window.schoolPersonAttachments?.sync();
 
-        const data = new FormData();
-        Array.from(form.elements).forEach((element) => {
-          if (!element?.name || element.disabled || element.type === 'file') return;
-          if ((element.type === 'checkbox' || element.type === 'radio') && !element.checked) return;
-          data.append(element.name, element.value ?? '');
-        });
-        const fileInput = window.schoolPersonAttachments?.getFileInput();
-        Array.from(fileInput?.files || []).forEach((file) => data.append('files', file));
-
         const token = document.getElementById('hid_actionStateId')?.value || '';
         const submitUrl = token && !/[?&]actionStateId=/.test(String(form.action || ''))
           ? String(form.action || '') + (String(form.action || '').includes('?') ? '&' : '?') + 'actionStateId=' + encodeURIComponent(token)
           : form.action;
-        const response = await fetch(submitUrl, {
-          method: 'POST',
-          headers: { 'X-AJAX-Request': 'true' },
-          body: data
-        });
 
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-          throw new Error('Server returned non-JSON response (Status ' + response.status + ')');
+        const buildTeacherFormData = (ackNameDup) => {
+          const data = new FormData();
+          Array.from(form.elements).forEach((element) => {
+            if (!element?.name || element.disabled || element.type === 'file') return;
+            if ((element.type === 'checkbox' || element.type === 'radio') && !element.checked) return;
+            if (element.name === 'acknowledgeNameDuplicate') return;
+            data.append(element.name, element.value ?? '');
+          });
+          if (ackNameDup) data.append('acknowledgeNameDuplicate', '1');
+          const fileInput = window.schoolPersonAttachments?.getFileInput();
+          Array.from(fileInput?.files || []).forEach((file) => data.append('files', file));
+          return data;
+        };
+
+        let result = null;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const response = await fetch(submitUrl, {
+            method: 'POST',
+            headers: { 'X-AJAX-Request': 'true' },
+            body: buildTeacherFormData(acknowledgeNameDuplicate)
+          });
+
+          const contentType = response.headers.get('content-type') || '';
+          if (!contentType.includes('application/json')) {
+            throw new Error('Server returned non-JSON response (Status ' + response.status + ')');
+          }
+
+          result = await response.json();
+          const nameDupMatches = Array.isArray(result?.matches)
+            ? result.matches
+            : (Array.isArray(result?.details?.matches) ? result.details.matches : []);
+          if (
+            result?.code === 'NAME_DUPLICATE_WARNING'
+            && nameDupMatches.length
+            && !acknowledgeNameDuplicate
+          ) {
+            const proceed = await confirmNameDuplicateMatches(nameDupMatches);
+            if (!proceed) {
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = originalText;
+              return;
+            }
+            acknowledgeNameDuplicate = true;
+            continue;
+          }
+          break;
         }
 
-        const result = await response.json();
         const guarded = typeof window.applyGuardedApiResult === 'function'
           ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
           : { stop: false };

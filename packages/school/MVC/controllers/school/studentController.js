@@ -28,6 +28,7 @@ const {
     assertNoDuplicatePersonAccount,
     enrichPersonPickerRowsWithAccountState
 } = require('../../services/school/schoolPeopleDuplicateGuardService');
+const schoolPersonNameDuplicateService = require('../../services/school/schoolPersonNameDuplicateService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolLinkedPersonProfileService = require('../../services/school/schoolLinkedPersonProfileService');
 const personDenormalizedNameSyncService = require('../../services/school/personDenormalizedNameSyncService');
@@ -523,6 +524,22 @@ exports.listEligiblePersons = async (req, res) => {
     return res.status(400).json({ status: 'error', message: error.message });
   }
 };
+
+exports.listNameMatches = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const firstName = String(req.query.first || req.query.firstName || '').trim();
+    const lastName = String(req.query.last || req.query.lastName || '').trim();
+    const matches = await schoolPersonNameDuplicateService.findExactNamePersonMatches({
+      reqUser: req.user,
+      firstName,
+      lastName
+    });
+    return res.json({ status: 'success', matches });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
 exports.listStudents = async (req, res) => {
     try {
         let query = await buildDataServiceQuery(req.query);
@@ -855,6 +872,12 @@ exports.saveStudent = async (req, res) => {
         let personId = toPublicId(req.body.personId);
 
         if (!existingStudent && personMode === 'new') {
+            await schoolPersonNameDuplicateService.assertNoExactNameDuplicateOrThrow({
+                reqUser: req.user,
+                firstName: String(req.body.newPersonFirstName || '').trim(),
+                lastName: String(req.body.newPersonLastName || '').trim(),
+                acknowledged: schoolPersonNameDuplicateService.isNameDuplicateAcknowledged(req.body)
+            });
             const personPayload = buildInlinePersonPayload(req.body, req.user);
             const createdPerson = await dataServiceGlobal.addData('persons', personPayload, req.user, { transactionContext: txContext });
             personId = toPublicId(createdPerson?.id);
@@ -1007,7 +1030,8 @@ exports.saveStudent = async (req, res) => {
             code: error?.code || '',
             error,
             message: error.message,
-            details: error?.details || null
+            details: error?.details || null,
+            matches: Array.isArray(error?.details?.matches) ? error.details.matches : undefined
         };
         if (isAjax(req)) return res.status(statusCode).json(responsePayload);
         res.status(statusCode).render('error', { title: 'Error', error, message: error.message, user: req.user, statusCode });

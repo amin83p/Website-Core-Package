@@ -371,6 +371,11 @@
                  <input type="text" id="inp_instructorRole" class="form-control size-md" value="Primary">
               </div>
            </div>
+           <div class="mb-3" id="additionalInstructorsSection">
+              <label class="form-label">Additional instructors</label>
+              <div id="additionalInstructorsList" class="border rounded p-2 bg-light small" style="min-height: 2.5rem;"></div>
+              <div class="form-text">Remove former or extra teachers from the class roster. The assigned teacher above cannot be removed here.</div>
+           </div>
         </div>
 
         <div class="tab-pane fade" id="tab-sessions">
@@ -1148,6 +1153,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('bg_teacherId').value = primary.personId;
         document.getElementById('bg_teacherName').value = primary.name || primary.personId;
     }
+    renderAdditionalInstructors();
+    document.getElementById('additionalInstructorsList')?.addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-remove-instructor]');
+        if (!btn) return;
+        removeInstructorFromRoster(btn.getAttribute('data-remove-instructor'));
+    });
 
     document.getElementById('inp_passingScore').value = dEval.passingScore || 60;
     document.getElementById('inp_wAtt').value = dEval.weights?.attendance || 10;
@@ -2811,6 +2822,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('inp_instructorName').value = teacher.displayName;
         document.getElementById('bg_teacherId').value = teacher.personId;
         document.getElementById('bg_teacherName').value = teacher.displayName;
+        getInstructorRowsForSubmit();
     }, {
         renderer: teacherPickerRenderer,
         context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
@@ -4181,6 +4193,57 @@ function parseInstructorRowsFromHidden() {
     }
 }
 
+function escapeInstructorListHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderAdditionalInstructors() {
+    const listEl = document.getElementById('additionalInstructorsList');
+    if (!listEl) return;
+    const primaryId = String(document.getElementById('inp_instructorId')?.value || '').trim();
+    const extras = parseInstructorRowsFromHidden().filter((row) => {
+        const personId = String(row?.personId || '').trim();
+        return personId && personId !== primaryId;
+    });
+    if (!extras.length) {
+        listEl.innerHTML = '<span class="text-muted">No additional instructors on this class.</span>';
+        return;
+    }
+    listEl.innerHTML = extras.map((row) => {
+        const personId = String(row?.personId || '').trim();
+        const name = escapeInstructorListHtml(row?.name || personId);
+        const role = escapeInstructorListHtml(row?.role || 'Instructor');
+        const inactive = String(row?.status || 'active').trim().toLowerCase() === 'inactive';
+        const inactiveBadge = inactive
+            ? '<span class="badge bg-secondary-subtle text-secondary border ms-1">Inactive</span>'
+            : '';
+        return `
+        <div class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
+          <div>
+            <span class="fw-semibold">${name}</span>
+            <span class="text-muted"> · ${role}</span>
+            ${inactiveBadge}
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-danger" data-remove-instructor="${escapeInstructorListHtml(personId)}" title="Remove from class roster">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>`;
+    }).join('');
+}
+
+function removeInstructorFromRoster(personId) {
+    const id = String(personId || '').trim();
+    const primaryId = String(document.getElementById('inp_instructorId')?.value || '').trim();
+    if (!id || (primaryId && id === primaryId)) return;
+    const rows = parseInstructorRowsFromHidden().filter((row) => String(row?.personId || '').trim() !== id);
+    writeInstructorRowsToHidden(rows);
+}
+
 function writeInstructorRowsToHidden(rows = []) {
     const cleaned = [];
     const seen = new Set();
@@ -4199,17 +4262,37 @@ function writeInstructorRowsToHidden(rows = []) {
     });
     const hidden = document.getElementById('hid_instructors');
     if (hidden) hidden.value = JSON.stringify(cleaned);
+    renderAdditionalInstructors();
     return cleaned;
 }
 
 function getInstructorRowsForSubmit() {
-    const rows = parseInstructorRowsFromHidden();
+    let rows = parseInstructorRowsFromHidden();
     const instId = String(document.getElementById('inp_instructorId')?.value || '').trim();
     const instName = String(document.getElementById('inp_instructorName')?.value || '').trim();
-    const instRole = String(document.getElementById('inp_instructorRole')?.value || 'Primary').trim();
-    if (instId && !rows.some((row) => String(row?.personId || '').trim() === instId)) {
-        rows.push({ personId: instId, name: instName || instId, role: instRole || 'Primary', status: 'active' });
+    const instRole = String(document.getElementById('inp_instructorRole')?.value || 'Primary').trim() || 'Primary';
+
+    if (instId) {
+        const existing = rows.find((row) => String(row?.personId || '').trim() === instId) || null;
+        rows = rows
+            .filter((row) => String(row?.personId || '').trim() !== instId)
+            .map((row) => {
+                const role = String(row?.role || '').trim();
+                if (role.toLowerCase() === 'primary') {
+                    return { ...row, role: 'Instructor' };
+                }
+                return row;
+            });
+        rows.unshift({
+            personId: instId,
+            name: instName || existing?.name || instId,
+            role: instRole,
+            status: 'active',
+            assignedAt: existing?.assignedAt || new Date().toISOString(),
+            unassignedAt: null
+        });
     }
+
     return writeInstructorRowsToHidden(rows);
 }
 
@@ -4254,6 +4337,7 @@ function syncInstructorRosterAfterBulkTeacherChange({ oldTeacherId = '', oldTeac
         primaryId.value = newId;
         if (primaryName) primaryName.value = String(newTeacherName || newId).trim();
         if (primaryRole && !String(primaryRole.value || '').trim()) primaryRole.value = 'Primary';
+        renderAdditionalInstructors();
     }
 }
 

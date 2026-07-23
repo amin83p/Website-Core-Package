@@ -281,13 +281,17 @@ test('buildTermClassPreview includes cycle issues for out-of-window enrollment d
   assert.ok(preview.issues.some((issue) => /cannot be before the class cycle start/.test(issue)));
 });
 
-test('isProgramRegistrationDateWithinCycle excludes late registrations', () => {
+test('isProgramRegistrationDateWithinCycle excludes late registrations but allows early ones', () => {
   assert.equal(
     policyService.isProgramRegistrationDateWithinCycle(rollingClass, '2026-07-01'),
     false
   );
   assert.equal(
     policyService.isProgramRegistrationDateWithinCycle(rollingClass, '2026-03-01'),
+    true
+  );
+  assert.equal(
+    policyService.isProgramRegistrationDateWithinCycle(rollingClass, '2025-12-15'),
     true
   );
 });

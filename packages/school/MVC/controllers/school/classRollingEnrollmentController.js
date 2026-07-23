@@ -1734,6 +1734,7 @@ async function resolveRollingEnrollmentProgramFromStudentRegistrations(req, clas
   const candidates = [];
   const seen = new Set();
   let hasAllowedProgramRegistration = false;
+  const skipReasons = [];
 
   for (const progReg of progRegs) {
     const pid = toPublicId(progReg?.programId);
@@ -1744,6 +1745,7 @@ async function resolveRollingEnrollmentProgramFromStudentRegistrations(req, clas
 
     const regDate = String(progReg?.registrationDate || '');
     if (!classCycleEnrollmentPolicyService.isProgramRegistrationDateWithinCycle(classData, regDate)) {
+      skipReasons.push({ reason: 'outside_cycle' });
       continue;
     }
     const programChoices = choices.filter((c) => idsEqual(c.programId, pid));
@@ -1752,7 +1754,10 @@ async function resolveRollingEnrollmentProgramFromStudentRegistrations(req, clas
       const choiceTermId = toPublicId(ch.termId);
       if (choiceTermId) {
         const hasTerm = termRegs.some((tr) => idsEqual(tr.programId, pid) && idsEqual(tr.termId, choiceTermId));
-        if (!hasTerm) continue;
+        if (!hasTerm) {
+          skipReasons.push({ reason: 'missing_required_term' });
+          continue;
+        }
         const key = `${prId}|${pid}|${choiceTermId}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -1801,6 +1806,13 @@ async function resolveRollingEnrollmentProgramFromStudentRegistrations(req, clas
 
   if (!candidates.length) {
     if (hasAllowedProgramRegistration) {
+      const outsideCycle = skipReasons.some((row) => row?.reason === 'outside_cycle');
+      const missingTerm = skipReasons.some((row) => row?.reason === 'missing_required_term');
+      if (outsideCycle && !missingTerm) {
+        throw new Error(
+          'This student has an approved program registration for an allowed program, but the program registration date falls outside this class cycle window.'
+        );
+      }
       throw new Error(
         'This student has an approved program registration for an allowed program, but the required term registration is missing. Register the student in the required term, then try Rolling Enrollment again.'
       );
