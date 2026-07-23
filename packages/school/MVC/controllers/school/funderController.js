@@ -6,7 +6,7 @@ const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
-const { getActiveOrgIdOrThrow, assertCreateOrgContextOrThrow, assertOrgAccess } = requireCoreModule('MVC/utils/orgContextUtils');
+    const { getActiveOrgIdOrThrow, assertCreateOrgContextOrThrow, assertOrgAccess, canCreateOrgScopedItem } = requireCoreModule('MVC/utils/orgContextUtils');
 
 const PARTY_LEAF_ROLES = new Set(['student', 'teacher', 'staff', 'parent', 'funder', 'vendor', 'organization', 'other']);
 
@@ -212,9 +212,10 @@ exports.listFunders = async (req, res) => {
     }));
     const query = String(req.query?.q || '').trim().toLowerCase();
     const filtered = query ? mapped.filter((row) => [row.id, row.personName, row.personEmail, row.externalReference, row.status, row.account?.code, row.account?.name].join(' ').toLowerCase().includes(query)) : mapped;
+    const canCreateFunders = await canCreateOrgScopedItem(req.user, { scopeLabel: 'funders' });
     const { data, pagination } = paginate(filtered, req.query || {});
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
-    return res.render('school/funder/funderList', { title: 'School Funders', data, pagination, filters: req.query || {}, user: req.user, includeModal: true, includeModal_Table: true, tableName: 'School_Funders', newUrl: 'school/funders', newLabel: 'Add Funder', print: true, actionStateId: req.actionStateId });
+    return res.render('school/funder/funderList', { title: 'School Funders', data, pagination, filters: req.query || {}, user: req.user, includeModal: true, includeModal_Table: true, tableName: 'School_Funders', newUrl: 'school/funders', newLabel: canCreateFunders ? 'Add Funder' : null, print: true, actionStateId: req.actionStateId });
   } catch (error) {
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     return res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });

@@ -10,7 +10,7 @@
 const fs = require('fs');
 const { parse } = require('csv-parse');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
-const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
+    const { getActiveOrgIdOrThrow, assertCreateOrgContextOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
 const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const {
   validateImportRecord,
@@ -50,6 +50,12 @@ async function previewImport(req, res) {
   try {
     if (!req.file) {
       return res.status(400).json({ status: 'error', message: 'No file uploaded.' });
+    }
+
+    try {
+      await assertCreateOrgContextOrThrow(req.user, { scopeLabel: 'students' });
+    } catch (orgError) {
+      return res.status(403).json({ status: 'error', message: orgError.message });
     }
 
     const context = buildContext(req);
@@ -103,6 +109,12 @@ async function previewImport(req, res) {
 
 async function processImport(req, res) {
   try {
+    try {
+      await assertCreateOrgContextOrThrow(req.user, { scopeLabel: 'students' });
+    } catch (orgError) {
+      return res.status(403).json({ status: 'error', message: orgError.message });
+    }
+
     const { rows } = req.body;
     if (!Array.isArray(rows) || rows.length === 0) {
       return res.status(400).json({ status: 'error', message: 'No rows selected for import.' });
