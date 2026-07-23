@@ -11,13 +11,18 @@ function escapeCsv(val) {
   return str;
 }
 
-async function convertExcelToCsv(inputFilePath, outputFilePath) {
+async function convertExcelToCsv(inputFilePath, outputFilePath, sheetIndex = 0) {
   try {
-    console.log(`Reading Excel file: ${inputFilePath}`);
+    console.log(`Reading Excel file: ${inputFilePath}, Sheet Index: ${sheetIndex}`);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(inputFilePath);
     
-    const worksheet = workbook.worksheets[0]; // Assume first sheet
+    if (sheetIndex >= workbook.worksheets.length) {
+      console.error(`Sheet index ${sheetIndex} is out of bounds. The workbook only has ${workbook.worksheets.length} sheets.`);
+      return;
+    }
+    
+    const worksheet = workbook.worksheets[sheetIndex];
     const students = [];
     
     let isDataRow = false;
@@ -67,7 +72,7 @@ async function convertExcelToCsv(inputFilePath, outputFilePath) {
         firstName = String(firstName || '').trim();
         clb = String(clb || '').trim();
         
-        if (lastName && firstName && lastName !== 'Last Name' && firstName !== 'First Name') {
+        if (lastName && firstName && lastName !== 'Last Name' && firstName !== 'First Name' && lastName !== 'Part-time') {
           students.push({
             firstName,
             lastName,
@@ -108,13 +113,14 @@ async function convertExcelToCsv(inputFilePath, outputFilePath) {
 if (require.main === module) {
   const inputPath = process.argv[2] || 'c:/Users/Amin/Downloads/July 2026 Attendance EAL class (3) (1).xlsx';
   const outputPath = process.argv[3] || path.join(__dirname, 'import_students.csv');
+  const sheetIndex = parseInt(process.argv[4] || '0', 10);
   
   if (!fs.existsSync(inputPath)) {
     console.error(`Input file not found: ${inputPath}`);
     process.exit(1);
   }
   
-  convertExcelToCsv(inputPath, outputPath);
+  convertExcelToCsv(inputPath, outputPath, sheetIndex);
 }
 
 module.exports = convertExcelToCsv;

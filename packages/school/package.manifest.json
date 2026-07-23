@@ -3084,6 +3084,38 @@
       "subsections": [],
       "related": [],
       "adoptExisting": true
+    },
+    {
+      "id": "445583",
+      "name": "SCHOOL_REPORT_HUB",
+      "category": "SCHOOL",
+      "description": "Full-width Report Hub for reviewing reports from one workspace.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/report-hub",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
     }
   ],
   "symbols": [
@@ -3603,6 +3635,18 @@
       "tags": [
         "SCHOOL_CALENDAR",
         "445581"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_128",
+      "name": "SCHOOL_REPORT_HUB",
+      "type": "class",
+      "value": "bi bi-grid-1x2-fill",
+      "tags": [
+        "SCHOOL_REPORT_HUB",
+        "445583"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -7980,6 +8024,17 @@
       "href": "/school/master-hub",
       "icon": "bi bi-grid-1x2-fill",
       "description": "Open the Master Academia Hub for people, attendance, schedules, sessions, classes, tasks, and leave requests.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
+    },
+    {
+      "id": "school-dashboard-report-hub",
+      "label": "Report Hub",
+      "href": "/school/report-hub",
+      "icon": "bi bi-grid-1x2-fill",
+      "description": "Open the Report Hub for reviewing reports from one workspace.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",

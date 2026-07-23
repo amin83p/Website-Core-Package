@@ -1992,6 +1992,51 @@ async function previewRollingEnrollmentEligibility(req, res) {
       effectiveStart
     );
 
+    const endDate = String(req.query.endDate || '').trim();
+    if (startDate && prereqPreview.status !== 'error') {
+      const sessions = await schoolDataService.getClassSessions(classData.id, req.user);
+      const filteredSessions = (Array.isArray(sessions) ? sessions : []).filter((s) => {
+        const sDate = String(s?.date || '').trim();
+        if (!sDate) return false;
+        if (sDate < startDate) return false;
+        if (endDate && sDate > endDate) return false;
+        return true;
+      });
+      
+      if (filteredSessions.length > 0) {
+        const personById = await schoolPersonAccessService.buildPersonByIdMap({
+          reqUser: req.user,
+          personIds: [student?.personId]
+        });
+        const studentLabel = schoolPersonAccessService.formatPersonName(
+          personById.get(toPublicId(student?.personId)),
+          toPublicId(student?.id)
+        );
+        
+        const conflictResult = await sessionConflictDetectionService.detectStudentScheduleConflicts({
+          orgId: classData.orgId,
+          classId: classData.id,
+          proposedSessions: filteredSessions,
+          studentPersonEntries: [{
+            studentId: student.id,
+            personId: student.personId,
+            name: studentLabel
+          }],
+          reqUser: req.user
+        });
+        
+        if (conflictResult.length > 0) {
+          const conflictMsg = "Scheduling conflicts detected with the student's existing schedule.";
+          if (!Array.isArray(prereqPreview.issues)) prereqPreview.issues = [];
+          prereqPreview.issues.push(conflictMsg);
+          prereqPreview.status = 'error';
+          prereqPreview.conflicts = conflictResult;
+          prereqPreview.conflictStudentPersonId = student.personId;
+          prereqPreview.conflictStudentLabel = studentLabel;
+        }
+      }
+    }
+
     return res.json({
       status: 'success',
       eligible: prereqPreview.status !== 'error',
@@ -2015,7 +2060,10 @@ async function previewRollingEnrollmentEligibility(req, res) {
           : { max: 0, enrolled: 0, isAtCapacity: false },
         missingSubjects: Array.isArray(prereqPreview.missingSubjects) ? prereqPreview.missingSubjects : [],
         canCreatePriorCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
-        repairProgramId: prereqPreview.repairProgramId || merged.programId || ''
+        repairProgramId: prereqPreview.repairProgramId || merged.programId || '',
+        conflicts: prereqPreview.conflicts || null,
+        conflictStudentPersonId: prereqPreview.conflictStudentPersonId || null,
+        conflictStudentLabel: prereqPreview.conflictStudentLabel || null
       }
     });
   } catch (error) {

@@ -1932,6 +1932,23 @@
     "value": "bi bi-file-earmark-text-fill"
   },
   {
+    "id": "SYM_SYSTEM_128",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-07-23T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-07-23T00:00:00.000Z"
+    },
+    "name": "SCHOOL_REPORT_HUB",
+    "orgId": "SYSTEM",
+    "tags": [
+      "SCHOOL_REPORT_HUB",
+      "445583"
+    ],
+    "type": "class",
+    "value": "bi bi-grid-1x2-fill"
+  },
+  {
     "id": "SYM_SYSTEM_055",
     "audit": {
       "createUser": "ROOT_001",

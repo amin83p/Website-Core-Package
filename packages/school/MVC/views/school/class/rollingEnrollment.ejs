@@ -849,6 +849,38 @@
 <%- include('partials/modal_GenericPicker') %>
 
 <script src="/scripts/wizardStepRail.js"></script>
+<div class="modal fade" id="studentConflictModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Student Schedule Conflicts</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Conflict Class</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="studentConflictTbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <a href="#" target="_blank" rel="noopener" class="btn btn-primary" id="btn_viewStudentSchedule">
+          <i class="bi bi-calendar3 me-1"></i>View Full Schedule
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (() => {
   const ORG_TODAY = <%- JSON.stringify(typeof orgToday !== 'undefined' ? orgToday : '') %>;
@@ -1187,6 +1219,28 @@
     return text.includes('no active program registration') || text.includes('register the student in a program listed under this class');
   }
 
+  function isStudentConflictMessage(message) {
+    const text = String(message || '').toLowerCase();
+    return text.includes('scheduling conflicts detected with the student\'s existing schedule');
+  }
+
+  function renderStudentConflictHtml(message) {
+    const issue = htmlEscape(message || 'Scheduling conflicts detected with the student\'s existing schedule.');
+    const conflicts = lastRollingEligibility?.prerequisite?.conflicts || [];
+    const choiceText = conflicts.length === 1
+      ? '1 session conflict detected.'
+      : conflicts.length + ' session conflicts detected.';
+    return (
+      '<div class="text-danger small mt-1">' + issue + '</div>' +
+      '<div class="d-flex flex-wrap align-items-center gap-2 mt-1">' +
+        '<button type="button" class="btn btn-sm btn-danger" id="btn_openStudentConflictModal">' +
+          '<i class="bi bi-calendar-x me-1"></i>View Conflicts' +
+        '</button>' +
+        '<span class="small text-muted">' + htmlEscape(choiceText) + '</span>' +
+      '</div>'
+    );
+  }
+
   function isMissingTermRegistrationMessage(message) {
     const text = String(message || '').toLowerCase();
     return text.includes('required term registration is missing') || text.includes('register the student in the required term');
@@ -1337,6 +1391,43 @@
     if (qs('priorRepair_evidenceNote')) qs('priorRepair_evidenceNote').value = 'Added from Rolling Enrollment prerequisite repair';
     renderPriorRepairSubjectList(repair.missingSubjects);
     priorCreditRepairModal?.show();
+  }
+
+  function openStudentConflictModal() {
+    const student = getSelectedShortcutStudent();
+    const conflicts = lastRollingEligibility?.prerequisite?.conflicts || [];
+    const tbody = qs('studentConflictTbody');
+    if (!tbody) return;
+    
+    if (!conflicts.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No conflicts found.</td></tr>';
+    } else {
+      tbody.innerHTML = conflicts.map(function(c) {
+        return '<tr>' +
+          '<td>' + htmlEscape(c.date || '') + '</td>' +
+          '<td>' + htmlEscape(c.conflictClass || '') + '</td>' +
+          '<td>' + htmlEscape(c.existTime || '') + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+    
+    const viewBtn = qs('btn_viewStudentSchedule');
+    if (viewBtn && student.id) {
+      const personId = lastRollingEligibility?.prerequisite?.conflictStudentPersonId || student.id;
+      const personName = lastRollingEligibility?.prerequisite?.conflictStudentLabel || student.label || '';
+      const startDate = qs('inp_startDate')?.value || '';
+      const params = new URLSearchParams();
+      params.set('personId', personId);
+      params.set('personName', personName);
+      if (startDate) params.set('date', startDate);
+      viewBtn.href = '/school/schedules/viewer?' + params.toString();
+    }
+    
+    const modalEl = qs('studentConflictModal');
+    if (modalEl) {
+      const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+      modal.show();
+    }
   }
 
   function getSelectedPriorRepairSubjectIds() {
@@ -1656,6 +1747,7 @@
     const panel = qs('roll_enrollmentRegistrationPanel');
     const sid = String(qs('inp_studentId')?.value || '').trim();
     const startDate = String(qs('inp_startDate')?.value || '').trim();
+    const endDate = String(qs('inp_endDate')?.value || '').trim();
     lastRollingEligibility = null;
     if (!panel) return;
     if (!sid) {
@@ -1666,6 +1758,7 @@
     try {
       let url = '/school/classes/api/' + encodeURIComponent(classId) + '/rolling-eligibility?studentId=' + encodeURIComponent(sid);
       if (startDate) url += '&startDate=' + encodeURIComponent(startDate);
+      if (endDate) url += '&endDate=' + encodeURIComponent(endDate);
       const data = await requestJson(url, 'GET');
       if (!data) {
         setRollingRegistrationPanelHtml('<span class="text-danger">Unable to check eligibility.</span>');
@@ -1673,8 +1766,10 @@
       }
       lastRollingEligibility = data;
       if (data.prerequisite && !data.resolved) {
-        const issues = (data.prerequisite.issues || []).map((t) => htmlEscape(t)).join('<br>');
-        const msg = issues || htmlEscape(data.message || 'Not eligible for this class.');
+        const conflictIssue = (data.prerequisite.issues || []).find(isStudentConflictMessage);
+        const otherIssues = (data.prerequisite.issues || []).filter(msg => !isStudentConflictMessage(msg));
+        const issuesHtml = otherIssues.map((t) => htmlEscape(t)).join('<br>');
+        const msg = issuesHtml || htmlEscape(data.message || 'Not eligible for this class.');
         const rawIssueMessage = data.message || (data.prerequisite.issues || []).join(' ');
         if (isMissingTermRegistrationMessage(rawIssueMessage)) {
           renderTermRegistrationShortcutPanel(rawIssueMessage);
@@ -1684,12 +1779,18 @@
           renderProgramRegistrationShortcutPanel(rawIssueMessage);
           return;
         }
-        setRollingRegistrationPanelHtml('<div class="text-danger small">' + msg + '</div>');
+        let inner = '';
+        if (msg) inner += '<div class="text-danger small">' + msg + '</div>';
+        if (conflictIssue) inner += renderStudentConflictHtml(conflictIssue);
+        setRollingRegistrationPanelHtml(inner);
         return;
       }
       if (data.resolved && data.prerequisite) {
         const ok = data.eligible === true;
-        const issues = (data.prerequisite.issues || []).map((t) => htmlEscape(t)).join('<br>');
+        const conflictIssue = (data.prerequisite.issues || []).find(isStudentConflictMessage);
+        const otherIssues = (data.prerequisite.issues || []).filter(msg => !isStudentConflictMessage(msg));
+        const issuesHtml = otherIssues.map((t) => htmlEscape(t)).join('<br>');
+        
         const capacityWarningHtml = renderClassCapacityWarningPanel(data.prerequisite.capacity || {});
         const otherWarnings = (data.prerequisite.warnings || [])
           .filter((text) => !isCapacityWarningText(text))
@@ -1700,10 +1801,11 @@
           return;
         }
         let inner = '<div class="fw-semibold text-dark">' + formatResolvedRegistrationLabel(data.resolved) + '</div>';
-        if (issues) inner += '<div class="text-danger small mt-1">' + issues + '</div>';
+        if (issuesHtml) inner += '<div class="text-danger small mt-1">' + issuesHtml + '</div>';
+        if (conflictIssue) inner += renderStudentConflictHtml(conflictIssue);
         if (capacityWarningHtml) inner += capacityWarningHtml;
         if (otherWarnings) inner += '<div class="text-warning small mt-1">' + otherWarnings + '</div>';
-        if (ok && !issues) inner += '<div class="text-success small mt-1">Prerequisites satisfied for this start date.</div>';
+        if (ok && !issuesHtml && !conflictIssue) inner += '<div class="text-success small mt-1">Prerequisites satisfied for this start date.</div>';
         setRollingRegistrationPanelHtml(inner);
         return;
       }
@@ -2722,10 +2824,14 @@
     }
     await refreshRollingEligibility();
     if (!lastRollingEligibility || lastRollingEligibility.eligible !== true) {
+      const issues = lastRollingEligibility?.prerequisite?.issues || [];
+      const msg = issues.length > 0 
+        ? issues.join('\n') 
+        : 'The student must have an active program registration allowed for this class and meet prerequisites. Fix the issues shown under Program registration, then try again.';
       await showMsg(
         'Not eligible',
         'warning',
-        'The student must have an active program registration allowed for this class and meet prerequisites. Fix the issues shown under Program registration, then try again.'
+        msg
       );
       return;
     }
@@ -3994,6 +4100,13 @@
     if (programShortcutBtn) {
       event.preventDefault();
       openProgramRegistrationShortcutModal();
+      return;
+    }
+
+    const studentConflictBtn = event.target.closest('#btn_openStudentConflictModal');
+    if (studentConflictBtn) {
+      event.preventDefault();
+      openStudentConflictModal();
       return;
     }
 
