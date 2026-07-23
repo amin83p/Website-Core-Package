@@ -24,7 +24,7 @@
     "id": "school-package-public-scripts",
     "path": "packages/school/public/scripts",
     "publicPath": "/scripts",
-    "metadataOnly": true,
+    "metadataOnly": false,
     "active": true
   },
   "operations": [],
