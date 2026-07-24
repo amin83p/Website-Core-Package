@@ -338,6 +338,334 @@
     box-shadow: 0 1px 0 rgba(15, 23, 42, 0.08);
   }
 
+  .school-master-hub .hub-weekly-reports-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .school-master-hub .hub-weekly-reports-quick-reports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0 1rem 1rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: #ffffff;
+  }
+
+  .school-master-hub .hub-weekly-reports-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1rem;
+    padding: 0.25rem;
+  }
+
+  .school-master-hub .hub-weekly-reports-tile {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 1rem;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    background: linear-gradient(145deg, rgba(255, 251, 235, 0.95), rgba(254, 243, 199, 0.9));
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.85rem;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+    cursor: default;
+    overflow: visible;
+  }
+
+  .school-master-hub .hub-weekly-reports-tile:hover {
+    transform: scale(1.2);
+    box-shadow: 0 20px 36px rgba(15, 23, 42, 0.2);
+    z-index: 5;
+  }
+
+  .school-master-hub .hub-weekly-reports-tile-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+  }
+
+  .school-master-hub .hub-weekly-reports-tile-name {
+    font-weight: 700;
+    font-size: 0.92rem;
+    line-height: 1.25;
+    color: #1e293b;
+    word-break: break-word;
+  }
+
+  .school-master-hub .hub-weekly-reports-tile-sessions {
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-style: italic;
+    line-height: 1.2;
+    color: #0284c7;
+    transition: color 0.22s ease, font-size 0.22s ease;
+  }
+
+  .school-master-hub .hub-weekly-reports-tile:hover .hub-weekly-reports-tile-sessions {
+    color: #dc2626;
+    font-size: 0.86rem;
+  }
+
+  .school-master-hub .hub-weekly-reports-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(248, 250, 252, 0.85);
+  }
+
+  .school-master-hub .hub-weekly-reports-tab {
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    max-width: 280px;
+  }
+
+  .school-master-hub .hub-weekly-reports-tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 220px;
+  }
+
+  .school-master-hub .hub-weekly-reports-tab-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    line-height: 1;
+    opacity: 0.75;
+  }
+
+  .school-master-hub .hub-weekly-reports-tab-close:hover {
+    opacity: 1;
+    background: rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-weekly-reports-class-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+    padding: 0.25rem;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-tile {
+    position: relative;
+    min-height: 220px;
+    border-radius: 1rem;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-left-width: 6px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 1.35rem 1.6rem;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-tile:hover {
+    transform: scale(1.04);
+    box-shadow: 0 20px 36px rgba(15, 23, 42, 0.2);
+    z-index: 5;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-tile-body {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.85rem;
+    width: 100%;
+    min-height: 100%;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-tile-name {
+    font-weight: 700;
+    font-size: 1.2rem;
+    line-height: 1.3;
+    color: #1e293b;
+    word-break: break-word;
+    text-align: center;
+    width: 100%;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-weekly-reports-class-tile-department {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #64748b;
+    text-align: center;
+    margin-top: -0.35rem;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-tile-metrics {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    width: 100%;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: #0f172a;
+    text-align: left;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-tile-metric-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-tile-metric-line .label {
+    color: #475569;
+    font-weight: 600;
+    flex: 0 0 auto;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-tile-metric-line .value {
+    color: #0284c7;
+    font-weight: 700;
+    flex: 1 1 auto;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-tile:hover .hub-weekly-reports-class-tile-metric-line .value {
+    color: #dc2626;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+    padding: 0.25rem;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-tile {
+    position: relative;
+    min-height: 280px;
+    border-radius: 1rem;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-left-width: 6px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 1.35rem 1.6rem;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+    cursor: default;
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-tile:hover {
+    transform: scale(1.04);
+    box-shadow: 0 20px 36px rgba(15, 23, 42, 0.2);
+    z-index: 5;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-tile-body {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.85rem;
+    width: 100%;
+    min-height: 100%;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-tile-name {
+    font-weight: 700;
+    font-size: 1.2rem;
+    line-height: 1.3;
+    color: #1e293b;
+    word-break: break-word;
+    text-align: center;
+    width: 100%;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-weekly-reports-student-tile-section {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+    width: 100%;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-tile-section-title {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-tile-metric-line,
+  .school-master-hub .hub-weekly-reports-student-tile-session-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.35;
+    text-align: left;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-tile-metric-line .label,
+  .school-master-hub .hub-weekly-reports-student-tile-session-line .label {
+    color: #475569;
+    font-weight: 600;
+    flex: 0 0 auto;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-tile-metric-line .value,
+  .school-master-hub .hub-weekly-reports-student-tile-session-line .value {
+    color: #0f172a;
+    font-weight: 700;
+    flex: 1 1 auto;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .school-master-hub .hub-weekly-reports-list-sort {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+
   .school-master-hub .hub-attendance-rollup,
   .school-master-hub .hub-attendance-student {
     position: sticky;
@@ -945,6 +1273,9 @@
       <button type="button" class="hub-section-segment" data-hub-workspace-section="academic-ledger">
         <span><i class="bi bi-journal-bookmark-fill me-1"></i> Academic Ledger</span>
       </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="weekly-reports">
+        <span><i class="bi bi-calendar-week me-1"></i> Weekly Reports</span>
+      </button>
     </div>
   </div>
 
@@ -1331,6 +1662,12 @@
       endpoint: '/school/report-hub/api/workspace/academic-ledger',
       sourceUrl: '/school/academic-ledger',
       icon: 'bi bi-journal-bookmark-fill'
+    },
+    'weekly-reports': {
+      label: 'Weekly Reports',
+      endpoint: '/school/report-hub/api/workspace/weekly-reports',
+      sourceUrl: '/school/report-hub',
+      icon: 'bi bi-calendar-week'
     }
   };
 
@@ -2166,6 +2503,30 @@
   let hubReportInstanceClassSelections = [];
   let hubReportInstanceTeacherSelections = [];
   let hubReportInstanceStudentSelections = [];
+  let hubWeeklyReportsClassSelections = [];
+  let hubWeeklyReportsStudentSelections = [];
+  let hubWeeklyReportsTabs = [];
+  let hubWeeklyReportsActiveTabId = '';
+  let hubWeeklyReportsTabSeq = 0;
+  let hubWeeklyReportsDepartmentOptions = [];
+  const HUB_WEEKLY_REPORTS_DEPARTMENT_COLORS = [
+    '#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777',
+    '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#0d9488', '#64748b'
+  ];
+  const hubWeeklyReportsState = {
+    level: 'classes',
+    selectedClassId: '',
+    selectedClassName: '',
+    classRows: [],
+    rows: [],
+    viewMode: 'board',
+    listSort: { key: 'name', dir: 'asc' },
+    classListSort: { key: 'className', dir: 'asc' },
+    loading: false,
+    lastLoadedAt: '',
+    lastRangeLabel: '',
+    lastError: ''
+  };
   let hubSessionRowsByKey = new Map();
   let hubSessionStatusMeta = [];
   let hubSessionCanUpdateSessions = false;
@@ -4563,6 +4924,1300 @@
       renderHubAttendanceMatrix(hubAttendanceState.data);
     }
     bindHubAttendanceControls();
+  }
+
+  function hubSnapToWeekStart(date) {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const day = d.getDay() || 7;
+    d.setDate(d.getDate() - (day - 1));
+    return d;
+  }
+
+  function hubSnapToWeekEnd(date) {
+    const start = hubSnapToWeekStart(date);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return end;
+  }
+
+  function hubParseDateInputValue(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    const parts = raw.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(function (n) { return Number.isNaN(n); })) return null;
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+
+  function hubWeeklyReportsHasFiltersApplied() {
+    return hubWeeklyReportsClassSelections.length > 0
+      || hubWeeklyReportsStudentSelections.length > 0
+      || !!hubInputValue('hubWeeklyReportsDepartmentId');
+  }
+
+  function createDefaultWeeklyReportsViewState() {
+    return {
+      level: 'classes',
+      selectedClassId: '',
+      selectedClassName: '',
+      classRows: [],
+      rows: [],
+      viewMode: 'board',
+      listSort: { key: 'name', dir: 'asc' },
+      classListSort: { key: 'className', dir: 'asc' },
+      loading: false,
+      lastLoadedAt: '',
+      lastRangeLabel: '',
+      lastError: ''
+    };
+  }
+
+  function captureWeeklyReportsFiltersSnapshot() {
+    snapHubWeeklyReportsDateInputs();
+    syncWeeklyReportsInputs();
+    return {
+      startDate: hubInputValue('hubWeeklyReportsStartDate'),
+      endDate: hubInputValue('hubWeeklyReportsEndDate'),
+      departmentId: hubInputValue('hubWeeklyReportsDepartmentId'),
+      classSelections: hubWeeklyReportsClassSelections.map(function (item) {
+        return { id: item.id, name: item.name || item.id };
+      }),
+      studentSelections: hubWeeklyReportsStudentSelections.map(function (item) {
+        return { id: item.id, name: item.name || item.id };
+      })
+    };
+  }
+
+  function restoreWeeklyReportsFiltersSnapshot(snapshot) {
+    const filters = snapshot || {};
+    hubWeeklyReportsClassSelections = (Array.isArray(filters.classSelections) ? filters.classSelections : []).map(function (item) {
+      return { id: item.id, name: item.name || item.id };
+    });
+    hubWeeklyReportsStudentSelections = (Array.isArray(filters.studentSelections) ? filters.studentSelections : []).map(function (item) {
+      return { id: item.id, name: item.name || item.id };
+    });
+    const startEl = document.getElementById('hubWeeklyReportsStartDate');
+    const endEl = document.getElementById('hubWeeklyReportsEndDate');
+    const departmentEl = document.getElementById('hubWeeklyReportsDepartmentId');
+    if (startEl) startEl.value = String(filters.startDate || '');
+    if (endEl) endEl.value = String(filters.endDate || '');
+    if (departmentEl) departmentEl.value = String(filters.departmentId || '');
+    syncWeeklyReportsInputs();
+  }
+
+  function captureWeeklyReportsViewState() {
+    return {
+      level: hubWeeklyReportsState.level,
+      selectedClassId: hubWeeklyReportsState.selectedClassId,
+      selectedClassName: hubWeeklyReportsState.selectedClassName,
+      classRows: Array.isArray(hubWeeklyReportsState.classRows) ? hubWeeklyReportsState.classRows.slice() : [],
+      rows: Array.isArray(hubWeeklyReportsState.rows) ? hubWeeklyReportsState.rows.slice() : [],
+      viewMode: hubWeeklyReportsState.viewMode,
+      listSort: Object.assign({}, hubWeeklyReportsState.listSort || { key: 'name', dir: 'asc' }),
+      classListSort: Object.assign({}, hubWeeklyReportsState.classListSort || { key: 'className', dir: 'asc' }),
+      loading: false,
+      lastLoadedAt: hubWeeklyReportsState.lastLoadedAt,
+      lastRangeLabel: hubWeeklyReportsState.lastRangeLabel,
+      lastError: hubWeeklyReportsState.lastError
+    };
+  }
+
+  function restoreWeeklyReportsViewState(viewState) {
+    const next = viewState || createDefaultWeeklyReportsViewState();
+    hubWeeklyReportsState.level = next.level === 'students' ? 'students' : 'classes';
+    hubWeeklyReportsState.selectedClassId = String(next.selectedClassId || '');
+    hubWeeklyReportsState.selectedClassName = String(next.selectedClassName || '');
+    hubWeeklyReportsState.classRows = Array.isArray(next.classRows) ? next.classRows.slice() : [];
+    hubWeeklyReportsState.rows = Array.isArray(next.rows) ? next.rows.slice() : [];
+    hubWeeklyReportsState.viewMode = next.viewMode === 'list' ? 'list' : 'board';
+    hubWeeklyReportsState.listSort = Object.assign({ key: 'name', dir: 'asc' }, next.listSort || {});
+    hubWeeklyReportsState.classListSort = Object.assign({ key: 'className', dir: 'asc' }, next.classListSort || {});
+    hubWeeklyReportsState.loading = false;
+    hubWeeklyReportsState.lastLoadedAt = String(next.lastLoadedAt || '');
+    hubWeeklyReportsState.lastRangeLabel = String(next.lastRangeLabel || '');
+    hubWeeklyReportsState.lastError = String(next.lastError || '');
+  }
+
+  function getActiveWeeklyReportsTab() {
+    return hubWeeklyReportsTabs.find(function (tab) { return tab.id === hubWeeklyReportsActiveTabId; }) || null;
+  }
+
+  function persistActiveWeeklyReportsTab() {
+    const tab = getActiveWeeklyReportsTab();
+    if (!tab) return;
+    tab.filtersSnapshot = captureWeeklyReportsFiltersSnapshot();
+    tab.viewState = captureWeeklyReportsViewState();
+  }
+
+  function nextWeeklyReportsTabId() {
+    hubWeeklyReportsTabSeq += 1;
+    return 'wr-tab-' + String(hubWeeklyReportsTabSeq);
+  }
+
+  function resolveWeeklyReportsDepartmentName(departmentId) {
+    const normalizedId = String(departmentId || '').trim();
+    if (!normalizedId) return 'All departments';
+    const match = hubWeeklyReportsDepartmentOptions.find(function (row) { return row.id === normalizedId; });
+    return match ? (match.name || normalizedId) : normalizedId;
+  }
+
+  function hashWeeklyReportsDepartmentColorSeed(value) {
+    const raw = String(value || '').trim() || '__none__';
+    let hash = 0;
+    for (let i = 0; i < raw.length; i += 1) {
+      hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash);
+  }
+
+  function resolveWeeklyReportsDepartmentColor(departmentId) {
+    const palette = HUB_WEEKLY_REPORTS_DEPARTMENT_COLORS;
+    const index = hashWeeklyReportsDepartmentColorSeed(departmentId) % palette.length;
+    return palette[index];
+  }
+
+  function hexToRgba(hex, alpha) {
+    const normalized = String(hex || '').replace('#', '');
+    if (normalized.length !== 6) return 'rgba(100, 116, 139, ' + String(alpha) + ')';
+    const r = parseInt(normalized.slice(0, 2), 16);
+    const g = parseInt(normalized.slice(2, 4), 16);
+    const b = parseInt(normalized.slice(4, 6), 16);
+    return 'rgba(' + String(r) + ', ' + String(g) + ', ' + String(b) + ', ' + String(alpha) + ')';
+  }
+
+  function buildWeeklyReportsClassTileStyle(departmentId) {
+    const color = resolveWeeklyReportsDepartmentColor(departmentId);
+    return [
+      'border-left-color:' + color + ';',
+      'background:linear-gradient(145deg, ' + hexToRgba(color, 0.14) + ', ' + hexToRgba(color, 0.06) + ');'
+    ].join('');
+  }
+
+  function buildWeeklyReportsBoardRequestKey(filters) {
+    const snapshot = filters || captureWeeklyReportsFiltersSnapshot();
+    return [
+      'classes',
+      snapshot.startDate || '',
+      snapshot.endDate || '',
+      snapshot.departmentId || '',
+      (snapshot.classSelections || []).map(function (item) { return item.id; }).join(','),
+      (snapshot.studentSelections || []).map(function (item) { return item.id; }).join(',')
+    ].join('|');
+  }
+
+  function buildWeeklyReportsStudentRequestKey(parentTabId, classId, filters) {
+    const snapshot = filters || captureWeeklyReportsFiltersSnapshot();
+    return [
+      'students',
+      parentTabId || '',
+      classId || '',
+      snapshot.startDate || '',
+      snapshot.endDate || '',
+      snapshot.departmentId || '',
+      (snapshot.studentSelections || []).map(function (item) { return item.id; }).join(',')
+    ].join('|');
+  }
+
+  function buildWeeklyReportsTabLabel(type, filters, className) {
+    const snapshot = filters || captureWeeklyReportsFiltersSnapshot();
+    const rangeLabel = snapshot.startDate && snapshot.endDate
+      ? snapshot.startDate + ' to ' + snapshot.endDate
+      : (snapshot.startDate || snapshot.endDate || 'All time');
+    if (type === 'students') {
+      return String(className || 'Class') + ' · ' + rangeLabel;
+    }
+    const departmentLabel = snapshot.departmentId
+      ? resolveWeeklyReportsDepartmentName(snapshot.departmentId)
+      : 'All depts';
+    return rangeLabel + ' · ' + departmentLabel;
+  }
+
+  function findWeeklyReportsTabByRequestKey(requestKey) {
+    return hubWeeklyReportsTabs.find(function (tab) { return tab.requestKey === requestKey; }) || null;
+  }
+
+  function createWeeklyReportsTab(options) {
+    const opts = options || {};
+    const tab = {
+      id: opts.id || nextWeeklyReportsTabId(),
+      label: String(opts.label || 'Weekly report'),
+      type: opts.type === 'students' ? 'students' : 'classes',
+      parentTabId: String(opts.parentTabId || ''),
+      requestKey: String(opts.requestKey || ''),
+      classId: String(opts.classId || ''),
+      className: String(opts.className || ''),
+      filtersSnapshot: opts.filtersSnapshot || captureWeeklyReportsFiltersSnapshot(),
+      viewState: opts.viewState || createDefaultWeeklyReportsViewState(),
+      loaded: opts.loaded === true
+    };
+    hubWeeklyReportsTabs.push(tab);
+    return tab;
+  }
+
+  function activateWeeklyReportsTab(tabId, options) {
+    const opts = options || {};
+    if (!opts.skipPersist) persistActiveWeeklyReportsTab();
+    const tab = hubWeeklyReportsTabs.find(function (row) { return row.id === tabId; });
+    if (!tab) {
+      hubWeeklyReportsActiveTabId = '';
+      Object.assign(hubWeeklyReportsState, createDefaultWeeklyReportsViewState());
+      renderWeeklyReportsTabBar();
+      renderWeeklyReportsResultsPanel();
+      return null;
+    }
+    hubWeeklyReportsActiveTabId = tab.id;
+    restoreWeeklyReportsFiltersSnapshot(tab.filtersSnapshot);
+    restoreWeeklyReportsViewState(tab.viewState);
+    renderWeeklyReportsTabBar();
+    renderWeeklyReportsResultsPanel();
+    return tab;
+  }
+
+  function closeWeeklyReportsTab(tabId, options) {
+    const opts = options || {};
+    const closingId = String(tabId || '').trim();
+    if (!closingId) return;
+    const childIds = hubWeeklyReportsTabs
+      .filter(function (tab) { return tab.parentTabId === closingId; })
+      .map(function (tab) { return tab.id; });
+    const removeIds = new Set([closingId].concat(childIds));
+    hubWeeklyReportsTabs = hubWeeklyReportsTabs.filter(function (tab) { return !removeIds.has(tab.id); });
+    if (opts.activateTabId && hubWeeklyReportsTabs.some(function (tab) { return tab.id === opts.activateTabId; })) {
+      activateWeeklyReportsTab(opts.activateTabId, { skipPersist: true });
+      return;
+    }
+    const wasActive = !hubWeeklyReportsActiveTabId || removeIds.has(hubWeeklyReportsActiveTabId);
+    if (!wasActive) {
+      renderWeeklyReportsTabBar();
+      return;
+    }
+    const lastTab = hubWeeklyReportsTabs[hubWeeklyReportsTabs.length - 1] || null;
+    if (lastTab) {
+      activateWeeklyReportsTab(lastTab.id, { skipPersist: true });
+      return;
+    }
+    hubWeeklyReportsActiveTabId = '';
+    Object.assign(hubWeeklyReportsState, createDefaultWeeklyReportsViewState());
+    renderWeeklyReportsTabBar();
+    renderWeeklyReportsResultsPanel();
+  }
+
+  function renderWeeklyReportsTabBar() {
+    const container = document.getElementById('hubWeeklyReportsTabBar');
+    if (!container) return;
+    if (!hubWeeklyReportsTabs.length) {
+      container.innerHTML = '';
+      container.classList.add('d-none');
+      return;
+    }
+    container.classList.remove('d-none');
+    container.innerHTML = hubWeeklyReportsTabs.map(function (tab) {
+      const active = tab.id === hubWeeklyReportsActiveTabId;
+      return [
+        '<button type="button" class="btn btn-sm hub-weekly-reports-tab ' + (active ? 'btn-primary' : 'btn-outline-primary') + '" data-hub-weekly-reports-tab-id="' + escapeHtml(tab.id) + '">',
+        '<span class="hub-weekly-reports-tab-label">' + escapeHtml(tab.label || 'Report') + '</span>',
+        '<span class="hub-weekly-reports-tab-close" data-hub-weekly-reports-tab-close="' + escapeHtml(tab.id) + '" aria-label="Close tab">&times;</span>',
+        '</button>'
+      ].join('');
+    }).join('');
+    bindWeeklyReportsTabBarControls();
+  }
+
+  function bindWeeklyReportsTabBarControls() {
+    const container = document.getElementById('hubWeeklyReportsTabBar');
+    if (!container) return;
+    container.querySelectorAll('[data-hub-weekly-reports-tab-id]').forEach(function (button) {
+      button.addEventListener('click', function (event) {
+        if (event.target && event.target.closest('[data-hub-weekly-reports-tab-close]')) return;
+        const tabId = button.getAttribute('data-hub-weekly-reports-tab-id') || '';
+        if (!tabId || tabId === hubWeeklyReportsActiveTabId) return;
+        activateWeeklyReportsTab(tabId);
+      });
+    });
+    container.querySelectorAll('[data-hub-weekly-reports-tab-close]').forEach(function (button) {
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeWeeklyReportsTab(button.getAttribute('data-hub-weekly-reports-tab-close') || '');
+      });
+    });
+  }
+
+  function cacheWeeklyReportsDepartmentOptions(payload) {
+    const options = payload && Array.isArray(payload.departmentOptions) ? payload.departmentOptions : [];
+    if (!options.length) return;
+    hubWeeklyReportsDepartmentOptions = options.map(function (row) {
+      return { id: String(row.id || '').trim(), name: String(row.name || row.id || 'Department').trim() };
+    }).filter(function (row) { return row.id; });
+    renderWeeklyReportsDepartmentSelect();
+  }
+
+  function renderWeeklyReportsDepartmentSelect() {
+    const selectEl = document.getElementById('hubWeeklyReportsDepartmentId');
+    if (!selectEl) return;
+    const currentValue = selectEl.value;
+    const options = ['<option value="">All Departments</option>'].concat(
+      hubWeeklyReportsDepartmentOptions.map(function (row) {
+        return '<option value="' + escapeHtml(row.id) + '">' + escapeHtml(row.name || row.id) + '</option>';
+      })
+    );
+    selectEl.innerHTML = options.join('');
+    if (currentValue && hubWeeklyReportsDepartmentOptions.some(function (row) { return row.id === currentValue; })) {
+      selectEl.value = currentValue;
+    }
+  }
+
+  function renderWeeklyReportsClassMetricLine(label, value) {
+    return [
+      '<div class="hub-weekly-reports-class-tile-metric-line">',
+      '<span class="label">' + escapeHtml(label) + '</span>',
+      '<span class="value">' + escapeHtml(value) + '</span>',
+      '</div>'
+    ].join('');
+  }
+
+  function setHubWeeklyReportsRange(range) {
+    const startEl = document.getElementById('hubWeeklyReportsStartDate');
+    const endEl = document.getElementById('hubWeeklyReportsEndDate');
+    if (!startEl || !endEl) return;
+
+    const today = hubTodayDate();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    if (range === 'allTime') {
+      startEl.value = '';
+      endEl.value = '';
+      return;
+    }
+
+    let start;
+    let end = hubSnapToWeekEnd(startOfDay);
+
+    if (range === 'thisWeek') {
+      start = hubSnapToWeekStart(startOfDay);
+    } else if (range === 'twoWeeks' || range === 'lastTwoWeeks') {
+      start = hubSnapToWeekStart(startOfDay);
+      start.setDate(start.getDate() - 7);
+    } else if (range === 'threeWeeks') {
+      start = hubSnapToWeekStart(startOfDay);
+      start.setDate(start.getDate() - 14);
+    } else if (range === 'fourWeeks' || range === 'lastFourWeeks') {
+      start = hubSnapToWeekStart(startOfDay);
+      start.setDate(start.getDate() - 21);
+    } else if (range === 'lastTwoMonths') {
+      const anchor = new Date(startOfDay);
+      anchor.setMonth(anchor.getMonth() - 2);
+      start = hubSnapToWeekStart(anchor);
+    } else if (range === 'lastThreeMonths') {
+      const anchor = new Date(startOfDay);
+      anchor.setMonth(anchor.getMonth() - 3);
+      start = hubSnapToWeekStart(anchor);
+    } else if (range === 'wholeYear') {
+      const year = parseInt(hubOrgYear(), 10) || startOfDay.getFullYear();
+      start = hubSnapToWeekStart(new Date(year, 0, 1));
+      end = hubSnapToWeekEnd(new Date(year, 11, 31));
+    } else {
+      return;
+    }
+
+    startEl.value = hubDateToIso(start);
+    endEl.value = hubDateToIso(end);
+  }
+
+  function runWeeklyReportsQuickReport(rangeKey) {
+    const range = String(rangeKey || '').trim();
+    if (!range) return;
+    hubWeeklyReportsClassSelections = [];
+    hubWeeklyReportsStudentSelections = [];
+    setHubWeeklyReportsRange(range);
+    syncWeeklyReportsInputs();
+    openWeeklyReportsClassBoardTab();
+  }
+
+  function snapHubWeeklyReportsDateInputs() {
+    const startEl = document.getElementById('hubWeeklyReportsStartDate');
+    const endEl = document.getElementById('hubWeeklyReportsEndDate');
+    if (!startEl || !endEl) return;
+
+    if (startEl.value) {
+      const startDate = hubParseDateInputValue(startEl.value);
+      if (startDate) startEl.value = hubDateToIso(hubSnapToWeekStart(startDate));
+    }
+    if (endEl.value) {
+      const endDate = hubParseDateInputValue(endEl.value);
+      if (endDate) endEl.value = hubDateToIso(hubSnapToWeekEnd(endDate));
+    }
+    if (startEl.value && endEl.value && endEl.value < startEl.value) {
+      const startDate = hubParseDateInputValue(startEl.value);
+      if (startDate) endEl.value = hubDateToIso(hubSnapToWeekEnd(startDate));
+    }
+  }
+
+  function renderWeeklyReportsClassChips() {
+    const container = document.getElementById('hubWeeklyReportsClassChips');
+    if (!container) return;
+    if (!hubWeeklyReportsClassSelections.length) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = hubWeeklyReportsClassSelections.map(function (item) {
+      return [
+        '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1">',
+        '<span>' + escapeHtml(item.name || item.id) + '</span>',
+        '<button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove class" data-hub-weekly-reports-remove-class="' + escapeHtml(item.id) + '"></button>',
+        '</span>'
+      ].join('');
+    }).join('');
+  }
+
+  function renderWeeklyReportsStudentChips() {
+    const container = document.getElementById('hubWeeklyReportsStudentChips');
+    if (!container) return;
+    if (!hubWeeklyReportsStudentSelections.length) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = hubWeeklyReportsStudentSelections.map(function (item) {
+      return [
+        '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1">',
+        '<span>' + escapeHtml(item.name || item.id) + '</span>',
+        '<button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove student" data-hub-weekly-reports-remove-student="' + escapeHtml(item.id) + '"></button>',
+        '</span>'
+      ].join('');
+    }).join('');
+  }
+
+  function syncWeeklyReportsInputs() {
+    const classIdEl = document.getElementById('hubWeeklyReportsClassId');
+    const classNameEl = document.getElementById('hubWeeklyReportsClassName');
+    const studentIdEl = document.getElementById('hubWeeklyReportsStudentId');
+    const studentNameEl = document.getElementById('hubWeeklyReportsStudentName');
+    if (classIdEl) classIdEl.value = hubWeeklyReportsClassSelections.map(function (item) { return item.id; }).filter(Boolean).join(',');
+    if (classNameEl) classNameEl.value = hubWeeklyReportsClassSelections.map(function (item) { return item.name || item.id; }).join(', ');
+    if (studentIdEl) studentIdEl.value = hubWeeklyReportsStudentSelections.map(function (item) { return item.id; }).filter(Boolean).join(',');
+    if (studentNameEl) studentNameEl.value = hubWeeklyReportsStudentSelections.map(function (item) { return item.name || item.id; }).join(', ');
+    renderWeeklyReportsClassChips();
+    renderWeeklyReportsStudentChips();
+  }
+
+  function openHubWeeklyReportsClassPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Class Picker', icon: 'warning', message: 'Class picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.class({
+      title: 'Filter Weekly Reports by Classes',
+      icon: 'bi-book',
+      multiselect: true,
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubClassId(item);
+          const name = formatHubClassName(item, id);
+          if (id && !hubWeeklyReportsClassSelections.some(function (row) { return row.id === id; })) {
+            hubWeeklyReportsClassSelections.push({ id: id, name: name });
+          }
+        });
+        syncWeeklyReportsInputs();
+      }
+    }));
+  }
+
+  function openHubWeeklyReportsStudentPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Student Picker', icon: 'warning', message: 'Student picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.student({
+      title: 'Filter Weekly Reports by Students',
+      placeholder: 'Search students, select one or more...',
+      multiselect: true,
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubStudentRecordId(item);
+          const name = formatHubStudentRecordName(item, id);
+          if (id && !hubWeeklyReportsStudentSelections.some(function (row) { return row.id === id; })) {
+            hubWeeklyReportsStudentSelections.push({ id: id, name: name });
+          }
+        });
+        syncWeeklyReportsInputs();
+      }
+    }));
+  }
+
+  function bindWeeklyReportsFilterCollapse() {
+    const collapseEl = document.getElementById('hubWeeklyReportsFilterCollapse');
+    const buttonEl = document.getElementById('hubWeeklyReportsFilterToggleBtn');
+    const iconEl = document.getElementById('hubWeeklyReportsFilterToggleIcon');
+    if (!collapseEl || !buttonEl || !iconEl) return;
+
+    const setState = function (expanded) {
+      iconEl.classList.remove('bi-chevron-down', 'bi-chevron-up');
+      iconEl.classList.add(expanded ? 'bi-chevron-up' : 'bi-chevron-down');
+      buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', expanded ? 'Close filters' : 'Open filters');
+    };
+
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', function () { setState(true); });
+    collapseEl.addEventListener('hidden.bs.collapse', function () { setState(false); });
+  }
+
+  function appendWeeklyReportsWorkspaceQuery(requestQuery, options) {
+    const opts = options || {};
+    snapHubWeeklyReportsDateInputs();
+    syncWeeklyReportsInputs();
+    const view = opts.view || (hubWeeklyReportsState.level === 'students' ? 'students' : 'classes');
+    requestQuery.set('view', view);
+    const values = {
+      startDate: hubInputValue('hubWeeklyReportsStartDate'),
+      endDate: hubInputValue('hubWeeklyReportsEndDate'),
+      departmentId: hubInputValue('hubWeeklyReportsDepartmentId'),
+      classIds: hubInputValue('hubWeeklyReportsClassId'),
+      studentIds: hubInputValue('hubWeeklyReportsStudentId')
+    };
+    if (view === 'students') {
+      const drillClassId = String(opts.classId || hubWeeklyReportsState.selectedClassId || '').trim();
+      if (drillClassId) {
+        values.classIds = drillClassId;
+      }
+    }
+    Object.keys(values).forEach(function (key) {
+      if (values[key]) requestQuery.set(key, values[key]);
+    });
+  }
+
+  function formatWeeklyReportsRangeLabel() {
+    const startDate = hubInputValue('hubWeeklyReportsStartDate');
+    const endDate = hubInputValue('hubWeeklyReportsEndDate');
+    if (!startDate && !endDate) return 'All time';
+    if (startDate && endDate) return startDate + ' to ' + endDate;
+    return startDate || endDate;
+  }
+
+  function sortWeeklyReportsRows(rows) {
+    const list = Array.isArray(rows) ? rows.slice() : [];
+    const sort = hubWeeklyReportsState.listSort || { key: 'name', dir: 'asc' };
+    const dir = sort.dir === 'desc' ? -1 : 1;
+    const numericKeys = ['sessionCount', 'classCount', 'attendanceHealth', 'presentCount', 'lateCount', 'absenceCount', 'caseCount'];
+    list.sort(function (a, b) {
+      if (numericKeys.indexOf(sort.key) >= 0) {
+        const left = Number(a[sort.key] || 0);
+        const right = Number(b[sort.key] || 0);
+        if (left !== right) return (left - right) * dir;
+      }
+      return String(a.name || '').localeCompare(String(b.name || '')) * dir;
+    });
+    return list;
+  }
+
+  function buildWeeklyReportsStudentTileStyle(health) {
+    const score = Math.max(0, Math.min(100, Number(health) || 0));
+    const t = score / 100;
+    const r = Math.round(220 + ((22 - 220) * t));
+    const g = Math.round(38 + ((163 - 38) * t));
+    const b = Math.round(38 + ((74 - 38) * t));
+    const color = 'rgb(' + String(r) + ', ' + String(g) + ', ' + String(b) + ')';
+    const toRgba = function (alpha) {
+      return 'rgba(' + String(r) + ', ' + String(g) + ', ' + String(b) + ', ' + String(alpha) + ')';
+    };
+    return [
+      'border-left-color:' + color + ';',
+      'background:linear-gradient(145deg, ' + toRgba(0.14) + ', ' + toRgba(0.06) + ');'
+    ].join('');
+  }
+
+  function renderWeeklyReportsStudentMetricLine(label, value) {
+    return [
+      '<div class="hub-weekly-reports-student-tile-metric-line">',
+      '<span class="label">' + escapeHtml(label) + '</span>',
+      '<span class="value">' + escapeHtml(value) + '</span>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsStudentSessionLine(session) {
+    const dateLabel = String(session?.date || 'Session');
+    const statusLabel = String(session?.label || session?.status || '-');
+    return [
+      '<div class="hub-weekly-reports-student-tile-session-line">',
+      '<span class="label">' + escapeHtml(dateLabel) + '</span>',
+      '<span class="value">' + escapeHtml(statusLabel) + '</span>',
+      '</div>'
+    ].join('');
+  }
+
+  function formatWeeklyReportsSkillSummary(skillAverages) {
+    const list = Array.isArray(skillAverages) ? skillAverages : [];
+    if (!list.length) return '-';
+    const top = list.slice(0, 2).map(function (row) {
+      return String(row.skillLabel || row.skillId || 'Skill') + ' ' + String(row.averagePercent) + '%';
+    });
+    if (list.length > 2) top.push('+' + String(list.length - 2));
+    return top.join(', ');
+  }
+
+  function sortWeeklyReportsClassRows(rows) {
+    const list = Array.isArray(rows) ? rows.slice() : [];
+    const sort = hubWeeklyReportsState.classListSort || { key: 'className', dir: 'asc' };
+    const dir = sort.dir === 'desc' ? -1 : 1;
+    const numericKeys = ['sessionCount', 'avgStudentsPerSession', 'absenceCount', 'lateCount', 'earlyLeaveCount', 'gradebookCount'];
+    list.sort(function (a, b) {
+      if (numericKeys.indexOf(sort.key) >= 0) {
+        const left = Number(a[sort.key] || 0);
+        const right = Number(b[sort.key] || 0);
+        if (left !== right) return (left - right) * dir;
+      }
+      return String(a.className || a.classId || '').localeCompare(String(b.className || b.classId || '')) * dir;
+    });
+    return list;
+  }
+
+  function formatWeeklyReportsClassMetrics(row) {
+    const sessionCount = Number(row.sessionCount || 0);
+    const sessionLabel = sessionCount === 1 ? '1' : String(sessionCount);
+    const avgStudents = Number(row.avgStudentsPerSession || 0);
+    const absenceCount = Number(row.absenceCount || 0);
+    const lateCount = Number(row.lateCount || 0);
+    const earlyLeaveCount = Number(row.earlyLeaveCount || 0);
+    const attendanceLabel = String(absenceCount) + ' · ' + String(lateCount) + ' · ' + String(earlyLeaveCount);
+    const gradebookCount = Number(row.gradebookCount || 0);
+    const gradebookLabel = gradebookCount === 1 ? '1' : String(gradebookCount);
+    return {
+      sessionLabel: sessionLabel,
+      avgLabel: String(avgStudents),
+      attendanceLabel: attendanceLabel,
+      gradebookLabel: gradebookLabel
+    };
+  }
+
+  function weeklyReportsClassSortIndicator(key) {
+    const sort = hubWeeklyReportsState.classListSort || { key: 'className', dir: 'asc' };
+    if (sort.key !== key) return '';
+    return sort.dir === 'desc' ? ' <i class="bi bi-sort-down"></i>' : ' <i class="bi bi-sort-up"></i>';
+  }
+
+  function renderWeeklyReportsEmptyState(message, hint) {
+    return [
+      '<div class="hub-empty"><div>',
+      '<i class="bi bi-calendar-week display-6 d-block mb-3"></i>',
+      '<div class="fw-semibold">' + escapeHtml(message || 'No results to display yet.') + '</div>',
+      '<div class="text-muted small mt-1">' + escapeHtml(hint || 'Choose filters and click Apply, or use a quick report shortcut below.') + '</div>',
+      '</div></div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsClassBoard(rows) {
+    const sortedRows = sortWeeklyReportsClassRows(rows);
+    if (!sortedRows.length) {
+      return renderWeeklyReportsEmptyState('No classes found.', 'Try widening the date range or clearing class filters.');
+    }
+    return [
+      '<div class="hub-weekly-reports-class-board">',
+      sortedRows.map(function (row) {
+        const metrics = formatWeeklyReportsClassMetrics(row);
+        const tileStyle = buildWeeklyReportsClassTileStyle(row.departmentId);
+        const departmentSubtitle = row.departmentName
+          ? '<div class="hub-weekly-reports-class-tile-department">' + escapeHtml(row.departmentName) + '</div>'
+          : '';
+        return [
+          '<div class="hub-weekly-reports-class-tile" style="' + tileStyle + '" data-hub-weekly-reports-class-id="' + escapeHtml(row.classId || '') + '" data-hub-weekly-reports-class-name="' + escapeHtml(row.className || row.classId || '') + '" title="' + escapeHtml(row.className || row.classId || '') + '">',
+          '<div class="hub-weekly-reports-class-tile-body">',
+          '<div class="hub-weekly-reports-class-tile-name">' + escapeHtml(row.className || row.classId || 'Class') + '</div>',
+          departmentSubtitle,
+          '<div class="hub-weekly-reports-class-tile-metrics">',
+          renderWeeklyReportsClassMetricLine('Sessions', metrics.sessionLabel),
+          renderWeeklyReportsClassMetricLine('Avg students / session', metrics.avgLabel),
+          renderWeeklyReportsClassMetricLine('Absences · Late · Early leave', metrics.attendanceLabel),
+          renderWeeklyReportsClassMetricLine('Gradebooks', metrics.gradebookLabel),
+          '</div>',
+          '</div>',
+          '</div>'
+        ].join('');
+      }).join(''),
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsClassList(rows) {
+    const sortedRows = sortWeeklyReportsClassRows(rows);
+    if (!sortedRows.length) {
+      return renderWeeklyReportsEmptyState('No classes found.', 'Try widening the date range or clearing class filters.');
+    }
+    const body = sortedRows.map(function (row) {
+      const metrics = formatWeeklyReportsClassMetrics(row);
+      return [
+        '<tr class="hub-weekly-reports-class-row" data-hub-weekly-reports-class-id="' + escapeHtml(row.classId || '') + '" data-hub-weekly-reports-class-name="' + escapeHtml(row.className || row.classId || '') + '" style="cursor:pointer;">',
+        '<td class="ps-3"><div class="fw-semibold">' + escapeHtml(row.className || row.classId || 'Class') + '</div>',
+        '<div class="small text-muted font-monospace">' + escapeHtml(row.classId || '-') + '</div></td>',
+        '<td class="text-center">' + escapeHtml(String(Number(row.sessionCount || 0))) + '</td>',
+        '<td class="text-center">' + escapeHtml(String(Number(row.avgStudentsPerSession || 0))) + '</td>',
+        '<td class="text-center">' + escapeHtml(String(Number(row.absenceCount || 0))) + '</td>',
+        '<td class="text-center">' + escapeHtml(String(Number(row.lateCount || 0))) + '</td>',
+        '<td class="text-center">' + escapeHtml(String(Number(row.earlyLeaveCount || 0))) + '</td>',
+        '<td class="text-center pe-3">' + escapeHtml(String(Number(row.gradebookCount || 0))) + '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="hub-table-wrap">',
+      '<table class="table table-hover align-middle hub-workspace-table mb-0">',
+      '<thead><tr>',
+      '<th class="ps-3 hub-weekly-reports-list-sort" data-hub-weekly-reports-class-sort="className">Class' + weeklyReportsClassSortIndicator('className') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-class-sort="sessionCount">Sessions' + weeklyReportsClassSortIndicator('sessionCount') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-class-sort="avgStudentsPerSession">Avg Students' + weeklyReportsClassSortIndicator('avgStudentsPerSession') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-class-sort="absenceCount">Absences' + weeklyReportsClassSortIndicator('absenceCount') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-class-sort="lateCount">Late' + weeklyReportsClassSortIndicator('lateCount') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-class-sort="earlyLeaveCount">Early Leave' + weeklyReportsClassSortIndicator('earlyLeaveCount') + '</th>',
+      '<th class="text-center pe-3 hub-weekly-reports-list-sort" data-hub-weekly-reports-class-sort="gradebookCount">Gradebooks' + weeklyReportsClassSortIndicator('gradebookCount') + '</th>',
+      '</tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsBoard(rows) {
+    const sortedRows = sortWeeklyReportsRows(rows);
+    if (!sortedRows.length) {
+      return renderWeeklyReportsEmptyState('No enrolled students found.', 'Try widening the date range or clearing class/student filters.');
+    }
+    return [
+      '<div class="hub-weekly-reports-student-board">',
+      sortedRows.map(function (row) {
+        const tileStyle = buildWeeklyReportsStudentTileStyle(row.attendanceHealth);
+        const sessions = Array.isArray(row.sessions) ? row.sessions : [];
+        const skillAverages = Array.isArray(row.skillAverages) ? row.skillAverages : [];
+        const caseCount = Number(row.caseCount || 0);
+        const sessionLines = sessions.length
+          ? sessions.map(function (session) { return renderWeeklyReportsStudentSessionLine(session); }).join('')
+          : '<div class="hub-weekly-reports-student-tile-session-line"><span class="label">Sessions</span><span class="value">None</span></div>';
+        const skillSection = skillAverages.length
+          ? [
+            '<div class="hub-weekly-reports-student-tile-section">',
+            '<div class="hub-weekly-reports-student-tile-section-title">Skills</div>',
+            skillAverages.map(function (skill) {
+              const label = String(skill.skillLabel || skill.skillId || 'Skill');
+              const value = String(skill.averagePercent) + '%';
+              return renderWeeklyReportsStudentMetricLine(label, value);
+            }).join(''),
+            '</div>'
+          ].join('')
+          : '';
+        const caseLine = caseCount > 0
+          ? renderWeeklyReportsStudentMetricLine('Cases', String(caseCount) + (caseCount === 1 ? ' case' : ' cases'))
+          : '';
+        return [
+          '<div class="hub-weekly-reports-student-tile" style="' + tileStyle + '" title="' + escapeHtml(row.name || row.studentId || '') + '">',
+          '<div class="hub-weekly-reports-student-tile-body">',
+          '<div class="hub-weekly-reports-student-tile-name">' + escapeHtml(row.name || row.studentId || 'Student') + '</div>',
+          '<div class="hub-weekly-reports-student-tile-section">',
+          '<div class="hub-weekly-reports-student-tile-section-title">Sessions</div>',
+          sessionLines,
+          '</div>',
+          skillSection,
+          caseLine,
+          '</div>',
+          '</div>'
+        ].join('');
+      }).join(''),
+      '</div>'
+    ].join('');
+  }
+
+  function weeklyReportsSortIndicator(key) {
+    const sort = hubWeeklyReportsState.listSort || { key: 'name', dir: 'asc' };
+    if (sort.key !== key) return '';
+    return sort.dir === 'desc' ? ' <i class="bi bi-sort-down"></i>' : ' <i class="bi bi-sort-up"></i>';
+  }
+
+  function renderWeeklyReportsList(rows) {
+    const sortedRows = sortWeeklyReportsRows(rows);
+    if (!sortedRows.length) {
+      return renderWeeklyReportsEmptyState('No enrolled students found.', 'Try widening the date range or clearing class/student filters.');
+    }
+    const body = sortedRows.map(function (row) {
+      const caseCount = Number(row.caseCount || 0);
+      const caseLabel = caseCount > 0 ? String(caseCount) : '-';
+      return [
+        '<tr>',
+        '<td class="ps-3"><div class="fw-semibold">' + hubStudentNameHtml(row.name || row.studentId, row.studentId) + '</div>',
+        '<div class="small text-muted font-monospace">' + escapeHtml(row.studentId || '-') + '</div></td>',
+        '<td class="text-center">' + escapeHtml(String(Number(row.presentCount || 0))) + '</td>',
+        '<td class="text-center">' + escapeHtml(String(Number(row.lateCount || 0))) + '</td>',
+        '<td class="text-center">' + escapeHtml(String(Number(row.absenceCount || 0))) + '</td>',
+        '<td class="text-center">' + escapeHtml(caseLabel) + '</td>',
+        '<td class="text-center">' + escapeHtml(String(Number(row.sessionCount || 0))) + '</td>',
+        '<td class="text-center">' + escapeHtml(formatWeeklyReportsSkillSummary(row.skillAverages)) + '</td>',
+        '<td class="text-center pe-3">' + escapeHtml(String(Math.round(Number(row.attendanceHealth || 0)))) + '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="hub-table-wrap">',
+      '<table class="table table-hover align-middle hub-workspace-table mb-0">',
+      '<thead><tr>',
+      '<th class="ps-3 hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="name">Student' + weeklyReportsSortIndicator('name') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="presentCount">Present' + weeklyReportsSortIndicator('presentCount') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="lateCount">Late' + weeklyReportsSortIndicator('lateCount') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="absenceCount">Absences' + weeklyReportsSortIndicator('absenceCount') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="caseCount">Cases' + weeklyReportsSortIndicator('caseCount') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="sessionCount">Sessions' + weeklyReportsSortIndicator('sessionCount') + '</th>',
+      '<th class="text-center">Skills</th>',
+      '<th class="text-center pe-3 hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="attendanceHealth">Health' + weeklyReportsSortIndicator('attendanceHealth') + '</th>',
+      '</tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsResultsToolbar() {
+    const level = hubWeeklyReportsState.level === 'students' ? 'students' : 'classes';
+    const rows = level === 'students'
+      ? (Array.isArray(hubWeeklyReportsState.rows) ? hubWeeklyReportsState.rows : [])
+      : (Array.isArray(hubWeeklyReportsState.classRows) ? hubWeeklyReportsState.classRows : []);
+    const viewMode = hubWeeklyReportsState.viewMode === 'list' ? 'list' : 'board';
+    const rangeLabel = hubWeeklyReportsState.lastRangeLabel || formatWeeklyReportsRangeLabel();
+    const refreshed = hubWeeklyReportsState.lastLoadedAt
+      ? 'Updated ' + escapeHtml(formatHubInstant(hubWeeklyReportsState.lastLoadedAt))
+      : '';
+    const countLabel = level === 'students'
+      ? '<span class="fw-semibold text-dark">' + escapeHtml(String(rows.length)) + '</span> student(s)'
+      : '<span class="fw-semibold text-dark">' + escapeHtml(String(rows.length)) + '</span> class(es)';
+    const classContext = level === 'students' && hubWeeklyReportsState.selectedClassName
+      ? ' <span class="mx-1">|</span> <span class="fw-semibold text-dark">' + escapeHtml(hubWeeklyReportsState.selectedClassName) + '</span>'
+      : '';
+    const backButton = level === 'students'
+      ? '<button type="button" class="btn btn-outline-secondary btn-sm me-2" data-hub-weekly-reports-back="classes"><i class="bi bi-arrow-left me-1"></i>Back to classes</button>'
+      : '';
+    return [
+      '<div class="hub-weekly-reports-toolbar">',
+      '<div class="small text-muted d-flex align-items-center flex-wrap gap-1">',
+      backButton,
+      '<span>', countLabel, classContext,
+      ' <span class="mx-1">|</span> ',
+      escapeHtml(rangeLabel),
+      refreshed ? ' <span class="mx-1">|</span> ' + refreshed : '',
+      '</span>',
+      '</div>',
+      '<div class="btn-group btn-group-sm" role="group" aria-label="Weekly reports view mode">',
+      '<button type="button" class="btn ' + (viewMode === 'board' ? 'btn-primary' : 'btn-outline-secondary') + '" data-hub-weekly-reports-view="board"><i class="bi bi-grid-3x3-gap me-1"></i>Board</button>',
+      '<button type="button" class="btn ' + (viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary') + '" data-hub-weekly-reports-view="list"><i class="bi bi-list-ul me-1"></i>List</button>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsResultsContent() {
+    const level = hubWeeklyReportsState.level === 'students' ? 'students' : 'classes';
+    if (hubWeeklyReportsState.loading) {
+      const loadingLabel = level === 'students' ? 'Loading students...' : 'Loading classes...';
+      return '<div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>' + escapeHtml(loadingLabel) + '</div>';
+    }
+    if (hubWeeklyReportsState.lastError) {
+      return renderWeeklyReportsEmptyState('Unable to load weekly reports.', hubWeeklyReportsState.lastError);
+    }
+    if (!hubWeeklyReportsActiveTabId && !hubWeeklyReportsState.lastLoadedAt && !hubWeeklyReportsState.loading) {
+      return renderWeeklyReportsEmptyState('Ready to load classes.', 'Choose filters and click Apply, or use a quick report shortcut below.');
+    }
+    if (level === 'classes') {
+      const classRows = Array.isArray(hubWeeklyReportsState.classRows) ? hubWeeklyReportsState.classRows : [];
+      const body = hubWeeklyReportsState.viewMode === 'list'
+        ? renderWeeklyReportsClassList(classRows)
+        : renderWeeklyReportsClassBoard(classRows);
+      return renderWeeklyReportsResultsToolbar() + body;
+    }
+    const rows = Array.isArray(hubWeeklyReportsState.rows) ? hubWeeklyReportsState.rows : [];
+    const body = hubWeeklyReportsState.viewMode === 'list'
+      ? renderWeeklyReportsList(rows)
+      : renderWeeklyReportsBoard(rows);
+    return renderWeeklyReportsResultsToolbar() + body;
+  }
+
+  function renderWeeklyReportsResultsPanel() {
+    const panel = document.getElementById('hubWeeklyReportsResults');
+    if (!panel) return;
+    panel.innerHTML = renderWeeklyReportsResultsContent();
+    bindWeeklyReportsResultsControls();
+    persistActiveWeeklyReportsTab();
+  }
+
+  function bindWeeklyReportsResultsControls() {
+    const panel = document.getElementById('hubWeeklyReportsResults');
+    if (!panel) return;
+    panel.querySelectorAll('[data-hub-weekly-reports-view]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        hubWeeklyReportsState.viewMode = button.getAttribute('data-hub-weekly-reports-view') === 'list' ? 'list' : 'board';
+        renderWeeklyReportsResultsPanel();
+      });
+    });
+    panel.querySelectorAll('[data-hub-weekly-reports-sort]').forEach(function (header) {
+      header.addEventListener('click', function () {
+        const key = header.getAttribute('data-hub-weekly-reports-sort') || 'name';
+        const current = hubWeeklyReportsState.listSort || { key: 'name', dir: 'asc' };
+        if (current.key === key) {
+          hubWeeklyReportsState.listSort = { key: key, dir: current.dir === 'asc' ? 'desc' : 'asc' };
+        } else {
+          hubWeeklyReportsState.listSort = { key: key, dir: 'asc' };
+        }
+        renderWeeklyReportsResultsPanel();
+      });
+    });
+    panel.querySelectorAll('[data-hub-weekly-reports-class-sort]').forEach(function (header) {
+      header.addEventListener('click', function () {
+        const key = header.getAttribute('data-hub-weekly-reports-class-sort') || 'className';
+        const current = hubWeeklyReportsState.classListSort || { key: 'className', dir: 'asc' };
+        if (current.key === key) {
+          hubWeeklyReportsState.classListSort = { key: key, dir: current.dir === 'asc' ? 'desc' : 'asc' };
+        } else {
+          hubWeeklyReportsState.classListSort = { key: key, dir: 'asc' };
+        }
+        renderWeeklyReportsResultsPanel();
+      });
+    });
+    panel.querySelectorAll('[data-hub-weekly-reports-back]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        const activeTab = getActiveWeeklyReportsTab();
+        if (activeTab && activeTab.parentTabId) {
+          closeWeeklyReportsTab(activeTab.id, { activateTabId: activeTab.parentTabId });
+          return;
+        }
+        hubWeeklyReportsState.level = 'classes';
+        hubWeeklyReportsState.selectedClassId = '';
+        hubWeeklyReportsState.selectedClassName = '';
+        hubWeeklyReportsState.rows = [];
+        hubWeeklyReportsState.lastError = '';
+        renderWeeklyReportsResultsPanel();
+      });
+    });
+    panel.querySelectorAll('[data-hub-weekly-reports-class-id]').forEach(function (tile) {
+      tile.addEventListener('click', function () {
+        const classId = tile.getAttribute('data-hub-weekly-reports-class-id') || '';
+        const className = tile.getAttribute('data-hub-weekly-reports-class-name') || classId;
+        if (!classId) return;
+        drillIntoWeeklyReportsClass(classId, className);
+      });
+    });
+  }
+
+  function applyWeeklyReportsPayloadToState(payload, opts) {
+    const options = opts || {};
+    const view = String(payload.view || options.view || 'classes');
+    cacheWeeklyReportsDepartmentOptions(payload);
+    if (view === 'students') {
+      hubWeeklyReportsState.level = 'students';
+      hubWeeklyReportsState.rows = Array.isArray(payload.rows) ? payload.rows : [];
+      hubWeeklyReportsState.selectedClassId = String(options.classId || hubWeeklyReportsState.selectedClassId || '');
+      hubWeeklyReportsState.selectedClassName = String(options.className || hubWeeklyReportsState.selectedClassName || '');
+    } else {
+      hubWeeklyReportsState.level = 'classes';
+      hubWeeklyReportsState.classRows = Array.isArray(payload.rows) ? payload.rows : [];
+      hubWeeklyReportsState.selectedClassId = '';
+      hubWeeklyReportsState.selectedClassName = '';
+      hubWeeklyReportsState.rows = [];
+    }
+    hubWeeklyReportsState.lastLoadedAt = payload.refreshedAt || new Date().toISOString();
+    hubWeeklyReportsState.lastRangeLabel = formatWeeklyReportsRangeLabel();
+    hubWeeklyReportsState.lastError = '';
+  }
+
+  function openWeeklyReportsClassBoardTab() {
+    const filtersSnapshot = captureWeeklyReportsFiltersSnapshot();
+    const requestKey = buildWeeklyReportsBoardRequestKey(filtersSnapshot) + '|' + String(Date.now());
+    const tab = createWeeklyReportsTab({
+      label: buildWeeklyReportsTabLabel('classes', filtersSnapshot),
+      type: 'classes',
+      requestKey: requestKey,
+      filtersSnapshot: filtersSnapshot,
+      loaded: false
+    });
+    activateWeeklyReportsTab(tab.id, { skipPersist: true });
+    return loadWeeklyReportsWorkspace({ view: 'classes', tabId: tab.id });
+  }
+
+  function openWeeklyReportsStudentTab(classId, className, parentTabId) {
+    const filtersSnapshot = captureWeeklyReportsFiltersSnapshot();
+    const normalizedClassId = String(classId || '').trim();
+    const normalizedClassName = String(className || classId || '').trim();
+    const normalizedParentTabId = String(parentTabId || hubWeeklyReportsActiveTabId || '').trim();
+    const requestKey = buildWeeklyReportsStudentRequestKey(normalizedParentTabId, normalizedClassId, filtersSnapshot);
+    const existing = findWeeklyReportsTabByRequestKey(requestKey);
+    if (existing) {
+      activateWeeklyReportsTab(existing.id);
+      return Promise.resolve();
+    }
+    const tab = createWeeklyReportsTab({
+      label: buildWeeklyReportsTabLabel('students', filtersSnapshot, normalizedClassName),
+      type: 'students',
+      parentTabId: normalizedParentTabId,
+      requestKey: requestKey,
+      classId: normalizedClassId,
+      className: normalizedClassName,
+      filtersSnapshot: filtersSnapshot,
+      loaded: false
+    });
+    activateWeeklyReportsTab(tab.id, { skipPersist: true });
+    return loadWeeklyReportsWorkspace({
+      view: 'students',
+      tabId: tab.id,
+      classId: normalizedClassId,
+      className: normalizedClassName
+    });
+  }
+
+  function drillIntoWeeklyReportsClass(classId, className) {
+    persistActiveWeeklyReportsTab();
+    const parentTabId = hubWeeklyReportsActiveTabId;
+    openWeeklyReportsStudentTab(classId, className, parentTabId);
+  }
+
+  async function loadWeeklyReportsWorkspace(options) {
+    const opts = options || {};
+    const tab = opts.tabId
+      ? hubWeeklyReportsTabs.find(function (row) { return row.id === opts.tabId; })
+      : getActiveWeeklyReportsTab();
+    if (!tab) return;
+    if (tab.loaded && !opts.forceReload) {
+      activateWeeklyReportsTab(tab.id, { skipPersist: true });
+      return;
+    }
+    if (hubWeeklyReportsState.loading) return;
+    hubWeeklyReportsState.loading = true;
+    hubWeeklyReportsState.lastError = '';
+    renderWeeklyReportsResultsPanel();
+
+    const applyBtn = document.getElementById('hubWeeklyReportsFilterApply');
+    const originalHtml = applyBtn ? applyBtn.innerHTML : '';
+    if (applyBtn) {
+      applyBtn.disabled = true;
+      applyBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Loading';
+    }
+    const loadingMessage = opts.view === 'students' ? 'Loading students...' : 'Loading classes...';
+    if (typeof window.showLoading === 'function') window.showLoading(loadingMessage);
+
+    try {
+      const requestQuery = new URLSearchParams();
+      appendWeeklyReportsWorkspaceQuery(requestQuery, opts);
+      const response = await fetch('/school/report-hub/api/workspace/weekly-reports?' + requestQuery.toString(), {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to load weekly reports.' };
+      });
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Unable to load weekly reports.');
+      }
+      applyWeeklyReportsPayloadToState(payload, opts);
+      tab.loaded = true;
+      tab.filtersSnapshot = captureWeeklyReportsFiltersSnapshot();
+      tab.viewState = captureWeeklyReportsViewState();
+    } catch (error) {
+      hubWeeklyReportsState.lastError = error.message || 'Unable to load weekly reports.';
+      if (opts.view === 'students') {
+        hubWeeklyReportsState.rows = [];
+      } else {
+        hubWeeklyReportsState.classRows = [];
+        hubWeeklyReportsState.level = 'classes';
+        hubWeeklyReportsState.selectedClassId = '';
+        hubWeeklyReportsState.selectedClassName = '';
+      }
+      tab.loaded = false;
+      tab.viewState = captureWeeklyReportsViewState();
+    } finally {
+      hubWeeklyReportsState.loading = false;
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+      if (applyBtn) {
+        applyBtn.disabled = false;
+        applyBtn.innerHTML = originalHtml;
+      }
+      renderWeeklyReportsTabBar();
+      renderWeeklyReportsResultsPanel();
+    }
+  }
+
+  async function loadWeeklyReportsClasses() {
+    return openWeeklyReportsClassBoardTab();
+  }
+
+  async function loadWeeklyReportsStudents(options) {
+    const opts = options || {};
+    const classId = String(opts.classId || hubWeeklyReportsState.selectedClassId || '').trim();
+    const className = String(opts.className || hubWeeklyReportsState.selectedClassName || classId).trim();
+    const parentTabId = opts.parentTabId || hubWeeklyReportsActiveTabId;
+    return openWeeklyReportsStudentTab(classId, className, parentTabId);
+  }
+
+  function bindWeeklyReportsWorkspaceControls() {
+    const applyBtn = document.getElementById('hubWeeklyReportsFilterApply');
+    if (applyBtn) applyBtn.addEventListener('click', function () {
+      loadWeeklyReportsClasses();
+    });
+
+    const resetBtn = document.getElementById('hubWeeklyReportsFilterReset');
+    if (resetBtn) resetBtn.addEventListener('click', function () {
+      hubWeeklyReportsClassSelections = [];
+      hubWeeklyReportsStudentSelections = [];
+      hubWeeklyReportsTabs = [];
+      hubWeeklyReportsActiveTabId = '';
+      Object.assign(hubWeeklyReportsState, createDefaultWeeklyReportsViewState());
+      const startEl = document.getElementById('hubWeeklyReportsStartDate');
+      const endEl = document.getElementById('hubWeeklyReportsEndDate');
+      const departmentEl = document.getElementById('hubWeeklyReportsDepartmentId');
+      if (startEl) startEl.value = '';
+      if (endEl) endEl.value = '';
+      if (departmentEl) departmentEl.value = '';
+      syncWeeklyReportsInputs();
+      renderWeeklyReportsTabBar();
+      renderWeeklyReportsResultsPanel();
+    });
+
+    root.querySelectorAll('[data-hub-weekly-reports-quick]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        runWeeklyReportsQuickReport(btn.getAttribute('data-hub-weekly-reports-quick') || '');
+      });
+    });
+
+    root.querySelectorAll('[data-hub-weekly-reports-range]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setHubWeeklyReportsRange(btn.getAttribute('data-hub-weekly-reports-range') || '');
+      });
+    });
+
+    const openClass = document.getElementById('hubWeeklyReportsOpenClassPicker');
+    if (openClass) openClass.addEventListener('click', openHubWeeklyReportsClassPicker);
+    const openStudent = document.getElementById('hubWeeklyReportsOpenStudentPicker');
+    if (openStudent) openStudent.addEventListener('click', openHubWeeklyReportsStudentPicker);
+
+    const clearClass = document.getElementById('hubWeeklyReportsClearClass');
+    if (clearClass) clearClass.addEventListener('click', function () {
+      hubWeeklyReportsClassSelections = [];
+      syncWeeklyReportsInputs();
+    });
+    const clearStudent = document.getElementById('hubWeeklyReportsClearStudent');
+    if (clearStudent) clearStudent.addEventListener('click', function () {
+      hubWeeklyReportsStudentSelections = [];
+      syncWeeklyReportsInputs();
+    });
+
+    const classChips = document.getElementById('hubWeeklyReportsClassChips');
+    if (classChips) classChips.addEventListener('click', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-weekly-reports-remove-class]');
+      if (!btn) return;
+      const removeId = btn.getAttribute('data-hub-weekly-reports-remove-class') || '';
+      hubWeeklyReportsClassSelections = hubWeeklyReportsClassSelections.filter(function (item) { return item.id !== removeId; });
+      syncWeeklyReportsInputs();
+    });
+
+    const studentChips = document.getElementById('hubWeeklyReportsStudentChips');
+    if (studentChips) studentChips.addEventListener('click', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-weekly-reports-remove-student]');
+      if (!btn) return;
+      const removeId = btn.getAttribute('data-hub-weekly-reports-remove-student') || '';
+      hubWeeklyReportsStudentSelections = hubWeeklyReportsStudentSelections.filter(function (item) { return item.id !== removeId; });
+      syncWeeklyReportsInputs();
+    });
+
+    const startEl = document.getElementById('hubWeeklyReportsStartDate');
+    const endEl = document.getElementById('hubWeeklyReportsEndDate');
+    if (startEl) startEl.addEventListener('change', snapHubWeeklyReportsDateInputs);
+    if (endEl) endEl.addEventListener('change', snapHubWeeklyReportsDateInputs);
+
+    bindWeeklyReportsFilterCollapse();
+  }
+
+  function renderWeeklyReportsWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : {
+      key: 'weekly-reports',
+      label: 'Weekly Reports',
+      icon: 'bi bi-calendar-week',
+      sourceUrl: '/school/report-hub'
+    };
+    const filtersExpanded = hubWeeklyReportsHasFiltersApplied();
+    const collapseShowClass = filtersExpanded ? ' show' : '';
+
+    els.workspace.innerHTML = [
+      '<section class="hub-workspace">',
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Report Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-week') + ' me-2"></i>' + escapeHtml(section.label || 'Weekly Reports') + '</h2>',
+      '<p class="text-muted mb-0">Start with class summary cards, then drill into a class to review enrolled students. Session counts reflect expected class sessions in the selected date range.</p>',
+      '</div>',
+      '</div>',
+      '<div class="p-3 border-bottom bg-white">',
+      '<div class="card border shadow-sm mb-0">',
+      '<div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">',
+      '<div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filters</div>',
+      '<button id="hubWeeklyReportsFilterToggleBtn" type="button" class="btn btn-outline-secondary btn-sm px-2" data-bs-toggle="collapse" data-bs-target="#hubWeeklyReportsFilterCollapse" aria-expanded="' + (filtersExpanded ? 'true' : 'false') + '" aria-controls="hubWeeklyReportsFilterCollapse" aria-label="' + (filtersExpanded ? 'Close filters' : 'Open filters') + '">',
+      '<i id="hubWeeklyReportsFilterToggleIcon" class="bi ' + (filtersExpanded ? 'bi-chevron-up' : 'bi-chevron-down') + '"></i>',
+      '</button>',
+      '</div>',
+      '<div class="collapse' + collapseShowClass + '" id="hubWeeklyReportsFilterCollapse">',
+      '<div class="card-body p-3">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-md-4"><label class="form-label fw-bold small">Classes</label><div class="input-group input-group-sm"><input type="hidden" id="hubWeeklyReportsClassId"><input type="text" id="hubWeeklyReportsClassName" class="form-control bg-white" placeholder="All Classes..." readonly><button type="button" class="btn btn-outline-danger" id="hubWeeklyReportsClearClass" title="Clear Classes"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubWeeklyReportsOpenClassPicker" title="Select Classes"><i class="bi bi-book"></i></button></div><div id="hubWeeklyReportsClassChips" class="mt-2"></div></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold small">Students</label><div class="input-group input-group-sm"><input type="hidden" id="hubWeeklyReportsStudentId"><input type="text" id="hubWeeklyReportsStudentName" class="form-control bg-white" placeholder="All Students..." readonly><button type="button" class="btn btn-outline-danger" id="hubWeeklyReportsClearStudent" title="Clear Students"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubWeeklyReportsOpenStudentPicker" title="Select Students"><i class="bi bi-mortarboard"></i></button></div><div id="hubWeeklyReportsStudentChips" class="mt-2"></div></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold small" for="hubWeeklyReportsDepartmentId">Department</label><select id="hubWeeklyReportsDepartmentId" class="form-select form-select-sm"><option value="">All Departments</option></select></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold small" for="hubWeeklyReportsStartDate">Start Date</label><input type="date" id="hubWeeklyReportsStartDate" class="form-control form-control-sm"><div class="form-text">Snaps to Monday</div></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold small" for="hubWeeklyReportsEndDate">End Date</label><input type="date" id="hubWeeklyReportsEndDate" class="form-control form-control-sm"><div class="form-text">Snaps to Sunday</div></div>',
+      '<div class="col-md-6 d-flex gap-2 justify-content-md-end"><button type="button" id="hubWeeklyReportsFilterApply" class="btn btn-primary btn-sm flex-fill flex-md-grow-0 fw-bold"><i class="bi bi-funnel-fill me-1"></i> Apply</button><button type="button" id="hubWeeklyReportsFilterReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button></div>',
+      '</div>',
+      '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="thisWeek">This Week</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="lastTwoWeeks">Last Two Weeks</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="lastFourWeeks">Last Four Weeks</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="lastTwoMonths">Last Two Months</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="lastThreeMonths">Last Three Months</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="wholeYear">Whole Year</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="allTime">All Time</button>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '<div class="hub-weekly-reports-quick-reports">',
+      '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-weekly-reports-quick="thisWeek"><i class="bi bi-calendar-week me-1"></i>This week Report</button>',
+      '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-weekly-reports-quick="twoWeeks"><i class="bi bi-calendar2-week me-1"></i>Two Weeks Report</button>',
+      '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-weekly-reports-quick="threeWeeks"><i class="bi bi-calendar2-range me-1"></i>Three Weeks Report</button>',
+      '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-weekly-reports-quick="fourWeeks"><i class="bi bi-calendar3 me-1"></i>Four Weeks Report</button>',
+      '</div>',
+      '<div id="hubWeeklyReportsTabBar" class="hub-weekly-reports-tabs d-none"></div>',
+      '<div class="p-3" id="hubWeeklyReportsResults">',
+      renderWeeklyReportsResultsContent(),
+      '</div>',
+      '</div>',
+      '</section>'
+    ].join('');
+
+    cacheWeeklyReportsDepartmentOptions(payload || {});
+    syncWeeklyReportsInputs();
+    renderWeeklyReportsDepartmentSelect();
+    if (Array.isArray(payload?.rows) && payload.rows.length) {
+      const filtersSnapshot = captureWeeklyReportsFiltersSnapshot();
+      const view = String(payload.view || 'classes');
+      const tab = createWeeklyReportsTab({
+        label: view === 'students'
+          ? buildWeeklyReportsTabLabel('students', filtersSnapshot, hubWeeklyReportsState.selectedClassName)
+          : buildWeeklyReportsTabLabel('classes', filtersSnapshot),
+        type: view === 'students' ? 'students' : 'classes',
+        requestKey: view === 'students'
+          ? buildWeeklyReportsStudentRequestKey('', hubWeeklyReportsState.selectedClassId, filtersSnapshot)
+          : buildWeeklyReportsBoardRequestKey(filtersSnapshot) + '|bootstrap',
+        filtersSnapshot: filtersSnapshot,
+        loaded: true
+      });
+      applyWeeklyReportsPayloadToState(payload, { view: view });
+      tab.viewState = captureWeeklyReportsViewState();
+      hubWeeklyReportsActiveTabId = tab.id;
+    }
+    bindWeeklyReportsWorkspaceControls();
+    renderWeeklyReportsTabBar();
+    renderWeeklyReportsResultsPanel();
   }
 
   function resolveHubStudentRecordId(item) {
@@ -7180,6 +8835,19 @@
         rows: [],
         total: 0,
         currentYear: workspaceState.holidaysYear || hubOrgYear()
+      });
+      return;
+    }
+
+    if (key === 'weekly-reports') {
+      renderWeeklyReportsWorkspace({
+        status: 'success',
+        section: {
+          key: 'weekly-reports',
+          label: 'Weekly Reports',
+          icon: 'bi bi-calendar-week',
+          sourceUrl: '/school/report-hub'
+        }
       });
       return;
     }

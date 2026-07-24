@@ -969,6 +969,7 @@ module.exports = {
     showAttendanceMatrixSettings,
     saveAttendanceMatrixSettings,
     listActiveAttendanceClasses,
+    buildAttendanceMatrixPayload,
     getAttendanceData,
     exportAttendanceExcel,
     uploadAttendanceFile,

@@ -4,6 +4,7 @@ const taskService = require('./taskService');
 const leaveRequestService = require('./leaveRequestService');
 const activityService = require('./activityService');
 const reportViewService = require('./reportViewService');
+const weeklyReportsHubService = require('./weeklyReportsHubService');
 const personDisplayNameService = require('./personDisplayNameService');
 const sessionExplorerService = require('./sessionExplorerService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
@@ -1135,6 +1136,61 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       rows: [],
       total: 0,
       refreshedAt: new Date().toISOString()
+    };
+  }
+
+  if (key === 'weekly-reports') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Weekly Reports',
+      sectionId: SECTIONS.SCHOOL_CLASSES
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Weekly Reports.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const classIds = weeklyReportsHubService.parseFilterIdList(
+      queryInput?.classIds || queryInput?.classId || ''
+    );
+    const studentIds = weeklyReportsHubService.parseFilterIdList(
+      queryInput?.studentIds || queryInput?.studentPersonId || queryInput?.studentId || ''
+    );
+    const startDate = normalizeText(queryInput?.startDate || queryInput?.dueDateStart || '');
+    const endDate = normalizeText(queryInput?.endDate || queryInput?.dueDateEnd || '');
+    const departmentId = normalizeText(queryInput?.departmentId || '');
+    const view = lower(queryInput?.view || 'classes');
+    const [board, departmentOptions] = await Promise.all([
+      view === 'students'
+        ? weeklyReportsHubService.buildWeeklyReportsStudentBoard({
+          reqUser: req.user,
+          classIds,
+          studentIds,
+          departmentId,
+          startDate,
+          endDate
+        })
+        : weeklyReportsHubService.buildWeeklyReportsClassBoard({
+          reqUser: req.user,
+          classIds,
+          departmentId,
+          startDate,
+          endDate
+        }),
+      weeklyReportsHubService.resolveWeeklyReportsDepartmentOptions(req.user)
+    ]);
+    return {
+      section: {
+        key: 'weekly-reports',
+        label: 'Weekly Reports',
+        icon: 'bi bi-calendar-week',
+        sourceUrl: '/school/report-hub'
+      },
+      view: board.view || view,
+      rows: board.rows,
+      total: board.total,
+      filters: board.filters,
+      departmentOptions,
+      refreshedAt: board.refreshedAt
     };
   }
 
