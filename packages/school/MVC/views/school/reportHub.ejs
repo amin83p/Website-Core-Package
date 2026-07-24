@@ -569,7 +569,7 @@
 
   .school-master-hub .hub-weekly-reports-student-tile {
     position: relative;
-    min-height: 280px;
+    min-height: 220px;
     border-radius: 1rem;
     border: 1px solid rgba(15, 23, 42, 0.1);
     border-left-width: 6px;
@@ -658,6 +658,12 @@
     text-align: right;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-tile-metric-line .value.attendance-status-present,
+  .school-master-hub .hub-weekly-reports-student-tile-metric-line .value.attendance-status-late,
+  .school-master-hub .hub-weekly-reports-student-tile-metric-line .value.attendance-status-absent {
+    font-weight: 800;
   }
 
   .school-master-hub .hub-weekly-reports-list-sort {
@@ -5529,22 +5535,43 @@
     ].join('');
   }
 
-  function renderWeeklyReportsStudentMetricLine(label, value) {
+  function renderWeeklyReportsStudentMetricLine(label, value, valueClass) {
+    const valueClassName = valueClass ? ('value ' + valueClass) : 'value';
     return [
       '<div class="hub-weekly-reports-student-tile-metric-line">',
       '<span class="label">' + escapeHtml(label) + '</span>',
-      '<span class="value">' + escapeHtml(value) + '</span>',
+      '<span class="' + escapeHtml(valueClassName) + '">' + escapeHtml(value) + '</span>',
       '</div>'
     ].join('');
   }
 
-  function renderWeeklyReportsStudentSessionLine(session) {
-    const dateLabel = String(session?.date || 'Session');
-    const statusLabel = String(session?.label || session?.status || '-');
+  function renderWeeklyReportsStudentAttendanceSummary(row) {
+    const presentCount = Number(row.presentCount || 0);
+    const lateCount = Number(row.lateCount || 0);
+    const absenceCount = Number(row.absenceCount || 0);
+    const attendancePercent = Math.round(Number(row.attendanceHealth || 0));
     return [
-      '<div class="hub-weekly-reports-student-tile-session-line">',
-      '<span class="label">' + escapeHtml(dateLabel) + '</span>',
-      '<span class="value">' + escapeHtml(statusLabel) + '</span>',
+      '<div class="hub-weekly-reports-student-tile-section">',
+      '<div class="hub-weekly-reports-student-tile-section-title">Attendance</div>',
+      renderWeeklyReportsStudentMetricLine('Present', String(presentCount), 'attendance-status-present'),
+      renderWeeklyReportsStudentMetricLine('Late', String(lateCount), 'attendance-status-late'),
+      renderWeeklyReportsStudentMetricLine('Absent', String(absenceCount), 'attendance-status-absent'),
+      renderWeeklyReportsStudentMetricLine('Overall', String(attendancePercent) + '%'),
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsStudentSkillsSummary(skillAverages) {
+    const list = Array.isArray(skillAverages) ? skillAverages : [];
+    if (!list.length) return '';
+    return [
+      '<div class="hub-weekly-reports-student-tile-section">',
+      '<div class="hub-weekly-reports-student-tile-section-title">Gradebook Skills</div>',
+      list.map(function (skill) {
+        const label = String(skill.skillLabel || skill.skillId || 'Skill');
+        const value = String(skill.averagePercent) + '%';
+        return renderWeeklyReportsStudentMetricLine(label, value);
+      }).join(''),
       '</div>'
     ].join('');
   }
@@ -5688,24 +5715,7 @@
       '<div class="hub-weekly-reports-student-board">',
       sortedRows.map(function (row) {
         const tileStyle = buildWeeklyReportsStudentTileStyle(row.attendanceHealth);
-        const sessions = Array.isArray(row.sessions) ? row.sessions : [];
-        const skillAverages = Array.isArray(row.skillAverages) ? row.skillAverages : [];
         const caseCount = Number(row.caseCount || 0);
-        const sessionLines = sessions.length
-          ? sessions.map(function (session) { return renderWeeklyReportsStudentSessionLine(session); }).join('')
-          : '<div class="hub-weekly-reports-student-tile-session-line"><span class="label">Sessions</span><span class="value">None</span></div>';
-        const skillSection = skillAverages.length
-          ? [
-            '<div class="hub-weekly-reports-student-tile-section">',
-            '<div class="hub-weekly-reports-student-tile-section-title">Skills</div>',
-            skillAverages.map(function (skill) {
-              const label = String(skill.skillLabel || skill.skillId || 'Skill');
-              const value = String(skill.averagePercent) + '%';
-              return renderWeeklyReportsStudentMetricLine(label, value);
-            }).join(''),
-            '</div>'
-          ].join('')
-          : '';
         const caseLine = caseCount > 0
           ? renderWeeklyReportsStudentMetricLine('Cases', String(caseCount) + (caseCount === 1 ? ' case' : ' cases'))
           : '';
@@ -5713,11 +5723,8 @@
           '<div class="hub-weekly-reports-student-tile" style="' + tileStyle + '" title="' + escapeHtml(row.name || row.studentId || '') + '">',
           '<div class="hub-weekly-reports-student-tile-body">',
           '<div class="hub-weekly-reports-student-tile-name">' + escapeHtml(row.name || row.studentId || 'Student') + '</div>',
-          '<div class="hub-weekly-reports-student-tile-section">',
-          '<div class="hub-weekly-reports-student-tile-section-title">Sessions</div>',
-          sessionLines,
-          '</div>',
-          skillSection,
+          renderWeeklyReportsStudentAttendanceSummary(row),
+          renderWeeklyReportsStudentSkillsSummary(row.skillAverages),
           caseLine,
           '</div>',
           '</div>'
