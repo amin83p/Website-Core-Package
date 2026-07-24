@@ -181,14 +181,82 @@
     .session-summary-label { color: #6c757d; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
     .session-summary-value { color: #1f2a37; font-size: 1.1rem; font-weight: 700; line-height: 1.1; }
 
-    /* Page header: match term edit — title row + dashboard; second row for other actions */
+    /* Page header: title + session meta on left; dashboard on right; class nav on toolbar */
+    .session-manager-page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.75rem 1.25rem;
+        margin-bottom: 1rem;
+    }
+    .session-manager-page-header-main {
+        min-width: 0;
+        flex: 1 1 16rem;
+    }
+    .session-manager-page-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin-top: 0.45rem;
+    }
+    .session-manager-page-meta-class {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        min-width: 0;
+        color: #1d4ed8;
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1.25;
+    }
+    .session-manager-page-meta-class-title {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .session-manager-page-meta-when {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem 0.85rem;
+        color: #334155;
+        font-size: 0.98rem;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+    .session-manager-page-meta-when-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        white-space: nowrap;
+    }
+    .session-manager-page-meta-when-item i {
+        color: #64748b;
+        font-size: 0.95em;
+    }
+    .session-manager-page-header-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        flex: 0 0 auto;
+    }
     .session-manager-toolbar-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.5rem 0.75rem;
+        margin-bottom: 1rem;
+    }
+    .session-manager-toolbar-actions {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         justify-content: flex-end;
         gap: 0.5rem;
-        margin-bottom: 1rem;
+        margin-left: auto;
     }
     .session-manager-toolbar-row .btn-save-session,
     .session-manager-toolbar-row .btn-close-session {
@@ -196,14 +264,13 @@
         font-weight: 600;
     }
 
-    .session-manager-quick-nav {
-        margin-bottom: 1rem;
-    }
     .session-manager-class-nav {
         display: inline-flex;
         flex-direction: column;
         align-items: stretch;
         min-width: min(100%, 280px);
+        max-width: 100%;
+        flex: 0 1 280px;
     }
     .session-manager-class-nav-toggle {
         display: inline-flex;
@@ -365,18 +432,6 @@
         color: #334155;
         line-height: 1.3;
     }
-    .session-info-summary-class {
-        color: #1d4ed8;
-        max-width: 11rem;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-weight: 700;
-    }
-    .session-info-summary-sep {
-        color: #cbd5e1;
-        font-weight: 400;
-    }
     .session-info-summary-chip {
         display: inline-flex;
         align-items: center;
@@ -389,6 +444,19 @@
         font-weight: 600;
         color: #475569;
         white-space: nowrap;
+    }
+    .session-info-summary-chip--primary {
+        padding: 0.28rem 0.7rem;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #1e293b;
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        gap: 0.35rem;
+    }
+    .session-info-summary-chip--primary i {
+        font-size: 1em;
+        color: #64748b;
     }
     .session-info-summary-chip.is-muted:empty {
         display: none;
@@ -739,7 +807,7 @@
     .session-manager-sidebar.collapsed .session-manager-nav-label { display: none; }
     .session-manager-sidebar.collapsed .session-manager-nav-item { justify-content: center; padding: 0.65rem; position: relative; }
     .session-manager-sidebar.collapsed .session-manager-sidebar-head .session-manager-nav-label { display: none; }
-    .session-manager-nav-item .session-reports-nav-badge {
+    .session-manager-nav-item .session-nav-badge {
         margin-left: auto;
         min-width: 1.35rem;
         font-size: 0.72rem;
@@ -747,7 +815,20 @@
         line-height: 1.2;
         padding: 0.2rem 0.4rem;
     }
-    .session-manager-sidebar.collapsed .session-manager-nav-item .session-reports-nav-badge {
+    .session-manager-nav-item .session-nav-badge.session-nav-badge--dot {
+        min-width: 0.65rem;
+        width: 0.65rem;
+        height: 0.65rem;
+        padding: 0;
+        border-radius: 50%;
+        /* Keep a filled ball visible; Bootstrap hides .badge:empty */
+        display: inline-block;
+        overflow: hidden;
+        font-size: 0;
+        line-height: 0;
+        vertical-align: middle;
+    }
+    .session-manager-sidebar.collapsed .session-manager-nav-item .session-nav-badge {
         position: absolute;
         top: 0.2rem;
         right: 0.2rem;
@@ -755,6 +836,12 @@
         min-width: 1.1rem;
         padding: 0.12rem 0.28rem;
         font-size: 0.65rem;
+    }
+    .session-manager-sidebar.collapsed .session-manager-nav-item .session-nav-badge.session-nav-badge--dot {
+        min-width: 0.55rem;
+        width: 0.55rem;
+        height: 0.55rem;
+        padding: 0;
     }
 
     .session-manager-main {
@@ -853,6 +940,15 @@
         outline: 2px solid rgba(245, 158, 11, 0.55);
         outline-offset: -2px;
         background: #fff8e1;
+    }
+    .skills-covered-note-input,
+    .skills-covered-note {
+        min-height: 4.5rem;
+        resize: vertical;
+        white-space: pre-wrap;
+    }
+    .skills-covered-note-display {
+        white-space: pre-wrap;
     }
 </style>
 
@@ -977,13 +1073,39 @@
             { key: 'respectsStudents', className: 'conduct-respects-students', label: 'Treats Other Students With Respect', valueKey: 'respectsStudentsPercent', peClass: 'pe-4' }
         ];
     %>
+    <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' && actionStateId ? actionStateId : '' %>">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' && csrfToken ? csrfToken : '' %>">
 
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-        <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-journal-check me-2 text-primary"></i>Manage Session<% if (isSessionCompleted) { %><span class="session-completed-check" role="img" aria-label="Session completed" title="Session completed"><i class="bi bi-check-lg" aria-hidden="true"></i></span><% } %></h1>
-        <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md session-manager-nav-away" id="linkSessionDashboard" data-confirm-title="Go to dashboard?" data-confirm-message="Leave this page and go to the school dashboard? Unsaved changes will be lost unless you save first."><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+    <div class="session-manager-page-header">
+        <div class="session-manager-page-header-main">
+            <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-journal-check me-2 text-primary"></i>Manage Session<% if (isSessionCompleted) { %><span class="session-completed-check" role="img" aria-label="Session completed" title="Session completed"><i class="bi bi-check-lg" aria-hidden="true"></i></span><% } %></h1>
+            <div class="session-manager-page-meta">
+                <div class="session-manager-page-meta-class">
+                    <span class="session-manager-page-meta-class-title" title="<%= classData.title %>"><%= classData.title %></span>
+                    <% if (smIsRolling && smCycleTooltipText) { %>
+                        <button
+                            type="button"
+                            class="session-class-info-badge<%= smSessionOutsideCycle ? ' is-danger' : '' %>"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            title="<%= smCycleTooltipText %>"
+                            aria-label="Rolling cycle window information">
+                            <i class="bi <%= smSessionOutsideCycle ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill' %>" aria-hidden="true"></i>
+                        </button>
+                    <% } %>
+                </div>
+                <div class="session-manager-page-meta-when">
+                    <span class="session-manager-page-meta-when-item" id="sessionInfoSummaryDate"><i class="bi bi-calendar3" aria-hidden="true"></i><%= session.date %></span>
+                    <span class="session-manager-page-meta-when-item" id="sessionInfoSummaryTime"><i class="bi bi-clock" aria-hidden="true"></i><%= session.startTime %>–<%= session.endTime %></span>
+                </div>
+            </div>
+        </div>
+        <div class="session-manager-page-header-actions">
+            <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md session-manager-nav-away" id="linkSessionDashboard" data-confirm-title="Go to dashboard?" data-confirm-message="Leave this page and go to the school dashboard? Unsaved changes will be lost unless you save first."><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+        </div>
     </div>
 
-    <div class="session-manager-quick-nav">
+    <div class="session-manager-toolbar-row">
         <div class="session-manager-class-nav">
             <button
                 type="button"
@@ -1010,33 +1132,32 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="session-manager-toolbar-row">
-        <div class="btn-group shadow-sm">
-            <% if (prevSessionId) { %>
-                <a href="/school/classes/<%= classData.id %>/sessions/<%= prevSessionId %>" class="btn btn-outline-primary bg-grey btn-md session-manager-nav-away" id="linkPrevSession" title="Previous session" data-confirm-title="Open previous session?" data-confirm-message="Leave this page and open the previous class session? Unsaved changes will be lost unless you save first."><i class="bi bi-chevron-left"></i></a>
-            <% } else { %>
-                <button type="button" class="btn btn-outline-secondary bg-light btn-md" disabled><i class="bi bi-chevron-left"></i></button>
+        <div class="session-manager-toolbar-actions">
+            <div class="btn-group shadow-sm">
+                <% if (prevSessionId) { %>
+                    <a href="/school/classes/<%= classData.id %>/sessions/<%= prevSessionId %>" class="btn btn-outline-primary bg-grey btn-md session-manager-nav-away" id="linkPrevSession" title="Previous session" data-confirm-title="Open previous session?" data-confirm-message="Leave this page and open the previous class session? Unsaved changes will be lost unless you save first."><i class="bi bi-chevron-left"></i></a>
+                <% } else { %>
+                    <button type="button" class="btn btn-outline-secondary bg-light btn-md" disabled><i class="bi bi-chevron-left"></i></button>
+                <% } %>
+                <% if (nextSessionId) { %>
+                    <a href="/school/classes/<%= classData.id %>/sessions/<%= nextSessionId %>" class="btn btn-outline-primary bg-grey btn-md session-manager-nav-away" id="linkNextSession" title="Next session" data-confirm-title="Open next session?" data-confirm-message="Leave this page and open the next class session? Unsaved changes will be lost unless you save first."><i class="bi bi-chevron-right"></i></a>
+                <% } else { %>
+                    <button type="button" class="btn btn-outline-secondary bg-light btn-md" disabled><i class="bi bi-chevron-right"></i></button>
+                <% } %>
+            </div>
+            <% if (canCreateMakeupSession) { %>
+                <button type="button" class="btn btn-outline-warning btn-md fw-semibold shadow-md" id="btnCreateMakeupSession"><i class="bi bi-calendar-plus me-1"></i>Create make-up session</button>
             <% } %>
-            <% if (nextSessionId) { %>
-                <a href="/school/classes/<%= classData.id %>/sessions/<%= nextSessionId %>" class="btn btn-outline-primary bg-grey btn-md session-manager-nav-away" id="linkNextSession" title="Next session" data-confirm-title="Open next session?" data-confirm-message="Leave this page and open the next class session? Unsaved changes will be lost unless you save first."><i class="bi bi-chevron-right"></i></a>
-            <% } else { %>
-                <button type="button" class="btn btn-outline-secondary bg-light btn-md" disabled><i class="bi bi-chevron-right"></i></button>
+            <% if (canToggleSessionLock) { %>
+                <button type="button" class="btn btn-outline-<%= isSessionLocked ? 'success' : 'secondary' %> btn-md fw-semibold shadow-sm" id="btnToggleSessionLock" data-next-locked="<%= isSessionLocked ? 'false' : 'true' %>">
+                    <i class="bi bi-<%= isSessionLocked ? 'unlock' : 'lock-fill' %> me-1"></i><%= isSessionLocked ? 'Unlock session' : 'Lock session' %>
+                </button>
             <% } %>
+            <% if (!isReadOnly) { %>
+                <button type="button" class="btn btn-primary btn-md btn-filled btn-save-session shadow-md" id="btnSaveSession"><i class="bi bi-save me-1"></i>Save session</button>
+            <% } %>
+            <button type="button" class="btn btn-warning btn-md btn-filled btn-close-session" id="btnCloseSessionManager"><i class="bi bi-x-lg me-1"></i>Close</button>
         </div>
-        <% if (canCreateMakeupSession) { %>
-            <button type="button" class="btn btn-outline-warning btn-md fw-semibold shadow-md" id="btnCreateMakeupSession"><i class="bi bi-calendar-plus me-1"></i>Create make-up session</button>
-        <% } %>
-        <% if (canToggleSessionLock) { %>
-            <button type="button" class="btn btn-outline-<%= isSessionLocked ? 'success' : 'secondary' %> btn-md fw-semibold shadow-sm" id="btnToggleSessionLock" data-next-locked="<%= isSessionLocked ? 'false' : 'true' %>">
-                <i class="bi bi-<%= isSessionLocked ? 'unlock' : 'lock-fill' %> me-1"></i><%= isSessionLocked ? 'Unlock session' : 'Lock session' %>
-            </button>
-        <% } %>
-        <% if (!isReadOnly) { %>
-            <button type="button" class="btn btn-primary btn-md btn-filled btn-save-session shadow-md" id="btnSaveSession"><i class="bi bi-save me-1"></i>Save session</button>
-        <% } %>
-        <button type="button" class="btn btn-warning btn-md btn-filled btn-close-session" id="btnCloseSessionManager"><i class="bi bi-x-lg me-1"></i>Close</button>
     </div>
 
     <div class="card session-manager-info-card shadow-sm mb-3">
@@ -1051,31 +1172,15 @@
                 aria-expanded="false"
                 aria-controls="sessionInfoDetailsCollapse">
                 <div class="session-info-summary">
-                    <span class="session-info-summary-class text-truncate" title="<%= classData.title %>"><%= classData.title %></span>
-                    <% if (smIsRolling && smCycleTooltipText) { %>
-                        <button
-                            type="button"
-                            class="session-class-info-badge<%= smSessionOutsideCycle ? ' is-danger' : '' %>"
-                            data-bs-toggle="tooltip"
-                            data-bs-placement="top"
-                            title="<%= smCycleTooltipText %>"
-                            aria-label="Rolling cycle window information"
-                            onclick="event.stopPropagation();">
-                            <i class="bi <%= smSessionOutsideCycle ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill' %>" aria-hidden="true"></i>
-                        </button>
-                    <% } %>
-                    <span class="session-info-summary-sep" aria-hidden="true">·</span>
-                    <span class="session-info-summary-chip" id="sessionInfoSummaryDate"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i><%= session.date %></span>
-                    <span class="session-info-summary-chip" id="sessionInfoSummaryTime"><i class="bi bi-clock me-1" aria-hidden="true"></i><%= session.startTime %>–<%= session.endTime %></span>
                     <% if (smTeacherLabel) { %>
-                        <span class="session-info-summary-chip d-none d-lg-inline-flex" id="sessionInfoSummaryTeacher" title="Teacher"><i class="bi bi-person-badge me-1" aria-hidden="true"></i><%= smTeacherLabel %></span>
+                        <span class="session-info-summary-chip session-info-summary-chip--primary" id="sessionInfoSummaryTeacher" title="Teacher"><i class="bi bi-person-badge me-1" aria-hidden="true"></i><%= smTeacherLabel %></span>
                     <% } else if (canEditSessionMetadataFlag) { %>
-                        <span class="session-info-summary-chip d-none d-lg-inline-flex is-muted" id="sessionInfoSummaryTeacher" title="Teacher"></span>
+                        <span class="session-info-summary-chip session-info-summary-chip--primary is-muted" id="sessionInfoSummaryTeacher" title="Teacher"></span>
                     <% } %>
+                    <span class="session-info-summary-chip session-info-summary-chip--primary session-info-summary-chip--location<%= smRoomLabel ? '' : ' is-muted' %>" id="sessionInfoSummaryLocation" title="Location"><% if (smRoomLabel) { %><i class="bi bi-geo-alt me-1" aria-hidden="true"></i><%= smRoomLabel %><% } %></span>
                     <% if (smIsRolling) { %>
                         <span class="session-info-summary-chip d-none d-md-inline-flex" title="Cycle window"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i><%= smCycleWindowLabel %></span>
                     <% } %>
-                    <span class="session-info-summary-chip session-info-summary-chip--location<%= smRoomLabel ? '' : ' is-muted' %>" id="sessionInfoSummaryLocation" title="Location"><% if (smRoomLabel) { %><i class="bi bi-geo-alt me-1" aria-hidden="true"></i><%= smRoomLabel %><% } %></span>
                 </div>
                 <span class="session-info-expand-meta">
                     <span class="session-info-expand-label">Details</span>
@@ -1291,6 +1396,8 @@
                 </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="session" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-journal-text fs-5"></i><span class="session-manager-nav-label">Session &amp; notes</span>
+                    <% const hasSessionNotes = String(session.notes || '').trim().length > 0; %>
+                    <span id="sessionNotesNavBadge" class="badge rounded-pill session-nav-badge session-nav-badge--dot bg-danger<%= hasSessionNotes ? '' : ' d-none' %>" aria-hidden="<%= hasSessionNotes ? 'false' : 'true' %>" title="Session notes available">&nbsp;</span>
                 </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="curriculum" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-book fs-5"></i><span class="session-manager-nav-label">Curriculum</span>
@@ -1300,7 +1407,7 @@
                 </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="assignments" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-clipboard-check fs-5"></i><span class="session-manager-nav-label">Reports</span>
-                    <span id="sessionReportsNavBadge" class="badge rounded-pill session-reports-nav-badge d-none" aria-hidden="true"></span>
+                    <span id="sessionReportsNavBadge" class="badge rounded-pill session-nav-badge d-none" aria-hidden="true"></span>
                 </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="student-cases" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-folder-check fs-5"></i><span class="session-manager-nav-label">Student Cases</span>
@@ -1561,7 +1668,7 @@
                     </div>
                     <div class="card-body">
                         <% if (!isReadOnly && !isMakeupRequiredInactive) { %>
-                        <div class="row g-2 align-items-end mb-3" id="skillsCoveredAddForm">
+                        <div class="row g-2 align-items-start mb-3" id="skillsCoveredAddForm">
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold mb-1" for="skillsCoveredSkillSelect">Skill</label>
                                 <select id="skillsCoveredSkillSelect" class="form-select">
@@ -1573,9 +1680,10 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold mb-1" for="skillsCoveredNoteInput">What was covered</label>
-                                <input type="text" id="skillsCoveredNoteInput" class="form-control" maxlength="2000" placeholder="Brief note about what you covered…" autocomplete="off">
+                                <textarea id="skillsCoveredNoteInput" class="form-control skills-covered-note-input" rows="3" maxlength="2000" placeholder="Describe what you covered…"></textarea>
                             </div>
                             <div class="col-md-2">
+                                <label class="form-label fw-semibold mb-1 d-none d-md-block" for="btnAddSkillCovered">&nbsp;</label>
                                 <button type="button" class="btn btn-primary w-100" id="btnAddSkillCovered"><i class="bi bi-plus-lg me-1"></i>Add</button>
                             </div>
                         </div>
@@ -2209,6 +2317,7 @@ function formatSchoolInstant(value) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const actionStateId = <%- jsonForScript((typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '') %>;
+    const csrfToken = <%- jsonForScript((typeof csrfToken !== 'undefined' && csrfToken) ? csrfToken : '') %>;
     const defaultSessionStatusCode = <%- jsonForScript(fallbackStatusCode) %>;
     const sessionInitialStatusCode = <%- jsonForScript(currentSessionStatus) %>;
     const sessionManagerClassId = <%- jsonForScript(classData.id) %>;
@@ -4139,6 +4248,18 @@ document.addEventListener('DOMContentLoaded', () => {
             ? `${total} report instance(s) — all submitted`
             : `${total} report instance(s) — ${pending} pending`;
     }
+    function syncSessionNotesNavBadge() {
+        const badge = document.getElementById('sessionNotesNavBadge');
+        if (!badge) return;
+        const notes = String(document.getElementById('sessionNotes')?.value || '').trim();
+        if (!notes) {
+            badge.classList.add('d-none');
+            badge.setAttribute('aria-hidden', 'true');
+            return;
+        }
+        badge.classList.remove('d-none');
+        badge.setAttribute('aria-hidden', 'false');
+    }
     function syncPendingReportsHint() {
         syncSessionReportsNavBadge();
         const hint = document.getElementById('sessionPendingReportsHint');
@@ -4178,8 +4299,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dateInput && summaryDate) {
             const date = String(dateInput.value || '').trim();
             summaryDate.innerHTML = date
-                ? `<i class="bi bi-calendar3 me-1" aria-hidden="true"></i>${scEscapeHtml(date)}`
-                : '<i class="bi bi-calendar3 me-1" aria-hidden="true"></i>—';
+                ? `<i class="bi bi-calendar3" aria-hidden="true"></i>${scEscapeHtml(date)}`
+                : '<i class="bi bi-calendar3" aria-hidden="true"></i>—';
         }
 
         const startInput = document.getElementById('sessionStartTime');
@@ -4189,8 +4310,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const startTime = String(startInput?.value || sessionDefaultStartTime || '').trim();
             const endTime = String(endInput?.value || sessionDefaultEndTime || '').trim();
             summaryTime.innerHTML = (startTime || endTime)
-                ? `<i class="bi bi-clock me-1" aria-hidden="true"></i>${scEscapeHtml(startTime || '--:--')}–${scEscapeHtml(endTime || '--:--')}`
-                : '<i class="bi bi-clock me-1" aria-hidden="true"></i>—';
+                ? `<i class="bi bi-clock" aria-hidden="true"></i>${scEscapeHtml(startTime || '--:--')}–${scEscapeHtml(endTime || '--:--')}`
+                : '<i class="bi bi-clock" aria-hidden="true"></i>—';
         }
 
         const teacherNameInput = document.getElementById('sessionTeacherName');
@@ -4453,6 +4574,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     initSessionManagerTooltips();
     syncSessionInfoSummary();
+    syncSessionNotesNavBadge();
+    document.getElementById('sessionNotes')?.addEventListener('input', syncSessionNotesNavBadge);
     if (statusButton) {
         statusButton.addEventListener('click', () => {
             ensureSessionStatusModal();
@@ -5097,8 +5220,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (emptyEl) emptyEl.classList.add('d-none');
         tbody.innerHTML = skillsCoveredState.map((row, index) => {
             const noteCell = skillsCoveredReadOnly
-                ? `<td class="small">${scEscapeHtml(row.note || '—')}</td>`
-                : `<td><input type="text" class="form-control form-control-sm skills-covered-note" data-index="${index}" maxlength="2000" value="${scEscapeHtml(row.note || '')}" placeholder="What was covered…"></td>`;
+                ? `<td class="small skills-covered-note-display">${scEscapeHtml(row.note || '—')}</td>`
+                : `<td><textarea class="form-control form-control-sm skills-covered-note" data-index="${index}" rows="3" maxlength="2000" placeholder="What was covered…">${scEscapeHtml(row.note || '')}</textarea></td>`;
             const removeCell = skillsCoveredReadOnly
                 ? ''
                 : `<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger skills-covered-remove" data-index="${index}" title="Remove" aria-label="Remove skill"><i class="bi bi-trash"></i></button></td>`;
@@ -5162,7 +5285,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btnAddSkillCovered')?.addEventListener('click', addSkillCoveredRow);
     document.getElementById('skillsCoveredNoteInput')?.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
             event.preventDefault();
             addSkillCoveredRow();
         }
@@ -5880,10 +6003,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const submitSessionSave = async (savePayload) => {
+                    const payloadWithCsrf = {
+                        ...(savePayload || {}),
+                        _csrf: csrfToken || undefined
+                    };
                     const response = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/save`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
-                        body: JSON.stringify(savePayload || {})
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-AJAX-Request': 'true',
+                            ...(csrfToken ? { 'csrf-token': csrfToken } : {})
+                        },
+                        body: JSON.stringify(payloadWithCsrf)
                     });
                     const parsed = await response.json().catch(() => ({ status: 'error', message: 'Unable to read save response.' }));
                     return { response, result: parsed };

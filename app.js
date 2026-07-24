@@ -152,11 +152,13 @@ app.use(expressSession({
   secret: SESSION_SECRET,
   resave: true,
   saveUninitialized: true,
+  rolling: true,
   cookie: {
     httpOnly: true,
     secure: isProduction,
     sameSite: 'lax',
-    maxAge: 10 * 60 * 1000
+    // Keep CSRF/session cookie alive during long in-page work (e.g. Manage Session).
+    maxAge: 12 * 60 * 60 * 1000
   }
 }));
 
@@ -177,14 +179,20 @@ app.use((req, res, next) => {
       return next();
     }
 
-    const tokenSent = req.headers['csrf-token'] || (req.body && req.body._csrf) || (req.query && req.query._csrf);
+    const tokenSent = req.headers['csrf-token']
+      || req.headers['x-csrf-token']
+      || (req.body && req.body._csrf)
+      || (req.query && req.query._csrf);
     
     if (!req.session || !tokenSent || tokenSent !== req.session.csrfToken) {
       const isAjax = req.headers['x-ajax-request'] || req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+      const message = !tokenSent
+        ? 'Invalid or missing CSRF token.'
+        : 'Invalid or missing CSRF token. Please refresh the page and try again.';
       if (isAjax) {
-        return res.status(403).json({ status: 'error', message: 'Invalid or missing CSRF token.' });
+        return res.status(403).json({ status: 'error', message });
       }
-      return res.status(403).send('Invalid or missing CSRF token.');
+      return res.status(403).send(message);
     }
   }
   

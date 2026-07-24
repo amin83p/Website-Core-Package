@@ -88,23 +88,19 @@
             }
 
             const headers = mergeHeaders(input, init);
-            
+
             const csrfToken = resolveCsrfToken();
             if (csrfToken && !headers.has('csrf-token')) {
                 headers.set('csrf-token', csrfToken);
             }
 
-            if (headers.has('x-skip-action-state-token') || headers.has('x-skip-action-state-bridge')) {
-                return nativeFetch(input, init);
-            }
-
-            const token = resolveActionStateToken();
-            if (!token) {
-                return nativeFetch(input, init);
-            }
-
-            if (!headers.has('x-action-state-id')) {
-                headers.set('X-Action-State-Id', token);
+            const skipActionState = headers.has('x-skip-action-state-token')
+                || headers.has('x-skip-action-state-bridge');
+            if (!skipActionState) {
+                const token = resolveActionStateToken();
+                if (token && !headers.has('x-action-state-id')) {
+                    headers.set('X-Action-State-Id', token);
+                }
             }
 
             const nextInit = {
