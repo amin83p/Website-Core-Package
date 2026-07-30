@@ -2,6 +2,37 @@
   const fields = (template?.schema?.fields || []);
   const editable = String(instance.status) === 'draft';
   const escJson = JSON.stringify(instance.answers || {}).replace(/</g, '\\u003c');
+  const validationSafe = validation || { errors: [], warnings: [], hasBlockingErrors: false };
+  const validationByField = {};
+  [...(validationSafe.errors || []), ...(validationSafe.warnings || [])].forEach((issue) => {
+    const fieldId = String(issue?.fieldId || '');
+    if (!fieldId) return;
+    if (!validationByField[fieldId]) validationByField[fieldId] = [];
+    validationByField[fieldId].push(issue);
+  });
+  const visualTypes = new Set(['section', 'subheader', 'row_break']);
+  const sectionGroups = [{ header: null, rows: [], pending: [] }];
+  const flushGroupRow = (group) => {
+    if (!group.pending.length) return;
+    group.rows.push(group.pending);
+    group.pending = [];
+  };
+  fields.forEach((field) => {
+    if (field.type === 'section') {
+      flushGroupRow(sectionGroups[sectionGroups.length - 1]);
+      sectionGroups.push({ header: field, rows: [], pending: [] });
+      return;
+    }
+    const group = sectionGroups[sectionGroups.length - 1];
+    if (field.type === 'row_break') { flushGroupRow(group); return; }
+    if (field.type === 'subheader' || field.fullPageWidth === true || String(field.fullPageWidth).toLowerCase() === 'true') {
+      flushGroupRow(group);
+      group.rows.push([field]);
+      return;
+    }
+    group.pending.push(field);
+  });
+  sectionGroups.forEach(flushGroupRow);
 %>
 <div class="sections-page">
   <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
@@ -32,29 +63,60 @@
   <form method="POST" id="overallAnswersForm" action="/school/reports/overall-reports/edit/<%= encodeURIComponent(instance.id) %>">
     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
     <input type="hidden" name="answersJson" id="answersJson">
-    <div class="card border-0 shadow-sm mb-3"><div class="card-body">
-      <% fields.forEach((field) => { const visual=['section','subheader','row_break'].includes(field.type); const mode=String(field.overallValueMode||'manual'); const canEdit=editable && mode !== 'derived_locked'; const value=instance.answers?.[field.id] ?? ''; %>
-        <% if (field.type === 'section') { %><h4 class="mt-3 border-bottom pb-2"><%= field.label %></h4>
-        <% } else if (field.type === 'subheader') { %><h6 class="mt-3 fw-bold"><%= field.label %></h6>
-        <% } else if (field.type === 'row_break') { %><hr>
-        <% } else { %>
-          <div class="mb-3">
-            <label class="form-label fw-bold"><%= field.label %><% if (field.required) { %> *<% } %>
-              <span class="badge ms-1 <%= mode === 'manual' ? 'bg-light text-dark border' : (mode === 'derived_locked' ? 'bg-secondary' : 'bg-warning text-dark') %>"><%= mode.replaceAll('_',' ') %></span>
-              <% if (instance.derivedOverrides?.[field.id]) { %><span class="badge bg-info text-dark">overridden</span><% } %>
-            </label>
-            <% if (field.type === 'textarea') { %><textarea class="form-control js-overall-answer" rows="3" data-field-id="<%= field.id %>" <%= canEdit ? '' : 'readonly' %>><%= value %></textarea>
-            <% } else if (field.type === 'checkbox') { %><select class="form-select js-overall-answer" data-field-id="<%= field.id %>" <%= canEdit ? '' : 'disabled' %>><option value="false" <%= !value ? 'selected' : '' %>>No</option><option value="true" <%= value ? 'selected' : '' %>>Yes</option></select>
-            <% } else if (field.type === 'select') { %><select class="form-select js-overall-answer" data-field-id="<%= field.id %>" <%= canEdit ? '' : 'disabled' %>><% (field.options || []).forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %></select>
-            <% } else { %><input class="form-control js-overall-answer" data-field-id="<%= field.id %>" type="<%= field.type === 'number' ? 'number' : (field.type === 'date' ? 'date' : 'text') %>" value="<%= value %>" <%= canEdit ? '' : 'readonly' %>><% } %>
-            <div class="form-text"><code>{{O.<%= field.id %>}}</code></div>
-            <% if (editable && instance.derivedOverrides?.[field.id]) { %>
-              <button type="button" class="btn btn-link btn-sm px-0 js-reset-override" data-field-id="<%= field.id %>">Reset to calculated value</button>
-            <% } %>
-          </div>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0 fw-bold">Overall Report Fields</h5><div class="small text-muted">Fields follow the template layout and snapshot order.</div></div>
+      <div class="card-body">
+        <% if (validationSafe.hasBlockingErrors || validationSafe.warnings?.length) { %>
+          <div class="alert <%= validationSafe.hasBlockingErrors ? 'alert-danger' : 'alert-warning' %> py-2"><strong><%= validationSafe.hasBlockingErrors ? 'Resolve validation errors before submitting.' : 'Review validation warnings.' %></strong></div>
         <% } %>
-      <% }); %>
-    </div></div>
+        <% if (!fields.length) { %><div class="text-muted">No fields are defined in this template snapshot.</div><% } %>
+        <% sectionGroups.forEach((group, groupIndex) => { const collapseId = `overallSection_${groupIndex}`; %>
+          <% if (group.header) { %>
+            <div class="border rounded mb-4">
+              <button type="button" class="card-header bg-light border-0 w-100 text-start d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#<%= collapseId %>" aria-expanded="true">
+                <span><strong><%= group.header.label %></strong><% if (group.header.helpText) { %><span class="small text-muted d-block"><%= group.header.helpText %></span><% } %></span><i class="bi bi-chevron-down"></i>
+              </button>
+              <div class="collapse show" id="<%= collapseId %>"><div class="card-body">
+          <% } %>
+          <% (group.rows || []).forEach((row) => { %>
+            <div class="row g-3 mb-3">
+              <% row.forEach((field) => { %>
+                <% if (field.type === 'subheader') { %>
+                  <div class="col-12"><hr class="my-2"><h6 class="fw-semibold text-muted mb-1"><%= field.label %></h6><% if (field.helpText) { %><div class="small text-muted"><%= field.helpText %></div><% } %></div>
+                <% } else if (!visualTypes.has(String(field.type))) { %>
+                  <%
+                    const mode = String(field.overallValueMode || 'manual');
+                    const canEdit = editable && mode !== 'derived_locked';
+                    const value = instance.answers?.[field.id] ?? '';
+                    const fullWidth = field.fullPageWidth === true || String(field.fullPageWidth).toLowerCase() === 'true';
+                    const hasBorder = field.hasBorder === true || String(field.hasBorder).toLowerCase() === 'true';
+                    const backgroundColor = /^#[0-9A-Fa-f]{6}$/.test(String(field.backgroundColor || '')) ? String(field.backgroundColor) : '';
+                    const shellClass = `${hasBorder ? 'border rounded p-2' : ''}${backgroundColor && !hasBorder ? ' p-2 rounded' : ''}`.trim();
+                    const issues = validationByField[field.id] || [];
+                    const modeLabel = mode === 'manual' ? 'User-entered' : (mode === 'derived_editable' ? 'Source/calculated, editable' : 'Source/calculated, locked');
+                  %>
+                  <div class="<%= fullWidth ? 'col-12' : 'col' %>"><div class="<%= shellClass %>" style="<%= backgroundColor ? `background-color:${backgroundColor};` : '' %>">
+                    <label class="form-label fw-bold"><%= field.label %><% if (field.required) { %><span class="text-danger"> *</span><% } %>
+                      <span class="badge ms-1 <%= mode === 'manual' ? 'bg-light text-dark border' : (mode === 'derived_locked' ? 'bg-secondary' : 'bg-warning text-dark') %>"><%= modeLabel %></span>
+                      <% if (instance.derivedOverrides?.[field.id]) { %><span class="badge bg-info text-dark">overridden</span><% } %>
+                    </label>
+                    <% if (field.type === 'textarea') { %><textarea class="form-control js-overall-answer<%= canEdit ? '' : ' bg-light' %>" rows="3" data-field-id="<%= field.id %>" placeholder="<%= field.placeholder || '' %>" <%= canEdit ? '' : 'readonly' %>><%= value %></textarea>
+                    <% } else if (field.type === 'checkbox') { %><div class="form-check border rounded p-2<%= canEdit ? '' : ' bg-light' %>"><input class="form-check-input js-overall-answer" type="checkbox" data-field-id="<%= field.id %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= canEdit ? '' : 'disabled' %>><label class="form-check-label">Checked</label></div>
+                    <% } else if (field.type === 'select') { %><select class="form-select js-overall-answer<%= canEdit ? '' : ' bg-light' %>" data-field-id="<%= field.id %>" <%= canEdit ? '' : 'disabled' %>><option value="">Select...</option><% (field.options || []).forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %></select>
+                    <% } else { %><input class="form-control js-overall-answer<%= canEdit ? '' : ' bg-light' %>" data-field-id="<%= field.id %>" type="<%= field.type === 'number' ? 'number' : (field.type === 'date' ? 'date' : 'text') %>" value="<%= value %>" placeholder="<%= field.placeholder || '' %>" <%= canEdit ? '' : 'readonly' %>><% } %>
+                    <% if (field.helpText) { %><div class="small text-muted mt-1"><%= field.helpText %></div><% } %>
+                    <div class="form-text"><code>{{O.<%= field.id %>}}</code></div>
+                    <% issues.slice(0, 3).forEach((issue) => { %><div class="small <%= issue.severity === 'warning' ? 'text-warning-emphasis' : 'text-danger' %>"><i class="bi <%= issue.severity === 'warning' ? 'bi-exclamation-triangle' : 'bi-x-circle' %> me-1"></i><%= issue.message %></div><% }); %>
+                    <% if (editable && instance.derivedOverrides?.[field.id]) { %><button type="button" class="btn btn-link btn-sm px-0 js-reset-override" data-field-id="<%= field.id %>">Reset to calculated value</button><% } %>
+                  </div></div>
+                <% } %>
+              <% }); %>
+            </div>
+          <% }); %>
+          <% if (group.header) { %></div></div></div><% } %>
+        <% }); %>
+      </div>
+    </div>
     <% if (editable) { %><div class="d-flex justify-content-end mb-3"><button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Save Values</button></div><% } %>
   </form>
 
@@ -108,7 +170,9 @@
     const answers = {...initialAnswers};
     document.querySelectorAll('.js-overall-answer').forEach(input => {
       if (!input.dataset.fieldId) return;
-      answers[input.dataset.fieldId] = input.type === 'number' && input.value !== '' ? Number(input.value) : (input.value === 'true' ? true : (input.value === 'false' ? false : input.value));
+      answers[input.dataset.fieldId] = input.type === 'checkbox'
+        ? input.checked
+        : (input.type === 'number' && input.value !== '' ? Number(input.value) : input.value);
     });
     document.getElementById('answersJson').value = JSON.stringify(answers);
   });

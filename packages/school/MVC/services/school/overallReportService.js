@@ -40,27 +40,108 @@ function getDataFields(template = {}) {
     .filter((field) => field?.id && !DATA_FIELD_EXCLUSIONS.has(String(field.type || '').toLowerCase()));
 }
 
-function getAllPrefillKeys() {
-  const catalog = reportService.getPrefillCatalog();
-  return Object.values(catalog || {})
-    .flatMap((rows) => Array.isArray(rows) ? rows : [])
-    .map((row) => clean(row?.key || row?.id || row))
-    .filter(Boolean);
+function getSourceTemplateKeyOptions(template = {}) {
+  const templateId = clean(template?.id);
+  const templateTitle = clean(template?.title || template?.name || templateId);
+  const templateType = clean(template?.type);
+  const templateVersion = Number(template?.version || 1);
+  const options = new Map();
+
+  const addOption = (keyValue, metadata = {}) => {
+    const key = clean(keyValue);
+    if (!key) return;
+    const existing = options.get(key) || {};
+    const incomingPriority = Number(metadata.priority || 0);
+    const existingPriority = Number(existing.priority || 0);
+    const preferred = incomingPriority >= existingPriority ? metadata : existing;
+    options.set(key, {
+      key,
+      label: clean(preferred.label || existing.label || metadata.label || key),
+      description: clean(preferred.description || existing.description || metadata.description),
+      origin: clean(preferred.origin || existing.origin || metadata.origin || 'predefined'),
+      group: clean(preferred.group || existing.group || metadata.group || 'Available values'),
+      fieldId: clean(preferred.fieldId || existing.fieldId || metadata.fieldId),
+      fieldType: clean(preferred.fieldType || existing.fieldType || metadata.fieldType),
+      templateId,
+      templateTitle,
+      templateType,
+      templateVersion,
+      priority: Math.max(existingPriority, incomingPriority)
+    });
+  };
+
+  Object.entries(reportService.getPrefillCatalog() || {}).forEach(([group, rows]) => {
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      addOption(row?.key || row?.id || row, {
+        label: row?.label || row?.key || row,
+        description: row?.description || '',
+        origin: 'predefined',
+        group,
+        priority: 10
+      });
+    });
+  });
+
+  getDataFields(template).forEach((field) => {
+    const fieldLabel = clean(field?.label || field?.id || 'Template field');
+    const fieldMetadata = {
+      fieldId: clean(field?.id),
+      fieldType: clean(field?.type),
+      priority: 30
+    };
+    if (field.prefillKey) {
+      addOption(field.prefillKey, {
+        ...fieldMetadata,
+        label: fieldLabel,
+        description: `Predefined value used by the template field ${fieldLabel}.`,
+        origin: 'template_prefill',
+        group: 'Template fields'
+      });
+    }
+    if (field.docxAlias) {
+      addOption(field.docxAlias, {
+        ...fieldMetadata,
+        label: `${fieldLabel} (DOCX shortcut)`,
+        description: `DOCX shortcut exported for the template field ${fieldLabel}.`,
+        origin: 'docx_alias',
+        group: 'Template fields'
+      });
+    }
+    const mappedToken = normalizeTokenKey(template?.placeholderMap?.[field.id]);
+    addOption(mappedToken || field.id, {
+      ...fieldMetadata,
+      label: fieldLabel,
+      description: `Saved or calculated value from the template field ${fieldLabel}.`,
+      origin: 'template_field',
+      group: 'Template fields',
+      priority: 40
+    });
+  });
+
+  Object.values(template?.placeholderMap || {}).forEach((token) => {
+    const key = normalizeTokenKey(token);
+    addOption(key, {
+      label: key,
+      description: 'DOCX placeholder value exported by the selected report template.',
+      origin: 'placeholder',
+      group: 'Template placeholders',
+      priority: 20
+    });
+  });
+
+  return [...options.values()]
+    .map(({ priority, ...option }) => option)
+    .sort((left, right) => (
+      String(left.group || '').localeCompare(String(right.group || ''))
+      || String(left.label || '').localeCompare(String(right.label || ''))
+      || String(left.key || '').localeCompare(String(right.key || ''))
+    ));
 }
 
 function getSourceTemplateKeyCatalog(template = {}) {
-  const keys = new Set(getAllPrefillKeys());
-  getDataFields(template).forEach((field) => {
-    if (field.prefillKey) keys.add(clean(field.prefillKey));
-    if (field.docxAlias) keys.add(clean(field.docxAlias));
-    const mappedToken = normalizeTokenKey(template?.placeholderMap?.[field.id]);
-    if (!mappedToken && field.id) keys.add(clean(field.id));
-  });
-  Object.values(template?.placeholderMap || {}).forEach((token) => {
-    const key = normalizeTokenKey(token);
-    if (key) keys.add(key);
-  });
-  return [...keys].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  return getSourceTemplateKeyOptions(template)
+    .map((option) => option.key)
+    .sort((left, right) => left.localeCompare(right));
 }
 
 async function validateTemplateReferences(template, reqUser) {
@@ -725,6 +806,7 @@ async function exportOverallReport(instance, reqUser) {
 module.exports = {
   COMPLETED_SOURCE_STATUSES: Object.freeze([...COMPLETED_SOURCE_STATUSES]),
   getSourceTemplateKeyCatalog,
+  getSourceTemplateKeyOptions,
   validateTemplateReferences,
   calculateAnswers,
   validateAnswers,

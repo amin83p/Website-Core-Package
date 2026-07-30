@@ -243,6 +243,76 @@ test('overall template normalization enforces stable slots, source keys, and cal
   );
 });
 
+test('source key options are structured, deduplicated, and retain legacy key compatibility', () => {
+  const template = sourceTemplate('SRC-1', 'Progress Report');
+  const options = overallReportService.getSourceTemplateKeyOptions(template);
+  const keys = overallReportService.getSourceTemplateKeyCatalog(template);
+
+  assert.deepEqual(keys, options.map((option) => option.key).sort((left, right) => left.localeCompare(right)));
+  assert.equal(new Set(keys).size, keys.length);
+  assert.ok(options.some((option) => option.key === 'teacher_name' && option.origin === 'predefined'));
+  assert.deepEqual(
+    options.find((option) => option.key === 'score'),
+    {
+      key: 'score',
+      label: 'Score',
+      description: 'Saved or calculated value from the template field Score.',
+      origin: 'template_field',
+      group: 'Template fields',
+      fieldId: 'score',
+      fieldType: 'number',
+      templateId: 'SRC-1',
+      templateTitle: 'Progress Report',
+      templateType: 'source_src-1',
+      templateVersion: 1
+    }
+  );
+});
+
+test('overall fields retain relevant layout, guidance, styling, typed defaults, and modes', () => {
+  const template = overallTemplate({
+    schema: {
+      version: 1,
+      fields: [
+        { id: '__section_1', label: 'Summary', type: 'section', helpText: 'Section help' },
+        { id: '__row_break_1', label: 'New Row', type: 'row_break' },
+        {
+          id: 'confirmed',
+          label: 'Confirmed',
+          type: 'checkbox',
+          overallValueMode: 'manual',
+          defaultValue: true,
+          required: true,
+          fullPageWidth: true,
+          hasBorder: true,
+          backgroundColor: '#abcdef',
+          placeholder: 'Input hint',
+          helpText: 'Field help'
+        },
+        {
+          id: 'source_score',
+          label: 'Source Score',
+          type: 'number',
+          overallValueMode: 'derived_editable',
+          calculationRule: { expression: 'source("T1", "score")', onError: 'empty' }
+        }
+      ]
+    }
+  });
+  const confirmed = template.schema.fields.find((field) => field.id === 'confirmed');
+  const derived = template.schema.fields.find((field) => field.id === 'source_score');
+
+  assert.equal(confirmed.defaultValue, true);
+  assert.equal(confirmed.fullPageWidth, true);
+  assert.equal(confirmed.hasBorder, true);
+  assert.equal(confirmed.backgroundColor, '#abcdef');
+  assert.equal(confirmed.placeholder, 'Input hint');
+  assert.equal(confirmed.helpText, 'Field help');
+  assert.equal(derived.overallValueMode, 'derived_editable');
+  assert.equal(derived.calculationRule.onError, 'empty');
+  assert.deepEqual(derived.sourceReferences, [{ slotKey: 'T1', key: 'score' }]);
+});
+
 test('overall instance sanitizer requires snapshot-aligned source selections', () => {
   const template = overallTemplate();
   const instance = overallInstanceModel.sanitizeInstance({
@@ -566,22 +636,33 @@ test('registry, maintenance, access, seeding, and Mongo index integrations are d
   assert.ok(symbols.some((row) => row.id === 'SYM_SYSTEM_130'));
 });
 
-test('overall template and instance views render parseable client scripts', async () => {
+test('overall template, creation, and instance views render searchable pickers and parseable client scripts', async () => {
   const template = { ...overallTemplate(), id: 'OVERALL-1' };
+  template.schema.fields = [
+    { id: '__section_1', label: 'Summary Section', type: 'section', helpText: 'Section guidance', fullPageWidth: true },
+    { ...template.schema.fields[0], helpText: 'Summary guidance', placeholder: 'Enter a summary', fullPageWidth: true, hasBorder: true, backgroundColor: '#f0f8ff' },
+    { id: '__row_break_1', label: 'New Row', type: 'row_break', fullPageWidth: true },
+    { id: 'confirmed', label: 'Confirmed', type: 'checkbox', overallValueMode: 'manual', defaultValue: true, docxAlias: 'c0nf', validationRules: [], conversionRule: { enabled: false, expression: '', onError: 'use_raw' } },
+    ...template.schema.fields.slice(1)
+  ];
+  const sourceRows = [sourceTemplate('SRC-1'), sourceTemplate('SRC-2')].map((row) => {
+    const keyOptions = overallReportService.getSourceTemplateKeyOptions(row);
+    return { ...row, keyOptions, keyCatalog: keyOptions.map((option) => option.key) };
+  });
+  const renderOptions = { views: [path.join(ROOT_DIR, 'MVC/views')] };
   const templateHtml = await ejs.renderFile(
     path.join(ROOT_DIR, 'packages/school/MVC/views/school/report/overallTemplateForm.ejs'),
     {
       title: 'Edit Overall Report Template',
       actionStateId: 'ACTION-1',
       template,
-      sourceTemplates: [
-        { ...sourceTemplate('SRC-1'), keyCatalog: ['score', 'comments'] },
-        { ...sourceTemplate('SRC-2'), keyCatalog: ['score', 'comments'] }
-      ],
-      funderPickerOptions: [],
+      sourceTemplates: sourceRows,
+      funderPickerOptions: [{ id: 'FUNDER-1', label: 'Funder One' }],
       valueModes: ['manual', 'derived_editable', 'derived_locked'],
-      statuses: ['draft', 'active', 'inactive', 'archived']
-    }
+      statuses: ['draft', 'active', 'inactive', 'archived'],
+      user: reqUser
+    },
+    renderOptions
   );
   const calculated = overallReportService.calculateAnswers({
     template,
@@ -607,10 +688,52 @@ test('overall template and instance views render parseable client scripts', asyn
         generatedDocs: []
       },
       template,
-      exportPreview: { placeholders: {}, missingTokens: [], validation: { hasBlockingErrors: false } }
-    }
+      validation: { errors: [{ fieldId: 'summary', severity: 'error', message: 'Summary is required.' }], warnings: [], hasBlockingErrors: true },
+      exportPreview: { placeholders: {}, missingTokens: [], validation: { hasBlockingErrors: true } }
+    },
+    renderOptions
   );
-  [templateHtml, editorHtml].forEach((html) => {
+  const createHtml = await ejs.renderFile(
+    path.join(ROOT_DIR, 'packages/school/MVC/views/school/report/overallReportCreate.ejs'),
+    {
+      title: 'Create Overall Report',
+      actionStateId: 'ACTION-3',
+      template,
+      sourceSlotOptions: template.sourceSlots.map((slot) => ({
+        ...slot,
+        templateTitle: `Template ${slot.slotKey}`,
+        templateType: 'progress_report',
+        templateVersion: 1,
+        instances: [{ id: `INSTANCE-${slot.slotKey}`, title: `Completed ${slot.slotKey}`, status: 'submitted', studentName: 'Student One', className: 'Class A', teacherName: 'Teacher One', reportDate: '2026-07-30' }]
+      })),
+      docxOptions: [{ key: 'default', label: 'Default', fileName: 'overall.docx' }],
+      user: reqUser
+    },
+    renderOptions
+  );
+
+  assert.match(templateHtml, /Use Source \/ Predefined Value/);
+  assert.match(templateHtml, /sourceMode:\s*'local'/);
+  assert.match(templateHtml, /searchFields:\s*'key,label,description,templateTitle,slotKey,origin,group,fieldId,fieldType'/);
+  assert.match(templateHtml, /btnAddSection/);
+  assert.match(templateHtml, /overall-field-row/);
+  assert.match(templateHtml, /Template Has Different Keys/);
+  assert.match(templateHtml, /Source Slot Is In Use/);
+  assert.match(templateHtml, /Field Is In Use/);
+  assert.match(templateHtml, /title:\s*'Select Funder'/);
+  assert.doesNotMatch(templateHtml, /id="funderPicker"/);
+  assert.doesNotMatch(templateHtml, /id="formulaSourceKey"/);
+  assert.doesNotMatch(templateHtml, /js-slot-template/);
+  assert.match(createHtml, /name="sourceInstance_T1"/);
+  assert.match(createHtml, /js-pick-source-report/);
+  assert.match(createHtml, /Report Already Selected/);
+  assert.doesNotMatch(createHtml, /<select[^>]+name="sourceInstance_/);
+  assert.match(editorHtml, /Summary guidance/);
+  assert.match(editorHtml, /background-color:#f0f8ff/);
+  assert.match(editorHtml, /type="checkbox"[^>]+data-field-id="confirmed"/);
+  assert.match(editorHtml, /Summary is required\./);
+
+  [templateHtml, editorHtml, createHtml].forEach((html) => {
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
     assert.ok(scripts.length > 0);
     scripts.forEach((source) => new Function(source));

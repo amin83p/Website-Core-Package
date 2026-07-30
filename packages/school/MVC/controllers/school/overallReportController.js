@@ -93,10 +93,14 @@ async function loadTemplateFormData(req, template = null) {
   const orgId = activeOrgId(req.user);
   const sourceTemplates = scoped(await schoolDataService.fetchData('reportTemplates', {}, req.user), req.user)
     .filter((row) => String(row.status || '').toLowerCase() !== 'archived')
-    .map((row) => ({
-      ...row,
-      keyCatalog: overallReportService.getSourceTemplateKeyCatalog(row)
-    }));
+    .map((row) => {
+      const keyOptions = overallReportService.getSourceTemplateKeyOptions(row);
+      return {
+        ...row,
+        keyOptions,
+        keyCatalog: overallReportService.getSourceTemplateKeyCatalog(row)
+      };
+    });
   const activeFunders = await reportFunderDocxService.loadActiveFunderOptions(req.user, orgId).catch(() => []);
   return {
     template: template || {
@@ -209,14 +213,18 @@ async function sourceTemplates(req, res) {
   try {
     const templates = scoped(await schoolDataService.fetchData('reportTemplates', {}, req.user), req.user)
       .filter((row) => String(row.status || '').toLowerCase() !== 'archived')
-      .map((row) => ({
-        id: row.id,
-        title: row.title,
-        type: row.type,
-        version: Number(row.version || 1),
-        status: row.status,
-        keys: overallReportService.getSourceTemplateKeyCatalog(row)
-      }));
+      .map((row) => {
+        const keyOptions = overallReportService.getSourceTemplateKeyOptions(row);
+        return {
+          id: row.id,
+          title: row.title,
+          type: row.type,
+          version: Number(row.version || 1),
+          status: row.status,
+          keys: overallReportService.getSourceTemplateKeyCatalog(row),
+          keyOptions
+        };
+      });
     return res.json({ status: 'success', results: templates });
   } catch (error) {
     return sendError(req, res, error);
@@ -253,16 +261,44 @@ async function showCreateOverallReport(req, res) {
   try {
     const template = await schoolDataService.getDataById('overallReportTemplates', req.params.templateId, req.user);
     if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) throw new Error('Overall report template not found.');
-    const completedInstances = scoped(await schoolDataService.fetchData('reportInstances', {}, req.user), req.user)
+    const [allInstances, reportTemplates] = await Promise.all([
+      schoolDataService.fetchData('reportInstances', {}, req.user),
+      schoolDataService.fetchData('reportTemplates', {}, req.user)
+    ]);
+    const completedInstances = scoped(allInstances, req.user)
       .filter((row) => ['submitted', 'locked'].includes(String(row.status || '').toLowerCase()));
+    const sourceTemplateMap = new Map(
+      scoped(reportTemplates, req.user).map((row) => [String(row.id), row])
+    );
     const instancesBySlot = {};
     (template.sourceSlots || []).forEach((slot) => {
       instancesBySlot[slot.slotKey] = completedInstances.filter((row) => idsEqual(row.templateId, slot.templateId));
+    });
+    const sourceSlotOptions = (template.sourceSlots || []).map((slot) => {
+      const sourceTemplate = sourceTemplateMap.get(String(slot.templateId)) || {};
+      return {
+        ...slot,
+        templateTitle: String(sourceTemplate.title || sourceTemplate.name || slot.templateId),
+        templateType: String(sourceTemplate.type || ''),
+        templateVersion: Number(sourceTemplate.version || slot.templateVersionAtSelection || 1),
+        instances: (instancesBySlot[slot.slotKey] || []).map((row) => ({
+          id: row.id,
+          title: row.title || row.name || row.id,
+          status: row.status,
+          templateId: row.templateId,
+          studentId: row.studentId || row.personId || '',
+          studentName: row.prefillSnapshot?.student_full_name || row.prefillSnapshot?.student_name || '',
+          className: row.prefillSnapshot?.class_name || '',
+          teacherName: row.prefillSnapshot?.teacher_name || '',
+          reportDate: row.prefillSnapshot?.report_date || row.audit?.lastUpdateDateTime || row.audit?.createDateTime || ''
+        }))
+      };
     });
     return res.render('school/report/overallReportCreate', {
       title: 'Create Overall Report',
       template,
       instancesBySlot,
+      sourceSlotOptions,
       docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template),
       user: req.user,
       actionStateId: req.actionStateId
@@ -297,6 +333,7 @@ async function createOverallReport(req, res) {
 async function showOverallReportEditor(req, res) {
   try {
     const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    const validation = overallReportService.validateAnswers(instance.templateSnapshot || {}, instance.answers || {});
     const exportPreview = await overallReportService.buildExportPreview(instance).catch((error) => ({
       ready: false,
       missingTokens: [],
@@ -307,6 +344,7 @@ async function showOverallReportEditor(req, res) {
       instance,
       template: instance.templateSnapshot || {},
       exportPreview,
+      validation,
       user: req.user,
       actionStateId: req.actionStateId
     });
