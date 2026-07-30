@@ -79,13 +79,11 @@
                   <div id="attachmentPreviewArea" class="d-none"></div>
 
                   <div class="p-2 border-top bg-white">
-                      <% if (!canChatUpdate) { %>
-                          <div class="small text-muted px-2 py-1">
-                              You can read this conversation, but your access profile does not allow sending messages.
-                          </div>
-                      <% } %>
+                      <div id="chatReadOnlyNotice" class="small text-muted px-2 py-1 <%= canChatUpdate ? 'd-none' : '' %>">
+                          You can read this conversation, but your access profile does not allow sending messages.
+                      </div>
                       <form id="chatForm" class="d-flex align-items-end gap-2 <%= canChatUpdate ? '' : 'd-none' %>">
-                           <button type="button" class="btn btn-light text-secondary rounded-circle" onclick="document.getElementById('chatFileInput').click()">
+                           <button type="button" id="chatAttachmentButton" class="btn btn-light text-secondary rounded-circle" onclick="document.getElementById('chatFileInput').click()">
                               <i class="bi bi-paperclip"></i>
                           </button>
               
@@ -95,7 +93,7 @@
                                     placeholder="Message..." 
                                     style="resize:none; min-height: 38px; max-height: 160px; overflow-y: auto; line-height: 1.5;"></textarea>
                           
-                          <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                          <button type="submit" id="chatSendButton" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
                               <i class="bi bi-send-fill" style="font-size: 0.9rem; margin-left: 2px;"></i>
                           </button>
                       </form>
@@ -220,6 +218,8 @@ const chatAccess = <%- JSON.stringify({
 let isSidebarVisible = true;
 let previousSidebarWidth = 280;
 let pendingAttachments = [];
+let currentConversationCanMessage = chatAccess.canUpdate;
+let currentConversationScopeReason = '';
 
 function safeText(value) {
     return String(value || '').replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
@@ -227,6 +227,13 @@ function safeText(value) {
 
 function safeAttr(value) {
     return safeText(value);
+}
+
+function safeInlineJson(value) {
+    return JSON.stringify(String(value == null ? '' : value))
+        .replace(/&/g, '\\u0026')
+        .replace(/</g, '\\u003c')
+        .replace(/'/g, '\\u0027');
 }
 
 function buildAvatarHtml(name, avatarUrl, size = 40, bgClass = 'bg-secondary', textClass = 'text-white') {
@@ -285,7 +292,14 @@ document.addEventListener('DOMContentLoaded', () => {
                  // Note: You need to store Name/Target when opening a chat to use them here.
                  // See updated openChat function below.
                  if(typeof currentChatName !== 'undefined') {
-                     openChat(currentConvId, currentChatName, currentChatTarget, currentChatAvatar);
+                     openChat(
+                         currentConvId,
+                         currentChatName,
+                         currentChatTarget,
+                         currentChatAvatar,
+                         window.currentChatCanMessage,
+                         window.currentChatScopeReason
+                     );
                  }
              }, 100);
         }
@@ -303,6 +317,11 @@ function initChatSystem() {
 
     socket.on('chat_error', (payload) => {
         const message = payload && payload.message ? payload.message : 'Chat action was not allowed.';
+        if (/read-only|role scope|contact scope|no longer share/i.test(message)) {
+            setConversationWriteState(false, message);
+            window.currentChatCanMessage = false;
+            window.currentChatScopeReason = message;
+        }
         safeShowAlert(message, 'warning');
     });
     
@@ -392,8 +411,8 @@ function initChatSystem() {
     if(form) {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!chatAccess.canUpdate) {
-                safeShowAlert('Your access profile does not allow sending chat messages.', 'warning');
+            if (!chatAccess.canUpdate || !currentConversationCanMessage) {
+                safeShowAlert(currentConversationScopeReason || 'This conversation is read-only.', 'warning');
                 return;
             }
             const input = document.getElementById('chatInput');
@@ -427,8 +446,8 @@ function initChatSystem() {
 // Uploads files and renders them LOCALLY immediately
 async function uploadPendingFiles() {
     if (!currentConvId) return;
-    if (!chatAccess.canUpdate) {
-        safeShowAlert('Your access profile does not allow uploading chat attachments.', 'warning');
+    if (!chatAccess.canUpdate || !currentConversationCanMessage) {
+        safeShowAlert(currentConversationScopeReason || 'This conversation is read-only.', 'warning');
         return;
     }
     if (!socket || !socket.connected) {
@@ -483,6 +502,9 @@ async function uploadPendingFiles() {
                 });
             });
         } else {
+            if (resp.status === 403) {
+                setConversationWriteState(false, res.message || 'This conversation is read-only.');
+            }
             safeShowAlert("Upload failed: " + res.message, "error");
         }
     } catch (e) {
@@ -611,8 +633,8 @@ function scrollToBottom() {
 }
 
 function handleFileSelection(input) {
-    if (!chatAccess.canUpdate) {
-        safeShowAlert('Your access profile does not allow uploading chat attachments.', 'warning');
+    if (!chatAccess.canUpdate || !currentConversationCanMessage) {
+        safeShowAlert(currentConversationScopeReason || 'This conversation is read-only.', 'warning');
         input.value = '';
         return;
     }
@@ -797,7 +819,7 @@ async function refreshInbox() {
                 const isActive = (c.id === currentConvId) ? 'active' : '';
                 const unreadNum = c.unreadCount || 0; // ✅ USE REAL NUMBER
                 const isUnreadClass = unreadNum > 0 ? 'unread' : '';
-                const lastMsg = c.lastMessage ? c.lastMessage.content : 'New Chat';
+                const lastMsg = c.lastMessage ? String(c.lastMessage.content || '') : 'New Chat';
                 
                 let displayMsg = lastMsg.length > 25 ? lastMsg.substring(0,25)+'...' : lastMsg;
                 if(c.lastMessage && String(c.lastMessage.senderId) === String(currentUser.id)) {
@@ -816,21 +838,31 @@ async function refreshInbox() {
                 const displayName = (c.display && c.display.name) ? c.display.name : 'Unknown';
                 const targetId = (c.display && c.display.targetUserId) ? c.display.targetUserId : '';
                 const avatarUrl = (c.display && c.display.avatar) ? String(c.display.avatar) : '';
+                const canMessage = c.canMessage !== false && (!c.display || c.display.canMessage !== false);
+                const scopeReason = c.scopeReason || (c.display && c.display.scopeReason) || '';
+                const roleLabels = c.display && Array.isArray(c.display.roleLabels) ? c.display.roleLabels : [];
+                const packageLabels = c.display && Array.isArray(c.display.packages) ? c.display.packages : [];
+                const scopeLabel = roleLabels.length
+                    ? roleLabels.join(', ')
+                    : (packageLabels.length ? packageLabels.join(', ') : 'Member');
+                const readOnlyBadge = canMessage
+                    ? ''
+                    : '<span class="badge bg-secondary-subtle text-secondary ms-1">Read-only</span>';
                 const avatarHtml = buildAvatarHtml(displayName, avatarUrl, 40);
 
                 const html = `
-                <div class="chat-item d-flex align-items-center ${isActive} ${isUnreadClass}" onclick='openChat(${JSON.stringify(String(c.id || ""))}, ${JSON.stringify(displayName)}, ${JSON.stringify(String(targetId || ""))}, ${JSON.stringify(String(avatarUrl || ""))})'>
+                <div class="chat-item d-flex align-items-center ${isActive} ${isUnreadClass}" onclick='openChat(${safeInlineJson(c.id)}, ${safeInlineJson(displayName)}, ${safeInlineJson(targetId)}, ${safeInlineJson(avatarUrl)}, ${canMessage ? 'true' : 'false'}, ${safeInlineJson(scopeReason)})'>
                     <div class="avatar-wrapper me-3">
                         ${avatarHtml}
                     </div>
                     
                     <div class="overflow-hidden flex-grow-1">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="chat-name small text-dark text-truncate">${displayName}</span>
+                            <span class="chat-name small text-dark text-truncate">${safeText(displayName)}${readOnlyBadge}</span>
                             <span class="x-small text-muted">${timeStr}</span>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
-                            <div class="chat-msg x-small text-muted text-truncate" style="max-width: 140px;">${displayMsg}</div>
+                            <div class="chat-msg x-small text-muted text-truncate" style="max-width: 140px;" title="${safeAttr(scopeLabel)}">${safeText(displayMsg)}</div>
                             ${badgeHtml}
                         </div>
                     </div>
@@ -867,13 +899,24 @@ async function fetchUsers(query) {
             if (res.data.length === 0) { listEl.innerHTML = '<div class="text-center text-muted mt-4 small">No users found.</div>'; return; }
             res.data.forEach(u => {
                 const avatarHtml = buildAvatarHtml(u.name, u.avatar, 35, 'bg-primary-subtle', 'text-primary');
+                const roleLabels = Array.isArray(u.roleLabels) && u.roleLabels.length
+                    ? u.roleLabels
+                    : ['Member'];
+                const packages = Array.isArray(u.packages) ? u.packages : [];
+                const packageText = packages.length ? `${packages.join(', ')} · ` : '';
+                const detailText = `${u.org || 'General'} · ${packageText}${roleLabels.join(', ')}`;
                 const html = `
-                <div class="chat-item d-flex align-items-center p-2" onclick='createNewChat(${JSON.stringify(String(u.id || ""))})'>
+                <div class="chat-item d-flex align-items-center p-2" onclick='createNewChat(${safeInlineJson(u.id)})'>
                     <div class="me-2 flex-shrink-0">${avatarHtml}</div>
-                    <div class="flex-grow-1"><div class="fw-bold small text-dark">${u.name}</div><div class="x-small text-muted">${u.org}</div></div>
+                    <div class="flex-grow-1 overflow-hidden">
+                        <div class="fw-bold small text-dark text-truncate">${safeText(u.name)}</div>
+                        <div class="x-small text-muted text-truncate" title="${safeAttr(detailText)}">${safeText(detailText)}</div>
+                    </div>
                 </div>`;
                 listEl.insertAdjacentHTML('beforeend', html);
             });
+        } else {
+            listEl.innerHTML = `<div class="text-center text-muted mt-4 small px-3">${safeText(res.message || 'Contacts are unavailable.')}</div>`;
         }
     } catch (e) { console.error(e); }
 }
@@ -888,13 +931,46 @@ async function createNewChat(uid){
 
 function handleSearch(v){if(document.getElementById('sidebarTitle').innerText==='New Chat')fetchUsers(v);}
 
-async function openChat(convId, name, targetUserId, avatarUrl = '') {
+function setConversationWriteState(canMessage, reason = '') {
+    currentConversationCanMessage = Boolean(chatAccess.canUpdate && canMessage);
+    currentConversationScopeReason = currentConversationCanMessage
+        ? ''
+        : (reason || (chatAccess.canUpdate
+            ? 'This conversation is read-only.'
+            : 'Your access profile does not allow sending chat messages.'));
+    const form = document.getElementById('chatForm');
+    const notice = document.getElementById('chatReadOnlyNotice');
+    const input = document.getElementById('chatInput');
+    const fileInput = document.getElementById('chatFileInput');
+    const attachmentButton = document.getElementById('chatAttachmentButton');
+    const sendButton = document.getElementById('chatSendButton');
+
+    if (form) form.classList.toggle('d-none', !currentConversationCanMessage);
+    if (notice) {
+        notice.classList.toggle('d-none', currentConversationCanMessage);
+        notice.textContent = currentConversationScopeReason;
+    }
+    if (input) input.disabled = !currentConversationCanMessage;
+    if (fileInput) fileInput.disabled = !currentConversationCanMessage;
+    if (attachmentButton) attachmentButton.disabled = !currentConversationCanMessage;
+    if (sendButton) sendButton.disabled = !currentConversationCanMessage;
+    if (!currentConversationCanMessage) {
+        pendingAttachments = [];
+        if (fileInput) fileInput.value = '';
+        if (typeof renderPreviews === 'function') renderPreviews();
+    }
+}
+
+async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage = true, scopeReason = '') {
     currentConvId = convId;
     
     // Store these for the "Reopen" logic
     window.currentChatName = name; 
     window.currentChatTarget = targetUserId;
     window.currentChatAvatar = avatarUrl || '';
+    window.currentChatCanMessage = canMessage !== false;
+    window.currentChatScopeReason = scopeReason || '';
+    setConversationWriteState(canMessage !== false, scopeReason);
 
     document.getElementById('chatEmptyState').classList.add('d-none');
     document.getElementById('chatActiveView').classList.remove('d-none');
@@ -927,8 +1003,15 @@ async function openChat(convId, name, targetUserId, avatarUrl = '') {
         
         container.innerHTML = '';
         if(res.status === 'success') {
+            const currentAccess = res.access || {};
+            setConversationWriteState(currentAccess.canMessage !== false, currentAccess.reason || '');
+            window.currentChatCanMessage = currentAccess.canMessage !== false;
+            window.currentChatScopeReason = currentAccess.reason || '';
             res.data.forEach(msg => appendMessage(msg));
             scrollToBottom();
+        } else {
+            setConversationWriteState(false, res.message || 'This conversation is unavailable.');
+            container.innerHTML = `<div class="text-danger text-center p-4">${safeText(res.message || 'Error loading history.')}</div>`;
         }
         if (socket && socket.connected) socket.emit('join_room', convId);
         

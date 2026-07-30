@@ -1,5 +1,6 @@
 const accessService = require('./security/index');
 const adminAuthorityService = require('./adminAuthorityService');
+const chatContactScopeService = require('./chatContactScopeService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const { idsEqual, toPublicId } = require('../utils/idAdapter');
 
@@ -142,10 +143,29 @@ async function canAccessConversation({
   if (!operationResult.allowed) return operationResult;
 
   if (conversationHasParticipant(conversation, user?.id)) {
+    if (operationResult.operationId === OPERATIONS.UPDATE) {
+      const contactAccess = await chatContactScopeService.getConversationMessagingEligibility(
+        user,
+        conversation
+      );
+      if (!contactAccess.canMessage) {
+        return {
+          allowed: false,
+          operationId: operationResult.operationId,
+          participant: true,
+          globalAdmin: false,
+          contactAccess,
+          reason: contactAccess.reason || 'This conversation is read-only.'
+        };
+      }
+    }
     return {
       ...operationResult,
       participant: true,
-      globalAdmin: false
+      globalAdmin: false,
+      contactAccess: operationResult.operationId === OPERATIONS.UPDATE
+        ? { canMessage: true, reason: '' }
+        : null
     };
   }
 

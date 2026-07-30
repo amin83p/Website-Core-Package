@@ -7,6 +7,7 @@ const organizationRepository = require('../../repositories/organizationRepositor
 const { normalizeOrgRoles, getPrimaryOrgRole } = require('../../utils/orgContextUtils');
 const { idsEqual, toPublicId } = require('../../utils/idAdapter');
 const { resolveCanonicalOrganizationName } = require('../../utils/organizationDisplay');
+const packagePersonDependencyGuardService = require('../packagePersonDependencyGuardService');
 const { DEFAULTS } = require('../../../config/constants');
 
 const FREE_ORG_ID = Number(DEFAULTS?.FREE_ORG_ID || 900000);
@@ -515,7 +516,7 @@ async function registerPublicPersonAndUser({
   });
 
   if (!autoUser.created || !autoUser.user?.id) {
-    await dataService.deleteData('persons', regPerson.id, systemUserContext).catch(() => {});
+    await rollbackTransientPerson(regPerson, systemUserContext).catch(() => {});
     throw new Error(`Registration failed: ${autoUser.reason || 'Unable to create user account.'}`);
   }
 
@@ -526,6 +527,28 @@ async function registerPublicPersonAndUser({
     tempPassword: autoUser.tempPassword,
     systemUserContext
   };
+}
+
+async function rollbackTransientPerson(person, requestingUser, options = {}) {
+  const personId = toPublicId(person?.id);
+  if (!personId) return null;
+
+  const roleCleanup = await packagePersonDependencyGuardService.stripPackageSystemRolesFromOrganizations(
+    person?.organizations,
+    { repositoryOptions: options }
+  );
+  if (roleCleanup.changed) {
+    await dataService.updateData('persons', personId, {
+      organizations: roleCleanup.organizations,
+      audit: {
+        ...(person?.audit || {}),
+        lastUpdateUser: toPublicId(requestingUser?.id) || String(requestingUser?.username || 'SYSTEM'),
+        lastUpdateDateTime: new Date().toISOString()
+      }
+    }, requestingUser, options);
+  }
+
+  return dataService.deleteData('persons', personId, requestingUser, options);
 }
 
 module.exports = {
@@ -547,5 +570,6 @@ module.exports = {
   toStoredOrgId,
   upsertOrganizationRoles,
   autoCreateMinimumUserForPerson,
-  registerPublicPersonAndUser
+  registerPublicPersonAndUser,
+  rollbackTransientPerson
 };

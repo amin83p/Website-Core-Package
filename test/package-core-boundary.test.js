@@ -35,11 +35,26 @@ test('core constants do not carry package feature defaults', () => {
   assert.equal(source.includes('SECTION_KEYS'), false);
 });
 
-test('core person controller uses generic package dependency guards', () => {
-  const source = read('MVC/controllers/personController.js');
-  assert.equal(source.includes('includeSchoolRoles: true'), false);
-  assert.equal(source.includes('school_student'), false);
-  assert.equal(source.includes('packagePersonDependencyGuardService'), true);
+test('core person deletion uses centralized package dependency guards', () => {
+  const controllerSource = read('MVC/controllers/personController.js');
+  const integritySource = read('MVC/services/deleteIntegrityService.js');
+  assert.equal(controllerSource.includes('includeSchoolRoles: true'), false);
+  assert.equal(controllerSource.includes('school_student'), false);
+  assert.equal(controllerSource.includes('packagePersonDependencyGuardService'), false);
+  assert.equal(integritySource.includes('packagePersonDependencyGuardService'), true);
+});
+
+test('person repository removal is only invoked by the guarded entity gateway', () => {
+  const roots = [
+    path.join(ROOT_DIR, 'MVC'),
+    path.join(ROOT_DIR, 'packages')
+  ];
+  const callers = roots
+    .flatMap((root) => walkFiles(root, (filePath) => filePath.endsWith('.js')))
+    .filter((filePath) => /personRepository\.remove\s*\(/.test(fs.readFileSync(filePath, 'utf8')))
+    .map((filePath) => path.relative(ROOT_DIR, filePath).replace(/\\/g, '/'));
+
+  assert.deepEqual(callers, ['MVC/services/data/entityGatewayService.js']);
 });
 
 test('school, ielts, benchpath, and activity quota expose package-owned access constants', () => {

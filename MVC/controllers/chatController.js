@@ -4,11 +4,11 @@ const { idsEqual } = require('../utils/idAdapter');
 
 const dataService = require('../services/dataService'); 
 const chatAccessService = require('../services/chatAccessService');
+const chatContactScopeService = require('../services/chatContactScopeService');
 const coreFilesService = require('../services/coreFilesService');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
-const { normalizeSearchKeyword } = require('../utils/generalTools');
 const { OPERATIONS } = require('../../config/accessConstants');
 const uploadMiddleware = require('../middleware/upload');
 const fileAssetStorage = require('../services/fileAssetStorageService');
@@ -90,41 +90,30 @@ async function assertCanUpdateConversation(req, conversation) {
     return result;
 }
 
-// Helper: Enrich conversation participants
-async function buildPersonAvatarMap(users, requestingUser) {
-    const personIds = Array.from(new Set(
-        (Array.isArray(users) ? users : [])
-            .map((u) => String(u?.personId || '').trim())
-            .filter(Boolean)
-    ));
-    if (!personIds.length) return new Map();
-
-    const persons = await dataService.fetchData('persons', {}, requestingUser);
-    const map = new Map();
-    (Array.isArray(persons) ? persons : []).forEach((p) => {
-        const pid = String(p?.id || '').trim();
-        if (!pid) return;
-        map.set(pid, String(p?.avatarUrl || '').trim() || null);
-    });
-    return map;
-}
-
-function resolveUserAvatar(userDetails, personAvatarMap) {
-    const directAvatar = String(userDetails?.avatar || userDetails?.avatarUrl || '').trim();
-    if (directAvatar) return directAvatar;
-    const personId = String(userDetails?.personId || '').trim();
-    if (!personId) return null;
-    return personAvatarMap.get(personId) || null;
-}
-
-async function enrichConversations(conversations, currentUserId, requestingUser) {
-    const allUsers = await dataService.getAccessibleUsers(requestingUser || { isSuperAdmin: true });
-    const userMap = new Map(allUsers.map(u => [String(u.id), u]));
-    const personAvatarMap = await buildPersonAvatarMap(allUsers, requestingUser);
+async function enrichConversations(conversations, currentUserId, requestingUser, updateAccess = {}) {
+    const stateByConversationId = await chatContactScopeService.buildConversationContactStates(
+        requestingUser,
+        conversations
+    );
 
     return conversations.map(c => {
+        const state = stateByConversationId.get(String(c?.id)) || {
+            canMessage: false,
+            reason: chatContactScopeService.READ_ONLY_REASON,
+            participants: []
+        };
         const otherParticipant = c.participants.find(p => !idsEqual(p.userId, currentUserId));
-        const userDetails = userMap.get(String(otherParticipant?.userId));
+        const participantState = state.participants.find((row) => idsEqual(row.userId, otherParticipant?.userId))
+            || state.participants[0]
+            || null;
+        const userDetails = participantState?.user || null;
+        const participantDisplay = participantState?.display || {};
+        const canMessage = Boolean(updateAccess?.allowed && state.canMessage);
+        const scopeReason = canMessage
+            ? ''
+            : (updateAccess?.allowed
+                ? state.reason
+                : (updateAccess?.reason || 'Your access profile does not allow sending chat messages.'));
         
         const myPart = c.participants.find(p => idsEqual(p.userId, currentUserId));
         const unreadCount = myPart ? (myPart.unreadCount || 0) : 0;
@@ -132,11 +121,19 @@ async function enrichConversations(conversations, currentUserId, requestingUser)
         return {
             ...c,
             display: {
-                name: userDetails ? (userDetails.username || userDetails.email) : 'Unknown User',
-                avatar: resolveUserAvatar(userDetails, personAvatarMap),
+                name: participantDisplay.name || 'Unknown User',
+                avatar: participantDisplay.avatar || null,
                 status: userDetails ? (userDetails.status || 'offline') : 'offline',
-                targetUserId: otherParticipant?.userId
+                targetUserId: otherParticipant?.userId,
+                org: participantDisplay.org || 'General',
+                roles: participantDisplay.roles || [],
+                roleLabels: participantDisplay.roleLabels || [],
+                packages: participantDisplay.packages || [],
+                canMessage,
+                scopeReason
             },
+            canMessage,
+            scopeReason,
             unreadCount: unreadCount, 
             totalMessages: c.totalMessages || 0
         };
@@ -307,8 +304,11 @@ exports.deleteChat = async (req, res) => {
 // 4. STANDARD ACTIONS (No changes needed here)
 exports.getInbox = async (req, res) => {
     try {
-        const rawConvs = await chatRepository.getConversationsForUser(req.user.id);
-        const enriched = await enrichConversations(rawConvs, req.user.id, req.user);
+        const [rawConvs, updateAccess] = await Promise.all([
+            chatRepository.getConversationsForUser(req.user.id),
+            chatAccessService.canUseChatOperation(req.user, OPERATIONS.UPDATE, req.ip)
+        ]);
+        const enriched = await enrichConversations(rawConvs, req.user.id, req.user, updateAccess);
         res.json({ status: 'success', data: enriched });
     } catch (err) {
         res.status(500).json({ status: 'error', message: err.message });
@@ -323,8 +323,26 @@ exports.getHistory = async (req, res) => {
         if (chatAccessService.conversationHasParticipant(conversation, req.user.id)) {
             await chatRepository.setLastRead(convId, req.user.id);
         }
-        const messages = await chatRepository.getMessages(convId);
-        res.json({ status: 'success', data: messages });
+        const [messages, writeAccess] = await Promise.all([
+            chatRepository.getMessages(convId),
+            chatAccessService.canAccessConversation({
+                user: req.user,
+                conversation,
+                operationIds: [OPERATIONS.UPDATE],
+                ipAddress: req.ip,
+                allowGlobalAdmin: false
+            })
+        ]);
+        res.json({
+            status: 'success',
+            data: messages,
+            access: {
+                canMessage: Boolean(writeAccess?.allowed),
+                reason: writeAccess?.allowed
+                    ? ''
+                    : (writeAccess?.reason || 'This conversation is read-only.')
+            }
+        });
     } catch (err) {
         res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
     }
@@ -335,17 +353,7 @@ exports.startChat = async (req, res) => {
         const { targetUserId } = req.body;
         if (!targetUserId) throw new Error("Target user required");
         if (idsEqual(targetUserId, req.user.id)) throw createHttpError('You cannot start a chat with yourself.', 400);
-
-        const targetRows = await dataService.fetchData('users', {
-            q: String(targetUserId),
-            type: 'exact_match',
-            searchFields: 'id',
-            page: 1,
-            limit: 1
-        }, req.user);
-        if (!Array.isArray(targetRows) || targetRows.length === 0) {
-            throw createHttpError('Selected user is outside your access scope.', 403);
-        }
+        await chatContactScopeService.assertCanContact(req.user, targetUserId);
 
         const conv = await chatRepository.create({ userIds: [req.user.id, targetUserId] });
         res.json({ status: 'success', conversationId: conv.id });
@@ -354,61 +362,15 @@ exports.startChat = async (req, res) => {
     }
 };
 
-exports.searchUsers1 = async (req, res) => {
-    try {
-        const query = req.query.q || '';
-        const currentUserId = req.user.id;
-        const allUsers = await dataService.getAccessibleUsers(req.user);
-        
-        const filtered = allUsers.filter(u => {
-            if (idsEqual(u.id, currentUserId)) return false;
-            const searchStr = (u.username + ' ' + (u.email || '') + ' ' + (u.name || '')).toLowerCase();
-            return searchStr.includes(query.toLowerCase());
-        });
-
-        const results = filtered.map(u => ({
-            id: u.id,
-            name: u.name || u.username,
-            avatar: u.avatar || null,
-            email: u.email,
-            org: u.organizations && u.organizations.length > 0 ? u.organizations[0].name : 'General'
-        })).slice(0, 20); 
-
-        res.json({ status: 'success', data: results });
-
-    } catch (err) {
-        res.status(500).json({ status: 'error', message: err.message });
-    }
-};
-
 exports.searchUsers = async (req, res) => {
     try {
-        const currentUserId = req.user.id;
-        // 1. Build the query parameters for the generic filter engine
-        const queryParams = {
-            q: normalizeSearchKeyword(req.query.q || ''),
-            searchFields: 'username,email,personId,id' // Target specific fields
-        };
-
-        // 2. Fetch and filter data simultaneously using the Data Service
-        const filteredUsers = await dataService.fetchData('users', queryParams, req.user);
-        const personAvatarMap = await buildPersonAvatarMap(filteredUsers, req.user);
-
-        // 3. Format the results for the chat sidebar and exclude the current user
-        const results = filteredUsers
-            .filter(u => !idsEqual(u.id, currentUserId))
-            .map(u => ({
-                id: u.id,
-                name: u.identity?.displayName || u.name || u.username,
-                avatar: resolveUserAvatar(u, personAvatarMap),
-                email: u.email,
-                org: u.organizations && u.organizations.length > 0 ? u.organizations[0].name : 'General'
-            }))
-            .slice(0, 20); 
-
+        const results = await chatContactScopeService.searchContacts(
+            req.user,
+            req.query.q || '',
+            { limit: 20 }
+        );
         res.json({ status: 'success', data: results, results });
-
     } catch (err) {
-        res.status(500).json({ status: 'error', message: err.message });
+        res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
     }
 };

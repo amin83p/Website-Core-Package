@@ -45,6 +45,7 @@ async function authenticateSocket(socket, next) {
 
         socket.user = user;
         socket.userId = String(user.id);
+        socket.authToken = token;
         return next();
     } catch (error) {
         return next(new Error(error?.message || 'Socket authentication failed.'));
@@ -52,6 +53,11 @@ async function authenticateSocket(socket, next) {
 }
 
 async function loadConversationForSocket(socket, convId, operationIds, allowGlobalAdmin = false) {
+    if (socket.authToken) {
+        const refreshedUser = await authService.getUserFromToken(socket.authToken);
+        socket.user = refreshedUser;
+        socket.userId = String(refreshedUser.id);
+    }
     const conversation = await chatRepository.getById(convId);
     if (!conversation) {
         return {

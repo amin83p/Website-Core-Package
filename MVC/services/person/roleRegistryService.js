@@ -6,6 +6,7 @@ const packageManifestService = require('../packageManifestService');
 const { getPackageStorageRootAbsolute } = require('../../utils/packageStoragePathUtils');
 
 const ROLE_DATA_PATH = path.join(__dirname, '../../../data/roles.json');
+const BUNDLED_PACKAGES_DIR = path.join(__dirname, '../../../packages');
 const CACHE_TTL_MS = 2000;
 
 const LEGACY_SYSTEM_ROLE_KEYS = Object.freeze([
@@ -131,7 +132,7 @@ function createBuiltInRoleRow(key, overrides = {}) {
   };
 }
 
-function readPackageManifestRowsSync(packageRoot = getPackageStorageRootAbsolute()) {
+function readPackageManifestRowsFromRootSync(packageRoot) {
   try {
     return fs.readdirSync(packageRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -154,9 +155,21 @@ function readPackageManifestRowsSync(packageRoot = getPackageStorageRootAbsolute
   }
 }
 
+function readPackageManifestRowsSync(packageRoot = getPackageStorageRootAbsolute(), options = {}) {
+  const primaryRows = readPackageManifestRowsFromRootSync(packageRoot);
+  if (primaryRows.length || options?.allowBundledFallback === false) return primaryRows;
+
+  const primaryPath = path.resolve(String(packageRoot || ''));
+  const bundledPath = path.resolve(BUNDLED_PACKAGES_DIR);
+  if (primaryPath === bundledPath) return primaryRows;
+  return readPackageManifestRowsFromRootSync(bundledPath);
+}
+
 function buildPackageRoleSeedRows(options = {}) {
   const packageRoot = options.packageRoot || getPackageStorageRootAbsolute();
-  return readPackageManifestRowsSync(packageRoot)
+  return readPackageManifestRowsSync(packageRoot, {
+    allowBundledFallback: !options.packageRoot
+  })
     .flatMap((manifest) => (
       Array.isArray(manifest.roles)
         ? manifest.roles.map((role) => ({

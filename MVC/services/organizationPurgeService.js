@@ -9,8 +9,15 @@ const orgPolicyRepository = require('../repositories/orgPolicyRepository');
 const subscriptionGroupRepository = require('../repositories/subscriptionGroupRepository');
 const userMembershipRepository = require('../repositories/userMembershipRepository');
 const activityQuotaLedgerService = require('./activityQuotaLedgerService');
+const dataService = require('./dataService');
+const packagePersonDependencyGuardService = require('./packagePersonDependencyGuardService');
 const pathResolver = require('../utils/pathResolver');
 const { toPublicId, idsEqual } = require('../utils/idAdapter');
+
+const SYSTEM_PURGE_CONTEXT = Object.freeze({
+  id: 'SYSTEM_ORGANIZATION_PURGE',
+  username: 'SYSTEM_ORGANIZATION_PURGE'
+});
 
 const ALL_MASTER_DEFINITIONS = Object.freeze({
   classes: true,
@@ -72,6 +79,15 @@ function resolveOrgDisplayName(org = {}) {
     || org?.id
     || ''
   ).trim();
+}
+
+function escapeHtml(value = '') {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function membershipOrgIds(entity = {}) {
@@ -251,6 +267,51 @@ async function classifyPeople(orgId) {
   };
 }
 
+async function collectOrganizationPurgePersonBlocks(orgId, requestingUser = null) {
+  const people = await classifyPeople(orgId);
+  const blockedPersons = [];
+
+  for (const person of people.deletePersons) {
+    // eslint-disable-next-line no-await-in-loop
+    const blocks = await packagePersonDependencyGuardService.collectPersonDeleteBlocks(person, {
+      user: requestingUser || SYSTEM_PURGE_CONTEXT
+    });
+    if (!blocks.length) continue;
+    blockedPersons.push({
+      personId: toPublicId(person?.id),
+      personName: `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim(),
+      blocks
+    });
+  }
+
+  return blockedPersons;
+}
+
+function buildOrganizationPurgeBlockedError(blockedPersons = []) {
+  const firstBlock = blockedPersons[0]?.blocks?.[0] || {};
+  const preview = blockedPersons.slice(0, 8).map((row) => {
+    const personLabel = row.personName
+      ? `${escapeHtml(row.personName)} (${escapeHtml(row.personId)})`
+      : `Person ${escapeHtml(row.personId)}`;
+    const assignments = Array.isArray(row?.blocks?.[0]?.assignments)
+      ? row.blocks[0].assignments
+      : [];
+    const roles = Array.from(new Set(assignments.map((item) => item.roleKey).filter(Boolean)));
+    return `- ${personLabel}${roles.length ? `: ${roles.map(escapeHtml).join(', ')}` : ''}`;
+  });
+  const extraCount = Math.max(0, blockedPersons.length - preview.length);
+  const error = new Error(
+    `<b>Organization purge blocked.</b><br>${blockedPersons.length} person(s) still have package-managed system roles.`
+    + '<br>Remove or unassign those package accounts and roles before purging the organization.'
+    + (preview.length ? `<br><br>${preview.join('<br>')}` : '')
+    + (extraCount ? `<br>...and ${extraCount} more blocked person(s).` : '')
+  );
+  error.code = firstBlock.code || 'ORGANIZATION_PERSON_PACKAGE_ROLE_CONFLICT';
+  error.statusCode = Number(firstBlock.statusCode || 409);
+  error.details = { blockedPersons };
+  return error;
+}
+
 async function buildOrganizationPurgePlan(orgId, requestingUser = null) {
   void requestingUser;
   const targetOrgId = toPublicId(orgId);
@@ -420,7 +481,7 @@ async function buildOrganizationPurgePlan(orgId, requestingUser = null) {
   };
 }
 
-async function processPeopleStage(orgId) {
+async function processPeopleStage(orgId, requestingUser = null) {
   const people = await classifyPeople(orgId);
   const errors = [];
   let deletedUsers = 0;
@@ -458,7 +519,11 @@ async function processPeopleStage(orgId) {
   for (const person of people.deletePersons) {
     try {
       // eslint-disable-next-line no-await-in-loop
-      await personRepository.remove(person.id);
+      await dataService.deleteData(
+        'persons',
+        person.id,
+        requestingUser || SYSTEM_PURGE_CONTEXT
+      );
       deletedPersons += 1;
     } catch (err) {
       errors.push(`person ${person.id}: ${String(err?.message || err)}`);
@@ -487,7 +552,6 @@ async function processPeopleStage(orgId) {
 }
 
 async function executeOrganizationPurge(orgId, requestingUser = null, { confirmName = '' } = {}) {
-  void requestingUser;
   const targetOrgId = toPublicId(orgId);
   if (!targetOrgId) throw new Error('Organization id is required.');
   if (targetOrgId === 'SYSTEM' || targetOrgId === 'GLOBAL') {
@@ -502,6 +566,11 @@ async function executeOrganizationPurge(orgId, requestingUser = null, { confirmN
     const error = new Error('Confirmation name does not match the organization display name.');
     error.code = 'CONFIRM_MISMATCH';
     throw error;
+  }
+
+  const blockedPersons = await collectOrganizationPurgePersonBlocks(targetOrgId, requestingUser);
+  if (blockedPersons.length) {
+    throw buildOrganizationPurgeBlockedError(blockedPersons);
   }
 
   const stages = [];
@@ -615,7 +684,7 @@ async function executeOrganizationPurge(orgId, requestingUser = null, { confirmN
 
   // 5) People
   try {
-    const peopleResult = await processPeopleStage(targetOrgId);
+    const peopleResult = await processPeopleStage(targetOrgId, requestingUser);
     pushStage(
       'people',
       'Persons & users',
@@ -628,12 +697,12 @@ async function executeOrganizationPurge(orgId, requestingUser = null, { confirmN
     });
   }
 
-  // 6) Organization row (bypass person integrity — people already handled)
+  // 6) Organization row (all person removals above passed centralized integrity checks)
   try {
     const stillLinked = await personRepository.countByOrganizationId(targetOrgId);
     if (stillLinked > 0) {
       // Final unlink pass for any stragglers
-      await processPeopleStage(targetOrgId);
+      await processPeopleStage(targetOrgId, requestingUser);
     }
     await organizationRepository.remove(targetOrgId);
     pushStage('organization', 'Organization record', 'success', { removed: true });
@@ -665,5 +734,6 @@ module.exports = {
   ALL_MASTER_DEFINITIONS,
   buildOrganizationPurgePlan,
   executeOrganizationPurge,
-  resolveOrgDisplayName
+  resolveOrgDisplayName,
+  collectOrganizationPurgePersonBlocks
 };

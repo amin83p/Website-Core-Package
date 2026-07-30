@@ -404,7 +404,7 @@ async function purgeOrganization(req, res) {
     const httpStatus = result.status === 'success' ? 200 : (result.status === 'partial' ? 207 : 500);
     return res.status(httpStatus).json(result);
   } catch (error) {
-    const status = error?.code === 'CONFIRM_MISMATCH' ? 400 : 500;
+    const status = Number(error?.statusCode || (error?.code === 'CONFIRM_MISMATCH' ? 400 : 500));
     return res.status(status).json({
       status: 'error',
       code: error?.code || 'PURGE_FAILED',

@@ -1,6 +1,7 @@
 const logRepository = require('../repositories/logRepository');
 const userRepository = require('../repositories/userRepository');
 const personRepository = require('../repositories/personRepository');
+const packagePersonDependencyGuardService = require('./packagePersonDependencyGuardService');
 
 const deleteIntegrityService = {
   async assertUserCanBeDeleted(userId) {
@@ -10,7 +11,27 @@ const deleteIntegrityService = {
     }
   },
 
-  async assertPersonCanBeDeleted(personId) {
+  async assertPersonCanBeDeleted(personId, context = {}) {
+    const repositoryOptions = context?.repositoryOptions || context?.options || {};
+    const person = context?.person || await personRepository.getById(personId, {
+      ...repositoryOptions,
+      enrichment: { includeSchoolRoles: false }
+    });
+    if (person) {
+      const deleteBlocks = await packagePersonDependencyGuardService.collectPersonDeleteBlocks(person, {
+        ...context,
+        repositoryOptions
+      });
+      if (deleteBlocks.length > 0) {
+        const firstBlock = deleteBlocks[0];
+        const error = new Error(firstBlock.message || 'Deletion blocked by a package dependency guard.');
+        error.code = firstBlock.code || 'PERSON_PACKAGE_DEPENDENCY_CONFLICT';
+        error.statusCode = Number(firstBlock.statusCode || 409);
+        error.details = firstBlock;
+        throw error;
+      }
+    }
+
     const hasLinkedUser = await userRepository.existsByPersonId(personId);
     if (!hasLinkedUser) return;
 
@@ -42,4 +63,3 @@ const deleteIntegrityService = {
 };
 
 module.exports = deleteIntegrityService;
-

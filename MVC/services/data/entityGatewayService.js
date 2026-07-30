@@ -534,7 +534,10 @@ const entityGatewayService = {
         await deleteIntegrityService.assertUserCanBeDeleted(id);
         return await trackDelete(userRepository.remove(id, options));
       case 'persons':
-        await deleteIntegrityService.assertPersonCanBeDeleted(id);
+        await deleteIntegrityService.assertPersonCanBeDeleted(id, {
+          user: requestingUser,
+          repositoryOptions: options
+        });
         return await trackDelete(personRepository.remove(id, options));
       case 'organizations':
         await deleteIntegrityService.assertOrganizationCanBeDeleted(id);

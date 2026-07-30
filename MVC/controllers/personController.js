@@ -5,7 +5,6 @@ const personRepository = require('../repositories/personRepository');
 const organizationRepository = require('../repositories/organizationRepository');
 const { buildDataServiceQuery } = require('../utils/generalTools');
 const publicRegistrationService = require('../services/person/publicRegistrationService');
-const packagePersonDependencyGuardService = require('../services/packagePersonDependencyGuardService');
 const {
   buildOrganizationDisplayMap,
   canonicalizeMembershipOrganizationNames,
@@ -43,7 +42,8 @@ const {
   validatePersonInput,
   buildPersonFromBody,
   autoCreateMinimumUserForPerson,
-  registerPublicPersonAndUser
+  registerPublicPersonAndUser,
+  rollbackTransientPerson
 } = publicRegistrationService;
 
 async function loadOrganizationDisplayMap() {
@@ -203,7 +203,7 @@ async function addPerson(req, res) {
     });
     
     if(!autoUser.created){
-      dataService.deleteData('persons', regPerson.id, req.user);
+      await rollbackTransientPerson(regPerson, req.user);
       // Logic failure (e.g. dup email) -> 400
       return res.status(400).json({
         status: 'error',
@@ -319,16 +319,6 @@ async function deletePerson(req, res) {
     const person = await dataService.getDataById('persons', personId, req.user, PERSON_QUERY_OPTIONS);
     if (!person) throw new Error('Person not found.');
 
-    const deleteBlocks = await packagePersonDependencyGuardService.collectPersonDeleteBlocks(person, {
-      user: req.user,
-      request: req
-    });
-    if (deleteBlocks.length > 0) {
-      const firstBlock = deleteBlocks[0];
-      const e = new Error(firstBlock.message || 'Deletion blocked by a package dependency guard.');
-      e.statusCode = Number(firstBlock.statusCode || 409);
-      throw e;
-    }
     // const linkedUsers = await dataService.fetchData('users', { q: personId, type: 'exact_match', searchFields: 'personId' }, req.user);
 
     // if (linkedUsers && linkedUsers.length > 0) {

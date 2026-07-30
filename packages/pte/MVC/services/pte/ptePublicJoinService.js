@@ -214,7 +214,10 @@ function createPtePublicJoinService(overrides = {}) {
       };
     } catch (applicantError) {
       await deps.dataService.deleteData('users', result.user.id, result.systemUserContext).catch(() => {});
-      await deps.dataService.deleteData('persons', result.person.id, result.systemUserContext).catch(() => {});
+      await deps.publicRegistrationService.rollbackTransientPerson(
+        result.person,
+        result.systemUserContext
+      ).catch(() => {});
       throw applicantError;
     }
   }
