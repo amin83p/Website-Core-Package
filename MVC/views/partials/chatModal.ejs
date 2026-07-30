@@ -17,6 +17,9 @@
                       <h6 class="fw-bold m-0 text-secondary ps-2" id="sidebarTitle">Messages</h6>
                   </div>
                   <div class="d-flex align-items-center gap-1">
+                      <button type="button" class="btn btn-sm btn-light text-secondary rounded-circle" id="chatSoundToggle" title="Mute chat sounds" aria-label="Mute chat sounds" aria-pressed="false">
+                          <i class="bi bi-volume-up-fill" aria-hidden="true"></i>
+                      </button>
                       <% if (canChatCreate) { %>
                           <button class="btn btn-sm btn-light text-primary rounded-circle" title="New Chat" onclick="startNewChatWizard()">
                               <i class="bi bi-pencil-square"></i>
@@ -196,6 +199,7 @@
         font-weight: bold;
         min-width: 18px;
         text-align: center;
+        display: inline-block;
     }
 
     #sidebarResizer,
@@ -220,6 +224,210 @@ let previousSidebarWidth = 280;
 let pendingAttachments = [];
 let currentConversationCanMessage = chatAccess.canUpdate;
 let currentConversationScopeReason = '';
+const unreadByConversation = new Map();
+const latestIncomingMessageByConversation = new Map();
+let totalUnreadCount = 0;
+const chatSoundStorageKey = `chat.soundMuted.${String(currentUser.id)}`;
+let chatSoundMuted = false;
+let chatAudioContext = null;
+
+function normalizeClientUnreadCount(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+    return Math.floor(parsed);
+}
+
+function renderGlobalUnreadCount() {
+    const badge = document.getElementById('chatGlobalBadge');
+    if (!badge) return;
+    const count = normalizeClientUnreadCount(totalUnreadCount);
+    badge.innerText = String(count);
+    badge.classList.toggle('d-none', count === 0);
+
+    const trigger = document.getElementById('chatGlobalTrigger');
+    if (trigger) {
+        trigger.setAttribute(
+            'aria-label',
+            count > 0 ? `Messages, ${count} unread` : 'Messages'
+        );
+    }
+}
+
+function renderConversationUnreadCount(convId) {
+    const key = String(convId || '');
+    const unreadCount = normalizeClientUnreadCount(unreadByConversation.get(key));
+    document.querySelectorAll('.chat-item[data-conv-id]').forEach((item) => {
+        if (String(item.dataset.convId || '') !== key) return;
+        item.classList.toggle('unread', unreadCount > 0);
+        const slot = item.querySelector('.unread-badge-slot');
+        if (slot) {
+            slot.innerHTML = unreadCount > 0
+                ? `<span class="unread-badge ms-2">${unreadCount}</span>`
+                : '';
+        }
+    });
+}
+
+function applyUnreadState(convId, unreadCount, totalUnread) {
+    const key = String(convId || '');
+    if (key && Number.isFinite(Number(unreadCount))) {
+        unreadByConversation.set(key, normalizeClientUnreadCount(unreadCount));
+    }
+
+    if (Number.isFinite(Number(totalUnread))) {
+        totalUnreadCount = normalizeClientUnreadCount(totalUnread);
+    } else {
+        totalUnreadCount = [...unreadByConversation.values()]
+            .reduce((sum, count) => sum + normalizeClientUnreadCount(count), 0);
+    }
+
+    if (key) renderConversationUnreadCount(key);
+    renderGlobalUnreadCount();
+}
+
+function replaceUnreadState(conversations, totalUnread) {
+    unreadByConversation.clear();
+    (Array.isArray(conversations) ? conversations : []).forEach((conversation) => {
+        unreadByConversation.set(
+            String(conversation?.id || ''),
+            normalizeClientUnreadCount(conversation?.unreadCount)
+        );
+    });
+    totalUnreadCount = Number.isFinite(Number(totalUnread))
+        ? normalizeClientUnreadCount(totalUnread)
+        : [...unreadByConversation.values()]
+            .reduce((sum, count) => sum + normalizeClientUnreadCount(count), 0);
+    renderGlobalUnreadCount();
+}
+
+function markConversationReadLocally(convId) {
+    const key = String(convId || '');
+    const previousCount = normalizeClientUnreadCount(unreadByConversation.get(key));
+    unreadByConversation.set(key, 0);
+    totalUnreadCount = Math.max(0, normalizeClientUnreadCount(totalUnreadCount) - previousCount);
+    renderConversationUnreadCount(key);
+    renderGlobalUnreadCount();
+}
+
+function isAppActive() {
+    return document.visibilityState === 'visible' && document.hasFocus();
+}
+
+function isConversationActivelyViewed(convId) {
+    const modal = document.getElementById('chatInterfaceModal');
+    return Boolean(
+        modal &&
+        modal.classList.contains('show') &&
+        String(currentConvId || '') === String(convId || '') &&
+        isAppActive()
+    );
+}
+
+function markActiveConversationRead() {
+    if (!currentConvId || !isConversationActivelyViewed(currentConvId)) return;
+    const unreadCount = normalizeClientUnreadCount(
+        unreadByConversation.get(String(currentConvId))
+    );
+    if (unreadCount === 0) return;
+
+    const messageId = latestIncomingMessageByConversation.get(String(currentConvId)) || null;
+    markConversationReadLocally(currentConvId);
+    if (socket && socket.connected) {
+        socket.emit('mark_conversation_read', {
+            convId: currentConvId,
+            messageId
+        });
+    }
+}
+
+function loadChatSoundPreference() {
+    try {
+        chatSoundMuted = localStorage.getItem(chatSoundStorageKey) === '1';
+    } catch (_) {
+        chatSoundMuted = false;
+    }
+}
+
+function saveChatSoundPreference() {
+    try {
+        localStorage.setItem(chatSoundStorageKey, chatSoundMuted ? '1' : '0');
+    } catch (_) {}
+}
+
+function renderChatSoundToggle() {
+    const button = document.getElementById('chatSoundToggle');
+    if (!button) return;
+    const label = chatSoundMuted ? 'Unmute chat sounds' : 'Mute chat sounds';
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.setAttribute('aria-pressed', chatSoundMuted ? 'true' : 'false');
+    button.innerHTML = chatSoundMuted
+        ? '<i class="bi bi-volume-mute-fill" aria-hidden="true"></i>'
+        : '<i class="bi bi-volume-up-fill" aria-hidden="true"></i>';
+}
+
+function ensureChatAudioContext() {
+    if (chatAudioContext) return chatAudioContext;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+    try {
+        chatAudioContext = new AudioContextClass();
+    } catch (_) {
+        chatAudioContext = null;
+    }
+    return chatAudioContext;
+}
+
+async function unlockChatAudio() {
+    const context = ensureChatAudioContext();
+    if (!context || context.state !== 'suspended') return;
+    try {
+        await context.resume();
+    } catch (_) {}
+}
+
+function playChatDing() {
+    if (chatSoundMuted || !isAppActive()) return;
+    const context = ensureChatAudioContext();
+    if (!context || context.state !== 'running') return;
+
+    const start = context.currentTime;
+    [
+        { frequency: 880, offset: 0, duration: 0.09 },
+        { frequency: 1174.66, offset: 0.1, duration: 0.12 }
+    ].forEach((tone) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const toneStart = start + tone.offset;
+        const toneEnd = toneStart + tone.duration;
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(tone.frequency, toneStart);
+        gain.gain.setValueAtTime(0.0001, toneStart);
+        gain.gain.exponentialRampToValueAtTime(0.12, toneStart + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, toneEnd);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(toneStart);
+        oscillator.stop(toneEnd + 0.01);
+    });
+}
+
+function initChatSoundControls() {
+    loadChatSoundPreference();
+    renderChatSoundToggle();
+    const button = document.getElementById('chatSoundToggle');
+    if (button) {
+        button.addEventListener('click', async () => {
+            chatSoundMuted = !chatSoundMuted;
+            saveChatSoundPreference();
+            renderChatSoundToggle();
+            if (!chatSoundMuted) await unlockChatAudio();
+        });
+    }
+
+    document.addEventListener('pointerdown', unlockChatAudio, { once: true, capture: true });
+    document.addEventListener('keydown', unlockChatAudio, { once: true, capture: true });
+}
 
 function safeText(value) {
     return String(value || '').replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
@@ -272,11 +480,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Init Logic
     initChatSystem();
     initResizers();
+    initChatSoundControls();
+    window.addEventListener('focus', markActiveConversationRead);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') markActiveConversationRead();
+    });
 
     // 3. Reset UI on Open
     modalEl.addEventListener('show.bs.modal', () => {
         showInbox(); 
-        updateUnreadCount(0, true); 
 
         // ✅ FIX #2: Refresh active chat if it exists
         const sidebar = document.getElementById('chatSidebar');
@@ -308,6 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initChatSystem() {
     if (!chatAccess.canRead) return;
+    refreshInbox();
     if(typeof io === 'undefined') return;
     socket = io();
 
@@ -325,29 +538,9 @@ function initChatSystem() {
         safeShowAlert(message, 'warning');
     });
     
-    // ✅ FIXED: Consolidated Connect Logic & Badge Fetch
     socket.on('connect', () => {
         socket.emit('identify', currentUser.id);
-
-        // Fetch unread count on initial load
-        setTimeout(async () => {
-            try {
-                const resp = await fetch('/chat/conversations');
-                const res = await resp.json();
-                if(res.status === 'success' && res.data) {
-                    let totalUnread = 0;
-                    res.data.forEach(c => {
-                        // If I am NOT the sender of the last message, and I haven't read it
-                        if (c.lastMessage && String(c.lastMessage.senderId) !== String(currentUser.id)) {
-                             // Fallback logic if unreadCount isn't on backend yet
-                             if(c.unreadCount) totalUnread += c.unreadCount;
-                             // Or simplified: Just count 1 if last msg is new (timestamp check needed for strictness)
-                        }
-                    });
-                    if(totalUnread > 0) updateUnreadCount(totalUnread);
-                }
-            } catch(e) {}
-        }, 1000);
+        refreshInbox();
     });
 
     // A. Sending Ack
@@ -370,18 +563,41 @@ function initChatSystem() {
 
         const modalEl = document.getElementById('chatInterfaceModal');
         const isModalOpen = modalEl.classList.contains('show');
+        const isCurrentConversationOpen = isModalOpen
+            && String(currentConvId || '') === String(data.convId || '');
+        const isActiveConversation = isConversationActivelyViewed(data.convId);
 
-        // Logic: Show message if I'm looking at it; otherwise Badge it.
-        if (isModalOpen && currentConvId === data.convId) {
+        const eventConversationUnread = Number.isFinite(Number(data.unreadCount))
+            ? data.unreadCount
+            : normalizeClientUnreadCount(unreadByConversation.get(String(data.convId))) + 1;
+        const eventTotalUnread = Number.isFinite(Number(data.totalUnread))
+            ? data.totalUnread
+            : normalizeClientUnreadCount(totalUnreadCount) + 1;
+        applyUnreadState(data.convId, eventConversationUnread, eventTotalUnread);
+        latestIncomingMessageByConversation.set(String(data.convId), data.message.id);
+        playChatDing();
+
+        if (isCurrentConversationOpen) {
             appendMessage(data.message);
             scrollToBottom();
-            if (socket && socket.connected) socket.emit('mark_read', { convId: data.convId, messageId: data.message.id });
-        } else {
-            // Background task
-            if (socket && socket.connected) socket.emit('mark_delivered', { convId: data.convId, messageId: data.message.id });
-            updateUnreadCount(1); // ✅ This adds the red number
-            if(isModalOpen) refreshInbox(); // Refresh sidebar list if modal is open (looking at other chat)
         }
+
+        if (isActiveConversation) {
+            markConversationReadLocally(data.convId);
+            if (socket && socket.connected) {
+                socket.emit('mark_conversation_read', {
+                    convId: data.convId,
+                    messageId: data.message.id
+                });
+            }
+        } else {
+            if (socket && socket.connected) socket.emit('mark_delivered', { convId: data.convId, messageId: data.message.id });
+            if (isModalOpen && !isCurrentConversationOpen) refreshInbox();
+        }
+    });
+
+    socket.on('unread_state', (data) => {
+        applyUnreadState(data.convId, data.unreadCount, data.totalUnread);
     });
 
     // C. Status Updates
@@ -561,21 +777,6 @@ async function deleteCurrentChat() {
     }
 }
 
-function updateUnreadCount(num, reset = false) {
-    const badge = document.getElementById('chatGlobalBadge');
-    if(!badge) return;
-    
-    let current = parseInt(badge.innerText) || 0;
-    if (reset) current = 0; else current += num;
-    
-    badge.innerText = current;
-    if (current > 0) {
-        badge.classList.remove('d-none');
-    } else {
-        badge.classList.add('d-none');
-    }
-}
-
 function appendMessage(msg, isTemp = false) {
     const container = document.getElementById('chatMessageContainer');
     const isMine = String(msg.senderId) === String(currentUser.id);
@@ -609,7 +810,7 @@ function appendMessage(msg, isTemp = false) {
             ${contentHtml}
             <div class="d-flex align-items-center justify-content-end mt-1">
                 <span class="msg-time small text-muted" style="font-size:0.65rem;">
-                    ${isTemp ? 'Now' : new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                    ${isTemp ? 'Now' : new Date(msg.timestamp || msg.sentAt || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                 </span>
                 <span class="status-container" id="status-${msg.id}">${statusIcon}</span>
             </div>
@@ -618,13 +819,6 @@ function appendMessage(msg, isTemp = false) {
     
     container.insertAdjacentHTML('beforeend', html);
     scrollToBottom();
-    
-    if (!isMine && !isTemp && msg.status !== 'read') {
-        if (socket && socket.connected) socket.emit('mark_delivered', { convId: currentConvId, messageId: msg.id });
-        if (document.visibilityState === 'visible') {
-             if (socket && socket.connected) socket.emit('mark_read', { convId: currentConvId, messageId: msg.id });
-        }
-    }
 }
 
 function scrollToBottom() {
@@ -806,18 +1000,16 @@ async function refreshInbox() {
         const res = await resp.json();
         if(res.status === 'success') {
             listEl.innerHTML = '';
+            replaceUnreadState(res.data || [], res.totalUnread);
             
             if(!res.data || res.data.length === 0) {
                  listEl.innerHTML = '<div class="text-center text-muted mt-5 small">No messages yet.</div>';
-                 updateUnreadCount(0, true);
                  return;
             }
 
-            let totalGlobalUnread = 0;
-
             res.data.forEach(c => {
-                const isActive = (c.id === currentConvId) ? 'active' : '';
-                const unreadNum = c.unreadCount || 0; // ✅ USE REAL NUMBER
+                const isActive = (String(c.id) === String(currentConvId)) ? 'active' : '';
+                const unreadNum = normalizeClientUnreadCount(c.unreadCount);
                 const isUnreadClass = unreadNum > 0 ? 'unread' : '';
                 const lastMsg = c.lastMessage ? String(c.lastMessage.content || '') : 'New Chat';
                 
@@ -826,13 +1018,15 @@ async function refreshInbox() {
                     displayMsg = 'You: ' + displayMsg;
                 }
 
-                totalGlobalUnread += unreadNum;
+                const badgeHtml = unreadNum > 0 ?
+                    `<span class="unread-badge ms-2">${unreadNum}</span>` : '';
 
-                // ✅ BADGE: Show Number
-                const badgeHtml = unreadNum > 0 ? 
-                    `<div class="unread-badge ms-2">${unreadNum}</div>` : ''; 
-
-                const timeStr = c.lastMessage ? new Date(c.lastMessage.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+                const lastMessageTimestamp = c.lastMessage
+                    ? (c.lastMessage.timestamp || c.lastMessage.sentAt || c.lastMessageAt)
+                    : null;
+                const timeStr = lastMessageTimestamp
+                    ? new Date(lastMessageTimestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+                    : '';
                 
                 // Safety check for display name
                 const displayName = (c.display && c.display.name) ? c.display.name : 'Unknown';
@@ -851,7 +1045,7 @@ async function refreshInbox() {
                 const avatarHtml = buildAvatarHtml(displayName, avatarUrl, 40);
 
                 const html = `
-                <div class="chat-item d-flex align-items-center ${isActive} ${isUnreadClass}" onclick='openChat(${safeInlineJson(c.id)}, ${safeInlineJson(displayName)}, ${safeInlineJson(targetId)}, ${safeInlineJson(avatarUrl)}, ${canMessage ? 'true' : 'false'}, ${safeInlineJson(scopeReason)})'>
+                <div class="chat-item d-flex align-items-center ${isActive} ${isUnreadClass}" data-conv-id="${safeAttr(c.id)}" onclick='openChat(${safeInlineJson(c.id)}, ${safeInlineJson(displayName)}, ${safeInlineJson(targetId)}, ${safeInlineJson(avatarUrl)}, ${canMessage ? 'true' : 'false'}, ${safeInlineJson(scopeReason)})'>
                     <div class="avatar-wrapper me-3">
                         ${avatarHtml}
                     </div>
@@ -863,14 +1057,13 @@ async function refreshInbox() {
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="chat-msg x-small text-muted text-truncate" style="max-width: 140px;" title="${safeAttr(scopeLabel)}">${safeText(displayMsg)}</div>
-                            ${badgeHtml}
+                            <span class="unread-badge-slot">${badgeHtml}</span>
                         </div>
                     </div>
                 </div>`;
                 listEl.insertAdjacentHTML('beforeend', html);
             });
 
-            updateUnreadCount(totalGlobalUnread, true); 
         }
     } catch(e) { 
         console.error(e);
@@ -1008,12 +1201,25 @@ async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage =
             window.currentChatCanMessage = currentAccess.canMessage !== false;
             window.currentChatScopeReason = currentAccess.reason || '';
             res.data.forEach(msg => appendMessage(msg));
+            const lastIncomingMessage = [...res.data].reverse().find((message) => (
+                String(message?.senderId) !== String(currentUser.id)
+            ));
+            if (lastIncomingMessage?.id) {
+                latestIncomingMessageByConversation.set(String(convId), lastIncomingMessage.id);
+            }
+            markConversationReadLocally(convId);
             scrollToBottom();
         } else {
             setConversationWriteState(false, res.message || 'This conversation is unavailable.');
             container.innerHTML = `<div class="text-danger text-center p-4">${safeText(res.message || 'Error loading history.')}</div>`;
         }
-        if (socket && socket.connected) socket.emit('join_room', convId);
+        if (res.status === 'success' && socket && socket.connected) {
+            socket.emit('join_room', convId);
+            socket.emit('mark_conversation_read', {
+                convId,
+                messageId: latestIncomingMessageByConversation.get(String(convId)) || null
+            });
+        }
         
         // Refresh sidebar to update read counts (remove badge)
         refreshInbox();

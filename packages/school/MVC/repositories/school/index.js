@@ -23,6 +23,9 @@ const academicSnapshotModel = require('../../models/school/academicSnapshotModel
 const reportTemplateModel = require('../../models/school/reportTemplateModel');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const reportInstanceModel = require('../../models/school/reportInstanceModel');
+const overallReportTemplateModel = require('../../models/school/overallReportTemplateModel');
+const overallReportInstanceModel = require('../../models/school/overallReportInstanceModel');
+const reportScopePolicy = require('../../services/school/reportScopePolicy');
 const examTemplateModel = require('../../models/school/examTemplateModel');
 const examRevisionModel = require('../../models/school/examRevisionModel');
 const examQuestionModel = require('../../models/school/examQuestionModel');
@@ -864,6 +867,21 @@ const schoolRepositories = {
     create: reportTemplateModel.addTemplate,
     update: reportTemplateModel.updateTemplate,
     remove: reportTemplateModel.deleteTemplate,
+    normalizePayload: (data, id) => {
+      const payload = { ...(data || {}) };
+      if (!id || Object.prototype.hasOwnProperty.call(payload, 'allowedReportScopes')) {
+        payload.allowedReportScopes = reportScopePolicy.normalizeAllowedReportScopes(payload.allowedReportScopes);
+      }
+      return payload;
+    },
+    transformList: (rows) => rows.map((row) => ({
+      ...row,
+      allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(row)
+    })),
+    transformItem: (row) => ({
+      ...row,
+      allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(row)
+    }),
     defaultSearchFields: ['id', 'orgId', 'title', 'type', 'status', 'description']
   }),
   reportAssignments: createSchoolRepository({
@@ -885,6 +903,26 @@ const schoolRepositories = {
     update: reportInstanceModel.updateInstance,
     remove: reportInstanceModel.deleteInstance,
     defaultSearchFields: ['id', 'orgId', 'assignmentId', 'classId', 'templateId', 'teacherId', 'studentId', 'status', 'sessionDate']
+  }),
+  overallReportTemplates: createSchoolRepository({
+    entityName: 'overallReportTemplates',
+    collectionName: 'schoolOverallReportTemplates',
+    getAll: overallReportTemplateModel.getAllTemplates,
+    getById: overallReportTemplateModel.getTemplateById,
+    create: overallReportTemplateModel.addTemplate,
+    update: overallReportTemplateModel.updateTemplate,
+    remove: overallReportTemplateModel.deleteTemplate,
+    defaultSearchFields: ['id', 'orgId', 'title', 'status', 'description']
+  }),
+  overallReportInstances: createSchoolRepository({
+    entityName: 'overallReportInstances',
+    collectionName: 'schoolOverallReportInstances',
+    getAll: overallReportInstanceModel.getAllInstances,
+    getById: overallReportInstanceModel.getInstanceById,
+    create: overallReportInstanceModel.addInstance,
+    update: overallReportInstanceModel.updateInstance,
+    remove: overallReportInstanceModel.deleteInstance,
+    defaultSearchFields: ['id', 'orgId', 'overallTemplateId', 'title', 'status']
   }),
   examTemplates: createSchoolRepository({
     entityName: 'examTemplates',
@@ -2473,6 +2511,8 @@ assertQueryableCrudRepository('schoolRepositories.academicSnapshots', schoolRepo
 assertQueryableCrudRepository('schoolRepositories.reportTemplates', schoolRepositories.reportTemplates);
 assertQueryableCrudRepository('schoolRepositories.reportAssignments', schoolRepositories.reportAssignments);
 assertQueryableCrudRepository('schoolRepositories.reportInstances', schoolRepositories.reportInstances);
+assertQueryableCrudRepository('schoolRepositories.overallReportTemplates', schoolRepositories.overallReportTemplates);
+assertQueryableCrudRepository('schoolRepositories.overallReportInstances', schoolRepositories.overallReportInstances);
 assertQueryableCrudRepository('schoolRepositories.examTemplates', schoolRepositories.examTemplates);
 assertQueryableCrudRepository('schoolRepositories.examRevisions', schoolRepositories.examRevisions);
 assertQueryableCrudRepository('schoolRepositories.examQuestions', schoolRepositories.examQuestions);

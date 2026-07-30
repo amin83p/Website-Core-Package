@@ -1,0 +1,400 @@
+<%
+  const isEdit = Boolean(template?.id);
+  const sourceTemplateJson = JSON.stringify(sourceTemplates || []).replace(/</g, '\\u003c');
+  const templateJson = JSON.stringify(template || {}).replace(/</g, '\\u003c');
+%>
+<div class="sections-page">
+  <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;"><i class="bi bi-files me-2"></i><%= title %></h1>
+      <div class="text-muted small mt-1">Combine completed report sources into editable and calculated overall fields.</div>
+    </div>
+    <a href="/school/reports/overall-templates" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Overall Templates</a>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data" id="overallTemplateForm" action="<%= isEdit ? '/school/reports/overall-templates/edit/' + encodeURIComponent(template.id) : '/school/reports/overall-templates/new' %>">
+    <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+    <input type="hidden" name="sourceSlotsJson" id="sourceSlotsJson">
+    <input type="hidden" name="schemaJson" id="schemaJson">
+    <input type="hidden" name="placeholderMapJson" id="placeholderMapJson">
+    <input type="hidden" name="nextSlotNumber" id="nextSlotNumber" value="<%= Number(template?.nextSlotNumber || 3) %>">
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label fw-bold">Name</label>
+            <input class="form-control" name="title" maxlength="180" required value="<%= template?.title || '' %>">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold">Version</label>
+            <input class="form-control" name="version" type="number" min="1" max="1000" required value="<%= Number(template?.version || 1) %>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Status</label>
+            <select class="form-select" name="status">
+              <% (statuses || []).forEach((status) => { %>
+                <option value="<%= status %>" <%= String(template?.status || 'draft') === status ? 'selected' : '' %>><%= status %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-bold">Description</label>
+            <textarea class="form-control" name="description" rows="2" maxlength="4000"><%= template?.description || '' %></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0 fw-bold">Source Template Slots</h5>
+          <div class="small text-muted">Aliases remain stable when rows are reordered. The same template may be selected more than once.</div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddSlot"><i class="bi bi-plus-lg me-1"></i>Add Source</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light"><tr><th>Alias</th><th>Report template</th><th>Version</th><th class="text-end">Order</th><th></th></tr></thead>
+          <tbody id="sourceSlotRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0 fw-bold">Overall Fields</h5>
+          <div class="small text-muted">Derived fields can use <code>source("T1", "key")</code>, <code>avg(...)</code>, <code>concat(...)</code>, and <code>answers.field_id</code>.</div>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPreview"><i class="bi bi-eye me-1"></i>Preview</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnAddField"><i class="bi bi-plus-lg me-1"></i>Add Field</button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light"><tr><th>Field</th><th>Type</th><th>Value mode</th><th>Default / expression</th><th>DOCX key</th><th></th></tr></thead>
+          <tbody id="fieldRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div><h5 class="mb-0 fw-bold">Key Catalog</h5><div class="small text-muted">Source keys are inputs; overall keys contain saved/editable output values.</div></div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnKeysCsv">CSV</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnKeysJson">JSON</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <input class="form-control form-control-sm mb-2" id="keySearch" placeholder="Search keys...">
+        <div class="table-responsive" style="max-height:320px;overflow:auto;">
+          <table class="table table-sm"><thead><tr><th>Group</th><th>Key</th><th></th></tr></thead><tbody id="keyRows"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0 fw-bold">Word Templates</h5></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label fw-bold">Default DOCX</label>
+            <input type="file" class="form-control" name="docxTemplate" accept=".docx">
+            <% if (template?.docxTemplate?.url) { %><div class="small mt-1">Current: <a href="<%= template.docxTemplate.url %>" target="_blank"><%= template.docxTemplate.originalName || template.docxTemplate.fileName %></a></div><% } %>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Add funder mapping</label>
+            <div class="input-group">
+              <select class="form-select" id="funderPicker"><option value="">Select...</option><% (funderPickerOptions || []).forEach((option) => { %><option value="<%= option.id %>" data-label="<%= option.label %>"><%= option.label %></option><% }); %></select>
+              <button type="button" class="btn btn-outline-primary" id="btnAddFunder">Add</button>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive mt-3"><table class="table table-sm"><thead><tr><th>Funder</th><th>DOCX</th><th></th></tr></thead><tbody id="funderRows">
+          <% (template?.docxTemplatesByFunder || []).forEach((row) => { %>
+            <tr data-funder-key="<%= row.funderKey %>"><td><input type="hidden" name="funderDocxKeys" value="<%= row.funderKey %>"><input type="hidden" name="funderDocxLabels" value="<%= row.label %>"><%= row.label %></td><td><input class="form-control form-control-sm" type="file" name="funderDocxFile_<%= row.funderKey %>" accept=".docx"><% if (row.docxTemplate?.url) { %><a class="small" target="_blank" href="<%= row.docxTemplate.url %>">Current file</a><% } %></td><td><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder">Remove</button></td></tr>
+          <% }); %>
+        </tbody></table></div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mb-5">
+      <a href="/school/reports/overall-templates" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i>Save Overall Template</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal fade" id="fieldModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Overall Field</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input type="hidden" id="fieldIndex" value="-1">
+    <div class="row g-3">
+      <div class="col-md-5"><label class="form-label">Label</label><input class="form-control" id="fieldLabel"></div>
+      <div class="col-md-4"><label class="form-label">Field ID</label><input class="form-control font-monospace" id="fieldId" pattern="[A-Za-z_][A-Za-z0-9_]*"></div>
+      <div class="col-md-3"><label class="form-label">Type</label><select class="form-select" id="fieldType"><% ['text','textarea','number','date','select','checkbox','section','subheader','row_break'].forEach((type) => { %><option value="<%= type %>"><%= type %></option><% }); %></select></div>
+      <div class="col-md-4"><label class="form-label">Value mode</label><select class="form-select" id="fieldMode"><option value="manual">Manual</option><option value="derived_editable">Derived, editable</option><option value="derived_locked">Derived, locked</option></select></div>
+      <div class="col-md-8"><label class="form-label">Manual default</label><input class="form-control" id="fieldDefault"></div>
+      <div class="col-md-6"><label class="form-label">DOCX alias</label><div class="input-group"><span class="input-group-text">O.</span><input class="form-control font-monospace" id="fieldAlias" maxlength="4" placeholder="abcd"></div><div class="form-text">Four lowercase letters/numbers, beginning with a letter.</div></div>
+      <div class="col-md-6"><label class="form-label">DOCX text case</label><select class="form-select" id="fieldExportCase"><option value="as_entered">As entered</option><option value="upper">UPPERCASE</option><option value="lower">lowercase</option><option value="title">Title Case</option></select></div>
+      <div class="col-12"><label class="form-label">Select options <span class="text-muted">(one per line: value | label)</span></label><textarea class="form-control font-monospace" rows="2" id="fieldOptions"></textarea></div>
+      <div class="col-12"><label class="form-label">Calculation expression</label><textarea class="form-control font-monospace" rows="3" id="fieldExpression"></textarea></div>
+      <div class="col-md-8"><label class="form-label">Insert source key</label><select class="form-select" id="formulaSourceKey"></select></div>
+      <div class="col-md-4 d-flex align-items-end"><button type="button" class="btn btn-outline-primary w-100" id="btnInsertSource">Insert source()</button></div>
+      <div class="col-md-8"><label class="form-label">Insert overall-field dependency</label><select class="form-select" id="formulaOverallField"></select></div>
+      <div class="col-md-4 d-flex align-items-end"><button type="button" class="btn btn-outline-primary w-100" id="btnInsertOverallField">Insert answers.field</button></div>
+      <div class="col-md-8"><label class="form-label">DOCX conversion expression <span class="text-muted">(optional)</span></label><input class="form-control font-monospace" id="fieldConversionExpression" placeholder="round(num(value), 2)"></div>
+      <div class="col-md-4"><label class="form-label">Conversion error</label><select class="form-select" id="fieldConversionError"><option value="use_raw">Use stored value</option><option value="empty">Export empty</option></select></div>
+      <div class="col-12"><label class="form-label">Validation rules JSON <span class="text-muted">(advanced)</span></label><textarea class="form-control font-monospace" rows="3" id="fieldValidationRules" placeholder='[{"id":"positive","expression":"num(value) >= 0","message":"Must be zero or greater.","severity":"error"}]'></textarea></div>
+      <div class="col-md-4 form-check ms-2"><input class="form-check-input" type="checkbox" id="fieldRequired"><label class="form-check-label" for="fieldRequired">Required</label></div>
+      <div class="col-md-4 form-check"><input class="form-check-input" type="checkbox" id="fieldFullWidth"><label class="form-check-label" for="fieldFullWidth">Full width</label></div>
+    </div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" id="btnSaveField">Save Field</button></div>
+</div></div></div>
+
+<div class="modal fade" id="previewModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Overall Report Form Preview</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="previewBody"></div></div></div></div>
+
+<script>
+(() => {
+  const sourceTemplates = <%- sourceTemplateJson %>;
+  const initial = <%- templateJson %>;
+  let slots = Array.isArray(initial.sourceSlots) ? initial.sourceSlots.map(row => ({...row})) : [];
+  let fields = Array.isArray(initial.schema?.fields) ? initial.schema.fields.map(row => ({...row})) : [];
+  let nextSlot = Number(initial.nextSlotNumber || 3);
+  const byTemplateId = new Map(sourceTemplates.map(row => [String(row.id), row]));
+  const slotRows = document.getElementById('sourceSlotRows');
+  const fieldRows = document.getElementById('fieldRows');
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+
+  function renderSlots() {
+    slotRows.innerHTML = slots.map((slot, index) => {
+      const options = sourceTemplates.map(template => `<option value="${escapeHtml(template.id)}" ${String(template.id) === String(slot.templateId) ? 'selected' : ''}>${escapeHtml(template.title)} | ${escapeHtml(template.type)} v${Number(template.version || 1)}</option>`).join('');
+      return `<tr><td><span class="badge bg-primary">${escapeHtml(slot.slotKey)}</span></td><td><select class="form-select form-select-sm js-slot-template" data-index="${index}" required><option value="">Select report template...</option>${options}</select></td><td class="js-slot-version">v${Number(slot.templateVersionAtSelection || 1)}</td><td class="text-end"><button type="button" class="btn btn-outline-secondary btn-sm js-slot-up" data-index="${index}" ${index === 0 ? 'disabled' : ''} aria-label="Move source up">↑</button> <button type="button" class="btn btn-outline-secondary btn-sm js-slot-down" data-index="${index}" ${index === slots.length - 1 ? 'disabled' : ''} aria-label="Move source down">↓</button></td><td><button type="button" class="btn btn-outline-danger btn-sm js-slot-remove" data-index="${index}" ${slots.length <= 2 ? 'disabled' : ''}>Remove</button></td></tr>`;
+    }).join('');
+    renderKeyCatalog();
+  }
+
+  function normalizedMode(field) { return String(field.overallValueMode || field.valueMode || 'manual'); }
+  function renderFields() {
+    fieldRows.innerHTML = fields.map((field, index) => {
+      const visual = ['section','subheader','row_break'].includes(String(field.type));
+      const mode = normalizedMode(field);
+      const detail = mode === 'manual' ? String(field.defaultValue ?? '') : String(field.calculationRule?.expression || '');
+      return `<tr><td><strong>${escapeHtml(field.label || field.id)}</strong><div class="small text-muted font-monospace">${escapeHtml(field.id || '')}</div></td><td>${escapeHtml(field.type)}</td><td><span class="badge ${mode === 'manual' ? 'bg-light text-dark border' : (mode === 'derived_locked' ? 'bg-secondary' : 'bg-warning text-dark')}">${escapeHtml(mode.replaceAll('_',' '))}</span></td><td class="small font-monospace text-break">${escapeHtml(detail)}</td><td class="font-monospace">${visual ? '-' : `{{O.${escapeHtml(field.id)}}}`}</td><td><button type="button" class="btn btn-outline-secondary btn-sm js-edit-field" data-index="${index}">Edit</button> <button type="button" class="btn btn-outline-danger btn-sm js-remove-field" data-index="${index}">Remove</button></td></tr>`;
+    }).join('');
+    renderKeyCatalog();
+  }
+
+  function keyCatalog() {
+    const rows = [];
+    slots.forEach(slot => {
+      const template = byTemplateId.get(String(slot.templateId));
+      (template?.keyCatalog || []).forEach(key => rows.push({group: slot.slotKey, key: `{{${slot.slotKey}.${key}}}`}));
+    });
+    fields.filter(field => !['section','subheader','row_break'].includes(String(field.type))).forEach(field => {
+      rows.push({group:'Overall', key:`{{O.${field.id}}}`});
+      if (/^[a-z][a-z0-9]{3}$/.test(String(field.docxAlias || ''))) rows.push({group:'Overall alias', key:`{{O.${field.docxAlias}}}`});
+    });
+    return rows;
+  }
+
+  function renderKeyCatalog() {
+    const query = String(document.getElementById('keySearch')?.value || '').toLowerCase();
+    document.getElementById('keyRows').innerHTML = keyCatalog().filter(row => !query || row.key.toLowerCase().includes(query) || row.group.toLowerCase().includes(query)).map(row => `<tr><td>${escapeHtml(row.group)}</td><td class="font-monospace">${escapeHtml(row.key)}</td><td><button type="button" class="btn btn-outline-secondary btn-sm js-copy-key" data-key="${escapeHtml(row.key)}">Copy</button></td></tr>`).join('');
+  }
+
+  function formulaSourceOptions() {
+    const select = document.getElementById('formulaSourceKey');
+    select.innerHTML = '<option value="">Select source key...</option>' + slots.flatMap(slot => {
+      const template = byTemplateId.get(String(slot.templateId));
+      return (template?.keyCatalog || []).map(key => `<option value="${escapeHtml(slot.slotKey + '|' + key)}">${escapeHtml(slot.slotKey + '.' + key)}</option>`);
+    }).join('');
+    document.getElementById('formulaOverallField').innerHTML = '<option value="">Select overall field...</option>' + fields
+      .filter(field => field.id && !['section','subheader','row_break'].includes(String(field.type)))
+      .map(field => `<option value="${escapeHtml(field.id)}">${escapeHtml(field.label || field.id)} (${escapeHtml(field.id)})</option>`)
+      .join('');
+  }
+
+  function openField(index = -1) {
+    const field = index >= 0 ? fields[index] : {id:'',label:'',type:'text',overallValueMode:'manual',defaultValue:'',required:false,fullPageWidth:false,calculationRule:{expression:'',onError:'keep_last'}};
+    document.getElementById('fieldIndex').value = index;
+    document.getElementById('fieldId').value = field.id || '';
+    document.getElementById('fieldLabel').value = field.label || '';
+    document.getElementById('fieldType').value = field.type || 'text';
+    document.getElementById('fieldMode').value = normalizedMode(field);
+    document.getElementById('fieldDefault').value = field.defaultValue ?? '';
+    document.getElementById('fieldAlias').value = field.docxAlias || '';
+    document.getElementById('fieldExportCase').value = field.exportTextCase || 'as_entered';
+    document.getElementById('fieldOptions').value = (field.options || []).map(option => `${option.value} | ${option.label}`).join('\n');
+    document.getElementById('fieldExpression').value = field.calculationRule?.expression || '';
+    document.getElementById('fieldConversionExpression').value = field.conversionRule?.expression || '';
+    document.getElementById('fieldConversionError').value = field.conversionRule?.onError || 'use_raw';
+    document.getElementById('fieldValidationRules').value = (field.validationRules || []).length ? JSON.stringify(field.validationRules, null, 2) : '';
+    document.getElementById('fieldRequired').checked = field.required === true;
+    document.getElementById('fieldFullWidth').checked = field.fullPageWidth === true;
+    formulaSourceOptions();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('fieldModal')).show();
+  }
+
+  document.getElementById('btnAddSlot').addEventListener('click', () => {
+    slots.push({slotKey:`T${nextSlot}`,order:slots.length + 1,templateId:'',templateVersionAtSelection:1});
+    nextSlot += 1; renderSlots();
+  });
+  slotRows.addEventListener('change', event => {
+    const select = event.target.closest('.js-slot-template'); if (!select) return;
+    const index = Number(select.dataset.index); const template = byTemplateId.get(String(select.value));
+    slots[index].templateId = select.value; slots[index].templateVersionAtSelection = Number(template?.version || 1); renderSlots();
+  });
+  slotRows.addEventListener('click', event => {
+    const button = event.target.closest('button'); if (!button) return; const index = Number(button.dataset.index);
+    if (button.classList.contains('js-slot-remove')) slots.splice(index, 1);
+    if (button.classList.contains('js-slot-up') && index > 0) [slots[index - 1], slots[index]] = [slots[index], slots[index - 1]];
+    if (button.classList.contains('js-slot-down') && index < slots.length - 1) [slots[index + 1], slots[index]] = [slots[index], slots[index + 1]];
+    slots.forEach((slot, idx) => slot.order = idx + 1); renderSlots();
+  });
+  document.getElementById('btnAddField').addEventListener('click', () => openField(-1));
+  fieldRows.addEventListener('click', event => {
+    const button = event.target.closest('button'); if (!button) return; const index = Number(button.dataset.index);
+    if (button.classList.contains('js-edit-field')) openField(index);
+    if (button.classList.contains('js-remove-field')) { fields.splice(index, 1); renderFields(); }
+  });
+  document.getElementById('btnInsertSource').addEventListener('click', () => {
+    const [slotKey, key] = String(document.getElementById('formulaSourceKey').value || '').split('|');
+    if (!slotKey || !key) return;
+    const textarea = document.getElementById('fieldExpression');
+    const token = `source("${slotKey}", "${key.replaceAll('"','\\"')}")`;
+    textarea.setRangeText(token, textarea.selectionStart, textarea.selectionEnd, 'end'); textarea.focus();
+  });
+  document.getElementById('btnInsertOverallField').addEventListener('click', () => {
+    const fieldId = String(document.getElementById('formulaOverallField').value || '').trim();
+    if (!fieldId) return;
+    const textarea = document.getElementById('fieldExpression');
+    textarea.setRangeText(`answers.${fieldId}`, textarea.selectionStart, textarea.selectionEnd, 'end');
+    textarea.focus();
+  });
+  document.getElementById('btnSaveField').addEventListener('click', () => {
+    const index = Number(document.getElementById('fieldIndex').value);
+    const id = String(document.getElementById('fieldId').value || '').trim();
+    const label = String(document.getElementById('fieldLabel').value || '').trim();
+    const type = document.getElementById('fieldType').value;
+    const visual = ['section','subheader','row_break'].includes(type);
+    if (!label || (!visual && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(id))) { alert('Enter a label and a valid field ID.'); return; }
+    if (fields.some((field, fieldIndex) => fieldIndex !== index && String(field.id).toLowerCase() === id.toLowerCase())) { alert('Field IDs must be unique.'); return; }
+    const mode = visual ? 'manual' : document.getElementById('fieldMode').value;
+    const expression = String(document.getElementById('fieldExpression').value || '').trim();
+    if (mode !== 'manual' && !expression) { alert('Derived fields require a calculation expression.'); return; }
+    const alias = String(document.getElementById('fieldAlias').value || '').trim();
+    if (alias && !/^[a-z][a-z0-9]{3}$/.test(alias)) { alert('DOCX alias must be four lowercase letters/numbers and begin with a letter.'); return; }
+    const options = String(document.getElementById('fieldOptions').value || '').split(/\r?\n/).map(line => {
+      const [value, ...labelParts] = line.split('|');
+      const cleanValue = String(value || '').trim();
+      return cleanValue ? {value:cleanValue,label:String(labelParts.join('|') || cleanValue).trim()} : null;
+    }).filter(Boolean);
+    if (type === 'select' && !options.length) { alert('Select fields require at least one option.'); return; }
+    let validationRules = [];
+    try {
+      const rawRules = String(document.getElementById('fieldValidationRules').value || '').trim();
+      validationRules = rawRules ? JSON.parse(rawRules) : [];
+      if (!Array.isArray(validationRules)) throw new Error('Rules must be an array.');
+    } catch (error) { alert(`Validation rules JSON is invalid: ${error.message}`); return; }
+    const conversionExpression = String(document.getElementById('fieldConversionExpression').value || '').trim();
+    const field = {id: visual ? (id || `__${type}_${Date.now()}`) : id,label,type,required:visual ? false : document.getElementById('fieldRequired').checked,readOnly:mode === 'derived_locked',fullPageWidth:document.getElementById('fieldFullWidth').checked,overallValueMode:mode,defaultValue:document.getElementById('fieldDefault').value,calculationRule:{enabled:mode !== 'manual',expression:mode === 'manual' ? '' : expression,onError:'keep_last'},options:type === 'select' ? options : [],validationRules,conversionRule:{enabled:Boolean(conversionExpression),expression:conversionExpression,onError:document.getElementById('fieldConversionError').value},exportTextCase:document.getElementById('fieldExportCase').value,docxAlias:alias};
+    if (index >= 0) fields[index] = {...fields[index],...field}; else fields.push(field);
+    bootstrap.Modal.getInstance(document.getElementById('fieldModal'))?.hide(); renderFields();
+  });
+  document.getElementById('btnPreview').addEventListener('click', () => {
+    document.getElementById('previewBody').innerHTML = fields.map(field => {
+      if (field.type === 'section') return `<h4 class="mt-3">${escapeHtml(field.label)}</h4>`;
+      if (field.type === 'subheader') return `<h6 class="mt-3">${escapeHtml(field.label)}</h6>`;
+      if (field.type === 'row_break') return '<hr>';
+      const mode = normalizedMode(field); const readonly = mode === 'derived_locked' ? 'readonly' : '';
+      let control = field.type === 'textarea' ? `<textarea class="form-control" ${readonly}></textarea>` : `<input class="form-control" type="${field.type === 'number' ? 'number' : (field.type === 'date' ? 'date' : 'text')}" ${readonly}>`;
+      if (field.type === 'select') control = `<select class="form-select" ${mode === 'derived_locked' ? 'disabled' : ''}>${(field.options || []).map(option => `<option>${escapeHtml(option.label)}</option>`).join('')}</select>`;
+      if (field.type === 'checkbox') control = `<div class="form-check"><input class="form-check-input" type="checkbox" ${mode === 'derived_locked' ? 'disabled' : ''}></div>`;
+      return `<div class="mb-3"><label class="form-label fw-bold">${escapeHtml(field.label)} ${field.required ? '*' : ''}</label>${control}<div class="form-text">${escapeHtml(mode.replaceAll('_',' '))} &middot; {{O.${escapeHtml(field.id)}}}</div></div>`;
+    }).join('');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('previewModal')).show();
+  });
+  document.getElementById('keySearch').addEventListener('input', renderKeyCatalog);
+  document.getElementById('keyRows').addEventListener('click', event => { const button = event.target.closest('.js-copy-key'); if (button) navigator.clipboard?.writeText(button.dataset.key || ''); });
+  function download(name, content, type) { const url=URL.createObjectURL(new Blob([content],{type})); const link=document.createElement('a');link.href=url;link.download=name;link.click();URL.revokeObjectURL(url); }
+  document.getElementById('btnKeysJson').addEventListener('click', () => download('overall-report-keys.json', JSON.stringify(keyCatalog(), null, 2), 'application/json'));
+  document.getElementById('btnKeysCsv').addEventListener('click', () => download('overall-report-keys.csv', 'group,key\n' + keyCatalog().map(row => `"${row.group}","${row.key}"`).join('\n'), 'text/csv'));
+  document.getElementById('btnAddFunder').addEventListener('click', () => {
+    const picker=document.getElementById('funderPicker'); if(!picker.value || document.querySelector(`[data-funder-key="${CSS.escape(picker.value)}"]`)) return;
+    const label=picker.options[picker.selectedIndex].dataset.label || picker.options[picker.selectedIndex].textContent; const key=picker.value;
+    document.getElementById('funderRows').insertAdjacentHTML('beforeend', `<tr data-funder-key="${escapeHtml(key)}"><td><input type="hidden" name="funderDocxKeys" value="${escapeHtml(key)}"><input type="hidden" name="funderDocxLabels" value="${escapeHtml(label)}">${escapeHtml(label)}</td><td><input class="form-control form-control-sm" type="file" name="funderDocxFile_${escapeHtml(key)}" accept=".docx"></td><td><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder">Remove</button></td></tr>`); picker.value='';
+  });
+  document.getElementById('funderRows').addEventListener('click', event => event.target.closest('.js-remove-funder')?.closest('tr')?.remove());
+  function assertBalancedExpression(expression, label) {
+    let depth = 0; let quote = ''; let escaped = false;
+    for (const char of String(expression || '')) {
+      if (escaped) { escaped = false; continue; }
+      if (char === '\\') { escaped = true; continue; }
+      if (quote) { if (char === quote) quote = ''; continue; }
+      if (char === '"' || char === "'") { quote = char; continue; }
+      if (char === '(') depth += 1;
+      if (char === ')') depth -= 1;
+      if (depth < 0) throw new Error(`${label} has an unmatched closing parenthesis.`);
+    }
+    if (quote) throw new Error(`${label} has an unterminated string.`);
+    if (depth !== 0) throw new Error(`${label} has unmatched parentheses.`);
+  }
+  function validateDesignerExpressions() {
+    const slotKeys = new Set(slots.map(slot => slot.slotKey));
+    const sourceKeys = new Map(slots.map(slot => [
+      slot.slotKey,
+      new Set(byTemplateId.get(String(slot.templateId))?.keyCatalog || [])
+    ]));
+    const dataFields = fields.filter(field => field.id && !['section','subheader','row_break'].includes(String(field.type)));
+    const fieldIds = new Set(dataFields.map(field => field.id));
+    const dependencies = new Map();
+    const allowedHelpers = new Set(['source','round','avg','concat','num','str','len','min','max','abs','clamp','ifelse','caseof']);
+    dataFields.forEach(field => {
+      const mode = normalizedMode(field);
+      const expression = mode === 'manual' ? '' : String(field.calculationRule?.expression || '');
+      if (!expression) { dependencies.set(field.id, []); return; }
+      assertBalancedExpression(expression, `Field "${field.label || field.id}"`);
+      [...expression.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\(/g)].forEach(match => {
+        if (!allowedHelpers.has(match[1])) throw new Error(`Field "${field.label || field.id}" uses unknown helper "${match[1]}".`);
+      });
+      const refs = [...expression.matchAll(/source\s*\(\s*(["'])(T[1-9]\d*)\1\s*,\s*(["'])([^"'\\]+)\3\s*\)/gi)];
+      if ((expression.match(/\bsource\s*\(/gi) || []).length !== refs.length) throw new Error(`Field "${field.label || field.id}" must use literal source slot and key names.`);
+      refs.forEach(match => {
+        const slotKey = String(match[2]).toUpperCase(); const key = String(match[4]).trim();
+        if (!slotKeys.has(slotKey)) throw new Error(`Field "${field.label || field.id}" references unknown slot ${slotKey}.`);
+        if (!sourceKeys.get(slotKey)?.has(key)) throw new Error(`Field "${field.label || field.id}" references unavailable key ${slotKey}.${key}.`);
+      });
+      const deps = [...new Set([...expression.matchAll(/\banswers\.([A-Za-z_][A-Za-z0-9_]*)\b/g)].map(match => match[1]))];
+      deps.forEach(fieldId => {
+        if (!fieldIds.has(fieldId)) throw new Error(`Field "${field.label || field.id}" references unknown overall field "${fieldId}".`);
+        if (fieldId === field.id) throw new Error(`Field "${field.label || field.id}" cannot depend on itself.`);
+      });
+      dependencies.set(field.id, deps);
+    });
+    const visiting = new Set(); const visited = new Set();
+    function visit(fieldId, stack=[]) {
+      if (visited.has(fieldId)) return;
+      if (visiting.has(fieldId)) throw new Error(`Overall-field calculation cycle: ${[...stack, fieldId].join(' → ')}.`);
+      visiting.add(fieldId);
+      (dependencies.get(fieldId) || []).forEach(dependencyId => visit(dependencyId, [...stack, fieldId]));
+      visiting.delete(fieldId); visited.add(fieldId);
+    }
+    dataFields.forEach(field => visit(field.id));
+  }
+  document.getElementById('overallTemplateForm').addEventListener('submit', event => {
+    if (slots.length < 2 || slots.some(slot => !slot.templateId)) { event.preventDefault(); alert('Select at least two source templates.'); return; }
+    try { validateDesignerExpressions(); } catch (error) { event.preventDefault(); alert(error.message); return; }
+    document.getElementById('sourceSlotsJson').value = JSON.stringify(slots.map((slot,index) => ({...slot,order:index+1})));
+    document.getElementById('schemaJson').value = JSON.stringify({version:Number(initial.schema?.version || 1),fields});
+    document.getElementById('placeholderMapJson').value = JSON.stringify(Object.fromEntries(fields.filter(field => !['section','subheader','row_break'].includes(field.type)).map(field => [field.id,`{{O.${field.id}}}`])));
+    document.getElementById('nextSlotNumber').value = nextSlot;
+  });
+  renderSlots(); renderFields();
+})();
+</script>

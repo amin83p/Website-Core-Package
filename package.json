@@ -56,6 +56,7 @@
     "school:manifest:audit": "node scripts/school/audit-school-package-manifest.js",
     "school:manifest:audit:apply": "node scripts/school/audit-school-package-manifest.js --apply",
     "school:master-academia-hub:seed": "node scripts/seed-school-master-academia-hub-section.js --db app",
+    "school:overall-reports:seed": "node scripts/seed-school-overall-report-sections.js --db app",
     "membership:period-org:migrate": "node scripts/migrate-membership-period-org-scope.js",
     "school:enrollment-periods:backfill": "node scripts/school/migration/backfillClassEnrollmentPeriods.js",
     "school:enrollment-periods:backfill:apply": "node scripts/school/migration/backfillClassEnrollmentPeriods.js --apply",

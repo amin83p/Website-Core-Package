@@ -121,29 +121,62 @@ function getDocxDependencies() {
   return { PizZip, Docxtemplater };
 }
 
-async function renderReportInstanceDocx({ template, instance, placeholders, collections, docxTemplateOverride = null }) {
-  if (!template || !instance) throw new Error('Template and report instance are required.');
-
-  const docxTemplate = docxTemplateOverride || template.docxTemplate || {};
+async function readDocxTemplateBuffer(docxTemplate = {}) {
   const filePath = resolveTemplateFilePath(docxTemplate);
-  if (!filePath) {
-    throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
-  }
-
-  const { PizZip, Docxtemplater } = getDocxDependencies();
-  let binary;
+  if (!filePath) throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
   try {
-    if (fileAssetStorage.isUploadReference?.(filePath)) {
-      binary = (await fileAssetStorage.readBuffer(filePath)).buffer;
-    } else {
-      binary = await fs.readFile(filePath);
-    }
+    const binary = fileAssetStorage.isUploadReference?.(filePath)
+      ? (await fileAssetStorage.readBuffer(filePath)).buffer
+      : await fs.readFile(filePath);
+    return { binary, filePath };
   } catch (error) {
     if (error && (error.code === 'ENOENT' || error.code === 'EPERM')) {
       throw new Error(`DOCX template file is not accessible: ${filePath}`);
     }
     throw error;
   }
+}
+
+function decodeXmlText(value = '') {
+  return String(value || '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, '\'')
+    .replace(/&amp;/g, '&');
+}
+
+async function inspectDocxTemplateTokens(docxTemplate = {}) {
+  const { binary, filePath } = await readDocxTemplateBuffer(docxTemplate);
+  const { PizZip } = getDocxDependencies();
+  let zip;
+  try {
+    zip = new PizZip(binary);
+  } catch (error) {
+    throw new Error(`Unable to inspect DOCX template: ${extractDocxRenderError(error)}`);
+  }
+  const tokens = new Set();
+  Object.keys(zip.files || {})
+    .filter((name) => /^word\/(?:document|header\d*|footer\d*|footnotes|endnotes)\.xml$/i.test(name))
+    .forEach((name) => {
+      const xml = zip.file(name)?.asText() || '';
+      const text = decodeXmlText(xml.replace(/<[^>]*>/g, ''));
+      const regex = /\{\{\s*([^{}]+?)\s*\}\}/g;
+      let match;
+      while ((match = regex.exec(text))) {
+        const token = normalizeTokenKey(match[1]);
+        if (token) tokens.add(token);
+      }
+    });
+  return { filePath, tokens: [...tokens] };
+}
+
+async function renderReportInstanceDocx({ template, instance, placeholders, collections, docxTemplateOverride = null }) {
+  if (!template || !instance) throw new Error('Template and report instance are required.');
+
+  const docxTemplate = docxTemplateOverride || template.docxTemplate || {};
+  const { PizZip, Docxtemplater } = getDocxDependencies();
+  const { binary, filePath } = await readDocxTemplateBuffer(docxTemplate);
 
   const renderData = buildRenderData(placeholders, collections);
 
@@ -239,6 +272,7 @@ module.exports = {
   normalizeCollectionRows,
   buildRenderData,
   resolveTemplateFilePath,
+  inspectDocxTemplateTokens,
   renderReportInstanceDocx,
   mergeReportInstanceDocxBuffers,
   zipReportInstanceDocxFiles

@@ -1,0 +1,149 @@
+<%
+  const fields = (template?.schema?.fields || []);
+  const editable = String(instance.status) === 'draft';
+  const escJson = JSON.stringify(instance.answers || {}).replace(/</g, '\\u003c');
+%>
+<div class="sections-page">
+  <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;"><i class="bi bi-file-earmark-check me-2"></i><%= title %></h1>
+      <div class="small text-muted"><span class="font-monospace"><%= instance.id %></span> &middot; revision <%= Number(instance.revision || 1) %></div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <span class="badge <%= instance.status === 'locked' ? 'bg-dark' : (instance.status === 'submitted' ? 'bg-success' : (instance.status === 'draft' ? 'bg-warning text-dark' : 'bg-secondary')) %>"><%= instance.status %></span>
+      <a href="/school/reports/overall-reports" class="btn btn-outline-secondary btn-sm">Overall Reports</a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <div><h5 class="mb-0 fw-bold">Source Snapshot</h5><div class="small text-muted">These stored values are not refreshed when this report opens or exports.</div></div>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="btnSourceUpdates" <%= !editable ? 'disabled' : '' %>><i class="bi bi-arrow-repeat me-1"></i>Update from Sources</button>
+    </div>
+    <div class="card-body">
+      <div class="row g-2">
+        <% (instance.sourceSelections || []).forEach((selection) => { %>
+          <div class="col-md-6"><div class="border rounded p-2"><span class="badge bg-primary"><%= selection.slotKey %></span> <strong><%= selection.instanceTitle || selection.instanceId %></strong><div class="font-monospace small"><%= selection.instanceId %></div><div class="small text-muted"><%= selection.templateTitle || selection.templateId %> &middot; captured <%= selection.capturedAt %></div></div></div>
+        <% }); %>
+      </div>
+    </div>
+  </div>
+
+  <form method="POST" id="overallAnswersForm" action="/school/reports/overall-reports/edit/<%= encodeURIComponent(instance.id) %>">
+    <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+    <input type="hidden" name="answersJson" id="answersJson">
+    <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+      <% fields.forEach((field) => { const visual=['section','subheader','row_break'].includes(field.type); const mode=String(field.overallValueMode||'manual'); const canEdit=editable && mode !== 'derived_locked'; const value=instance.answers?.[field.id] ?? ''; %>
+        <% if (field.type === 'section') { %><h4 class="mt-3 border-bottom pb-2"><%= field.label %></h4>
+        <% } else if (field.type === 'subheader') { %><h6 class="mt-3 fw-bold"><%= field.label %></h6>
+        <% } else if (field.type === 'row_break') { %><hr>
+        <% } else { %>
+          <div class="mb-3">
+            <label class="form-label fw-bold"><%= field.label %><% if (field.required) { %> *<% } %>
+              <span class="badge ms-1 <%= mode === 'manual' ? 'bg-light text-dark border' : (mode === 'derived_locked' ? 'bg-secondary' : 'bg-warning text-dark') %>"><%= mode.replaceAll('_',' ') %></span>
+              <% if (instance.derivedOverrides?.[field.id]) { %><span class="badge bg-info text-dark">overridden</span><% } %>
+            </label>
+            <% if (field.type === 'textarea') { %><textarea class="form-control js-overall-answer" rows="3" data-field-id="<%= field.id %>" <%= canEdit ? '' : 'readonly' %>><%= value %></textarea>
+            <% } else if (field.type === 'checkbox') { %><select class="form-select js-overall-answer" data-field-id="<%= field.id %>" <%= canEdit ? '' : 'disabled' %>><option value="false" <%= !value ? 'selected' : '' %>>No</option><option value="true" <%= value ? 'selected' : '' %>>Yes</option></select>
+            <% } else if (field.type === 'select') { %><select class="form-select js-overall-answer" data-field-id="<%= field.id %>" <%= canEdit ? '' : 'disabled' %>><% (field.options || []).forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %></select>
+            <% } else { %><input class="form-control js-overall-answer" data-field-id="<%= field.id %>" type="<%= field.type === 'number' ? 'number' : (field.type === 'date' ? 'date' : 'text') %>" value="<%= value %>" <%= canEdit ? '' : 'readonly' %>><% } %>
+            <div class="form-text"><code>{{O.<%= field.id %>}}</code></div>
+            <% if (editable && instance.derivedOverrides?.[field.id]) { %>
+              <button type="button" class="btn btn-link btn-sm px-0 js-reset-override" data-field-id="<%= field.id %>">Reset to calculated value</button>
+            <% } %>
+          </div>
+        <% } %>
+      <% }); %>
+    </div></div>
+    <% if (editable) { %><div class="d-flex justify-content-end mb-3"><button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Save Values</button></div><% } %>
+  </form>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white"><h5 class="mb-0 fw-bold">Lifecycle and Export</h5></div>
+    <div class="card-body d-flex flex-wrap gap-2">
+      <% if (instance.status === 'draft') { %>
+        <form method="POST" action="/school/reports/overall-reports/<%= encodeURIComponent(instance.id) %>/submit"><input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>"><button class="btn btn-success">Submit</button></form>
+        <button type="button" class="btn btn-outline-secondary" id="btnExportPreview">Export Preview</button>
+      <% } %>
+      <% if (instance.status === 'submitted') { %>
+        <form method="POST" action="/school/reports/overall-reports/<%= encodeURIComponent(instance.id) %>/reopen"><input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>"><button class="btn btn-outline-warning">Reopen to Draft</button></form>
+        <form method="POST" action="/school/reports/overall-reports/<%= encodeURIComponent(instance.id) %>/lock"><input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>"><button class="btn btn-dark">Lock</button></form>
+      <% } %>
+      <% if (instance.status === 'locked') { %>
+        <form method="POST" action="/school/reports/overall-reports/<%= encodeURIComponent(instance.id) %>/unlock"><input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>"><button class="btn btn-outline-dark">Unlock</button></form>
+      <% } %>
+      <% if (['submitted','locked'].includes(instance.status)) { %>
+        <button type="button" class="btn btn-outline-secondary" id="btnExportPreview">Export Preview</button>
+        <form method="POST" action="/school/reports/overall-reports/<%= encodeURIComponent(instance.id) %>/export"><input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>"><button class="btn btn-primary"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</button></form>
+      <% } %>
+      <% if (instance.status !== 'archived') { %>
+        <form method="POST" action="/school/reports/overall-reports/<%= encodeURIComponent(instance.id) %>/archive"><input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>"><button class="btn btn-outline-danger">Archive</button></form>
+      <% } %>
+    </div>
+    <div class="card-footer bg-white small">
+      <% if (exportPreview?.error) { %><span class="text-danger"><%= exportPreview.error %></span>
+      <% } else if (exportPreview?.missingTokens?.length) { %><span class="text-danger">Missing DOCX values: <%= exportPreview.missingTokens.join(', ') %></span>
+      <% } else if (exportPreview?.calculationMismatches?.length || exportPreview?.calculationDiagnostics?.length || exportPreview?.conversionDiagnostics?.length) { %><span class="text-danger">Resolve calculation or conversion errors before export.</span>
+      <% } else if (exportPreview?.validation?.hasBlockingErrors) { %><span class="text-danger">Resolve required-field or validation errors before export.</span>
+      <% } else { %><span class="text-muted">DOCX preflight currently resolves <%= Object.keys(exportPreview?.placeholders || {}).length %> stored values.</span><% } %>
+    </div>
+  </div>
+
+  <% if (instance.generatedDocs?.length) { %>
+    <div class="card border-0 shadow-sm mb-5"><div class="card-header bg-white"><h5 class="mb-0 fw-bold">Generated Documents</h5></div><div class="list-group list-group-flush">
+      <% instance.generatedDocs.slice().reverse().forEach((doc) => { %><div class="list-group-item d-flex justify-content-between"><div><strong><%= doc.fileName %></strong><div class="small text-muted"><%= doc.generatedAt %> &middot; revision <%= doc.revision %></div></div><% if (doc.url) { %><a class="btn btn-outline-primary btn-sm" href="<%= doc.url %>" target="_blank">Download</a><% } %></div><% }); %>
+    </div></div>
+  <% } %>
+</div>
+
+<div class="modal fade" id="sourceUpdateModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Update from Sources</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="sourceUpdateIssues"></div><div class="table-responsive"><table class="table table-sm"><thead><tr><th></th><th>Source key</th><th>Stored</th><th>Current</th><th>Affected overall fields</th></tr></thead><tbody id="sourceUpdateRows"></tbody></table></div></div><div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" id="btnApplySourceUpdates">Apply Selected</button></div></div></div></div>
+<div class="modal fade" id="exportPreviewModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">DOCX Export Preview</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="exportPreviewBody"></div></div></div></div>
+
+<script>
+(() => {
+  const instanceId = <%- JSON.stringify(String(instance.id)) %>;
+  const actionStateId = <%- JSON.stringify(String(actionStateId || '')) %>;
+  const initialAnswers = <%- escJson %>;
+  document.getElementById('overallAnswersForm')?.addEventListener('submit', () => {
+    const answers = {...initialAnswers};
+    document.querySelectorAll('.js-overall-answer').forEach(input => {
+      if (!input.dataset.fieldId) return;
+      answers[input.dataset.fieldId] = input.type === 'number' && input.value !== '' ? Number(input.value) : (input.value === 'true' ? true : (input.value === 'false' ? false : input.value));
+    });
+    document.getElementById('answersJson').value = JSON.stringify(answers);
+  });
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  document.getElementById('btnSourceUpdates')?.addEventListener('click', async () => {
+    const response = await fetch(`/school/reports/overall-reports/${encodeURIComponent(instanceId)}/source-update-preview`, {headers:{Accept:'application/json','x-ajax-request':'true'}});
+    const result = await response.json(); if (!response.ok) { alert(result.message || 'Unable to compare sources.'); return; }
+    document.getElementById('sourceUpdateIssues').innerHTML = (result.issues || []).map(issue => `<div class="alert alert-warning py-2">${esc(issue.slotKey)}: ${esc(issue.message)}</div>`).join('');
+    document.getElementById('sourceUpdateRows').innerHTML = (result.changes || []).map(change => `<tr><td><input class="form-check-input js-source-change" type="checkbox" value="${esc(change.selectionKey)}"></td><td><span class="badge bg-primary">${esc(change.slotKey)}</span> <code>${esc(change.key)}</code><div class="small text-muted">${esc(change.sourceInstanceTitle || change.sourceInstanceId)}<br>${esc(change.sourceTemplateTitle || change.sourceTemplateId)}</div></td><td class="text-break">${esc(change.oldValue)}</td><td class="text-break">${esc(change.newValue)}</td><td>${(change.affectedFields || []).map(field => `<div><strong>${esc(field.label)}</strong>: ${esc(field.currentValue)} &rarr; ${esc(field.newValue)} ${field.overridden ? `<span class="badge bg-info text-dark">override preserved</span><label class="small ms-1"><input class="form-check-input js-replace-override" type="checkbox" value="${esc(field.fieldId)}"> replace override</label>` : ''}</div>`).join('') || '<span class="text-muted">Direct DOCX source key</span>'}</td></tr>`).join('') || '<tr><td colspan="5" class="text-center text-muted py-4">No source changes found.</td></tr>';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('sourceUpdateModal')).show();
+  });
+  document.getElementById('btnApplySourceUpdates')?.addEventListener('click', async () => {
+    const selectedKeys = [...document.querySelectorAll('.js-source-change:checked')].map(input => input.value);
+    const replaceOverrideFieldIds = [...new Set([...document.querySelectorAll('.js-replace-override:checked')].map(input => input.value))];
+    if (!selectedKeys.length) { alert('Select at least one source value.'); return; }
+    const response = await fetch(`/school/reports/overall-reports/${encodeURIComponent(instanceId)}/source-update-apply`, {method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json','x-ajax-request':'true'},body:JSON.stringify({actionStateId,selectedKeys,replaceOverrideFieldIds})});
+    const result = await response.json(); if (!response.ok) { alert(result.message || 'Unable to apply source updates.'); return; }
+    location.reload();
+  });
+  document.querySelectorAll('.js-reset-override').forEach(button => button.addEventListener('click', async () => {
+    if (!confirm('Reset this field to its current calculated value?')) return;
+    const response = await fetch(`/school/reports/overall-reports/${encodeURIComponent(instanceId)}/reset-override`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', Accept:'application/json', 'x-ajax-request':'true'},
+      body: JSON.stringify({actionStateId, fieldId: button.dataset.fieldId})
+    });
+    const result = await response.json();
+    if (!response.ok) { alert(result.message || 'Unable to reset the override.'); return; }
+    location.reload();
+  }));
+  document.querySelectorAll('#btnExportPreview').forEach(button => button.addEventListener('click', async () => {
+    const response=await fetch(`/school/reports/overall-reports/${encodeURIComponent(instanceId)}/export-preview`,{headers:{Accept:'application/json','x-ajax-request':'true'}}); const result=await response.json();
+    const resolvedRows = Object.entries(result.placeholders || {}).sort(([left], [right]) => left.localeCompare(right)).map(([key, value]) => `<tr><td><code>${esc(key)}</code></td><td class="text-break">${esc(value)}</td></tr>`).join('');
+    document.getElementById('exportPreviewBody').innerHTML = response.ok ? `<div class="alert ${result.ready ? 'alert-success' : 'alert-warning'}">${result.ready ? 'DOCX is ready to export.' : 'DOCX preflight needs attention.'}</div><dl class="row"><dt class="col-4">Word variant</dt><dd class="col-8">${esc(result.docxLabel || result.docxKey)}</dd><dt class="col-4">Word file</dt><dd class="col-8">${esc(result.fileName)}</dd><dt class="col-4">Stored values</dt><dd class="col-8">${Object.keys(result.placeholders || {}).length}</dd><dt class="col-4">Missing tokens</dt><dd class="col-8">${esc((result.missingTokens || []).join(', ') || 'None')}</dd><dt class="col-4">Validation errors</dt><dd class="col-8">${(result.validation?.errors || []).map(row => esc(row.message)).join('<br>') || 'None'}</dd><dt class="col-4">Calculation mismatches</dt><dd class="col-8">${(result.calculationMismatches || []).map(row => `${esc(row.fieldLabel)}: ${esc(row.storedValue)} &rarr; ${esc(row.calculatedValue)}`).join('<br>') || 'None'}</dd><dt class="col-4">Conversion errors</dt><dd class="col-8">${(result.conversionDiagnostics || []).map(row => esc(row.message || row.error)).join('<br>') || 'None'}</dd></dl><h6 class="fw-bold">Resolved snapshot placeholders</h6><div class="table-responsive" style="max-height:320px;overflow:auto"><table class="table table-sm"><thead><tr><th>Key</th><th>Stored export value</th></tr></thead><tbody>${resolvedRows || '<tr><td colspan="2" class="text-muted">No stored values.</td></tr>'}</tbody></table></div>` : `<div class="alert alert-danger">${esc(result.message || 'Preview failed.')}</div>`;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('exportPreviewModal')).show();
+  }));
+})();
+</script>

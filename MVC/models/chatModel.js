@@ -6,6 +6,13 @@ const { queueWrite } = require('./fileQueue');
 const { applyGenericFilter } = require('../utils/queryEngine');
 const { idsEqual, toPublicId } = require('../utils/idAdapter');
 const { getEntityQueryExecutor } = require('./queryExecutionBridge');
+const {
+    normalizeMessage,
+    normalizeConversation,
+    applyMessageToConversation,
+    markConversationRead,
+    buildUnreadSummary
+} = require('../services/chatUnreadStateService');
 
 const CONV_FILE = path.join(__dirname, '../../data/conversations.json');
 const MSG_DIR = path.join(__dirname, '../../data/messages/');
@@ -19,6 +26,7 @@ async function getConversations(userId) {
         const all = JSON.parse(data);
         return all
             .filter(c => c.participants.some(p => idsEqual(p.userId, userId)))
+            .map(normalizeConversation)
             .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     } catch (e) { return []; }
 }
@@ -27,7 +35,7 @@ async function getMessages(convId) {
     try {
         const filePath = path.join(MSG_DIR, `${convId}.json`);
         const data = await fs.readFile(filePath, 'utf8').catch(() => '[]');
-        return JSON.parse(data);
+        return JSON.parse(data).map((message) => normalizeMessage(message));
     } catch (e) { return []; }
 }
 
@@ -35,31 +43,36 @@ async function createConversation(userIds) {
     return await queueWrite(async () => {
         const data = await fs.readFile(CONV_FILE, 'utf8').catch(() => '[]');
         const all = JSON.parse(data);
+        const normalizedUserIds = userIds.map((id) => toPublicId(id)).filter(Boolean);
 
         // Check if exists
         const exists = all.find(c => 
             c.type === 'direct' && 
-            c.participants.every(p => userIds.includes(String(p.userId)))
+            Array.isArray(c.participants) &&
+            c.participants.length === normalizedUserIds.length &&
+            c.participants.every(p => normalizedUserIds.some((id) => idsEqual(id, p.userId)))
         );
-        if (exists) return exists;
+        if (exists) return normalizeConversation(exists);
+
+        const now = new Date().toISOString();
 
         const newConv = {
             id: `CONV_${Date.now()}`,
             type: 'direct',
-            // Initialize unreadCount to 0 for everyone
-            participants: userIds.map(id => ({ 
+            participants: normalizedUserIds.map(id => ({
                 userId: id, 
-                lastRead: new Date(),
-                unreadCount: 0  // <--- NEW FIELD
+                lastRead: now,
+                unreadCount: 0
             })),
             lastMessage: null,
-            totalMessages: 0, // <--- NEW FIELD
-            updatedAt: new Date()
+            totalMessages: 0,
+            createdAt: now,
+            updatedAt: now
         };
 
         all.push(newConv);
         await fs.writeFile(CONV_FILE, JSON.stringify(all, null, 2));
-        return newConv;
+        return normalizeConversation(newConv);
     });
 }
 
@@ -71,12 +84,12 @@ async function addMessage(convId, senderId, content, type = 'text', fileUrl = nu
         try { messages = JSON.parse(await fs.readFile(msgPath, 'utf8')); } catch {}
 
         const newMessage = {
-            id: `MSG_${Date.now()}`,
-            senderId,
-            content,
-            type,
+            id: `MSG_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            senderId: toPublicId(senderId),
+            content: String(content || ''),
+            type: String(type || 'text'),
             fileUrl: fileUrl || null,
-            timestamp: new Date(),
+            timestamp: new Date().toISOString(),
             status: 'sent'
         };
         messages.push(newMessage);
@@ -88,36 +101,18 @@ async function addMessage(convId, senderId, content, type = 'text', fileUrl = nu
         const convIndex = allConv.findIndex(c => c.id === convId);
         
         if (convIndex > -1) {
-            allConv[convIndex].lastMessage = {
-                content: type === 'image' ? '📷 Image' : (type === 'file' ? '📎 File' : content),
+            allConv[convIndex] = applyMessageToConversation(
+                allConv[convIndex],
                 senderId,
-                timestamp: newMessage.timestamp,
-                status: 'sent'
-            };
-            allConv[convIndex].updatedAt = newMessage.timestamp;
-            
-            // ✅ NEW: Increment Total Messages
-            allConv[convIndex].totalMessages = (allConv[convIndex].totalMessages || 0) + 1;
-
-            // ✅ NEW: Increment Unread Count for RECIPIENTS (everyone except sender)
-            allConv[convIndex].participants.forEach(p => {
-                if (!idsEqual(p.userId, senderId)) {
-                    p.unreadCount = (p.unreadCount || 0) + 1;
-                } else {
-                    // Sender read their own message
-                    p.lastRead = newMessage.timestamp;
-                    p.unreadCount = 0; 
-                }
-            });
-
+                newMessage
+            );
             await fs.writeFile(CONV_FILE, JSON.stringify(allConv, null, 2));
         }
 
-        return newMessage;
+        return normalizeMessage(newMessage);
     });
 }
 
-// ✅ UPDATED: Reset Unread Count
 async function setLastRead(convId, userId) {
     return await queueWrite(async () => {
         const data = await fs.readFile(CONV_FILE, 'utf8').catch(() => '[]');
@@ -125,13 +120,11 @@ async function setLastRead(convId, userId) {
         const convIndex = all.findIndex(c => c.id === convId);
         
         if (convIndex > -1) {
-            const pIndex = all[convIndex].participants.findIndex(p => idsEqual(p.userId, userId));
-            if (pIndex > -1) {
-                all[convIndex].participants[pIndex].lastRead = new Date();
-                all[convIndex].participants[pIndex].unreadCount = 0; // ✅ RESET TO 0
-                await fs.writeFile(CONV_FILE, JSON.stringify(all, null, 2));
-            }
+            all[convIndex] = markConversationRead(all[convIndex], userId);
+            await fs.writeFile(CONV_FILE, JSON.stringify(all, null, 2));
+            return true;
         }
+        return false;
     });
 }
 
@@ -140,7 +133,7 @@ async function updateMessageStatus(convId, messageId, newStatus) {
         const msgPath = path.join(MSG_DIR, `${convId}.json`);
         try {
             const messages = JSON.parse(await fs.readFile(msgPath, 'utf8'));
-            const msgIndex = messages.findIndex(m => m.id === messageId);
+            const msgIndex = messages.findIndex(m => idsEqual(m?.id, messageId));
             
             if (msgIndex > -1) {
                 const current = messages[msgIndex].status;
@@ -179,8 +172,9 @@ async function getAllConversations() {
     try {
         const data = await fs.readFile(CONV_FILE, 'utf8').catch(() => '[]');
         const all = JSON.parse(data);
-        // Sort by newest update
-        return all.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        return all
+            .map(normalizeConversation)
+            .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     } catch (e) { return []; }
 }
 
@@ -233,8 +227,8 @@ async function queryConversations(options = {}) {
 
     if (typeof executor === 'function') {
         const result = await executor(plan);
-        if (Array.isArray(result)) return result;
-        if (result && Array.isArray(result.items)) return result.items;
+        if (Array.isArray(result)) return result.map(normalizeConversation);
+        if (result && Array.isArray(result.items)) return result.items.map(normalizeConversation);
     }
 
     const all = await getAllConversations();
@@ -258,8 +252,13 @@ async function updateConversation(convId, updates) {
         };
         all[index] = merged;
         await fs.writeFile(CONV_FILE, JSON.stringify(all, null, 2));
-        return merged;
+        return normalizeConversation(merged);
     });
+}
+
+async function getUnreadSummaryForUser(userId) {
+    const conversations = await getConversations(userId);
+    return buildUnreadSummary(conversations, userId);
 }
 
 module.exports = { 
@@ -274,5 +273,6 @@ module.exports = {
     getConversationById,
     queryConversations,
     buildConversationQueryPlan,
-    updateConversation
+    updateConversation,
+    getUnreadSummaryForUser
 };

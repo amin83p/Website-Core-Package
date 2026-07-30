@@ -17,6 +17,10 @@ const INDEX_DEFINITIONS = Object.freeze({
     { key: { status: 1, active: 1 }, options: { name: 'idx_users_status_active' } },
     { key: { orgIds: 1 }, options: { name: 'idx_users_orgIds' } }
   ],
+  chatConversations: [
+    { key: { id: 1 }, options: { name: 'idx_chat_conversations_id' } },
+    { key: { 'participants.userId': 1, lastMessageAt: -1 }, options: { name: 'idx_chat_conversations_participant_last_message' } }
+  ],
   sections: [
     { key: { id: 1 }, options: { name: 'idx_sections_id' } },
     { key: { name: 1 }, options: { name: 'idx_sections_name' } },

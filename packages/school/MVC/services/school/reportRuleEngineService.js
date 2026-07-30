@@ -110,6 +110,17 @@ function createHelperSet() {
     ifelse(condition, whenTrue, whenFalse = '') {
       return condition ? whenTrue : whenFalse;
     },
+    avg(...args) {
+      const values = args
+        .filter((value) => value !== undefined && value !== null && String(value).trim() !== '')
+        .map((value) => Number(value))
+        .filter(Number.isFinite);
+      if (!values.length) return '';
+      return values.reduce((sum, value) => sum + value, 0) / values.length;
+    },
+    concat(...args) {
+      return args.map((value) => (value === undefined || value === null ? '' : String(value))).join('');
+    },
     caseof(value, ...branches) {
       if (branches.length === 0) return value;
       const hasDefault = branches.length % 2 === 1;
@@ -355,6 +366,50 @@ function parseExpressionAst(expression) {
   return ast;
 }
 
+function validateExpressionSymbols(expression, {
+  additionalHelpers = [],
+  allowedRoots = ['value', 'answers', 'prefill', 'sources']
+} = {}) {
+  const ast = parseExpressionAst(expression);
+  const helpers = new Set([...Object.keys(HELPERS), ...(additionalHelpers || []).map(String)]);
+  const roots = new Set([
+    'true',
+    'false',
+    'null',
+    'undefined',
+    ...(allowedRoots || []).map(String)
+  ]);
+  function visit(node) {
+    if (!node || node.type === 'literal') return;
+    if (node.type === 'path') {
+      const root = String(node.path?.[0] || '');
+      if (!roots.has(root)) throw new Error(`Unknown identifier "${root}".`);
+      return;
+    }
+    if (node.type === 'call') {
+      if (!Array.isArray(node.path) || node.path.length !== 1) {
+        throw new Error('Only direct helper calls are allowed.');
+      }
+      const helper = String(node.path[0] || '');
+      if (!helpers.has(helper)) throw new Error(`Unknown helper "${helper}".`);
+      (node.args || []).forEach(visit);
+      return;
+    }
+    if (node.type === 'unary') {
+      visit(node.arg);
+      return;
+    }
+    if (node.type === 'binary') {
+      visit(node.left);
+      visit(node.right);
+      return;
+    }
+    throw new Error('Unsupported AST node.');
+  }
+  visit(ast);
+  return true;
+}
+
 function resolvePath(path, context) {
   const root = path[0];
   if (root === 'true') return true;
@@ -384,6 +439,18 @@ function evalAst(node, context) {
       throw new Error('Only direct helper calls are allowed.');
     }
     const fnName = node.path[0];
+    if (fnName === 'source') {
+      const args = node.args.map((arg) => evalAst(arg, context));
+      if (args.length !== 2) throw new Error('source() requires a slot key and source key.');
+      const slotKey = String(args[0] ?? '').trim().toUpperCase();
+      const sourceKey = String(args[1] ?? '').trim();
+      if (!slotKey || !sourceKey) throw new Error('source() requires non-empty slot and key arguments.');
+      const slotValues = context?.sources && typeof context.sources === 'object'
+        ? context.sources[slotKey]
+        : null;
+      if (!slotValues || typeof slotValues !== 'object') return undefined;
+      return slotValues[sourceKey];
+    }
     const fn = HELPERS[fnName];
     if (typeof fn !== 'function') throw new Error(`Unknown helper "${fnName}".`);
     const args = node.args.map((arg) => evalAst(arg, context));
@@ -428,7 +495,8 @@ function evaluateSafeExpression(expression, context = {}) {
   const localContext = {
     value: context.value,
     answers: context.answers && typeof context.answers === 'object' ? context.answers : {},
-    prefill: context.prefill && typeof context.prefill === 'object' ? context.prefill : {}
+    prefill: context.prefill && typeof context.prefill === 'object' ? context.prefill : {},
+    sources: context.sources && typeof context.sources === 'object' ? context.sources : {}
   };
   return evalAst(ast, localContext);
 }
@@ -919,6 +987,7 @@ module.exports = {
   buildCalculatedFieldPlan,
   recomputeCalculatedAnswers,
   validateExpressionSyntax,
+  validateExpressionSymbols,
   validateCalculatedFieldExpressions,
   evaluateSafeExpression,
   evaluateFieldValidations,

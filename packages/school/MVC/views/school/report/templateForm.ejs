@@ -1,6 +1,22 @@
 <%
   const isEdit = !!(template && template.id);
   const sourceTemplateForCopy = (typeof copySourceTemplate !== 'undefined' && copySourceTemplate) ? copySourceTemplate : null;
+  const scopeDefinitions = typeof reportScopeDefinitions !== 'undefined'
+    && Array.isArray(reportScopeDefinitions)
+    && reportScopeDefinitions.length
+    ? reportScopeDefinitions
+    : [
+      { value: 'class', label: 'Whole Class' },
+      { value: 'each_student', label: 'Each Student' },
+      { value: 'selected_students', label: 'Specific Students' }
+    ];
+  const availableFunderPickerOptions = typeof funderPickerOptions !== 'undefined'
+    && Array.isArray(funderPickerOptions)
+    ? funderPickerOptions
+    : [];
+  const initialAllowedReportScopes = Array.isArray(template?.allowedReportScopes) && template.allowedReportScopes.length
+    ? template.allowedReportScopes.map((scope) => String(scope || '').trim().toLowerCase())
+    : scopeDefinitions.map((scope) => scope.value);
   const initialFields = Array.isArray(template?.schema?.fields) && template.schema.fields.length
     ? template.schema.fields
     : [
@@ -66,6 +82,7 @@
     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
     <input type="hidden" name="schemaJson" id="schemaJsonInput">
     <input type="hidden" name="placeholderMapJson" id="placeholderMapJsonInput">
+    <input type="hidden" name="allowedReportScopesPresent" value="true">
     <% if (!isEdit && sourceTemplateForCopy?.id) { %>
       <input type="hidden" name="copySourceTemplateId" value="<%= sourceTemplateForCopy.id %>">
     <% } %>
@@ -94,6 +111,26 @@
             </select>
           </div>
           <div class="col-12">
+            <fieldset>
+              <legend class="form-label fw-bold mb-2">Approved Report Scopes</legend>
+              <div class="d-flex flex-wrap gap-3" id="allowedReportScopesGroup">
+                <% scopeDefinitions.forEach((scope) => { %>
+                  <div class="form-check">
+                    <input
+                      class="form-check-input approved-report-scope"
+                      type="checkbox"
+                      name="allowedReportScopes"
+                      id="allowedReportScope_<%= scope.value %>"
+                      value="<%= scope.value %>"
+                      <%= initialAllowedReportScopes.includes(scope.value) ? 'checked' : '' %>>
+                    <label class="form-check-label" for="allowedReportScope_<%= scope.value %>"><%= scope.label %></label>
+                  </div>
+                <% }); %>
+              </div>
+              <div class="form-text">Assignments using this template can only select the checked scopes.</div>
+            </fieldset>
+          </div>
+          <div class="col-12">
             <label class="form-label fw-bold">Description</label>
             <textarea name="description" class="form-control" rows="2" maxlength="4000"><%= template?.description || '' %></textarea>
           </div>
@@ -104,7 +141,7 @@
               <div class="d-flex flex-wrap gap-2 align-items-center">
                 <select id="funderDocxPicker" class="form-select form-select-sm" style="min-width: 220px;">
                   <option value="">Add funder…</option>
-                  <% (funderPickerOptions || []).forEach((opt) => { %>
+                  <% availableFunderPickerOptions.forEach((opt) => { %>
                     <option value="<%= opt.id %>" data-label="<%= opt.label %>"><%= opt.label %></option>
                   <% }); %>
                 </select>
@@ -761,6 +798,7 @@
     const clearFieldEditorBackgroundColorBtn = document.getElementById('btnFieldEditorClearBackgroundColor');
     const saveFieldEditorBtn = document.getElementById('btnSaveFieldEditor');
     const form = document.getElementById('templateForm');
+    const approvedReportScopeInputs = Array.from(form.querySelectorAll('.approved-report-scope'));
     const schemaJsonInput = document.getElementById('schemaJsonInput');
     const placeholderMapJsonInput = document.getElementById('placeholderMapJsonInput');
     const schemaVersionInput = document.getElementById('schemaVersionInput');
@@ -2154,6 +2192,14 @@ num(value) <= 95</code></pre>
     btnExportPrefillCsv?.addEventListener('click', () => exportPrefillRows('csv'));
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (!approvedReportScopeInputs.some((input) => input.checked)) {
+        showReportModal({
+          title: 'Report Scope Required',
+          icon: 'warning',
+          message: 'Select at least one approved report scope before saving the template.'
+        });
+        return;
+      }
       const payload = collect();
       if (!payload.schema.fields.length) {
         showReportModal({ title: 'Field Required', icon: 'warning', message: 'Add at least one field before saving the template.' });

@@ -1640,6 +1640,12 @@
         },
         {
           "id": "446103"
+        },
+        {
+          "id": "446104"
+        },
+        {
+          "id": "446105"
         }
       ],
       "related": [],
@@ -1740,6 +1746,58 @@
           "sessionTime": 15,
           "active": true
         }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446104",
+      "name": "SCHOOL_REPORTS_OVERALL_TEMPLATE",
+      "category": "SCHOOL",
+      "description": "Design overall report templates from completed report sources.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/reports/overall-templates",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446105",
+      "name": "SCHOOL_REPORTS_OVERALL_INSTANCES",
+      "category": "SCHOOL",
+      "description": "Create, edit, submit, lock, and export snapshot-based overall reports.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/reports/overall-reports",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
       ],
       "subsections": [],
       "related": [],
@@ -3362,6 +3420,30 @@
       "adoptExisting": true
     },
     {
+      "id": "SYM_SYSTEM_129",
+      "name": "SCHOOL_REPORTS_OVERALL_TEMPLATE",
+      "type": "class",
+      "value": "bi bi-files",
+      "tags": [
+        "SCHOOL_REPORTS_OVERALL_TEMPLATE",
+        "446104"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_130",
+      "name": "SCHOOL_REPORTS_OVERALL_INSTANCES",
+      "type": "class",
+      "value": "bi bi-file-earmark-check",
+      "tags": [
+        "SCHOOL_REPORTS_OVERALL_INSTANCES",
+        "446105"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
       "id": "SYM_SYSTEM_125",
       "name": "SCHOOL_REPORTS_TEMPLATE",
       "type": "class",
@@ -4225,6 +4307,28 @@
               "maxSessionDurationMinutes": null,
               "maxFetchUploadVolumeKB": null
             }
+          ]
+        },
+        {
+          "sectionId": "446104",
+          "adminAccess": false,
+          "operations": [
+            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1004", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+          ]
+        },
+        {
+          "sectionId": "446105",
+          "adminAccess": false,
+          "operations": [
+            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1012", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
           ]
         },
         {
@@ -5545,6 +5649,28 @@
           ]
         },
         {
+          "sectionId": "446104",
+          "adminAccess": false,
+          "operations": [
+            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1004", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+          ]
+        },
+        {
+          "sectionId": "446105",
+          "adminAccess": false,
+          "operations": [
+            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1012", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+          ]
+        },
+        {
           "sectionId": "445562",
           "adminAccess": false,
           "operations": [
@@ -6787,6 +6913,28 @@
           ]
         },
         {
+          "sectionId": "446104",
+          "adminAccess": false,
+          "operations": [
+            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1004", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+          ]
+        },
+        {
+          "sectionId": "446105",
+          "adminAccess": false,
+          "operations": [
+            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
+            { "operationId": "OP1012", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+          ]
+        },
+        {
           "sectionId": "445562",
           "adminAccess": false,
           "operations": [
@@ -7627,6 +7775,14 @@
       "label": "Report Templates"
     },
     {
+      "entityType": "overallReportTemplates",
+      "label": "Overall Report Templates"
+    },
+    {
+      "entityType": "overallReportInstances",
+      "label": "Overall Report Instances"
+    },
+    {
       "entityType": "sessionStatuses",
       "label": "Session Statuses"
     },
@@ -7729,7 +7885,12 @@
   "dataSchemas": [],
   "upgradeGuards": [],
   "quotaDefinitions": [],
-  "mongoIndexes": [],
+  "mongoIndexes": [
+    {
+      "path": "config/mongoIndexes.js",
+      "active": true
+    }
+  ],
   "settings": [],
   "menuEntries": [
     {

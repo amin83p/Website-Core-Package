@@ -25,7 +25,9 @@ const SECTION_HREFS = Object.freeze({
   reports: {
     template: (id) => `/school/reports/templates/edit/${encodeURIComponent(id)}`,
     assignment: (id) => `/school/reports/assignments/edit/${encodeURIComponent(id)}`,
-    instance: (id) => `/school/reports/instances/edit-v2/${encodeURIComponent(id)}`
+    instance: (id) => `/school/reports/instances/edit-v2/${encodeURIComponent(id)}`,
+    overallTemplate: (id) => `/school/reports/overall-templates/edit/${encodeURIComponent(id)}`,
+    overallInstance: (id) => `/school/reports/overall-reports/edit/${encodeURIComponent(id)}`
   },
   timesheets: (periodId, teacherId) => {
     const params = new URLSearchParams();
@@ -991,7 +993,8 @@ const ENTITY_DEFINITIONS = Object.freeze({
     labelFields: ['name', 'title', 'code'],
     fieldRules: [
       { type: 'fieldMatch', code: 'REPORT_ASSIGNMENT', entityType: 'reportAssignments', field: 'templateId', label: 'Report Assignments', section: 'reports', sectionHref: SECTION_HREFS.reports.assignment },
-      { type: 'fieldMatch', code: 'REPORT_INSTANCE', entityType: 'reportInstances', field: 'templateId', label: 'Report Instances', section: 'reports', sectionHref: SECTION_HREFS.reports.instance }
+      { type: 'fieldMatch', code: 'REPORT_INSTANCE', entityType: 'reportInstances', field: 'templateId', label: 'Report Instances', section: 'reports', sectionHref: SECTION_HREFS.reports.instance },
+      { type: 'fieldMatch', code: 'OVERALL_REPORT_TEMPLATE_SOURCE', entityType: 'overallReportTemplates', field: 'sourceSlots.templateId', label: 'Overall Report Templates', section: 'reports', sectionHref: SECTION_HREFS.reports.overallTemplate }
     ]
   },
 
@@ -1021,6 +1024,26 @@ const ENTITY_DEFINITIONS = Object.freeze({
   reportInstance: {
     entityKey: 'reportInstance',
     repositoryKey: 'reportInstances',
+    deleteMode: 'hard',
+    labelFields: ['title', 'name', 'id'],
+    fieldRules: [
+      { type: 'fieldMatch', code: 'OVERALL_REPORT_SOURCE_INSTANCE', entityType: 'overallReportInstances', field: 'sourceSelections.instanceId', label: 'Overall Reports', section: 'reports', sectionHref: SECTION_HREFS.reports.overallInstance }
+    ]
+  },
+
+  overallReportTemplate: {
+    entityKey: 'overallReportTemplate',
+    repositoryKey: 'overallReportTemplates',
+    deleteMode: 'hard',
+    labelFields: ['title', 'name', 'id'],
+    fieldRules: [
+      { type: 'fieldMatch', code: 'OVERALL_REPORT_INSTANCE', entityType: 'overallReportInstances', field: 'overallTemplateId', label: 'Overall Reports', section: 'reports', sectionHref: SECTION_HREFS.reports.overallInstance }
+    ]
+  },
+
+  overallReportInstance: {
+    entityKey: 'overallReportInstance',
+    repositoryKey: 'overallReportInstances',
     deleteMode: 'hard',
     labelFields: ['title', 'name', 'id'],
     fieldRules: []
@@ -1390,6 +1413,8 @@ const REPOSITORY_KEY_TO_ENTITY_KEY = Object.freeze({
   reportTemplates: 'reportTemplate',
   reportAssignments: 'reportAssignment',
   reportInstances: 'reportInstance',
+  overallReportTemplates: 'overallReportTemplate',
+  overallReportInstances: 'overallReportInstance',
   timesheetPeriods: 'timesheetPeriod',
   activities: 'activity',
   activityCategories: 'activityCategory',

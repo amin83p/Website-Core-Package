@@ -1,8 +1,13 @@
 const chatModel = require('../models/chatModel');
-const { toPublicId, idsEqual } = require('../utils/idAdapter');
+const { toPublicId } = require('../utils/idAdapter');
 const { assertQueryableCrudRepository } = require('./contracts/crudRepositoryContract');
 const { runByRepositoryBackend } = require('./backend/repositoryBackendSelector');
 const { getMongoCollection } = require('../infrastructure/mongo/mongoConnection');
+const {
+  normalizeMessage,
+  normalizeConversation,
+  buildUnreadSummary
+} = require('../services/chatUnreadStateService');
 const {
   buildMongoFilterFromQuery,
   buildMongoSortFromQuery,
@@ -45,7 +50,15 @@ async function listMongoConversations(options = {}) {
   if (skip > 0) cursor = cursor.skip(skip);
   if (limit > 0) cursor = cursor.limit(limit);
   const rows = await cursor.toArray();
-  return rows.map(normalizeMongoDocument).filter(Boolean);
+  return rows
+    .map(normalizeMongoDocument)
+    .filter(Boolean)
+    .map(normalizeConversation);
+}
+
+function normalizeChatDocument(row) {
+  const normalized = normalizeMongoDocument(row);
+  return normalized ? normalizeConversation(normalized) : null;
 }
 
 const chatRepository = {
@@ -91,7 +104,9 @@ const chatRepository = {
   async getById(id, options = {}) {
     return runByRepositoryBackend(options, {
       json: async () => chatModel.getConversationById(id),
-      mongo: async () => normalizeMongoDocument(await getMongoCollection('chatConversations').findOne(resolveMongoIdFilter(id)))
+      mongo: async () => normalizeChatDocument(
+        await getMongoCollection('chatConversations').findOne(resolveMongoIdFilter(id))
+      )
     }, 'core.chat.getById');
   },
 
@@ -106,16 +121,29 @@ const chatRepository = {
         const userIds = Array.isArray(data?.userIds) ? data.userIds.map((id) => toPublicId(id)).filter(Boolean) : [];
         if (!userIds.length) throw new Error('Conversation participants are required.');
         const collection = getMongoCollection('chatConversations');
+        const now = new Date().toISOString();
         const payload = {
           ...(data || {}),
+          type: String(data?.type || 'direct'),
           participants: Array.isArray(data?.participants)
-            ? data.participants
-            : userIds.map((id) => ({ userId: id })),
-          messages: Array.isArray(data?.messages) ? data.messages : []
+            ? data.participants.map((participant) => ({
+                ...(participant || {}),
+                userId: toPublicId(participant?.userId),
+                lastRead: participant?.lastRead || now,
+                unreadCount: 0
+              }))
+            : userIds.map((id) => ({ userId: id, lastRead: now, unreadCount: 0 })),
+          messages: Array.isArray(data?.messages)
+            ? data.messages.map((message) => normalizeMessage(message))
+            : [],
+          lastMessage: data?.lastMessage ? normalizeMessage(data.lastMessage) : null,
+          totalMessages: Array.isArray(data?.messages) ? data.messages.length : 0,
+          createdAt: data?.createdAt || now,
+          updatedAt: data?.updatedAt || now
         };
         payload.id = await generateUniqueStringId(collection, payload.id);
         await collection.insertOne(payload);
-        return normalizeMongoDocument(payload);
+        return normalizeChatDocument(payload);
       }
     }, 'core.chat.create');
   },
@@ -131,7 +159,7 @@ const chatRepository = {
         merged.id = toPublicId(existing?.id || existing?._id);
         const { _id, ...toSet } = merged;
         await collection.updateOne({ _id: existing._id }, { $set: toSet });
-        return normalizeMongoDocument(await collection.findOne({ _id: existing._id }));
+        return normalizeChatDocument(await collection.findOne({ _id: existing._id }));
       }
     }, 'core.chat.update');
   },
@@ -148,7 +176,9 @@ const chatRepository = {
       json: async () => chatModel.getMessages(convId),
       mongo: async () => {
         const row = await getMongoCollection('chatConversations').findOne(resolveMongoIdFilter(convId), { projection: { messages: 1 } });
-        return Array.isArray(row?.messages) ? row.messages : [];
+        return Array.isArray(row?.messages)
+          ? row.messages.map((message) => normalizeMessage(message))
+          : [];
       }
     }, 'core.chat.getMessages');
   },
@@ -158,23 +188,103 @@ const chatRepository = {
       json: async () => chatModel.addMessage(convId, senderId, content, type, fileUrl),
       mongo: async () => {
         const collection = getMongoCollection('chatConversations');
-        const row = await collection.findOne(resolveMongoIdFilter(convId));
-        if (!row) throw new Error('Conversation not found');
+        const timestamp = new Date().toISOString();
+        const senderKey = toPublicId(senderId);
         const message = {
-          id: await generateUniqueStringId(collection, null, { min: 1000000, max: 9999999 }),
-          senderId: toPublicId(senderId),
+          id: `MSG_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          senderId: senderKey,
           content: String(content || ''),
           type: String(type || 'text'),
           fileUrl: fileUrl || null,
           status: 'sent',
-          sentAt: new Date().toISOString()
+          timestamp
         };
-        const messages = Array.isArray(row.messages) ? [...row.messages, message] : [message];
-        await collection.updateOne(
-          { _id: row._id },
-          { $set: { messages, lastMessageAt: message.sentAt, updatedAt: message.sentAt } }
+        const existingMessages = {
+          $cond: [{ $isArray: '$messages' }, '$messages', []]
+        };
+        const existingParticipants = {
+          $cond: [{ $isArray: '$participants' }, '$participants', []]
+        };
+        const participantIsSender = {
+          $eq: [
+            {
+              $convert: {
+                input: '$$participant.userId',
+                to: 'string',
+                onError: '',
+                onNull: ''
+              }
+            },
+            senderKey
+          ]
+        };
+        const result = await collection.updateOne(
+          resolveMongoIdFilter(convId),
+          [{
+            $set: {
+              messages: {
+                $concatArrays: [existingMessages, { $literal: [message] }]
+              },
+              participants: {
+                $map: {
+                  input: existingParticipants,
+                  as: 'participant',
+                  in: {
+                    $mergeObjects: [
+                      '$$participant',
+                      {
+                        unreadCount: {
+                          $cond: [
+                            participantIsSender,
+                            0,
+                            {
+                              $add: [
+                                {
+                                  $convert: {
+                                    input: '$$participant.unreadCount',
+                                    to: 'int',
+                                    onError: 0,
+                                    onNull: 0
+                                  }
+                                },
+                                1
+                              ]
+                            }
+                          ]
+                        },
+                        lastRead: {
+                          $cond: [
+                            participantIsSender,
+                            timestamp,
+                            '$$participant.lastRead'
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              lastMessage: {
+                $literal: {
+                  content: message.type === 'image'
+                    ? 'Image'
+                    : (message.type === 'file' ? 'File' : message.content),
+                  senderId: senderKey,
+                  timestamp,
+                  status: 'sent',
+                  type: message.type
+                }
+              },
+              lastMessageAt: timestamp,
+              totalMessages: {
+                $add: [{ $size: existingMessages }, 1]
+              },
+              updatedAt: timestamp
+            }
+          }]
         );
-        return message;
+        if (!result?.matchedCount) throw new Error('Conversation not found');
+        return normalizeMessage(message);
       }
     }, 'core.chat.addMessage');
   },
@@ -184,15 +294,63 @@ const chatRepository = {
       json: async () => chatModel.setLastRead(convId, userId),
       mongo: async () => {
         const collection = getMongoCollection('chatConversations');
-        const row = await collection.findOne(resolveMongoIdFilter(convId));
-        if (!row) throw new Error('Conversation not found');
-        const reads = Array.isArray(row.lastRead) ? [...row.lastRead] : [];
         const key = toPublicId(userId);
-        const idx = reads.findIndex((item) => idsEqual(item?.userId, key));
         const stamp = new Date().toISOString();
-        if (idx >= 0) reads[idx] = { ...reads[idx], userId: key, at: stamp };
-        else reads.push({ userId: key, at: stamp });
-        await collection.updateOne({ _id: row._id }, { $set: { lastRead: reads, updatedAt: stamp } });
+        const participantIsUser = {
+          $eq: [
+            {
+              $convert: {
+                input: '$$participant.userId',
+                to: 'string',
+                onError: '',
+                onNull: ''
+              }
+            },
+            key
+          ]
+        };
+        const result = await collection.updateOne(
+          resolveMongoIdFilter(convId),
+          [{
+            $set: {
+              participants: {
+                $map: {
+                  input: {
+                    $cond: [{ $isArray: '$participants' }, '$participants', []]
+                  },
+                  as: 'participant',
+                  in: {
+                    $cond: [
+                      participantIsUser,
+                      {
+                        $mergeObjects: [
+                          '$$participant',
+                          { lastRead: stamp, unreadCount: 0 }
+                        ]
+                      },
+                      {
+                        $mergeObjects: [
+                          '$$participant',
+                          {
+                            unreadCount: {
+                              $convert: {
+                                input: '$$participant.unreadCount',
+                                to: 'int',
+                                onError: 0,
+                                onNull: 0
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }]
+        );
+        if (!result?.matchedCount) throw new Error('Conversation not found');
         return true;
       }
     }, 'core.chat.setLastRead');
@@ -203,16 +361,57 @@ const chatRepository = {
       json: async () => chatModel.updateMessageStatus(convId, messageId, newStatus),
       mongo: async () => {
         const collection = getMongoCollection('chatConversations');
-        const row = await collection.findOne(resolveMongoIdFilter(convId));
-        if (!row) throw new Error('Conversation not found');
-        const messages = Array.isArray(row.messages) ? [...row.messages] : [];
-        const idx = messages.findIndex((m) => idsEqual(m?.id, messageId));
-        if (idx < 0) throw new Error('Message not found');
-        messages[idx] = { ...messages[idx], status: String(newStatus || '').trim() || 'sent' };
-        await collection.updateOne({ _id: row._id }, { $set: { messages, updatedAt: new Date().toISOString() } });
-        return messages[idx];
+        const normalizedMessageId = toPublicId(messageId);
+        const messageIdCandidates = [normalizedMessageId];
+        if (/^\d+$/.test(normalizedMessageId)) {
+          messageIdCandidates.push(Number(normalizedMessageId));
+        }
+        const status = String(newStatus || '').trim() || 'sent';
+        const stamp = new Date().toISOString();
+        const result = await collection.updateOne(
+          {
+            ...resolveMongoIdFilter(convId),
+            'messages.id': { $in: messageIdCandidates }
+          },
+          {
+            $set: {
+              'messages.$[message].status': status,
+              updatedAt: stamp
+            }
+          },
+          {
+            arrayFilters: [{
+              'message.id': { $in: messageIdCandidates }
+            }]
+          }
+        );
+        if (!result?.matchedCount) throw new Error('Message not found');
+        return normalizeMessage({
+          id: normalizedMessageId,
+          status,
+          timestamp: stamp
+        });
       }
     }, 'core.chat.updateMessageStatus');
+  },
+
+  async getUnreadSummaryForUser(userId, options = {}) {
+    return runByRepositoryBackend(options, {
+      json: async () => chatModel.getUnreadSummaryForUser(userId),
+      mongo: async () => {
+        const userKey = toPublicId(userId);
+        const rows = await getMongoCollection('chatConversations')
+          .find(
+            { 'participants.userId': userKey },
+            { projection: { id: 1, participants: 1 } }
+          )
+          .toArray();
+        return buildUnreadSummary(
+          rows.map(normalizeChatDocument).filter(Boolean),
+          userKey
+        );
+      }
+    }, 'core.chat.getUnreadSummaryForUser');
   },
 
   async getConversationsForUser(userId, query = {}) {

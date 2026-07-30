@@ -1,0 +1,38 @@
+<div class="sections-page">
+  <div class="d-flex justify-content-between align-items-start mb-4">
+    <div><h1 class="page-heading size-md m-0 text-start" style="padding-left:0;"><i class="bi bi-file-earmark-plus me-2"></i><%= title %></h1><div class="text-muted"><%= template.title %> &middot; v<%= Number(template.version || 1) %></div></div>
+    <a href="/school/reports/overall-templates" class="btn btn-outline-secondary btn-sm">Back</a>
+  </div>
+  <form method="POST" action="/school/reports/overall-reports/new/<%= encodeURIComponent(template.id) %>">
+    <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+    <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+      <label class="form-label fw-bold">Overall report name</label>
+      <input class="form-control" name="title" maxlength="240" placeholder="<%= template.title %> - <%= new Date().toISOString().slice(0,10) %>">
+    </div></div>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0 fw-bold">Completed Source Reports</h5><div class="small text-muted">Only submitted or locked reports matching each source slot are available.</div></div>
+      <div class="card-body">
+        <% (template.sourceSlots || []).forEach((slot) => { const rows=instancesBySlot?.[slot.slotKey] || []; %>
+          <div class="mb-3">
+            <label class="form-label fw-bold"><span class="badge bg-primary me-2"><%= slot.slotKey %></span><%= slot.templateId %></label>
+            <select class="form-select" name="sourceInstance_<%= slot.slotKey %>" required>
+              <option value="">Select a completed report...</option>
+              <% rows.forEach((row) => { const student=row.prefillSnapshot?.student_full_name || row.prefillSnapshot?.student_name || row.studentId || 'Whole class'; %>
+                <option value="<%= row.id %>"><%= student %> | <%= row.id %> | <%= row.status %></option>
+              <% }); %>
+            </select>
+            <% if (!rows.length) { %><div class="form-text text-danger">No submitted or locked instances are available for this template.</div><% } %>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+      <label class="form-label fw-bold">Output Word template</label>
+      <select class="form-select" name="selectedDocxKey" required>
+        <% (docxOptions || []).forEach((option) => { %><option value="<%= option.key %>"><%= option.label %> &middot; <%= option.fileName %></option><% }); %>
+      </select>
+      <% if (!docxOptions?.length) { %><div class="form-text text-danger">This overall template has no Word file configured.</div><% } %>
+    </div></div>
+    <div class="d-flex justify-content-end gap-2"><a href="/school/reports/overall-templates" class="btn btn-outline-secondary">Cancel</a><button class="btn btn-primary" type="submit" <%= !docxOptions?.length ? 'disabled' : '' %>>Create Snapshot Report</button></div>
+  </form>
+</div>

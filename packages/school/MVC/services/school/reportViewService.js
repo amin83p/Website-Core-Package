@@ -12,6 +12,7 @@ const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkServi
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const reportFunderDocxService = require('./reportFunderDocxService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
+const reportScopePolicy = require('./reportScopePolicy');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function isSchoolReportAdminViewer(reqUser) {
@@ -372,9 +373,11 @@ function inferAssignmentTargetType(row) {
 }
 
 function inferAssignmentReportScope(row) {
-  const explicit = String(row?.reportScope || '').trim().toLowerCase();
-  if (reportAssignmentModel.ASSIGNMENT_REPORT_SCOPES?.includes(explicit)) return explicit;
-  return 'class';
+  try {
+    return reportScopePolicy.normalizeReportScope(row?.reportScope);
+  } catch (_) {
+    return 'class';
+  }
 }
 
 function getClassStudentIds(classData, sessions = []) {
@@ -744,7 +747,8 @@ function mapReportInstanceParticipantFields({
 }
 
 async function listAllReportTemplates(reqUser) {
-  return await schoolDataService.fetchData('reportTemplates', {}, reqUser);
+  const rows = await schoolDataService.fetchData('reportTemplates', {}, reqUser);
+  return (Array.isArray(rows) ? rows : []).map(reportScopePolicy.withResolvedAllowedReportScopes);
 }
 
 async function listAllReportAssignments(reqUser) {
@@ -880,6 +884,10 @@ function buildTemplateSavePayload({
   uploadedFile,
   uploadedFiles = []
 }) {
+  const submittedAllowedScopes = body.allowedReportScopes === undefined
+    && String(body.allowedReportScopesPresent || '').trim()
+    ? []
+    : body.allowedReportScopes;
   const payload = {
     orgId: existingTemplate?.orgId || activeOrgId,
     type: String(body.type || '').trim().toLowerCase(),
@@ -887,6 +895,7 @@ function buildTemplateSavePayload({
     title: String(body.title || '').trim(),
     status: String(body.status || 'draft').trim().toLowerCase(),
     description: String(body.description || '').trim(),
+    allowedReportScopes: reportScopePolicy.normalizeAllowedReportScopes(submittedAllowedScopes),
     schema: buildSchemaFromBuilderPayload(body),
     placeholderMap: buildPlaceholderMapFromPayload(body),
     audit: {
@@ -1129,7 +1138,8 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
     buildPersonNameMap(reqUser)
   ]);
 
-  const templates = filterRecordsByOrg(allTemplates, reqUser).filter((row) => row.status !== 'archived');
+  const orgTemplates = filterRecordsByOrg(allTemplates, reqUser);
+  const templates = orgTemplates.filter((row) => row.status !== 'archived');
   const selectedClassId = String(requestedClassId || assignment?.classId || '').trim();
   const selectedClass = classes.find((row) => idsEqual(row.id, selectedClassId)) || null;
   const sessionsRaw = selectedClassId
@@ -1142,7 +1152,7 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
   });
 
   const selectedTemplateId = String(assignment?.templateId || '').trim();
-  const selectedTemplate = templates.find((tpl) => idsEqual(tpl.id, selectedTemplateId)) || null;
+  const selectedTemplate = orgTemplates.find((tpl) => idsEqual(tpl.id, selectedTemplateId)) || null;
 
   const selectedSessionIds = [];
   const selectedDateTargets = [];
@@ -1212,6 +1222,9 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
     selectedClassTitle: selectedClass?.title || '',
     selectedTemplateId,
     selectedTemplateTitle: selectedTemplate?.title || '',
+    selectedTemplateAllowedReportScopes: selectedTemplate
+      ? reportScopePolicy.resolveAllowedReportScopes(selectedTemplate)
+      : [],
     selectedSessionIds,
     selectedDateTargets,
     selectedTaskStartTime,

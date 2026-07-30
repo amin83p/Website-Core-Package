@@ -16,6 +16,7 @@ const reportRuleEngineService = require('../../services/school/reportRuleEngineS
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
+const reportScopePolicy = require('../../services/school/reportScopePolicy');
 const sessionConductService = require('../../services/school/sessionConductService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
@@ -356,6 +357,26 @@ async function showHome(req, res) {
         buttonLabel: 'Open Templates'
       },
       {
+        title: 'Overall Report Templates',
+        description: 'Design consolidated reports from two or more completed report templates.',
+        href: '/school/reports/overall-templates',
+        sectionId: SECTIONS.SCHOOL_REPORTS_OVERALL_TEMPLATE,
+        icon: 'bi-files',
+        subtleClass: 'bg-info-subtle text-info',
+        buttonClass: 'btn btn-info text-dark',
+        buttonLabel: 'Open Overall Templates'
+      },
+      {
+        title: 'Overall Reports',
+        description: 'Create, review, submit, lock, and export snapshot-based consolidated reports.',
+        href: '/school/reports/overall-reports',
+        sectionId: SECTIONS.SCHOOL_REPORTS_OVERALL_INSTANCES,
+        icon: 'bi-file-earmark-check',
+        subtleClass: 'bg-danger-subtle text-danger',
+        buttonClass: 'btn btn-danger',
+        buttonLabel: 'Open Overall Reports'
+      },
+      {
         title: 'Assignments',
         description: `Assign reports to classes/sessions. Total assignments: ${Number(summary?.assignmentCount || 0)}.`,
         href: '/school/reports/assignments',
@@ -404,7 +425,9 @@ async function showHome(req, res) {
 async function listTemplates(req, res) {
   try {
     const q = String(req.query.q || '').trim().toLowerCase();
-    const allTemplates = await schoolDataService.fetchData('reportTemplates', {}, req.user);
+    const templateRows = await schoolDataService.fetchData('reportTemplates', {}, req.user);
+    const allTemplates = (Array.isArray(templateRows) ? templateRows : [])
+      .map(reportScopePolicy.withResolvedAllowedReportScopes);
 
     const filtered = allTemplates
       .filter((row) => {
@@ -423,6 +446,7 @@ async function listTemplates(req, res) {
       title: 'Report Templates',
       tableName: 'Report_Templates',
       data,
+      reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
       newUrl: 'school/reports/templates',
       newLabel: 'Add Template',
       pagination,
@@ -473,7 +497,8 @@ function buildCopiedTemplateDraft(sourceTemplate = {}, templates = [], activeOrg
     schema: clonePlainValue(sourceTemplate?.schema, { version: 1, fields: [] }),
     placeholderMap: clonePlainValue(sourceTemplate?.placeholderMap, {}),
     docxTemplate: clonePlainValue(sourceTemplate?.docxTemplate, null),
-    docxTemplatesByFunder: clonePlainValue(sourceTemplate?.docxTemplatesByFunder, [])
+    docxTemplatesByFunder: clonePlainValue(sourceTemplate?.docxTemplatesByFunder, []),
+    allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(sourceTemplate)
   };
 }
 async function showTemplateForm(req, res) {
@@ -499,6 +524,7 @@ async function showTemplateForm(req, res) {
       funderPickerOptions,
       fieldTypes: reportTemplateModel.FIELD_TYPES,
       templateStatuses: reportTemplateModel.TEMPLATE_STATUSES,
+      reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
       prefillCatalog: reportService.getPrefillCatalog(),
       includeModal: true,
       user: req.user,
@@ -528,6 +554,7 @@ async function showTemplateCopyForm(req, res) {
       funderPickerOptions,
       fieldTypes: reportTemplateModel.FIELD_TYPES,
       templateStatuses: reportTemplateModel.TEMPLATE_STATUSES,
+      reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
       prefillCatalog: reportService.getPrefillCatalog(),
       includeModal: true,
       user: req.user,
@@ -594,6 +621,11 @@ async function saveTemplate(req, res) {
     }
 
     if (isEdit) {
+      await reportIntegrityService.assertTemplateScopeChangeCompatible({
+        templateId: id,
+        nextAllowedReportScopes: payload.allowedReportScopes,
+        reqUser: req.user
+      });
       await schoolDataService.updateData('reportTemplates', id, payload, req.user);
     } else {
       await schoolDataService.addData('reportTemplates', payload, req.user);
@@ -715,7 +747,8 @@ async function showAssignmentForm(req, res) {
       title: isEdit ? 'Edit Report Assignment' : 'New Report Assignment',
       assignment,
       ...formContext,
-      assignmentReportScopes: reportAssignmentModel.ASSIGNMENT_REPORT_SCOPES || ['class', 'each_student', 'selected_students'],
+      assignmentReportScopes: reportScopePolicy.REPORT_SCOPES,
+      reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
       assignmentStatuses: reportAssignmentModel.ASSIGNMENT_STATUSES,
       includeModal: true,
       user: req.user,

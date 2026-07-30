@@ -37,6 +37,8 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   reportTemplates: { repository: schoolRepositories.reportTemplates },
   reportAssignments: { repository: schoolRepositories.reportAssignments },
   reportInstances: { repository: schoolRepositories.reportInstances },
+  overallReportTemplates: { repository: schoolRepositories.overallReportTemplates },
+  overallReportInstances: { repository: schoolRepositories.overallReportInstances },
   examTemplates: { repository: schoolRepositories.examTemplates },
   examRevisions: { repository: schoolRepositories.examRevisions },
   examQuestions: { repository: schoolRepositories.examQuestions },
@@ -300,6 +302,28 @@ const schoolDataService = {
       });
     }
 
+    if (normalizedType === 'overallReportInstances'
+      && Array.isArray(currentForLock?.generatedDocs)
+      && currentForLock.generatedDocs.length > 0) {
+      const now = new Date().toISOString();
+      const archived = await config.repository.update(id, {
+        status: 'archived',
+        revision: Math.max(1, Number(currentForLock.revision || 1) || 1) + 1,
+        audit: {
+          ...(currentForLock.audit || {}),
+          lastUpdateUser: toPublicId(requestingUser?.id),
+          lastUpdateDateTime: now,
+          archivedAt: now
+        }
+      }, { ...options, requestingUser });
+      recordTransactionOperation(options, {
+        type: 'update',
+        entityType: normalizedType,
+        id: toPublicId(id)
+      });
+      return archived;
+    }
+
     let result;
     if (isVoidPolicy(normalizedType)) {
       result = await config.repository.update(id, buildVoidPatch(
@@ -429,6 +453,8 @@ const schoolDataService = {
   getAccessibleReportTemplates: async (requestingUser) => schoolDataService.fetchData('reportTemplates', {}, requestingUser),
   getAccessibleReportAssignments: async (requestingUser) => schoolDataService.fetchData('reportAssignments', {}, requestingUser),
   getAccessibleReportInstances: async (requestingUser) => schoolDataService.fetchData('reportInstances', {}, requestingUser),
+  getAccessibleOverallReportTemplates: async (requestingUser) => schoolDataService.fetchData('overallReportTemplates', {}, requestingUser),
+  getAccessibleOverallReportInstances: async (requestingUser) => schoolDataService.fetchData('overallReportInstances', {}, requestingUser),
   getAccessibleExamTemplates: async (requestingUser) => schoolDataService.fetchData('examTemplates', {}, requestingUser),
   getAccessibleExamRevisions: async (requestingUser) => schoolDataService.fetchData('examRevisions', {}, requestingUser),
   getAccessibleExamQuestions: async (requestingUser) => schoolDataService.fetchData('examQuestions', {}, requestingUser),

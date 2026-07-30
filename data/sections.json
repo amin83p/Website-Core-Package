@@ -3049,6 +3049,12 @@
       },
       {
         "id": "446103"
+      },
+      {
+        "id": "446104"
+      },
+      {
+        "id": "446105"
       }
     ],
     "related": [],
@@ -3779,6 +3785,68 @@
       "lastUpdateDateTime": "2026-04-09T04:30:43.028Z"
     },
     "id": "446103",
+    "navigatorSection": false,
+    "mainDashboardDisplay": false
+  },
+  {
+    "name": "SCHOOL_REPORTS_OVERALL_TEMPLATE",
+    "category": "SCHOOL",
+    "description": "Design overall report templates from completed report sources.",
+    "homeURL": "/school/reports/overall-templates",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-07-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-07-30T00:00:00.000Z"
+    },
+    "id": "446104",
+    "navigatorSection": false,
+    "mainDashboardDisplay": false
+  },
+  {
+    "name": "SCHOOL_REPORTS_OVERALL_INSTANCES",
+    "category": "SCHOOL",
+    "description": "Create, edit, submit, lock, and export snapshot-based overall reports.",
+    "homeURL": "/school/reports/overall-reports",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-07-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-07-30T00:00:00.000Z"
+    },
+    "id": "446105",
     "navigatorSection": false,
     "mainDashboardDisplay": false
   },

@@ -2523,5 +2523,29 @@
     ],
     "orgId": "SYSTEM",
     "adoptExisting": true
+  },
+  {
+    "id": "SYM_SYSTEM_129",
+    "name": "SCHOOL_REPORTS_OVERALL_TEMPLATE",
+    "type": "class",
+    "value": "bi bi-files",
+    "tags": [
+      "SCHOOL_REPORTS_OVERALL_TEMPLATE",
+      "446104"
+    ],
+    "orgId": "SYSTEM",
+    "adoptExisting": true
+  },
+  {
+    "id": "SYM_SYSTEM_130",
+    "name": "SCHOOL_REPORTS_OVERALL_INSTANCES",
+    "type": "class",
+    "value": "bi bi-file-earmark-check",
+    "tags": [
+      "SCHOOL_REPORTS_OVERALL_INSTANCES",
+      "446105"
+    ],
+    "orgId": "SYSTEM",
+    "adoptExisting": true
   }
 ]

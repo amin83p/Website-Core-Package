@@ -6,7 +6,42 @@ const chatAccessService = require('./chatAccessService');
 const { OPERATIONS } = require('../../config/accessConstants');
 
 let io;
-const onlineUsers = new Map(); // Maps userId -> socketId
+const onlineUsers = new Map(); // Maps userId -> Set<socketId>
+
+function getUserRoom(userId) {
+    return `chat:user:${String(userId || '').trim()}`;
+}
+
+function trackOnlineSocket(userId, socketId) {
+    const key = String(userId || '').trim();
+    if (!key) return;
+    const sockets = onlineUsers.get(key) || new Set();
+    sockets.add(socketId);
+    onlineUsers.set(key, sockets);
+}
+
+function untrackOnlineSocket(userId, socketId) {
+    const key = String(userId || '').trim();
+    const sockets = onlineUsers.get(key);
+    if (!sockets) return;
+    sockets.delete(socketId);
+    if (sockets.size === 0) onlineUsers.delete(key);
+}
+
+async function getUnreadPayload(userId, convId) {
+    const summary = await chatRepository.getUnreadSummaryForUser(userId);
+    return {
+        convId: String(convId || ''),
+        unreadCount: Number(summary?.byConversation?.[String(convId)]) || 0,
+        totalUnread: Number(summary?.totalUnread) || 0
+    };
+}
+
+async function emitUnreadState(userId, convId) {
+    const payload = await getUnreadPayload(userId, convId);
+    io.to(getUserRoom(userId)).emit('unread_state', payload);
+    return payload;
+}
 
 function parseCookies(cookieHeader = '') {
     const out = {};
@@ -90,12 +125,14 @@ function init(server) {
     io.use(authenticateSocket);
 
     io.on('connection', (socket) => {
-        onlineUsers.set(socket.userId, socket.id);
+        trackOnlineSocket(socket.userId, socket.id);
+        socket.join(getUserRoom(socket.userId));
         console.log('Chat client connected:', socket.id, 'user:', socket.userId);
 
         // Legacy clients still emit identify; ignore the supplied user id to prevent spoofing.
         socket.on('identify', () => {
-            onlineUsers.set(socket.userId, socket.id);
+            trackOnlineSocket(socket.userId, socket.id);
+            socket.join(getUserRoom(socket.userId));
         });
 
         socket.on('join_room', async (convId) => {
@@ -140,10 +177,26 @@ function init(server) {
                     realMsg: savedMsg
                 });
 
-                socket.to(String(data.convId)).emit('new_message', {
-                    convId: data.convId,
-                    message: savedMsg
-                });
+                const recipients = (Array.isArray(access.conversation?.participants)
+                    ? access.conversation.participants
+                    : [])
+                    .map((participant) => String(participant?.userId || '').trim())
+                    .filter((userId) => userId && userId !== String(socket.userId));
+
+                await Promise.all([...new Set(recipients)].map(async (recipientId) => {
+                    let unread = null;
+                    try {
+                        unread = await getUnreadPayload(recipientId, data.convId);
+                    } catch (summaryError) {
+                        console.error('Socket Unread Summary Error:', summaryError);
+                    }
+                    io.to(getUserRoom(recipientId)).emit('new_message', {
+                        convId: String(data.convId),
+                        message: savedMsg,
+                        unreadCount: unread?.unreadCount,
+                        totalUnread: unread?.totalUnread
+                    });
+                }));
             } catch (err) {
                 console.error('Socket Message Error:', err);
                 emitChatError(socket, 'Failed to send message.');
@@ -177,8 +230,37 @@ function init(server) {
                 if (!access.allowed) return;
                 await chatRepository.updateMessageStatus(data.convId, data.messageId, 'read');
                 socket.to(String(data.convId)).emit('status_update', { messageId: data.messageId, status: 'read' });
+                if (chatAccessService.conversationHasParticipant(access.conversation, socket.userId)) {
+                    await chatRepository.setLastRead(data.convId, socket.userId);
+                    await emitUnreadState(socket.userId, data.convId);
+                }
             } catch (error) {
                 console.error('Socket Read Status Error:', error);
+            }
+        });
+
+        socket.on('mark_conversation_read', async (data = {}) => {
+            try {
+                const access = await loadConversationForSocket(
+                    socket,
+                    data.convId,
+                    [OPERATIONS.READ, OPERATIONS.READ_ALL],
+                    false
+                );
+                if (!access.allowed) return;
+                if (!chatAccessService.conversationHasParticipant(access.conversation, socket.userId)) return;
+
+                await chatRepository.setLastRead(data.convId, socket.userId);
+                if (data.messageId) {
+                    await chatRepository.updateMessageStatus(data.convId, data.messageId, 'read');
+                    socket.to(String(data.convId)).emit('status_update', {
+                        messageId: data.messageId,
+                        status: 'read'
+                    });
+                }
+                await emitUnreadState(socket.userId, data.convId);
+            } catch (error) {
+                console.error('Socket Conversation Read Error:', error);
             }
         });
 
@@ -200,7 +282,7 @@ function init(server) {
         });
 
         socket.on('disconnect', () => {
-            if (socket.userId) onlineUsers.delete(socket.userId);
+            if (socket.userId) untrackOnlineSocket(socket.userId, socket.id);
         });
     });
 

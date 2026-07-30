@@ -13,6 +13,7 @@ const { OPERATIONS } = require('../../config/accessConstants');
 const uploadMiddleware = require('../middleware/upload');
 const fileAssetStorage = require('../services/fileAssetStorageService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
+const { normalizeUnreadCount } = require('../services/chatUnreadStateService');
 
 /* ==========================================================================
    HELPERS
@@ -116,7 +117,7 @@ async function enrichConversations(conversations, currentUserId, requestingUser,
                 : (updateAccess?.reason || 'Your access profile does not allow sending chat messages.'));
         
         const myPart = c.participants.find(p => idsEqual(p.userId, currentUserId));
-        const unreadCount = myPart ? (myPart.unreadCount || 0) : 0;
+        const unreadCount = normalizeUnreadCount(myPart?.unreadCount);
 
         return {
             ...c,
@@ -309,7 +310,11 @@ exports.getInbox = async (req, res) => {
             chatAccessService.canUseChatOperation(req.user, OPERATIONS.UPDATE, req.ip)
         ]);
         const enriched = await enrichConversations(rawConvs, req.user.id, req.user, updateAccess);
-        res.json({ status: 'success', data: enriched });
+        const totalUnread = enriched.reduce(
+            (sum, conversation) => sum + normalizeUnreadCount(conversation?.unreadCount),
+            0
+        );
+        res.json({ status: 'success', data: enriched, totalUnread });
     } catch (err) {
         res.status(500).json({ status: 'error', message: err.message });
     }

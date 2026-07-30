@@ -4,6 +4,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const reportScopePolicy = require('../../services/school/reportScopePolicy');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/reportAssignments.json');
 
@@ -13,7 +14,7 @@ if (!fsSync.existsSync(dataPath)) {
 
 const ASSIGNMENT_STATUSES = new Set(['active', 'inactive', 'archived']);
 const ASSIGNMENT_TARGET_TYPES = new Set(['session', 'date']);
-const ASSIGNMENT_REPORT_SCOPES = new Set(['class', 'each_student', 'selected_students']);
+const ASSIGNMENT_REPORT_SCOPES = new Set(reportScopePolicy.REPORT_SCOPES);
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -337,8 +338,14 @@ function sanitizeAssignment(input, { isUpdate = false, existing = null } = {}) {
     ])]
   );
   if (!teacherIds.length) throw new Error('Select at least one teacher for assignment.');
-  const reportScope = cleanString(input.reportScope, { max: 40, allowEmpty: true }).toLowerCase() || 'class';
-  if (!ASSIGNMENT_REPORT_SCOPES.has(reportScope)) throw new Error('Invalid assignment report scope.');
+  let reportScope;
+  try {
+    reportScope = reportScopePolicy.normalizeReportScope(
+      cleanString(input.reportScope, { max: 40, allowEmpty: true })
+    );
+  } catch (_) {
+    throw new Error('Invalid assignment report scope.');
+  }
   const targetStudentIds = sanitizeStudentIds(input.targetStudentIds);
   if (reportScope === 'selected_students' && !targetStudentIds.length) {
     throw new Error('Select at least one student for "specific students" scope.');

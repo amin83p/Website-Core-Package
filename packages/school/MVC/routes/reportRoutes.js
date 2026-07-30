@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/school/reportController');
+const overallCtrl = require('../controllers/school/overallReportController');
 const { requireCoreModule } = require('../services/school/schoolCoreContracts');
 const upload = requireCoreModule('MVC/middleware/upload');
 const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
@@ -15,6 +16,8 @@ const REPORT_NAV_SECTION = SECTIONS.SCHOOL_REPORTS;
 const REPORT_TEMPLATE_SECTION = SECTIONS.SCHOOL_REPORTS_TEMPLATE;
 const REPORT_ASSIGNMENT_SECTION = SECTIONS.SCHOOL_REPORTS_ASSIGNMENT;
 const REPORT_INSTANCE_SECTION = SECTIONS.SCHOOL_REPORTS_INSTANCES;
+const OVERALL_REPORT_TEMPLATE_SECTION = SECTIONS.SCHOOL_REPORTS_OVERALL_TEMPLATE;
+const OVERALL_REPORT_INSTANCE_SECTION = SECTIONS.SCHOOL_REPORTS_OVERALL_INSTANCES;
 const reportAssignmentMutationActionState = {
   requireToken: true,
   allowOperationTokenFallback: true,
@@ -216,6 +219,135 @@ router.delete('/templates/delete/:id',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.DELETE),
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.DELETE, { requireToken: true }),
   ctrl.deleteTemplate);
+
+// Overall Report Templates
+router.get('/overall-templates',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ_ALL),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ_ALL),
+  overallCtrl.listTemplates);
+
+router.get('/overall-templates/source-templates',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  overallCtrl.sourceTemplates);
+
+router.get('/overall-templates/new',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
+  overallCtrl.showTemplateForm);
+
+router.post('/overall-templates/new',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
+  upload('school-reports').any(),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, reportTemplateCreateActionState),
+  overallCtrl.saveTemplate);
+
+router.get('/overall-templates/edit/:id',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
+  overallCtrl.showTemplateForm);
+
+router.post('/overall-templates/edit/:id',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
+  upload('school-reports').any(),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
+  overallCtrl.saveTemplate);
+
+router.get('/overall-templates/delete/:id',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.DELETE),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.DELETE),
+  overallCtrl.deleteTemplate);
+
+router.delete('/overall-templates/delete/:id',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.DELETE),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.DELETE, { requireToken: true }),
+  overallCtrl.deleteTemplate);
+
+// Snapshot-based Overall Reports
+router.get('/overall-reports',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
+  overallCtrl.listOverallReports);
+
+router.get('/overall-reports/new/:templateId',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
+  overallCtrl.showCreateOverallReport);
+
+router.post('/overall-reports/new/:templateId',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE, { requireToken: true }),
+  overallCtrl.createOverallReport);
+
+router.get('/overall-reports/edit/:id',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  overallCtrl.showOverallReportEditor);
+
+router.post('/overall-reports/edit/:id',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
+  overallCtrl.saveOverallReport);
+
+router.get('/overall-reports/:id/source-update-preview',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { keepActive: true }),
+  overallCtrl.sourceUpdatePreview);
+
+router.post('/overall-reports/:id/source-update-apply',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallCtrl.sourceUpdateApply);
+
+router.post('/overall-reports/:id/reset-override',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallCtrl.resetDerivedOverride);
+
+['submit', 'lock', 'reopen', 'unlock', 'archive'].forEach((action) => {
+  router.post(`/overall-reports/:id/${action}`,
+    requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+    trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+      requireToken: true,
+      keepActive: true,
+      allowOperationTokenFallback: true,
+      allowInactiveTokenFallback: true
+    }),
+    (req, res, next) => {
+      req.params.action = action;
+      return overallCtrl.lifecycle(req, res, next);
+    });
+});
+
+router.get('/overall-reports/:id/export-preview',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT, { keepActive: true }),
+  overallCtrl.exportPreview);
+
+router.post('/overall-reports/:id/export',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  overallCtrl.exportDocx);
+
+router.get('/overall-reports/delete/:id',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.DELETE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.DELETE),
+  overallCtrl.deleteOverallReport);
+
+router.delete('/overall-reports/delete/:id',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.DELETE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.DELETE, { requireToken: true }),
+  overallCtrl.deleteOverallReport);
 
 // Assignments
 router.get('/assignments',

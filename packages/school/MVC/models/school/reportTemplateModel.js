@@ -6,6 +6,7 @@ const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const { normalizePrefillKey } = require('../../services/school/reportPrefillKeyUtils');
+const reportScopePolicy = require('../../services/school/reportScopePolicy');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/reportTemplates.json');
 
@@ -314,6 +315,7 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
     title,
     status,
     description: cleanString(input.description, { max: 4000, allowEmpty: true }),
+    allowedReportScopes: reportScopePolicy.normalizeAllowedReportScopes(input.allowedReportScopes),
     schema,
     placeholderMap,
     docxTemplate: sanitizeDocxTemplate(input.docxTemplate) || sanitizeDocxTemplate(existing?.docxTemplate),
@@ -431,6 +433,8 @@ async function deleteTemplate(id) {
 module.exports = {
   TEMPLATE_STATUSES: Object.freeze([...TEMPLATE_STATUSES]),
   FIELD_TYPES: Object.freeze([...FIELD_TYPES]),
+  REPORT_SCOPES: reportScopePolicy.REPORT_SCOPES,
+  REPORT_SCOPE_DEFINITIONS: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
   sanitizeDocxTemplate,
   sanitizeDocxTemplatesByFunder,
   sanitizeTemplate,

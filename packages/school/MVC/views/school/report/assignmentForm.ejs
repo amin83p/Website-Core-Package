@@ -13,6 +13,23 @@
   const classLastSessionDate = sessionDatesForBounds[sessionDatesForBounds.length - 1] || '';
   const classLabel = selectedClassTitle || selectedClassId || '';
   const templateLabel = selectedTemplateTitle || selectedTemplateId || '';
+  const initialTemplateAllowedReportScopes = typeof selectedTemplateAllowedReportScopes !== 'undefined'
+    && Array.isArray(selectedTemplateAllowedReportScopes)
+    ? selectedTemplateAllowedReportScopes
+    : [];
+  const initialSelectedReportScope = String(selectedReportScope || assignment?.reportScope || 'class');
+  const assignmentScopeDefinitions = typeof reportScopeDefinitions !== 'undefined'
+    && Array.isArray(reportScopeDefinitions)
+    && reportScopeDefinitions.length
+    ? reportScopeDefinitions
+    : [
+      { value: 'class', label: 'Whole Class' },
+      { value: 'each_student', label: 'Each Student' },
+      { value: 'selected_students', label: 'Specific Students' }
+    ];
+  const availableAssignmentReportScopes = Array.isArray(assignmentReportScopes)
+    ? assignmentReportScopes
+    : assignmentScopeDefinitions.map((scope) => scope.value);
 %>
 <div class="sections-page">
   <div class="row g-2 align-items-start mb-4">
@@ -68,15 +85,21 @@
 
           <div class="col-md-4">
             <label class="form-label fw-bold">Report Scope</label>
-            <select class="form-select" id="reportScopeInput" name="reportScope">
-              <% (assignmentReportScopes || ['class', 'each_student', 'selected_students']).forEach((scope) => { %>
-                <% const selectedScope = String(selectedReportScope || assignment?.reportScope || 'class'); %>
-                <option value="<%= scope %>" <%= selectedScope === scope ? 'selected' : '' %>>
-                  <%= scope === 'class' ? 'Whole Class' : (scope === 'each_student' ? 'Each Student' : 'Specific Students') %>
+            <select class="form-select" id="reportScopeInput" name="reportScope" required <%= selectedTemplateId ? '' : 'disabled' %>>
+              <option value="" <%= initialSelectedReportScope ? '' : 'selected' %> disabled>Select report scope...</option>
+              <% assignmentScopeDefinitions
+                .filter((definition) => availableAssignmentReportScopes.includes(definition.value))
+                .forEach((definition) => { const scope = definition.value; %>
+                <% const isInitiallyAllowed = initialTemplateAllowedReportScopes.includes(scope); %>
+                <option
+                  value="<%= scope %>"
+                  <%= initialSelectedReportScope === scope ? 'selected' : '' %>
+                  <%= selectedTemplateId && !isInitiallyAllowed ? 'disabled' : '' %>>
+                  <%= definition.label %>
                 </option>
               <% }); %>
             </select>
-            <div class="form-text">Choose whether reports are filled for class or student targets.</div>
+            <div class="form-text" id="reportScopeHelp">Select a template to see its approved report scopes.</div>
           </div>
 
           <div class="col-md-8" id="specificStudentsSection">
@@ -398,6 +421,7 @@
     const dateTargetsInput = document.getElementById('dateTargetsJson');
     const targetStudentIdsInput = document.getElementById('targetStudentIdsJson');
     const reportScopeInput = document.getElementById('reportScopeInput');
+    const reportScopeHelp = document.getElementById('reportScopeHelp');
     const targetStudentSummaryInput = document.getElementById('targetStudentSummaryInput');
     const selectedStudentsContainer = document.getElementById('selectedStudentsContainer');
     const specificStudentsSection = document.getElementById('specificStudentsSection');
@@ -434,6 +458,12 @@
     const teacherOptions = <%- JSON.stringify(teacherOptions || []) %>;
     const classFirstSessionDate = <%- JSON.stringify(classFirstSessionDate) %>;
     const classLastSessionDate = <%- JSON.stringify(classLastSessionDate) %>;
+    const reportScopeDefinitions = <%- JSON.stringify(assignmentScopeDefinitions) %>;
+    const canonicalReportScopes = reportScopeDefinitions.map((scope) => scope.value);
+    const reportScopeLabels = Object.fromEntries(
+      reportScopeDefinitions.map((scope) => [scope.value, scope.label])
+    );
+    let selectedTemplateAllowedReportScopes = <%- JSON.stringify(initialTemplateAllowedReportScopes) %>;
     const firstTeacherId = <%- JSON.stringify(firstTeacherId) %>;
     const isEditAssignment = <%= isEdit ? 'true' : 'false' %>;
     const assignmentId = <%- JSON.stringify(assignment?.id || '') %>;
@@ -1386,21 +1416,53 @@
     }
 
     function applyScopeState() {
-      const scope = String(reportScopeInput?.value || 'class').trim().toLowerCase();
+      const scope = String(reportScopeInput?.value || '').trim().toLowerCase();
       const useSpecificStudents = scope === 'selected_students';
       specificStudentsSection.classList.toggle('opacity-50', !useSpecificStudents);
       targetStudentSummaryInput.disabled = !useSpecificStudents;
       document.getElementById('btnOpenStudentPicker').disabled = !useSpecificStudents;
-      scopeStudentHint.textContent = scope === 'each_student'
+      scopeStudentHint.textContent = !scope
+        ? 'Select an approved report scope.'
+        : (scope === 'each_student'
         ? 'Each student in this class will receive a separate report instance.'
         : (scope === 'class'
           ? 'One report instance will be used for the whole class.'
-          : 'Pick one or more students for this assignment.');
+          : 'Pick one or more students for this assignment.'));
       if (!useSpecificStudents) {
         selectedTargetStudentIds = [];
         renderSelectedStudents();
       }
       updateHiddenFields();
+    }
+
+    function normalizeTemplateAllowedScopes(value) {
+      if (!Array.isArray(value)) return [...canonicalReportScopes];
+      const selected = new Set(value.map((scope) => String(scope || '').trim().toLowerCase()));
+      return canonicalReportScopes.filter((scope) => selected.has(scope));
+    }
+
+    function applyTemplateScopePolicy() {
+      const hasTemplate = Boolean(String(templateIdInput?.value || '').trim());
+      const allowedScopes = hasTemplate
+        ? normalizeTemplateAllowedScopes(selectedTemplateAllowedReportScopes)
+        : [];
+      reportScopeInput.disabled = !hasTemplate;
+
+      Array.from(reportScopeInput.options).forEach((option) => {
+        const value = String(option.value || '').trim();
+        if (!value) return;
+        option.disabled = !hasTemplate || !allowedScopes.includes(value);
+      });
+
+      const currentScope = String(reportScopeInput.value || '').trim().toLowerCase();
+      if (hasTemplate && !allowedScopes.includes(currentScope)) {
+        reportScopeInput.value = allowedScopes.length === 1 ? allowedScopes[0] : '';
+      }
+
+      reportScopeHelp.textContent = !hasTemplate
+        ? 'Select a template to see its approved report scopes.'
+        : `Approved by this template: ${allowedScopes.map((scope) => reportScopeLabels[scope] || scope).join(', ')}.`;
+      applyScopeState();
     }
 
     function reloadForClass(classId) {
@@ -1439,6 +1501,8 @@
           templateIdInput.value = id;
           const version = Number(item?.version || 1);
           templateTitleInput.value = `${item?.title || id} | ${item?.type || '-'} v${version}`;
+          selectedTemplateAllowedReportScopes = normalizeTemplateAllowedScopes(item?.allowedReportScopes);
+          applyTemplateScopePolicy();
         }
       }));
     });
@@ -1494,6 +1558,7 @@
 
       const classId = String(classIdInput.value || '').trim();
       const templateId = String(templateIdInput.value || '').trim();
+      const reportScope = String(reportScopeInput?.value || '').trim().toLowerCase();
       if (!classId) {
         await showReportModal({ title: 'Class Required', icon: 'warning', message: 'Select a class.' });
         return;
@@ -1502,12 +1567,20 @@
         await showReportModal({ title: 'Template Required', icon: 'warning', message: 'Select a template.' });
         return;
       }
+      if (!reportScope || !normalizeTemplateAllowedScopes(selectedTemplateAllowedReportScopes).includes(reportScope)) {
+        await showReportModal({
+          title: 'Report Scope Required',
+          icon: 'warning',
+          message: 'Select a report scope approved by the selected template.'
+        });
+        return;
+      }
       targetRows = targetRows.map(normalizeTargetRow);
       if (!targetRows.length) {
         await showReportModal({ title: 'Target Rows Required', icon: 'warning', message: 'Add at least one report target row.' });
         return;
       }
-      if (String(reportScopeInput?.value || 'class').trim().toLowerCase() === 'selected_students' && !selectedTargetStudentIds.length) {
+      if (reportScope === 'selected_students' && !selectedTargetStudentIds.length) {
         await showReportModal({ title: 'Student Required', icon: 'warning', message: 'Select at least one student for the specific students scope.' });
         return;
       }
@@ -1600,6 +1673,6 @@
 
     renderSelectedStudents();
     renderTargetRows();
-    applyScopeState();
+    applyTemplateScopePolicy();
   })();
 </script>

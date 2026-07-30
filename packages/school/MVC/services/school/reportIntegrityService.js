@@ -8,12 +8,15 @@ const {
   canBypassOrgScope
 } = require('./schoolDataScopeBuilder');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
+const reportScopePolicy = require('./reportScopePolicy');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function inferAssignmentReportScope(row) {
-  const explicit = String(row?.reportScope || '').trim().toLowerCase();
-  if (['class', 'each_student', 'selected_students'].includes(explicit)) return explicit;
-  return 'class';
+  try {
+    return reportScopePolicy.normalizeReportScope(row?.reportScope);
+  } catch (_) {
+    return 'class';
+  }
 }
 
 function normalizeDateOnly(value) {
@@ -493,6 +496,39 @@ const reportIntegrityService = {
     return assignment;
   },
 
+  async assertTemplateScopeChangeCompatible({
+    templateId,
+    nextAllowedReportScopes,
+    reqUser
+  }) {
+    const template = await assertTemplateAccessible(templateId, reqUser);
+    const currentScopes = reportScopePolicy.resolveAllowedReportScopes(template);
+    const nextScopes = reportScopePolicy.normalizeAllowedReportScopes(nextAllowedReportScopes);
+    const removedScopes = currentScopes.filter((scope) => !nextScopes.includes(scope));
+    if (!removedScopes.length) return { removedScopes: [], conflicts: [] };
+
+    const assignments = await schoolDataService.fetchData('reportAssignments', {
+      templateId__eq: templateId
+    }, reqUser);
+    const conflicts = (Array.isArray(assignments) ? assignments : [])
+      .filter((assignment) => idsEqual(assignment?.templateId, templateId))
+      .filter((assignment) => removedScopes.includes(inferAssignmentReportScope(assignment)));
+    if (!conflicts.length) return { removedScopes, conflicts: [] };
+
+    const preview = conflicts.slice(0, 10).map((assignment) => {
+      const scope = inferAssignmentReportScope(assignment);
+      return `${String(assignment?.id || 'unknown')} (${reportScopePolicy.getReportScopeLabel(scope)})`;
+    });
+    const remaining = conflicts.length - preview.length;
+    const scopeLabels = removedScopes.map(reportScopePolicy.getReportScopeLabel).join(', ');
+    throw new Error(
+      `Cannot remove approved report scope${removedScopes.length === 1 ? '' : 's'} ${scopeLabels}. ` +
+      `${conflicts.length} existing assignment${conflicts.length === 1 ? '' : 's'} use ` +
+      `${removedScopes.length === 1 ? 'this scope' : 'these scopes'}: ${preview.join(', ')}` +
+      `${remaining > 0 ? `, and ${remaining} more` : ''}.`
+    );
+  },
+
   async validateAssignmentCrossEntityContext({
     classId,
     templateId,
@@ -519,8 +555,14 @@ const reportIntegrityService = {
 
     if (!classData) throw new Error('Class not found or inaccessible.');
 
-    if (!['class', 'each_student', 'selected_students'].includes(String(reportScope || ''))) {
+    if (!reportScopePolicy.REPORT_SCOPES.includes(String(reportScope || ''))) {
       throw new Error('Invalid report scope.');
+    }
+    const allowedReportScopes = reportScopePolicy.resolveAllowedReportScopes(template);
+    if (!allowedReportScopes.includes(String(reportScope || ''))) {
+      throw new Error(
+        `"${reportScopePolicy.getReportScopeLabel(reportScope)}" is not approved for the selected report template.`
+      );
     }
 
     const effectiveTargetRows = Array.isArray(targetRows) && targetRows.length
