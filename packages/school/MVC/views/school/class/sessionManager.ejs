@@ -41,16 +41,22 @@
         line-height: 1.25;
     }
     .conduct-rating-cell {
-        min-width: 7.5rem;
-        max-width: 9.5rem;
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: nowrap;
+        gap: 0.25rem;
+        min-width: 0;
         margin: 0 auto;
     }
     .conduct-emoji-picker {
         display: flex;
         justify-content: center;
         gap: 0.2rem;
-        flex-wrap: wrap;
-        margin-bottom: 0.35rem;
+        flex-wrap: nowrap;
+        flex: 0 0 auto;
+        margin-bottom: 0;
     }
     .conduct-emoji-btn,
     .conduct-code-btn {
@@ -90,12 +96,67 @@
         min-width: 2.4rem;
     }
     .conduct-percent-input {
-        max-width: 5.5rem;
-        margin: 0 auto;
+        max-width: 3.75rem;
+        flex: 0 0 auto;
+        margin: 0;
         text-align: center;
         font-size: 0.75rem;
         font-weight: 600;
         border-radius: 8px;
+    }
+    #conductTable .conduct-code-btn,
+    #conductBulkRatingTable .conduct-code-btn,
+    #optionalConductTable .conduct-code-btn {
+        min-width: 1.9rem;
+        height: 1.85rem;
+        padding: 0 0.25rem;
+        font-size: 0.68rem;
+    }
+    #conductTable .conduct-code-btn[data-code="NA"],
+    #conductBulkRatingTable .conduct-code-btn[data-code="NA"],
+    #optionalConductTable .conduct-code-btn[data-code="NA"] {
+        min-width: 2.15rem;
+        font-size: 0.64rem;
+    }
+    #conductTable tbody tr,
+    #conductBulkRatingTable tbody tr,
+    #optionalConductTable tbody tr {
+        white-space: nowrap;
+    }
+    #conductTable td,
+    #conductBulkRatingTable td,
+    #optionalConductTable td {
+        vertical-align: middle;
+    }
+    #conductTable th:not(:first-child),
+    #conductTable td:not(:first-child),
+    #conductBulkRatingTable th:not(:first-child),
+    #conductBulkRatingTable td:not(:first-child),
+    #optionalConductTable th:not(:first-child),
+    #optionalConductTable td:not(:first-child) {
+        border-left: 1px solid #e2e8f0;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    #conductTable .conduct-rating-cell,
+    #conductBulkRatingTable .conduct-rating-cell,
+    #optionalConductTable .conduct-rating-cell {
+        padding: 0.15rem 0.25rem;
+    }
+    .conduct-bulk-cell {
+        display: inline-flex;
+        justify-content: center;
+    }
+    .conduct-column-actions {
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: center;
+        gap: 0.15rem;
+        margin-top: 0.25rem;
+    }
+    .conduct-bulk-modal-dialog {
+        max-width: min(96vw, 1400px);
+        width: 96vw;
     }
     .conduct-legend-chip {
         display: inline-flex;
@@ -879,6 +940,37 @@
     .session-panel.active { display: block; }
     .session-inactive-workspace .session-panel { display: none !important; }
     @keyframes sessionPanelIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .session-report-workflow-progress {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .session-report-workflow-step {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #94a3b8;
+    }
+    .session-report-workflow-step.is-active { color: #0d6efd; }
+    .session-report-workflow-step.is-complete { color: #198754; }
+    .session-report-workflow-step.is-locked { color: #94a3b8; opacity: 0.7; }
+    .session-report-workflow-divider {
+        color: #cbd5e1;
+        font-size: 0.75rem;
+        user-select: none;
+    }
+    .session-report-workflow-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 0.75rem;
+        padding: 0.25rem 0.25rem 0;
+    }
 
     .session-placeholder-card {
         border: 2px dashed #e2e8f0;
@@ -1756,11 +1848,26 @@
             </div>
             <div class="session-panel" id="session-panel-assignments" role="tabpanel">
                 <% if (hasSessionReportsAssigned) { %>
-                <div class="card border-0 shadow-sm mb-3" id="sessionReportConductStep">
+                <div class="card border-0 shadow-sm mb-3" id="sessionReportWorkflowToolbar">
+                    <div class="card-body py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="session-report-workflow-progress" id="sessionReportWorkflowProgress" aria-label="Report workflow progress">
+                            <span class="session-report-workflow-step" id="sessionReportWorkflowStep1Label" data-workflow-step="1"><i class="bi bi-1-circle"></i>Class Conduct</span>
+                            <span class="session-report-workflow-divider" aria-hidden="true">→</span>
+                            <span class="session-report-workflow-step" id="sessionReportWorkflowStep2Label" data-workflow-step="2"><i class="bi bi-2-circle"></i>Report instances</span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 flex-shrink-0">
+                            <% if (canAssignSessionReports) { %>
+                                <button type="button" class="btn btn-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
+                            <% } %>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card border-0 shadow-sm mb-3<%= conductReadyForReports ? ' d-none' : '' %>" id="sessionReportConductStep">
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
                         <div>
                             <h5 class="m-0 fw-bold text-primary"><i class="bi bi-1-circle me-2"></i>Step 1 — Class Conduct</h5>
-                            <div class="conduct-rating-help mt-1">Complete class conduct for this session before filling reports. Early Class Conduct ratings are prefilled when available; other students default to <strong>N/A</strong>. Use <strong>S</strong>, <strong>Sat</strong>, <strong>NI</strong>, <strong>U</strong>, or <strong>N/A</strong>.</div>
+                            <div class="conduct-rating-help mt-1">Rate every student, then save to unlock report filling. Early Class Conduct ratings are prefilled when available; other students default to <strong>N/A</strong>. Use <strong>S</strong>, <strong>Sat</strong>, <strong>NI</strong>, <strong>U</strong>, or <strong>N/A</strong>.</div>
                             <div class="d-flex flex-wrap gap-2 mt-2">
                                 <% conductPickerLevels.forEach((level) => { %>
                                     <span class="conduct-legend-chip" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>">
@@ -1822,23 +1929,25 @@
                 </div>
                 <% } %>
 
-                <div class="card border-0 shadow-sm" id="sessionReportInstancesStep">
+                <div class="card border-0 shadow-sm<%= (hasSessionReportsAssigned && !conductReadyForReports) ? ' d-none' : '' %>" id="sessionReportInstancesStep">
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
                         <div>
                             <h5 class="m-0 fw-bold text-primary"><i class="bi bi-<%= hasSessionReportsAssigned ? '2-circle' : 'clipboard-check' %> me-2"></i><%= hasSessionReportsAssigned ? 'Step 2 — ' : '' %>Report instances</h5>
                             <div class="small text-muted mt-1">
                                 <% if (hasSessionReportsAssigned) { %>
-                                    Fill reports after class conduct is saved. Use <strong>Fill Reports</strong> for the student matrix, or open an individual report when needed.
+                                    Fill reports for this session. Use <strong>Fill Reports</strong> for the student matrix, or open an individual report when needed. Use <strong>Previous step</strong> below to edit class conduct ratings.
                                 <% } else { %>
                                     Assign a report to this session to unlock class conduct and report filling.
                                 <% } %>
                             </div>
                         </div>
                         <div class="d-flex flex-wrap gap-2 flex-shrink-0">
-                            <% if (canAssignSessionReports) { %>
-                                <button type="button" class="btn btn-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
+                            <% if (!hasSessionReportsAssigned) { %>
+                                <% if (canAssignSessionReports) { %>
+                                    <button type="button" class="btn btn-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
+                                <% } %>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
                             <% } %>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
                         </div>
                     </div>
                     <div class="card-body p-0">
@@ -1860,6 +1969,12 @@
                         </div>
                     </div>
                 </div>
+                <% if (hasSessionReportsAssigned) { %>
+                <div class="session-report-workflow-nav" id="sessionReportWorkflowNav" aria-label="Report workflow navigation">
+                    <button type="button" class="btn btn-outline-secondary" id="btnReportWorkflowPrevious"><i class="bi bi-arrow-left me-1"></i>Previous step</button>
+                    <button type="button" class="btn btn-primary" id="btnReportWorkflowNext">Next step<i class="bi bi-arrow-right ms-1"></i></button>
+                </div>
+                <% } %>
             </div>
             <div class="session-panel" id="session-panel-student-cases" role="tabpanel">
                 <div class="card border-0 shadow-sm">
@@ -1911,7 +2026,7 @@
 </div>
 
 <div class="modal fade" id="conductBulkRatingModal" tabindex="-1" aria-labelledby="conductBulkRatingModalTitle" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-scrollable conduct-bulk-modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title fw-bold" id="conductBulkRatingModalTitle"><i class="bi bi-lightning-charge me-2"></i>Quick rate conduct</h5>
@@ -2620,6 +2735,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;
     let sessionConductReadyForReports = <%- jsonForScript(Boolean(conductReadyForReports)) %>;
     const sessionHasReportsForConduct = <%- jsonForScript(Boolean(hasSessionReportsAssigned)) %>;
+    let currentReportWorkflowStep = (sessionHasReportsForConduct && !sessionConductReadyForReports) ? 1 : 2;
     const optionalConductRosterSeed = <%- jsonForScript((session.roster || []).map((student) => ({
         personId: String(student.personId || ''),
         name: String(student.name || ''),
@@ -2777,7 +2893,56 @@ document.addEventListener('DOMContentLoaded', () => {
             badge.className = `badge ${sessionConductReadyForReports ? 'bg-success' : 'bg-warning text-dark'}`;
             badge.textContent = sessionConductReadyForReports ? 'Completed' : 'Required before reports';
         }
+        if (sessionConductReadyForReports && sessionHasReportsForConduct) {
+            currentReportWorkflowStep = 2;
+        }
+        syncReportWorkflowStepUi();
         renderSessionReportInstances();
+    }
+
+    function syncReportWorkflowStepUi() {
+        if (!sessionHasReportsForConduct) return;
+
+        if (!sessionConductReadyForReports) {
+            currentReportWorkflowStep = 1;
+        } else if (currentReportWorkflowStep !== 1 && currentReportWorkflowStep !== 2) {
+            currentReportWorkflowStep = 2;
+        }
+
+        const showStep1 = currentReportWorkflowStep === 1;
+        const conductStep = document.getElementById('sessionReportConductStep');
+        const instancesStep = document.getElementById('sessionReportInstancesStep');
+        conductStep?.classList.toggle('d-none', !showStep1);
+        instancesStep?.classList.toggle('d-none', showStep1);
+
+        const step1Label = document.getElementById('sessionReportWorkflowStep1Label');
+        const step2Label = document.getElementById('sessionReportWorkflowStep2Label');
+        if (step1Label) {
+            step1Label.classList.toggle('is-active', showStep1);
+            step1Label.classList.toggle('is-complete', sessionConductReadyForReports && !showStep1);
+            step1Label.classList.remove('is-locked');
+        }
+        if (step2Label) {
+            step2Label.classList.toggle('is-active', !showStep1);
+            step2Label.classList.toggle('is-complete', sessionConductReadyForReports && !showStep1);
+            step2Label.classList.toggle('is-locked', !sessionConductReadyForReports);
+        }
+
+        const prevBtn = document.getElementById('btnReportWorkflowPrevious');
+        const nextBtn = document.getElementById('btnReportWorkflowNext');
+        if (prevBtn) {
+            const showPrevious = sessionConductReadyForReports && !showStep1;
+            prevBtn.classList.toggle('d-none', !showPrevious);
+            prevBtn.disabled = !showPrevious;
+        }
+        if (nextBtn) {
+            const showNext = showStep1;
+            nextBtn.classList.toggle('d-none', !showNext);
+            nextBtn.disabled = !sessionConductReadyForReports;
+            nextBtn.title = sessionConductReadyForReports
+                ? 'Continue to report instances'
+                : 'Save class conduct before continuing to the next step';
+        }
     }
 
     function showConductRequiredModal() {
@@ -2985,6 +3150,21 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnSaveSessionConduct')?.addEventListener('click', () => {
         saveSessionConductForReports();
     });
+    document.getElementById('btnReportWorkflowPrevious')?.addEventListener('click', () => {
+        if (!sessionHasReportsForConduct || !sessionConductReadyForReports) return;
+        currentReportWorkflowStep = 1;
+        syncReportWorkflowStepUi();
+    });
+    document.getElementById('btnReportWorkflowNext')?.addEventListener('click', () => {
+        if (!sessionHasReportsForConduct) return;
+        if (!sessionConductReadyForReports) {
+            showConductRequiredModal();
+            return;
+        }
+        currentReportWorkflowStep = 2;
+        syncReportWorkflowStepUi();
+    });
+    syncReportWorkflowStepUi();
     document.getElementById('btnAddOptionalConductStudents')?.addEventListener('click', () => {
         addSelectedOptionalConductStudents();
     });
