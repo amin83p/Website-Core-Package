@@ -406,8 +406,8 @@ const schoolDataService = {
     return Array.isArray(cls.sessions) ? cls.sessions : [];
   },
 
-  saveClassSessions: async (classId, sessions, requestingUser = null) => {
-    const cls = await schoolDataService.getDataById('classes', classId, requestingUser);
+  saveClassSessions: async (classId, sessions, requestingUser = null, accessContext = null) => {
+    const cls = await schoolDataService.getDataById('classes', classId, requestingUser, accessContext);
     if (!cls) throw new Error('Class not found or inaccessible.');
     const updated = await schoolDataService.updateData('classes', classId, {
       sessions: Array.isArray(sessions) ? sessions : []

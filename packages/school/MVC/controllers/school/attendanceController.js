@@ -18,6 +18,20 @@ const schoolFileService = require('../../services/school/schoolFileService');
 const accessService = requireCoreModule('MVC/services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
+const schoolRecordAccessService = require('../../services/school/schoolRecordAccessService');
+
+function buildAttendanceRouteAccessContext(req) {
+    return schoolDataService.buildRouteAccessContext(req);
+}
+
+async function getAttendanceClassOrThrow(req, classId) {
+    const accessContext = buildAttendanceRouteAccessContext(req);
+    const classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
+    if (!classData) {
+        throw new Error(schoolRecordAccessService.CLASS_ACCESS_DENIED);
+    }
+    return classData;
+}
 
 function resolveClassTeacherName(classData = {}) {
     const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
@@ -298,7 +312,12 @@ async function showAttendancePage(req, res) {
         let initialClassName = String(q.className || '').trim();
         if (initialClassId && !initialClassName) {
             try {
-                const classRow = await schoolDataService.getDataById('classes', initialClassId, req.user);
+                const classRow = await schoolDataService.getDataById(
+                    'classes',
+                    initialClassId,
+                    req.user,
+                    buildAttendanceRouteAccessContext(req)
+                );
                 if (classRow?.title) initialClassName = String(classRow.title).trim();
             } catch (e) {
                 /* leave name empty */
@@ -329,7 +348,8 @@ async function showAttendancePage(req, res) {
 async function listActiveAttendanceClasses(req, res) {
     try {
         const activeOrgId = String(req.user?.activeOrgId || '').trim();
-        const classes = await schoolDataService.fetchData('classes', {}, req.user);
+        const routeAccessContext = buildAttendanceRouteAccessContext(req);
+        const classes = await schoolDataService.fetchData('classes', {}, req.user, routeAccessContext);
         const items = (Array.isArray(classes) ? classes : [])
             .filter((row) => classBelongsToActiveOrg(row, activeOrgId))
             .filter(isActiveAttendanceClass)
@@ -361,10 +381,10 @@ async function buildAttendanceMatrixPayload(req) {
         const { classId, startDate, endDate } = req.query;
         if (!classId) throw new Error('Class ID is required.');
 
-        const classData = await schoolDataService.getDataById('classes', classId, req.user);
-        if (!classData) throw new Error('Class not found.');
+        const routeAccessContext = buildAttendanceRouteAccessContext(req);
+        const classData = await getAttendanceClassOrThrow(req, classId);
         
-        const allSessions = await schoolDataService.getClassSessions(classId, req.user);
+        const allSessions = await schoolDataService.getClassSessions(classId, req.user, routeAccessContext);
 
         const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || req.user?.activeOrgId || '', {
             includeInactive: true
@@ -657,8 +677,9 @@ async function addAttendanceComment(req, res) {
         const { classId, sessionId, studentPersonId, text, mentions, attachment } = req.body;
         if (!classId || !sessionId || !studentPersonId || !text) throw new Error('Missing required fields.');
 
-        const classData = await schoolDataService.getDataById('classes', classId, req.user);
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const accessContext = buildAttendanceRouteAccessContext(req);
+        const classData = await getAttendanceClassOrThrow(req, classId);
+        const sessions = await schoolDataService.getClassSessions(classId, req.user, accessContext);
         const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
         if (sessionIndex === -1) throw new Error('Session not found.');
 
@@ -695,7 +716,7 @@ async function addAttendanceComment(req, res) {
         };
 
         rosterRecord.comments.push(newComment);
-        await schoolDataService.saveClassSessions(classId, sessions, req.user);
+        await schoolDataService.saveClassSessions(classId, sessions, req.user, accessContext);
 
         // =========================================================================
         // NEW: AUTOMATIC CHAT MESSAGE ENGINE
@@ -762,9 +783,9 @@ async function uploadAttendanceFile(req, res) {
         if (!classId || !sessionId) throw new Error('classId and sessionId are required.');
         if (!req.file) throw new Error('No file was uploaded.');
 
-        const classData = await schoolDataService.getDataById('classes', classId, req.user);
-        if (!classData) throw new Error('Class not found.');
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const accessContext = buildAttendanceRouteAccessContext(req);
+        const classData = await getAttendanceClassOrThrow(req, classId);
+        const sessions = await schoolDataService.getClassSessions(classId, req.user, accessContext);
         const session = (Array.isArray(sessions) ? sessions : []).find((row) => idsEqual(row?.sessionId, sessionId));
         if (!session) throw new Error('Session not found.');
         if (studentPersonId) {
@@ -799,10 +820,10 @@ async function updateAttendanceRosterCell(req, res) {
             throw new Error('classId, sessionId, and studentPersonId are required.');
         }
 
-        const classData = await schoolDataService.getDataById('classes', classId, req.user);
-        if (!classData) throw new Error('Class not found.');
+        const routeAccessContext = buildAttendanceRouteAccessContext(req);
+        const classData = await getAttendanceClassOrThrow(req, classId);
 
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const sessions = await schoolDataService.getClassSessions(classId, req.user, routeAccessContext);
         const sessionIndex = sessions.findIndex((s) => s.sessionId === sessionId);
         if (sessionIndex === -1) throw new Error('Session not found.');
 
@@ -879,7 +900,7 @@ async function updateAttendanceRosterCell(req, res) {
             enabledAttendanceStatuses
         );
 
-        await schoolDataService.saveClassSessions(classId, sessions, req.user);
+        await schoolDataService.saveClassSessions(classId, sessions, req.user, routeAccessContext);
         await classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass({
             classData,
             sessions,

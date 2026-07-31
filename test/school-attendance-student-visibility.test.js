@@ -33,6 +33,22 @@ test('attendance matrix print uses only visible students', () => {
   assert.match(view, /No visible students to print/);
 });
 
+test('attendance matrix print indexes session and attendance notes separately', () => {
+  const view = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
+  const collectNotesMatch = view.match(/function attPrintCollectNoteParts\(rec\) \{([\s\S]*?)\n    \}/);
+  assert.ok(collectNotesMatch, 'attPrintCollectNoteParts should exist');
+  assert.doesNotMatch(collectNotesMatch[1], /sessionLevelNote/);
+  assert.match(collectNotesMatch[1], /rosterStudentNotes/);
+  assert.match(collectNotesMatch[1], /rec\?\.comments/);
+  assert.match(view, /function attPrintFormatCommentEntry\(comment, index = 0, total = 1\)/);
+  assert.match(view, /function attPrintBuildSessionNoteIndex\(sessions = \[\], sessionNotesById = new Map\(\)\)/);
+  assert.match(view, /session-fn-mark/);
+  assert.match(view, /<h2>Session Notes<\/h2>/);
+  assert.match(view, /<h2>Attendance Notes<\/h2>/);
+  assert.match(view, /attendanceNoteMarkerFor\(name, rec\)/);
+  assert.doesNotMatch(view, /day-session-note/);
+});
+
 test('master hub attendance includes student visibility dropdown for single and batch', () => {
   const hub = read('packages/school/MVC/views/school/masterAcademiaHub.ejs');
   assert.match(hub, /buildHubStudentFilterDropdownHtml/);

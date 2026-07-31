@@ -1096,15 +1096,61 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${letter} ${mins}`;
     }
 
+    function attPrintFormatCommentEntry(comment, index = 0, total = 1) {
+        if (!comment) return '';
+        if (typeof comment === 'string') return String(comment).trim();
+        const text = String(comment?.text || '').trim();
+        if (!text) return '';
+        const author = String(comment?.authorName || '').trim();
+        const label = total > 1 ? `Comment ${index + 1}` : 'Comment';
+        return author ? `${label} (${author}): ${text}` : `${label}: ${text}`;
+    }
+
     function attPrintCollectNoteParts(rec) {
         const parts = [];
         const excuse = String(rec?.excuseRef || '').trim();
         const rosterNote = String(rec?.rosterStudentNotes || '').trim();
-        const sessionNote = String(rec?.sessionLevelNote || '').trim();
         if (excuse) parts.push(`Excuse: ${excuse}`);
         if (rosterNote) parts.push(`Note: ${rosterNote}`);
-        if (sessionNote) parts.push(`Session: ${sessionNote}`);
+        const comments = Array.isArray(rec?.comments) ? rec.comments : [];
+        comments.forEach((comment, index) => {
+            const formatted = attPrintFormatCommentEntry(comment, index, comments.length);
+            if (formatted) parts.push(formatted);
+        });
         return parts;
+    }
+
+    function attPrintBuildSessionNotesById(students = []) {
+        const notesBySessionId = new Map();
+        (Array.isArray(students) ? students : []).forEach((stu) => {
+            (Array.isArray(stu?.records) ? stu.records : []).forEach((rec) => {
+                const sessionId = String(rec?.sessionId || '').trim();
+                const sessionNote = String(rec?.sessionLevelNote || '').trim();
+                if (!sessionId || !sessionNote || notesBySessionId.has(sessionId)) return;
+                notesBySessionId.set(sessionId, sessionNote);
+            });
+        });
+        return notesBySessionId;
+    }
+
+    function attPrintBuildSessionNoteIndex(sessions = [], sessionNotesById = new Map()) {
+        const sessionNoteEntries = [];
+        const markerBySessionId = new Map();
+        (Array.isArray(sessions) ? sessions : []).forEach((sessionRow) => {
+            const sessionId = String(sessionRow?.id || sessionRow?.sessionId || '').trim();
+            const note = String(sessionNotesById.get(sessionId) || '').trim();
+            if (!sessionId || !note) return;
+            const num = sessionNoteEntries.length + 1;
+            sessionNoteEntries.push({
+                num,
+                sessionId,
+                dateLabel: attPrintFormatDateShort(sessionRow?.date),
+                weekday: attPrintFormatWeekday(sessionRow?.date),
+                note
+            });
+            markerBySessionId.set(sessionId, num);
+        });
+        return { sessionNoteEntries, markerBySessionId };
     }
 
     function attPrintToSuperscript(n) {
@@ -1152,10 +1198,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const printedAt = meta.printedAt instanceof Date ? meta.printedAt : new Date();
         const printedAtLabel = formatSchoolInstant(printedAt);
 
-        const footnotes = [];
-        const footnoteByKey = new Map();
+        const attendanceNotes = [];
+        const attendanceNoteByKey = new Map();
+        const sessionNotesById = attPrintBuildSessionNotesById(students);
+        const { sessionNoteEntries, markerBySessionId } = attPrintBuildSessionNoteIndex(sessions, sessionNotesById);
 
-        function footnoteMarkerFor(studentName, rec) {
+        function attendanceNoteMarkerFor(studentName, rec) {
             const parts = attPrintCollectNoteParts(rec);
             if (!parts.length) return '';
             const key = [
@@ -1163,16 +1211,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 String(studentName || ''),
                 parts.join('|')
             ].join('::');
-            let num = footnoteByKey.get(key);
+            let num = attendanceNoteByKey.get(key);
             if (!num) {
-                num = footnotes.length + 1;
-                footnoteByKey.set(key, num);
+                num = attendanceNotes.length + 1;
+                attendanceNoteByKey.set(key, num);
                 const late = Number(rec?.lateMinutes) || 0;
                 const early = Number(rec?.earlyLeaveMinutes) || 0;
                 const timingBits = [];
                 if (late > 0) timingBits.push(`Late ${late}'`);
                 if (early > 0) timingBits.push(`Early leave ${early}'`);
-                footnotes.push({
+                attendanceNotes.push({
                     num,
                     studentName: String(studentName || 'Student'),
                     dateLabel: attPrintFormatDateShort(rec?.date),
@@ -1187,7 +1235,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const headerCells = sessions.map((s) => {
             const shortDate = attPrintFormatDateShort(s.date);
             const weekday = attPrintFormatWeekday(s.date);
-            return `<th class="day-col"><div class="day-date">${attPrintEscapeHtml(shortDate)}</div>${weekday ? `<div class="day-wd">${attPrintEscapeHtml(weekday)}</div>` : ''}</th>`;
+            const sessionId = String(s?.id || s?.sessionId || '').trim();
+            const sessionMarkerNum = markerBySessionId.get(sessionId);
+            const sessionMarkerHtml = sessionMarkerNum
+                ? `<sup class="fn-mark session-fn-mark">${attPrintEscapeHtml(attPrintToSuperscript(sessionMarkerNum))}</sup>`
+                : '';
+            return `<th class="day-col"><div class="day-date">${attPrintEscapeHtml(shortDate)}${sessionMarkerHtml}</div>${weekday ? `<div class="day-wd">${attPrintEscapeHtml(weekday)}</div>` : ''}</th>`;
         }).join('');
 
         const bodyRows = students.map((stu, index) => {
@@ -1202,7 +1255,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const cells = (Array.isArray(stu.records) ? stu.records : []).map((rec) => {
                 const text = attPrintCellText(rec);
                 const statusClass = `st-${String(rec?.status || 'na').replace(/_/g, '-')}`;
-                const fn = footnoteMarkerFor(name, rec);
+                const fn = attendanceNoteMarkerFor(name, rec);
                 return `<td class="att-print-cell ${statusClass}">${attPrintEscapeHtml(text)}${fn}</td>`;
             }).join('');
             return `<tr>
@@ -1219,11 +1272,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `<tr><td colspan="3" class="empty-msg">No active sessions found in this date range.</td></tr>`
                 : '');
 
-        const footnotesHtml = footnotes.length
-            ? `<section class="footnotes">
-                <h2>Notes</h2>
+        const sessionNotesHtml = sessionNoteEntries.length
+            ? `<section class="footnotes session-notes">
+                <h2>Session Notes</h2>
                 <ol>
-                  ${footnotes.map((fn) => {
+                  ${sessionNoteEntries.map((entry) => {
+                    const headBits = [attPrintEscapeHtml(entry.dateLabel)];
+                    if (entry.weekday) headBits.push(attPrintEscapeHtml(entry.weekday));
+                    return `<li value="${entry.num}"><span class="fn-head">${headBits.join(' · ')}</span> — ${attPrintEscapeHtml(entry.note)}</li>`;
+                  }).join('')}
+                </ol>
+              </section>`
+            : '';
+
+        const attendanceNotesHtml = attendanceNotes.length
+            ? `<section class="footnotes attendance-notes">
+                <h2>Attendance Notes</h2>
+                <ol>
+                  ${attendanceNotes.map((fn) => {
                     const headBits = [
                       attPrintEscapeHtml(fn.studentName),
                       attPrintEscapeHtml(fn.dateLabel),
@@ -1344,6 +1410,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .st-acf { color: #a71d2a; }
     .st-not-applicable, .st-na { color: #6c757d; font-weight: 500; }
     .fn-mark { font-size: 8px; font-weight: 700; color: #0d6efd; margin-left: 1px; }
+    .session-fn-mark { color: #6f42c1; }
     .empty-msg { text-align: center; color: #666; padding: 16px !important; }
     .footnotes {
       margin-top: 12px;
@@ -1433,7 +1500,8 @@ document.addEventListener('DOMContentLoaded', () => {
       </tbody>
     </table>
 
-    ${footnotesHtml}
+    ${sessionNotesHtml}
+    ${attendanceNotesHtml}
 
     <footer class="doc-footer">
       <span>Generated from Attendance Matrix</span>
