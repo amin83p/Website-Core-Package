@@ -6,6 +6,7 @@ const { getDashboardSection } = requireCoreModule('MVC/controllers/dashboardCont
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const DASHBOARD_ACCESS_RULES = Object.freeze([
+    { pattern: /^\/school\/settings(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SETTINGS },
     { pattern: /^\/school\/programs\/term-registrations(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TERM_REGISTRATIONS },
     { pattern: /^\/school\/programs\/registrations(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS },
     { pattern: /^\/school\/programs(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_PROGRAMS },
@@ -61,7 +62,10 @@ async function canAccessDashboardSection(user, sectionId, ipAddress) {
     if (!user || !sectionId) return false;
     if (await adminAuthorityService.isAdminForRequestAsync(user, sectionId, OPERATIONS.READ_ALL, { section: { id: sectionId } })) return true;
 
-    for (const operationId of DASHBOARD_VISIBLE_OPERATION_IDS) {
+    const visibleOperationIds = sectionId === SECTIONS.SCHOOL_SETTINGS
+        ? [OPERATIONS.READ_ALL]
+        : DASHBOARD_VISIBLE_OPERATION_IDS;
+    for (const operationId of visibleOperationIds) {
         try {
             const evaluation = await accessService.evaluateAccess({
                 user,
@@ -103,6 +107,16 @@ async function showDashboard(req, res) {
     try {
         const dashboardSections = [
             // Foundation / Setup
+            {
+                priority: 5,
+                title: 'School Settings',
+                description: 'Manage organization-wide conduct rating and attendance matrix policies.',
+                href: '/school/settings',
+                buttonLabel: 'Open School Settings',
+                icon: 'bi-gear-wide-connected',
+                subtleClass: 'bg-secondary-subtle text-secondary',
+                buttonClass: 'btn btn-secondary'
+            },
             {
                 priority: 70,
                 title: 'Departments',

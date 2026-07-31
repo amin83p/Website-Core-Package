@@ -37,7 +37,7 @@ test('attendance routes expose export.xlsx with same access gate as matrix data'
   assert.match(routes, /\/api\/export\.xlsx/);
   assert.match(routes, /exportAttendanceExcel/);
   assert.match(routes, /\/api\/export\.xlsx'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
-  assert.match(routes, /\/settings'[\s\S]*?requireAttendanceMatrixPolicyAdmin\(\)/);
+  assert.match(routes, /\/settings'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.READ_ALL\)/);
 });
 
 test('matrix payload builder enriches enrollment dates and CLB maps', () => {

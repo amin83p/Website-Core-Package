@@ -1,19 +1,19 @@
 const reportHubService = require('../../services/school/schoolReportHubService');
 const taskService = require('../../services/school/taskService');
-const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
+const { userCanOpenAttendanceMatrix } = require('../../services/school/attendanceMatrixAccessService');
 
 exports.showReportHubPage = async (req, res) => {
   try {
     const modules = await reportHubService.resolveAccessibleModules(req);
     const defaultModule = modules[0] || null;
-    const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
+    const canOpenAttendanceMatrix = await userCanOpenAttendanceMatrix(req.user, req.ip);
 
     res.render('school/reportHub', {
       title: 'Report Hub',
       modules,
       defaultType: defaultModule ? defaultModule.type : '',
       canManageAllTasks: taskService.isAdminViewer(req.user),
-      canManageAttendanceMatrixPolicy,
+      canOpenAttendanceMatrix,
       orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
       orgToday: req.orgToday || req.user?.orgToday || '',
       user: req.user

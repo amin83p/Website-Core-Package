@@ -142,6 +142,9 @@
         },
         {
           "id": "445581"
+        },
+        {
+          "id": "446106"
         }
       ],
       "related": [],
@@ -1804,6 +1807,38 @@
       "adoptExisting": true
     },
     {
+      "id": "446106",
+      "name": "SCHOOL_SETTINGS",
+      "category": "SCHOOL",
+      "description": "Manage organization-wide school policies and settings.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/settings",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
       "id": "446101",
       "name": "SCHOOL_REPORTS_TEMPLATE",
       "category": "SCHOOL",
@@ -3439,6 +3474,18 @@
       "tags": [
         "SCHOOL_REPORTS_OVERALL_INSTANCES",
         "446105"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_131",
+      "name": "SCHOOL_SETTINGS",
+      "type": "class",
+      "value": "bi bi-gear-wide-connected",
+      "tags": [
+        "SCHOOL_SETTINGS",
+        "446106"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true

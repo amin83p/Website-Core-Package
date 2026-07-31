@@ -29,7 +29,13 @@
             <div class="d-flex justify-content-end gap-1">
               <a href="/school/reports/overall-reports/edit/<%= encodeURIComponent(row.id) %>" class="btn btn-outline-primary btn-sm">Open</a>
               <% if (status !== 'archived') { %>
-                <a href="/school/reports/overall-reports/delete/<%= encodeURIComponent(row.id) %>" class="btn btn-outline-danger btn-sm"><%= (row.generatedDocs || []).length ? 'Archive' : 'Delete' %></a>
+                <% const removeAction = (row.generatedDocs || []).length ? 'Archive' : 'Delete'; %>
+                <a
+                  href="/school/reports/overall-reports/delete/<%= encodeURIComponent(row.id) %>"
+                  class="btn btn-outline-danger btn-sm js-remove-overall-report"
+                  data-action="<%= removeAction %>"
+                  data-report-title="<%= row.title || row.id %>"
+                ><%= removeAction %></a>
               <% } %>
             </div>
           </td>
@@ -40,3 +46,38 @@
 </div>
 <%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/reports/overall-reports' }) %>
 <%- include('partials/tablePages-end') %>
+
+<script>
+(() => {
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+
+  async function confirmReportRemoval(link) {
+    const action = String(link.dataset.action || 'Delete');
+    const reportTitle = String(link.dataset.reportTitle || 'this overall report');
+    const isArchive = action === 'Archive';
+    const message = isArchive
+      ? `Archive <strong>${escapeHtml(reportTitle)}</strong>? The report and its generated documents will remain available as read-only records.`
+      : `Delete <strong>${escapeHtml(reportTitle)}</strong>? This action cannot be undone.`;
+    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      const result = await window.showMessageModal({
+        title: `${action} Overall Report?`,
+        icon: 'warning',
+        message,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: action, class: 'btn-danger' }
+        ]
+      });
+      return result === action;
+    }
+    return window.confirm(`${action} ${reportTitle}?`);
+  }
+
+  document.querySelectorAll('.js-remove-overall-report').forEach(link => {
+    link.addEventListener('click', async event => {
+      event.preventDefault();
+      if (await confirmReportRemoval(link)) window.location.assign(link.href);
+    });
+  });
+})();
+</script>

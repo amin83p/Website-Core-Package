@@ -108,10 +108,9 @@ async function loadTemplateFormData(req, template = null) {
       version: 1,
       status: 'draft',
       description: '',
-      nextSlotNumber: 3,
+      nextSlotNumber: 2,
       sourceSlots: [
-        { slotKey: 'T1', order: 1, templateId: '', templateVersionAtSelection: 1 },
-        { slotKey: 'T2', order: 2, templateId: '', templateVersionAtSelection: 1 }
+        { slotKey: 'T1', order: 1, templateId: '', templateVersionAtSelection: 1 }
       ],
       schema: { version: 1, fields: [] },
       docxTemplatesByFunder: []

@@ -367,6 +367,9 @@
       },
       {
         "id": "445581"
+      },
+      {
+        "id": "446106"
       }
     ],
     "trackState": false
@@ -3847,6 +3850,43 @@
       "lastUpdateDateTime": "2026-07-30T00:00:00.000Z"
     },
     "id": "446105",
+    "navigatorSection": false,
+    "mainDashboardDisplay": false
+  },
+  {
+    "name": "SCHOOL_SETTINGS",
+    "category": "SCHOOL",
+    "description": "Manage organization-wide school policies and settings.",
+    "homeURL": "/school/settings",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-07-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-07-30T00:00:00.000Z"
+    },
+    "id": "446106",
     "navigatorSection": false,
     "mainDashboardDisplay": false
   },

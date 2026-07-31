@@ -69,13 +69,13 @@ function sanitizeInstance(input, { existing = null, isUpdate = false } = {}) {
       capturedAt: clean(row?.capturedAt, 60) || new Date().toISOString()
     };
   });
-  if (sourceSelections.length < 2) throw new Error('Overall reports require at least two source report instances.');
+  if (sourceSelections.length < 1) throw new Error('Overall reports require at least one source report instance.');
   const now = new Date().toISOString();
   const title = clean(input.title, 240);
   if (!title) throw new Error('Overall report title is required.');
   const templateSnapshot = clone(input.templateSnapshot, {});
   const snapshotSlots = Array.isArray(templateSnapshot?.sourceSlots) ? templateSnapshot.sourceSlots : [];
-  if (snapshotSlots.length < 2) throw new Error('Overall report template snapshot is missing source slots.');
+  if (snapshotSlots.length < 1) throw new Error('Overall report template snapshot is missing source slots.');
   snapshotSlots.forEach((slot) => {
     const selection = sourceSelections.find((row) => row.slotKey === clean(slot?.slotKey, 30).toUpperCase());
     if (!selection || !idsEqual(selection.templateId, slot?.templateId)) {

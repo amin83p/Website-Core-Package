@@ -11,6 +11,7 @@ const {
   resolveEnabledAttendanceStatuses,
   assertAttendanceStatusAllowedForSave,
   coerceAttendanceStatusToEnabled,
+  resolveEffectiveAttendanceStatus,
   ALL_ATTENDANCE_STATUSES_ORDERED
 } = require('../packages/school/MVC/services/school/attendanceMatrixMetricsService');
 
@@ -84,6 +85,24 @@ test('resolvePolicy org layer applies; class overrides per field', () => {
   assert.equal(p.disqualifyCombinedMissedMinutes, 50);
 });
 
+test('organization threshold switch is authoritative over class policy values', () => {
+  const p = resolvePolicy(
+    {
+      attendancePolicy: {
+        thresholdsEnabled: true,
+        disqualifyLateMinutes: 1,
+        disqualifyEarlyLeaveMinutes: 1
+      }
+    },
+    {
+      thresholdsEnabled: false,
+      disqualifyLateMinutes: 30,
+      disqualifyEarlyLeaveMinutes: 30
+    }
+  );
+  assert.equal(p.thresholdsEnabled, false);
+});
+
 test('absent and N/A yield zero credit', () => {
   const w = 10;
   assert.equal(computeSessionCredit({ status: 'absent' }, w, policy180).credit, 0);
@@ -154,6 +173,66 @@ test('combined missed minutes threshold', () => {
   );
   assert.equal(bad.credit, 0);
   assert.equal(bad.disqualified, true);
+});
+
+test('disabled thresholds give full credit and reclassify legacy absent timing rows', () => {
+  const disabledPolicy = { ...policy180, thresholdsEnabled: false };
+  const late = computeSessionCredit(
+    { status: 'late', lateMinutes: 179, earlyLeaveMinutes: 0 },
+    25,
+    disabledPolicy
+  );
+  const legacyAbsent = computeSessionCredit(
+    { status: 'absent', lateMinutes: 60, earlyLeaveMinutes: 0 },
+    25,
+    disabledPolicy
+  );
+  assert.equal(late.credit, 25);
+  assert.equal(late.disqualified, false);
+  assert.equal(legacyAbsent.credit, 25);
+  assert.equal(legacyAbsent.reason, 'thresholds_disabled_full');
+  assert.equal(
+    resolveEffectiveAttendanceStatus(
+      { status: 'absent', lateMinutes: 60 },
+      disabledPolicy
+    ),
+    'late'
+  );
+  assert.equal(
+    resolveEffectiveAttendanceStatus(
+      { status: 'excused', lateMinutes: 60 },
+      disabledPolicy
+    ),
+    'excused'
+  );
+});
+
+test('disabled thresholds use Present when Late is unavailable for the class', () => {
+  const disabledPolicy = { ...policy180, thresholdsEnabled: false };
+  assert.equal(
+    resolveEffectiveAttendanceStatus(
+      { status: 'absent', lateMinutes: 60 },
+      disabledPolicy,
+      ['present', 'absent', 'not_applicable']
+    ),
+    'present'
+  );
+});
+
+test('disabled-threshold rollup gives full credit without rewriting true absences', () => {
+  const records = [
+    { status: 'absent', lateMinutes: 60, earlyLeaveMinutes: 0 },
+    { status: 'late', lateMinutes: 179, earlyLeaveMinutes: 0 },
+    { status: 'absent', lateMinutes: 0, earlyLeaveMinutes: 0 }
+  ];
+  const s = computeStudentMatrixSummary(records, {}, {
+    thresholdsEnabled: false,
+    ...policy180
+  });
+  assert.equal(s.totalPresentSessions, 2);
+  assert.equal(s.totalAbsentSessions, 1);
+  assert.equal(s.disqualifiedSessionCount, 0);
+  assert.equal(s.performancePercent, 66.67);
 });
 
 test('rollup: 10 sessions all present = 100%', () => {

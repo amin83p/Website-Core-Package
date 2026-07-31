@@ -151,6 +151,45 @@ function overallTemplate(overrides = {}) {
   });
 }
 
+function singleSourceOverallTemplate(overrides = {}) {
+  return overallTemplate({
+    title: 'Extracted Progress',
+    nextSlotNumber: 2,
+    sourceSlots: [
+      { slotKey: 'T1', order: 1, templateId: 'SRC-1', templateVersionAtSelection: 1 }
+    ],
+    schema: {
+      version: 1,
+      fields: [
+        {
+          id: 'summary',
+          label: 'Summary',
+          type: 'text',
+          overallValueMode: 'manual',
+          defaultValue: 'Initial',
+          required: true,
+          validationRules: [],
+          conversionRule: { enabled: false, expression: '', onError: 'use_raw' }
+        },
+        {
+          id: 'extracted_score',
+          label: 'Extracted score',
+          type: 'number',
+          overallValueMode: 'derived_locked',
+          calculationRule: {
+            enabled: true,
+            expression: 'source("T1", "score")',
+            onError: 'keep_last'
+          },
+          validationRules: [],
+          conversionRule: { enabled: false, expression: '', onError: 'use_raw' }
+        }
+      ]
+    },
+    ...overrides
+  });
+}
+
 function sourceValues(score1 = 80, score2 = 90) {
   return {
     T1: { score: score1, comments: 'Good' },
@@ -193,8 +232,15 @@ test('safe formulas support namespaced source values, avg, concat, and overall d
 
 test('overall template normalization enforces stable slots, source keys, and calculation cycles', () => {
   const template = overallTemplate();
+  const singleSource = singleSourceOverallTemplate();
   assert.deepEqual(template.sourceSlots.map((row) => row.slotKey), ['T1', 'T2']);
   assert.equal(template.nextSlotNumber, 3);
+  assert.deepEqual(singleSource.sourceSlots.map((row) => row.slotKey), ['T1']);
+  assert.equal(singleSource.nextSlotNumber, 2);
+  assert.deepEqual(
+    singleSource.schema.fields.find((field) => field.id === 'extracted_score').sourceReferences,
+    [{ slotKey: 'T1', key: 'score' }]
+  );
   assert.equal(template.placeholderMap.average_score, '{{O.average_score}}');
   assert.deepEqual(
     template.schema.fields.find((field) => field.id === 'average_score').sourceReferences,
@@ -202,10 +248,10 @@ test('overall template normalization enforces stable slots, source keys, and cal
   );
   assert.throws(
     () => overallTemplate({
-      sourceSlots: [{ slotKey: 'T1', templateId: 'SRC-1' }],
+      sourceSlots: [],
       schema: { version: 1, fields: [] }
     }),
-    /at least two source template slots/
+    /at least one source template slot/
   );
   assert.throws(
     () => overallTemplate({
@@ -315,6 +361,22 @@ test('overall fields retain relevant layout, guidance, styling, typed defaults, 
 
 test('overall instance sanitizer requires snapshot-aligned source selections', () => {
   const template = overallTemplate();
+  const singleTemplate = singleSourceOverallTemplate();
+  const singleInstance = overallInstanceModel.sanitizeInstance({
+    orgId: 'ORG-1',
+    overallTemplateId: 'OVERALL-SINGLE',
+    overallTemplateVersion: 1,
+    title: 'Single-source snapshot',
+    status: 'draft',
+    templateSnapshot: singleTemplate,
+    sourceSelections: [
+      { slotKey: 'T1', templateId: 'SRC-1', instanceId: 'REPORT-1', instanceStatus: 'submitted' }
+    ],
+    sourceValues: { T1: { score: '80', comments: 'Good' } },
+    answers: { summary: 'Initial', extracted_score: 80 },
+    derivedOverrides: {}
+  });
+  assert.deepEqual(singleInstance.sourceSelections.map((row) => row.slotKey), ['T1']);
   const instance = overallInstanceModel.sanitizeInstance({
     orgId: 'ORG-1',
     overallTemplateId: 'OVERALL-1',
@@ -331,6 +393,20 @@ test('overall instance sanitizer requires snapshot-aligned source selections', (
     derivedOverrides: { combined_comments: 'true' }
   });
   assert.equal(instance.derivedOverrides.combined_comments, true);
+  assert.throws(
+    () => overallInstanceModel.sanitizeInstance({
+      ...singleInstance,
+      sourceSelections: []
+    }),
+    /at least one source report instance/
+  );
+  assert.throws(
+    () => overallInstanceModel.sanitizeInstance({
+      ...singleInstance,
+      templateSnapshot: { ...singleTemplate, sourceSlots: [] }
+    }),
+    /snapshot is missing source slots/
+  );
   assert.throws(
     () => overallInstanceModel.sanitizeInstance({
       ...instance,
@@ -395,6 +471,91 @@ test('creation accepts only matching submitted or locked reports and persists a 
       /must be submitted or locked/
     );
   });
+});
+
+test('single-source reports create, refresh, submit, lock, and export from the stored T1 snapshot', async () => {
+  const fixture = createDocxWithTokens(['T1.score', 'O.extracted_score']);
+  try {
+    const template = {
+      ...singleSourceOverallTemplate({
+        docxTemplate: {
+          fileName: 'single-source.docx',
+          originalName: 'single-source.docx',
+          path: fixture.filePath,
+          url: ''
+        }
+      }),
+      id: 'OVERALL-SINGLE'
+    };
+    const reportTemplate = sourceTemplate('SRC-1');
+    const sourceInstance = {
+      id: 'REPORT-1',
+      orgId: 'ORG-1',
+      templateId: 'SRC-1',
+      templateVersion: 4,
+      status: 'submitted',
+      answers: { score: 72, comments: 'Initial source' },
+      prefillSnapshot: {}
+    };
+    let persisted = null;
+
+    await withPatched(schoolDataService, {
+      getDataById: async (entityType, id) => {
+        if (entityType === 'reportTemplates' && id === 'SRC-1') return reportTemplate;
+        if (entityType === 'reportInstances' && id === 'REPORT-1') return sourceInstance;
+        if (entityType === 'reportAssignments') return null;
+        return null;
+      },
+      addData: async (_entityType, row) => {
+        persisted = { ...row, id: 'OVERALL-INSTANCE-SINGLE' };
+        return persisted;
+      },
+      updateData: async (_entityType, _id, updates) => {
+        persisted = { ...persisted, ...updates };
+        return persisted;
+      }
+    }, async () => {
+      persisted = await overallReportService.createOverallInstance({
+        template,
+        sourceSelections: [{ slotKey: 'T1', instanceId: 'REPORT-1' }],
+        selectedDocxKey: 'default',
+        title: 'Single-source extraction',
+        reqUser
+      });
+      assert.equal(persisted.sourceSelections.length, 1);
+      assert.equal(persisted.sourceValues.T1.score, '72');
+      assert.equal(persisted.answers.extracted_score, '72');
+
+      sourceInstance.answers.score = 88;
+      const updatePreview = await overallReportService.buildSourceUpdatePreview(persisted, reqUser);
+      assert.ok(updatePreview.changes.some((row) => row.selectionKey === 'T1:score'));
+      await overallReportService.applySourceUpdates({
+        instance: persisted,
+        selectedKeys: ['T1:score'],
+        replaceOverrideFieldIds: [],
+        reqUser
+      });
+      assert.equal(persisted.sourceValues.T1.score, '88');
+      assert.equal(persisted.answers.extracted_score, '88');
+
+      persisted = await overallReportService.transitionStatus({ instance: persisted, action: 'submit', reqUser });
+      persisted = await overallReportService.transitionStatus({ instance: persisted, action: 'lock', reqUser });
+      assert.equal(persisted.status, 'locked');
+
+      await withPatched(schoolDataService, {
+        getDataById: async () => {
+          throw new Error('Export preview must not reread the live single source.');
+        }
+      }, async () => {
+        const exportPreview = await overallReportService.buildExportPreview(persisted);
+        assert.equal(exportPreview.ready, true);
+        assert.equal(exportPreview.placeholders['T1.score'], '88');
+        assert.equal(exportPreview.placeholders['O.extracted_score'], '88');
+      });
+    });
+  } finally {
+    fs.rmSync(fixture.dir, { recursive: true, force: true });
+  }
 });
 
 test('derived overrides are preserved until explicitly replaced', () => {
@@ -614,6 +775,7 @@ test('DOCX inspection recognizes split namespaced tokens and export preview uses
 });
 
 test('registry, maintenance, access, seeding, and Mongo index integrations are declared', () => {
+  const controller = read('packages/school/MVC/controllers/school/overallReportController.js');
   const repository = read('packages/school/MVC/repositories/school/index.js');
   const deletionRegistry = read('packages/school/MVC/services/school/schoolDeletionRuleRegistry.js');
   const maintenance = read('packages/school/MVC/config/schoolDataMaintenanceCatalog.js');
@@ -622,6 +784,8 @@ test('registry, maintenance, access, seeding, and Mongo index integrations are d
   const sections = JSON.parse(read('data/sections.json'));
   const symbols = JSON.parse(read('data/symbols.json'));
 
+  assert.match(controller, /nextSlotNumber:\s*2/);
+  assert.match(controller, /sourceSlots:\s*\[\s*\{\s*slotKey:\s*'T1'/);
   assert.match(repository, /schoolOverallReportTemplates/);
   assert.match(repository, /schoolOverallReportInstances/);
   assert.match(deletionRegistry, /sourceSlots\.templateId/);
@@ -638,6 +802,8 @@ test('registry, maintenance, access, seeding, and Mongo index integrations are d
 
 test('overall template, creation, and instance views render searchable pickers and parseable client scripts', async () => {
   const template = { ...overallTemplate(), id: 'OVERALL-1' };
+  const templateListSource = read('packages/school/MVC/views/school/report/overallTemplateList.ejs');
+  const reportListSource = read('packages/school/MVC/views/school/report/overallReportList.ejs');
   template.schema.fields = [
     { id: '__section_1', label: 'Summary Section', type: 'section', helpText: 'Section guidance', fullPageWidth: true },
     { ...template.schema.fields[0], helpText: 'Summary guidance', placeholder: 'Enter a summary', fullPageWidth: true, hasBorder: true, backgroundColor: '#f0f8ff' },
@@ -711,6 +877,53 @@ test('overall template, creation, and instance views render searchable pickers a
     },
     renderOptions
   );
+  const listPagination = {
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 1,
+    startItem: 1,
+    endItem: 1,
+    limit: 10
+  };
+  const templateListHtml = await ejs.renderFile(
+    path.join(ROOT_DIR, 'packages/school/MVC/views/school/report/overallTemplateList.ejs'),
+    {
+      title: 'Overall Report Templates',
+      tableName: 'overallReportTemplates',
+      data: [template],
+      pagination: listPagination,
+      filters: {},
+      newUrl: 'school/reports/overall-templates',
+      newLabel: 'New Overall Template',
+      print: false,
+      user: reqUser
+    },
+    renderOptions
+  );
+  const reportListHtml = await ejs.renderFile(
+    path.join(ROOT_DIR, 'packages/school/MVC/views/school/report/overallReportList.ejs'),
+    {
+      title: 'Overall Reports',
+      tableName: 'overallReportInstances',
+      data: [{
+        id: 'OVERALL-INSTANCE-1',
+        title: 'Overall Report',
+        overallTemplateId: template.id,
+        overallTemplateVersion: 1,
+        sourceSelections: [{ slotKey: 'T1', instanceId: 'REPORT-1' }],
+        status: 'submitted',
+        revision: 1,
+        generatedDocs: [{ fileName: 'overall.docx' }]
+      }],
+      pagination: listPagination,
+      filters: {},
+      newUrl: null,
+      newLabel: null,
+      print: false,
+      user: reqUser
+    },
+    renderOptions
+  );
 
   assert.match(templateHtml, /Use Source \/ Predefined Value/);
   assert.match(templateHtml, /sourceMode:\s*'local'/);
@@ -719,6 +932,9 @@ test('overall template, creation, and instance views render searchable pickers a
   assert.match(templateHtml, /overall-field-row/);
   assert.match(templateHtml, /Template Has Different Keys/);
   assert.match(templateHtml, /Source Slot Is In Use/);
+  assert.match(templateHtml, /slots\.length <= 1/);
+  assert.match(templateHtml, /slots\.length < 1/);
+  assert.match(templateHtml, /Select at least one source template\./);
   assert.match(templateHtml, /Field Is In Use/);
   assert.match(templateHtml, /title:\s*'Select Funder'/);
   assert.doesNotMatch(templateHtml, /id="funderPicker"/);
@@ -732,10 +948,30 @@ test('overall template, creation, and instance views render searchable pickers a
   assert.match(editorHtml, /background-color:#f0f8ff/);
   assert.match(editorHtml, /type="checkbox"[^>]+data-field-id="confirmed"/);
   assert.match(editorHtml, /Summary is required\./);
+  assert.match(editorHtml, /async function showReportMessage/);
+  assert.match(editorHtml, /await showReportMessage/);
+  assert.match(editorHtml, /await confirmReportAction/);
+  assert.match(createHtml, /typeof window\.showMessageModal === 'function'/);
+  assert.match(templateHtml, /typeof window\.showMessageModal === 'function'/);
+  assert.match(templateListSource, /js-delete-overall-template/);
+  assert.match(templateListSource, /Delete Overall Report Template\?/);
+  assert.match(reportListSource, /js-remove-overall-report/);
+  assert.match(reportListSource, /Archive <strong>/);
+  assert.match(templateListHtml, /data-template-title="Consolidated Progress"/);
+  assert.match(reportListHtml, /data-action="Archive"/);
+
+  [templateHtml, editorHtml, createHtml, templateListSource, reportListSource].forEach((source) => {
+    assert.doesNotMatch(source, /(^|[^.\w])(?:alert|confirm)\s*\(/m);
+  });
 
   [templateHtml, editorHtml, createHtml].forEach((html) => {
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
     assert.ok(scripts.length > 0);
     scripts.forEach((source) => new Function(source));
+  });
+  [templateListSource, reportListSource].forEach((source) => {
+    const scripts = [...source.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    assert.equal(scripts.length, 1);
+    scripts.forEach((clientScript) => new Function(clientScript));
   });
 });

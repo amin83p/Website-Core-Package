@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const classCtrl = require('../controllers/school/classController');
+const settingsCtrl = require('../controllers/school/schoolSettingsController');
 const rollingCtrl = require('../controllers/school/classRollingEnrollmentController');
 const programRegistrationCtrl = require('../controllers/school/programRegistrationController');
 const studentProgramPriorSubjectCtrl = require('../controllers/school/studentProgramPriorSubjectController');
@@ -12,7 +13,6 @@ const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
 const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
 const upload = requireCoreModule('MVC/middleware/upload');
 const { SECTIONS, OPERATIONS } = require('./schoolRouteDependencies');
-const { requireConductRatingScalePolicyAdmin } = require('../middleware/conductRatingScalePolicyAdminMiddleware');
 
 router.use(requireAuth);
 
@@ -432,16 +432,20 @@ router.post('/api/cycles/split-boundary',
   trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.splitClassEnrollmentPeriodsForCycleBoundary);
 
+router.get('/conduct-rating-scale/settings',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.READ_ALL),
+  settingsCtrl.redirectLegacyConductSettings);
+
 router.post('/conduct-rating-scale/settings',
-  requireConductRatingScalePolicyAdmin(),
-  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE, {
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, {
     requireToken: true,
     keepActive: true,
     allowOperationTokenFallback: true,
     allowInactiveTokenFallback: true,
     allowSectionTokenFallback: true
   }),
-  classCtrl.saveConductRatingScaleSettings);
+  settingsCtrl.saveConductRatingScale);
 
 // --- Session Execution Routes ---
 router.get('/:id/sessions/:sessionId',
@@ -516,7 +520,7 @@ router.post('/:id/sessions/:sessionId/gradebooks/save',
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
   classCtrl.saveSessionGradebooks);
 router.post('/:id/sessions/:sessionId/lock',
-  requireConductRatingScalePolicyAdmin(),
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
   classCtrl.setSessionLock);
 router.post('/:id/sessions/:sessionId/save',

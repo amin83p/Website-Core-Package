@@ -15,7 +15,6 @@ const attendanceExcelExportService = require('../../services/school/attendanceEx
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const schoolFileService = require('../../services/school/schoolFileService');
-const { userCanManageAttendanceMatrixPolicy } = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
 const accessService = requireCoreModule('MVC/services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
@@ -275,7 +274,6 @@ function classBelongsToActiveOrg(row = {}, activeOrgId = '') {
 
 async function showAttendancePage(req, res) {
     try {
-        const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
         const editEval = await accessService.evaluateAccess({
             user: req.user,
             sectionId: SECTIONS.SCHOOL_ATTENDANCES,
@@ -313,7 +311,6 @@ async function showAttendancePage(req, res) {
             user: req.user,
             actionStateId: req.actionStateId,
             tableName: 'Attendance_Matrix',
-            canManageAttendanceMatrixPolicy,
             canEditAttendanceRoster,
             canOverrideSessionLock,
             initialClassId,
@@ -357,69 +354,6 @@ async function listActiveAttendanceClasses(req, res) {
         });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
-    }
-}
-
-async function showAttendanceMatrixSettings(req, res) {
-    try {
-        const activeOrgId = String(req.user?.activeOrgId || '').trim();
-        let policyItems = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(activeOrgId);
-        if (!policyItems.length) {
-            policyItems = [{
-                ...attendanceMatrixPolicyModel.DEFAULT_POLICY,
-                id: '',
-                isDefault: true
-            }];
-        }
-        const policy = await attendanceMatrixPolicyModel.getPolicyForOrg(activeOrgId);
-        res.render('school/attendance/attendanceMatrixPolicy', {
-            title: 'Attendance Matrix — Threshold Settings',
-            includeModal: true,
-            user: req.user,
-            actionStateId: req.actionStateId,
-            policy,
-            policyItems,
-            policyOrgKey: attendanceMatrixPolicyModel.orgKey(activeOrgId),
-            saved: req.query.saved === '1',
-            errorMessage: null
-        });
-    } catch (error) {
-        res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
-    }
-}
-
-async function saveAttendanceMatrixSettings(req, res) {
-    try {
-        const activeOrgId = String(req.user?.activeOrgId || '').trim();
-        const rawItems = attendanceMatrixPolicyModel.parsePolicyItemsFromBody(req.body || {});
-        await attendanceMatrixPolicyModel.savePolicyItemsForOrg(activeOrgId, rawItems, req.user?.id);
-        res.redirect('/school/attendances/settings?saved=1');
-    } catch (error) {
-        const activeOrgId = String(req.user?.activeOrgId || '').trim();
-        let policyItems = [];
-        try {
-            policyItems = attendanceMatrixPolicyModel.normalizePolicyItemsForSave(
-                attendanceMatrixPolicyModel.parsePolicyItemsFromBody(req.body || {})
-            );
-        } catch (_) {
-            policyItems = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(activeOrgId);
-        }
-        const policy = await attendanceMatrixPolicyModel.getPolicyForOrg(activeOrgId);
-        res.status(400).render('school/attendance/attendanceMatrixPolicy', {
-            title: 'Attendance Matrix — Threshold Settings',
-            includeModal: true,
-            user: req.user,
-            actionStateId: req.actionStateId,
-            policy,
-            policyItems: policyItems.length ? policyItems : [{
-                ...attendanceMatrixPolicyModel.DEFAULT_POLICY,
-                id: '',
-                isDefault: true
-            }],
-            policyOrgKey: attendanceMatrixPolicyModel.orgKey(req.user?.activeOrgId),
-            saved: false,
-            errorMessage: error.message || 'Could not save settings.'
-        });
     }
 }
 
@@ -562,13 +496,11 @@ async function buildAttendanceMatrixPayload(req) {
         });
         studentList.sort((a, b) => a.name.localeCompare(b.name));
 
-        const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(
-            String(req.user?.activeOrgId || classData?.orgId || '').trim()
-        );
-        const orgPolicyItems = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(
-            String(req.user?.activeOrgId || classData?.orgId || '').trim()
-        );
-        const orgPolicyCatalog = { items: orgPolicyItems };
+        const attendancePolicyOrgId = String(req.user?.activeOrgId || classData?.orgId || '').trim();
+        const [orgPolicyLayer, orgPolicyCatalog] = await Promise.all([
+            attendanceMatrixPolicyModel.getPolicyForOrg(attendancePolicyOrgId),
+            attendanceMatrixPolicyModel.getPolicyCatalogForOrg(attendancePolicyOrgId)
+        ]);
         const attendancePolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
         const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
 
@@ -624,7 +556,11 @@ async function buildAttendanceMatrixPayload(req) {
                 } else if (withinEnrollmentWindow && !forceNotApplicable && status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE && rosterRecord) {
                     applicability = 'manual_not_applicable';
                 }
-                return {
+                const scheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+                    ses,
+                    attendancePolicy.scheduledMinutes
+                );
+                const record = {
                     sessionId: ses.sessionId,
                     date: ses.date,
                     status,
@@ -642,11 +578,19 @@ async function buildAttendanceMatrixPayload(req) {
                     sessionLevelNote: ses.notes || '',
                     sessionLocked,
                     comments: enrichAttendanceComments(rosterRecord?.comments || [], userContactById),
-                    scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(
-                        ses,
-                        attendancePolicy.scheduledMinutes
-                    )
+                    scheduledMinutes
                 };
+                const recordPolicy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
+                    classData,
+                    orgPolicyCatalog,
+                    scheduledMinutes
+                );
+                record.status = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus(
+                    record,
+                    recordPolicy,
+                    enabledAttendanceStatuses
+                );
+                return record;
             });
             const summary = attendanceMatrixMetricsService.computeStudentMatrixSummary(
                 records,
@@ -656,7 +600,6 @@ async function buildAttendanceMatrixPayload(req) {
             return { ...stu, records, summary };
         });
 
-        const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
         const payload = {
             classId: classId,
             className: classData.title,
@@ -671,11 +614,6 @@ async function buildAttendanceMatrixPayload(req) {
                 : String(enrollmentSnapshot?.source || 'legacy'),
             enrollmentUsedFallback: Boolean(enrollmentSnapshot?.usedFallback)
         };
-        // Threshold numbers are admin-only; matrix itself is also admin-gated at the route.
-        if (canManageAttendanceMatrixPolicy) {
-            payload.attendancePolicy = attendancePolicy;
-            payload.attendancePolicyItems = orgPolicyItems;
-        }
         return payload;
 }
 
@@ -918,19 +856,23 @@ async function updateAttendanceRosterCell(req, res) {
         }
         if (!rosterRecord.comments) rosterRecord.comments = [];
 
-        const orgPolicyItemsCell = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(classData?.orgId || '');
+        const orgPolicyCatalogCell = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(classData?.orgId || '');
         const sessionScheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
             session,
             attendanceMatrixPolicyModel.DEFAULT_POLICY.scheduledMinutes
         );
         const orgPolicyLayerCell = attendanceMatrixMetricsService.pickOrgPolicyLayerForMinutes(
-            { items: orgPolicyItemsCell },
+            orgPolicyCatalogCell,
             sessionScheduledMinutes
         );
         const matrixPolicyCell = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerCell);
         Object.assign(
             rosterRecord,
-            attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(rosterRecord, matrixPolicyCell)
+            attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(
+                rosterRecord,
+                matrixPolicyCell,
+                enabledAttendanceStatuses
+            )
         );
         rosterRecord.attendance = attendanceMatrixMetricsService.coerceAttendanceStatusToEnabled(
             rosterRecord.attendance,
@@ -966,8 +908,6 @@ async function updateAttendanceRosterCell(req, res) {
 
 module.exports = {
     showAttendancePage,
-    showAttendanceMatrixSettings,
-    saveAttendanceMatrixSettings,
     listActiveAttendanceClasses,
     buildAttendanceMatrixPayload,
     getAttendanceData,

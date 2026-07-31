@@ -358,7 +358,7 @@ async function showHome(req, res) {
       },
       {
         title: 'Overall Report Templates',
-        description: 'Design consolidated reports from two or more completed report templates.',
+        description: 'Extract or consolidate reports from one or more completed report templates.',
         href: '/school/reports/overall-templates',
         sectionId: SECTIONS.SCHOOL_REPORTS_OVERALL_TEMPLATE,
         icon: 'bi-files',

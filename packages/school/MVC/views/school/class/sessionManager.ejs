@@ -1035,7 +1035,7 @@
         const smTeacherLabel = String(session.delivery?.deliveredByName || session.delivery?.deliveredBy || '').trim();
         const smCurrentStatusLabel = String(currentSessionStatusMeta?.label || currentSessionStatus || 'Scheduled').trim();
         const canEditSessionMetadataFlag = typeof canEditSessionMetadata !== 'undefined' && canEditSessionMetadata === true;
-        const canManageConductRatingScaleFlag = typeof canManageConductRatingScale !== 'undefined' && canManageConductRatingScale === true;
+        const canViewSchoolSettingsFlag = typeof canViewSchoolSettings !== 'undefined' && canViewSchoolSettings === true;
         const isTimesheetSessionLock = typeof isSessionLocked !== 'undefined' && isSessionLocked && String(session.lockReason || '') === 'timesheet_approved';
         const canToggleSessionLock = canEditSessionMetadataFlag && !isTimesheetSessionLock;
         const conductScaleDefaultLevels = [
@@ -1588,11 +1588,6 @@
                                 <% }) %>
                             </div>
                         </div>
-                        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                            <% if (canManageConductRatingScaleFlag) { %>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnOpenOptionalConductScaleSettings"><i class="bi bi-sliders me-1"></i>Scale settings</button>
-                            <% } %>
-                        </div>
                     </div>
                     <div class="card-body">
                         <% if (session.roster.length === 0) { %>
@@ -1780,9 +1775,6 @@
                             <% if (!isReadOnly && session.roster.length > 0) { %>
                                 <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenConductBulkModal"><i class="bi bi-lightning-charge me-1"></i>Quick rate</button>
                             <% } %>
-                            <% if (canManageConductRatingScaleFlag) { %>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnOpenConductScaleSettingsModal"><i class="bi bi-sliders me-1"></i>Scale settings</button>
-                            <% } %>
                             <% if (!isReadOnly) { %>
                                 <button type="button" class="btn btn-primary btn-sm" id="btnSaveSessionConduct"><i class="bi bi-check2-circle me-1"></i>Save class conduct</button>
                             <% } %>
@@ -1960,53 +1952,6 @@
     </div>
 </div>
 
-<% if (canManageConductRatingScaleFlag) { %>
-<div class="modal fade" id="conductScaleSettingsModal" tabindex="-1" aria-labelledby="conductScaleSettingsModalTitle" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-secondary text-white">
-                <h5 class="modal-title fw-bold" id="conductScaleSettingsModalTitle"><i class="bi bi-sliders me-2"></i>Conduct rating scale settings</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="small text-muted">Adjust percentage ranges for each qualitative band. Ranges must cover 0–100% without gaps or overlaps.</p>
-                <div id="conductScaleSettingsAlert" class="alert alert-danger d-none" role="alert"></div>
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Code</th>
-                                <th>Label</th>
-                                <th>Display</th>
-                                <th>Min %</th>
-                                <th>Max %</th>
-                                <th>Default %</th>
-                            </tr>
-                        </thead>
-                        <tbody id="conductScaleSettingsBody">
-                            <% conductScaleLevels.forEach((level, index) => { %>
-                                <tr class="conduct-scale-level-row" data-level-index="<%= index %>">
-                                    <td class="fw-bold font-monospace"><%= level.code %></td>
-                                    <td><input type="text" class="form-control form-control-sm conduct-scale-label" value="<%= level.label %>" maxlength="80"></td>
-                                    <td><input type="text" class="form-control form-control-sm conduct-scale-display" value="<%= level.displayCode || level.code %>" maxlength="8" style="max-width:4.5rem;"></td>
-                                    <td><input type="number" class="form-control form-control-sm conduct-scale-min" min="0" max="100" step="0.5" value="<%= level.minPercent %>"></td>
-                                    <td><input type="number" class="form-control form-control-sm conduct-scale-max" min="0" max="100" step="0.5" value="<%= level.maxPercent %>"></td>
-                                    <td><input type="number" class="form-control form-control-sm conduct-scale-default" min="0" max="100" step="0.5" value="<%= level.defaultPercent %>"></td>
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary fw-bold" id="btnSaveConductScaleSettings"><i class="bi bi-save me-1"></i>Save settings</button>
-            </div>
-        </div>
-    </div>
-</div>
-<% } %>
-
 <div class="modal fade" id="attendanceDetailsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -2041,9 +1986,6 @@
                             </div>
                         </div>
                         <div class="small mt-2" id="modalExcuseAttachmentPreview"></div>
-                    </div>
-                    <div class="col-12">
-                        <p class="small text-muted mb-0" id="attendanceMatrixThresholdHint"></p>
                     </div>
                 </div>
 
@@ -2667,12 +2609,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    window.__attendanceMatrixPolicy = <%- JSON.stringify(typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved ? attendanceMatrixPolicyResolved : { disqualifyLateMinutes: 30, disqualifyEarlyLeaveMinutes: 30, disqualifyCombinedMissedMinutes: null, scheduledMinutes: 180 }) %>;
-    window.__attendanceMatrixPolicyItems = <%- JSON.stringify(typeof attendanceMatrixPolicyItems !== 'undefined' && Array.isArray(attendanceMatrixPolicyItems) ? attendanceMatrixPolicyItems : []) %>;
-    window.CAN_MANAGE_ATTENDANCE_MATRIX_POLICY = <%= (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) ? 'true' : 'false' %>;
+    window.__attendanceMatrixPolicy = <%- canViewSchoolSettingsFlag
+        ? JSON.stringify(typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved ? attendanceMatrixPolicyResolved : { thresholdsEnabled: true, disqualifyLateMinutes: 30, disqualifyEarlyLeaveMinutes: 30, disqualifyCombinedMissedMinutes: null, scheduledMinutes: 180 })
+        : 'null' %>;
+    window.__attendanceThresholdsEnabled = <%= typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved?.thresholdsEnabled === false ? 'false' : 'true' %>;
     window.__conductRatingScale = <%- JSON.stringify(typeof conductRatingScaleResolved !== 'undefined' && conductRatingScaleResolved ? conductRatingScaleResolved : { levels: conductScaleDefaultLevels }) %>;
     const sessionConductReadOnly = <%= JSON.stringify(!!isReadOnly) %>;
-    const canManageConductRatingScaleClient = <%- jsonForScript(Boolean(canManageConductRatingScaleFlag)) %>;
     const conductDimensionMeta = <%- jsonForScript(conductDimensions) %>;
     const CONDUCT_SCALE_FALLBACK_LEVELS = <%- jsonForScript(conductScaleDefaultLevels) %>;
     const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;
@@ -3116,36 +3058,9 @@ document.addEventListener('DOMContentLoaded', () => {
         root.querySelectorAll(selector).forEach((cell) => applyConductLevel(cell, level.code));
     }
 
-    function refreshConductScaleUi() {
-        renderConductBulkLegend();
-        document.querySelectorAll('#conductScaleSettingsBody .conduct-scale-level-row').forEach((row, index) => {
-            const level = getConductScaleLevels()[index];
-            if (!level) return;
-            row.querySelector('.conduct-scale-label').value = level.label || level.code;
-            row.querySelector('.conduct-scale-display').value = level.displayCode || level.code || '';
-            row.querySelector('.conduct-scale-min').value = level.minPercent;
-            row.querySelector('.conduct-scale-max').value = level.maxPercent;
-            row.querySelector('.conduct-scale-default').value = level.defaultPercent;
-        });
-    }
-
-    function collectConductScaleSettingsFromForm() {
-        return Array.from(document.querySelectorAll('#conductScaleSettingsBody .conduct-scale-level-row')).map((row) => ({
-            code: row.querySelector('td.fw-bold')?.textContent?.trim() || '',
-            label: row.querySelector('.conduct-scale-label')?.value || '',
-            displayCode: row.querySelector('.conduct-scale-display')?.value || '',
-            minPercent: row.querySelector('.conduct-scale-min')?.value,
-            maxPercent: row.querySelector('.conduct-scale-max')?.value,
-            defaultPercent: row.querySelector('.conduct-scale-default')?.value
-        }));
-    }
-
     let conductBulkModalInstance = null;
     const conductBulkModalEl = document.getElementById('conductBulkRatingModal');
     if (conductBulkModalEl && window.bootstrap) conductBulkModalInstance = new bootstrap.Modal(conductBulkModalEl);
-    let conductScaleSettingsModalInstance = null;
-    const conductScaleSettingsModalEl = document.getElementById('conductScaleSettingsModal');
-    if (conductScaleSettingsModalEl && window.bootstrap) conductScaleSettingsModalInstance = new bootstrap.Modal(conductScaleSettingsModalEl);
 
     document.getElementById('btnOpenConductBulkModal')?.addEventListener('click', () => {
         renderConductBulkLegend();
@@ -3157,59 +3072,9 @@ document.addEventListener('DOMContentLoaded', () => {
         syncConductModalFromTable('#optionalConductTable');
         conductBulkModalInstance?.show();
     });
-    document.getElementById('btnOpenOptionalConductScaleSettings')?.addEventListener('click', () => {
-        refreshConductScaleUi();
-        conductScaleSettingsModalInstance?.show();
-    });
     conductBulkModalEl?.addEventListener('hidden.bs.modal', () => syncConductTableFromModal());
     document.querySelectorAll(".conduct-bulk-set-all-level").forEach((button) => button.addEventListener("click", () => setAllConductCellsToLevel(button.dataset.code, document.getElementById("conductBulkRatingBody"))));
     document.querySelectorAll(".conduct-bulk-column-emoji-btn").forEach((button) => button.addEventListener("click", () => setConductColumnToLevel(button.dataset.dimension, button.dataset.code, conductBulkModalEl)));
-    document.getElementById('btnOpenConductScaleSettingsModal')?.addEventListener('click', () => {
-        refreshConductScaleUi();
-        conductScaleSettingsModalInstance?.show();
-    });
-    document.getElementById('btnSaveConductScaleSettings')?.addEventListener('click', async () => {
-        const alertEl = document.getElementById('conductScaleSettingsAlert');
-        const btn = document.getElementById('btnSaveConductScaleSettings');
-        if (!btn) return;
-        const levels = collectConductScaleSettingsFromForm();
-        btn.disabled = true;
-        if (alertEl) {
-            alertEl.classList.add('d-none');
-            alertEl.textContent = '';
-        }
-        try {
-            const body = new URLSearchParams();
-            body.set('levels', JSON.stringify(levels));
-            body.set('actionStateId', actionStateId);
-            const res = await fetch('/school/classes/conduct-rating-scale/settings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-AJAX-Request': 'true',
-                    'Accept': 'application/json'
-                },
-                body: body.toString()
-            });
-            const result = await res.json().catch(() => null);
-            if (!res.ok || !result || result.status !== 'success') {
-                throw new Error(result?.message || 'Failed to save conduct rating scale settings.');
-            }
-            window.__conductRatingScale = result.policy || { levels };
-            refreshConductScaleUi();
-            conductScaleSettingsModalInstance?.hide();
-            if (typeof window.showMessageModal === 'function') {
-                await window.showMessageModal({ title: 'Saved', message: 'Conduct rating scale settings were updated.', icon: 'success' });
-            }
-        } catch (error) {
-            if (alertEl) {
-                alertEl.textContent = error?.message || 'Failed to save settings.';
-                alertEl.classList.remove('d-none');
-            }
-        } finally {
-            btn.disabled = false;
-        }
-    });
 
     initAllConductRatingCells();
     initOptionalConductTableFromSavedStudents();
@@ -3977,12 +3842,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setAttendanceRadio(row, value) {
         const r = row.querySelector(`.att-radio[value="${value}"]`);
-        if (r && !r.disabled) r.checked = true;
+        if (r && !r.disabled) {
+            r.checked = true;
+            return true;
+        }
+        return false;
     }
 
     function applyAttendanceRulesToRow(row) {
         if (!row) return;
-        const pol = window.__attendanceMatrixPolicy || {};
+        const pol = window.__attendanceMatrixPolicy;
         const late = parseNonNegAttendanceMins(row.querySelector('.att-late')?.value);
         const early = parseNonNegAttendanceMins(row.querySelector('.att-leave')?.value);
         let att = row.querySelector('.att-radio:checked')?.value || '';
@@ -3994,18 +3863,28 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const lateCut = Number(pol.disqualifyLateMinutes);
-        const earlyCut = Number(pol.disqualifyEarlyLeaveMinutes);
-        const comb = pol.disqualifyCombinedMissedMinutes;
-
-        if ((Number.isFinite(lateCut) && late >= lateCut) || (Number.isFinite(earlyCut) && early >= earlyCut)) {
-            setAttendanceRadio(row, 'absent');
+        if (window.__attendanceThresholdsEnabled === false) {
+            if (!att || att === 'acf' || att === 'excused') return;
+            if (late > 0 || early > 0 || att === 'late') {
+                if (!setAttendanceRadio(row, 'late')) setAttendanceRadio(row, 'present');
+            }
             return;
         }
-        const combN = comb === null || comb === undefined || comb === '' ? null : Number(comb);
-        if (combN != null && Number.isFinite(combN) && late + early >= combN) {
-            setAttendanceRadio(row, 'absent');
-            return;
+
+        if (pol) {
+            const lateCut = Number(pol.disqualifyLateMinutes);
+            const earlyCut = Number(pol.disqualifyEarlyLeaveMinutes);
+            const comb = pol.disqualifyCombinedMissedMinutes;
+
+            if ((Number.isFinite(lateCut) && late >= lateCut) || (Number.isFinite(earlyCut) && early >= earlyCut)) {
+                setAttendanceRadio(row, 'absent');
+                return;
+            }
+            const combN = comb === null || comb === undefined || comb === '' ? null : Number(comb);
+            if (combN != null && Number.isFinite(combN) && late + early >= combN) {
+                setAttendanceRadio(row, 'absent');
+                return;
+            }
         }
         // Unmarked (white): do not coerce to Absent or Late from empty selection alone.
         if (!att) {
@@ -4015,30 +3894,6 @@ document.addEventListener('DOMContentLoaded', () => {
             setAttendanceRadio(row, 'late');
         }
     }
-
-    function refreshAttendanceMatrixHint() {
-        const el = document.getElementById('attendanceMatrixThresholdHint');
-        if (!el) return;
-        if (window.CAN_MANAGE_ATTENDANCE_MATRIX_POLICY !== true) {
-            el.textContent = '';
-            el.classList.add('d-none');
-            return;
-        }
-        el.classList.remove('d-none');
-        const pol = window.__attendanceMatrixPolicy || {};
-        const lateCut = pol.disqualifyLateMinutes;
-        const earlyCut = pol.disqualifyEarlyLeaveMinutes;
-        const comb = pol.disqualifyCombinedMissedMinutes;
-        const parts = [
-            `Late ≥ ${lateCut} min or left early ≥ ${earlyCut} min counts as absent`
-        ];
-        if (comb != null && comb !== '' && Number.isFinite(Number(comb))) {
-            parts.push(`combined late + early ≥ ${comb} min counts as absent`);
-        }
-        parts.push('any late/early minutes with Present or Excused switches status to Late');
-        el.textContent = parts.join('. ') + '.';
-    }
-    window.refreshAttendanceMatrixHint = refreshAttendanceMatrixHint;
 
     if (typeof bootstrap !== 'undefined') {
         detailsModalInstance = new bootstrap.Modal(document.getElementById('attendanceDetailsModal'));
@@ -6141,7 +5996,6 @@ document.addEventListener('DOMContentLoaded', () => {
 function openDetailsModal(personId, name) {
     document.getElementById('modalPersonId').value = personId;
     document.getElementById('modalStudentName').innerText = name;
-    if (typeof window.refreshAttendanceMatrixHint === 'function') window.refreshAttendanceMatrixHint();
 
     const row = document.querySelector(`.roster-row[data-personid="${personId}"]`);
     if (row) {

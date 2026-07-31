@@ -450,6 +450,7 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
   const classData = options?.classData && typeof options.classData === 'object' ? options.classData : {};
   const orgPolicyLayer = options?.orgPolicyLayer && typeof options.orgPolicyLayer === 'object' ? options.orgPolicyLayer : {};
   const matrixPolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
+  const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
   const matrixRecords = [];
 
   sessions.forEach((session) => {
@@ -462,13 +463,22 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
     const derivedNotApplicable = sessionKey && notApplicableSessionIds.has(sessionKey);
     const expectedForSession = !expectedSessionIds || !sessionKey || expectedSessionIds.has(sessionKey);
     const row = roster.find((item) => idsEqual(item?.personId, target));
-    const status = resolveEffectiveAttendanceStatus({
+    const rawStatus = resolveEffectiveAttendanceStatus({
       session,
       rosterRow: row,
       statusMap: effectiveStatusMap,
       derivedNotApplicable,
       expectedForSession
     });
+    const scheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+      session,
+      matrixPolicy.scheduledMinutes
+    );
+    const status = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus({
+      status: rawStatus,
+      lateMinutes: row?.lateMinutes || 0,
+      earlyLeaveMinutes: row?.earlyLeaveMinutes || 0
+    }, matrixPolicy, enabledAttendanceStatuses);
     if (!row && status !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE && !countMissingAsAbsent) return;
     if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
       out.notApplicable += 1;
@@ -476,7 +486,7 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
         status,
         lateMinutes: 0,
         earlyLeaveMinutes: 0,
-        scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(session, matrixPolicy.scheduledMinutes)
+        scheduledMinutes
       });
       return;
     }
@@ -490,7 +500,7 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
       status,
       lateMinutes: row?.lateMinutes || 0,
       earlyLeaveMinutes: row?.earlyLeaveMinutes || 0,
-      scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(session, matrixPolicy.scheduledMinutes)
+      scheduledMinutes
     });
   });
 
@@ -534,6 +544,7 @@ function buildStudentPunctualitySummary(sessions, studentId, statusMap = null, o
   const classData = options?.classData && typeof options.classData === 'object' ? options.classData : {};
   const orgPolicyLayer = options?.orgPolicyLayer && typeof options.orgPolicyLayer === 'object' ? options.orgPolicyLayer : {};
   const matrixPolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
+  const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
 
   (Array.isArray(sessions) ? sessions : []).forEach((session) => {
     if (sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(effectiveStatusMap, {
@@ -545,7 +556,11 @@ function buildStudentPunctualitySummary(sessions, studentId, statusMap = null, o
     const row = roster.find((item) => idsEqual(item?.personId, target));
     if (!row) return;
 
-    const normalized = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(row, matrixPolicy);
+    const normalized = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(
+      row,
+      matrixPolicy,
+      enabledAttendanceStatuses
+    );
     const status = String(normalized?.attendance || '').trim().toLowerCase();
     if (status !== 'present' && status !== 'late' && status !== 'excused') return;
 
@@ -612,6 +627,7 @@ function buildStudentSessionRatingSummary(sessions, studentId, statusMap = null,
   const classData = options?.classData && typeof options.classData === 'object' ? options.classData : {};
   const orgPolicyLayer = options?.orgPolicyLayer && typeof options.orgPolicyLayer === 'object' ? options.orgPolicyLayer : {};
   const matrixPolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
+  const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
 
   (Array.isArray(sessions) ? sessions : []).forEach((session) => {
     if (sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(effectiveStatusMap, {
@@ -623,7 +639,11 @@ function buildStudentSessionRatingSummary(sessions, studentId, statusMap = null,
     const row = roster.find((item) => idsEqual(item?.personId, target));
     if (!row) return;
 
-    const normalized = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(row, matrixPolicy);
+    const normalized = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(
+      row,
+      matrixPolicy,
+      enabledAttendanceStatuses
+    );
     const status = String(normalized?.attendance || '').trim().toLowerCase();
     if (status !== 'present' && status !== 'late' && status !== 'excused') return;
 

@@ -47,7 +47,7 @@ function clonePlain(value, fallback = null) {
 
 function sanitizeSourceSlots(rawSlots) {
   const rows = Array.isArray(rawSlots) ? rawSlots : [];
-  if (rows.length < 2) throw new Error('Overall report templates require at least two source template slots.');
+  if (rows.length < 1) throw new Error('Overall report templates require at least one source template slot.');
   const seen = new Set();
   return rows.map((raw, index) => {
     const slotKey = clean(raw?.slotKey || `T${index + 1}`, 30).toUpperCase();

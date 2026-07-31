@@ -90,9 +90,6 @@
   const attManageBtns = [
     '<a href="/school/grades-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-table me-1"></i> Grades Matrix</a>'
   ];
-  if (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) {
-    attManageBtns.push('<a href="/school/attendances/settings" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-sliders me-1"></i> Matrix Thresholds</a>');
-  }
 %>
 
 <%- include('partials/tablePages-start', {
@@ -658,7 +655,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
     window.ATTENDANCE_ACTION_STATE_ID = actionStateId;
     window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
-    window.CAN_MANAGE_ATTENDANCE_MATRIX_POLICY = <%= (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) ? 'true' : 'false' %>;
     window.CAN_OVERRIDE_SESSION_LOCK = <%= (typeof canOverrideSessionLock !== 'undefined' && canOverrideSessionLock) ? 'true' : 'false' %>;
 
     if (typeof bootstrap !== 'undefined') {
@@ -900,18 +896,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const tbody = document.getElementById('matrixBody');
             headers.innerHTML = ''; tbody.innerHTML = '';
 
-            const ap = result.attendancePolicy || {};
-            const canSeeThresholds = window.CAN_MANAGE_ATTENDANCE_MATRIX_POLICY === true && result.attendancePolicy;
-            const policyTitle = canSeeThresholds
-              ? [
-                  `Scheduled ${ap.scheduledMinutes ?? 180} min/session`,
-                  `late ≥ ${ap.disqualifyLateMinutes ?? 30} min → 0%`,
-                  `early leave ≥ ${ap.disqualifyEarlyLeaveMinutes ?? 30} min → 0%`,
-                  ap.disqualifyCombinedMissedMinutes != null
-                    ? `combined late+leave ≥ ${ap.disqualifyCombinedMissedMinutes} min → 0%`
-                    : null
-                ].filter(Boolean).join(' · ')
-              : 'Attendance rollup';
+            const policyTitle = 'Attendance rollup';
 
             const studentHeaderHtml = buildAttendanceStudentFilterDropdownHtml(
                 result.matrix,

@@ -50,43 +50,32 @@ test('schoolAdminAccessService delegates to adminAuthorityService', () => {
   assert.doesNotMatch(source, /roles\.includes\(/);
 });
 
-test('attendance matrix thresholds are admin-only via schoolAdminAccessService', () => {
-  const middleware = fs.readFileSync(
-    path.join(SCHOOL_ROOT, 'MVC', 'middleware', 'attendanceMatrixPolicyAdminMiddleware.js'),
+test('School Settings uses standard READ_ALL and UPDATE access', () => {
+  const settingsAccess = fs.readFileSync(
+    path.join(SCHOOL_ROOT, 'MVC', 'services', 'school', 'schoolSettingsAccessService.js'),
     'utf8'
   );
-  assert.match(middleware, /schoolAdminAccessService/);
-  assert.match(middleware, /isAttendancesAdminViewerAsync/);
-  assert.doesNotMatch(middleware, /VIEW_DASHBOARD/);
-  assert.match(middleware, /async function userCanOpenAttendanceMatrix/);
-
-  // Manage-policy must not fall back to evaluateAccess; open-matrix may.
-  const manageFn = middleware.slice(
-    middleware.indexOf('async function userCanManageAttendanceMatrixPolicy'),
-    middleware.indexOf('async function userCanOpenAttendanceMatrix')
-  );
-  assert.doesNotMatch(manageFn, /evaluateAccess/);
-  assert.match(
-    middleware.slice(middleware.indexOf('async function userCanOpenAttendanceMatrix')),
-    /evaluateAccess/
-  );
+  assert.match(settingsAccess, /SECTIONS\.SCHOOL_SETTINGS/);
+  assert.match(settingsAccess, /OPERATIONS\.READ_ALL/);
+  assert.match(settingsAccess, /OPERATIONS\.UPDATE/);
+  assert.match(settingsAccess, /evaluateAccess/);
+  assert.doesNotMatch(settingsAccess, /schoolAdminAccessService/);
 
   const routes = fs.readFileSync(
-    path.join(SCHOOL_ROOT, 'MVC', 'routes', 'attendanceRoutes.js'),
+    path.join(SCHOOL_ROOT, 'MVC', 'routes', 'schoolSettingsRoutes.js'),
     'utf8'
   );
-  assert.match(routes, /\/settings'[\s\S]*?requireAttendanceMatrixPolicyAdmin\(\)/);
-  assert.match(routes, /router\.get\('\/'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
-  assert.match(routes, /\/api\/data'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
-  assert.match(routes, /\/api\/export\.xlsx'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
-  assert.match(routes, /\/api\/active-classes'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routes, /router\.get\('\/'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routes, /conduct-rating-scale'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routes, /attendance-matrix'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routes, /trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/);
 
   const viewer = fs.readFileSync(
     path.join(SCHOOL_ROOT, 'MVC', 'views', 'school', 'attendance', 'attendanceViewer.ejs'),
     'utf8'
   );
-  assert.match(viewer, /canManageAttendanceMatrixPolicy/);
-  assert.match(viewer, /Matrix Thresholds/);
+  assert.doesNotMatch(viewer, /canViewSchoolSettings/);
+  assert.doesNotMatch(viewer, /Matrix Thresholds/);
 });
 
 test('school production JS does not import adminChekersService', () => {

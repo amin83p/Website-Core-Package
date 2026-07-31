@@ -59,7 +59,7 @@
       <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <div>
           <h5 class="mb-0 fw-bold">Source Template Slots</h5>
-          <div class="small text-muted">Aliases remain stable when rows are reordered. The same template may be selected more than once.</div>
+          <div class="small text-muted">Use one source for extraction or multiple sources for consolidation. Aliases remain stable when rows are reordered, and the same template may be selected more than once.</div>
         </div>
         <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddSlot"><i class="bi bi-plus-lg me-1"></i>Add Source</button>
       </div>
@@ -233,19 +233,19 @@
   }
 
   async function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
-    if (typeof showMessageModal === 'function') {
-      return showMessageModal({ title, icon, message, buttons: [{ text: 'OK', class: buttonClass }] });
+    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      return window.showMessageModal({ title, icon, message: escapeHtml(message), buttons: [{ text: 'OK', class: buttonClass }] });
     }
     window.alert(String(message || title));
     return 'OK';
   }
 
   async function confirmReportModal({ title = 'Confirm', message = '', confirmText = 'Confirm', confirmClass = 'btn-danger' } = {}) {
-    if (typeof showMessageModal === 'function') {
-      const result = await showMessageModal({
+    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      const result = await window.showMessageModal({
         title,
         icon: 'warning',
-        message,
+        message: escapeHtml(message),
         buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: confirmText, class: confirmClass }]
       });
       return result === confirmText;
@@ -353,7 +353,7 @@
       const summary = template
         ? `<strong>${escapeHtml(template.title || template.id)}</strong><div class="small text-muted">${escapeHtml(template.type || 'Report')} &middot; ${escapeHtml(template.id)}</div>`
         : '<span class="text-muted">No report template selected</span>';
-      return `<tr><td><span class="badge bg-primary">${escapeHtml(slot.slotKey)}</span></td><td><div class="input-group input-group-sm"><div class="form-control bg-white overall-picker-summary">${summary}</div><button type="button" class="btn btn-outline-primary js-pick-template" data-index="${index}"><i class="bi bi-search"></i> ${template ? 'Change' : 'Select'}</button></div></td><td>v${Number(slot.templateVersionAtSelection || template?.version || 1)}</td><td class="text-end text-nowrap"><button type="button" class="btn btn-outline-secondary btn-sm js-slot-up" data-index="${index}" ${index === 0 ? 'disabled' : ''} aria-label="Move source up"><i class="bi bi-arrow-up"></i></button> <button type="button" class="btn btn-outline-secondary btn-sm js-slot-down" data-index="${index}" ${index === slots.length - 1 ? 'disabled' : ''} aria-label="Move source down"><i class="bi bi-arrow-down"></i></button></td><td><button type="button" class="btn btn-outline-danger btn-sm js-slot-remove" data-index="${index}" ${slots.length <= 2 ? 'disabled' : ''}>Remove</button></td></tr>`;
+      return `<tr><td><span class="badge bg-primary">${escapeHtml(slot.slotKey)}</span></td><td><div class="input-group input-group-sm"><div class="form-control bg-white overall-picker-summary">${summary}</div><button type="button" class="btn btn-outline-primary js-pick-template" data-index="${index}"><i class="bi bi-search"></i> ${template ? 'Change' : 'Select'}</button></div></td><td>v${Number(slot.templateVersionAtSelection || template?.version || 1)}</td><td class="text-end text-nowrap"><button type="button" class="btn btn-outline-secondary btn-sm js-slot-up" data-index="${index}" ${index === 0 ? 'disabled' : ''} aria-label="Move source up"><i class="bi bi-arrow-up"></i></button> <button type="button" class="btn btn-outline-secondary btn-sm js-slot-down" data-index="${index}" ${index === slots.length - 1 ? 'disabled' : ''} aria-label="Move source down"><i class="bi bi-arrow-down"></i></button></td><td><button type="button" class="btn btn-outline-danger btn-sm js-slot-remove" data-index="${index}" ${slots.length <= 1 ? 'disabled' : ''}>Remove</button></td></tr>`;
     }).join('');
     renderKeyCatalog();
   }
@@ -811,7 +811,7 @@
     dataFields.forEach(field => visit(field.id));
   }
   document.getElementById('overallTemplateForm').addEventListener('submit', event => {
-    if (slots.length < 2 || slots.some(slot => !slot.templateId)) { event.preventDefault(); showReportModal({ title: 'Source Templates Required', message: 'Select at least two source templates.' }); return; }
+    if (slots.length < 1 || slots.some(slot => !slot.templateId)) { event.preventDefault(); showReportModal({ title: 'Source Template Required', message: 'Select at least one source template.' }); return; }
     try { validateDesignerExpressions(); } catch (error) { event.preventDefault(); showReportModal({ title: 'Designer Validation', message: error.message }); return; }
     ensureAliases();
     document.getElementById('sourceSlotsJson').value = JSON.stringify(slots.map((slot,index) => ({...slot,order:index+1})));

@@ -1,0 +1,689 @@
+<%
+  const canUpdateFlag = typeof canUpdate !== 'undefined' && canUpdate === true;
+  const conductLevelsJson = JSON.stringify(conductPolicy?.levels || []).replace(/</g, '\\u003c');
+  const attendanceItemsJson = JSON.stringify(attendanceItems || []).replace(/</g, '\\u003c');
+  const attendanceThresholdsEnabledFlag = typeof attendanceThresholdsEnabled === 'undefined'
+    ? true
+    : attendanceThresholdsEnabled !== false;
+%>
+
+<style>
+  .school-settings-page {
+    --settings-sidebar-width: 278px;
+    --settings-sidebar-collapsed-width: 76px;
+  }
+  .school-settings-workspace {
+    display: grid;
+    grid-template-columns: var(--settings-sidebar-width) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+    transition: grid-template-columns 160ms ease;
+  }
+  .school-settings-workspace.sidebar-collapsed {
+    grid-template-columns: var(--settings-sidebar-collapsed-width) minmax(0, 1fr);
+  }
+  .school-settings-sidebar {
+    position: sticky;
+    top: 1rem;
+    overflow: hidden;
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+  }
+  .school-settings-sidebar-header {
+    min-height: 68px;
+    border-bottom: 1px solid var(--bs-border-color);
+  }
+  .school-settings-sidebar-title,
+  .school-settings-nav-label,
+  .school-settings-org-details {
+    transition: opacity 120ms ease;
+  }
+  .school-settings-org-details {
+    min-width: 0;
+  }
+  .school-settings-nav {
+    display: grid;
+    gap: .35rem;
+    padding: .75rem;
+  }
+  .school-settings-nav-item {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    width: 100%;
+    min-height: 48px;
+    padding: .65rem .75rem;
+    border: 0;
+    border-radius: .65rem;
+    color: var(--bs-body-color);
+    background: transparent;
+    text-align: left;
+    text-decoration: none;
+    transition: color 120ms ease, background-color 120ms ease, transform 120ms ease;
+  }
+  .school-settings-nav-item:hover,
+  .school-settings-nav-item:focus-visible {
+    color: var(--bs-primary);
+    background: var(--bs-primary-bg-subtle);
+  }
+  .school-settings-nav-item.active {
+    color: var(--bs-primary);
+    background: var(--bs-primary-bg-subtle);
+    font-weight: 700;
+  }
+  .school-settings-nav-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    border-radius: .55rem;
+    color: var(--bs-primary);
+    background: var(--bs-primary-bg-subtle);
+    font-size: 1rem;
+  }
+  .school-settings-sidebar-org {
+    border-top: 1px solid var(--bs-border-color);
+    padding: .85rem 1rem;
+    background: var(--bs-tertiary-bg);
+  }
+  .school-settings-workspace.sidebar-collapsed .school-settings-sidebar-title,
+  .school-settings-workspace.sidebar-collapsed .school-settings-nav-label,
+  .school-settings-workspace.sidebar-collapsed .school-settings-org-details {
+    display: none;
+  }
+  .school-settings-workspace.sidebar-collapsed .school-settings-sidebar-header {
+    justify-content: center !important;
+    padding-inline: .5rem !important;
+  }
+  .school-settings-workspace.sidebar-collapsed .school-settings-nav {
+    padding-inline: .6rem;
+  }
+  .school-settings-workspace.sidebar-collapsed .school-settings-nav-item {
+    justify-content: center;
+    padding-inline: .35rem;
+  }
+  .school-settings-workspace.sidebar-collapsed .school-settings-sidebar-org {
+    display: flex;
+    justify-content: center;
+    padding-inline: .5rem;
+  }
+  .school-settings-content {
+    min-width: 0;
+  }
+  .school-settings-panel {
+    display: none;
+  }
+  .school-settings-panel.active {
+    display: block;
+    animation: school-settings-panel-in 150ms ease-out;
+  }
+  .school-settings-panel-header {
+    border-bottom: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+  }
+  @keyframes school-settings-panel-in {
+    from { opacity: 0; transform: translateY(3px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .school-settings-table input:disabled {
+    background-color: var(--bs-secondary-bg);
+    opacity: 1;
+  }
+  .attendance-threshold-editor {
+    transition: opacity 140ms ease;
+  }
+  .attendance-threshold-editor.is-disabled {
+    opacity: .58;
+  }
+  @media (max-width: 767.98px) {
+    .school-settings-workspace,
+    .school-settings-workspace.sidebar-collapsed {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .school-settings-sidebar {
+      position: static;
+    }
+    .school-settings-workspace.sidebar-collapsed .school-settings-sidebar-title {
+      display: block;
+    }
+    .school-settings-workspace.sidebar-collapsed .school-settings-sidebar-header {
+      justify-content: space-between !important;
+      padding-inline: 1rem !important;
+    }
+    .school-settings-workspace.sidebar-collapsed .school-settings-nav,
+    .school-settings-workspace.sidebar-collapsed .school-settings-sidebar-org {
+      display: none;
+    }
+  }
+</style>
+
+<div class="sections-page school-settings-page">
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;">
+        <i class="bi bi-gear-wide-connected me-2"></i>School Settings
+      </h1>
+      <p class="text-muted mb-0 mt-1">Organization-wide academic and operational policies managed from one place.</p>
+    </div>
+    <a href="<%= (typeof schoolSectionDashboardHref !== 'undefined' && schoolSectionDashboardHref) || '/dashboard/section-nav/SCHOOL' %>" class="school-navigator-dashboard btn btn-outline-secondary btn-sm">
+      <i class="bi bi-speedometer2 me-1"></i>School Dashboard
+    </a>
+  </div>
+
+  <% if (!canUpdateFlag) { %>
+    <div class="alert alert-info border-0 shadow-sm" role="status">
+      <i class="bi bi-eye me-2"></i>You have read-only access. School Settings update access is required to save changes.
+    </div>
+  <% } %>
+
+  <div class="school-settings-workspace" id="schoolSettingsWorkspace">
+    <aside class="school-settings-sidebar rounded-3 shadow-sm" id="schoolSettingsSidebar" aria-label="School settings">
+      <div class="school-settings-sidebar-header d-flex align-items-center justify-content-between gap-2 px-3 py-2">
+        <div class="school-settings-sidebar-title">
+          <div class="fw-bold">Settings</div>
+          <div class="small text-muted">Choose an area</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" id="btnToggleSettingsSidebar" aria-expanded="true" aria-controls="schoolSettingsNav" title="Collapse settings sidebar">
+          <i class="bi bi-layout-sidebar-inset" id="settingsSidebarToggleIcon" aria-hidden="true"></i>
+          <span class="visually-hidden" id="settingsSidebarToggleText">Collapse settings sidebar</span>
+        </button>
+      </div>
+      <nav class="school-settings-nav" id="schoolSettingsNav" role="tablist" aria-orientation="vertical">
+        <% (groups || []).forEach((group, index) => { %>
+          <a
+            class="school-settings-nav-item <%= index === 0 ? 'active' : '' %>"
+            href="#<%= group.key %>"
+            role="tab"
+            id="settings-tab-<%= group.key %>"
+            data-settings-target="<%= group.key %>"
+            aria-controls="<%= group.key %>"
+            aria-selected="<%= index === 0 ? 'true' : 'false' %>"
+            title="<%= group.title %>"
+          >
+            <span class="school-settings-nav-icon"><i class="bi <%= group.icon %>" aria-hidden="true"></i></span>
+            <span class="school-settings-nav-label"><%= group.title %></span>
+          </a>
+        <% }); %>
+      </nav>
+      <div class="school-settings-sidebar-org d-flex align-items-center gap-2">
+        <i class="bi bi-building text-primary" aria-hidden="true"></i>
+        <div class="school-settings-org-details min-w-0">
+          <div class="small fw-semibold text-truncate" title="<%= activeOrgName %>"><%= activeOrgName %></div>
+          <div class="small text-muted font-monospace text-truncate" title="<%= activeOrgId %>"><%= activeOrgId %></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="school-settings-content" id="schoolSettingsContent">
+      <section class="school-settings-panel active card border-0 shadow-sm" id="conduct-rating-scale" role="tabpanel" aria-labelledby="settings-tab-conduct-rating-scale" tabindex="0">
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-emoji-smile" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Conduct Rating Scale</h2>
+              <p class="small text-muted mb-0">Configure conduct labels, display codes, and percentage bands.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted">
+            Configure the labels used for class conduct. Percentage ranges must cover 0–100 without gaps or overlaps,
+            and each default percentage must remain inside its range. N/A remains a fixed non-percentage option.
+          </p>
+          <div class="alert alert-danger d-none js-settings-error" id="conductSettingsError" role="alert"></div>
+          <form id="conductSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="table-responsive">
+              <table class="table table-sm align-middle school-settings-table">
+                <thead class="table-light">
+                  <tr>
+                    <th>Code</th>
+                    <th style="min-width:11rem;">Label</th>
+                    <th>Display</th>
+                    <th>Min %</th>
+                    <th>Max %</th>
+                    <th>Default %</th>
+                  </tr>
+                </thead>
+                <tbody id="conductSettingsBody"></tbody>
+              </table>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit" id="btnSaveConductSettings">
+                  <i class="bi bi-save me-1"></i>Save Conduct Scale
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
+
+      <section class="school-settings-panel card border-0 shadow-sm" id="attendance-matrix" role="tabpanel" aria-labelledby="settings-tab-attendance-matrix" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+              <span class="school-settings-nav-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
+              <div>
+                <h2 class="h5 fw-bold mb-1">Attendance Matrix Thresholds</h2>
+                <p class="small text-muted mb-0">Configure duration-based late, early-leave, and combined thresholds.</p>
+              </div>
+            </div>
+            <div class="form-check form-switch m-0">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+                id="attendanceThresholdsEnabled"
+                <%= attendanceThresholdsEnabledFlag ? 'checked' : '' %>
+                <%= canUpdateFlag ? '' : 'disabled' %>
+                aria-describedby="attendanceThresholdsEnabledHelp"
+              >
+              <label class="form-check-label fw-semibold" for="attendanceThresholdsEnabled">
+                <span id="attendanceThresholdsEnabledLabel"><%= attendanceThresholdsEnabledFlag ? 'On' : 'Off' %></span>
+              </label>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted mb-3" id="attendanceThresholdsEnabledHelp">
+            When Off, late and early-leaving students receive full attendance credit. They are recorded as Late, or Present when Late is unavailable for the class.
+          </p>
+          <p class="small text-muted mb-1">
+            Create one threshold set per session duration. Exact duration matches are preferred; unmatched sessions use
+            the selected default item and then the built-in 180 / 30 / 30 defaults.
+          </p>
+          <p class="small text-muted">When On, class-level attendance policy values continue to override these organization defaults.</p>
+          <div class="alert alert-danger d-none js-settings-error" id="attendanceSettingsError" role="alert"></div>
+          <form id="attendanceSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="attendance-threshold-editor" id="attendanceThresholdEditor">
+            <div class="d-flex justify-content-end mb-2">
+              <% if (canUpdateFlag) { %>
+                <button class="btn btn-outline-primary btn-sm" type="button" id="btnAddAttendanceDuration">
+                  <i class="bi bi-plus-lg me-1"></i>Add Duration
+                </button>
+              <% } %>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle school-settings-table">
+                <thead class="table-light">
+                  <tr>
+                    <th style="min-width:8rem;">Duration (min)</th>
+                    <th style="min-width:8rem;">Late ≥</th>
+                    <th style="min-width:8rem;">Early leave ≥</th>
+                    <th style="min-width:13rem;">Combined late + early</th>
+                    <th class="text-center">Default</th>
+                    <% if (canUpdateFlag) { %><th aria-label="Actions"></th><% } %>
+                  </tr>
+                </thead>
+                <tbody id="attendanceSettingsBody"></tbody>
+              </table>
+            </div>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit" id="btnSaveAttendanceSettings">
+                  <i class="bi bi-save me-1"></i>Save Attendance Thresholds
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canUpdate = <%= canUpdateFlag ? 'true' : 'false' %>;
+  let conductLevels = <%- conductLevelsJson %>;
+  let attendanceItems = <%- attendanceItemsJson %>;
+  let attendanceThresholdsEnabled = <%= attendanceThresholdsEnabledFlag ? 'true' : 'false' %>;
+  const conductBody = document.getElementById('conductSettingsBody');
+  const attendanceBody = document.getElementById('attendanceSettingsBody');
+  const settingsWorkspace = document.getElementById('schoolSettingsWorkspace');
+  const settingsSidebarToggle = document.getElementById('btnToggleSettingsSidebar');
+  const settingsSidebarToggleIcon = document.getElementById('settingsSidebarToggleIcon');
+  const settingsSidebarToggleText = document.getElementById('settingsSidebarToggleText');
+  const settingsNavItems = [...document.querySelectorAll('[data-settings-target]')];
+  const settingsPanels = [...document.querySelectorAll('.school-settings-panel')];
+  const settingsSidebarStorageKey = 'schoolSettingsSidebarCollapsed';
+
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[character]));
+
+  function readSettingsHash() {
+    try {
+      return decodeURIComponent(String(window.location.hash || '').replace(/^#/, '').trim());
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function setActiveSettingsPanel(target, { updateHash = false, focusPanel = false } = {}) {
+    const requested = String(target || '').trim();
+    const nextPanel = settingsPanels.find(panel => panel.id === requested) || settingsPanels[0] || null;
+    if (!nextPanel) return;
+
+    settingsPanels.forEach(panel => {
+      const active = panel === nextPanel;
+      panel.classList.toggle('active', active);
+      panel.hidden = !active;
+    });
+    settingsNavItems.forEach(item => {
+      const active = item.dataset.settingsTarget === nextPanel.id;
+      item.classList.toggle('active', active);
+      item.setAttribute('aria-selected', active ? 'true' : 'false');
+      item.tabIndex = active ? 0 : -1;
+    });
+
+    if (updateHash && readSettingsHash() !== nextPanel.id) {
+      window.location.hash = nextPanel.id;
+    }
+    if (focusPanel) nextPanel.focus({ preventScroll: true });
+  }
+
+  function setSettingsSidebarCollapsed(collapsed, { remember = true } = {}) {
+    if (!settingsWorkspace) return;
+    const isCollapsed = collapsed === true;
+    settingsWorkspace.classList.toggle('sidebar-collapsed', isCollapsed);
+    settingsSidebarToggle?.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+    const label = isCollapsed ? 'Expand settings sidebar' : 'Collapse settings sidebar';
+    if (settingsSidebarToggle) settingsSidebarToggle.title = label;
+    if (settingsSidebarToggleText) settingsSidebarToggleText.textContent = label;
+    if (settingsSidebarToggleIcon) {
+      settingsSidebarToggleIcon.className = isCollapsed
+        ? 'bi bi-layout-sidebar'
+        : 'bi bi-layout-sidebar-inset';
+    }
+    if (remember) {
+      try {
+        window.localStorage.setItem(settingsSidebarStorageKey, isCollapsed ? '1' : '0');
+      } catch (_) {
+        // Storage can be unavailable in privacy-restricted browsers.
+      }
+    }
+  }
+
+  settingsSidebarToggle?.addEventListener('click', () => {
+    setSettingsSidebarCollapsed(!settingsWorkspace?.classList.contains('sidebar-collapsed'));
+  });
+
+  settingsNavItems.forEach((item, index) => {
+    item.addEventListener('click', event => {
+      event.preventDefault();
+      const target = item.dataset.settingsTarget || '';
+      setActiveSettingsPanel(target, { updateHash: true });
+      if (window.matchMedia('(max-width: 767.98px)').matches) {
+        setSettingsSidebarCollapsed(true);
+        document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+    item.addEventListener('keydown', event => {
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      let nextIndex = index;
+      if (event.key === 'ArrowDown') nextIndex = (index + 1) % settingsNavItems.length;
+      if (event.key === 'ArrowUp') nextIndex = (index - 1 + settingsNavItems.length) % settingsNavItems.length;
+      if (event.key === 'Home') nextIndex = 0;
+      if (event.key === 'End') nextIndex = settingsNavItems.length - 1;
+      const nextItem = settingsNavItems[nextIndex];
+      if (!nextItem) return;
+      nextItem.focus();
+      setActiveSettingsPanel(nextItem.dataset.settingsTarget, { updateHash: true });
+    });
+  });
+
+  window.addEventListener('hashchange', () => setActiveSettingsPanel(readSettingsHash()));
+
+  try {
+    setSettingsSidebarCollapsed(window.localStorage.getItem(settingsSidebarStorageKey) === '1', { remember: false });
+  } catch (_) {
+    setSettingsSidebarCollapsed(false, { remember: false });
+  }
+  setActiveSettingsPanel(readSettingsHash());
+
+  function setPanelError(id, message = '') {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.textContent = String(message || '');
+    element.classList.toggle('d-none', !message);
+  }
+
+  async function showSettingsMessage({ title = 'School Settings', message = '', icon = 'info', buttonClass = 'btn-primary' } = {}) {
+    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      return window.showMessageModal({
+        title,
+        icon,
+        message: escapeHtml(message),
+        buttons: [{ text: 'OK', class: buttonClass }]
+      });
+    }
+    window.alert(String(message || title));
+    return 'OK';
+  }
+
+  function renderConductLevels() {
+    if (!conductBody) return;
+    const disabled = canUpdate ? '' : 'disabled';
+    conductBody.innerHTML = conductLevels.map((level, index) => `
+      <tr data-level-index="${index}">
+        <td class="fw-bold font-monospace">${escapeHtml(level.code)}</td>
+        <td><input class="form-control form-control-sm js-conduct-label" maxlength="80" value="${escapeHtml(level.label || level.code)}" ${disabled} aria-label="${escapeHtml(level.code)} label"></td>
+        <td><input class="form-control form-control-sm js-conduct-display" maxlength="8" value="${escapeHtml(level.displayCode || level.code)}" ${disabled} aria-label="${escapeHtml(level.code)} display code"></td>
+        <td><input class="form-control form-control-sm js-conduct-min" type="number" min="0" max="100" step="0.5" value="${escapeHtml(level.minPercent)}" ${disabled} aria-label="${escapeHtml(level.code)} minimum percentage"></td>
+        <td><input class="form-control form-control-sm js-conduct-max" type="number" min="0" max="100" step="0.5" value="${escapeHtml(level.maxPercent)}" ${disabled} aria-label="${escapeHtml(level.code)} maximum percentage"></td>
+        <td><input class="form-control form-control-sm js-conduct-default" type="number" min="0" max="100" step="0.5" value="${escapeHtml(level.defaultPercent)}" ${disabled} aria-label="${escapeHtml(level.code)} default percentage"></td>
+      </tr>
+    `).join('') + `
+      <tr class="table-light">
+        <td class="fw-bold font-monospace">NA</td>
+        <td>Not Available</td>
+        <td>N/A</td>
+        <td colspan="3" class="small text-muted">Fixed non-percentage option</td>
+      </tr>
+    `;
+  }
+
+  function collectConductLevels() {
+    return [...conductBody.querySelectorAll('tr[data-level-index]')].map(row => {
+      const index = Number(row.dataset.levelIndex);
+      return {
+        code: String(conductLevels[index]?.code || ''),
+        label: row.querySelector('.js-conduct-label')?.value || '',
+        displayCode: row.querySelector('.js-conduct-display')?.value || '',
+        minPercent: row.querySelector('.js-conduct-min')?.value,
+        maxPercent: row.querySelector('.js-conduct-max')?.value,
+        defaultPercent: row.querySelector('.js-conduct-default')?.value
+      };
+    });
+  }
+
+  function normalizeAttendanceClientItems() {
+    if (!attendanceItems.length) {
+      attendanceItems = [{
+        id: '',
+        scheduledMinutes: 180,
+        disqualifyLateMinutes: 30,
+        disqualifyEarlyLeaveMinutes: 30,
+        disqualifyCombinedMissedMinutes: null,
+        isDefault: true
+      }];
+    }
+    if (!attendanceItems.some(item => item.isDefault)) attendanceItems[0].isDefault = true;
+  }
+
+  function renderAttendanceItems() {
+    if (!attendanceBody) return;
+    normalizeAttendanceClientItems();
+    const editorEnabled = canUpdate && attendanceThresholdsEnabled;
+    const disabled = editorEnabled ? '' : 'disabled';
+    attendanceBody.innerHTML = attendanceItems.map((item, index) => {
+      const combinedOn = item.disqualifyCombinedMissedMinutes !== null
+        && item.disqualifyCombinedMissedMinutes !== undefined
+        && item.disqualifyCombinedMissedMinutes !== '';
+      return `
+        <tr data-attendance-index="${index}">
+          <td><input class="form-control form-control-sm js-attendance-duration" type="number" min="1" max="1440" step="1" value="${escapeHtml(item.scheduledMinutes)}" ${disabled} aria-label="Scheduled duration minutes"></td>
+          <td><input class="form-control form-control-sm js-attendance-late" type="number" min="0" max="1440" step="1" value="${escapeHtml(item.disqualifyLateMinutes)}" ${disabled} aria-label="Late threshold minutes"></td>
+          <td><input class="form-control form-control-sm js-attendance-early" type="number" min="0" max="1440" step="1" value="${escapeHtml(item.disqualifyEarlyLeaveMinutes)}" ${disabled} aria-label="Early leave threshold minutes"></td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <input class="form-check-input js-attendance-combined-on" type="checkbox" ${combinedOn ? 'checked' : ''} ${disabled} aria-label="Enable combined threshold">
+              <input class="form-control form-control-sm js-attendance-combined" type="number" min="1" max="1440" step="1" value="${combinedOn ? escapeHtml(item.disqualifyCombinedMissedMinutes) : ''}" ${combinedOn && editorEnabled ? '' : 'disabled'} aria-label="Combined missed minutes threshold">
+            </div>
+          </td>
+          <td class="text-center"><input class="form-check-input js-attendance-default" type="radio" name="attendanceDefaultItem" ${item.isDefault ? 'checked' : ''} ${disabled} aria-label="Use as default duration"></td>
+          ${canUpdate ? `<td><button class="btn btn-outline-danger btn-sm js-remove-attendance-item" type="button" ${attendanceItems.length <= 1 || !editorEnabled ? 'disabled' : ''} aria-label="Remove duration"><i class="bi bi-trash"></i></button></td>` : ''}
+        </tr>
+      `;
+    }).join('');
+
+    attendanceBody.querySelectorAll('.js-attendance-combined-on').forEach(checkbox => {
+      checkbox.addEventListener('change', () => {
+        const input = checkbox.closest('td')?.querySelector('.js-attendance-combined');
+        if (input) input.disabled = !editorEnabled || !checkbox.checked;
+      });
+    });
+    attendanceBody.querySelectorAll('.js-remove-attendance-item').forEach(button => {
+      button.addEventListener('click', () => {
+        readAttendanceItems();
+        const index = Number(button.closest('tr')?.dataset.attendanceIndex);
+        if (!Number.isInteger(index) || attendanceItems.length <= 1) return;
+        attendanceItems.splice(index, 1);
+        normalizeAttendanceClientItems();
+        renderAttendanceItems();
+      });
+    });
+    refreshAttendanceThresholdState();
+  }
+
+  function refreshAttendanceThresholdState() {
+    const toggle = document.getElementById('attendanceThresholdsEnabled');
+    const label = document.getElementById('attendanceThresholdsEnabledLabel');
+    const editor = document.getElementById('attendanceThresholdEditor');
+    const addButton = document.getElementById('btnAddAttendanceDuration');
+    if (toggle) toggle.checked = attendanceThresholdsEnabled;
+    if (label) label.textContent = attendanceThresholdsEnabled ? 'On' : 'Off';
+    editor?.classList.toggle('is-disabled', !attendanceThresholdsEnabled);
+    if (addButton) addButton.disabled = !canUpdate || !attendanceThresholdsEnabled;
+  }
+
+  function readAttendanceItems() {
+    attendanceItems = [...attendanceBody.querySelectorAll('tr[data-attendance-index]')].map((row, index) => {
+      const combinedOn = row.querySelector('.js-attendance-combined-on')?.checked === true;
+      const combinedValue = row.querySelector('.js-attendance-combined')?.value;
+      return {
+        id: String(attendanceItems[index]?.id || ''),
+        scheduledMinutes: Number(row.querySelector('.js-attendance-duration')?.value || 0),
+        disqualifyLateMinutes: Number(row.querySelector('.js-attendance-late')?.value || 0),
+        disqualifyEarlyLeaveMinutes: Number(row.querySelector('.js-attendance-early')?.value || 0),
+        disqualifyCombinedMissedMinutes: combinedOn && combinedValue !== '' ? Number(combinedValue) : null,
+        useCombinedThreshold: combinedOn,
+        isDefault: row.querySelector('.js-attendance-default')?.checked === true
+      };
+    });
+    normalizeAttendanceClientItems();
+    return attendanceItems;
+  }
+
+  async function postSettings(url, payload, button, errorId) {
+    if (!canUpdate) return null;
+    button.disabled = true;
+    setPanelError(errorId);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams(payload).toString()
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error(result?.message || 'Unable to save School Settings.');
+      }
+      return result;
+    } catch (error) {
+      const message = error?.message || 'Unable to save School Settings.';
+      setPanelError(errorId, message);
+      await showSettingsMessage({
+        title: 'Settings Not Saved',
+        message,
+        icon: 'error',
+        buttonClass: 'btn-danger'
+      });
+      return null;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  document.getElementById('conductSettingsForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveConductSettings');
+    if (!button) return;
+    const result = await postSettings('/school/settings/conduct-rating-scale', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      levels: JSON.stringify(collectConductLevels())
+    }, button, 'conductSettingsError');
+    if (!result) return;
+    conductLevels = Array.isArray(result.policy?.levels) ? result.policy.levels : conductLevels;
+    renderConductLevels();
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
+  document.getElementById('attendanceSettingsForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveAttendanceSettings');
+    if (!button) return;
+    const result = await postSettings('/school/settings/attendance-matrix', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      thresholdsEnabled: String(attendanceThresholdsEnabled),
+      items: JSON.stringify(readAttendanceItems())
+    }, button, 'attendanceSettingsError');
+    if (!result) return;
+    attendanceThresholdsEnabled = result.thresholdsEnabled !== false;
+    attendanceItems = Array.isArray(result.items) ? result.items : attendanceItems;
+    renderAttendanceItems();
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
+  document.getElementById('btnAddAttendanceDuration')?.addEventListener('click', () => {
+    if (!attendanceThresholdsEnabled) return;
+    readAttendanceItems();
+    const usedDurations = new Set(attendanceItems.map(item => Number(item.scheduledMinutes)));
+    let duration = 60;
+    while (usedDurations.has(duration) && duration < 1440) duration += 30;
+    attendanceItems.push({
+      id: '',
+      scheduledMinutes: Math.min(duration, 1440),
+      disqualifyLateMinutes: 30,
+      disqualifyEarlyLeaveMinutes: 30,
+      disqualifyCombinedMissedMinutes: null,
+      isDefault: false
+    });
+    renderAttendanceItems();
+  });
+
+  document.getElementById('attendanceThresholdsEnabled')?.addEventListener('change', event => {
+    readAttendanceItems();
+    attendanceThresholdsEnabled = event.currentTarget.checked === true;
+    renderAttendanceItems();
+  });
+
+  renderConductLevels();
+  renderAttendanceItems();
+})();
+</script>

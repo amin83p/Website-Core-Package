@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/school/attendanceController');
+const settingsCtrl = require('../controllers/school/schoolSettingsController');
 const { requireCoreModule } = require('../services/school/schoolCoreContracts');
 const {
   requireAuth,
@@ -11,7 +12,6 @@ const {
   OPERATIONS
 } = require('./schoolRouteDependencies');
 
-const { requireAttendanceMatrixPolicyAdmin } = require('../middleware/attendanceMatrixPolicyAdminMiddleware');
 const upload = requireCoreModule('MVC/middleware/upload');
 
 router.use(requireAuth);
@@ -25,14 +25,13 @@ const attendanceMatrixMutationActionState = Object.freeze({
 });
 
 router.get('/settings',
-  requireAttendanceMatrixPolicyAdmin(),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
-  ctrl.showAttendanceMatrixSettings);
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.READ_ALL),
+  settingsCtrl.redirectLegacyAttendanceSettings);
 
 router.post('/settings',
-  requireAttendanceMatrixPolicyAdmin(),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { requireToken: true }),
-  ctrl.saveAttendanceMatrixSettings);
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, { requireToken: true, keepActive: true }),
+  settingsCtrl.saveAttendanceMatrix);
 
 router.get('/',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),

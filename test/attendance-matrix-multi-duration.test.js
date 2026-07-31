@@ -36,6 +36,22 @@ test('legacy flat org policy migrates to one default item', () => {
   assert.equal(storage.items[0].scheduledMinutes, 120);
   assert.equal(storage.items[0].disqualifyLateMinutes, 20);
   assert.equal(storage.items[0].isDefault, true);
+  assert.equal(storage.thresholdsEnabled, true);
+});
+
+test('organization policy storage retains an explicit disabled master switch', () => {
+  const storage = normalizeOrgPolicyStorage({
+    thresholdsEnabled: false,
+    items: [{
+      scheduledMinutes: 120,
+      disqualifyLateMinutes: 20,
+      disqualifyEarlyLeaveMinutes: 25,
+      isDefault: true
+    }]
+  });
+  assert.equal(storage.thresholdsEnabled, false);
+  const resolved = resolvePolicyFieldsForScheduledMinutes(storage, 120);
+  assert.equal(resolved.thresholdsEnabled, false);
 });
 
 test('exact match picks duration item; otherwise default item; otherwise built-in', () => {
@@ -126,25 +142,24 @@ test('pickOrgPolicyLayerForMinutes and resolvePolicyForScheduledMinutes helpers'
   };
   const layer = pickOrgPolicyLayerForMinutes(catalog, 90);
   assert.equal(layer.disqualifyLateMinutes, 12);
+  assert.equal(layer.thresholdsEnabled, true);
   const policy = resolvePolicyForScheduledMinutes({}, catalog, 90);
   assert.equal(policy.disqualifyLateMinutes, 12);
 });
 
-test('attendance routes gate matrix page with requireAccess; settings with policy admin', () => {
+test('attendance routes keep matrix access and protect settings alias with School Settings', () => {
   const routes = read('packages/school/MVC/routes/attendanceRoutes.js');
-  assert.match(routes, /\/settings'[\s\S]*?requireAttendanceMatrixPolicyAdmin\(\)/);
+  assert.match(routes, /\/settings'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routes, /\/settings'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)/);
   assert.match(routes, /router\.get\('\/'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
   assert.match(routes, /\/api\/data'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
 });
 
-test('matrix policy admin gate is section-admin only via schoolAdminAccessService', () => {
-  const middleware = read('packages/school/MVC/middleware/attendanceMatrixPolicyAdminMiddleware.js');
-  assert.match(middleware, /schoolAdminAccessService/);
-  assert.match(middleware, /isAttendancesAdminViewerAsync/);
-  assert.doesNotMatch(middleware, /VIEW_DASHBOARD/);
-  const manageFn = middleware.slice(
-    middleware.indexOf('async function userCanManageAttendanceMatrixPolicy'),
-    middleware.indexOf('async function userCanOpenAttendanceMatrix')
-  );
-  assert.doesNotMatch(manageFn, /evaluateAccess/);
+test('settings access uses standard access evaluation, independent of attendance admin', () => {
+  const service = read('packages/school/MVC/services/school/schoolSettingsAccessService.js');
+  assert.match(service, /evaluateAccess/);
+  assert.match(service, /SECTIONS\.SCHOOL_SETTINGS/);
+  assert.match(service, /OPERATIONS\.READ_ALL/);
+  assert.match(service, /OPERATIONS\.UPDATE/);
+  assert.doesNotMatch(service, /schoolAdminAccessService/);
 });

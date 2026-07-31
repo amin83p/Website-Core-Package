@@ -79,3 +79,62 @@ test('empty unmarked attendance becomes absent at late threshold', () => {
   );
   assert.equal(out.attendance, 'absent');
 });
+
+test('disabled thresholds keep timing records attended and convert legacy absent to late', () => {
+  const disabledPolicy = { ...policy, thresholdsEnabled: false };
+  const out = applyAttendanceMatrixRosterRules(
+    { attendance: 'absent', lateMinutes: 179, earlyLeaveMinutes: 0 },
+    disabledPolicy
+  );
+  assert.equal(out.attendance, 'late');
+  assert.equal(out.lateMinutes, 179);
+});
+
+test('disabled thresholds use present when late status is disabled', () => {
+  const disabledPolicy = { ...policy, thresholdsEnabled: false };
+  const out = applyAttendanceMatrixRosterRules(
+    { attendance: 'absent', lateMinutes: 179, earlyLeaveMinutes: 0 },
+    disabledPolicy,
+    ['present', 'absent', 'not_applicable']
+  );
+  assert.equal(out.attendance, 'present');
+});
+
+test('disabled thresholds preserve true absent, ACF, N/A, and unmarked rows', () => {
+  const disabledPolicy = { ...policy, thresholdsEnabled: false };
+  assert.equal(
+    applyAttendanceMatrixRosterRules(
+      { attendance: 'absent', lateMinutes: 0, earlyLeaveMinutes: 0 },
+      disabledPolicy
+    ).attendance,
+    'absent'
+  );
+  assert.equal(
+    applyAttendanceMatrixRosterRules(
+      { attendance: 'acf', lateMinutes: 5, earlyLeaveMinutes: 0 },
+      disabledPolicy
+    ).attendance,
+    'acf'
+  );
+  assert.equal(
+    applyAttendanceMatrixRosterRules(
+      { attendance: 'excused', lateMinutes: 5, earlyLeaveMinutes: 0 },
+      disabledPolicy
+    ).attendance,
+    'excused'
+  );
+  assert.equal(
+    applyAttendanceMatrixRosterRules(
+      { attendance: 'N/A', lateMinutes: 5, earlyLeaveMinutes: 5 },
+      disabledPolicy
+    ).attendance,
+    'not_applicable'
+  );
+  assert.equal(
+    applyAttendanceMatrixRosterRules(
+      { attendance: '', lateMinutes: 5, earlyLeaveMinutes: 0 },
+      disabledPolicy
+    ).attendance,
+    ''
+  );
+});

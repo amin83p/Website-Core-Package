@@ -61,7 +61,11 @@
                 <a href="/school/reports/overall-reports/new/<%= encodeURIComponent(row.id) %>" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>Create Report</a>
               <% } %>
               <a href="/school/reports/overall-templates/edit/<%= encodeURIComponent(row.id) %>" class="btn btn-outline-secondary btn-sm">Edit</a>
-              <a href="/school/reports/overall-templates/delete/<%= encodeURIComponent(row.id) %>" class="btn btn-outline-danger btn-sm">Delete</a>
+              <a
+                href="/school/reports/overall-templates/delete/<%= encodeURIComponent(row.id) %>"
+                class="btn btn-outline-danger btn-sm js-delete-overall-template"
+                data-template-title="<%= row.title %>"
+              >Delete</a>
             </div>
           </td>
         </tr>
@@ -72,3 +76,32 @@
 <span id="urlRef" data-id="<%= newUrl %>" hidden></span>
 <%- include('partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
 <%- include('partials/tablePages-end') %>
+
+<script>
+(() => {
+  async function confirmTemplateDelete(link) {
+    const templateTitle = String(link.dataset.templateTitle || 'this overall report template');
+    const message = `Delete <strong>${templateTitle.replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]))}</strong>? A template that is already referenced by an overall report cannot be deleted.`;
+    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      const result = await window.showMessageModal({
+        title: 'Delete Overall Report Template?',
+        icon: 'warning',
+        message,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Delete', class: 'btn-danger' }
+        ]
+      });
+      return result === 'Delete';
+    }
+    return window.confirm(`Delete ${templateTitle}?`);
+  }
+
+  document.querySelectorAll('.js-delete-overall-template').forEach(link => {
+    link.addEventListener('click', async event => {
+      event.preventDefault();
+      if (await confirmTemplateDelete(link)) window.location.assign(link.href);
+    });
+  });
+})();
+</script>

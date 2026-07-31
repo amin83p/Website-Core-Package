@@ -49,11 +49,12 @@ test('conductRatingScaleService normalizePolicyFromForm throws on invalid ranges
   }), /Lowest level must start at 0%/);
 });
 
-test('class routes expose admin conduct rating scale settings endpoint', () => {
+test('legacy class route protects conduct settings with School Settings access', () => {
   const source = read('packages/school/MVC/routes/classRoutes.js');
-  assert.match(source, /requireConductRatingScalePolicyAdmin/);
+  assert.match(source, /SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.READ_ALL/);
+  assert.match(source, /SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/);
   assert.match(source, /router\.post\('\/conduct-rating-scale\/settings'/);
-  assert.match(source, /classCtrl\.saveConductRatingScaleSettings/);
+  assert.match(source, /settingsCtrl\.saveConductRatingScale/);
   assert.match(source, /router\.post\('\/:id\/sessions\/:sessionId\/conduct'/);
   assert.match(source, /classCtrl\.saveSessionConduct/);
 });
@@ -62,8 +63,8 @@ test('manageSession passes conduct rating scale to session manager view', () => 
   const source = read('packages/school/MVC/controllers/school/classController.js');
   assert.match(source, /conductRatingScalePolicyModel\.getPolicyForOrg/);
   assert.match(source, /conductRatingScaleResolved/);
-  assert.match(source, /canManageConductRatingScale: canOverride/);
-  assert.match(source, /async function saveConductRatingScaleSettings/);
+  assert.match(source, /canViewSchoolSettings/);
+  assert.doesNotMatch(source, /canUpdateSchoolSettings/);
   assert.match(source, /async function saveSessionConduct/);
   assert.match(source, /parseConductReadyFlag/);
   assert.match(source, /conductPrefillByPersonId/);
@@ -111,14 +112,14 @@ test('session manager places optional conduct after attendance and Step 1 only i
   assert.match(source, /id="btnConductBulkSetAllSuperior"/);
   assert.match(source, /conduct-bulk-set-all-level/);
   assert.match(source, /conduct-bulk-column-emoji-btn/);
-  assert.match(source, /conduct-scale-display/);
+  assert.doesNotMatch(source, /conduct-scale-display/);
   assert.doesNotMatch(source, /conduct-scale-emoji/);
   assert.doesNotMatch(source, /conduct-set-all-level/);
   assert.doesNotMatch(source, /conduct-column-emoji-btn/);
   assert.match(source, /setConductColumnToLevel/);
-  assert.match(source, /canManageConductRatingScaleFlag/);
-  assert.match(source, /id="btnOpenConductScaleSettingsModal"/);
-  assert.match(source, /id="conductScaleSettingsModal"/);
+  assert.doesNotMatch(source, /\/school\/settings#conduct-rating-scale/);
+  assert.match(source, /canViewSchoolSettingsFlag/);
+  assert.doesNotMatch(source, /id="conductScaleSettingsModal"/);
   assert.match(source, /window\.__conductRatingScale/);
   assert.match(source, /ready:\s*true/);
   assert.doesNotMatch(source, /saveOptionalSessionConduct/);

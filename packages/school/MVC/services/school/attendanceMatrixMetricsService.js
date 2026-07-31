@@ -279,6 +279,44 @@ function parseNonNegIntRoster(v) {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 }
 
+function policyThresholdsAreEnabled(policy) {
+  const value = policy?.thresholdsEnabled;
+  if (value === false || value === 0) return false;
+  return !['false', '0', 'off', 'no'].includes(String(value ?? 'true').trim().toLowerCase());
+}
+
+/**
+ * Resolve the status users and downstream calculations should see without mutating storage.
+ * With thresholds disabled, a recorded late/early duration proves attendance even when a
+ * legacy threshold previously persisted the row as Absent.
+ */
+function resolveEffectiveAttendanceStatus(record, policy, enabledStatuses = null) {
+  const rawStatus = record?.status !== undefined ? record.status : record?.attendance;
+  const status = normalizeStatus(rawStatus);
+  if (policyThresholdsAreEnabled(policy)) return status;
+
+  if (
+    !status
+    || status === ATTENDANCE_STATUS.NOT_APPLICABLE
+    || status === ATTENDANCE_STATUS.ACF
+    || status === ATTENDANCE_STATUS.EXCUSED
+  ) {
+    return status;
+  }
+
+  const late = parseNonNegIntRoster(record?.lateMinutes);
+  const early = parseNonNegIntRoster(record?.earlyLeaveMinutes);
+  const hasTimingIssue = late > 0 || early > 0;
+  if (!hasTimingIssue && status !== ATTENDANCE_STATUS.LATE) return status;
+
+  const enabled = Array.isArray(enabledStatuses)
+    ? normalizeEnabledAttendanceStatuses(enabledStatuses)
+    : ALL_ATTENDANCE_STATUSES_ORDERED;
+  return enabled.includes(ATTENDANCE_STATUS.LATE)
+    ? ATTENDANCE_STATUS.LATE
+    : ATTENDANCE_STATUS.PRESENT;
+}
+
 /**
  * Enforce Manage Session / roster rules aligned with the attendance matrix policy:
  * 1) Late minutes ≥ disqualifyLate, early ≥ disqualifyEarly, or combined missed ≥ combined threshold → absent.
@@ -288,7 +326,7 @@ function parseNonNegIntRoster(v) {
  * @param {ReturnType<typeof resolvePolicy>} policy
  * @returns {object} record with normalized minutes and possibly updated attendance
  */
-function applyAttendanceMatrixRosterRules(record, policy) {
+function applyAttendanceMatrixRosterRules(record, policy, enabledStatuses = null) {
   const pol = policy && typeof policy === 'object' ? policy : resolvePolicy({}, {});
   const base = record && typeof record === 'object' ? { ...record } : {};
 
@@ -299,6 +337,19 @@ function applyAttendanceMatrixRosterRules(record, policy) {
 
   if (attendance === ATTENDANCE_STATUS.NOT_APPLICABLE) {
     return { ...base, attendance, lateMinutes: 0, earlyLeaveMinutes: 0 };
+  }
+
+  if (!policyThresholdsAreEnabled(pol)) {
+    return {
+      ...base,
+      attendance: resolveEffectiveAttendanceStatus(
+        { ...base, attendance, lateMinutes: late, earlyLeaveMinutes: early },
+        pol,
+        enabledStatuses
+      ),
+      lateMinutes: late,
+      earlyLeaveMinutes: early
+    };
   }
 
   const lateCut = pol.disqualifyLateMinutes;
@@ -336,6 +387,7 @@ function resolvePolicy(classData = {}, orgPolicyLayer = {}) {
       ? classData.attendancePolicy
       : {};
   const ap = { ...org, ...cls };
+  const thresholdsEnabled = policyThresholdsAreEnabled(org);
   const num = (v, fallback) => {
     const n = Number(v);
     return Number.isFinite(n) ? n : fallback;
@@ -351,6 +403,7 @@ function resolvePolicy(classData = {}, orgPolicyLayer = {}) {
     if (!Number.isFinite(combined)) combined = null;
   }
   return {
+    thresholdsEnabled,
     scheduledMinutes: scheduled > 0 ? scheduled : 180,
     disqualifyLateMinutes: disqualifyLate >= 0 ? disqualifyLate : 30,
     disqualifyEarlyLeaveMinutes: disqualifyEarly >= 0 ? disqualifyEarly : 30,
@@ -369,16 +422,19 @@ function pickOrgPolicyLayerForMinutes(orgPolicyLayer, scheduledMinutes) {
     ? orgPolicyLayer.items
     : (Array.isArray(orgPolicyLayer) ? orgPolicyLayer : null);
   if (!items) return orgPolicyLayer;
-  if (!items.length) return {};
+  const thresholdsEnabled = policyThresholdsAreEnabled(orgPolicyLayer);
+  if (!items.length) return { thresholdsEnabled };
   const mins = Number(scheduledMinutes);
   if (Number.isFinite(mins) && mins > 0) {
     const exact = items.find((item) => Number(item?.scheduledMinutes) === mins);
-    if (exact) return exact;
+    if (exact) return { ...exact, thresholdsEnabled };
   }
   const def = items.find((item) => item && item.isDefault)
     || items.find((item) => Number(item?.scheduledMinutes) === 180)
     || items[0];
-  return def && typeof def === 'object' ? def : {};
+  return def && typeof def === 'object'
+    ? { ...def, thresholdsEnabled }
+    : { thresholdsEnabled };
 }
 
 function resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, scheduledMinutes) {
@@ -396,7 +452,7 @@ function computeSessionCredit(record, sessionWeight, policy) {
     Number.isFinite(recSched) && recSched > 0 ? recSched : policy.scheduledMinutes;
   const late = Math.max(0, Number(record?.lateMinutes) || 0);
   const early = Math.max(0, Number(record?.earlyLeaveMinutes) || 0);
-  const st = normalizeStatus(record?.status);
+  const st = resolveEffectiveAttendanceStatus(record, policy);
 
   if (st === ATTENDANCE_STATUS.NOT_APPLICABLE) {
     return { credit: 0, disqualified: false, exempt: true, reason: 'not_applicable' };
@@ -415,6 +471,14 @@ function computeSessionCredit(record, sessionWeight, policy) {
   }
   if (st !== ATTENDANCE_STATUS.PRESENT && st !== ATTENDANCE_STATUS.LATE) {
     return { credit: 0, disqualified: false, reason: 'unknown_status' };
+  }
+
+  if (!policyThresholdsAreEnabled(policy)) {
+    return {
+      credit: sessionWeight,
+      disqualified: false,
+      reason: 'thresholds_disabled_full'
+    };
   }
 
   if (late >= policy.disqualifyLateMinutes) {
@@ -440,9 +504,15 @@ function computeSessionCredit(record, sessionWeight, policy) {
  */
 function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {}) {
   const allRecords = Array.isArray(records) ? records : [];
-  const eligibleRecords = allRecords.filter((rec) => isEligibleAttendanceStatus(rec?.status));
+  const enabledStatuses = resolveEnabledAttendanceStatuses(classData);
+  const preparedRecords = allRecords.map((rec) => {
+    const policy = resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, rec?.scheduledMinutes);
+    const effectiveStatus = resolveEffectiveAttendanceStatus(rec, policy, enabledStatuses);
+    return { rec, policy, effectiveStatus };
+  });
+  const eligibleRecords = preparedRecords.filter((row) => isEligibleAttendanceStatus(row.effectiveStatus));
   const n = eligibleRecords.length;
-  const notApplicableSessionCount = allRecords.filter((rec) => isNotApplicableStatus(rec?.status)).length;
+  const notApplicableSessionCount = preparedRecords.filter((row) => isNotApplicableStatus(row.effectiveStatus)).length;
   if (!n) {
     return {
       totalPresentSessions: 0,
@@ -461,13 +531,16 @@ function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {
   let totalPresentSessions = 0;
   let totalAbsentSessions = 0;
 
-  for (const rec of eligibleRecords) {
-    const st = normalizeStatus(rec?.status);
+  for (const row of eligibleRecords) {
+    const { rec, policy, effectiveStatus: st } = row;
     if (st === ATTENDANCE_STATUS.PRESENT || st === ATTENDANCE_STATUS.LATE) totalPresentSessions += 1;
     if (isAbsentLikeStatus(st)) totalAbsentSessions += 1;
 
-    const policy = resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, rec?.scheduledMinutes);
-    const { credit, disqualified } = computeSessionCredit(rec, sessionWeight, policy);
+    const { credit, disqualified } = computeSessionCredit(
+      { ...rec, status: st },
+      sessionWeight,
+      policy
+    );
     sumCredit += credit;
     if (disqualified) disqualifiedSessionCount += 1;
   }
@@ -503,6 +576,8 @@ module.exports = {
   isAttendanceStatusEnabled,
   assertAttendanceStatusAllowedForSave,
   coerceAttendanceStatusToEnabled,
+  policyThresholdsAreEnabled,
+  resolveEffectiveAttendanceStatus,
   resolvePolicy,
   pickOrgPolicyLayerForMinutes,
   resolvePolicyForScheduledMinutes,

@@ -177,9 +177,48 @@
     document.getElementById('answersJson').value = JSON.stringify(answers);
   });
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  async function showReportMessage({ title = 'Overall Report', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
+    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      return window.showMessageModal({
+        title,
+        icon,
+        message: esc(message),
+        buttons: [{ text: 'OK', class: buttonClass }]
+      });
+    }
+    window.alert(String(message || title));
+    return 'OK';
+  }
+
+  async function confirmReportAction({ title = 'Confirm', message = '', confirmText = 'Confirm', confirmClass = 'btn-primary' } = {}) {
+    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      const result = await window.showMessageModal({
+        title,
+        icon: 'warning',
+        message: esc(message),
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: confirmText, class: confirmClass }
+        ]
+      });
+      return result === confirmText;
+    }
+    return window.confirm(String(message || title));
+  }
+
   document.getElementById('btnSourceUpdates')?.addEventListener('click', async () => {
     const response = await fetch(`/school/reports/overall-reports/${encodeURIComponent(instanceId)}/source-update-preview`, {headers:{Accept:'application/json','x-ajax-request':'true'}});
-    const result = await response.json(); if (!response.ok) { alert(result.message || 'Unable to compare sources.'); return; }
+    const result = await response.json();
+    if (!response.ok) {
+      await showReportMessage({
+        title: 'Source Comparison Failed',
+        message: result.message || 'Unable to compare sources.',
+        icon: 'error',
+        buttonClass: 'btn-danger'
+      });
+      return;
+    }
     document.getElementById('sourceUpdateIssues').innerHTML = (result.issues || []).map(issue => `<div class="alert alert-warning py-2">${esc(issue.slotKey)}: ${esc(issue.message)}</div>`).join('');
     document.getElementById('sourceUpdateRows').innerHTML = (result.changes || []).map(change => `<tr><td><input class="form-check-input js-source-change" type="checkbox" value="${esc(change.selectionKey)}"></td><td><span class="badge bg-primary">${esc(change.slotKey)}</span> <code>${esc(change.key)}</code><div class="small text-muted">${esc(change.sourceInstanceTitle || change.sourceInstanceId)}<br>${esc(change.sourceTemplateTitle || change.sourceTemplateId)}</div></td><td class="text-break">${esc(change.oldValue)}</td><td class="text-break">${esc(change.newValue)}</td><td>${(change.affectedFields || []).map(field => `<div><strong>${esc(field.label)}</strong>: ${esc(field.currentValue)} &rarr; ${esc(field.newValue)} ${field.overridden ? `<span class="badge bg-info text-dark">override preserved</span><label class="small ms-1"><input class="form-check-input js-replace-override" type="checkbox" value="${esc(field.fieldId)}"> replace override</label>` : ''}</div>`).join('') || '<span class="text-muted">Direct DOCX source key</span>'}</td></tr>`).join('') || '<tr><td colspan="5" class="text-center text-muted py-4">No source changes found.</td></tr>';
     bootstrap.Modal.getOrCreateInstance(document.getElementById('sourceUpdateModal')).show();
@@ -187,20 +226,49 @@
   document.getElementById('btnApplySourceUpdates')?.addEventListener('click', async () => {
     const selectedKeys = [...document.querySelectorAll('.js-source-change:checked')].map(input => input.value);
     const replaceOverrideFieldIds = [...new Set([...document.querySelectorAll('.js-replace-override:checked')].map(input => input.value))];
-    if (!selectedKeys.length) { alert('Select at least one source value.'); return; }
+    if (!selectedKeys.length) {
+      await showReportMessage({
+        title: 'Select Source Values',
+        message: 'Select at least one source value to apply.'
+      });
+      return;
+    }
     const response = await fetch(`/school/reports/overall-reports/${encodeURIComponent(instanceId)}/source-update-apply`, {method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json','x-ajax-request':'true'},body:JSON.stringify({actionStateId,selectedKeys,replaceOverrideFieldIds})});
-    const result = await response.json(); if (!response.ok) { alert(result.message || 'Unable to apply source updates.'); return; }
+    const result = await response.json();
+    if (!response.ok) {
+      await showReportMessage({
+        title: 'Source Update Failed',
+        message: result.message || 'Unable to apply source updates.',
+        icon: 'error',
+        buttonClass: 'btn-danger'
+      });
+      return;
+    }
     location.reload();
   });
   document.querySelectorAll('.js-reset-override').forEach(button => button.addEventListener('click', async () => {
-    if (!confirm('Reset this field to its current calculated value?')) return;
+    const shouldReset = await confirmReportAction({
+      title: 'Reset Calculated Value?',
+      message: 'Reset this field to its current calculated value?',
+      confirmText: 'Reset',
+      confirmClass: 'btn-warning'
+    });
+    if (!shouldReset) return;
     const response = await fetch(`/school/reports/overall-reports/${encodeURIComponent(instanceId)}/reset-override`, {
       method: 'POST',
       headers: {'Content-Type':'application/json', Accept:'application/json', 'x-ajax-request':'true'},
       body: JSON.stringify({actionStateId, fieldId: button.dataset.fieldId})
     });
     const result = await response.json();
-    if (!response.ok) { alert(result.message || 'Unable to reset the override.'); return; }
+    if (!response.ok) {
+      await showReportMessage({
+        title: 'Reset Failed',
+        message: result.message || 'Unable to reset the override.',
+        icon: 'error',
+        buttonClass: 'btn-danger'
+      });
+      return;
+    }
     location.reload();
   }));
   document.querySelectorAll('#btnExportPreview').forEach(button => button.addEventListener('click', async () => {

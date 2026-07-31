@@ -2547,5 +2547,17 @@
     ],
     "orgId": "SYSTEM",
     "adoptExisting": true
+  },
+  {
+    "id": "SYM_SYSTEM_131",
+    "name": "SCHOOL_SETTINGS",
+    "type": "class",
+    "value": "bi bi-gear-wide-connected",
+    "tags": [
+      "SCHOOL_SETTINGS",
+      "446106"
+    ],
+    "orgId": "SYSTEM",
+    "adoptExisting": true
   }
 ]

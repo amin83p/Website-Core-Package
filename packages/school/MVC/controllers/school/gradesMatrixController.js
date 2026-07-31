@@ -15,9 +15,8 @@ const schoolPersonAccessService = require('../../services/school/schoolPersonAcc
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const {
-  userCanManageAttendanceMatrixPolicy,
   userCanOpenAttendanceMatrix
-} = require('../../middleware/attendanceMatrixPolicyAdminMiddleware');
+} = require('../../services/school/attendanceMatrixAccessService');
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -232,7 +231,6 @@ async function showGradesMatrixPage(req, res) {
       }
     }
 
-    const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
     const canOpenAttendanceMatrix = await userCanOpenAttendanceMatrix(req.user, req.ip);
 
     res.render('school/grades/gradesMatrix', {
@@ -246,7 +244,6 @@ async function showGradesMatrixPage(req, res) {
       initialStartDate,
       initialEndDate,
       initialRange,
-      canManageAttendanceMatrixPolicy,
       canOpenAttendanceMatrix
     });
   } catch (error) {
@@ -357,10 +354,12 @@ async function buildGradesMatrixPayload(req, query) {
   studentList.sort((a, b) => a.name.localeCompare(b.name));
 
   const orgIdForPolicy = String(req.user?.activeOrgId || classData?.orgId || '').trim();
-  const orgPolicyItems = await attendanceMatrixPolicyModel.listPolicyItemsForOrg(orgIdForPolicy);
-  const orgPolicyCatalog = { items: orgPolicyItems };
-  const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(orgIdForPolicy);
+  const [orgPolicyCatalog, orgPolicyLayer] = await Promise.all([
+    attendanceMatrixPolicyModel.getPolicyCatalogForOrg(orgIdForPolicy),
+    attendanceMatrixPolicyModel.getPolicyForOrg(orgIdForPolicy)
+  ]);
   const attendancePolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
+  const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
 
   const sessionById = new Map(filteredSessions.map((s) => [s.sessionId, s]));
 
@@ -395,14 +394,29 @@ async function buildGradesMatrixPayload(req, query) {
       if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(status))) {
         status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       }
-      return {
+      const scheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+        ses,
+        attendancePolicy.scheduledMinutes
+      );
+      const record = {
         sessionId: ses.sessionId,
         date: ses.date,
         status,
         lateMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.lateMinutes || 0),
         earlyLeaveMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.earlyLeaveMinutes || 0),
-        scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(ses, attendancePolicy.scheduledMinutes)
+        scheduledMinutes
       };
+      const recordPolicy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
+        classData,
+        orgPolicyCatalog,
+        scheduledMinutes
+      );
+      record.status = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus(
+        record,
+        recordPolicy,
+        enabledAttendanceStatuses
+      );
+      return record;
     });
     const attSummary = attendanceMatrixMetricsService.computeStudentMatrixSummary(attendanceRecords, classData, orgPolicyCatalog);
     const attendancePct = attSummary.performancePercent;
@@ -426,6 +440,20 @@ async function buildGradesMatrixPayload(req, query) {
       if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(att))) {
         att = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       }
+      const scheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+        ses,
+        attendancePolicy.scheduledMinutes
+      );
+      const cellPolicy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
+        classData,
+        orgPolicyCatalog,
+        scheduledMinutes
+      );
+      att = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus({
+        status: att,
+        lateMinutes: rosterRecord?.lateMinutes || 0,
+        earlyLeaveMinutes: rosterRecord?.earlyLeaveMinutes || 0
+      }, cellPolicy, enabledAttendanceStatuses);
       const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
         || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
 

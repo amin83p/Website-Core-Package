@@ -13,11 +13,15 @@ const dataPath = path.join(resolveCoreRoot(), 'data/school/attendanceMatrixPolic
 const MONGO_COLLECTION = 'schoolAttendanceMatrixPolicy';
 const MONGO_DOC_ID = 'attendance-matrix-policy';
 
-const DEFAULT_POLICY = Object.freeze({
+const DEFAULT_THRESHOLD_FIELDS = Object.freeze({
   scheduledMinutes: 180,
   disqualifyLateMinutes: 30,
   disqualifyEarlyLeaveMinutes: 30,
   disqualifyCombinedMissedMinutes: null
+});
+const DEFAULT_POLICY = Object.freeze({
+  thresholdsEnabled: true,
+  ...DEFAULT_THRESHOLD_FIELDS
 });
 
 function orgKey(activeOrgId) {
@@ -37,6 +41,15 @@ function pickStoredPolicyFields(row) {
     disqualifyEarlyLeaveMinutes: row.disqualifyEarlyLeaveMinutes,
     disqualifyCombinedMissedMinutes: row.disqualifyCombinedMissedMinutes
   };
+}
+
+function normalizeThresholdsEnabled(value, fallback = true) {
+  if (value === undefined || value === null || value === '') return fallback !== false;
+  if (value === false || value === 0) return false;
+  const token = String(value).trim().toLowerCase();
+  if (['false', '0', 'off', 'no'].includes(token)) return false;
+  if (['true', '1', 'on', 'yes'].includes(token)) return true;
+  return fallback !== false;
 }
 
 function applyNumericPolicyFields(input, out) {
@@ -60,7 +73,7 @@ function applyNumericPolicyFields(input, out) {
 
 /** Merge persisted row fields with defaults (no form checkbox). */
 function normalizePolicyFromStored(input = {}) {
-  const out = { ...DEFAULT_POLICY };
+  const out = { ...DEFAULT_THRESHOLD_FIELDS };
   applyNumericPolicyFields(input, out);
   const c = input.disqualifyCombinedMissedMinutes;
   if (c === null || c === undefined || c === '') {
@@ -76,7 +89,7 @@ function normalizePolicyFromStored(input = {}) {
  * Full policy from POST body. Checkbox omitted when unchecked - combined rule off.
  */
 function normalizePolicyFromForm(input = {}) {
-  const out = { ...DEFAULT_POLICY };
+  const out = { ...DEFAULT_THRESHOLD_FIELDS };
   applyNumericPolicyFields(input, out);
   const combinedOn =
     input.useCombinedThreshold === true ||
@@ -115,8 +128,9 @@ function normalizePolicyItem(input = {}, opts = {}) {
 
 function ensureDefaultItem(storage) {
   const items = Array.isArray(storage.items) ? storage.items.map((item) => ({ ...item })) : [];
+  const thresholdsEnabled = normalizeThresholdsEnabled(storage.thresholdsEnabled, true);
   if (!items.length) {
-    return { items: [], audit: storage.audit || null };
+    return { thresholdsEnabled, items: [], audit: storage.audit || null };
   }
   const defaultCount = items.filter((item) => item.isDefault).length;
   if (defaultCount === 0) {
@@ -143,7 +157,7 @@ function ensureDefaultItem(storage) {
   if (!unique.some((item) => item.isDefault) && unique.length) {
     unique[0].isDefault = true;
   }
-  return { items: unique, audit: storage.audit || null };
+  return { thresholdsEnabled, items: unique, audit: storage.audit || null };
 }
 
 /**
@@ -151,21 +165,22 @@ function ensureDefaultItem(storage) {
  */
 function normalizeOrgPolicyStorage(row) {
   if (!row || typeof row !== 'object') {
-    return { items: [] };
+    return { thresholdsEnabled: true, items: [] };
   }
+  const thresholdsEnabled = normalizeThresholdsEnabled(row.thresholdsEnabled, true);
   if (Array.isArray(row.items)) {
     const items = row.items.map((item) => normalizePolicyItem(item));
-    return ensureDefaultItem({ items, audit: row.audit || null });
+    return ensureDefaultItem({ thresholdsEnabled, items, audit: row.audit || null });
   }
   if (isLegacyFlatPolicyRow(row)) {
     const item = normalizePolicyItem(pickStoredPolicyFields(row), { forceDefault: true });
-    return ensureDefaultItem({ items: [item], audit: row.audit || null });
+    return ensureDefaultItem({ thresholdsEnabled, items: [item], audit: row.audit || null });
   }
-  return { items: [], audit: row.audit || null };
+  return { thresholdsEnabled, items: [], audit: row.audit || null };
 }
 
 function policyFieldsFromItem(item) {
-  if (!item || typeof item !== 'object') return { ...DEFAULT_POLICY };
+  if (!item || typeof item !== 'object') return { ...DEFAULT_THRESHOLD_FIELDS };
   return normalizePolicyFromStored(pickStoredPolicyFields(item));
 }
 
@@ -182,14 +197,20 @@ function getDefaultItemFromStorage(storage) {
 function resolvePolicyFieldsForScheduledMinutes(storage, scheduledMinutes) {
   const normalized = normalizeOrgPolicyStorage(storage);
   const items = normalized.items || [];
+  let fields = null;
   const mins = Number(scheduledMinutes);
   if (Number.isFinite(mins) && mins > 0 && items.length) {
     const exact = items.find((item) => Number(item.scheduledMinutes) === mins);
-    if (exact) return policyFieldsFromItem(exact);
+    if (exact) fields = policyFieldsFromItem(exact);
   }
-  const defaultItem = getDefaultItemFromStorage(normalized);
-  if (defaultItem) return policyFieldsFromItem(defaultItem);
-  return { ...DEFAULT_POLICY };
+  if (!fields) {
+    const defaultItem = getDefaultItemFromStorage(normalized);
+    fields = defaultItem ? policyFieldsFromItem(defaultItem) : { ...DEFAULT_THRESHOLD_FIELDS };
+  }
+  return {
+    thresholdsEnabled: normalized.thresholdsEnabled,
+    ...fields
+  };
 }
 
 async function readFileParsed() {
@@ -220,7 +241,10 @@ function effectivePolicyFromDoc(doc, activeOrgId) {
   }
   const storage = normalizeOrgPolicyStorage(row);
   const defaultItem = getDefaultItemFromStorage(storage);
-  return defaultItem ? policyFieldsFromItem(defaultItem) : { ...DEFAULT_POLICY };
+  return {
+    thresholdsEnabled: storage.thresholdsEnabled,
+    ...(defaultItem ? policyFieldsFromItem(defaultItem) : DEFAULT_THRESHOLD_FIELDS)
+  };
 }
 
 function itemsFromDoc(doc, activeOrgId) {
@@ -229,6 +253,20 @@ function itemsFromDoc(doc, activeOrgId) {
   const row = byOrg[key];
   if (!row || typeof row !== 'object') return [];
   return normalizeOrgPolicyStorage(row).items;
+}
+
+function policyCatalogFromDoc(doc, activeOrgId) {
+  const byOrg = doc.byOrgId && typeof doc.byOrgId === 'object' ? doc.byOrgId : {};
+  const key = orgKey(activeOrgId);
+  const row = byOrg[key];
+  if (!row || typeof row !== 'object') {
+    return { thresholdsEnabled: true, items: [] };
+  }
+  const storage = normalizeOrgPolicyStorage(row);
+  return {
+    thresholdsEnabled: storage.thresholdsEnabled,
+    items: storage.items
+  };
 }
 
 /**
@@ -259,6 +297,19 @@ async function listPolicyItemsForOrg(activeOrgId) {
       return itemsFromDoc(doc, activeOrgId);
     }
   }, 'school.attendanceMatrixPolicy.listPolicyItemsForOrg');
+}
+
+async function getPolicyCatalogForOrg(activeOrgId) {
+  return runByRepositoryBackend({}, {
+    json: async () => {
+      const doc = await readFileParsed();
+      return policyCatalogFromDoc(doc, activeOrgId);
+    },
+    mongo: async () => {
+      const doc = await readMongoDoc();
+      return policyCatalogFromDoc(doc, activeOrgId);
+    }
+  }, 'school.attendanceMatrixPolicy.getPolicyCatalogForOrg');
 }
 
 /**
@@ -347,21 +398,30 @@ function normalizePolicyItemsForSave(rawItems) {
   return ensureDefaultItem({ items }).items;
 }
 
-async function savePolicyItemsForOrg(activeOrgId, rawItems, auditUserId) {
+async function savePolicyItemsForOrg(activeOrgId, rawItems, auditUserId, options = {}) {
   const items = normalizePolicyItemsForSave(rawItems);
-  const stored = {
-    items,
-    audit: {
-      lastUpdateUser: String(auditUserId || 'system'),
-      lastUpdateDateTime: new Date().toISOString()
-    }
+  const hasExplicitEnabled = Object.prototype.hasOwnProperty.call(options || {}, 'thresholdsEnabled')
+    && options.thresholdsEnabled !== undefined;
+  const buildStored = (existingRow) => {
+    const existing = normalizeOrgPolicyStorage(existingRow);
+    return {
+      thresholdsEnabled: hasExplicitEnabled
+        ? normalizeThresholdsEnabled(options.thresholdsEnabled, existing.thresholdsEnabled)
+        : existing.thresholdsEnabled,
+      items,
+      audit: {
+        lastUpdateUser: String(auditUserId || 'system'),
+        lastUpdateDateTime: new Date().toISOString()
+      }
+    };
   };
   await runByRepositoryBackend({}, {
     json: async () => {
       await queueWrite(async () => {
         const doc = await readFileParsed();
         if (!doc.byOrgId || typeof doc.byOrgId !== 'object') doc.byOrgId = {};
-        doc.byOrgId[orgKey(activeOrgId)] = stored;
+        const key = orgKey(activeOrgId);
+        doc.byOrgId[key] = buildStored(doc.byOrgId[key]);
         await fs.mkdir(path.dirname(dataPath), { recursive: true });
         await fs.writeFile(dataPath, JSON.stringify(doc, null, 2), 'utf8');
       });
@@ -371,7 +431,8 @@ async function savePolicyItemsForOrg(activeOrgId, rawItems, auditUserId) {
       const existing = await readMongoDoc();
       if (!existing.byOrgId || typeof existing.byOrgId !== 'object') existing.byOrgId = {};
       const byOrgId = { ...existing.byOrgId };
-      byOrgId[orgKey(activeOrgId)] = stored;
+      const key = orgKey(activeOrgId);
+      byOrgId[key] = buildStored(byOrgId[key]);
       const nowIso = new Date().toISOString();
       await collection.updateOne(
         { id: MONGO_DOC_ID },
@@ -392,12 +453,16 @@ async function savePolicyItemsForOrg(activeOrgId, rawItems, auditUserId) {
 /** Prefer savePolicyItemsForOrg — still saves as a single default item. */
 async function savePolicyForOrg(activeOrgId, patch, auditUserId) {
   const normalized = normalizePolicyFromForm(patch);
-  const items = await savePolicyItemsForOrg(
+  const saveOptions = Object.prototype.hasOwnProperty.call(patch || {}, 'thresholdsEnabled')
+    ? { thresholdsEnabled: patch.thresholdsEnabled }
+    : {};
+  await savePolicyItemsForOrg(
     activeOrgId,
     [{ ...normalized, isDefault: true, id: patch.id }],
-    auditUserId
+    auditUserId,
+    saveOptions
   );
-  return items[0] ? policyFieldsFromItem(items[0]) : normalized;
+  return getPolicyForOrg(activeOrgId);
 }
 
 async function removePolicyForOrg(activeOrgId) {
@@ -457,10 +522,11 @@ async function getStoredPolicyRowForOrg(activeOrgId) {
   if (!stored || typeof stored !== 'object') return null;
   const storage = normalizeOrgPolicyStorage(stored);
   const defaultItem = getDefaultItemFromStorage(storage);
-  const normalized = defaultItem ? policyFieldsFromItem(defaultItem) : { ...DEFAULT_POLICY };
+  const normalized = defaultItem ? policyFieldsFromItem(defaultItem) : { ...DEFAULT_THRESHOLD_FIELDS };
   return {
     id: key,
     orgId: key,
+    thresholdsEnabled: storage.thresholdsEnabled,
     ...normalized,
     items: storage.items,
     status: 'stored',
@@ -472,6 +538,7 @@ async function getStoredPolicyRowForOrg(activeOrgId) {
 module.exports = {
   DEFAULT_POLICY,
   getPolicyForOrg,
+  getPolicyCatalogForOrg,
   listPolicyItemsForOrg,
   resolveOrgPolicyForScheduledMinutes,
   resolvePolicyFieldsForScheduledMinutes,
@@ -486,6 +553,7 @@ module.exports = {
   normalizePolicyPatch: normalizePolicyFromForm,
   normalizePolicyFromStored,
   normalizePolicyFromForm,
+  normalizeThresholdsEnabled,
   pickStoredPolicyFields,
   policyFieldsFromItem,
   orgKey

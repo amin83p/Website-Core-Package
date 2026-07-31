@@ -53,7 +53,9 @@
   }
 
   function showReportModal(title, message) {
-    if (typeof showMessageModal === 'function') return showMessageModal({ title, icon: 'warning', message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      return window.showMessageModal({ title, icon: 'warning', message: escapeHtml(message), buttons: [{ text: 'OK', class: 'btn-primary' }] });
+    }
     window.alert(message);
     return null;
   }
