@@ -9,7 +9,13 @@ const DEFAULT_HIDDEN_PATH_PREFIXES = Object.freeze([
   'audit.lastUpdateUser',
   'audit.lastUpdateDateTime',
   'audit.updatedAt',
-  'audit.modifiedAt'
+  'audit.modifiedAt',
+  'password',
+  'passwordHash',
+  'currentPassword',
+  'newPassword',
+  'confirmPassword',
+  'passwordConfirmation'
 ]);
 
 function isPlainObject(value) {

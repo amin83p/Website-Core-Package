@@ -9,10 +9,17 @@ function validateRequest(schema) {
         params: req.params
       });
       
-      // Replace request data with validated data (strips unknown fields if schema is strict/strip)
-      req.body = parsed.body;
-      req.query = parsed.query;
-      req.params = parsed.params;
+      // Replace only request segments that the schema actually validates.
+      // A body-only schema must not erase Express route params or query values.
+      if (Object.prototype.hasOwnProperty.call(parsed, 'body')) {
+        req.body = parsed.body;
+      }
+      if (Object.prototype.hasOwnProperty.call(parsed, 'query')) {
+        req.query = parsed.query;
+      }
+      if (Object.prototype.hasOwnProperty.call(parsed, 'params')) {
+        req.params = parsed.params;
+      }
       
       next();
     } catch (error) {

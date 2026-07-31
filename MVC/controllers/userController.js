@@ -432,9 +432,11 @@ async function showEditUserForm(req, res) {
 }
 
 async function editUser(req, res) {
+  let updateStage = 'load_user';
   try {
     const current = await dataService.getDataById('users', req.params.id, req.user);
     if(!current) throw new Error('User not found');
+    updateStage = 'handle_super_admin';
 
     if (adminAuthorityService.isSuperAdmin(current)) { // ✅ Reused helper
         if (req.body.primaryOrgId) {
@@ -444,13 +446,17 @@ async function editUser(req, res) {
         return res.redirect('/users');
     }
 
+    updateStage = 'validate_input';
     await validateUserInput(req.body, { allowNoPerson: true });
     const now = new Date().toISOString();
     const reqUserId = req.user?.id || null;
 
+    updateStage = 'build_organizations';
     const organizations = await buildUserOrganizations(current.personId, req.body.organizations, req.user, current.organizations || []);
+    updateStage = 'validate_organization_profiles';
     await assertOrgAccessProfilesMatch(organizations, req.user);
 
+    updateStage = 'validate_delegation';
     for (const org of organizations) {
         const directProfileIds = Array.isArray(org.directAccessProfileIds)
           ? normalizeIdList(org.directAccessProfileIds)
@@ -464,6 +470,7 @@ async function editUser(req, res) {
     }
 
     // ✅ NEW: Handle System Access Profile (Tier 2 Admin)
+    updateStage = 'resolve_system_access';
     let systemAccessProfileId = current.systemAccessProfileId; // Default: Keep existing
     
     // 1. Check Privilege: Only System Admins can CHANGE this
@@ -486,6 +493,7 @@ async function editUser(req, res) {
     }
     // If NOT system admin, we ignore req.body.systemAccessProfileId and keep `systemAccessProfileId` as `current.systemAccessProfileId`
 
+    updateStage = 'prepare_update';
     let targetPrimaryOrgId = req.body.primaryOrgId ? Number(req.body.primaryOrgId) : null;
     if (organizations.length > 0) {
        const exists = organizations.some(o => Number(o.orgId) === targetPrimaryOrgId);
@@ -520,14 +528,27 @@ async function editUser(req, res) {
     if (passwordHash) updates.passwordHash = passwordHash;
     updates.personId = current.personId;
 
+    updateStage = 'persist_update';
     const results = await dataService.updateData('users', req.params.id, updates, req.user);
 
+    updateStage = 'send_response';
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'User updated successfully.', data: results });
     res.redirect('/users');
 
   } catch (error) {
+    console.error('[UserController.editUser] User update failed.', {
+      targetUserId: String(req.params?.id || ''),
+      requestId: String(req.requestId || req.headers?.['x-request-id'] || ''),
+      stage: updateStage,
+      error: error?.stack || error?.message || error
+    });
     if (req.headers['x-ajax-request']) {
-        return res.status(400).json({ status: 'error', error, message: error.message });
+        return res.status(400).json({
+          status: 'error',
+          code: 'USER_UPDATE_FAILED',
+          stage: updateStage,
+          message: error.message
+        });
     }
     res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user || null });
   }

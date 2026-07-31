@@ -97,16 +97,39 @@ function normalizePayloadValue(value) {
     return parsedValue;
 }
 
+const SENSITIVE_PAYLOAD_KEYS = new Set([
+    'password',
+    'passwordhash',
+    'currentpassword',
+    'newpassword',
+    'confirmpassword',
+    'passwordconfirmation'
+]);
+
+function redactSensitivePayload(value) {
+    if (Array.isArray(value)) {
+        return value.map((item) => redactSensitivePayload(item));
+    }
+    if (!value || typeof value !== 'object') return value;
+
+    const redacted = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+        const normalizedKey = String(key || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+        if (SENSITIVE_PAYLOAD_KEYS.has(normalizedKey)) continue;
+        redacted[key] = redactSensitivePayload(nestedValue);
+    }
+    return redacted;
+}
+
 function buildActionStatePayload(method, reqBody, bodyOrChunk) {
     if (method === 'GET') return null;
 
     const source = (reqBody && typeof reqBody === 'object') ? reqBody : bodyOrChunk;
     if (!source || typeof source !== 'object') return source || null;
 
-    const normalized = normalizePayloadValue(source);
+    const normalized = redactSensitivePayload(normalizePayloadValue(source));
     if (normalized && typeof normalized === 'object' && !Array.isArray(normalized)) {
         delete normalized.actionStateId;
-        delete normalized.password;
     }
     return normalized;
 }
@@ -475,4 +498,10 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
     };
 };
 
-module.exports = { trackActionState };
+module.exports = {
+    trackActionState,
+    _test: {
+        buildActionStatePayload,
+        redactSensitivePayload
+    }
+};

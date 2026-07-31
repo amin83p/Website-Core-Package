@@ -124,6 +124,20 @@ function clearCountCache() {
   countCache.clear();
 }
 
+async function trackActionStateChangeSafely(method, payload = {}) {
+  const tracker = actionStateChangeTrackerService?.[method];
+  if (typeof tracker !== 'function') return null;
+  try {
+    return await tracker.call(actionStateChangeTrackerService, payload);
+  } catch (error) {
+    console.error(
+      `Action-state ${String(method || 'change')} tracking failed after the data operation completed:`,
+      error?.stack || error?.message || error
+    );
+    return null;
+  }
+}
+
 function resolveTrackedEntityId(entityType, inputId, resultRow = null) {
   const normalizedType = String(entityType || '').trim();
   if (normalizedType === 'tableSettings') {
@@ -365,7 +379,7 @@ const entityGatewayService = {
         const trackedEntityId = resolveTrackedEntityId(normalizedType, row?.id, row);
         if (!trackedEntityId) continue;
         // eslint-disable-next-line no-await-in-loop
-        await actionStateChangeTrackerService.trackCreate({
+        await trackActionStateChangeSafely('trackCreate', {
           source: 'core',
           entityType: normalizedType,
           entityId: trackedEntityId
@@ -439,7 +453,7 @@ const entityGatewayService = {
       const normalizedType = String(entityType || '').trim();
       const trackedEntityId = resolveTrackedEntityId(normalizedType, id, result);
       if (trackedEntityId && beforeSnapshot && typeof beforeSnapshot === 'object') {
-        await actionStateChangeTrackerService.trackUpdate({
+        await trackActionStateChangeSafely('trackUpdate', {
           source: 'core',
           entityType: normalizedType,
           entityId: trackedEntityId,
