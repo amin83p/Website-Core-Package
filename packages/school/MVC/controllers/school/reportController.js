@@ -223,7 +223,12 @@ function hydrateInitialAnswersFromPrefill(template, instance, options = {}) {
 
     const currentValue = currentAnswers[field.id];
     const hasCurrentValue = !(currentValue === undefined || currentValue === null || String(currentValue) === '');
-    if (hasCurrentValue && !overwritePrefillFields) return;
+    const looksRating = /session_rating|classEffort|classParticipation|respectsTeachers|respectsStudents|conduct/i.test(
+      String(field?.prefillKey || '')
+    );
+    const currentIsNa = ['n/a', 'na'].includes(String(currentValue ?? '').trim().toLowerCase());
+    const canOverwriteNaRating = looksRating && currentIsNa;
+    if (hasCurrentValue && !overwritePrefillFields && !canOverwriteNaRating) return;
 
     const rawPrefill = resolvedPrefill.value;
     let nextValue = rawPrefill;
@@ -1213,14 +1218,38 @@ async function buildInstanceEditorRenderContext(req) {
   const canEditAnswers = await reportViewService.canEditReportInstanceAnswers(latestInstance, req.user);
   const isAdminEditor = await reportViewService.isReportInstanceAdminEditor(req.user);
   if (canEditAnswers) {
+    // Refresh prefill so Step 1 conduct saved after instance create still flows into rating fields.
+    const freshPrefill = await reportService.buildPrefillSnapshot({
+      assignment: effectiveAssignment || assignment,
+      teacherId: latestInstance.teacherId,
+      studentId: latestInstance.studentId,
+      reqUser: req.user
+    });
+    const prevPrefill = latestInstance.prefillSnapshot && typeof latestInstance.prefillSnapshot === 'object'
+      ? latestInstance.prefillSnapshot
+      : {};
+    const ratingPrefillChanged = [
+      'student_session_rating_span_rated_sessions',
+      'student_session_rating_span_class_effort_percent',
+      'student_session_rating_span_class_participation_percent',
+      'student_session_rating_span_respects_teachers_percent',
+      'student_session_rating_span_respects_students_percent'
+    ].some((key) => String(prevPrefill[key] ?? '') !== String(freshPrefill?.[key] ?? ''));
+    latestInstance = {
+      ...latestInstance,
+      prefillSnapshot: freshPrefill
+    };
     const hydrated = hydrateInitialAnswersFromPrefill(template, latestInstance);
-    if (hydrated.changed) {
+    if (hydrated.changed || ratingPrefillChanged) {
       latestInstance = await schoolDataService.updateData('reportInstances', latestInstance.id, {
-        answers: hydrated.answers,
+        ...(hydrated.changed ? { answers: hydrated.answers } : {}),
+        prefillSnapshot: freshPrefill,
         audit: {
           lastUpdateUser: req.user?.id || '',
           lastUpdateDateTime: new Date().toISOString(),
-          prefillHydratedAt: new Date().toISOString()
+          ...(hydrated.changed
+            ? { prefillHydratedAt: new Date().toISOString() }
+            : { prefillRefreshedAt: new Date().toISOString() })
         }
       }, req.user);
     }

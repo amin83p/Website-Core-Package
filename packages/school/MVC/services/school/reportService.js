@@ -645,7 +645,13 @@ function buildStudentSessionRatingSummary(sessions, studentId, statusMap = null,
       enabledAttendanceStatuses
     );
     const status = String(normalized?.attendance || '').trim().toLowerCase();
-    if (status !== 'present' && status !== 'late' && status !== 'excused') return;
+    // Allow unmarked attendance: Step 1 conduct is often saved before attendance is marked.
+    // Still exclude absent / N/A / other non-attending statuses from rating averages.
+    const attendanceEligible = status === 'present'
+      || status === 'late'
+      || status === 'excused'
+      || status === '';
+    if (!attendanceEligible) return;
 
     const pushIfRated = (bucket, raw) => {
       const value = normalizeSessionRatingPercent(raw, null);
