@@ -28,19 +28,35 @@
   }
 
   function findActiveOrg(userData) {
-    if (!userData || !userData.activeOrgId || !Array.isArray(userData.allowedOrgs)) return null;
-    return userData.allowedOrgs.find((org) => String(org.orgId) === String(userData.activeOrgId)) || null;
+    if (!userData || typeof userData !== 'object') return null;
+    const activeOrgId = String(
+      userData.activeOrgId
+      || userData.organizationId
+      || userData.orgId
+      || userData.primaryOrgId
+      || ''
+    ).trim();
+    if (!activeOrgId) return null;
+    const allowedOrgs = Array.isArray(userData.allowedOrgs) ? userData.allowedOrgs : [];
+    return allowedOrgs.find((org) => {
+      const orgId = String(org?.orgId || org?.id || '').trim();
+      return orgId && orgId === activeOrgId;
+    }) || null;
   }
 
   function activeOrganizationScope(options) {
     const opts = options || {};
     const userData = opts.user || getCurrentUser();
     const activeOrg = findActiveOrg(userData);
+    const orgId = opts.orgId || activeOrg?.orgId || activeOrg?.id || null;
+    const orgName = opts.orgName || activeOrg?.name || activeOrg?.orgName || '';
     return {
-      label: opts.label || 'Active Organization Scope',
-      orgId: opts.orgId || activeOrg?.orgId || null,
-      orgName: opts.orgName || activeOrg?.name || '',
-      value: Object.prototype.hasOwnProperty.call(opts, 'value') ? opts.value : null,
+      label: opts.label || 'Active Organization',
+      orgId,
+      orgName,
+      value: Object.prototype.hasOwnProperty.call(opts, 'value')
+        ? opts.value
+        : (orgName || (orgId ? `Org ${orgId}` : null)),
       icon: pickIcon(opts.icon, 'bi bi-building fs-4')
     };
   }

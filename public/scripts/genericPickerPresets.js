@@ -262,6 +262,9 @@
 
   function buildDefaultContext(name) {
     if (!contexts || typeof contexts.activeOrganizationScope !== 'function') return null;
+    if (isSchoolPage()) {
+      return contexts.activeOrganizationScope({ label: 'Active Organization' });
+    }
     const namesUsingActiveOrgContext = new Set([
       'accessProfile',
       'account',
@@ -283,6 +286,14 @@
     ]);
     if (!namesUsingActiveOrgContext.has(name)) return null;
     return contexts.activeOrganizationScope({ label: 'Active Organization' });
+  }
+
+  function ensureSchoolActiveOrgContext(config) {
+    const next = { ...(config || {}) };
+    if (next.context || !isSchoolPage()) return next;
+    if (!contexts || typeof contexts.activeOrganizationScope !== 'function') return next;
+    next.context = contexts.activeOrganizationScope({ label: 'Active Organization' });
+    return next;
   }
 
   function merge(base, overrides) {
@@ -351,10 +362,10 @@
   function byName(name, overrides) {
     const mergedWithGuardrails = applySchoolIdentityGuardrails(name, merge(presetMap[name] || {}, overrides), overrides);
     const merged = applyPickerDefaults(name, mergedWithGuardrails);
-    if (!merged.context) {
+    if (!Object.prototype.hasOwnProperty.call(overrides || {}, 'context') && !merged.context) {
       merged.context = buildDefaultContext(name);
     }
-    return merged;
+    return ensureSchoolActiveOrgContext(merged);
   }
 
   function inferName(config) {
@@ -366,7 +377,7 @@
   function normalizeConfig(config) {
     const current = { ...(config || {}) };
     const presetName = typeof current.preset === 'string' ? current.preset : inferName(current);
-    if (!presetName) return current;
+    if (!presetName) return ensureSchoolActiveOrgContext(current);
     delete current.preset;
     return byName(presetName, current);
   }

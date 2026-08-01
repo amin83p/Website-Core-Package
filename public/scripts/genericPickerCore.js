@@ -259,7 +259,10 @@
     if (!context) return 'Global';
 
     const allowedOrgs = Array.isArray(userData?.allowedOrgs) ? userData.allowedOrgs : [];
-    const findAllowedOrg = (id) => allowedOrgs.find((org) => String(org.orgId) === String(id));
+    const findAllowedOrg = (id) => allowedOrgs.find((org) => {
+      const orgId = String(org?.orgId || org?.id || '').trim();
+      return orgId && orgId === String(id || '').trim();
+    });
     const isGenericOrgLabel = (value, id) => {
       const normalized = String(value || '').trim().toLowerCase();
       const generic = `org ${String(id || '').trim()}`.toLowerCase();
@@ -292,21 +295,29 @@
     }
 
     const rawValue = String(context.value || '').trim();
-    if (rawValue) {
-      const matchedOrg = allowedOrgs.find((org) => String(org.orgId) === rawValue);
+    if (rawValue && !['global', 'system / global', 'system/global'].includes(rawValue.toLowerCase())) {
+      const matchedOrg = findAllowedOrg(rawValue);
       if (matchedOrg) {
-        const name = matchedOrg.name || `Org ${matchedOrg.orgId}`;
-        return `${name} (#${matchedOrg.orgId})`;
+        const name = matchedOrg.name || `Org ${matchedOrg.orgId || matchedOrg.id}`;
+        return `${name} (#${matchedOrg.orgId || matchedOrg.id})`;
       }
       return rawValue;
     }
 
-    if (userData?.activeOrgId && Array.isArray(userData?.allowedOrgs)) {
-      const activeOrg = userData.allowedOrgs.find((org) => String(org.orgId) === String(userData.activeOrgId));
+    const activeOrgId = String(
+      userData?.activeOrgId
+      || userData?.organizationId
+      || userData?.orgId
+      || userData?.primaryOrgId
+      || ''
+    ).trim();
+    if (activeOrgId) {
+      const activeOrg = findAllowedOrg(activeOrgId);
       if (activeOrg) {
-        const name = activeOrg.name || `Org ${activeOrg.orgId}`;
-        return `${name} (#${activeOrg.orgId})`;
+        const name = activeOrg.name || `Org ${activeOrg.orgId || activeOrg.id || activeOrgId}`;
+        return `${name} (#${activeOrg.orgId || activeOrg.id || activeOrgId})`;
       }
+      return `Org ${activeOrgId} (#${activeOrgId})`;
     }
 
     return 'System / Global';

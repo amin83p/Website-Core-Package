@@ -753,30 +753,43 @@ window.GenericPicker = (function() {
             // Context Setup
             if (currentConfig.context) {
               contextSection.style.display = 'flex';
-              contextLabel.textContent = currentConfig.context.label || 'Context';
-              contextValue.textContent = pickerCore?.formatContextValue
-                ? pickerCore.formatContextValue(currentConfig.context, null)
-                : (currentConfig.context.value || 'Global');
+              contextLabel.textContent = currentConfig.context.label || 'Active Organization';
               
               if(currentConfig.context.icon) {
                   contextIcon.className = `bi ${currentConfig.context.icon}`;
               }
-              
-              try {
-                const userDataInfoFromBE = JSON.parse(`<%- JSON.stringify(user || {}) %>`);
-                if (pickerCore?.formatContextValue) {
-                  contextValue.textContent = pickerCore.formatContextValue(currentConfig.context, userDataInfoFromBE);
-                } else if (!currentConfig.context.value || currentConfig.context.value === '') {
-                  let activeOrgName1 = 'System / Global';
-                  if (userDataInfoFromBE && userDataInfoFromBE.activeOrgId && userDataInfoFromBE.allowedOrgs) {
-                    const orgObj = userDataInfoFromBE.allowedOrgs.find(o => String(o.orgId) === String(userDataInfoFromBE.activeOrgId));
-                    if (orgObj) {
-                      activeOrgName1 = orgObj.name || ('Org #' + orgObj.orgId);
-                    }
+
+              const userDataInfoFromBE = (window.__GENERIC_PICKER_USER__ && typeof window.__GENERIC_PICKER_USER__ === 'object')
+                ? window.__GENERIC_PICKER_USER__
+                : {};
+              if (pickerCore?.formatContextValue) {
+                contextValue.textContent = pickerCore.formatContextValue(currentConfig.context, userDataInfoFromBE);
+              } else if (currentConfig.context.orgName || currentConfig.context.orgId) {
+                contextValue.textContent = currentConfig.context.orgId
+                  ? `${currentConfig.context.orgName || ('Org #' + currentConfig.context.orgId)} (#${currentConfig.context.orgId})`
+                  : String(currentConfig.context.orgName);
+              } else {
+                let activeOrgName1 = 'System / Global';
+                const activeOrgId = String(
+                  userDataInfoFromBE.activeOrgId
+                  || userDataInfoFromBE.organizationId
+                  || userDataInfoFromBE.orgId
+                  || userDataInfoFromBE.primaryOrgId
+                  || ''
+                ).trim();
+                if (activeOrgId && Array.isArray(userDataInfoFromBE.allowedOrgs)) {
+                  const orgObj = userDataInfoFromBE.allowedOrgs.find((o) => {
+                    const orgId = String(o?.orgId || o?.id || '').trim();
+                    return orgId && orgId === activeOrgId;
+                  });
+                  if (orgObj) {
+                    activeOrgName1 = `${orgObj.name || ('Org #' + activeOrgId)} (#${orgObj.orgId || orgObj.id || activeOrgId})`;
+                  } else {
+                    activeOrgName1 = `Org ${activeOrgId} (#${activeOrgId})`;
                   }
-                  contextValue.textContent = activeOrgName1;
                 }
-              } catch(e) { /* ignore parse error if user undefined */ }
+                contextValue.textContent = activeOrgName1;
+              }
             } else {
               contextSection.style.display = 'none';
             }
