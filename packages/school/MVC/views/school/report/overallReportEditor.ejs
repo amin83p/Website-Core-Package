@@ -86,7 +86,8 @@
                 <% } else if (!visualTypes.has(String(field.type))) { %>
                   <%
                     const mode = String(field.overallValueMode || 'manual');
-                    const canEdit = editable && mode !== 'derived_locked';
+                    const fieldReadOnly = field.readOnly === true || String(field.readOnly).toLowerCase() === 'true' || mode === 'derived_locked';
+                    const canEdit = editable && !fieldReadOnly;
                     const value = instance.answers?.[field.id] ?? '';
                     const fullWidth = field.fullPageWidth === true || String(field.fullPageWidth).toLowerCase() === 'true';
                     const hasBorder = field.hasBorder === true || String(field.hasBorder).toLowerCase() === 'true';
@@ -98,6 +99,7 @@
                   <div class="<%= fullWidth ? 'col-12' : 'col' %>"><div class="<%= shellClass %>" style="<%= backgroundColor ? `background-color:${backgroundColor};` : '' %>">
                     <label class="form-label fw-bold"><%= field.label %><% if (field.required) { %><span class="text-danger"> *</span><% } %>
                       <span class="badge ms-1 <%= mode === 'manual' ? 'bg-light text-dark border' : (mode === 'derived_locked' ? 'bg-secondary' : 'bg-warning text-dark') %>"><%= modeLabel %></span>
+                      <% if (fieldReadOnly) { %><span class="badge bg-secondary-subtle text-secondary-emphasis border">Read-only</span><% } %>
                       <% if (instance.derivedOverrides?.[field.id]) { %><span class="badge bg-info text-dark">overridden</span><% } %>
                     </label>
                     <% if (field.type === 'textarea') { %><textarea class="form-control js-overall-answer<%= canEdit ? '' : ' bg-light' %>" rows="3" data-field-id="<%= field.id %>" placeholder="<%= field.placeholder || '' %>" <%= canEdit ? '' : 'readonly' %>><%= value %></textarea>
@@ -161,6 +163,8 @@
 <div class="modal fade" id="sourceUpdateModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Update from Sources</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="sourceUpdateIssues"></div><div class="table-responsive"><table class="table table-sm"><thead><tr><th></th><th>Source key</th><th>Stored</th><th>Current</th><th>Affected overall fields</th></tr></thead><tbody id="sourceUpdateRows"></tbody></table></div></div><div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" id="btnApplySourceUpdates">Apply Selected</button></div></div></div></div>
 <div class="modal fade" id="exportPreviewModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">DOCX Export Preview</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="exportPreviewBody"></div></div></div></div>
 
+<%- include('partials/reportMessageHelpers') %>
+
 <script>
 (() => {
   const instanceId = <%- JSON.stringify(String(instance.id)) %>;
@@ -179,32 +183,11 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   async function showReportMessage({ title = 'Overall Report', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
-    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
-      return window.showMessageModal({
-        title,
-        icon,
-        message: esc(message),
-        buttons: [{ text: 'OK', class: buttonClass }]
-      });
-    }
-    window.alert(String(message || title));
-    return 'OK';
+    return window.ReportMessaging.showReportMessage({ title, message, icon, buttonClass });
   }
 
   async function confirmReportAction({ title = 'Confirm', message = '', confirmText = 'Confirm', confirmClass = 'btn-primary' } = {}) {
-    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
-      const result = await window.showMessageModal({
-        title,
-        icon: 'warning',
-        message: esc(message),
-        buttons: [
-          { text: 'Cancel', class: 'btn-secondary' },
-          { text: confirmText, class: confirmClass }
-        ]
-      });
-      return result === confirmText;
-    }
-    return window.confirm(String(message || title));
+    return window.ReportMessaging.confirmReportAction({ title, message, confirmText, confirmClass });
   }
 
   document.getElementById('btnSourceUpdates')?.addEventListener('click', async () => {

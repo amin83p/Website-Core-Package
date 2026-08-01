@@ -47,30 +47,23 @@
 <%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/reports/overall-reports' }) %>
 <%- include('partials/tablePages-end') %>
 
+<%- include('partials/reportMessageHelpers') %>
+
 <script>
 (() => {
-  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
-
   async function confirmReportRemoval(link) {
     const action = String(link.dataset.action || 'Delete');
     const reportTitle = String(link.dataset.reportTitle || 'this overall report');
     const isArchive = action === 'Archive';
     const message = isArchive
-      ? `Archive <strong>${escapeHtml(reportTitle)}</strong>? The report and its generated documents will remain available as read-only records.`
-      : `Delete <strong>${escapeHtml(reportTitle)}</strong>? This action cannot be undone.`;
-    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
-      const result = await window.showMessageModal({
-        title: `${action} Overall Report?`,
-        icon: 'warning',
-        message,
-        buttons: [
-          { text: 'Cancel', class: 'btn-secondary' },
-          { text: action, class: 'btn-danger' }
-        ]
-      });
-      return result === action;
-    }
-    return window.confirm(`${action} ${reportTitle}?`);
+      ? `Archive <strong>${String(reportTitle).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]))}</strong>? The report and its generated documents will remain available as read-only records.`
+      : `Delete <strong>${String(reportTitle).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]))}</strong>? This action cannot be undone.`;
+    return window.ReportMessaging.confirmReportAction({
+      title: `${action} Overall Report?`,
+      message,
+      confirmText: action,
+      html: true
+    });
   }
 
   document.querySelectorAll('.js-remove-overall-report').forEach(link => {

@@ -1,100 +1,844 @@
 <%
-  const sourceSlotsJson = JSON.stringify(sourceSlotOptions || []).replace(/</g, '\\u003c');
+  const initialTemplate = template || null;
+  const initialInstance = instance || null;
+  const initialSourceSlots = Array.isArray(sourceSlots) ? sourceSlots : [];
+  const initialDocxOptions = Array.isArray(docxOptions) ? docxOptions : [];
+  const workspaceReadOnly = readOnly === true;
+  const escJson = (value) => JSON.stringify(value ?? null).replace(/</g, '\\u003c');
 %>
-<div class="sections-page">
-  <div class="d-flex justify-content-between align-items-start mb-4">
-    <div><h1 class="page-heading size-md m-0 text-start" style="padding-left:0;"><i class="bi bi-file-earmark-plus me-2"></i><%= title %></h1><div class="text-muted"><%= template.title %> &middot; v<%= Number(template.version || 1) %></div></div>
-    <a href="/school/reports/overall-templates" class="btn btn-outline-secondary btn-sm">Back</a>
-  </div>
-  <form method="POST" id="overallReportCreateForm" action="/school/reports/overall-reports/new/<%= encodeURIComponent(template.id) %>">
-    <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
-    <div class="card border-0 shadow-sm mb-3"><div class="card-body">
-      <label class="form-label fw-bold">Overall report name</label>
-      <input class="form-control" name="title" maxlength="240" placeholder="<%= template.title %> - <%= new Date().toISOString().slice(0,10) %>">
-    </div></div>
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white"><h5 class="mb-0 fw-bold">Completed Source Reports</h5><div class="small text-muted">Search submitted or locked reports matching each source-template slot.</div></div>
-      <div class="card-body" id="sourceReportPickerRows">
-        <% (sourceSlotOptions || []).forEach((slot) => { %>
-          <div class="mb-3 border rounded p-3" data-source-slot="<%= slot.slotKey %>">
-            <input type="hidden" name="sourceInstance_<%= slot.slotKey %>" id="sourceInstance_<%= slot.slotKey %>" value="">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
-              <div><span class="badge bg-primary me-2"><%= slot.slotKey %></span><strong><%= slot.templateTitle || slot.templateId %></strong><div class="small text-muted ms-1 mt-1"><%= slot.templateType || 'Report' %> &middot; v<%= Number(slot.templateVersion || 1) %> &middot; <span class="font-monospace"><%= slot.templateId %></span></div></div>
-              <button type="button" class="btn btn-outline-primary btn-sm js-pick-source-report" data-slot-key="<%= slot.slotKey %>" <%= slot.instances?.length ? '' : 'disabled' %>><i class="bi bi-search me-1"></i>Find Completed Report</button>
-            </div>
-            <div class="form-control bg-white source-report-summary" id="sourceSummary_<%= slot.slotKey %>"><span class="text-muted">No completed report selected</span></div>
-            <% if (!slot.instances?.length) { %><div class="form-text text-danger">No submitted or locked instances are available for this template.</div><% } %>
-          </div>
-        <% }); %>
+<div class="sections-page overall-report-workspace">
+  <div class="d-flex justify-content-between align-items-start mb-4 gap-2 flex-wrap">
+    <div>
+      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;">
+        <i class="bi bi-files me-2"></i><%= title || 'Create Overall Report' %>
+      </h1>
+      <div class="text-muted" id="workspaceSubtitle">
+        <% if (initialInstance) { %>
+          <%= initialInstance.status %> &middot; <span class="font-monospace"><%= initialInstance.id %></span>
+        <% } else { %>
+          Select a template, date range, and source reports to build a multi-student overall report.
+        <% } %>
       </div>
     </div>
-    <div class="card border-0 shadow-sm mb-3"><div class="card-body">
-      <label class="form-label fw-bold">Output Word template</label>
-      <select class="form-select" name="selectedDocxKey" required>
-        <% (docxOptions || []).forEach((option) => { %><option value="<%= option.key %>"><%= option.label %> &middot; <%= option.fileName %></option><% }); %>
-      </select>
-      <% if (!docxOptions?.length) { %><div class="form-text text-danger">This overall template has no Word file configured.</div><% } %>
-    </div></div>
-    <div class="d-flex justify-content-end gap-2"><a href="/school/reports/overall-templates" class="btn btn-outline-secondary">Cancel</a><button class="btn btn-primary" type="submit" <%= !docxOptions?.length ? 'disabled' : '' %>>Create Snapshot Report</button></div>
-  </form>
+    <div class="d-flex gap-2">
+      <a href="/school/reports/overall-reports" class="btn btn-outline-secondary btn-sm">Back to List</a>
+      <a href="/school/reports/overall-templates" class="btn btn-outline-secondary btn-sm">Templates</a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-4">
+          <label class="form-label fw-bold">Overall Template</label>
+          <div class="input-group">
+            <input type="hidden" id="overallTemplateId" value="<%= initialTemplate?.id || '' %>">
+            <input type="text" class="form-control" id="overallTemplateTitle" readonly
+              value="<%= initialTemplate?.title || '' %>"
+              placeholder="Select an overall report template">
+            <button type="button" class="btn btn-outline-primary" id="btnPickOverallTemplate" <%= workspaceReadOnly ? 'disabled' : '' %>>
+              <i class="bi bi-search"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <label class="form-label fw-bold">Overall report name</label>
+          <input class="form-control" id="overallReportTitle" maxlength="240"
+            value="<%= initialInstance?.title || '' %>"
+            placeholder="Optional title"
+            <%= workspaceReadOnly ? 'readonly' : '' %>>
+        </div>
+        <div class="col-lg-4">
+          <label class="form-label fw-bold">Output Word template</label>
+          <select class="form-select" id="selectedDocxKey" <%= workspaceReadOnly ? 'disabled' : '' %>>
+            <% initialDocxOptions.forEach((option) => { %>
+              <option value="<%= option.key %>" <%= String(initialInstance?.selectedDocxKey || '') === String(option.key) ? 'selected' : '' %>>
+                <%= option.label %> &middot; <%= option.fileName %>
+              </option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-3 align-items-end mt-1">
+        <div class="col-md-3">
+          <label class="form-label fw-bold">Start date</label>
+          <input type="date" class="form-control" id="filterStartDate"
+            value="<%= initialInstance?.filtersSnapshot?.startDate || '' %>"
+            <%= workspaceReadOnly ? 'readonly' : '' %>>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">End date</label>
+          <input type="date" class="form-control" id="filterEndDate"
+            value="<%= initialInstance?.filtersSnapshot?.endDate || '' %>"
+            <%= workspaceReadOnly ? 'readonly' : '' %>>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-bold d-block">Date shortcuts</label>
+          <div class="btn-group flex-wrap" role="group" aria-label="Date range shortcuts">
+            <button type="button" class="btn btn-outline-secondary btn-sm js-date-range" data-range="today" <%= workspaceReadOnly ? 'disabled' : '' %>>Today</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm js-date-range" data-range="thisWeek" <%= workspaceReadOnly ? 'disabled' : '' %>>This Week</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm js-date-range" data-range="last7" <%= workspaceReadOnly ? 'disabled' : '' %>>Last 7 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm js-date-range" data-range="thisMonth" <%= workspaceReadOnly ? 'disabled' : '' %>>This Month</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm js-date-range" data-range="allTime" <%= workspaceReadOnly ? 'disabled' : '' %>>All Time</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 align-items-end mt-1">
+        <div class="col-lg-5">
+          <label class="form-label fw-bold">Students <span class="text-muted fw-normal">(optional — empty loads all matching)</span></label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="studentFilterSummary" readonly
+              value="<%= (initialInstance?.filtersSnapshot?.studentIds || []).length ? `${initialInstance.filtersSnapshot.studentIds.length} selected` : 'All matching students' %>"
+              placeholder="All matching students">
+            <button type="button" class="btn btn-outline-primary" id="btnPickStudents" <%= workspaceReadOnly ? 'disabled' : '' %>>
+              <i class="bi bi-people"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="btnClearStudents" <%= workspaceReadOnly ? 'disabled' : '' %>>Clear</button>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <label class="form-label fw-bold d-block">Instance status</label>
+          <div class="d-flex flex-wrap gap-3">
+            <% ['draft', 'submitted', 'locked'].forEach((status) => {
+              const checked = !(initialInstance?.filtersSnapshot?.statuses || []).length
+                ? (status === 'submitted' || status === 'locked')
+                : (initialInstance.filtersSnapshot.statuses || []).includes(status);
+            %>
+              <label class="form-check form-check-inline m-0">
+                <input class="form-check-input js-status-filter" type="checkbox" value="<%= status %>"
+                  <%= checked ? 'checked' : '' %> <%= workspaceReadOnly ? 'disabled' : '' %>>
+                <span class="form-check-label text-capitalize"><%= status %></span>
+              </label>
+            <% }); %>
+          </div>
+        </div>
+        <div class="col-lg-3 text-lg-end">
+          <button type="button" class="btn btn-primary" id="btnLoadCandidates" <%= workspaceReadOnly ? 'disabled' : '' %>>
+            <i class="bi bi-arrow-repeat me-1"></i>Load
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-3" id="sourceSlotsPanel">
+        <div class="small text-muted mb-2">Template sources</div>
+        <div class="d-flex flex-wrap gap-2" id="sourceSlotsChips">
+          <% if (!initialSourceSlots.length) { %>
+            <span class="text-muted">Select a template to see source slots.</span>
+          <% } %>
+          <% initialSourceSlots.forEach((slot) => { %>
+            <span class="badge text-bg-light border px-3 py-2">
+              <strong><%= slot.slotKey %></strong>
+              &middot; <%= slot.templateTitle || slot.templateId %>
+            </span>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h5 class="mb-0 fw-bold">Matched Students</h5>
+        <div class="small text-muted">Pick one source instance per template slot, then preview/create and save.</div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-success btn-sm" id="btnSaveWorkspace" <%= workspaceReadOnly ? 'disabled' : '' %>>
+          <i class="bi bi-save me-1"></i>Save
+        </button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btnExportZip" <%= initialInstance ? '' : 'disabled' %>>
+          <i class="bi bi-file-zip me-1"></i>Export (Download)
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnExportDocx" <%= initialInstance ? '' : 'disabled' %>>
+          <i class="bi bi-file-earmark-word me-1"></i>Export
+        </button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0" id="workspaceStudentsTable">
+          <thead class="table-light" id="workspaceStudentsHead"></thead>
+          <tbody id="workspaceStudentsBody">
+            <tr><td class="text-center text-muted py-4" colspan="6">Load matching report instances to begin.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
+<div class="modal fade" id="studentPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="studentPreviewTitle">Student Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="studentPreviewBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="btnSaveStudentPreview" <%= workspaceReadOnly ? 'disabled' : '' %>>Save Answers</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="exportDocxModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Export Word Document</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label fw-bold">Word template</label>
+        <select class="form-select" id="exportDocxKeySelect"></select>
+        <div class="form-text">Exports all included students using the selected Word template (ZIP when more than one).</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnConfirmExportDocx">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="hidden" id="hid_actionStateId" value="<%= actionStateId || '' %>">
+
 <%- include('partials/modal_GenericPicker', { user }) %>
+<%- include('partials/reportMessageHelpers') %>
 
 <script>
 (() => {
-  const sourceSlots = <%- sourceSlotsJson %>;
-  const bySlot = new Map(sourceSlots.map(slot => [String(slot.slotKey), slot]));
-  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-  const selectedBySlot = new Map();
+  const actionStateId = String(document.getElementById('hid_actionStateId')?.value || '').trim();
+  const readOnly = <%= workspaceReadOnly ? 'true' : 'false' %>;
+  let templateMeta = <%- escJson(initialTemplate ? { id: initialTemplate.id, title: initialTemplate.title, status: initialTemplate.status, version: initialTemplate.version } : null) %>;
+  let sourceSlots = <%- escJson(initialSourceSlots) %>;
+  let docxOptions = <%- escJson(initialDocxOptions) %>;
+  let hasOverallFields = <%= hasOverallFields ? 'true' : 'false' %>;
+  let instanceId = <%- escJson(initialInstance?.id || '') %>;
+  let selectedStudents = <%- escJson((initialInstance?.filtersSnapshot?.studentIds || []).map((id) => ({ id, name: id }))) %>;
+  let studentRows = [];
 
-  function pickerConfig(config) {
-    return window.GenericPickerPresets?.normalizeConfig ? window.GenericPickerPresets.normalizeConfig(config) : config;
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
+
+  function showModal(title, message, icon = 'warning') {
+    return window.ReportMessaging.showReportMessage({ title, message, icon });
   }
 
-  function showReportModal(title, message) {
-    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
-      return window.showMessageModal({ title, icon: 'warning', message: escapeHtml(message), buttons: [{ text: 'OK', class: 'btn-primary' }] });
+  function ymd(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function startOfWeek(date) {
+    const copy = new Date(date);
+    const day = copy.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    copy.setDate(copy.getDate() + diff);
+    return copy;
+  }
+
+  function setDateRange(range) {
+    const today = new Date();
+    const startInput = document.getElementById('filterStartDate');
+    const endInput = document.getElementById('filterEndDate');
+    if (!startInput || !endInput) return;
+    if (range === 'today') {
+      startInput.value = ymd(today);
+      endInput.value = ymd(today);
+      return;
     }
-    window.alert(message);
-    return null;
+    if (range === 'thisWeek') {
+      const start = startOfWeek(today);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      startInput.value = ymd(start);
+      endInput.value = ymd(end);
+      return;
+    }
+    if (range === 'last7') {
+      const start = new Date(today);
+      start.setDate(today.getDate() - 6);
+      startInput.value = ymd(start);
+      endInput.value = ymd(today);
+      return;
+    }
+    if (range === 'thisMonth') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      startInput.value = ymd(start);
+      endInput.value = ymd(end);
+      return;
+    }
+    startInput.value = '';
+    endInput.value = '';
   }
 
-  function summaryHtml(item) {
-    const person = item.studentName || item.studentId || 'Whole class';
-    const context = [item.className, item.teacherName, item.reportDate ? String(item.reportDate).slice(0, 10) : ''].filter(Boolean).map(escapeHtml).join(' &middot; ');
-    return `<strong>${escapeHtml(person)}</strong><span class="badge bg-light text-dark border ms-2">${escapeHtml(item.status)}</span><div>${escapeHtml(item.title || item.id)}</div><div class="small text-muted">${context || 'Completed report'} &middot; <code>${escapeHtml(item.id)}</code></div>`;
+  function selectedStatuses() {
+    return [...document.querySelectorAll('.js-status-filter:checked')].map((input) => input.value);
   }
 
-  function openSourcePicker(slotKey) {
-    const slot = bySlot.get(String(slotKey));
-    if (!slot || !window.GenericPicker) return;
-    const usedIds = new Set([...selectedBySlot.entries()].filter(([key]) => key !== slotKey).map(([, item]) => String(item.id)));
-    window.GenericPicker.open(pickerConfig({
-      title: `Select Completed Report for ${slotKey}`,
-      icon: 'bi-file-earmark-check',
-      placeholder: 'Search student, class, teacher, title, date, status, or id...',
-      sourceMode: 'local',
-      localItems: (slot.instances || []).map(item => ({ ...item, id: String(item.id), templateTitle: slot.templateTitle })),
-      searchFields: 'id,title,status,studentId,studentName,className,teacherName,reportDate,templateTitle',
+  function renderSourceChips() {
+    const host = document.getElementById('sourceSlotsChips');
+    if (!host) return;
+    if (!sourceSlots.length) {
+      host.innerHTML = '<span class="text-muted">Select a template to see source slots.</span>';
+      return;
+    }
+    host.innerHTML = sourceSlots.map((slot) => `
+      <span class="badge text-bg-light border px-3 py-2">
+        <strong>${escapeHtml(slot.slotKey)}</strong>
+        &middot; ${escapeHtml(slot.templateTitle || slot.templateId)}
+      </span>
+    `).join('');
+  }
+
+  function fillDocxSelect(selectEl, selectedKey) {
+    if (!selectEl) return;
+    selectEl.innerHTML = '';
+    (docxOptions || []).forEach((option) => {
+      const opt = document.createElement('option');
+      opt.value = option.key;
+      opt.textContent = `${option.label} · ${option.fileName || ''}`.trim();
+      if (String(option.key) === String(selectedKey || '')) opt.selected = true;
+      selectEl.appendChild(opt);
+    });
+  }
+
+  function updateStudentSummary() {
+    const input = document.getElementById('studentFilterSummary');
+    if (!input) return;
+    input.value = selectedStudents.length
+      ? `${selectedStudents.length} selected`
+      : 'All matching students';
+  }
+
+  function getFiltersPayload() {
+    return {
+      startDate: document.getElementById('filterStartDate')?.value || '',
+      endDate: document.getElementById('filterEndDate')?.value || '',
+      studentIds: selectedStudents.map((row) => row.id),
+      statuses: selectedStatuses()
+    };
+  }
+
+  function collectStudentEntries() {
+    return studentRows.map((row) => ({
+      studentId: row.studentId,
+      studentName: row.studentName,
+      included: true,
+      answers: row.answers || {},
+      derivedOverrides: row.derivedOverrides || {},
+      generatedDocs: row.generatedDocs || [],
+      sourceSelections: sourceSlots.map((slot) => ({
+        slotKey: slot.slotKey,
+        instanceId: row.selectedBySlot?.[slot.slotKey] || '',
+        templateId: slot.templateId
+      }))
+    }));
+  }
+
+  function rowComplete(row) {
+    return sourceSlots.every((slot) => Boolean(row.selectedBySlot?.[slot.slotKey]));
+  }
+
+  function renderTable() {
+    const head = document.getElementById('workspaceStudentsHead');
+    const body = document.getElementById('workspaceStudentsBody');
+    if (!head || !body) return;
+    const slotHeaders = sourceSlots.map((slot) => `<th>${escapeHtml(slot.slotKey)}<div class="small fw-normal text-muted">${escapeHtml(slot.templateTitle || '')}</div></th>`).join('');
+    head.innerHTML = `<tr>
+      <th class="ps-3">Student</th>
+      ${slotHeaders}
+      <th>Preview / Create</th>
+      <th class="pe-3 text-end">Actions</th>
+    </tr>`;
+    if (!studentRows.length) {
+      body.innerHTML = `<tr><td class="text-center text-muted py-4" colspan="${3 + sourceSlots.length}">Load matching report instances to begin.</td></tr>`;
+      return;
+    }
+    body.innerHTML = studentRows.map((row) => {
+      const complete = rowComplete(row);
+      const slotCells = sourceSlots.map((slot) => {
+        const options = row.slots?.[slot.slotKey] || [];
+        if (!options.length) {
+          return '<td><span class="text-muted small">No matches</span></td>';
+        }
+        return `<td>${options.map((item) => {
+          const checked = String(row.selectedBySlot?.[slot.slotKey] || '') === String(item.id);
+          return `<label class="d-flex align-items-start gap-2 small mb-2">
+            <input type="radio" class="mt-1 js-slot-pick"
+              name="slot_${escapeHtml(row.studentId)}_${escapeHtml(slot.slotKey)}"
+              data-student-id="${escapeHtml(row.studentId)}"
+              data-slot-key="${escapeHtml(slot.slotKey)}"
+              value="${escapeHtml(item.id)}"
+              ${checked ? 'checked' : ''}
+              ${readOnly ? 'disabled' : ''}>
+            <span>
+              <strong>${escapeHtml(item.sessionDate || item.reportDate || '—')}</strong>
+              <span class="badge bg-light text-dark border ms-1">${escapeHtml(item.status)}</span>
+              <div class="text-muted">${escapeHtml(item.className || '')}${item.teacherName ? ` · ${escapeHtml(item.teacherName)}` : ''}</div>
+              <div class="font-monospace text-muted">${escapeHtml(item.id)}</div>
+            </span>
+          </label>`;
+        }).join('')}</td>`;
+      }).join('');
+      const previewOrCreate = hasOverallFields
+        ? `<button type="button" class="btn btn-outline-primary btn-sm js-preview-student" data-student-id="${escapeHtml(row.studentId)}" ${(!complete || !instanceId) ? 'disabled' : ''}>Preview</button>`
+        : `<button type="button" class="btn btn-outline-success btn-sm js-create-student" data-student-id="${escapeHtml(row.studentId)}" ${(!complete || !instanceId) ? 'disabled' : ''}>Create</button>`;
+      const docs = (row.generatedDocs || []).slice(-1).map((doc) => (
+        doc.url
+          ? `<a class="btn btn-outline-secondary btn-sm" href="${escapeHtml(doc.url)}" target="_blank">Open file</a>`
+          : `<span class="small text-muted">${escapeHtml(doc.fileName || 'Generated')}</span>`
+      )).join('');
+      return `<tr data-student-id="${escapeHtml(row.studentId)}">
+        <td class="ps-3">
+          <div class="fw-semibold">${escapeHtml(row.studentName || row.studentId)}</div>
+          <div class="small text-muted font-monospace">${escapeHtml(row.studentId)}</div>
+          ${readOnly ? '' : `<button type="button" class="btn btn-link btn-sm text-danger px-0 js-remove-student" data-student-id="${escapeHtml(row.studentId)}">Remove</button>`}
+        </td>
+        ${slotCells}
+        <td>${previewOrCreate}</td>
+        <td class="pe-3 text-end">${docs || '<span class="text-muted small">—</span>'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function hydrateFromInstance(instance) {
+    if (!instance) return;
+    instanceId = instance.id;
+    document.getElementById('btnExportZip').disabled = false;
+    document.getElementById('btnExportDocx').disabled = false;
+    const savedEntries = Array.isArray(instance.studentEntries) ? instance.studentEntries : [];
+    if (!savedEntries.length) return;
+    studentRows = savedEntries.map((entry) => ({
+      studentId: entry.studentId,
+      studentName: entry.studentName,
+      slots: Object.fromEntries(sourceSlots.map((slot) => {
+        const selection = (entry.sourceSelections || []).find((row) => row.slotKey === slot.slotKey);
+        return [slot.slotKey, selection ? [{
+          id: selection.instanceId,
+          status: selection.instanceStatus,
+          sessionDate: '',
+          reportDate: selection.capturedAt || '',
+          className: '',
+          teacherName: '',
+          title: selection.instanceTitle
+        }] : []];
+      })),
+      selectedBySlot: Object.fromEntries(
+        (entry.sourceSelections || []).map((row) => [row.slotKey, row.instanceId])
+      ),
+      answers: entry.answers || {},
+      derivedOverrides: entry.derivedOverrides || {},
+      generatedDocs: entry.generatedDocs || []
+    }));
+    renderTable();
+  }
+
+  async function fetchJson(url, options = {}) {
+    const headers = {
+      Accept: 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'x-ajax-request': 'true',
+      ...(options.headers || {})
+    };
+    if (actionStateId) headers['x-action-state-id'] = actionStateId;
+    const response = await fetch(url, {
+      credentials: 'same-origin',
+      ...options,
+      headers
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.status === 'error') {
+      throw new Error(payload.message || 'Request failed.');
+    }
+    return payload;
+  }
+
+  async function loadTemplate(templateId) {
+    const payload = await fetchJson(`/school/reports/overall-reports/api/template/${encodeURIComponent(templateId)}`);
+    templateMeta = payload.template;
+    sourceSlots = payload.sourceSlots || [];
+    docxOptions = payload.docxOptions || [];
+    hasOverallFields = payload.hasOverallFields === true;
+    document.getElementById('overallTemplateId').value = templateMeta.id;
+    document.getElementById('overallTemplateTitle').value = templateMeta.title || '';
+    fillDocxSelect(document.getElementById('selectedDocxKey'), document.getElementById('selectedDocxKey').value);
+    renderSourceChips();
+    studentRows = [];
+    renderTable();
+  }
+
+  function openTemplatePicker() {
+    if (!window.GenericPicker) {
+      showModal('Picker Unavailable', 'The searchable picker could not be loaded.', 'error');
+      return;
+    }
+    const config = {
+      title: 'Select Overall Template',
+      icon: 'bi-files',
+      placeholder: 'Search overall templates...',
+      sourceMode: 'remote',
+      apiEndpoint: '/school/reports/overall-templates',
+      searchFields: 'id,title,status,description',
       multiselect: false,
-      limit: 5000,
-      renderer: item => `<div>${summaryHtml(item)}<div class="small text-muted mt-1">${escapeHtml(slot.templateTitle || slot.templateId)}</div></div>`,
-      onSelect(item) {
-        if (usedIds.has(String(item.id))) { showReportModal('Report Already Selected', 'Choose a different completed report for this source slot.'); return; }
-        selectedBySlot.set(slotKey, item);
-        document.getElementById(`sourceInstance_${slotKey}`).value = item.id;
-        document.getElementById(`sourceSummary_${slotKey}`).innerHTML = summaryHtml(item);
+      limit: 200,
+      selectedItems: templateMeta ? [{ id: templateMeta.id, title: templateMeta.title }] : [],
+      renderer: (item) => `<div><strong>${escapeHtml(item.title || item.id)}</strong>
+        <span class="badge bg-light text-dark border ms-1">${escapeHtml(item.status || '')}</span>
+        <div class="small text-muted font-monospace">${escapeHtml(item.id)}</div></div>`,
+      onSelect: async (item) => {
+        try {
+          await loadTemplate(item.id);
+        } catch (error) {
+          showModal('Template Load Failed', error.message || 'Unable to load template.', 'error');
+        }
+      }
+    };
+    window.GenericPicker.open(
+      window.GenericPickerPresets?.normalizeConfig
+        ? window.GenericPickerPresets.normalizeConfig(config)
+        : config
+    );
+  }
+
+  function openStudentPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showModal('Picker Unavailable', 'The student picker could not be loaded.', 'error');
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.student({
+      title: 'Select Students',
+      multiselect: true,
+      selectedItems: selectedStudents,
+      onSelect: (items) => {
+        selectedStudents = (Array.isArray(items) ? items : [items]).map((item) => ({
+          id: String(item.id || '').trim(),
+          name: String(item.name || item.title || item.id || '').trim()
+        })).filter((item) => item.id);
+        updateStudentSummary();
       }
     }));
   }
 
-  document.querySelectorAll('.js-pick-source-report').forEach(button => button.addEventListener('click', () => openSourcePicker(button.dataset.slotKey)));
-  document.getElementById('overallReportCreateForm').addEventListener('submit', event => {
-    const missing = sourceSlots.filter(slot => !String(document.getElementById(`sourceInstance_${slot.slotKey}`)?.value || '').trim());
-    if (!missing.length) return;
-    event.preventDefault();
-    showReportModal('Completed Reports Required', `Select a completed report for: ${missing.map(slot => slot.slotKey).join(', ')}.`);
+  async function loadCandidates() {
+    if (!templateMeta?.id) {
+      await showModal('Template Required', 'Select an overall report template first.');
+      return;
+    }
+    if (!selectedStatuses().length) {
+      await showModal('Status Required', 'Select at least one instance status.');
+      return;
+    }
+    try {
+      if (typeof showLoading === 'function') showLoading({ note: 'Loading matching report instances...' });
+      const body = new URLSearchParams();
+      body.set('templateId', templateMeta.id);
+      body.set('startDate', document.getElementById('filterStartDate').value || '');
+      body.set('endDate', document.getElementById('filterEndDate').value || '');
+      body.set('studentIdsJson', JSON.stringify(selectedStudents.map((row) => row.id)));
+      body.set('statusesJson', JSON.stringify(selectedStatuses()));
+      body.set('actionStateId', actionStateId);
+      const payload = await fetchJson('/school/reports/overall-reports/api/load-candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body
+      });
+      sourceSlots = payload.sourceSlots || sourceSlots;
+      hasOverallFields = payload.hasOverallFields === true;
+      docxOptions = payload.docxOptions || docxOptions;
+      fillDocxSelect(document.getElementById('selectedDocxKey'), document.getElementById('selectedDocxKey').value);
+      renderSourceChips();
+      const previousSelections = new Map(
+        studentRows.map((row) => [row.studentId, row.selectedBySlot || {}])
+      );
+      studentRows = (payload.students || []).map((row) => {
+        const selectedBySlot = { ...(previousSelections.get(row.studentId) || {}) };
+        sourceSlots.forEach((slot) => {
+          const options = row.slots?.[slot.slotKey] || [];
+          if (!selectedBySlot[slot.slotKey] && options.length === 1) {
+            selectedBySlot[slot.slotKey] = options[0].id;
+          }
+        });
+        return {
+          studentId: row.studentId,
+          studentName: row.studentName,
+          slots: row.slots || {},
+          selectedBySlot,
+          answers: {},
+          derivedOverrides: {},
+          generatedDocs: []
+        };
+      });
+      renderTable();
+      if (!studentRows.length) {
+        await showModal('No Matches', 'No student report instances matched the selected filters.', 'info');
+      }
+    } catch (error) {
+      await showModal('Load Failed', error.message || 'Unable to load candidates.', 'error');
+    } finally {
+      if (typeof hideLoading === 'function') hideLoading({ force: true });
+    }
+  }
+
+  async function saveWorkspace() {
+    if (!templateMeta?.id) {
+      await showModal('Template Required', 'Select an overall report template first.');
+      return;
+    }
+    const entries = collectStudentEntries();
+    if (!entries.length) {
+      await showModal('Students Required', 'Load and keep at least one student before saving.');
+      return;
+    }
+    const incomplete = entries.filter((entry) => entry.sourceSelections.some((row) => !row.instanceId));
+    if (incomplete.length) {
+      await showModal('Incomplete Selections', 'Each student needs one source instance selected for every template slot.');
+      return;
+    }
+    try {
+      if (typeof showLoading === 'function') showLoading({ note: 'Saving overall report...' });
+      const body = new URLSearchParams();
+      body.set('templateId', templateMeta.id);
+      body.set('title', document.getElementById('overallReportTitle').value || '');
+      body.set('selectedDocxKey', document.getElementById('selectedDocxKey').value || 'default');
+      body.set('studentEntriesJson', JSON.stringify(entries));
+      body.set('filtersJson', JSON.stringify(getFiltersPayload()));
+      body.set('actionStateId', actionStateId);
+      const url = instanceId
+        ? `/school/reports/overall-reports/${encodeURIComponent(instanceId)}/save`
+        : '/school/reports/overall-reports/new';
+      const payload = await fetchJson(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body
+      });
+      instanceId = payload.result?.id || instanceId;
+      if (payload.result) hydrateFromInstance(payload.result);
+      document.getElementById('btnExportZip').disabled = false;
+      document.getElementById('btnExportDocx').disabled = false;
+      await showModal('Saved', payload.message || 'Overall report saved.', 'success');
+      if (payload.redirect && !window.location.pathname.includes('/edit/')) {
+        window.location.assign(payload.redirect);
+      }
+    } catch (error) {
+      await showModal('Save Failed', error.message || 'Unable to save overall report.', 'error');
+    } finally {
+      if (typeof hideLoading === 'function') hideLoading({ force: true });
+    }
+  }
+
+  let previewStudentId = '';
+
+  async function openPreview(studentId) {
+    if (!instanceId) {
+      await showModal('Save Required', 'Save the overall report before previewing student fields.');
+      return;
+    }
+    try {
+      const payload = await fetchJson(`/school/reports/overall-reports/${encodeURIComponent(instanceId)}/student/${encodeURIComponent(studentId)}/preview`);
+      previewStudentId = studentId;
+      document.getElementById('studentPreviewTitle').textContent = `Preview · ${payload.studentName || studentId}`;
+      document.getElementById('studentPreviewBody').innerHTML = (payload.fields || []).map((field) => `
+        <div class="mb-3">
+          <label class="form-label fw-semibold">${escapeHtml(field.label)}
+            <span class="badge bg-light text-dark border ms-1">${escapeHtml(field.overallValueMode)}</span>
+          </label>
+          <input class="form-control js-preview-field" data-field-id="${escapeHtml(field.id)}"
+            value="${escapeHtml(field.value ?? '')}"
+            ${!field.editable || readOnly ? 'readonly' : ''}>
+          ${field.helpText ? `<div class="form-text">${escapeHtml(field.helpText)}</div>` : ''}
+        </div>
+      `).join('') || '<div class="text-muted">No overall fields are defined on this template.</div>';
+      const modalEl = document.getElementById('studentPreviewModal');
+      if (window.bootstrap?.Modal && modalEl) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+    } catch (error) {
+      await showModal('Preview Failed', error.message || 'Unable to open preview.', 'error');
+    }
+  }
+
+  async function savePreviewAnswers() {
+    if (!instanceId || !previewStudentId) return;
+    const answers = {};
+    document.querySelectorAll('.js-preview-field').forEach((input) => {
+      answers[input.dataset.fieldId] = input.value;
+    });
+    try {
+      const body = new URLSearchParams();
+      body.set('answersJson', JSON.stringify(answers));
+      body.set('actionStateId', actionStateId);
+      const payload = await fetchJson(
+        `/school/reports/overall-reports/${encodeURIComponent(instanceId)}/student/${encodeURIComponent(previewStudentId)}/preview`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body
+        }
+      );
+      const row = studentRows.find((item) => item.studentId === previewStudentId);
+      if (row) {
+        row.answers = payload.preview?.answers || answers;
+        row.derivedOverrides = payload.preview?.derivedOverrides || {};
+      }
+      await showModal('Saved', 'Student answers saved.', 'success');
+    } catch (error) {
+      await showModal('Save Failed', error.message || 'Unable to save answers.', 'error');
+    }
+  }
+
+  async function downloadBinary(url, bodyObj) {
+    const headers = {
+      'X-Requested-With': 'XMLHttpRequest',
+      'x-ajax-request': 'true',
+      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+    };
+    if (actionStateId) headers['x-action-state-id'] = actionStateId;
+    const body = new URLSearchParams(bodyObj || {});
+    body.set('actionStateId', actionStateId);
+    const response = await fetch(url, { method: 'POST', headers, body, credentials: 'same-origin' });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || 'Export failed.');
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="?([^"]+)"?/i);
+    const fileName = match?.[1] || 'overall-export.bin';
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  async function generateStudent(studentId) {
+    if (!instanceId) {
+      await showModal('Save Required', 'Save the overall report before generating documents.');
+      return;
+    }
+    try {
+      if (typeof showLoading === 'function') showLoading({ note: 'Generating document...' });
+      await downloadBinary(
+        `/school/reports/overall-reports/${encodeURIComponent(instanceId)}/student/${encodeURIComponent(studentId)}/generate`,
+        { selectedDocxKey: document.getElementById('selectedDocxKey').value || 'default' }
+      );
+    } catch (error) {
+      await showModal('Generate Failed', error.message || 'Unable to generate document.', 'error');
+    } finally {
+      if (typeof hideLoading === 'function') hideLoading({ force: true });
+    }
+  }
+
+  async function exportZip() {
+    if (!instanceId) {
+      await showModal('Save Required', 'Save the overall report before exporting.');
+      return;
+    }
+    try {
+      if (typeof showLoading === 'function') showLoading({ note: 'Building ZIP package...' });
+      await downloadBinary(
+        `/school/reports/overall-reports/${encodeURIComponent(instanceId)}/export-zip`,
+        { selectedDocxKey: document.getElementById('selectedDocxKey').value || 'default' }
+      );
+    } catch (error) {
+      await showModal('Export Failed', error.message || 'Unable to export package.', 'error');
+    } finally {
+      if (typeof hideLoading === 'function') hideLoading({ force: true });
+    }
+  }
+
+  function openExportModal() {
+    if (!instanceId) {
+      showModal('Save Required', 'Save the overall report before exporting.');
+      return;
+    }
+    fillDocxSelect(document.getElementById('exportDocxKeySelect'), document.getElementById('selectedDocxKey').value);
+    const modalEl = document.getElementById('exportDocxModal');
+    if (window.bootstrap?.Modal && modalEl) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  async function confirmExportDocx() {
+    try {
+      if (typeof showLoading === 'function') showLoading({ note: 'Exporting Word documents...' });
+      await downloadBinary(
+        `/school/reports/overall-reports/${encodeURIComponent(instanceId)}/export`,
+        {
+          selectedDocxKey: document.getElementById('exportDocxKeySelect').value || 'default',
+          asZip: 'true'
+        }
+      );
+      const modalEl = document.getElementById('exportDocxModal');
+      if (window.bootstrap?.Modal && modalEl) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+      }
+    } catch (error) {
+      await showModal('Export Failed', error.message || 'Unable to export.', 'error');
+    } finally {
+      if (typeof hideLoading === 'function') hideLoading({ force: true });
+    }
+  }
+
+  document.getElementById('btnPickOverallTemplate')?.addEventListener('click', openTemplatePicker);
+  document.getElementById('btnPickStudents')?.addEventListener('click', openStudentPicker);
+  document.getElementById('btnClearStudents')?.addEventListener('click', () => {
+    selectedStudents = [];
+    updateStudentSummary();
   });
+  document.querySelectorAll('.js-date-range').forEach((button) => {
+    button.addEventListener('click', () => setDateRange(button.dataset.range));
+  });
+  document.getElementById('btnLoadCandidates')?.addEventListener('click', loadCandidates);
+  document.getElementById('btnSaveWorkspace')?.addEventListener('click', saveWorkspace);
+  document.getElementById('btnExportZip')?.addEventListener('click', exportZip);
+  document.getElementById('btnExportDocx')?.addEventListener('click', openExportModal);
+  document.getElementById('btnConfirmExportDocx')?.addEventListener('click', confirmExportDocx);
+  document.getElementById('btnSaveStudentPreview')?.addEventListener('click', savePreviewAnswers);
+
+  document.getElementById('workspaceStudentsBody')?.addEventListener('change', (event) => {
+    const input = event.target.closest('.js-slot-pick');
+    if (!input) return;
+    const row = studentRows.find((item) => item.studentId === input.dataset.studentId);
+    if (!row) return;
+    row.selectedBySlot = row.selectedBySlot || {};
+    row.selectedBySlot[input.dataset.slotKey] = input.value;
+    renderTable();
+  });
+
+  document.getElementById('workspaceStudentsBody')?.addEventListener('click', async (event) => {
+    const removeBtn = event.target.closest('.js-remove-student');
+    if (removeBtn) {
+      studentRows = studentRows.filter((row) => row.studentId !== removeBtn.dataset.studentId);
+      renderTable();
+      return;
+    }
+    const previewBtn = event.target.closest('.js-preview-student');
+    if (previewBtn) {
+      await openPreview(previewBtn.dataset.studentId);
+      return;
+    }
+    const createBtn = event.target.closest('.js-create-student');
+    if (createBtn) await generateStudent(createBtn.dataset.studentId);
+  });
+
+  renderSourceChips();
+  fillDocxSelect(document.getElementById('selectedDocxKey'), document.getElementById('selectedDocxKey').value);
+  updateStudentSummary();
+  hydrateFromInstance(<%- escJson(initialInstance) %>);
+  renderTable();
 })();
 </script>

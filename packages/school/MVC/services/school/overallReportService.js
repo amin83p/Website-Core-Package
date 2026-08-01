@@ -40,11 +40,160 @@ function getDataFields(template = {}) {
     .filter((field) => field?.id && !DATA_FIELD_EXCLUSIONS.has(String(field.type || '').toLowerCase()));
 }
 
+function snapshotDocxAliases(template = {}) {
+  return new Map(
+    getDataFields(template).map((field) => [String(field.id), String(field.docxAlias || '')])
+  );
+}
+
+function buildReservedDocxAliasTokens(template = {}) {
+  const reserved = new Set();
+  getDataFields(template).forEach((field) => {
+    const id = normalizeTokenKey(field?.id);
+    const prefillKey = normalizeTokenKey(field?.prefillKey);
+    if (id) reserved.add(id);
+    if (prefillKey) reserved.add(prefillKey);
+  });
+  Object.values(template?.placeholderMap || {}).forEach((token) => {
+    const key = normalizeTokenKey(token);
+    if (key) reserved.add(key);
+  });
+  return reserved;
+}
+
+function deterministicPreviewDocxAlias(fieldId, reserved = new Set()) {
+  const slug = String(fieldId || 'field').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const firstMatch = slug.match(/[a-z]/);
+  const first = firstMatch ? firstMatch[0] : 'f';
+  const tailSource = slug.replace(/[^a-z0-9]/g, '').slice(1);
+  const baseTail = `${tailSource}000`.slice(0, 3);
+  const candidates = [
+    `${first}${baseTail}`.slice(0, 4),
+    `${first}${baseTail.slice(0, 2)}0`.slice(0, 4),
+    `${first}000`.slice(0, 4)
+  ];
+  for (let counter = 0; counter < 1000; counter += 1) {
+    const suffix = String(counter).padStart(3, '0').slice(-3);
+    const candidate = counter === 0
+      ? candidates.find((value) => reportRuleEngineService.DOCX_ALIAS_PATTERN.test(value) && !reserved.has(value))
+      : `${first}${suffix}`.slice(0, 4);
+    if (candidate && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(candidate) && !reserved.has(candidate)) {
+      reserved.add(candidate);
+      return candidate;
+    }
+  }
+  return reportRuleEngineService.generateDocxAlias(reserved);
+}
+
+function attachDocxAliasesToKeyOptions(template = {}, options = []) {
+  const prepared = prepareSourceTemplateForKeyOptions(template);
+  const reserved = buildReservedDocxAliasTokens(prepared);
+  getDataFields(prepared).forEach((field) => {
+    const alias = reportRuleEngineService.normalizeDocxAlias(field.docxAlias);
+    if (reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) reserved.add(alias);
+  });
+
+  const aliasByCatalogKey = new Map();
+  getDataFields(prepared).forEach((field) => {
+    const alias = reportRuleEngineService.normalizeDocxAlias(field.docxAlias);
+    if (!reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) return;
+    [
+      normalizeTokenKey(field.id),
+      normalizeTokenKey(field.prefillKey),
+      normalizeTokenKey(prepared?.placeholderMap?.[field.id])
+    ].filter(Boolean).forEach((key) => aliasByCatalogKey.set(key, alias));
+  });
+
+  return options.map((option) => {
+    if (option.origin === 'docx_alias') {
+      const alias = String(option.key || '').toLowerCase();
+      return {
+        ...option,
+        docxAlias: reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias) ? alias : ''
+      };
+    }
+    const catalogKey = normalizeTokenKey(option.key);
+    if (!catalogKey) return { ...option, docxAlias: '' };
+    let docxAlias = aliasByCatalogKey.get(catalogKey) || '';
+    if (!reportRuleEngineService.DOCX_ALIAS_PATTERN.test(docxAlias)) {
+      if (!aliasByCatalogKey.has(catalogKey)) {
+        docxAlias = deterministicPreviewDocxAlias(catalogKey, reserved);
+        aliasByCatalogKey.set(catalogKey, docxAlias);
+      } else {
+        docxAlias = aliasByCatalogKey.get(catalogKey);
+      }
+    }
+    return { ...option, docxAlias: docxAlias || '' };
+  });
+}
+
+function buildDocxAliasLookup(template = {}) {
+  const aliasToCatalogKey = new Map();
+  const aliasKeys = new Set();
+  getSourceTemplateKeyOptions(template).forEach((option) => {
+    if (option.origin === 'docx_alias') return;
+    const catalogKey = normalizeTokenKey(option.key);
+    const alias = reportRuleEngineService.normalizeDocxAlias(option.docxAlias);
+    if (!catalogKey || !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) return;
+    aliasToCatalogKey.set(alias, catalogKey);
+    aliasKeys.add(alias);
+  });
+  return { aliasToCatalogKey, aliasKeys };
+}
+
+function mirrorDocxAliasValues(template = {}, values = {}) {
+  const mirrored = { ...(values || {}) };
+  getSourceTemplateKeyOptions(template).forEach((option) => {
+    if (option.origin === 'docx_alias') return;
+    const catalogKey = normalizeTokenKey(option.key);
+    const alias = reportRuleEngineService.normalizeDocxAlias(option.docxAlias);
+    if (!catalogKey || !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) return;
+    if (Object.prototype.hasOwnProperty.call(mirrored, catalogKey)) {
+      mirrored[alias] = mirrored[catalogKey];
+    }
+  });
+  return mirrored;
+}
+
+function prepareSourceTemplateForKeyOptions(template = {}) {
+  const prepared = clone(template, {});
+  if (!prepared?.schema?.fields) return prepared;
+  const reserved = buildReservedDocxAliasTokens(prepared);
+  getDataFields(prepared).forEach((field) => {
+    const alias = reportRuleEngineService.normalizeDocxAlias(field.docxAlias);
+    if (reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias) && !reserved.has(alias)) {
+      reserved.add(alias);
+      field.docxAlias = alias;
+      return;
+    }
+    field.docxAlias = deterministicPreviewDocxAlias(field.id, reserved);
+  });
+  return prepared;
+}
+
+function ensureSourceTemplateDocxAliases(template = {}) {
+  const working = clone(template, {});
+  if (!working?.schema?.fields) return { template: working, changed: false };
+  const before = snapshotDocxAliases(working);
+  getDataFields(working).forEach((field) => {
+    const alias = reportRuleEngineService.normalizeDocxAlias(field.docxAlias);
+    if (alias && !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+      field.docxAlias = '';
+    }
+  });
+  reportRuleEngineService.ensureTemplateDocxAliases(working);
+  const after = snapshotDocxAliases(working);
+  const changed = before.size !== after.size
+    || [...after.entries()].some(([fieldId, alias]) => before.get(fieldId) !== alias);
+  return { template: working, changed };
+}
+
 function getSourceTemplateKeyOptions(template = {}) {
-  const templateId = clean(template?.id);
-  const templateTitle = clean(template?.title || template?.name || templateId);
-  const templateType = clean(template?.type);
-  const templateVersion = Number(template?.version || 1);
+  const prepared = prepareSourceTemplateForKeyOptions(template);
+  const templateId = clean(prepared?.id);
+  const templateTitle = clean(prepared?.title || prepared?.name || templateId);
+  const templateType = clean(prepared?.type);
+  const templateVersion = Number(prepared?.version || 1);
   const options = new Map();
 
   const addOption = (keyValue, metadata = {}) => {
@@ -82,7 +231,7 @@ function getSourceTemplateKeyOptions(template = {}) {
     });
   });
 
-  getDataFields(template).forEach((field) => {
+  getDataFields(prepared).forEach((field) => {
     const fieldLabel = clean(field?.label || field?.id || 'Template field');
     const fieldMetadata = {
       fieldId: clean(field?.id),
@@ -107,7 +256,7 @@ function getSourceTemplateKeyOptions(template = {}) {
         group: 'Template fields'
       });
     }
-    const mappedToken = normalizeTokenKey(template?.placeholderMap?.[field.id]);
+    const mappedToken = normalizeTokenKey(prepared?.placeholderMap?.[field.id]);
     addOption(mappedToken || field.id, {
       ...fieldMetadata,
       label: fieldLabel,
@@ -118,7 +267,7 @@ function getSourceTemplateKeyOptions(template = {}) {
     });
   });
 
-  Object.values(template?.placeholderMap || {}).forEach((token) => {
+  Object.values(prepared?.placeholderMap || {}).forEach((token) => {
     const key = normalizeTokenKey(token);
     addOption(key, {
       label: key,
@@ -129,13 +278,13 @@ function getSourceTemplateKeyOptions(template = {}) {
     });
   });
 
-  return [...options.values()]
+  return attachDocxAliasesToKeyOptions(template, [...options.values()]
     .map(({ priority, ...option }) => option)
     .sort((left, right) => (
       String(left.group || '').localeCompare(String(right.group || ''))
       || String(left.label || '').localeCompare(String(right.label || ''))
       || String(left.key || '').localeCompare(String(right.key || ''))
-    ));
+    )));
 }
 
 function getSourceTemplateKeyCatalog(template = {}) {
@@ -301,7 +450,7 @@ async function buildSourcePayload(instance, reqUser) {
     const key = normalizeTokenKey(token);
     if (key) values[key] = value;
   });
-  return { template, assignment, values, diagnostics: bundle.conversionDiagnostics || [] };
+  return { template, assignment, values: mirrorDocxAliasValues(template, values), diagnostics: bundle.conversionDiagnostics || [] };
 }
 
 async function createOverallInstance({
@@ -411,8 +560,7 @@ async function saveOverallAnswers({ instance, submittedAnswers = {}, reqUser }) 
   const nextAnswers = { ...(instance.answers || {}) };
   const overrides = { ...(instance.derivedOverrides || {}) };
   fields.forEach((field) => {
-    const mode = String(field.overallValueMode || 'manual');
-    if (mode === 'derived_locked') return;
+    if (!isOverallFieldEditable(field)) return;
     if (!Object.prototype.hasOwnProperty.call(submittedAnswers, field.id)) return;
     nextAnswers[field.id] = submittedAnswers[field.id];
   });
@@ -425,6 +573,7 @@ async function saveOverallAnswers({ instance, submittedAnswers = {}, reqUser }) 
   });
   fields.forEach((field) => {
     if (String(field.overallValueMode) !== 'derived_editable') return;
+    if (!isOverallFieldEditable(field)) return;
     if (!Object.prototype.hasOwnProperty.call(submittedAnswers, field.id)) return;
     overrides[field.id] = !valuesEqual(submittedAnswers[field.id], baseline.answers[field.id]);
   });
@@ -452,6 +601,7 @@ async function saveOverallAnswers({ instance, submittedAnswers = {}, reqUser }) 
 async function buildSourceUpdatePreview(instance, reqUser) {
   const template = instance.templateSnapshot || {};
   const latestValues = {};
+  const slotTemplates = {};
   const issues = [];
   for (const selection of instance.sourceSelections || []) {
     // eslint-disable-next-line no-await-in-loop
@@ -476,6 +626,7 @@ async function buildSourceUpdatePreview(instance, reqUser) {
       // eslint-disable-next-line no-await-in-loop
       const sourcePayload = await buildSourcePayload(sourceInstance, reqUser);
       latestValues[selection.slotKey] = sourcePayload.values;
+      slotTemplates[selection.slotKey] = sourcePayload.template;
       if (sourcePayload.diagnostics.length) {
         sourcePayload.diagnostics.forEach((diagnostic) => {
           issues.push({
@@ -511,6 +662,9 @@ async function buildSourceUpdatePreview(instance, reqUser) {
       });
     });
     Object.entries(values || {}).forEach(([key, newValue]) => {
+      const normalizedKey = normalizeTokenKey(key);
+      const { aliasKeys } = buildDocxAliasLookup(slotTemplates[slotKey] || {});
+      if (aliasKeys.has(normalizedKey)) return;
       if (valuesEqual(stored[key], newValue)) return;
       const affectedIds = getAffectedFieldIds(template, slotKey, key);
       const affectedFields = getDataFields(template)
@@ -618,16 +772,27 @@ async function transitionStatus({ instance, action, reqUser }) {
   let next = current;
   if (action === 'submit') {
     if (current !== 'draft') throw new Error('Only draft overall reports can be submitted.');
-    const validation = validateAnswers(instance.templateSnapshot || {}, instance.answers || {});
-    if (hasBlockingValidationErrors(validation)) {
-      const error = new Error('Resolve all validation errors before submitting this overall report.');
-      error.validation = validation;
-      throw error;
-    }
-    const calculation = findCalculationMismatches(instance);
-    if (calculation.diagnostics.length || calculation.mismatches.length) {
-      throw new Error('Save the overall report to resolve calculation changes before submitting it.');
-    }
+    const workspace = ensureWorkspaceShape(instance);
+    const entries = workspace.studentEntries.length
+      ? workspace.studentEntries
+      : [{ answers: instance.answers || {}, sourceValues: instance.sourceValues || {}, derivedOverrides: instance.derivedOverrides || {} }];
+    entries.forEach((entry) => {
+      const validation = validateAnswers(instance.templateSnapshot || {}, entry.answers || {});
+      if (hasBlockingValidationErrors(validation)) {
+        const error = new Error(`Resolve all validation errors before submitting${entry.studentId ? ` (${entry.studentName || entry.studentId})` : ''}.`);
+        error.validation = validation;
+        throw error;
+      }
+      const calculation = findCalculationMismatches({
+        ...instance,
+        answers: entry.answers || {},
+        sourceValues: entry.sourceValues || {},
+        derivedOverrides: entry.derivedOverrides || {}
+      });
+      if (calculation.diagnostics.length || calculation.mismatches.length) {
+        throw new Error('Save the overall report to resolve calculation changes before submitting it.');
+      }
+    });
     next = 'submitted';
   } else if (action === 'lock') {
     if (current !== 'submitted') throw new Error('Only submitted overall reports can be locked.');
@@ -760,7 +925,14 @@ async function exportOverallReport(instance, reqUser) {
   if (!COMPLETED_SOURCE_STATUSES.has(String(instance.status || '').toLowerCase())) {
     throw new Error('Submit or lock the overall report before exporting the final DOCX.');
   }
-  const preview = await buildExportPreview(instance);
+  const workspace = ensureWorkspaceShape(instance);
+  if (workspace.studentEntries.length > 1) {
+    return exportWorkspaceZip({ instance: workspace, docxKey: instance.selectedDocxKey, reqUser });
+  }
+  const entryInstance = workspace.studentEntries.length === 1
+    ? buildVirtualEntryInstance(workspace, workspace.studentEntries[0])
+    : instance;
+  const preview = await buildExportPreview(entryInstance);
   if (preview.missingTokens.length) {
     throw new Error(`DOCX export cancelled. Missing stored values for: ${preview.missingTokens.join(', ')}.`);
   }
@@ -768,8 +940,8 @@ async function exportOverallReport(instance, reqUser) {
     throw new Error('DOCX export cancelled because the overall report has validation or calculation errors.');
   }
   const rendered = await reportDocxRenderService.renderReportInstanceDocx({
-    template: instance.templateSnapshot,
-    instance,
+    template: entryInstance.templateSnapshot,
+    instance: entryInstance,
     placeholders: preview.placeholders,
     collections: {},
     docxTemplateOverride: preview.resolved.docxTemplate
@@ -787,11 +959,20 @@ async function exportOverallReport(instance, reqUser) {
     path: saved.path || saved.url || '',
     url: saved.url || '',
     docxKey: preview.docxKey,
+    studentId: workspace.studentEntries[0]?.studentId || '',
     generatedAt: new Date().toISOString(),
     generatedBy: reqUser?.id || '',
     revision: Number(instance.revision || 1)
   };
+  let nextStudentEntries = workspace.studentEntries;
+  if (nextStudentEntries.length === 1) {
+    nextStudentEntries = [{
+      ...nextStudentEntries[0],
+      generatedDocs: [...(nextStudentEntries[0].generatedDocs || []), generatedDoc]
+    }];
+  }
   const updated = await schoolDataService.updateData('overallReportInstances', instance.id, {
+    studentEntries: nextStudentEntries,
     generatedDocs: [...(instance.generatedDocs || []), generatedDoc],
     revision: nextRevision(instance),
     audit: {
@@ -803,15 +984,595 @@ async function exportOverallReport(instance, reqUser) {
   return { rendered, saved, generatedDoc, instance: updated };
 }
 
+function ensureWorkspaceShape(instance = {}) {
+  const studentEntries = overallReportInstanceModel.wrapLegacyAsStudentEntries(instance);
+  return {
+    ...instance,
+    studentEntries,
+    filtersSnapshot: overallReportInstanceModel.sanitizeFiltersSnapshot(instance.filtersSnapshot || {})
+  };
+}
+
+function templateHasOverallFields(template = {}) {
+  return getDataFields(template).length > 0;
+}
+
+function resolveAllowedSourceStatuses(statuses) {
+  const requested = (Array.isArray(statuses) ? statuses : [])
+    .map((status) => clean(status).toLowerCase())
+    .filter((status) => overallReportInstanceModel.LOAD_STATUSES.includes(status));
+  return new Set(requested.length ? requested : ['submitted', 'locked']);
+}
+
+function sessionDateInRange(sessionDate, startDate, endDate) {
+  const value = clean(sessionDate);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const start = clean(startDate);
+  const end = clean(endDate);
+  if (start && value < start) return false;
+  if (end && value > end) return false;
+  return true;
+}
+
+function summarizeSourceInstance(row = {}) {
+  return {
+    id: row.id,
+    title: row.title || row.name || row.id,
+    status: row.status,
+    templateId: row.templateId,
+    studentId: row.studentId || row.personId || '',
+    studentName: row.prefillSnapshot?.student_full_name
+      || row.prefillSnapshot?.student_name
+      || row.studentName
+      || '',
+    className: row.prefillSnapshot?.class_name || row.className || '',
+    teacherName: row.prefillSnapshot?.teacher_name || row.teacherName || '',
+    sessionDate: row.sessionDate || '',
+    reportDate: row.prefillSnapshot?.report_date || row.sessionDate || row.audit?.lastUpdateDateTime || ''
+  };
+}
+
+async function loadOverallCreateCandidates({
+  template,
+  startDate = '',
+  endDate = '',
+  studentIds = [],
+  statuses = ['submitted', 'locked'],
+  reqUser
+}) {
+  if (!template?.id) throw new Error('Overall report template is required.');
+  await validateTemplateReferences(template, reqUser);
+  const allowedStatuses = resolveAllowedSourceStatuses(statuses);
+  const studentFilter = new Set(
+    (Array.isArray(studentIds) ? studentIds : [])
+      .map((id) => clean(id))
+      .filter(Boolean)
+  );
+  const [allInstances, reportTemplates] = await Promise.all([
+    schoolDataService.fetchData('reportInstances', {}, reqUser),
+    schoolDataService.fetchData('reportTemplates', {}, reqUser)
+  ]);
+  const orgId = toPublicId(reqUser?.activeOrgId || reqUser?.organizationId || reqUser?.orgId || template.orgId);
+  const sourceTemplateMap = new Map(
+    (Array.isArray(reportTemplates) ? reportTemplates : [])
+      .filter((row) => idsEqual(row?.orgId, orgId))
+      .map((row) => [String(row.id), row])
+  );
+  const slots = (template.sourceSlots || []).map((slot) => {
+    const sourceTemplate = sourceTemplateMap.get(String(slot.templateId)) || {};
+    return {
+      slotKey: slot.slotKey,
+      templateId: slot.templateId,
+      templateTitle: clean(sourceTemplate.title || sourceTemplate.name || slot.templateId),
+      templateType: clean(sourceTemplate.type || ''),
+      templateVersion: Number(sourceTemplate.version || slot.templateVersionAtSelection || 1)
+    };
+  });
+  const matching = (Array.isArray(allInstances) ? allInstances : [])
+    .filter((row) => idsEqual(row?.orgId, orgId))
+    .filter((row) => allowedStatuses.has(String(row.status || '').toLowerCase()))
+    .filter((row) => clean(row.studentId || row.personId))
+    .filter((row) => sessionDateInRange(row.sessionDate, startDate, endDate))
+    .filter((row) => !studentFilter.size || studentFilter.has(clean(row.studentId || row.personId)));
+
+  const byStudent = new Map();
+  matching.forEach((row) => {
+    const studentId = clean(row.studentId || row.personId);
+    if (!studentId) return;
+    if (!byStudent.has(studentId)) {
+      byStudent.set(studentId, {
+        studentId,
+        studentName: summarizeSourceInstance(row).studentName || studentId,
+        slots: Object.fromEntries(slots.map((slot) => [slot.slotKey, []]))
+      });
+    }
+    const entry = byStudent.get(studentId);
+    slots.forEach((slot) => {
+      if (!idsEqual(row.templateId, slot.templateId)) return;
+      entry.slots[slot.slotKey].push(summarizeSourceInstance(row));
+      if (!entry.studentName || entry.studentName === studentId) {
+        entry.studentName = summarizeSourceInstance(row).studentName || studentId;
+      }
+    });
+  });
+
+  const students = [...byStudent.values()]
+    .filter((row) => slots.some((slot) => (row.slots[slot.slotKey] || []).length > 0))
+    .sort((a, b) => String(a.studentName || a.studentId).localeCompare(String(b.studentName || b.studentId)));
+
+  return {
+    templateId: template.id,
+    templateTitle: template.title,
+    hasOverallFields: templateHasOverallFields(template),
+    sourceSlots: slots,
+    docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template),
+    filters: {
+      startDate: clean(startDate),
+      endDate: clean(endDate),
+      studentIds: [...studentFilter],
+      statuses: [...allowedStatuses]
+    },
+    students
+  };
+}
+
+async function resolveStudentEntrySelections({
+  template,
+  entry,
+  allowedStatuses,
+  reqUser
+}) {
+  const selectionsBySlot = new Map(
+    (Array.isArray(entry?.sourceSelections) ? entry.sourceSelections : [])
+      .map((row) => [clean(row?.slotKey).toUpperCase(), row])
+  );
+  const sourceValues = {};
+  const normalizedSelections = [];
+  for (const slot of template.sourceSlots || []) {
+    const requested = selectionsBySlot.get(slot.slotKey);
+    if (!requested?.instanceId) {
+      throw new Error(`Select a report for source slot ${slot.slotKey} for student ${entry?.studentId || ''}.`);
+    }
+    // eslint-disable-next-line no-await-in-loop
+    const sourceInstance = await schoolDataService.getDataById('reportInstances', requested.instanceId, reqUser);
+    if (!sourceInstance || !idsEqual(sourceInstance.orgId, template.orgId)) {
+      throw new Error(`Source report for slot ${slot.slotKey} was not found in the active organization.`);
+    }
+    if (!idsEqual(sourceInstance.templateId, slot.templateId)) {
+      throw new Error(`Source report ${sourceInstance.id} does not match template slot ${slot.slotKey}.`);
+    }
+    const studentId = clean(sourceInstance.studentId || sourceInstance.personId);
+    if (studentId && clean(entry.studentId) && studentId !== clean(entry.studentId)) {
+      throw new Error(`Source report ${sourceInstance.id} does not belong to student ${entry.studentId}.`);
+    }
+    const sourceStatus = String(sourceInstance.status || '').toLowerCase();
+    if (!allowedStatuses.has(sourceStatus)) {
+      throw new Error(`Source report ${sourceInstance.id} has status "${sourceStatus}" which is not allowed for this workspace.`);
+    }
+    // eslint-disable-next-line no-await-in-loop
+    const payload = await buildSourcePayload(sourceInstance, reqUser);
+    sourceValues[slot.slotKey] = payload.values;
+    normalizedSelections.push({
+      slotKey: slot.slotKey,
+      templateId: sourceInstance.templateId,
+      templateTitle: clean(payload.template?.title || payload.template?.name || sourceInstance.templateId),
+      templateVersion: Number(sourceInstance.templateVersion || 1),
+      instanceId: sourceInstance.id,
+      instanceTitle: clean(sourceInstance.title || sourceInstance.name || sourceInstance.id),
+      instanceStatus: sourceStatus,
+      capturedAt: new Date().toISOString()
+    });
+  }
+  const calculated = calculateAnswers({
+    template,
+    sourceValues,
+    currentAnswers: entry?.answers || {},
+    derivedOverrides: entry?.derivedOverrides || {},
+    initialize: true
+  });
+  if (calculated.diagnostics.length) {
+    throw new Error(`Unable to calculate overall report fields for ${entry?.studentId || 'student'}: ${
+      calculated.diagnostics.map((row) => row.message).join(' | ')
+    }`);
+  }
+  return {
+    studentId: clean(entry.studentId),
+    studentName: clean(entry.studentName) || clean(entry.studentId),
+    sourceSelections: normalizedSelections,
+    sourceValues,
+    answers: calculated.answers,
+    derivedOverrides: calculated.derivedOverrides,
+    generatedDocs: Array.isArray(entry?.generatedDocs) ? entry.generatedDocs : [],
+    included: entry?.included !== false
+  };
+}
+
+function resolveSelectedDocxKey(template, selectedDocxKey = 'default') {
+  const requestedDocxKey = clean(selectedDocxKey || 'default') || 'default';
+  const availableDocx = reportFunderDocxService.buildAvailableDocxOptions(template);
+  const selectedOption = availableDocx.find((row) => (
+    idsEqual(row.key, requestedDocxKey)
+    || String(row.key || '').toLowerCase() === requestedDocxKey.toLowerCase()
+  ));
+  if (!selectedOption) throw new Error('The selected overall report Word template is unavailable.');
+  const resolvedDocx = reportFunderDocxService.resolveDocxTemplateForFunder({
+    template,
+    funderKey: selectedOption.key
+  });
+  if (!resolvedDocx.docxTemplate) throw new Error('Select an available Word template before creating the overall report.');
+  return resolvedDocx;
+}
+
+async function buildNormalizedStudentEntries({
+  template,
+  studentEntries,
+  allowedStatuses,
+  reqUser
+}) {
+  const normalized = [];
+  for (const entry of (Array.isArray(studentEntries) ? studentEntries : [])) {
+    if (entry?.included === false) continue;
+    // eslint-disable-next-line no-await-in-loop
+    normalized.push(await resolveStudentEntrySelections({
+      template,
+      entry,
+      allowedStatuses,
+      reqUser
+    }));
+  }
+  if (!normalized.length) throw new Error('Select at least one student with complete source reports.');
+  return normalized;
+}
+
+async function createOverallWorkspace({
+  template,
+  filters = {},
+  selectedDocxKey = 'default',
+  title = '',
+  studentEntries = [],
+  reqUser
+}) {
+  if (String(template?.status || '').toLowerCase() !== 'active') {
+    throw new Error('Only active overall report templates can create reports.');
+  }
+  await validateTemplateReferences(template, reqUser);
+  const filtersSnapshot = overallReportInstanceModel.sanitizeFiltersSnapshot(filters);
+  const allowedStatuses = resolveAllowedSourceStatuses(filtersSnapshot.statuses);
+  const normalizedEntries = await buildNormalizedStudentEntries({
+    template,
+    studentEntries,
+    allowedStatuses,
+    reqUser
+  });
+  const resolvedDocx = resolveSelectedDocxKey(template, selectedDocxKey);
+  const now = new Date().toISOString();
+  const record = overallReportInstanceModel.sanitizeInstance({
+    orgId: template.orgId,
+    overallTemplateId: template.id,
+    overallTemplateVersion: template.version,
+    title: clean(title) || `${template.title} - ${now.slice(0, 10)}`,
+    status: 'draft',
+    selectedDocxKey: resolvedDocx.docxKey,
+    templateSnapshot: clone(template, {}),
+    filtersSnapshot,
+    studentEntries: normalizedEntries,
+    generatedDocs: [],
+    revision: 1,
+    audit: {
+      createUser: reqUser?.id || '',
+      createDateTime: now,
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: now
+    }
+  });
+  return schoolDataService.addData('overallReportInstances', record, reqUser);
+}
+
+async function saveOverallWorkspace({
+  instance,
+  studentEntries = [],
+  title = '',
+  selectedDocxKey = '',
+  filters = null,
+  reqUser
+}) {
+  if (String(instance.status || '') !== 'draft') {
+    throw new Error('Only draft overall reports can be edited.');
+  }
+  const template = instance.templateSnapshot || {};
+  const filtersSnapshot = overallReportInstanceModel.sanitizeFiltersSnapshot(
+    filters != null ? filters : instance.filtersSnapshot || {}
+  );
+  const allowedStatuses = resolveAllowedSourceStatuses(filtersSnapshot.statuses);
+  const normalizedEntries = await buildNormalizedStudentEntries({
+    template,
+    studentEntries,
+    allowedStatuses,
+    reqUser
+  });
+  const resolvedDocx = resolveSelectedDocxKey(template, selectedDocxKey || instance.selectedDocxKey);
+  const now = new Date().toISOString();
+  return schoolDataService.updateData('overallReportInstances', instance.id, {
+    title: clean(title) || instance.title,
+    selectedDocxKey: resolvedDocx.docxKey,
+    filtersSnapshot,
+    studentEntries: normalizedEntries,
+    revision: nextRevision(instance),
+    audit: {
+      ...(instance.audit || {}),
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: now
+    }
+  }, reqUser);
+}
+
+function buildVirtualEntryInstance(instance, entry) {
+  return {
+    ...instance,
+    sourceSelections: entry.sourceSelections || [],
+    sourceValues: entry.sourceValues || {},
+    answers: entry.answers || {},
+    derivedOverrides: entry.derivedOverrides || {},
+    generatedDocs: entry.generatedDocs || []
+  };
+}
+
+function findStudentEntry(instance, studentId) {
+  const workspace = ensureWorkspaceShape(instance);
+  const entry = workspace.studentEntries.find((row) => idsEqual(row.studentId, studentId));
+  if (!entry) throw new Error('Student entry not found on this overall report.');
+  return { workspace, entry };
+}
+
+function isOverallFieldEditable(field = {}) {
+  if (field.readOnly === true || String(field.readOnly).toLowerCase() === 'true') return false;
+  return String(field.overallValueMode || 'manual') !== 'derived_locked';
+}
+
+function previewStudentEntry({ instance, studentId }) {
+  const { workspace, entry } = findStudentEntry(instance, studentId);
+  const template = workspace.templateSnapshot || {};
+  const fields = getDataFields(template).map((field) => {
+    const mode = String(field.overallValueMode || 'manual');
+    return {
+      id: field.id,
+      label: field.label || field.id,
+      type: field.type || 'text',
+      helpText: field.helpText || '',
+      required: field.required === true,
+      overallValueMode: mode,
+      readOnly: !isOverallFieldEditable(field),
+      editable: isOverallFieldEditable(field),
+      value: entry.answers?.[field.id],
+      overridden: Boolean(entry.derivedOverrides?.[field.id])
+    };
+  });
+  const validation = validateAnswers(template, entry.answers || {});
+  return {
+    studentId: entry.studentId,
+    studentName: entry.studentName,
+    sourceSelections: entry.sourceSelections,
+    fields,
+    answers: entry.answers || {},
+    derivedOverrides: entry.derivedOverrides || {},
+    validation,
+    hasOverallFields: fields.length > 0
+  };
+}
+
+async function saveStudentAnswers({ instance, studentId, submittedAnswers = {}, reqUser }) {
+  if (String(instance.status || '') !== 'draft') {
+    throw new Error('Only draft overall reports can be edited.');
+  }
+  const { workspace, entry } = findStudentEntry(instance, studentId);
+  const template = workspace.templateSnapshot || {};
+  const fields = getDataFields(template);
+  const nextAnswers = { ...(entry.answers || {}) };
+  const overrides = { ...(entry.derivedOverrides || {}) };
+  fields.forEach((field) => {
+    if (!isOverallFieldEditable(field)) return;
+    if (!Object.prototype.hasOwnProperty.call(submittedAnswers, field.id)) return;
+    nextAnswers[field.id] = submittedAnswers[field.id];
+  });
+  const baseline = calculateAnswers({
+    template,
+    sourceValues: entry.sourceValues || {},
+    currentAnswers: nextAnswers,
+    derivedOverrides: {},
+    initialize: false
+  });
+  fields.forEach((field) => {
+    if (String(field.overallValueMode) !== 'derived_editable') return;
+    if (!isOverallFieldEditable(field)) return;
+    if (!Object.prototype.hasOwnProperty.call(submittedAnswers, field.id)) return;
+    overrides[field.id] = !valuesEqual(submittedAnswers[field.id], baseline.answers[field.id]);
+  });
+  const finalCalculation = calculateAnswers({
+    template,
+    sourceValues: entry.sourceValues || {},
+    currentAnswers: nextAnswers,
+    derivedOverrides: overrides,
+    initialize: false
+  });
+  const validation = validateAnswers(template, finalCalculation.answers);
+  const nextEntries = workspace.studentEntries.map((row) => (
+    idsEqual(row.studentId, studentId)
+      ? {
+        ...row,
+        answers: finalCalculation.answers,
+        derivedOverrides: finalCalculation.derivedOverrides
+      }
+      : row
+  ));
+  const updated = await schoolDataService.updateData('overallReportInstances', instance.id, {
+    studentEntries: nextEntries,
+    revision: nextRevision(instance),
+    audit: {
+      ...(instance.audit || {}),
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: new Date().toISOString()
+    }
+  }, reqUser);
+  return {
+    instance: updated,
+    validation,
+    diagnostics: finalCalculation.diagnostics,
+    preview: previewStudentEntry({ instance: updated, studentId })
+  };
+}
+
+async function renderEntryDocx(instance, entry, docxKey, reqUser) {
+  const virtual = buildVirtualEntryInstance(instance, entry);
+  if (docxKey) virtual.selectedDocxKey = docxKey;
+  const preview = await buildExportPreview(virtual);
+  if (preview.missingTokens.length) {
+    throw new Error(`DOCX export cancelled for ${entry.studentName || entry.studentId}. Missing: ${preview.missingTokens.join(', ')}.`);
+  }
+  if (hasBlockingValidationErrors(preview.validation) || preview.calculationMismatches.length || preview.calculationDiagnostics.length) {
+    throw new Error(`DOCX export cancelled for ${entry.studentName || entry.studentId} because of validation or calculation errors.`);
+  }
+  const rendered = await reportDocxRenderService.renderReportInstanceDocx({
+    template: virtual.templateSnapshot,
+    instance: virtual,
+    placeholders: preview.placeholders,
+    collections: {},
+    docxTemplateOverride: preview.resolved.docxTemplate
+  });
+  const safeStudent = clean(entry.studentName || entry.studentId || 'student').replace(/[^\w.-]+/g, '_');
+  const fileName = rendered.fileName?.includes(safeStudent)
+    ? rendered.fileName
+    : `${safeStudent}_${rendered.fileName || 'overall.docx'}`;
+  const saved = await fileAssetStorage.saveBuffer({
+    scopeKey: instance.orgId,
+    relativeDir: 'school-reports/overall/generated',
+    fileName,
+    originalName: fileName,
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    buffer: rendered.buffer
+  });
+  const generatedDoc = {
+    fileName: saved.fileName || fileName,
+    path: saved.path || saved.url || '',
+    url: saved.url || '',
+    docxKey: preview.docxKey,
+    studentId: entry.studentId,
+    generatedAt: new Date().toISOString(),
+    generatedBy: reqUser?.id || '',
+    revision: Number(instance.revision || 1)
+  };
+  return { rendered: { ...rendered, fileName, buffer: rendered.buffer }, saved, generatedDoc, preview };
+}
+
+async function generateStudentDocx({ instance, studentId, docxKey = '', reqUser }) {
+  const { workspace, entry } = findStudentEntry(instance, studentId);
+  const result = await renderEntryDocx(
+    workspace,
+    entry,
+    docxKey || workspace.selectedDocxKey,
+    reqUser
+  );
+  const nextEntries = workspace.studentEntries.map((row) => (
+    idsEqual(row.studentId, studentId)
+      ? { ...row, generatedDocs: [...(row.generatedDocs || []), result.generatedDoc] }
+      : row
+  ));
+  const updated = await schoolDataService.updateData('overallReportInstances', instance.id, {
+    studentEntries: nextEntries,
+    generatedDocs: [...(instance.generatedDocs || []), result.generatedDoc],
+    revision: nextRevision(instance),
+    audit: {
+      ...(instance.audit || {}),
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: new Date().toISOString()
+    }
+  }, reqUser);
+  return { ...result, instance: updated };
+}
+
+async function exportWorkspaceZip({ instance, docxKey = '', reqUser }) {
+  const workspace = ensureWorkspaceShape(instance);
+  if (!workspace.studentEntries.length) throw new Error('This overall report has no students to export.');
+  const key = clean(docxKey) || workspace.selectedDocxKey;
+  const files = [];
+  const generatedDocs = [];
+  let nextEntries = [...workspace.studentEntries];
+  for (const entry of workspace.studentEntries) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await renderEntryDocx(workspace, entry, key, reqUser);
+    files.push({ fileName: result.rendered.fileName, buffer: result.rendered.buffer });
+    generatedDocs.push(result.generatedDoc);
+    nextEntries = nextEntries.map((row) => (
+      idsEqual(row.studentId, entry.studentId)
+        ? { ...row, generatedDocs: [...(row.generatedDocs || []), result.generatedDoc] }
+        : row
+    ));
+  }
+  const zipBuffer = await reportDocxRenderService.zipReportInstanceDocxFiles(files);
+  const zipName = `${clean(workspace.title || 'overall-report').replace(/[^\w.-]+/g, '_') || 'overall-report'}.zip`;
+  const saved = await fileAssetStorage.saveBuffer({
+    scopeKey: instance.orgId,
+    relativeDir: 'school-reports/overall/generated',
+    fileName: zipName,
+    originalName: zipName,
+    mimeType: 'application/zip',
+    buffer: zipBuffer
+  });
+  const packageDoc = {
+    fileName: saved.fileName || zipName,
+    path: saved.path || saved.url || '',
+    url: saved.url || '',
+    docxKey: key,
+    generatedAt: new Date().toISOString(),
+    generatedBy: reqUser?.id || '',
+    revision: Number(instance.revision || 1)
+  };
+  const updated = await schoolDataService.updateData('overallReportInstances', instance.id, {
+    studentEntries: nextEntries,
+    generatedDocs: [...(instance.generatedDocs || []), ...generatedDocs, packageDoc],
+    revision: nextRevision(instance),
+    audit: {
+      ...(instance.audit || {}),
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: new Date().toISOString()
+    }
+  }, reqUser);
+  return {
+    zipBuffer,
+    fileName: zipName,
+    generatedDocs,
+    packageDoc,
+    instance: updated
+  };
+}
+
+async function exportWorkspaceDocx({ instance, docxKey = '', studentId = '', reqUser }) {
+  if (studentId) {
+    return generateStudentDocx({ instance, studentId, docxKey, reqUser });
+  }
+  return exportWorkspaceZip({ instance, docxKey, reqUser });
+}
+
 module.exports = {
   COMPLETED_SOURCE_STATUSES: Object.freeze([...COMPLETED_SOURCE_STATUSES]),
   getSourceTemplateKeyCatalog,
   getSourceTemplateKeyOptions,
+  ensureSourceTemplateDocxAliases,
+  prepareSourceTemplateForKeyOptions,
   validateTemplateReferences,
   calculateAnswers,
   validateAnswers,
   buildSourcePayload,
   createOverallInstance,
+  createOverallWorkspace,
+  saveOverallWorkspace,
+  loadOverallCreateCandidates,
+  ensureWorkspaceShape,
+  templateHasOverallFields,
+  previewStudentEntry,
+  saveStudentAnswers,
+  generateStudentDocx,
+  exportWorkspaceZip,
+  exportWorkspaceDocx,
   getOverallInstance,
   saveOverallAnswers,
   buildSourceUpdatePreview,
@@ -819,6 +1580,7 @@ module.exports = {
   resetDerivedOverride,
   transitionStatus,
   hasBlockingValidationErrors,
+  isOverallFieldEditable,
   buildDocxPayload,
   buildDocxPayloadDetailed,
   findCalculationMismatches,

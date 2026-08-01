@@ -81,6 +81,8 @@ async function listTemplates(req, res) {
       newUrl: 'school/reports/overall-templates',
       newLabel: 'Add Overall Template',
       print: true,
+      includeModal: true,
+      includeModal_Table: true,
       user: req.user,
       actionStateId: req.actionStateId
     });
@@ -133,6 +135,7 @@ async function showTemplateForm(req, res) {
     return res.render('school/report/overallTemplateForm', {
       title: template ? 'Edit Overall Report Template' : 'New Overall Report Template',
       ...context,
+      includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
     });
@@ -230,6 +233,38 @@ async function sourceTemplates(req, res) {
   }
 }
 
+async function ensureSourceTemplateDocx(req, res) {
+  try {
+    const templateId = String(req.params.templateId || '').trim();
+    if (!templateId) throw new Error('Report template id is required.');
+    const template = await schoolDataService.getDataById('reportTemplates', templateId, req.user);
+    if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) {
+      throw new Error('Report template not found.');
+    }
+    const { template: ensured, changed } = overallReportService.ensureSourceTemplateDocxAliases(template);
+    const saved = changed
+      ? await schoolDataService.updateData('reportTemplates', template.id, {
+        schema: ensured.schema,
+        audit: {
+          ...(template.audit || {}),
+          lastUpdateUser: req.user?.id || '',
+          lastUpdateDateTime: new Date().toISOString()
+        }
+      }, req.user)
+      : template;
+    const keyOptions = overallReportService.getSourceTemplateKeyOptions(saved);
+    return res.json({
+      status: 'success',
+      templateId: saved.id,
+      keyOptions,
+      keyCatalog: overallReportService.getSourceTemplateKeyCatalog(saved),
+      docxAliasesEnsured: changed
+    });
+  } catch (error) {
+    return sendError(req, res, error, 'Prepare Source Template DOCX Shortcuts');
+  }
+}
+
 async function listOverallReports(req, res) {
   try {
     const query = String(req.query.q || '').trim().toLowerCase();
@@ -245,9 +280,11 @@ async function listOverallReports(req, res) {
       data,
       pagination,
       filters: req.query,
-      newUrl: null,
-      newLabel: null,
+      newUrl: 'school/reports/overall-reports/new',
+      newLabel: 'New Overall Report',
       print: true,
+      includeModal: true,
+      includeModal_Table: true,
       user: req.user,
       actionStateId: req.actionStateId
     });
@@ -258,47 +295,37 @@ async function listOverallReports(req, res) {
 
 async function showCreateOverallReport(req, res) {
   try {
-    const template = await schoolDataService.getDataById('overallReportTemplates', req.params.templateId, req.user);
-    if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) throw new Error('Overall report template not found.');
-    const [allInstances, reportTemplates] = await Promise.all([
-      schoolDataService.fetchData('reportInstances', {}, req.user),
-      schoolDataService.fetchData('reportTemplates', {}, req.user)
-    ]);
-    const completedInstances = scoped(allInstances, req.user)
-      .filter((row) => ['submitted', 'locked'].includes(String(row.status || '').toLowerCase()));
-    const sourceTemplateMap = new Map(
-      scoped(reportTemplates, req.user).map((row) => [String(row.id), row])
-    );
-    const instancesBySlot = {};
-    (template.sourceSlots || []).forEach((slot) => {
-      instancesBySlot[slot.slotKey] = completedInstances.filter((row) => idsEqual(row.templateId, slot.templateId));
-    });
-    const sourceSlotOptions = (template.sourceSlots || []).map((slot) => {
-      const sourceTemplate = sourceTemplateMap.get(String(slot.templateId)) || {};
-      return {
-        ...slot,
-        templateTitle: String(sourceTemplate.title || sourceTemplate.name || slot.templateId),
-        templateType: String(sourceTemplate.type || ''),
-        templateVersion: Number(sourceTemplate.version || slot.templateVersionAtSelection || 1),
-        instances: (instancesBySlot[slot.slotKey] || []).map((row) => ({
-          id: row.id,
-          title: row.title || row.name || row.id,
-          status: row.status,
-          templateId: row.templateId,
-          studentId: row.studentId || row.personId || '',
-          studentName: row.prefillSnapshot?.student_full_name || row.prefillSnapshot?.student_name || '',
-          className: row.prefillSnapshot?.class_name || '',
-          teacherName: row.prefillSnapshot?.teacher_name || '',
-          reportDate: row.prefillSnapshot?.report_date || row.audit?.lastUpdateDateTime || row.audit?.createDateTime || ''
-        }))
-      };
-    });
+    const templateId = cleanParam(req.params.templateId);
+    let template = null;
+    let sourceSlots = [];
+    let docxOptions = [];
+    if (templateId) {
+      template = await schoolDataService.getDataById('overallReportTemplates', templateId, req.user);
+      if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) {
+        throw new Error('Overall report template not found.');
+      }
+      const reportTemplates = scoped(await schoolDataService.fetchData('reportTemplates', {}, req.user), req.user);
+      const byId = new Map(reportTemplates.map((row) => [String(row.id), row]));
+      sourceSlots = (template.sourceSlots || []).map((slot) => {
+        const sourceTemplate = byId.get(String(slot.templateId)) || {};
+        return {
+          ...slot,
+          templateTitle: String(sourceTemplate.title || sourceTemplate.name || slot.templateId),
+          templateType: String(sourceTemplate.type || ''),
+          templateVersion: Number(sourceTemplate.version || slot.templateVersionAtSelection || 1)
+        };
+      });
+      docxOptions = reportFunderDocxService.buildAvailableDocxOptions(template);
+    }
     return res.render('school/report/overallReportCreate', {
       title: 'Create Overall Report',
       template,
-      instancesBySlot,
-      sourceSlotOptions,
-      docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template),
+      sourceSlots,
+      docxOptions,
+      hasOverallFields: overallReportService.templateHasOverallFields(template || {}),
+      instance: null,
+      readOnly: false,
+      includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
     });
@@ -307,10 +334,104 @@ async function showCreateOverallReport(req, res) {
   }
 }
 
+function cleanParam(value) {
+  return String(value || '').trim();
+}
+
+async function getTemplateApi(req, res) {
+  try {
+    const template = await schoolDataService.getDataById('overallReportTemplates', req.params.id, req.user);
+    if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) {
+      throw new Error('Overall report template not found.');
+    }
+    const reportTemplates = scoped(await schoolDataService.fetchData('reportTemplates', {}, req.user), req.user);
+    const byId = new Map(reportTemplates.map((row) => [String(row.id), row]));
+    const sourceSlots = (template.sourceSlots || []).map((slot) => {
+      const sourceTemplate = byId.get(String(slot.templateId)) || {};
+      return {
+        slotKey: slot.slotKey,
+        templateId: slot.templateId,
+        templateTitle: String(sourceTemplate.title || sourceTemplate.name || slot.templateId),
+        templateType: String(sourceTemplate.type || ''),
+        templateVersion: Number(sourceTemplate.version || slot.templateVersionAtSelection || 1)
+      };
+    });
+    return res.json({
+      status: 'success',
+      template: {
+        id: template.id,
+        title: template.title,
+        status: template.status,
+        version: template.version
+      },
+      sourceSlots,
+      hasOverallFields: overallReportService.templateHasOverallFields(template),
+      docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template)
+    });
+  } catch (error) {
+    return sendError(req, res, error);
+  }
+}
+
+async function loadCandidatesApi(req, res) {
+  try {
+    const templateId = cleanParam(req.body.templateId || req.query.templateId);
+    const template = await schoolDataService.getDataById('overallReportTemplates', templateId, req.user);
+    if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) {
+      throw new Error('Overall report template not found.');
+    }
+    const studentIds = Array.isArray(req.body.studentIds)
+      ? req.body.studentIds
+      : parseJson(req.body.studentIdsJson, []);
+    const statuses = Array.isArray(req.body.statuses)
+      ? req.body.statuses
+      : parseJson(req.body.statusesJson, ['submitted', 'locked']);
+    const result = await overallReportService.loadOverallCreateCandidates({
+      template,
+      startDate: req.body.startDate || req.query.startDate || '',
+      endDate: req.body.endDate || req.query.endDate || '',
+      studentIds,
+      statuses,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', ...result });
+  } catch (error) {
+    return sendError(req, res, error, 'Load Overall Report Candidates');
+  }
+}
+
 async function createOverallReport(req, res) {
   try {
-    const template = await schoolDataService.getDataById('overallReportTemplates', req.params.templateId, req.user);
-    if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) throw new Error('Overall report template not found.');
+    const templateId = cleanParam(req.body.templateId || req.params.templateId);
+    const template = await schoolDataService.getDataById('overallReportTemplates', templateId, req.user);
+    if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) {
+      throw new Error('Overall report template not found.');
+    }
+    const studentEntries = parseJson(req.body.studentEntriesJson, req.body.studentEntries || []);
+    const filters = parseJson(req.body.filtersJson, {
+      startDate: req.body.startDate,
+      endDate: req.body.endDate,
+      studentIds: parseJson(req.body.studentIdsJson, []),
+      statuses: parseJson(req.body.statusesJson, ['submitted', 'locked'])
+    });
+    if (Array.isArray(studentEntries) && studentEntries.length) {
+      const instance = await overallReportService.createOverallWorkspace({
+        template,
+        filters,
+        selectedDocxKey: req.body.selectedDocxKey,
+        title: req.body.title,
+        studentEntries,
+        reqUser: req.user
+      });
+      if (isAjax(req)) {
+        return res.json({
+          status: 'success',
+          result: instance,
+          redirect: `/school/reports/overall-reports/edit/${instance.id}`
+        });
+      }
+      return res.redirect(`/school/reports/overall-reports/edit/${instance.id}`);
+    }
     const sourceSelections = (template.sourceSlots || []).map((slot) => ({
       slotKey: slot.slotKey,
       instanceId: req.body[`sourceInstance_${slot.slotKey}`]
@@ -332,6 +453,34 @@ async function createOverallReport(req, res) {
 async function showOverallReportEditor(req, res) {
   try {
     const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    const workspaceEntries = Array.isArray(instance.studentEntries) ? instance.studentEntries : [];
+    if (workspaceEntries.length) {
+      const workspace = overallReportService.ensureWorkspaceShape(instance);
+      const template = instance.templateSnapshot || {};
+      const reportTemplates = scoped(await schoolDataService.fetchData('reportTemplates', {}, req.user), req.user);
+      const byId = new Map(reportTemplates.map((row) => [String(row.id), row]));
+      const sourceSlots = (template.sourceSlots || []).map((slot) => {
+        const sourceTemplate = byId.get(String(slot.templateId)) || {};
+        return {
+          ...slot,
+          templateTitle: String(sourceTemplate.title || sourceTemplate.name || slot.templateId),
+          templateType: String(sourceTemplate.type || ''),
+          templateVersion: Number(sourceTemplate.version || slot.templateVersionAtSelection || 1)
+        };
+      });
+      return res.render('school/report/overallReportCreate', {
+        title: instance.title || 'Overall Report',
+        template,
+        sourceSlots,
+        docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template),
+        hasOverallFields: overallReportService.templateHasOverallFields(template),
+        instance: workspace,
+        readOnly: String(instance.status || '') !== 'draft',
+        includeModal: true,
+        user: req.user,
+        actionStateId: req.actionStateId
+      });
+    }
     const validation = overallReportService.validateAnswers(instance.templateSnapshot || {}, instance.answers || {});
     const exportPreview = await overallReportService.buildExportPreview(instance).catch((error) => ({
       ready: false,
@@ -344,6 +493,7 @@ async function showOverallReportEditor(req, res) {
       template: instance.templateSnapshot || {},
       exportPreview,
       validation,
+      includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
     });
@@ -352,9 +502,97 @@ async function showOverallReportEditor(req, res) {
   }
 }
 
+async function saveOverallWorkspace(req, res) {
+  try {
+    const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    const studentEntries = parseJson(req.body.studentEntriesJson, req.body.studentEntries || []);
+    const filters = parseJson(req.body.filtersJson, null);
+    const updated = await overallReportService.saveOverallWorkspace({
+      instance,
+      studentEntries,
+      title: req.body.title,
+      selectedDocxKey: req.body.selectedDocxKey,
+      filters,
+      reqUser: req.user
+    });
+    if (isAjax(req)) {
+      return res.json({
+        status: 'success',
+        message: 'Overall report saved.',
+        result: updated,
+        redirect: `/school/reports/overall-reports/edit/${updated.id}`
+      });
+    }
+    return res.redirect(`/school/reports/overall-reports/edit/${updated.id}`);
+  } catch (error) {
+    return sendError(req, res, error, 'Save Overall Report');
+  }
+}
+
+async function studentPreview(req, res) {
+  try {
+    const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    if (req.method === 'POST') {
+      const answers = parseJson(req.body.answersJson, req.body.answers || {});
+      const result = await overallReportService.saveStudentAnswers({
+        instance,
+        studentId: req.params.studentId,
+        submittedAnswers: answers,
+        reqUser: req.user
+      });
+      return res.json({ status: 'success', message: 'Student answers saved.', ...result });
+    }
+    return res.json({
+      status: 'success',
+      ...overallReportService.previewStudentEntry({
+        instance,
+        studentId: req.params.studentId
+      })
+    });
+  } catch (error) {
+    return sendError(req, res, error);
+  }
+}
+
+async function generateStudentDocx(req, res) {
+  try {
+    const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    const result = await overallReportService.generateStudentDocx({
+      instance,
+      studentId: req.params.studentId,
+      docxKey: req.body.selectedDocxKey || req.body.docxKey || instance.selectedDocxKey,
+      reqUser: req.user
+    });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.rendered.fileName}"`);
+    return res.send(result.rendered.buffer);
+  } catch (error) {
+    return sendError(req, res, error, 'Generate Overall Report Document');
+  }
+}
+
+async function exportZip(req, res) {
+  try {
+    const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    const result = await overallReportService.exportWorkspaceZip({
+      instance,
+      docxKey: req.body.selectedDocxKey || req.body.docxKey || instance.selectedDocxKey,
+      reqUser: req.user
+    });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+    return res.send(result.zipBuffer);
+  } catch (error) {
+    return sendError(req, res, error, 'Export Overall Report Package');
+  }
+}
+
 async function saveOverallReport(req, res) {
   try {
     const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    if ((instance.studentEntries || []).length && (req.body.studentEntriesJson || req.body.studentEntries)) {
+      return saveOverallWorkspace(req, res);
+    }
     const answers = parseJson(req.body.answersJson, req.body.answers || {});
     const result = await overallReportService.saveOverallAnswers({ instance, submittedAnswers: answers, reqUser: req.user });
     if (isAjax(req)) return res.json({ status: 'success', message: 'Overall report saved.', ...result });
@@ -484,7 +722,30 @@ async function exportPreview(req, res) {
 async function exportDocx(req, res) {
   try {
     const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    const studentId = cleanParam(req.body.studentId || req.query.studentId);
+    const docxKey = cleanParam(req.body.selectedDocxKey || req.body.docxKey || instance.selectedDocxKey);
+    if (studentId || (instance.studentEntries || []).length > 1 || req.body.asZip === true || req.body.asZip === 'true') {
+      const result = await overallReportService.exportWorkspaceDocx({
+        instance,
+        docxKey,
+        studentId,
+        reqUser: req.user
+      });
+      if (result.zipBuffer) {
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        return res.send(result.zipBuffer);
+      }
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.rendered.fileName}"`);
+      return res.send(result.rendered.buffer);
+    }
     const result = await overallReportService.exportOverallReport(instance, req.user);
+    if (result.zipBuffer) {
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+      return res.send(result.zipBuffer);
+    }
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="${result.rendered.fileName}"`);
     return res.send(result.rendered.buffer);
@@ -499,11 +760,18 @@ module.exports = {
   saveTemplate,
   deleteTemplate,
   sourceTemplates,
+  ensureSourceTemplateDocx,
   listOverallReports,
   showCreateOverallReport,
+  getTemplateApi,
+  loadCandidatesApi,
   createOverallReport,
   showOverallReportEditor,
   saveOverallReport,
+  saveOverallWorkspace,
+  studentPreview,
+  generateStudentDocx,
+  exportZip,
   sourceUpdatePreview,
   sourceUpdateApply,
   resetDerivedOverride,

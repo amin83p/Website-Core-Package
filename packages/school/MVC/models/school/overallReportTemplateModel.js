@@ -178,7 +178,11 @@ function sanitizeSchema(rawSchema, sourceSlots, inputPlaceholderMap = {}) {
     });
     return {
       ...field,
-      readOnly: visual ? false : overallValueMode === 'derived_locked',
+      readOnly: visual
+        ? false
+        : (overallValueMode === 'derived_locked'
+          || original.readOnly === true
+          || String(original.readOnly).toLowerCase() === 'true'),
       overallValueMode,
       defaultValue: visual ? '' : clonePlain(original.defaultValue, ''),
       calculationRule: overallValueMode === 'manual'

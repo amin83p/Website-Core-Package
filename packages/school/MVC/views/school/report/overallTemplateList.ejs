@@ -56,16 +56,25 @@
             <% } %>
           </td>
           <td class="table-actions pe-4">
-            <div class="d-flex justify-content-end gap-1 flex-wrap">
-              <% if (status === 'active') { %>
-                <a href="/school/reports/overall-reports/new/<%= encodeURIComponent(row.id) %>" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>Create Report</a>
-              <% } %>
-              <a href="/school/reports/overall-templates/edit/<%= encodeURIComponent(row.id) %>" class="btn btn-outline-secondary btn-sm">Edit</a>
-              <a
-                href="/school/reports/overall-templates/delete/<%= encodeURIComponent(row.id) %>"
-                class="btn btn-outline-danger btn-sm js-delete-overall-template"
-                data-template-title="<%= row.title %>"
-              >Delete</a>
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Overall Template Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <% if (status === 'active') { %>
+                  <a href="/school/reports/overall-reports/new/<%= encodeURIComponent(row.id) %>" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-2"></i>Create Report</a>
+                <% } %>
+                <a href="/school/reports/overall-templates/edit/<%= encodeURIComponent(row.id) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <a
+                  href="/school/reports/overall-templates/delete/<%= encodeURIComponent(row.id) %>"
+                  class="btn btn-outline-danger btn-sm js-delete-overall-template"
+                  data-template-title="<%= row.title %>"
+                ><i class="bi bi-trash me-2"></i>Delete</a>
+              </div>
             </div>
           </td>
         </tr>
@@ -73,28 +82,22 @@
     </tbody>
   </table>
 </div>
-<span id="urlRef" data-id="<%= newUrl %>" hidden></span>
 <%- include('partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
 <%- include('partials/tablePages-end') %>
+
+<%- include('partials/reportMessageHelpers') %>
 
 <script>
 (() => {
   async function confirmTemplateDelete(link) {
     const templateTitle = String(link.dataset.templateTitle || 'this overall report template');
     const message = `Delete <strong>${templateTitle.replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]))}</strong>? A template that is already referenced by an overall report cannot be deleted.`;
-    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
-      const result = await window.showMessageModal({
-        title: 'Delete Overall Report Template?',
-        icon: 'warning',
-        message,
-        buttons: [
-          { text: 'Cancel', class: 'btn-secondary' },
-          { text: 'Delete', class: 'btn-danger' }
-        ]
-      });
-      return result === 'Delete';
-    }
-    return window.confirm(`Delete ${templateTitle}?`);
+    return window.ReportMessaging.confirmReportAction({
+      title: 'Delete Overall Report Template?',
+      message,
+      confirmText: 'Delete',
+      html: true
+    });
   }
 
   document.querySelectorAll('.js-delete-overall-template').forEach(link => {

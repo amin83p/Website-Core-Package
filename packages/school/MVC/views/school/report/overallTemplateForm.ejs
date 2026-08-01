@@ -11,6 +11,7 @@
   .overall-field-summary { white-space: normal; overflow-wrap: anywhere; }
   .overall-picker-summary { min-height: 38px; }
   .overall-field-visual { background: #fcfcff; }
+  .overall-field-dropdown-menu-floating { z-index: 1080; }
 </style>
 <div class="sections-page">
   <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
@@ -104,7 +105,7 @@
       <div class="card-body">
         <input class="form-control form-control-sm mb-2" id="keySearch" placeholder="Search keys...">
         <div class="table-responsive" style="max-height:320px;overflow:auto;">
-          <table class="table table-sm"><thead><tr><th>Source</th><th>Label</th><th>Key</th><th>Origin</th><th></th></tr></thead><tbody id="keyRows"></tbody></table>
+          <table class="table table-sm"><thead><tr><th>Source</th><th>Label</th><th>Key</th><th>DOCX Shortcut</th><th>Origin</th><th></th></tr></thead><tbody id="keyRows"></tbody></table>
         </div>
       </div>
     </div>
@@ -152,11 +153,15 @@
       <div class="col-12" id="fieldDataSettings">
         <div class="border rounded p-3 bg-light-subtle">
           <div class="row g-3">
-            <div class="col-12"><label class="form-label fw-bold">Value behavior</label><select class="form-select" id="fieldMode">
+            <div class="col-md-8"><label class="form-label fw-bold">Value behavior</label><select class="form-select" id="fieldMode">
               <option value="manual">User-entered, with an optional fixed starting value</option>
               <option value="derived_editable">Start from source/calculation and allow override</option>
               <option value="derived_locked">Always calculated and read-only</option>
             </select><div class="form-text" id="fieldModeHelp"></div></div>
+            <div class="col-md-4"><label class="form-label fw-bold">Field access</label><select class="form-select" id="fieldAccess">
+              <option value="editable">Editable</option>
+              <option value="readonly">Read-only</option>
+            </select><div class="form-text" id="fieldAccessHelp">Controls whether users can change the field value on the overall report.</div></div>
             <div class="col-12" id="fieldManualPanel">
               <label class="form-label fw-bold">Starting value</label><div id="fieldDefaultControl"></div>
               <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="btnUseSourceDefault"><i class="bi bi-search me-1"></i>Use Source / Predefined Value</button>
@@ -199,6 +204,7 @@
 <div class="modal fade" id="previewModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Overall Report Form Preview</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="previewBody"></div></div></div></div>
 
 <%- include('partials/modal_GenericPicker', { user }) %>
+<%- include('partials/reportMessageHelpers') %>
 
 <script>
 (() => {
@@ -212,6 +218,44 @@
   const byTemplateId = new Map(sourceTemplates.map(row => [String(row.id), row]));
   const slotRows = document.getElementById('sourceSlotRows');
   const fieldRows = document.getElementById('fieldRows');
+  const form = document.getElementById('overallTemplateForm');
+  function bindOverallFieldDropdown(toggle) {
+    if (!toggle || typeof bootstrap === 'undefined' || !bootstrap.Dropdown) return null;
+    const dropdownRoot = toggle.closest('.js-overall-field-dropdown');
+    const menu = dropdownRoot?.querySelector('.dropdown-menu');
+    if (!dropdownRoot || !menu) return null;
+    const existing = bootstrap.Dropdown.getInstance(toggle);
+    if (existing) existing.dispose();
+    new bootstrap.Dropdown(toggle, {
+      popperConfig(defaultConfig) {
+        const config = typeof defaultConfig === 'object' && defaultConfig ? { ...defaultConfig } : {};
+        config.strategy = 'fixed';
+        const modifiers = Array.isArray(config.modifiers) ? config.modifiers.slice() : [];
+        modifiers.push({ name: 'preventOverflow', options: { boundary: 'viewport', padding: 8 } });
+        modifiers.push({ name: 'flip', options: { fallbackPlacements: ['bottom-end', 'top-end', 'bottom-start', 'top-start'] } });
+        config.modifiers = modifiers;
+        return config;
+      }
+    });
+    toggle.addEventListener('show.bs.dropdown', () => {
+      if (menu.parentElement !== document.body) {
+        menu.dataset.returnToParent = '1';
+        document.body.appendChild(menu);
+      }
+      menu.classList.add('overall-field-dropdown-menu-floating', 'show');
+    });
+    toggle.addEventListener('hidden.bs.dropdown', () => {
+      menu.classList.remove('overall-field-dropdown-menu-floating', 'show');
+      if (menu.dataset.returnToParent === '1' && dropdownRoot.isConnected) {
+        dropdownRoot.appendChild(menu);
+        delete menu.dataset.returnToParent;
+      }
+    });
+    return toggle;
+  }
+  function bindOverallFieldDropdowns() {
+    fieldRows.querySelectorAll('.js-overall-field-dropdown [data-bs-toggle="dropdown"]').forEach(bindOverallFieldDropdown);
+  }
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const visualTypes = new Set(['section', 'subheader', 'row_break']);
   const modeLabels = {
@@ -233,24 +277,11 @@
   }
 
   async function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
-    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
-      return window.showMessageModal({ title, icon, message: escapeHtml(message), buttons: [{ text: 'OK', class: buttonClass }] });
-    }
-    window.alert(String(message || title));
-    return 'OK';
+    return window.ReportMessaging.showReportMessage({ title, message, icon, buttonClass });
   }
 
   async function confirmReportModal({ title = 'Confirm', message = '', confirmText = 'Confirm', confirmClass = 'btn-danger' } = {}) {
-    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
-      const result = await window.showMessageModal({
-        title,
-        icon: 'warning',
-        message: escapeHtml(message),
-        buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: confirmText, class: confirmClass }]
-      });
-      return result === confirmText;
-    }
-    return window.confirm(String(message || title));
+    return window.ReportMessaging.confirmReportAction({ title, message, confirmText, confirmClass });
   }
 
   function showFieldError(message = '') {
@@ -272,6 +303,35 @@
       return;
     }
     window.GenericPicker.open(pickerConfig({ sourceMode: 'local', multiselect: false, limit: 5000, ...config }));
+  }
+
+  function upsertSourceTemplateCache(templateRow) {
+    const id = String(templateRow?.id || '').trim();
+    if (!id) return;
+    const index = sourceTemplates.findIndex((row) => String(row.id) === id);
+    const merged = { ...(index >= 0 ? sourceTemplates[index] : {}), ...templateRow, id };
+    if (index >= 0) sourceTemplates[index] = merged;
+    else sourceTemplates.push(merged);
+    byTemplateId.set(id, merged);
+  }
+
+  async function ensureSourceTemplateDocxAliases(templateId) {
+    const body = new URLSearchParams();
+    body.set('actionStateId', document.querySelector('[name="actionStateId"]')?.value || '');
+    const response = await fetch(`/school/reports/overall-templates/ensure-source-docx/${encodeURIComponent(String(templateId))}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-AJAX-Request': 'true',
+        Accept: 'application/json'
+      },
+      body: body.toString()
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.status !== 'success') {
+      throw new Error(result.message || 'Failed to prepare source template DOCX shortcuts.');
+    }
+    return result;
   }
 
   function sourceKeyItems() {
@@ -371,7 +431,8 @@
         field.required ? '<span class="badge bg-danger-subtle text-danger border">Required</span>' : '',
         field.fullPageWidth ? '<span class="badge bg-primary-subtle text-primary-emphasis border">Full width</span>' : '',
         field.hasBorder ? '<span class="badge bg-secondary-subtle text-secondary-emphasis border">Border</span>' : '',
-        !visual && mode !== 'manual' ? `<span class="badge ${mode === 'derived_locked' ? 'bg-secondary' : 'bg-warning text-dark'}">${escapeHtml(modeLabels[mode])}</span>` : ''
+        !visual && mode !== 'manual' ? `<span class="badge ${mode === 'derived_locked' ? 'bg-secondary' : 'bg-warning text-dark'}">${escapeHtml(modeLabels[mode])}</span>` : '',
+        !visual && fieldIsReadOnly(field) ? '<span class="badge bg-secondary-subtle text-secondary-emphasis border">Read-only</span>' : ''
       ].filter(Boolean).join(' ') || '<span class="text-muted">None</span>';
       const details = visual
         ? (field.helpText || 'Display-only organization row')
@@ -382,29 +443,61 @@
             field.helpText || '',
             field.docxAlias ? `{{O.${field.docxAlias}}}` : ''
           ].filter(Boolean).join(' | ');
-      return `<tr class="overall-field-row${visual ? ' overall-field-visual' : ''}" draggable="true" data-index="${index}"><td class="text-center"><span class="overall-field-handle text-muted"><i class="bi bi-grip-vertical"></i></span><span class="badge bg-light text-dark border ms-1">${index + 1}</span></td><td><strong>${escapeHtml(field.label || field.id)}</strong><div class="small text-muted font-monospace">${escapeHtml(field.id || '')}</div></td><td><span class="badge bg-light text-dark border">${escapeHtml(field.type)}</span></td><td>${flags}</td><td class="small overall-field-summary" title="${escapeHtml(details)}">${escapeHtml(details || '-')}</td><td><div class="dropdown"><button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><button type="button" class="dropdown-item js-field-action" data-action="edit" data-index="${index}"><i class="bi bi-pencil me-2"></i>Edit</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="duplicate" data-index="${index}"><i class="bi bi-files me-2"></i>Duplicate</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up me-2"></i>Move Up</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="down" data-index="${index}" ${index === fields.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down me-2"></i>Move Down</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item text-danger js-field-action" data-action="delete" data-index="${index}"><i class="bi bi-trash me-2"></i>Delete</button></li></ul></div></td></tr>`;
+      return `<tr class="overall-field-row${visual ? ' overall-field-visual' : ''}" draggable="true" data-index="${index}"><td class="text-center"><span class="overall-field-handle text-muted"><i class="bi bi-grip-vertical"></i></span><span class="badge bg-light text-dark border ms-1">${index + 1}</span></td><td><strong>${escapeHtml(field.label || field.id)}</strong><div class="small text-muted font-monospace">${escapeHtml(field.id || '')}</div></td><td><span class="badge bg-light text-dark border">${escapeHtml(field.type)}</span></td><td>${flags}</td><td class="small overall-field-summary" title="${escapeHtml(details)}">${escapeHtml(details || '-')}</td><td><div class="dropdown js-overall-field-dropdown"><button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><button type="button" class="dropdown-item js-field-action" data-action="edit" data-index="${index}"><i class="bi bi-pencil me-2"></i>Edit</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="duplicate" data-index="${index}"><i class="bi bi-files me-2"></i>Duplicate</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up me-2"></i>Move Up</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="down" data-index="${index}" ${index === fields.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down me-2"></i>Move Down</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item text-danger js-field-action" data-action="delete" data-index="${index}"><i class="bi bi-trash me-2"></i>Delete</button></li></ul></div></td></tr>`;
     }).join('');
     renderKeyCatalog();
+    bindOverallFieldDropdowns();
+  }
+
+  function slotDocxShortcut(slotKey, alias = '') {
+    const cleanAlias = String(alias || '').toLowerCase();
+    return aliasPattern.test(cleanAlias) ? `{{${slotKey}.${cleanAlias}}}` : '';
   }
 
   function keyCatalog() {
     const rows = [];
     slots.forEach(slot => {
+      if (!String(slot.templateId || '').trim()) return;
       const template = byTemplateId.get(String(slot.templateId));
+      if (!template) return;
       const options = template?.keyOptions || (template?.keyCatalog || []).map(key => ({ key, label: key }));
-      options.forEach(option => rows.push({ group: slot.slotKey, label: option.label || option.key, origin: option.origin || 'available_value', key: `{{${slot.slotKey}.${option.key}}}`, description: option.description || '', templateTitle: template?.title || slot.templateId }));
+      const seen = new Set();
+      options.forEach(option => {
+        if (option.origin === 'docx_alias') return;
+        const optionKey = String(option.key || '').trim();
+        if (!optionKey) return;
+        const catalogKey = `{{${slot.slotKey}.${optionKey}}}`;
+        if (seen.has(catalogKey)) return;
+        seen.add(catalogKey);
+        rows.push({
+          group: slot.slotKey,
+          label: option.label || optionKey,
+          origin: option.origin || 'available_value',
+          key: catalogKey,
+          docxShortcut: slotDocxShortcut(slot.slotKey, option.docxAlias),
+          description: option.description || '',
+          templateTitle: template?.title || slot.templateId
+        });
+      });
     });
     fields.filter(field => !isVisual(field)).forEach(field => {
-      rows.push({group:'Overall', label: field.label || field.id, origin: 'overall_field', key:`{{O.${field.id}}}`, description: field.helpText || '', templateTitle: initial.title || 'Overall Report'});
-      if (aliasPattern.test(String(field.docxAlias || ''))) rows.push({group:'Overall alias', label: `${field.label || field.id} shortcut`, origin: 'docx_alias', key:`{{O.${field.docxAlias}}}`, description: '', templateTitle: initial.title || 'Overall Report'});
+      rows.push({
+        group: 'O',
+        label: field.label || field.id,
+        origin: 'overall_field',
+        key: `{{O.${field.id}}}`,
+        docxShortcut: slotDocxShortcut('O', field.docxAlias),
+        description: field.helpText || '',
+        templateTitle: initial.title || 'Overall Report'
+      });
     });
     return rows;
   }
 
   function renderKeyCatalog() {
     const query = String(document.getElementById('keySearch')?.value || '').toLowerCase();
-    const filtered = keyCatalog().filter(row => !query || [row.key, row.group, row.label, row.origin, row.description, row.templateTitle].some(value => String(value || '').toLowerCase().includes(query)));
-    document.getElementById('keyRows').innerHTML = filtered.map(row => `<tr><td><span class="badge bg-primary me-1">${escapeHtml(row.group)}</span><span class="small">${escapeHtml(row.templateTitle)}</span></td><td><strong>${escapeHtml(row.label)}</strong>${row.description ? `<div class="small text-muted">${escapeHtml(row.description)}</div>` : ''}</td><td class="font-monospace">${escapeHtml(row.key)}</td><td><span class="badge bg-light text-dark border">${escapeHtml(row.origin)}</span></td><td><button type="button" class="btn btn-outline-secondary btn-sm js-copy-key" data-key="${escapeHtml(row.key)}">Copy</button></td></tr>`).join('') || '<tr><td colspan="5" class="text-center text-muted py-3">No matching keys.</td></tr>';
+    const filtered = keyCatalog().filter(row => !query || [row.key, row.docxShortcut, row.group, row.label, row.origin, row.description, row.templateTitle].some(value => String(value || '').toLowerCase().includes(query)));
+    document.getElementById('keyRows').innerHTML = filtered.map(row => `<tr><td><span class="badge bg-primary">${escapeHtml(row.group)}</span></td><td><strong>${escapeHtml(row.label)}</strong>${row.description ? `<div class="small text-muted">${escapeHtml(row.description)}</div>` : ''}</td><td class="font-monospace">${escapeHtml(row.key)}</td><td class="font-monospace">${row.docxShortcut ? escapeHtml(row.docxShortcut) : '<span class="text-muted">—</span>'}</td><td><span class="badge bg-light text-dark border">${escapeHtml(row.origin)}</span></td><td class="text-nowrap">${row.docxShortcut ? `<button type="button" class="btn btn-outline-secondary btn-sm js-copy-key me-1" data-key="${escapeHtml(row.docxShortcut)}" title="Copy DOCX shortcut">S</button>` : ''}<button type="button" class="btn btn-outline-secondary btn-sm js-copy-key" data-key="${escapeHtml(row.key)}" title="Copy key">Copy</button></td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No matching keys.</td></tr>';
   }
 
   function modalOptions() {
@@ -435,6 +528,39 @@
     return input.value;
   }
 
+  function fieldIsReadOnly(field) {
+    if (field?.readOnly === true) return true;
+    return normalizedMode(field) === 'derived_locked';
+  }
+
+  function syncFieldAccessControl({ forceFromMode = false } = {}) {
+    const access = document.getElementById('fieldAccess');
+    const help = document.getElementById('fieldAccessHelp');
+    if (!access) return;
+    const type = document.getElementById('fieldType').value;
+    const visual = isVisual(type);
+    const mode = visual ? 'manual' : document.getElementById('fieldMode').value;
+    if (visual) {
+      access.value = 'editable';
+      access.disabled = true;
+      if (help) help.textContent = 'Visual layout rows are not editable data fields.';
+      return;
+    }
+    if (mode === 'derived_locked') {
+      access.value = 'readonly';
+      access.disabled = true;
+      if (help) help.textContent = 'Calculated locked fields are always read-only.';
+      return;
+    }
+    access.disabled = false;
+    if (forceFromMode) access.value = 'editable';
+    if (help) {
+      help.textContent = access.value === 'readonly'
+        ? 'Users can see the value but cannot change it on the overall report.'
+        : 'Users can change the field value on the overall report.';
+    }
+  }
+
   function updateFieldVisibility({ preserveDefault = true } = {}) {
     const type = document.getElementById('fieldType').value;
     const visual = isVisual(type);
@@ -457,6 +583,7 @@
       : (mode === 'derived_editable'
           ? 'The value starts from selected source reports and can be overridden by the user.'
           : 'The value is recalculated from selected source reports and cannot be edited.');
+    syncFieldAccessControl();
     if (!visual) renderDefaultControl(priorDefault);
   }
 
@@ -506,12 +633,13 @@
   }
 
   function openField(index = -1, presetType = 'text') {
-    const field = index >= 0 ? fields[index] : {id:'',label:presetType === 'row_break' ? 'New Row' : '',type:presetType,overallValueMode:'manual',defaultValue:'',required:false,fullPageWidth:false,hasBorder:false,backgroundColor:'',placeholder:'',helpText:'',options:[],validationRules:[],calculationRule:{expression:'',onError:'keep_last'},conversionRule:{expression:'',onError:'use_raw'},exportTextCase:'as_entered',docxAlias:isVisual(presetType) ? '' : generateAlias()};
+    const field = index >= 0 ? fields[index] : {id:'',label:presetType === 'row_break' ? 'New Row' : '',type:presetType,overallValueMode:'manual',readOnly:false,defaultValue:'',required:false,fullPageWidth:false,hasBorder:false,backgroundColor:'',placeholder:'',helpText:'',options:[],validationRules:[],calculationRule:{expression:'',onError:'keep_last'},conversionRule:{expression:'',onError:'use_raw'},exportTextCase:'as_entered',docxAlias:isVisual(presetType) ? '' : generateAlias()};
     document.getElementById('fieldIndex').value = index;
     document.getElementById('fieldId').value = field.id || '';
     document.getElementById('fieldLabel').value = field.label || '';
     document.getElementById('fieldType').value = field.type || 'text';
     document.getElementById('fieldMode').value = normalizedMode(field);
+    document.getElementById('fieldAccess').value = fieldIsReadOnly(field) ? 'readonly' : 'editable';
     document.getElementById('fieldAlias').value = field.docxAlias || '';
     document.getElementById('fieldExportCase').value = field.exportTextCase || 'as_entered';
     document.getElementById('fieldOptions').value = (field.options || []).map(option => `${option.value} | ${option.label}`).join('\n');
@@ -549,16 +677,30 @@
         localItems: sourceTemplates.map(template => ({ ...template, id: String(template.id), name: template.title, searchVersion: `v${Number(template.version || 1)}` })),
         searchFields: 'id,title,name,type,status,description,searchVersion',
         renderer: item => `<div><div class="fw-bold">${escapeHtml(item.title || item.id)}</div><div class="small text-muted">${escapeHtml(item.type || 'Report')} &middot; v${Number(item.version || 1)} &middot; <code>${escapeHtml(item.id)}</code></div></div>`,
-        onSelect(template) {
-          const available = new Set((template.keyOptions || template.keyCatalog || []).map(option => String(option?.key || option)));
-          const affected = fields.filter(field => expressionSourceRefs(field?.calculationRule?.expression).some(ref => ref.slotKey === slots[index].slotKey && !available.has(ref.key)));
-          if (affected.length) {
-            showReportModal({ title: 'Template Has Different Keys', message: `This selection would invalidate: ${affected.map(field => field.label || field.id).join(', ')}. Update those formulas before changing the source template.` });
-            return;
+        onSelect: async (template) => {
+          try {
+            if (typeof window.showLoading === 'function') window.showLoading('Preparing source template keys...');
+            const ensured = await ensureSourceTemplateDocxAliases(template.id);
+            upsertSourceTemplateCache({
+              ...template,
+              keyOptions: ensured.keyOptions || [],
+              keyCatalog: ensured.keyCatalog || []
+            });
+            const refreshed = byTemplateId.get(String(template.id)) || template;
+            const available = new Set((refreshed.keyOptions || refreshed.keyCatalog || []).map(option => String(option?.key || option)));
+            const affected = fields.filter(field => expressionSourceRefs(field?.calculationRule?.expression).some(ref => ref.slotKey === slots[index].slotKey && !available.has(ref.key)));
+            if (affected.length) {
+              showReportModal({ title: 'Template Has Different Keys', message: `This selection would invalidate: ${affected.map(field => field.label || field.id).join(', ')}. Update those formulas before changing the source template.` });
+              return;
+            }
+            slots[index].templateId = template.id;
+            slots[index].templateVersionAtSelection = Number(template.version || 1);
+            renderSlots();
+          } catch (error) {
+            showReportModal({ title: 'Unable to Prepare Source Template', message: error?.message || 'Failed to prepare source template DOCX shortcuts.', icon: 'error' });
+          } finally {
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
           }
-          slots[index].templateId = template.id;
-          slots[index].templateVersionAtSelection = Number(template.version || 1);
-          renderSlots();
         }
       });
       return;
@@ -580,8 +722,10 @@
   document.getElementById('btnAddSection').addEventListener('click', () => openField(-1, 'section'));
   document.getElementById('btnAddSubheader').addEventListener('click', () => openField(-1, 'subheader'));
   document.getElementById('btnAddRowBreak').addEventListener('click', () => openField(-1, 'row_break'));
-  fieldRows.addEventListener('click', async event => {
-    const button = event.target.closest('.js-field-action'); if (!button) return; const index = Number(button.dataset.index); const action = button.dataset.action;
+  async function handleOverallFieldAction(button) {
+    if (!button || button.disabled) return;
+    const index = Number(button.dataset.index);
+    const action = button.dataset.action;
     if (action === 'edit') openField(index);
     if (action === 'up' && index > 0) [fields[index - 1], fields[index]] = [fields[index], fields[index - 1]];
     if (action === 'down' && index < fields.length - 1) [fields[index + 1], fields[index]] = [fields[index], fields[index + 1]];
@@ -604,6 +748,16 @@
       fields.splice(index, 1);
     }
     renderFields();
+  }
+  fieldRows.addEventListener('click', async event => {
+    const button = event.target.closest('.js-field-action');
+    if (!button) return;
+    await handleOverallFieldAction(button);
+  });
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('.overall-field-dropdown-menu-floating .js-field-action');
+    if (!button) return;
+    await handleOverallFieldAction(button);
   });
   fieldRows.addEventListener('dragstart', event => {
     const row = event.target.closest('.overall-field-row');
@@ -618,7 +772,17 @@
     const [moved] = fields.splice(dragFieldIndex, 1); fields.splice(target, 0, moved); dragFieldIndex = -1; renderFields();
   });
   document.getElementById('fieldType').addEventListener('change', () => updateFieldVisibility());
-  document.getElementById('fieldMode').addEventListener('change', () => updateFieldVisibility());
+  document.getElementById('fieldMode').addEventListener('change', () => {
+    const mode = document.getElementById('fieldMode').value;
+    const access = document.getElementById('fieldAccess');
+    if (mode === 'derived_locked') {
+      access.value = 'readonly';
+    } else if (access.disabled) {
+      access.value = 'editable';
+    }
+    updateFieldVisibility();
+  });
+  document.getElementById('fieldAccess').addEventListener('change', () => syncFieldAccessControl());
   document.getElementById('fieldOptions').addEventListener('input', () => { if (document.getElementById('fieldType').value === 'select') renderDefaultControl(readDefaultValue()); });
   document.getElementById('btnUseSourceDefault').addEventListener('click', () => chooseSourceKey({ replaceExpression: true, switchToEditable: true }));
   document.getElementById('btnInsertSource').addEventListener('click', () => chooseSourceKey());
@@ -656,12 +820,15 @@
     const conversionExpression = String(document.getElementById('fieldConversionExpression').value || '').trim();
     const colorInput = document.getElementById('fieldBackgroundColor');
     const backgroundColor = visual || colorInput.dataset.cleared === '1' ? '' : colorInput.value;
+    const readOnly = visual
+      ? false
+      : (mode === 'derived_locked' || document.getElementById('fieldAccess').value === 'readonly');
     const field = {
       id,
       label,
       type,
       required: visual ? false : document.getElementById('fieldRequired').checked,
-      readOnly: mode === 'derived_locked',
+      readOnly,
       fullPageWidth: visual ? true : document.getElementById('fieldFullWidth').checked,
       hasBorder: visual ? false : document.getElementById('fieldBorder').checked,
       backgroundColor,
@@ -683,8 +850,8 @@
     renderFields();
   });
   function previewControl(field) {
+    const locked = fieldIsReadOnly(field);
     const mode = normalizedMode(field);
-    const locked = mode === 'derived_locked';
     const value = mode === 'manual' ? field.defaultValue : '[Calculated from selected sources]';
     const placeholder = escapeHtml(field.placeholder || '');
     if (field.type === 'textarea') return `<textarea class="form-control${locked ? ' bg-light' : ''}" rows="3" placeholder="${placeholder}" ${locked ? 'readonly' : ''}>${escapeHtml(value || '')}</textarea>`;
@@ -699,7 +866,8 @@
     const mode = normalizedMode(field);
     const shellClass = field.hasBorder ? 'border rounded p-2' : '';
     const shellStyle = /^#[0-9A-Fa-f]{6}$/.test(String(field.backgroundColor || '')) ? `background-color:${escapeHtml(field.backgroundColor)};padding:0.5rem;` : '';
-    return `<div class="${field.fullPageWidth ? 'col-12' : 'col'}"><div class="${shellClass}" style="${shellStyle}"><label class="form-label fw-bold">${escapeHtml(field.label)}${field.required ? ' <span class="text-danger">*</span>' : ''}<span class="badge bg-light text-dark border ms-1">${escapeHtml(modeLabels[mode])}</span></label>${previewControl(field)}${field.helpText ? `<div class="small text-muted mt-1">${escapeHtml(field.helpText)}</div>` : ''}<div class="small text-muted mt-1"><code>{{O.${escapeHtml(field.id)}}}</code></div></div></div>`;
+    const accessBadge = fieldIsReadOnly(field) ? '<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1">Read-only</span>' : '<span class="badge bg-success-subtle text-success-emphasis border ms-1">Editable</span>';
+    return `<div class="${field.fullPageWidth ? 'col-12' : 'col'}"><div class="${shellClass}" style="${shellStyle}"><label class="form-label fw-bold">${escapeHtml(field.label)}${field.required ? ' <span class="text-danger">*</span>' : ''}<span class="badge bg-light text-dark border ms-1">${escapeHtml(modeLabels[mode])}</span>${accessBadge}</label>${previewControl(field)}${field.helpText ? `<div class="small text-muted mt-1">${escapeHtml(field.helpText)}</div>` : ''}<div class="small text-muted mt-1"><code>{{O.${escapeHtml(field.id)}}}</code></div></div></div>`;
   }
 
   function previewRows(list) {
@@ -734,7 +902,7 @@
   document.getElementById('keyRows').addEventListener('click', event => { const button = event.target.closest('.js-copy-key'); if (button) navigator.clipboard?.writeText(button.dataset.key || ''); });
   function download(name, content, type) { const url=URL.createObjectURL(new Blob([content],{type})); const link=document.createElement('a');link.href=url;link.download=name;link.click();URL.revokeObjectURL(url); }
   document.getElementById('btnKeysJson').addEventListener('click', () => download('overall-report-keys.json', JSON.stringify(keyCatalog(), null, 2), 'application/json'));
-  document.getElementById('btnKeysCsv').addEventListener('click', () => download('overall-report-keys.csv', 'source,label,key,origin,description\n' + keyCatalog().map(row => [row.group,row.label,row.key,row.origin,row.description].map(value => `"${String(value || '').replaceAll('"','""')}"`).join(',')).join('\n'), 'text/csv'));
+  document.getElementById('btnKeysCsv').addEventListener('click', () => download('overall-report-keys.csv', 'source,label,key,docxShortcut,origin,description\n' + keyCatalog().map(row => [row.group,row.label,row.key,row.docxShortcut,row.origin,row.description].map(value => `"${String(value || '').replaceAll('"','""')}"`).join(',')).join('\n'), 'text/csv'));
   document.getElementById('btnAddFunder').addEventListener('click', () => {
     const existing = new Set([...document.querySelectorAll('[data-funder-key]')].map(row => String(row.dataset.funderKey)));
     const available = funderOptions.map(option => ({ ...option, id: String(option.id), title: option.label || option.name || option.id })).filter(option => !existing.has(option.id));
@@ -810,14 +978,70 @@
     }
     dataFields.forEach(field => visit(field.id));
   }
-  document.getElementById('overallTemplateForm').addEventListener('submit', event => {
-    if (slots.length < 1 || slots.some(slot => !slot.templateId)) { event.preventDefault(); showReportModal({ title: 'Source Template Required', message: 'Select at least one source template.' }); return; }
-    try { validateDesignerExpressions(); } catch (error) { event.preventDefault(); showReportModal({ title: 'Designer Validation', message: error.message }); return; }
+  document.getElementById('overallTemplateForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (slots.length < 1 || slots.some(slot => !slot.templateId)) {
+      await showReportModal({ title: 'Source Template Required', message: 'Select at least one source template.' });
+      return;
+    }
+    try {
+      validateDesignerExpressions();
+    } catch (error) {
+      await showReportModal({ title: 'Designer Validation', message: error.message });
+      return;
+    }
     ensureAliases();
-    document.getElementById('sourceSlotsJson').value = JSON.stringify(slots.map((slot,index) => ({...slot,order:index+1})));
-    document.getElementById('schemaJson').value = JSON.stringify({version:Number(initial.schema?.version || 1),fields});
-    document.getElementById('placeholderMapJson').value = JSON.stringify(Object.fromEntries(fields.filter(field => !isVisual(field)).map(field => [field.id,`{{O.${field.id}}}`])));
+    document.getElementById('sourceSlotsJson').value = JSON.stringify(slots.map((slot, index) => ({ ...slot, order: index + 1 })));
+    document.getElementById('schemaJson').value = JSON.stringify({ version: Number(initial.schema?.version || 1), fields });
+    document.getElementById('placeholderMapJson').value = JSON.stringify(Object.fromEntries(fields.filter(field => !isVisual(field)).map(field => [field.id, `{{O.${field.id}}}`])));
     document.getElementById('nextSlotNumber').value = nextSlot;
+
+    const submitter = event.submitter || form.querySelector('button[type="submit"]');
+    const originalHtml = submitter ? submitter.innerHTML : '';
+    if (submitter) {
+      submitter.disabled = true;
+      submitter.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Saving...';
+    }
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: new FormData(form)
+      });
+      const responseText = await response.text();
+      let result = null;
+      try {
+        result = responseText ? JSON.parse(responseText) : null;
+      } catch (_) {
+        result = responseText ? { status: 'error', message: responseText.trim() } : null;
+      }
+      if (!response.ok || result?.status !== 'success') {
+        const reason = String(result?.message || `Save failed (HTTP ${response.status}).`).trim();
+        await showReportModal({ title: 'Save Failed', icon: 'error', message: reason, buttonClass: 'btn-danger' });
+        return;
+      }
+
+      await showReportModal({
+        title: 'Saved',
+        icon: 'success',
+        message: String(result?.message || 'Overall report template saved successfully.'),
+        buttonClass: 'btn-success'
+      });
+      window.location.href = '/school/reports/overall-templates';
+    } catch (error) {
+      await showReportModal({
+        title: 'Save Failed',
+        icon: 'error',
+        message: String(error?.message || 'Unexpected error while saving template.'),
+        buttonClass: 'btn-danger'
+      });
+    } finally {
+      if (submitter) {
+        submitter.disabled = false;
+        submitter.innerHTML = originalHtml;
+      }
+    }
   });
   renderSlots(); renderFields();
 })();

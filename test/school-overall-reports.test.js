@@ -310,9 +310,56 @@ test('source key options are structured, deduplicated, and retain legacy key com
       templateId: 'SRC-1',
       templateTitle: 'Progress Report',
       templateType: 'source_src-1',
-      templateVersion: 1
+      templateVersion: 1,
+      docxAlias: 'scor'
     }
   );
+  assert.ok(options.some((option) => option.origin === 'docx_alias' && option.fieldId === 'comments'));
+});
+
+test('ensureSourceTemplateDocxAliases generates missing DOCX shortcuts and reports changes', () => {
+  const template = sourceTemplate('SRC-3', 'Alias Test');
+  template.schema.fields.forEach((field) => {
+    field.docxAlias = '';
+  });
+  const { template: ensured, changed } = overallReportService.ensureSourceTemplateDocxAliases(template);
+  assert.equal(changed, true);
+  ensured.schema.fields.forEach((field) => {
+    if (field.type === 'section' || field.type === 'subheader' || field.type === 'row_break') return;
+    assert.match(String(field.docxAlias || ''), /^[a-z][a-z0-9]{3}$/);
+  });
+  const options = overallReportService.getSourceTemplateKeyOptions(ensured);
+  assert.ok(options.some((option) => option.origin === 'docx_alias' && option.fieldId === 'comments'));
+  assert.ok(options.some((option) => option.origin === 'docx_alias' && option.fieldId === 'score'));
+});
+
+test('getSourceTemplateKeyOptions previews DOCX shortcuts before source template aliases are persisted', () => {
+  const template = sourceTemplate('SRC-4', 'Preview Aliases');
+  template.schema.fields.forEach((field) => {
+    field.docxAlias = '';
+  });
+  const options = overallReportService.getSourceTemplateKeyOptions(template);
+  assert.ok(options.filter((option) => option.origin === 'docx_alias').length >= 2);
+  options.filter((option) => option.origin !== 'docx_alias').forEach((option) => {
+    assert.match(String(option.docxAlias || ''), /^[a-z][a-z0-9]{3}$/, `missing alias for ${option.key}`);
+  });
+});
+
+test('getSourceTemplateKeyOptions assigns docxAlias to predefined catalog keys', () => {
+  const options = overallReportService.getSourceTemplateKeyOptions(sourceTemplate('SRC-5', 'Alias All'));
+  const predefined = options.filter((option) => option.origin === 'predefined');
+  assert.ok(predefined.length > 0);
+  predefined.forEach((option) => {
+    assert.match(String(option.docxAlias || ''), /^[a-z][a-z0-9]{3}$/, `missing alias for predefined key ${option.key}`);
+  });
+});
+
+test('overall template routes expose ensure-source-docx endpoint', () => {
+  const routes = read('packages/school/MVC/routes/reportRoutes.js');
+  const controller = read('packages/school/MVC/controllers/school/overallReportController.js');
+  assert.match(routes, /overall-templates\/ensure-source-docx\/:templateId/);
+  assert.match(controller, /async function ensureSourceTemplateDocx/);
+  assert.match(controller, /docxAliasesEnsured/);
 });
 
 test('overall fields retain relevant layout, guidance, styling, typed defaults, and modes', () => {
@@ -336,6 +383,14 @@ test('overall fields retain relevant layout, guidance, styling, typed defaults, 
           helpText: 'Field help'
         },
         {
+          id: 'locked_note',
+          label: 'Locked Note',
+          type: 'text',
+          overallValueMode: 'manual',
+          readOnly: true,
+          defaultValue: 'Fixed note'
+        },
+        {
           id: 'source_score',
           label: 'Source Score',
           type: 'number',
@@ -346,6 +401,7 @@ test('overall fields retain relevant layout, guidance, styling, typed defaults, 
     }
   });
   const confirmed = template.schema.fields.find((field) => field.id === 'confirmed');
+  const lockedNote = template.schema.fields.find((field) => field.id === 'locked_note');
   const derived = template.schema.fields.find((field) => field.id === 'source_score');
 
   assert.equal(confirmed.defaultValue, true);
@@ -354,6 +410,10 @@ test('overall fields retain relevant layout, guidance, styling, typed defaults, 
   assert.equal(confirmed.backgroundColor, '#abcdef');
   assert.equal(confirmed.placeholder, 'Input hint');
   assert.equal(confirmed.helpText, 'Field help');
+  assert.equal(confirmed.readOnly, false);
+  assert.equal(lockedNote.readOnly, true);
+  assert.equal(overallReportService.isOverallFieldEditable(lockedNote), false);
+  assert.equal(overallReportService.isOverallFieldEditable(confirmed), true);
   assert.equal(derived.overallValueMode, 'derived_editable');
   assert.equal(derived.calculationRule.onError, 'empty');
   assert.deepEqual(derived.sourceReferences, [{ slotKey: 'T1', key: 'score' }]);
@@ -776,6 +836,7 @@ test('DOCX inspection recognizes split namespaced tokens and export preview uses
 
 test('registry, maintenance, access, seeding, and Mongo index integrations are declared', () => {
   const controller = read('packages/school/MVC/controllers/school/overallReportController.js');
+  const routes = read('packages/school/MVC/routes/reportRoutes.js');
   const repository = read('packages/school/MVC/repositories/school/index.js');
   const deletionRegistry = read('packages/school/MVC/services/school/schoolDeletionRuleRegistry.js');
   const maintenance = read('packages/school/MVC/config/schoolDataMaintenanceCatalog.js');
@@ -786,6 +847,9 @@ test('registry, maintenance, access, seeding, and Mongo index integrations are d
 
   assert.match(controller, /nextSlotNumber:\s*2/);
   assert.match(controller, /sourceSlots:\s*\[\s*\{\s*slotKey:\s*'T1'/);
+  assert.match(routes, /overallTemplateMutationActionState/);
+  assert.match(controller, /includeModal:\s*true/);
+  assert.match(controller, /includeModal_Table:\s*true/);
   assert.match(repository, /schoolOverallReportTemplates/);
   assert.match(repository, /schoolOverallReportInstances/);
   assert.match(deletionRegistry, /sourceSlots\.templateId/);
@@ -865,14 +929,16 @@ test('overall template, creation, and instance views render searchable pickers a
       title: 'Create Overall Report',
       actionStateId: 'ACTION-3',
       template,
-      sourceSlotOptions: template.sourceSlots.map((slot) => ({
+      sourceSlots: template.sourceSlots.map((slot) => ({
         ...slot,
         templateTitle: `Template ${slot.slotKey}`,
         templateType: 'progress_report',
-        templateVersion: 1,
-        instances: [{ id: `INSTANCE-${slot.slotKey}`, title: `Completed ${slot.slotKey}`, status: 'submitted', studentName: 'Student One', className: 'Class A', teacherName: 'Teacher One', reportDate: '2026-07-30' }]
+        templateVersion: 1
       })),
       docxOptions: [{ key: 'default', label: 'Default', fileName: 'overall.docx' }],
+      hasOverallFields: true,
+      instance: null,
+      readOnly: false,
       user: reqUser
     },
     renderOptions
@@ -925,9 +991,19 @@ test('overall template, creation, and instance views render searchable pickers a
     renderOptions
   );
 
+  assert.match(templateHtml, /id="fieldAccess"/);
+  assert.match(templateHtml, /Field access/);
+  assert.match(templateHtml, /fieldIsReadOnly/);
   assert.match(templateHtml, /Use Source \/ Predefined Value/);
   assert.match(templateHtml, /sourceMode:\s*'local'/);
   assert.match(templateHtml, /searchFields:\s*'key,label,description,templateTitle,slotKey,origin,group,fieldId,fieldType'/);
+  assert.match(templateHtml, /ensure-source-docx/);
+  assert.match(templateHtml, /ensureSourceTemplateDocxAliases/);
+  assert.match(templateHtml, /<th>DOCX Shortcut<\/th>/);
+  assert.match(templateHtml, /docxShortcut/);
+  assert.doesNotMatch(templateHtml, /sourceDocxAliasByFieldId/);
+  assert.match(templateHtml, /group: 'O'/);
+  assert.doesNotMatch(templateHtml, /group:'Overall alias'/);
   assert.match(templateHtml, /btnAddSection/);
   assert.match(templateHtml, /overall-field-row/);
   assert.match(templateHtml, /Template Has Different Keys/);
@@ -940,10 +1016,15 @@ test('overall template, creation, and instance views render searchable pickers a
   assert.doesNotMatch(templateHtml, /id="funderPicker"/);
   assert.doesNotMatch(templateHtml, /id="formulaSourceKey"/);
   assert.doesNotMatch(templateHtml, /js-slot-template/);
-  assert.match(createHtml, /name="sourceInstance_T1"/);
-  assert.match(createHtml, /js-pick-source-report/);
-  assert.match(createHtml, /Report Already Selected/);
-  assert.doesNotMatch(createHtml, /<select[^>]+name="sourceInstance_/);
+  assert.match(createHtml, /btnLoadCandidates/);
+  assert.match(createHtml, /overall-reports\/api\/load-candidates/);
+  assert.match(createHtml, /js-date-range/);
+  assert.match(createHtml, /workspaceStudentsTable/);
+  assert.match(createHtml, /btnSaveWorkspace/);
+  assert.match(createHtml, /btnExportZip/);
+  assert.match(createHtml, /ReportMessaging/);
+  assert.doesNotMatch(createHtml, /name="sourceInstance_T1"/);
+  assert.doesNotMatch(createHtml, /js-pick-source-report/);
   assert.match(editorHtml, /Summary guidance/);
   assert.match(editorHtml, /background-color:#f0f8ff/);
   assert.match(editorHtml, /type="checkbox"[^>]+data-field-id="confirmed"/);
@@ -951,8 +1032,13 @@ test('overall template, creation, and instance views render searchable pickers a
   assert.match(editorHtml, /async function showReportMessage/);
   assert.match(editorHtml, /await showReportMessage/);
   assert.match(editorHtml, /await confirmReportAction/);
-  assert.match(createHtml, /typeof window\.showMessageModal === 'function'/);
-  assert.match(templateHtml, /typeof window\.showMessageModal === 'function'/);
+  assert.match(createHtml, /window\.ReportMessaging/);
+  assert.match(templateHtml, /window\.ReportMessaging/);
+  assert.match(templateHtml, /fetch\(form\.action/);
+  assert.match(templateHtml, /X-Requested-With/);
+  assert.match(templateHtml, /window\.location\.href = '\/school\/reports\/overall-templates'/);
+  assert.match(templateListSource, /btn-row-actions-toggle/);
+  assert.match(templateListSource, /bi-three-dots-vertical/);
   assert.match(templateListSource, /js-delete-overall-template/);
   assert.match(templateListSource, /Delete Overall Report Template\?/);
   assert.match(reportListSource, /js-remove-overall-report/);
@@ -973,5 +1059,197 @@ test('overall template, creation, and instance views render searchable pickers a
     const scripts = [...source.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
     assert.equal(scripts.length, 1);
     scripts.forEach((clientScript) => new Function(clientScript));
+  });
+});
+
+test('loadOverallCreateCandidates groups by student and respects sessionDate, status, and student filters', async () => {
+  const template = { ...overallTemplate(), id: 'OVERALL-1' };
+  const templates = {
+    'SRC-1': sourceTemplate('SRC-1'),
+    'SRC-2': sourceTemplate('SRC-2')
+  };
+  const instances = [
+    {
+      id: 'R1', orgId: 'ORG-1', templateId: 'SRC-1', status: 'submitted', studentId: 'STU-1',
+      sessionDate: '2026-07-10', prefillSnapshot: { student_full_name: 'Ada', class_name: 'A', teacher_name: 'T' }
+    },
+    {
+      id: 'R2', orgId: 'ORG-1', templateId: 'SRC-2', status: 'locked', studentId: 'STU-1',
+      sessionDate: '2026-07-11', prefillSnapshot: { student_full_name: 'Ada', class_name: 'A', teacher_name: 'T' }
+    },
+    {
+      id: 'R3', orgId: 'ORG-1', templateId: 'SRC-1', status: 'submitted', studentId: 'STU-2',
+      sessionDate: '2026-07-12', prefillSnapshot: { student_full_name: 'Bob', class_name: 'B', teacher_name: 'T' }
+    },
+    {
+      id: 'R4', orgId: 'ORG-1', templateId: 'SRC-1', status: 'draft', studentId: 'STU-1',
+      sessionDate: '2026-07-10', prefillSnapshot: { student_full_name: 'Ada' }
+    },
+    {
+      id: 'R5', orgId: 'ORG-1', templateId: 'SRC-1', status: 'submitted', studentId: 'STU-1',
+      sessionDate: '2026-06-01', prefillSnapshot: { student_full_name: 'Ada' }
+    }
+  ];
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'reportTemplates') return templates[id] || null;
+      return null;
+    },
+    fetchData: async (entityType) => {
+      if (entityType === 'reportInstances') return instances;
+      if (entityType === 'reportTemplates') return Object.values(templates);
+      return [];
+    }
+  }, async () => {
+    const result = await overallReportService.loadOverallCreateCandidates({
+      template,
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+      statuses: ['submitted', 'locked'],
+      reqUser
+    });
+    assert.equal(result.students.length, 2);
+    const ada = result.students.find((row) => row.studentId === 'STU-1');
+    assert.ok(ada);
+    assert.equal(ada.slots.T1.length, 1);
+    assert.equal(ada.slots.T1[0].id, 'R1');
+    assert.equal(ada.slots.T2.length, 1);
+
+    const filtered = await overallReportService.loadOverallCreateCandidates({
+      template,
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+      studentIds: ['STU-2'],
+      statuses: ['submitted', 'locked'],
+      reqUser
+    });
+    assert.equal(filtered.students.length, 1);
+    assert.equal(filtered.students[0].studentId, 'STU-2');
+
+    const withDraft = await overallReportService.loadOverallCreateCandidates({
+      template,
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+      studentIds: ['STU-1'],
+      statuses: ['draft', 'submitted'],
+      reqUser
+    });
+    assert.equal(withDraft.students[0].slots.T1.length, 2);
+  });
+});
+
+test('createOverallWorkspace and saveOverallWorkspace persist multi-student entries and support remove-on-save', async () => {
+  const template = { ...overallTemplate(), id: 'OVERALL-1' };
+  const templates = {
+    'SRC-1': sourceTemplate('SRC-1'),
+    'SRC-2': sourceTemplate('SRC-2')
+  };
+  const instances = {
+    'R1': {
+      id: 'R1', orgId: 'ORG-1', templateId: 'SRC-1', templateVersion: 1, status: 'submitted',
+      studentId: 'STU-1', answers: { score: 70, comments: 'A' }, prefillSnapshot: {}
+    },
+    'R2': {
+      id: 'R2', orgId: 'ORG-1', templateId: 'SRC-2', templateVersion: 1, status: 'locked',
+      studentId: 'STU-1', answers: { score: 80, comments: 'B' }, prefillSnapshot: {}
+    },
+    'R3': {
+      id: 'R3', orgId: 'ORG-1', templateId: 'SRC-1', templateVersion: 1, status: 'submitted',
+      studentId: 'STU-2', answers: { score: 60, comments: 'C' }, prefillSnapshot: {}
+    },
+    'R4': {
+      id: 'R4', orgId: 'ORG-1', templateId: 'SRC-2', templateVersion: 1, status: 'submitted',
+      studentId: 'STU-2', answers: { score: 90, comments: 'D' }, prefillSnapshot: {}
+    }
+  };
+  let stored = null;
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'reportTemplates') return templates[id] || null;
+      if (entityType === 'reportInstances') return instances[id] || null;
+      if (entityType === 'overallReportInstances') return stored && stored.id === id ? stored : null;
+      return null;
+    },
+    addData: async (_entityType, row) => {
+      stored = overallInstanceModel.sanitizeInstance({ ...row, id: 'OVR-WS-1' });
+      return stored;
+    },
+    updateData: async (_entityType, id, updates) => {
+      stored = overallInstanceModel.sanitizeInstance({ ...stored, ...updates, id }, { existing: stored, isUpdate: true });
+      return stored;
+    }
+  }, async () => {
+    const created = await overallReportService.createOverallWorkspace({
+      template,
+      filters: { startDate: '2026-07-01', endDate: '2026-07-31', statuses: ['submitted', 'locked'] },
+      selectedDocxKey: 'default',
+      title: 'Workspace Report',
+      studentEntries: [
+        {
+          studentId: 'STU-1',
+          studentName: 'Ada',
+          sourceSelections: [
+            { slotKey: 'T1', instanceId: 'R1' },
+            { slotKey: 'T2', instanceId: 'R2' }
+          ]
+        },
+        {
+          studentId: 'STU-2',
+          studentName: 'Bob',
+          sourceSelections: [
+            { slotKey: 'T1', instanceId: 'R3' },
+            { slotKey: 'T2', instanceId: 'R4' }
+          ]
+        }
+      ],
+      reqUser
+    });
+    assert.equal(created.studentEntries.length, 2);
+    assert.equal(created.studentEntries[0].answers.average_score, 75);
+
+    const preview = overallReportService.previewStudentEntry({
+      instance: created,
+      studentId: 'STU-1'
+    });
+    assert.equal(preview.hasOverallFields, true);
+    assert.ok(preview.fields.some((field) => field.id === 'summary' && field.editable));
+
+    const savedAnswers = await overallReportService.saveStudentAnswers({
+      instance: created,
+      studentId: 'STU-1',
+      submittedAnswers: { summary: 'Updated summary' },
+      reqUser
+    });
+    assert.equal(savedAnswers.preview.answers.summary, 'Updated summary');
+
+    const saved = await overallReportService.saveOverallWorkspace({
+      instance: savedAnswers.instance,
+      title: 'Workspace Report',
+      selectedDocxKey: 'default',
+      studentEntries: [
+        {
+          studentId: 'STU-2',
+          studentName: 'Bob',
+          sourceSelections: [
+            { slotKey: 'T1', instanceId: 'R3' },
+            { slotKey: 'T2', instanceId: 'R4' }
+          ],
+          answers: savedAnswers.instance.studentEntries.find((row) => row.studentId === 'STU-2')?.answers || {}
+        }
+      ],
+      reqUser
+    });
+    assert.equal(saved.studentEntries.length, 1);
+    assert.equal(saved.studentEntries[0].studentId, 'STU-2');
+
+    const wrapped = overallReportService.ensureWorkspaceShape({
+      ...created,
+      studentEntries: [],
+      sourceSelections: created.sourceSelections,
+      sourceValues: created.sourceValues,
+      answers: created.answers
+    });
+    assert.equal(wrapped.studentEntries.length, 1);
+    assert.equal(wrapped.studentEntries[0].studentId, 'LEGACY');
   });
 });

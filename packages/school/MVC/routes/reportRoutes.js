@@ -27,6 +27,11 @@ const reportTemplateCreateActionState = {
   requireToken: true,
   allowOperationTokenFallback: true
 };
+const overallTemplateMutationActionState = {
+  requireToken: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+};
 const reportAssignmentBulkActionState = {
   requireToken: false,
   keepActive: true
@@ -231,6 +236,15 @@ router.get('/overall-templates/source-templates',
   trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
   overallCtrl.sourceTemplates);
 
+router.post('/overall-templates/ensure-source-docx/:templateId',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true
+  }),
+  overallCtrl.ensureSourceTemplateDocx);
+
 router.get('/overall-templates/new',
   requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
   trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
@@ -239,7 +253,7 @@ router.get('/overall-templates/new',
 router.post('/overall-templates/new',
   requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
   upload('school-reports').any(),
-  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, reportTemplateCreateActionState),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, overallTemplateMutationActionState),
   overallCtrl.saveTemplate);
 
 router.get('/overall-templates/edit/:id',
@@ -250,7 +264,7 @@ router.get('/overall-templates/edit/:id',
 router.post('/overall-templates/edit/:id',
   requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
   upload('school-reports').any(),
-  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE, overallTemplateMutationActionState),
   overallCtrl.saveTemplate);
 
 router.get('/overall-templates/delete/:id',
@@ -269,10 +283,35 @@ router.get('/overall-reports',
   trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
   overallCtrl.listOverallReports);
 
+router.get('/overall-reports/new',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
+  overallCtrl.showCreateOverallReport);
+
 router.get('/overall-reports/new/:templateId',
   requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
   trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
   overallCtrl.showCreateOverallReport);
+
+router.get('/overall-reports/api/template/:id',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE, { keepActive: true }),
+  overallCtrl.getTemplateApi);
+
+router.post('/overall-reports/api/load-candidates',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallCtrl.loadCandidatesApi);
+
+router.post('/overall-reports/new',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE, { requireToken: true }),
+  overallCtrl.createOverallReport);
 
 router.post('/overall-reports/new/:templateId',
   requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.CREATE),
@@ -288,6 +327,51 @@ router.post('/overall-reports/edit/:id',
   requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
   trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
   overallCtrl.saveOverallReport);
+
+router.post('/overall-reports/:id/save',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallCtrl.saveOverallWorkspace);
+
+router.get('/overall-reports/:id/student/:studentId/preview',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { keepActive: true }),
+  overallCtrl.studentPreview);
+
+router.post('/overall-reports/:id/student/:studentId/preview',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallCtrl.studentPreview);
+
+router.post('/overall-reports/:id/student/:studentId/generate',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallCtrl.generateStudentDocx);
+
+router.post('/overall-reports/:id/export-zip',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallCtrl.exportZip);
 
 router.get('/overall-reports/:id/source-update-preview',
   requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
@@ -336,7 +420,12 @@ router.get('/overall-reports/:id/export-preview',
 
 router.post('/overall-reports/:id/export',
   requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
-  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   overallCtrl.exportDocx);
 
 router.get('/overall-reports/delete/:id',
