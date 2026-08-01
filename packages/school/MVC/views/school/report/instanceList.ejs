@@ -233,6 +233,7 @@
 <%- include('partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
 <%- include('partials/tablePages-end') %>
 
+<%- include('partials/reportMessageHelpers') %>
 <script src="/scripts/reportAssignmentDelete.js"></script>
 <script>
 (() => {
@@ -240,16 +241,12 @@
 
   function showReportExportDenied() {
     const message = 'You do not have permission to export report documents or payloads. Contact an administrator if you need Export access.';
-    if (typeof showMessageModal === 'function') {
-      return showMessageModal({
-        title: 'Access Denied',
-        icon: 'error',
-        message,
-        buttons: [{ text: 'OK', class: 'btn-danger' }]
-      });
-    }
-    window.alert(message);
-    return Promise.resolve();
+    return window.ReportMessaging.showReportMessage({
+      title: 'Access Denied',
+      icon: 'error',
+      message,
+      buttonClass: 'btn-danger'
+    });
   }
 
   function initCollapseToggleIcon(options = {}) {

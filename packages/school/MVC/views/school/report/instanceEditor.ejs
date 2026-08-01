@@ -470,12 +470,14 @@
                                     <label class="form-check-label">Checked</label>
                                   </div>
                                 <% } else if (field.type === 'select') { %>
-                                  <select class="form-select bg-light" data-field-id="<%= field.id %>" disabled>
-                                    <option value="">Select...</option>
-                                    <% (field.options || []).forEach((opt) => { %>
-                                      <option value="<%= opt.value %>" <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label || opt.value %></option>
-                                    <% }); %>
-                                  </select>
+                                  <%- include('partials/reportSelectField', {
+                                    field,
+                                    value,
+                                    name: fieldName,
+                                    disabled: true,
+                                    readOnly: true,
+                                    inputClass: ''
+                                  }) %>
                                 <% } else { %>
                                   <input type="text" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= displaySelectSt %>" readonly>
                                 <% } %>
@@ -491,12 +493,14 @@
                                   <label class="form-check-label">Checked</label>
                                 </div>
                               <% } else if (field.type === 'select') { %>
-                                <select class="form-select js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
-                                  <option value="">Select...</option>
-                                  <% (field.options || []).forEach((opt) => { %>
-                                    <option value="<%= opt.value %>" <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label || opt.value %></option>
-                                  <% }); %>
-                                </select>
+                                <%- include('partials/reportSelectField', {
+                                  field,
+                                  value,
+                                  name: fieldName,
+                                  disabled: fieldIsDisabled(field),
+                                  readOnly: false,
+                                  inputClass: 'js-report-field'
+                                }) %>
                               <% } else { %>
                                 <input type="text" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                               <% } %>
@@ -586,12 +590,14 @@
                                 <label class="form-check-label">Checked</label>
                               </div>
                             <% } else if (field.type === 'select') { %>
-                              <select class="form-select bg-light" data-field-id="<%= field.id %>" disabled>
-                                <option value="">Select...</option>
-                                <% (field.options || []).forEach((opt) => { %>
-                                  <option value="<%= opt.value %>" <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label || opt.value %></option>
-                                <% }); %>
-                              </select>
+                              <%- include('partials/reportSelectField', {
+                                field,
+                                value,
+                                name: fieldName,
+                                disabled: true,
+                                readOnly: true,
+                                inputClass: ''
+                              }) %>
                             <% } else { %>
                               <input type="text" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= displaySelectSt %>" readonly>
                             <% } %>
@@ -607,12 +613,14 @@
                               <label class="form-check-label">Checked</label>
                             </div>
                           <% } else if (field.type === 'select') { %>
-                            <select class="form-select js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
-                              <option value="">Select...</option>
-                              <% (field.options || []).forEach((opt) => { %>
-                                <option value="<%= opt.value %>" <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label || opt.value %></option>
-                              <% }); %>
-                            </select>
+                            <%- include('partials/reportSelectField', {
+                              field,
+                              value,
+                              name: fieldName,
+                              disabled: fieldIsDisabled(field),
+                              readOnly: false,
+                              inputClass: 'js-report-field'
+                            }) %>
                           <% } else { %>
                             <input type="text" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                           <% } %>
@@ -838,6 +846,7 @@
 </div>
 
 <%- include('partials/calculatedFieldsRuntime') %>
+<%- include('partials/reportMessageHelpers') %>
 <script src="/scripts/reportAssignmentDelete.js"></script>
 <script>
   (function () {
@@ -874,16 +883,12 @@
     initializeTooltips();
 
     function showReportInstanceMessage({ title = 'Report Instance', icon = 'info', message = '', buttons = null } = {}) {
-      if (typeof showMessageModal === 'function') {
-        return showMessageModal({
-          title,
-          icon,
-          message,
-          buttons: buttons || [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
-        });
-      }
-      window.alert(String(message || title || 'Report Instance'));
-      return Promise.resolve();
+      return window.ReportMessaging.showReportMessage({
+        title,
+        icon,
+        message,
+        buttons: buttons || [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
     }
 
     function escapeHtml(value) {
@@ -937,20 +942,16 @@
 
     async function showExpiredActionStateMessage() {
       const message = 'This report form session is no longer active. Reload the report instance, review your changes, and save again.';
-      if (typeof showMessageModal === 'function') {
-        const result = await showMessageModal({
-          title: 'Form Session Expired',
-          icon: 'warning',
-          message,
-          buttons: [
-            { text: 'Stay', class: 'btn-secondary' },
-            { text: 'Reload', class: 'btn-primary' }
-          ]
-        });
-        if (result === 'Reload') window.location.reload();
-        return;
-      }
-      window.alert(message);
+      const result = await window.ReportMessaging.showReportMessage({
+        title: 'Form Session Expired',
+        icon: 'warning',
+        message,
+        buttons: [
+          { text: 'Stay', class: 'btn-secondary' },
+          { text: 'Reload', class: 'btn-primary' }
+        ]
+      });
+      if (result === 'Reload') window.location.reload();
     }
 
     function getPrefillRefreshModal() {
@@ -1066,19 +1067,16 @@
 
     async function confirmLeave(title, message, confirmLabel) {
       const confirmText = confirmLabel || 'Close';
-      if (typeof showMessageModal === 'function') {
-        const res = await showMessageModal({
-          title: title || 'Leave this page?',
-          icon: 'question',
-          message: message || 'Unsaved changes will be lost unless you save first.',
-          buttons: [
-            { text: 'Stay', class: 'btn-secondary' },
-            { text: confirmText, class: 'btn-warning' }
-          ]
-        });
-        return res === confirmText;
-      }
-      return window.confirm(message || 'Leave this page?');
+      const res = await window.ReportMessaging.showReportMessage({
+        title: title || 'Leave this page?',
+        icon: 'question',
+        message: message || 'Unsaved changes will be lost unless you save first.',
+        buttons: [
+          { text: 'Stay', class: 'btn-secondary' },
+          { text: confirmText, class: 'btn-warning' }
+        ]
+      });
+      return res === confirmText;
     }
 
     function resolveReturnHref() {
@@ -1596,6 +1594,13 @@
       const name = `field__${field.id}`;
       let input = formEl.elements[name];
       if (input && typeof input.length === 'number' && !input.tagName) {
+        if (input[0]?.type === 'radio') {
+          const target = nextValue === undefined || nextValue === null ? '' : String(nextValue);
+          Array.from(input).forEach((radio) => {
+            radio.checked = String(radio.value) === target;
+          });
+          return;
+        }
         input = input[0] || null;
       }
       if (!input) {
@@ -1614,6 +1619,15 @@
         }
         const n = Number(nextValue);
         input.value = Number.isFinite(n) ? String(n) : '';
+        return;
+      }
+      if (type === 'select' && input.type === 'radio') {
+        const container = input.closest('form') || formEl;
+        const group = container.querySelectorAll(`[name="${CSS.escape(name)}"][data-field-id="${CSS.escape(String(field.id))}"]`);
+        const target = nextValue === undefined || nextValue === null ? '' : String(nextValue);
+        group.forEach((radio) => {
+          if (radio.type === 'radio') radio.checked = String(radio.value) === target;
+        });
         return;
       }
       if (nextValue === undefined || nextValue === null) {
@@ -1842,16 +1856,11 @@
             if (!summary.errors.length) return;
             event.preventDefault();
             const first = summary.errors[0];
-            if (typeof showMessageModal === 'function') {
-              await showMessageModal({
-                title: 'Validation Error',
-                icon: 'warning',
-                message: `${first.message} Please fix validation errors before submitting.`,
-                buttons: [{ text: 'OK', class: 'btn-primary' }]
-              });
-            } else {
-              window.alert(`${first.message} Please fix validation errors before submitting.`);
-            }
+            await showReportInstanceMessage({
+              title: 'Validation Error',
+              icon: 'warning',
+              message: `${first.message} Please fix validation errors before submitting.`
+            });
           });
         });
 
@@ -1869,16 +1878,11 @@
             if (summary.errors.length) {
               event.preventDefault();
               const first = summary.errors[0];
-              if (typeof showMessageModal === 'function') {
-                await showMessageModal({
-                  title: 'Validation Error',
-                  icon: 'warning',
-                  message: `${first.message} Please fix validation errors before submitting.`,
-                  buttons: [{ text: 'OK', class: 'btn-primary' }]
-                });
-              } else {
-                window.alert(`${first.message} Please fix validation errors before submitting.`);
-              }
+              await showReportInstanceMessage({
+                title: 'Validation Error',
+                icon: 'warning',
+                message: `${first.message} Please fix validation errors before submitting.`
+              });
               return;
             }
           }
@@ -1934,7 +1938,11 @@
       if (!id) return;
       const api = window.ReportAssignmentDelete;
       if (!api || typeof api.reopenReportInstance !== 'function' || typeof api.unlockReportInstance !== 'function') {
-        window.alert('Unable to process this action. Please hard-refresh the page (Ctrl+F5) and try again.');
+        await showReportInstanceMessage({
+          title: 'Action Unavailable',
+          icon: 'error',
+          message: 'Unable to process this action. Please hard-refresh the page (Ctrl+F5) and try again.'
+        });
         return;
       }
       const actionStateId = String(
@@ -1943,12 +1951,8 @@
         || ''
       ).trim();
       const confirmFn = kind === 'reopen'
-        ? (typeof api.confirmReopen === 'function'
-          ? (msg) => api.confirmReopen(msg)
-          : async (msg) => window.confirm(String(msg || '')))
-        : (typeof api.confirmUnlock === 'function'
-          ? (msg) => api.confirmUnlock(msg)
-          : async (msg) => window.confirm(String(msg || '')));
+        ? (msg) => api.confirmReopen(msg)
+        : (msg) => api.confirmUnlock(msg);
       try {
         if (kind === 'reopen') {
           const reopenBtn = document.querySelector('.js-reopen-report-instance[data-instance-id="' + CSS.escape(id) + '"]')
@@ -1976,13 +1980,9 @@
         }
         window.location.reload();
       } catch (error) {
-        if (typeof api.showError === 'function') {
-          api.showError(error?.message || (kind === 'reopen'
-            ? 'Unable to reopen report.'
-            : 'Unable to unlock report.'));
-        } else {
-          window.alert(error?.message || 'Unable to process this action.');
-        }
+        await api.showError(error?.message || (kind === 'reopen'
+          ? 'Unable to reopen report.'
+          : 'Unable to unlock report.'));
       }
     }
 
@@ -2026,8 +2026,11 @@
         });
         instanceDocxModal?.show();
       } catch (error) {
-        if (typeof api?.showError === 'function') api.showError(error?.message || 'Unable to open export options.');
-        else window.alert(error?.message || 'Unable to open export options.');
+        await showReportInstanceMessage({
+          title: 'Export Failed',
+          icon: 'error',
+          message: error?.message || 'Unable to open export options.'
+        });
       }
     });
 
@@ -2074,8 +2077,11 @@
         URL.revokeObjectURL(url);
         instanceDocxModal?.hide();
       } catch (error) {
-        if (typeof api?.showError === 'function') api.showError(error?.message || 'Unable to export Word file.');
-        else window.alert(error?.message || 'Unable to export Word file.');
+        await showReportInstanceMessage({
+          title: 'Export Failed',
+          icon: 'error',
+          message: error?.message || 'Unable to export Word file.'
+        });
       } finally {
         if (btn) {
           btn.disabled = false;

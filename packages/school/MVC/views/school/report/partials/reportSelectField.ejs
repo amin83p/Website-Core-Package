@@ -1,0 +1,46 @@
+<%
+  const selectField = field && typeof field === 'object' ? field : {};
+  const selectOptions = Array.isArray(selectField.options) ? selectField.options : [];
+  const selectFieldId = String(selectField.id || '').trim();
+  const selectValue = (value === undefined || value === null) ? '' : value;
+  const selectValueStr = String(selectValue);
+  const selectName = String(typeof name !== 'undefined' ? name : `field__${selectFieldId}`).trim();
+  const selectInputClass = String(typeof inputClass !== 'undefined' ? inputClass : '').trim();
+  const selectSize = String(typeof size !== 'undefined' ? size : '').trim();
+  const selectIdBase = String(typeof idPrefix !== 'undefined' && idPrefix ? idPrefix : selectFieldId).trim();
+  const selectDisabled = disabled === true || readOnly === true;
+  const selectSizeClass = selectSize === 'sm' ? ' btn-group-sm' : '';
+  const selectAriaLabel = String(selectField.label || 'Select option');
+%>
+<% if (selectOptions.length === 2) { %>
+  <div class="btn-group<%= selectSizeClass %>" role="group" aria-label="<%= selectAriaLabel %>">
+    <% selectOptions.forEach((opt, idx) => { %>
+      <% const optValue = String(opt?.value ?? ''); %>
+      <% const optLabel = String(opt?.label || opt?.value || ''); %>
+      <% const inputId = `${selectIdBase}_bin_${idx}`; %>
+      <input
+        type="radio"
+        class="btn-check <%= selectInputClass %>"
+        name="<%= selectName %>"
+        id="<%= inputId %>"
+        value="<%= optValue %>"
+        data-field-id="<%= selectFieldId %>"
+        <%= selectValueStr === optValue ? 'checked' : '' %>
+        <%= selectDisabled ? 'disabled' : '' %>
+      >
+      <label class="btn btn-outline-primary" for="<%= inputId %>"><%= optLabel %></label>
+    <% }); %>
+  </div>
+<% } else { %>
+  <select
+    class="form-select<%= selectSize === 'sm' ? ' form-select-sm' : '' %><%= selectDisabled ? ' bg-light' : '' %> <%= selectInputClass %>"
+    name="<%= selectName %>"
+    data-field-id="<%= selectFieldId %>"
+    <%= selectDisabled ? 'disabled' : '' %>
+  >
+    <option value="">Select...</option>
+    <% selectOptions.forEach((opt) => { %>
+      <option value="<%= opt.value %>" <%= selectValueStr === String(opt.value) ? 'selected' : '' %>><%= opt.label || opt.value %></option>
+    <% }); %>
+  </select>
+<% } %>

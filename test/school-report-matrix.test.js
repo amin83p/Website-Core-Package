@@ -490,7 +490,7 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(matrixView, /Save All Drafts/);
   assert.match(matrixView, /Lock All Reports/);
   assert.match(matrixView, /function showReportMatrixMessage/);
-  assert.match(matrixView, /typeof showMessageModal === 'function'/);
+  assert.match(matrixView, /window\.ReportMessaging/);
   assert.doesNotMatch(matrixView, /reportMatrixAlert/);
   assert.doesNotMatch(matrixView, /data-matrix-bulk-summary/);
   assert.ok(matrixView.indexOf('id="reportMatrixActions"') > matrixView.indexOf('id="reportMatrixStudentReports"'));
@@ -500,6 +500,8 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(matrixView, /reportMatrixPrefillModal/);
   assert.match(matrixView, /Submit All Reports/);
   assert.doesNotMatch(matrixView, /js-matrix-save/);
+  assert.match(matrixView, /include\('partials\/reportSelectField'/);
+  assert.match(matrixView, /processedRadioFields/);
   assert.match(sessionView, /matrixGroupKey/);
   assert.match(sessionView, />Fill Reports</);
 });

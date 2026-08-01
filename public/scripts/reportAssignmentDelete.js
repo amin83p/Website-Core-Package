@@ -11,6 +11,14 @@
     return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
+  function reportMessagingAvailable() {
+    return global.ReportMessaging?.ready === true;
+  }
+
+  function reportMessageModalAvailable() {
+    return typeof global.showMessageModal === 'function' && document.getElementById('messageModal');
+  }
+
   function withLoading(note, fn) {
     let token = null;
     if (typeof global.showLoading === 'function') {
@@ -165,7 +173,16 @@
   }
 
   async function confirmDelete(message, title = 'Confirm Delete') {
-    if (typeof global.showMessageModal === 'function') {
+    if (reportMessagingAvailable()) {
+      return global.ReportMessaging.confirmReportAction({
+        title,
+        message: String(message || ''),
+        confirmText: 'Delete',
+        confirmClass: 'btn-warning btn-md',
+        icon: 'warning'
+      });
+    }
+    if (reportMessageModalAvailable()) {
       const result = await global.showMessageModal({
         title,
         icon: 'warning',
@@ -178,11 +195,21 @@
       });
       return result === 'Delete';
     }
-    return global.confirm(String(message || ''));
+    console.error('Report message modal is unavailable on this page.');
+    return false;
   }
 
   async function confirmUnlock(message, title = 'Unlock Report') {
-    if (typeof global.showMessageModal === 'function') {
+    if (reportMessagingAvailable()) {
+      return global.ReportMessaging.confirmReportAction({
+        title,
+        message: String(message || ''),
+        confirmText: 'Unlock',
+        confirmClass: 'btn-warning btn-md',
+        icon: 'warning'
+      });
+    }
+    if (reportMessageModalAvailable()) {
       const result = await global.showMessageModal({
         title,
         icon: 'warning',
@@ -195,11 +222,21 @@
       });
       return result === 'Unlock';
     }
-    return global.confirm(String(message || ''));
+    console.error('Report message modal is unavailable on this page.');
+    return false;
   }
 
   async function confirmReopen(message, title = 'Reopen Report') {
-    if (typeof global.showMessageModal === 'function') {
+    if (reportMessagingAvailable()) {
+      return global.ReportMessaging.confirmReportAction({
+        title,
+        message: String(message || ''),
+        confirmText: 'Reopen',
+        confirmClass: 'btn-warning btn-md',
+        icon: 'warning'
+      });
+    }
+    if (reportMessageModalAvailable()) {
       const result = await global.showMessageModal({
         title,
         icon: 'warning',
@@ -212,12 +249,22 @@
       });
       return result === 'Reopen';
     }
-    return global.confirm(String(message || ''));
+    console.error('Report message modal is unavailable on this page.');
+    return false;
   }
 
   async function showError(message, title = 'Error') {
     const plain = stripHtml(message) || 'Something went wrong.';
-    if (typeof global.showMessageModal === 'function') {
+    if (reportMessagingAvailable()) {
+      await global.ReportMessaging.showReportMessage({
+        title,
+        message: plain,
+        icon: 'error',
+        buttonClass: 'btn-danger btn-sm'
+      });
+      return;
+    }
+    if (reportMessageModalAvailable()) {
       await global.showMessageModal({
         title,
         icon: 'error',
@@ -226,7 +273,7 @@
       });
       return;
     }
-    global.alert(plain);
+    console.error('Report message modal is unavailable on this page.', plain);
   }
 
   global.ReportAssignmentDelete = {

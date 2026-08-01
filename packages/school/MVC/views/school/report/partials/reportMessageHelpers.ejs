@@ -1,0 +1,78 @@
+<script>
+(() => {
+  if (window.ReportMessaging?.ready) return;
+
+  function escapeReportMessage(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[char]));
+  }
+
+  function plainReportMessage(value) {
+    return String(value ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
+  }
+
+  function reportMessageModalAvailable() {
+    return typeof window.showMessageModal === 'function' && document.getElementById('messageModal');
+  }
+
+  async function showReportMessage({
+    title = 'Notice',
+    message = '',
+    icon = 'warning',
+    buttonClass = 'btn-primary',
+    buttons = null,
+    html = false
+  } = {}) {
+    if (!reportMessageModalAvailable()) {
+      console.error('Report message modal is unavailable on this page.');
+      return 'OK';
+    }
+    const displayMessage = html ? String(message ?? '') : escapeReportMessage(plainReportMessage(message));
+    return window.showMessageModal({
+      title,
+      icon,
+      message: displayMessage,
+      buttons: buttons || [{ text: 'OK', class: buttonClass }]
+    });
+  }
+
+  async function confirmReportAction({
+    title = 'Confirm',
+    message = '',
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    confirmClass = 'btn-danger',
+    icon = 'warning',
+    html = false
+  } = {}) {
+    if (!reportMessageModalAvailable()) {
+      console.error('Report message modal is unavailable on this page.');
+      return false;
+    }
+    const displayMessage = html ? String(message ?? '') : escapeReportMessage(plainReportMessage(message));
+    const result = await window.showMessageModal({
+      title,
+      icon,
+      message: displayMessage,
+      buttons: [
+        { text: cancelText, class: 'btn-secondary' },
+        { text: confirmText, class: confirmClass }
+      ]
+    });
+    return result === confirmText;
+  }
+
+  window.ReportMessaging = {
+    ready: true,
+    escapeReportMessage,
+    plainReportMessage,
+    showReportMessage,
+    confirmReportAction
+  };
+})();
+</script>

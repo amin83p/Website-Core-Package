@@ -410,6 +410,8 @@
 
 <%- include('partials/modal_GenericPicker') %>
 
+<%- include('partials/reportMessageHelpers') %>
+
 <script>
   (function () {
     const classIdInput = document.getElementById('classIdInput');
@@ -472,16 +474,7 @@
 
     function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
       if (typeof hideLoading === 'function') hideLoading();
-      if (typeof showMessageModal === 'function') {
-        return showMessageModal({
-          title,
-          icon,
-          message,
-          buttons: [{ text: 'OK', class: buttonClass }]
-        });
-      }
-      alert(String(message || title || 'Notice'));
-      return Promise.resolve('OK');
+      return window.ReportMessaging.showReportMessage({ title, message, icon, buttonClass });
     }
 
     function getTargetRowModalInstance() {

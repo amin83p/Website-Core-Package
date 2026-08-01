@@ -194,6 +194,7 @@
 
 <% if (isAdminViewer) { %>
   <%- include('partials/modal_GenericPicker') %>
+  <%- include('partials/reportMessageHelpers') %>
   <script>
     (function () {
       const scopeInput = document.getElementById('roleScopeInput');
@@ -207,14 +208,12 @@
       }
 
       function showWarn(message) {
-        if (typeof showMessageModal === 'function') {
-          showMessageModal({
-            title: 'Selection Required',
-            icon: 'warning',
-            message,
-            buttons: [{ text: 'OK', class: 'btn-secondary' }]
-          });
-        }
+        return window.ReportMessaging.showReportMessage({
+          title: 'Selection Required',
+          icon: 'warning',
+          message,
+          buttonClass: 'btn-secondary'
+        });
       }
 
       function openPickerByScope(scope) {

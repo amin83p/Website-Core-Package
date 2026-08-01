@@ -58,6 +58,8 @@
   .report-matrix-page .matrix-table input[type="number"],
   .report-matrix-page .matrix-table input[type="date"],
   .report-matrix-page .matrix-table select { min-width: 130px; width: 100%; }
+  .report-matrix-page .matrix-table .btn-group { min-width: 130px; width: 100%; flex-wrap: wrap; }
+  .report-matrix-page .matrix-table .btn-group .btn { flex: 1 1 auto; white-space: normal; }
   .report-matrix-page .matrix-help-icon { border: 0; background: transparent; color: var(--bs-secondary-color); padding: 0 .2rem; }
   .report-matrix-page .matrix-help-icon:hover,
   .report-matrix-page .matrix-help-icon:focus-visible { color: var(--bs-primary); }
@@ -135,7 +137,17 @@
                 <% (group.fields || []).forEach((field) => { const value = field.value === undefined || field.value === null ? '' : field.value; const col = field.fullPageWidth ? 'col-12' : 'col-12 col-md-6 col-xl-4'; const sharedDisabled = !sharedFieldsEditableSafe; %>
                   <div class="<%= col %>"><label class="form-label fw-bold"><%= field.label %> <span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span></label>
                     <% if (field.type === 'textarea') { %><textarea class="form-control js-matrix-shared-field" rows="3" data-field-id="<%= field.id %>" <%= sharedDisabled ? 'readonly' : '' %>><%= value %></textarea>
-                    <% } else if (field.type === 'select') { %><select class="form-select js-matrix-shared-field" data-field-id="<%= field.id %>" <%= sharedDisabled ? 'disabled' : '' %>><option value="">Select...</option><% (field.options || []).forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %></select>
+                    <% } else if (field.type === 'select') { %>
+                      <%- include('partials/reportSelectField', {
+                        field,
+                        value,
+                        name: `matrix_shared_${field.id}`,
+                        idPrefix: `matrix_shared_${field.id}`,
+                        disabled: sharedDisabled,
+                        readOnly: sharedDisabled,
+                        inputClass: 'js-matrix-shared-field',
+                        size: ''
+                      }) %>
                     <% } else { %><input type="<%= field.type === 'number' || field.type === 'date' ? field.type : 'text' %>" class="form-control js-matrix-shared-field" data-field-id="<%= field.id %>" value="<%= value %>" <%= sharedDisabled ? 'readonly' : '' %>><% } %>
                   </div>
                 <% }); %>
@@ -193,10 +205,16 @@
                   <% if (field.type === 'textarea') { %>
                     <textarea class="form-control form-control-sm js-matrix-row-field" rows="3" data-field-id="<%= field.id %>" placeholder="<%= field.placeholder || '' %>" <%= disabled ? 'readonly' : '' %>><%= value %></textarea>
                   <% } else if (field.type === 'select') { %>
-                    <select class="form-select form-select-sm js-matrix-row-field" data-field-id="<%= field.id %>" <%= disabled ? 'disabled' : '' %>>
-                      <option value="">Select...</option>
-                      <% field.options.forEach((option) => { %><option value="<%= option.value %>" <%= String(value) === String(option.value) ? 'selected' : '' %>><%= option.label %></option><% }); %>
-                    </select>
+                    <%- include('partials/reportSelectField', {
+                      field,
+                      value,
+                      name: `matrix_row_${row.studentId}_${field.id}`,
+                      idPrefix: `${row.studentId}_${field.id}`,
+                      disabled,
+                      readOnly: disabled,
+                      inputClass: 'js-matrix-row-field',
+                      size: 'sm'
+                    }) %>
                   <% } else if (field.type === 'checkbox') { %>
                     <div class="form-check d-flex justify-content-center">
                       <input type="checkbox" class="form-check-input js-matrix-row-field" data-field-id="<%= field.id %>" <%= value === true || String(value).toLowerCase() === 'true' ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %>>
@@ -244,6 +262,7 @@
 </div>
 
 <%- include('partials/calculatedFieldsRuntime') %>
+<%- include('partials/reportMessageHelpers') %>
 <script src="/scripts/reportAssignmentDelete.js"></script>
 <script>
   (function () {
@@ -264,16 +283,12 @@
     }
 
     function showReportMatrixMessage({ title = 'Fill Reports', icon = 'info', message = '' } = {}) {
-      if (typeof showMessageModal === 'function') {
-        return showMessageModal({
-          title,
-          icon,
-          message,
-          buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
-        });
-      }
-      window.alert(String(message || title || 'Fill Reports'));
-      return Promise.resolve();
+      return window.ReportMessaging.showReportMessage({
+        title,
+        icon,
+        message,
+        buttonClass: icon === 'error' ? 'btn-danger' : 'btn-primary'
+      });
     }
 
     document.addEventListener('click', function (event) {
@@ -292,6 +307,7 @@
     function readControl(control) {
       if (!control) return '';
       if (control.type === 'checkbox') return control.checked;
+      if (control.type === 'radio') return control.checked ? control.value : '';
       if (control.type === 'number') {
         if (control.value === '') return '';
         const value = Number(control.value);
@@ -302,15 +318,36 @@
 
     function writeControl(control, value) {
       if (!control) return;
+      if (control.type === 'radio') {
+        const fieldId = String(control.dataset.fieldId || '').trim();
+        if (!fieldId) return;
+        const container = control.closest('tr[data-student-id], #reportMatrixSharedFields, .accordion-body') || document;
+        const group = container.querySelectorAll(`[data-field-id="${CSS.escape(fieldId)}"]`);
+        const target = value === undefined || value === null ? '' : String(value);
+        group.forEach((el) => {
+          if (el.type === 'radio') el.checked = String(el.value) === target;
+        });
+        return;
+      }
       if (control.type === 'checkbox') control.checked = value === true || String(value).toLowerCase() === 'true';
       else control.value = value === undefined || value === null ? '' : String(value);
     }
 
     function collectControls(container, selector) {
       const out = {};
+      const processedRadioFields = new Set();
       container.querySelectorAll(selector).forEach((control) => {
         const fieldId = String(control.dataset.fieldId || '').trim();
-        if (fieldId) out[fieldId] = readControl(control);
+        if (!fieldId) return;
+        if (control.type === 'radio') {
+          if (processedRadioFields.has(fieldId)) return;
+          processedRadioFields.add(fieldId);
+          const group = container.querySelectorAll(`${selector}[data-field-id="${CSS.escape(fieldId)}"]`);
+          const checked = Array.from(group).find((el) => el.checked);
+          out[fieldId] = checked ? readControl(checked) : '';
+          return;
+        }
+        out[fieldId] = readControl(control);
       });
       return out;
     }
@@ -688,8 +725,8 @@
         return;
       }
       const confirmFn = kind === 'reopen'
-        ? (typeof api.confirmReopen === 'function' ? (msg) => api.confirmReopen(msg) : async (msg) => window.confirm(String(msg || '')))
-        : (typeof api.confirmUnlock === 'function' ? (msg) => api.confirmUnlock(msg) : async (msg) => window.confirm(String(msg || '')));
+        ? (msg) => api.confirmReopen(msg)
+        : (msg) => api.confirmUnlock(msg);
       let confirmMessage = kind === 'reopen'
         ? (rows.length === 1
           ? ('Reopen the report for ' + rows[0].studentName + ' as draft so the teacher can edit it?')

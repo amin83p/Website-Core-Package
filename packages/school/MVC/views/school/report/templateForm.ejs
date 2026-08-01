@@ -747,6 +747,9 @@
   <% }); %>
 </datalist>
 
+<%- include('partials/reportMessageHelpers') %>
+<script src="/scripts/reportSelectField.js"></script>
+
 <script>
   (function () {
     const fieldTypes = <%- JSON.stringify(fieldTypes || []) %>;
@@ -1037,18 +1040,7 @@
     }
 
     async function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
-      if (typeof showMessageModal === 'function') {
-        return showMessageModal({
-          title,
-          icon,
-          message,
-          buttons: [{ text: 'OK', class: buttonClass }]
-        });
-      }
-      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-        window.alert(String(message || title || 'Notice'));
-      }
-      return 'OK';
+      return window.ReportMessaging.showReportMessage({ title, message, icon, buttonClass });
     }
 
     async function confirmReportModal({
@@ -1058,24 +1050,17 @@
       confirmText = 'Confirm',
       confirmClass = 'btn-danger',
       cancelText = 'Cancel',
-      fallbackMessage = ''
+      html = false
     } = {}) {
-      if (typeof showMessageModal === 'function') {
-        const result = await showMessageModal({
-          title,
-          icon,
-          message,
-          buttons: [
-            { text: cancelText, class: 'btn-secondary' },
-            { text: confirmText, class: confirmClass }
-          ]
-        });
-        return result === confirmText;
-      }
-      if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
-        return window.confirm(String(fallbackMessage || message || title || 'Are you sure?'));
-      }
-      return false;
+      return window.ReportMessaging.confirmReportAction({
+        title,
+        message,
+        icon,
+        confirmText,
+        confirmClass,
+        cancelText,
+        html
+      });
     }
 
     function parseOptionsCsv(csvText) {
@@ -1740,6 +1725,14 @@ num(value) <= 95</code></pre>
           `;
         }
         if (type === 'select') {
+          const selectHtml = window.ReportSelectField?.buildReportSelectFieldHtml?.({
+            field: { ...field, options },
+            value: '',
+            disabled: true,
+            readOnly: true,
+            inputClass: ''
+          });
+          if (selectHtml) return selectHtml;
           const selectOpts = options.map((opt) => `<option value="${escapeHtml(opt.value || '')}">${escapeHtml(opt.label || opt.value || '')}</option>`).join('');
           return `<select class="form-select bg-light" disabled><option value="">Select...</option>${selectOpts}</select>`;
         }
@@ -1764,6 +1757,14 @@ num(value) <= 95</code></pre>
         `;
       }
       if (type === 'select') {
+        const selectHtml = window.ReportSelectField?.buildReportSelectFieldHtml?.({
+          field: { ...field, options },
+          value: '',
+          disabled: false,
+          readOnly: false,
+          inputClass: ''
+        });
+        if (selectHtml) return selectHtml;
         const selectOpts = options.map((opt) => `<option value="${escapeHtml(opt.value || '')}">${escapeHtml(opt.label || opt.value || '')}</option>`).join('');
         return `<select class="form-select"><option value="">Select...</option>${selectOpts}</select>`;
       }
@@ -1988,7 +1989,7 @@ num(value) <= 95</code></pre>
           confirmText: 'Delete',
           confirmClass: 'btn-danger',
           cancelText: 'Cancel',
-          fallbackMessage: `Delete "${fieldName}" from this template?`
+          html: true
         });
         if (!ok) return;
         fieldsState.splice(index, 1);

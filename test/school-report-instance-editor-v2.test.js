@@ -47,6 +47,7 @@ test('shared editor template has V2-only streamlined toolbar and essential detai
   assert.ok(v2DetailsBlock.includes('Assignment'));
   assert.equal(v2DetailsBlock.includes('Template'), false);
   assert.equal(v2DetailsBlock.includes('Target'), false);
+  assert.match(viewSource, /include\('partials\/reportSelectField'/);
 });
 
 test('shared editor template uses tooltip help markers for V2 instead of inline help text', () => {

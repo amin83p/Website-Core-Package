@@ -244,6 +244,7 @@
 <%- include('partials/tablePages-end') %>
 <%- include('partials/modal_GenericPicker') %>
 
+<%- include('partials/reportMessageHelpers') %>
 <script src="/scripts/reportAssignmentDelete.js"></script>
 <script>
   (function () {
@@ -287,14 +288,12 @@
     }
 
     function showPickerUnavailable(message) {
-      if (typeof showMessageModal === 'function') {
-        showMessageModal({
-          title: 'Picker Unavailable',
-          icon: 'warning',
-          message: message || 'Picker is not available on this page.',
-          buttons: [{ text: 'OK', class: 'btn-secondary' }]
-        });
-      }
+      return window.ReportMessaging.showReportMessage({
+        title: 'Picker Unavailable',
+        icon: 'warning',
+        message: message || 'Picker is not available on this page.',
+        buttonClass: 'btn-secondary'
+      });
     }
 
     function renderClassChips() {
