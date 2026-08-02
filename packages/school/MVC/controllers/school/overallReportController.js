@@ -280,7 +280,7 @@ async function listOverallReports(req, res) {
       data,
       pagination,
       filters: req.query,
-      newUrl: 'school/reports/overall-reports/new',
+      newUrl: 'school/reports/overall-reports',
       newLabel: 'New Overall Report',
       print: true,
       includeModal: true,

@@ -2559,5 +2559,17 @@
     ],
     "orgId": "SYSTEM",
     "adoptExisting": true
+  },
+  {
+    "id": "SYM_SYSTEM_132",
+    "name": "SCHOOL_REPORTS_OVERALL_MANAGEMENT",
+    "type": "class",
+    "value": "bi bi-table",
+    "tags": [
+      "SCHOOL_REPORTS_OVERALL_MANAGEMENT",
+      "446107"
+    ],
+    "orgId": "SYSTEM",
+    "adoptExisting": true
   }
 ]

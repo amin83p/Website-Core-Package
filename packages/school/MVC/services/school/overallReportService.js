@@ -458,7 +458,8 @@ async function createOverallInstance({
   sourceSelections,
   selectedDocxKey = 'default',
   title = '',
-  reqUser
+  reqUser,
+  allowMissingDocx = false
 }) {
   if (String(template?.status || '').toLowerCase() !== 'active') {
     throw new Error('Only active overall report templates can create reports.');
@@ -504,12 +505,25 @@ async function createOverallInstance({
     idsEqual(row.key, requestedDocxKey)
     || String(row.key || '').toLowerCase() === requestedDocxKey.toLowerCase()
   ));
-  if (!selectedOption) throw new Error('The selected overall report Word template is unavailable.');
-  const resolvedDocx = reportFunderDocxService.resolveDocxTemplateForFunder({
-    template,
-    funderKey: selectedOption.key
-  });
-  if (!resolvedDocx.docxTemplate) throw new Error('Select an available Word template before creating the overall report.');
+  let resolvedDocx;
+  if (!selectedOption) {
+    if (!allowMissingDocx) {
+      throw new Error('The selected overall report Word template is unavailable.');
+    }
+    resolvedDocx = {
+      docxKey: requestedDocxKey,
+      label: requestedDocxKey,
+      docxTemplate: null
+    };
+  } else {
+    resolvedDocx = reportFunderDocxService.resolveDocxTemplateForFunder({
+      template,
+      funderKey: selectedOption.key
+    });
+    if (!resolvedDocx.docxTemplate && !allowMissingDocx) {
+      throw new Error('Select an available Word template before creating the overall report.');
+    }
+  }
   const calculated = calculateAnswers({
     template,
     sourceValues,
@@ -1187,20 +1201,45 @@ async function resolveStudentEntrySelections({
   };
 }
 
-function resolveSelectedDocxKey(template, selectedDocxKey = 'default') {
+function resolveSelectedDocxKey(template, selectedDocxKey = 'default', { allowMissingDocx = false } = {}) {
   const requestedDocxKey = clean(selectedDocxKey || 'default') || 'default';
   const availableDocx = reportFunderDocxService.buildAvailableDocxOptions(template);
   const selectedOption = availableDocx.find((row) => (
     idsEqual(row.key, requestedDocxKey)
     || String(row.key || '').toLowerCase() === requestedDocxKey.toLowerCase()
   ));
-  if (!selectedOption) throw new Error('The selected overall report Word template is unavailable.');
+  if (!selectedOption) {
+    if (!allowMissingDocx) {
+      throw new Error('The selected overall report Word template is unavailable.');
+    }
+    return {
+      docxKey: requestedDocxKey,
+      label: requestedDocxKey,
+      docxTemplate: null
+    };
+  }
   const resolvedDocx = reportFunderDocxService.resolveDocxTemplateForFunder({
     template,
     funderKey: selectedOption.key
   });
-  if (!resolvedDocx.docxTemplate) throw new Error('Select an available Word template before creating the overall report.');
+  if (!resolvedDocx.docxTemplate && !allowMissingDocx) {
+    throw new Error('Select an available Word template before creating the overall report.');
+  }
   return resolvedDocx;
+}
+
+function templateHasAttachedDocx(template = {}, docxKey = 'default') {
+  const availableDocx = reportFunderDocxService.buildAvailableDocxOptions(template);
+  const selectedOption = availableDocx.find((row) => (
+    idsEqual(row.key, docxKey)
+    || String(row.key || '').toLowerCase() === String(docxKey || 'default').toLowerCase()
+  )) || availableDocx[0];
+  if (!selectedOption) return false;
+  const resolved = reportFunderDocxService.resolveDocxTemplateForFunder({
+    template,
+    funderKey: selectedOption.key
+  });
+  return Boolean(resolved?.docxTemplate);
 }
 
 async function buildNormalizedStudentEntries({
@@ -1230,7 +1269,8 @@ async function createOverallWorkspace({
   selectedDocxKey = 'default',
   title = '',
   studentEntries = [],
-  reqUser
+  reqUser,
+  allowMissingDocx = false
 }) {
   if (String(template?.status || '').toLowerCase() !== 'active') {
     throw new Error('Only active overall report templates can create reports.');
@@ -1244,7 +1284,7 @@ async function createOverallWorkspace({
     allowedStatuses,
     reqUser
   });
-  const resolvedDocx = resolveSelectedDocxKey(template, selectedDocxKey);
+  const resolvedDocx = resolveSelectedDocxKey(template, selectedDocxKey, { allowMissingDocx });
   const now = new Date().toISOString();
   const record = overallReportInstanceModel.sanitizeInstance({
     orgId: template.orgId,
@@ -1552,6 +1592,28 @@ async function exportWorkspaceDocx({ instance, docxKey = '', studentId = '', req
   return exportWorkspaceZip({ instance, docxKey, reqUser });
 }
 
+function buildOverallExportPayload(instance = {}) {
+  const template = instance.templateSnapshot || {};
+  const workspace = ensureWorkspaceShape(instance);
+  const entry = workspace.studentEntries[0] || null;
+  const validation = validateAnswers(template, entry?.answers || instance.answers || {});
+  return {
+    id: instance.id,
+    title: instance.title,
+    status: instance.status,
+    overallTemplateId: instance.overallTemplateId,
+    overallTemplateVersion: instance.overallTemplateVersion,
+    selectedDocxKey: instance.selectedDocxKey,
+    sourceSelections: entry?.sourceSelections || instance.sourceSelections || [],
+    sourceValues: entry?.sourceValues || instance.sourceValues || {},
+    answers: entry?.answers || instance.answers || {},
+    derivedOverrides: entry?.derivedOverrides || instance.derivedOverrides || {},
+    schema: template.schema || {},
+    validation,
+    exportedAt: new Date().toISOString()
+  };
+}
+
 module.exports = {
   COMPLETED_SOURCE_STATUSES: Object.freeze([...COMPLETED_SOURCE_STATUSES]),
   getSourceTemplateKeyCatalog,
@@ -1568,6 +1630,7 @@ module.exports = {
   loadOverallCreateCandidates,
   ensureWorkspaceShape,
   templateHasOverallFields,
+  templateHasAttachedDocx,
   previewStudentEntry,
   saveStudentAnswers,
   generateStudentDocx,
@@ -1585,5 +1648,6 @@ module.exports = {
   buildDocxPayloadDetailed,
   findCalculationMismatches,
   buildExportPreview,
+  buildOverallExportPayload,
   exportOverallReport
 };

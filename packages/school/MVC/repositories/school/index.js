@@ -25,6 +25,7 @@ const reportAssignmentModel = require('../../models/school/reportAssignmentModel
 const reportInstanceModel = require('../../models/school/reportInstanceModel');
 const overallReportTemplateModel = require('../../models/school/overallReportTemplateModel');
 const overallReportInstanceModel = require('../../models/school/overallReportInstanceModel');
+const overallReportManagementSessionModel = require('../../models/school/overallReportManagementSessionModel');
 const reportScopePolicy = require('../../services/school/reportScopePolicy');
 const examTemplateModel = require('../../models/school/examTemplateModel');
 const examRevisionModel = require('../../models/school/examRevisionModel');
@@ -923,6 +924,16 @@ const schoolRepositories = {
     update: overallReportInstanceModel.updateInstance,
     remove: overallReportInstanceModel.deleteInstance,
     defaultSearchFields: ['id', 'orgId', 'overallTemplateId', 'title', 'status']
+  }),
+  overallReportManagementSessions: createSchoolRepository({
+    entityName: 'overallReportManagementSessions',
+    collectionName: 'schoolOverallReportManagementSessions',
+    getAll: overallReportManagementSessionModel.getAllSessions,
+    getById: overallReportManagementSessionModel.getSessionById,
+    create: overallReportManagementSessionModel.addSession,
+    update: overallReportManagementSessionModel.updateSession,
+    remove: overallReportManagementSessionModel.deleteSession,
+    defaultSearchFields: ['id', 'orgId', 'title', 'status', 'startDate', 'endDate']
   }),
   examTemplates: createSchoolRepository({
     entityName: 'examTemplates',
@@ -2513,6 +2524,7 @@ assertQueryableCrudRepository('schoolRepositories.reportAssignments', schoolRepo
 assertQueryableCrudRepository('schoolRepositories.reportInstances', schoolRepositories.reportInstances);
 assertQueryableCrudRepository('schoolRepositories.overallReportTemplates', schoolRepositories.overallReportTemplates);
 assertQueryableCrudRepository('schoolRepositories.overallReportInstances', schoolRepositories.overallReportInstances);
+assertQueryableCrudRepository('schoolRepositories.overallReportManagementSessions', schoolRepositories.overallReportManagementSessions);
 assertQueryableCrudRepository('schoolRepositories.examTemplates', schoolRepositories.examTemplates);
 assertQueryableCrudRepository('schoolRepositories.examRevisions', schoolRepositories.examRevisions);
 assertQueryableCrudRepository('schoolRepositories.examQuestions', schoolRepositories.examQuestions);

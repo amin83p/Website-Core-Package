@@ -1649,6 +1649,9 @@
         },
         {
           "id": "446105"
+        },
+        {
+          "id": "446107"
         }
       ],
       "related": [],
@@ -1792,6 +1795,32 @@
       "mainDashboardDisplay": false,
       "navigatorSection": false,
       "homeURL": "/school/reports/overall-reports",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446107",
+      "name": "SCHOOL_REPORTS_OVERALL_MANAGEMENT",
+      "category": "SCHOOL",
+      "description": "Batch overall report workflows across multiple templates and students.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/reports/overall-management",
       "inactiveMessage": "",
       "message": "",
       "operations": [
@@ -3474,6 +3503,18 @@
       "tags": [
         "SCHOOL_REPORTS_OVERALL_INSTANCES",
         "446105"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_132",
+      "name": "SCHOOL_REPORTS_OVERALL_MANAGEMENT",
+      "type": "class",
+      "value": "bi bi-table",
+      "tags": [
+        "SCHOOL_REPORTS_OVERALL_MANAGEMENT",
+        "446107"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true

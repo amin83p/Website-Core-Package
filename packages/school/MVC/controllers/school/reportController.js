@@ -382,6 +382,16 @@ async function showHome(req, res) {
         buttonLabel: 'Open Overall Reports'
       },
       {
+        title: 'Overall Report Management',
+        description: 'Batch overall report workflows across multiple templates, students, and saved sessions.',
+        href: '/school/reports/overall-management',
+        sectionId: SECTIONS.SCHOOL_REPORTS_OVERALL_MANAGEMENT,
+        icon: 'bi-table',
+        subtleClass: 'bg-secondary-subtle text-secondary',
+        buttonClass: 'btn btn-secondary',
+        buttonLabel: 'Open Management'
+      },
+      {
         title: 'Assignments',
         description: `Assign reports to classes/sessions. Total assignments: ${Number(summary?.assignmentCount || 0)}.`,
         href: '/school/reports/assignments',

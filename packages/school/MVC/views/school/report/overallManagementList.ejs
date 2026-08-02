@@ -1,0 +1,74 @@
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  headerManageBtns: [
+    `<a href="/school/reports" class="btn btn-outline-secondary btn-sm"><i class="bi bi-house me-1"></i>Report Home</a>`
+  ]
+}) %>
+<%- include('partials/tablePages-search', { placeholder: 'Search management sessions...', fields: [] }) %>
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Session</th>
+        <th>Date range</th>
+        <th>Templates</th>
+        <th>Students</th>
+        <th>Last updated</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data?.length) { %>
+        <tr><td colspan="6" class="text-center text-muted py-4">No management sessions have been saved yet.</td></tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold"><%= row.title || row.id %></div>
+            <div class="x-small text-muted font-monospace"><%= row.id %></div>
+          </td>
+          <td><%= row.startDate || '' %> &ndash; <%= row.endDate || '' %></td>
+          <td><%= (row.selectedTemplateIds || []).length %></td>
+          <td><%= (row.rows || []).length %></td>
+          <td><%= row.audit?.lastUpdateDateTime || '' %></td>
+          <td class="text-end pe-4">
+            <div class="d-flex justify-content-end gap-1">
+              <a href="/school/reports/overall-management/edit/<%= encodeURIComponent(row.id) %>" class="btn btn-outline-primary btn-sm">Open</a>
+              <a
+                href="/school/reports/overall-management/delete/<%= encodeURIComponent(row.id) %>"
+                class="btn btn-outline-danger btn-sm js-delete-management-session"
+                data-session-title="<%= row.title || row.id %>"
+              >Delete</a>
+            </div>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/reports/overall-management' }) %>
+<%- include('partials/tablePages-end') %>
+<%- include('partials/reportMessageHelpers') %>
+<script>
+(() => {
+  document.querySelectorAll('.js-delete-management-session').forEach((link) => {
+    link.addEventListener('click', async (event) => {
+      event.preventDefault();
+      const title = String(link.dataset.sessionTitle || 'this session');
+      const confirmed = await window.ReportMessaging.confirmReportAction({
+        title: 'Delete Management Session?',
+        message: `Delete <strong>${title.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</strong>? This cannot be undone.`,
+        confirmText: 'Delete',
+        html: true
+      });
+      if (confirmed) window.location.assign(link.href);
+    });
+  });
+})();
+</script>

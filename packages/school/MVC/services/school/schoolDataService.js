@@ -39,6 +39,7 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   reportInstances: { repository: schoolRepositories.reportInstances },
   overallReportTemplates: { repository: schoolRepositories.overallReportTemplates },
   overallReportInstances: { repository: schoolRepositories.overallReportInstances },
+  overallReportManagementSessions: { repository: schoolRepositories.overallReportManagementSessions },
   examTemplates: { repository: schoolRepositories.examTemplates },
   examRevisions: { repository: schoolRepositories.examRevisions },
   examQuestions: { repository: schoolRepositories.examQuestions },

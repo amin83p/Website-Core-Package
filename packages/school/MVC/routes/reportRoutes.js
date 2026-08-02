@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/school/reportController');
 const overallCtrl = require('../controllers/school/overallReportController');
+const overallMgmtCtrl = require('../controllers/school/overallReportManagementController');
 const { requireCoreModule } = require('../services/school/schoolCoreContracts');
 const upload = requireCoreModule('MVC/middleware/upload');
 const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
@@ -18,6 +19,7 @@ const REPORT_ASSIGNMENT_SECTION = SECTIONS.SCHOOL_REPORTS_ASSIGNMENT;
 const REPORT_INSTANCE_SECTION = SECTIONS.SCHOOL_REPORTS_INSTANCES;
 const OVERALL_REPORT_TEMPLATE_SECTION = SECTIONS.SCHOOL_REPORTS_OVERALL_TEMPLATE;
 const OVERALL_REPORT_INSTANCE_SECTION = SECTIONS.SCHOOL_REPORTS_OVERALL_INSTANCES;
+const OVERALL_REPORT_MANAGEMENT_SECTION = SECTIONS.SCHOOL_REPORTS_OVERALL_MANAGEMENT;
 const reportAssignmentMutationActionState = {
   requireToken: true,
   allowOperationTokenFallback: true,
@@ -437,6 +439,92 @@ router.delete('/overall-reports/delete/:id',
   requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.DELETE),
   trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.DELETE, { requireToken: true }),
   overallCtrl.deleteOverallReport);
+
+// Overall Report Management
+router.get('/overall-management',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.READ_ALL),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.READ_ALL),
+  overallMgmtCtrl.listManagementSessions);
+
+router.get('/overall-management/new',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.CREATE),
+  overallMgmtCtrl.showNewWorkspace);
+
+router.get('/overall-management/edit/:id',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.UPDATE),
+  overallMgmtCtrl.showEditWorkspace);
+
+router.post('/overall-management/api/load-matrix',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.READ),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.READ),
+  overallMgmtCtrl.loadMatrixApi);
+
+router.post('/overall-management/api/save',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.CREATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallMgmtCtrl.saveSessionApi);
+
+router.post('/overall-management/edit/:id/add-students',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallMgmtCtrl.addStudents);
+
+router.post('/overall-management/edit/:id/row/:studentId/create',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.CREATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallMgmtCtrl.createRowInstance);
+
+router.get('/overall-management/edit/:id/row/:studentId/preview',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.READ),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.READ),
+  overallMgmtCtrl.rowPreview);
+
+router.post('/overall-management/edit/:id/row/:studentId/preview',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.UPDATE),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallMgmtCtrl.rowPreview);
+
+router.post('/overall-management/edit/:id/row/:studentId/export-docx',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.EXPORT, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallMgmtCtrl.rowExportDocx);
+
+router.get('/overall-management/edit/:id/row/:studentId/export-payload',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.EXPORT),
+  overallMgmtCtrl.rowExportPayload);
+
+router.get('/overall-management/delete/:id',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.DELETE),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.DELETE),
+  overallMgmtCtrl.deleteManagementSession);
+
+router.delete('/overall-management/delete/:id',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.DELETE),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.DELETE, { requireToken: true }),
+  overallMgmtCtrl.deleteManagementSession);
 
 // Assignments
 router.get('/assignments',

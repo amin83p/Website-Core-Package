@@ -1,0 +1,185 @@
+<%
+  const initialSession = session || null;
+  const isReopened = Boolean(initialSession?.id);
+  const escJson = (value) => JSON.stringify(value ?? null).replace(/</g, '\\u003c');
+  const templateMetaMap = Object.fromEntries((templates || []).map((row) => [row.id, row]));
+%>
+<div class="sections-page overall-management-workspace">
+  <div class="d-flex justify-content-between align-items-start mb-4 gap-2 flex-wrap">
+    <div>
+      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;">
+        <i class="bi bi-table me-2"></i><%= title || 'Overall Report Management' %>
+      </h1>
+      <div class="text-muted" id="workspaceSubtitle">
+        <% if (isReopened) { %>
+          Saved session &middot; <span class="font-monospace"><%= initialSession.id %></span>
+        <% } else { %>
+          Select overall templates, filter instances, and manage students in a saved batch session.
+        <% } %>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/school/reports/overall-management" class="btn btn-outline-secondary btn-sm">Back to List</a>
+      <a href="/school/reports/overall-templates" class="btn btn-outline-secondary btn-sm">Templates</a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-5">
+          <label class="form-label fw-bold">Session title</label>
+          <input class="form-control" id="sessionTitle" maxlength="240"
+            value="<%= initialSession?.title || '' %>"
+            placeholder="Overall report management session">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">Start date</label>
+          <input type="date" class="form-control" id="filterStartDate"
+            value="<%= initialSession?.startDate || '' %>"
+            <%= isReopened ? 'readonly' : '' %>>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">End date</label>
+          <input type="date" class="form-control" id="filterEndDate"
+            value="<%= initialSession?.endDate || '' %>"
+            <%= isReopened ? 'readonly' : '' %>>
+        </div>
+      </div>
+
+      <div class="row g-3 align-items-end mt-1">
+        <div class="col-lg-8">
+          <label class="form-label fw-bold">Overall templates</label>
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickTemplates" <%= isReopened ? '' : '' %>>
+              <i class="bi bi-files me-1"></i>Select Templates
+            </button>
+            <div id="selectedTemplateChips" class="d-flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+        <% if (!isReopened) { %>
+          <div class="col-lg-4 text-lg-end">
+            <button type="button" class="btn btn-primary" id="btnLoadMatrix">
+              <i class="bi bi-arrow-repeat me-1"></i>Load Students
+            </button>
+          </div>
+        <% } %>
+      </div>
+
+      <% if (isReopened) { %>
+        <hr>
+        <div class="row g-3 align-items-end">
+          <div class="col-lg-5">
+            <label class="form-label fw-bold">Add students <span class="text-muted fw-normal">(optional filters)</span></label>
+            <div class="input-group">
+              <input type="text" class="form-control" id="addStudentFilterSummary" readonly placeholder="All matching students">
+              <button type="button" class="btn btn-outline-primary" id="btnPickAddStudents"><i class="bi bi-people"></i></button>
+              <button type="button" class="btn btn-outline-secondary" id="btnClearAddStudents">Clear</button>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <label class="form-label fw-bold d-block">Instance status</label>
+            <div class="d-flex flex-wrap gap-3">
+              <% ['draft', 'submitted', 'locked'].forEach((status) => {
+                const checked = !(initialSession?.addFilters?.statuses || []).length
+                  ? (status === 'submitted' || status === 'locked')
+                  : (initialSession.addFilters.statuses || []).includes(status);
+              %>
+                <label class="form-check form-check-inline m-0">
+                  <input class="form-check-input js-add-status-filter" type="checkbox" value="<%= status %>" <%= checked ? 'checked' : '' %>>
+                  <span class="form-check-label text-capitalize"><%= status %></span>
+                </label>
+              <% }); %>
+            </div>
+          </div>
+          <div class="col-lg-3 text-lg-end">
+            <button type="button" class="btn btn-outline-primary" id="btnAddStudents">
+              <i class="bi bi-person-plus me-1"></i>Add Students
+            </button>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="row g-3 align-items-end mt-1">
+          <div class="col-lg-5">
+            <label class="form-label fw-bold">Students <span class="text-muted fw-normal">(optional)</span></label>
+            <div class="input-group">
+              <input type="text" class="form-control" id="studentFilterSummary" readonly placeholder="All matching students">
+              <button type="button" class="btn btn-outline-primary" id="btnPickStudents"><i class="bi bi-people"></i></button>
+              <button type="button" class="btn btn-outline-secondary" id="btnClearStudents">Clear</button>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <label class="form-label fw-bold d-block">Instance status</label>
+            <div class="d-flex flex-wrap gap-3">
+              <% ['draft', 'submitted', 'locked'].forEach((status) => { %>
+                <label class="form-check form-check-inline m-0">
+                  <input class="form-check-input js-status-filter" type="checkbox" value="<%= status %>"
+                    <%= status === 'submitted' || status === 'locked' ? 'checked' : '' %>>
+                  <span class="form-check-label text-capitalize"><%= status %></span>
+                </label>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="mt-3 text-end">
+        <button type="button" class="btn btn-success" id="btnSaveSession">
+          <i class="bi bi-save me-1"></i>Save Session
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white">
+      <h5 class="mb-0 fw-bold">Student Matrix</h5>
+      <div class="small text-muted">Select matching overall templates per student, create reports, preview fields, and export.</div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0" id="managementMatrixTable">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Student</th>
+              <th>Instances found</th>
+              <th>Matching templates</th>
+              <th>Create / Preview</th>
+              <th class="pe-3">Export</th>
+            </tr>
+          </thead>
+          <tbody id="managementMatrixBody">
+            <tr><td colspan="5" class="text-center text-muted py-4">Load or reopen a session to see students.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="studentPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="studentPreviewTitle">Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="studentPreviewBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="btnSaveStudentPreview">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="managementData"><%- escJson({
+  session: initialSession,
+  templates: templates || [],
+  templateOptions: templateOptions || [],
+  actionStateId: actionStateId || ''
+}) %></script>
+
+<%- include('partials/modal_GenericPicker', { user }) %>
+<%- include('partials/reportMessageHelpers') %>
+<script src="/scripts/overallReportManagement.js"></script>

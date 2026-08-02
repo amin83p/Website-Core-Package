@@ -530,6 +530,36 @@ test('creation accepts only matching submitted or locked reports and persists a 
       }),
       /must be submitted or locked/
     );
+
+    instances['REPORT-1'].status = 'submitted';
+    const templateWithoutDocx = {
+      ...template,
+      docxTemplate: null,
+      docxTemplatesByFunder: []
+    };
+    const createdWithoutDocx = await overallReportService.createOverallInstance({
+      template: templateWithoutDocx,
+      sourceSelections: [
+        { slotKey: 'T1', instanceId: 'REPORT-1' },
+        { slotKey: 'T2', instanceId: 'REPORT-2' }
+      ],
+      selectedDocxKey: 'default',
+      allowMissingDocx: true,
+      reqUser
+    });
+    assert.equal(createdWithoutDocx.id, 'OVERALL-INSTANCE-1');
+    await assert.rejects(
+      () => overallReportService.createOverallInstance({
+        template: templateWithoutDocx,
+        sourceSelections: [
+          { slotKey: 'T1', instanceId: 'REPORT-1' },
+          { slotKey: 'T2', instanceId: 'REPORT-2' }
+        ],
+        selectedDocxKey: 'default',
+        reqUser
+      }),
+      /Word template/
+    );
   });
 });
 
@@ -850,6 +880,8 @@ test('registry, maintenance, access, seeding, and Mongo index integrations are d
   assert.match(routes, /overallTemplateMutationActionState/);
   assert.match(controller, /includeModal:\s*true/);
   assert.match(controller, /includeModal_Table:\s*true/);
+  assert.match(controller, /newUrl:\s*'school\/reports\/overall-reports'/);
+  assert.doesNotMatch(controller, /newUrl:\s*'school\/reports\/overall-reports\/new'/);
   assert.match(repository, /schoolOverallReportTemplates/);
   assert.match(repository, /schoolOverallReportInstances/);
   assert.match(deletionRegistry, /sourceSlots\.templateId/);

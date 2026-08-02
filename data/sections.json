@@ -3058,6 +3058,9 @@
       },
       {
         "id": "446105"
+      },
+      {
+        "id": "446107"
       }
     ],
     "related": [],
@@ -3850,6 +3853,37 @@
       "lastUpdateDateTime": "2026-07-30T00:00:00.000Z"
     },
     "id": "446105",
+    "navigatorSection": false,
+    "mainDashboardDisplay": false
+  },
+  {
+    "name": "SCHOOL_REPORTS_OVERALL_MANAGEMENT",
+    "category": "SCHOOL",
+    "description": "Batch overall report workflows across multiple templates and students.",
+    "homeURL": "/school/reports/overall-management",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-07-31T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-07-31T00:00:00.000Z"
+    },
+    "id": "446107",
     "navigatorSection": false,
     "mainDashboardDisplay": false
   },
