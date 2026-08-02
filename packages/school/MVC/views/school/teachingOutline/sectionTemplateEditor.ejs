@@ -7,6 +7,10 @@
   <form id="sectionTemplateForm" method="POST" action="/school/teaching-outlines/<%= skillId %>/sections" class="card border-0 shadow-sm p-4">
     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
     <input type="hidden" name="sectionsJson" id="sectionsJson" value="">
+    <div class="alert alert-info small">
+      <strong>Session selectable</strong> controls whether teachers may choose content from this section in Manage Session.
+      Reference sections remain visible for context but do not show selection checkboxes.
+    </div>
     <div id="sectionsEditor"></div>
     <button type="button" class="btn btn-outline-primary btn-sm mt-3" id="btnAddSection">Add section</button>
     <div class="mt-4">
@@ -27,8 +31,8 @@
           <div class="col-md-5"><input class="form-control form-control-sm sec-title" value="${s.title || ''}" placeholder="title"></div>
           <div class="col-md-2"><input type="number" class="form-control form-control-sm sec-order" value="${s.displayOrder || (i+1)*10}"></div>
           <div class="col-md-2">
-            <div class="form-check"><input class="form-check-input sec-selectable" type="checkbox" ${s.isSelectable ? 'checked' : ''}> Selectable</div>
-            <div class="form-check"><input class="form-check-input sec-groups" type="checkbox" ${s.allowsGroups ? 'checked' : ''}> Groups</div>
+            <div class="form-check"><input class="form-check-input sec-selectable" type="checkbox" ${s.isSelectable ? 'checked' : ''}> Session selectable</div>
+            <div class="form-check"><input class="form-check-input sec-groups" type="checkbox" ${s.allowsGroups ? 'checked' : ''}> Allows groups</div>
           </div>
         </div>
       </div>`).join('');

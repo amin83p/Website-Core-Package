@@ -63,17 +63,42 @@ router.get('/:skillId/:levelId',
 
 router.post('/api/save-item',
   requireAccess(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowSectionTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.saveOutlineItem);
 
 router.post('/api/toggle-active/:id',
   requireAccess(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowSectionTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.toggleOutlineItem);
 
 router.post('/api/import-seed',
   requireAccess(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.CREATE),
-  trackActionState(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.CREATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowSectionTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.importSeed);
+
+router.post('/api/import-data',
+  requireAccess(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TEACHING_OUTLINES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowSectionTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.importOutlineData);
 
 module.exports = router;

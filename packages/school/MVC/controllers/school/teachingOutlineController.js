@@ -291,13 +291,22 @@ exports.showOutlineEditor = async (req, res) => {
     const levelItems = (items || []).filter((row) => (
       idsEqual(row.orgId, orgId) && row.skillId === skillId && String(row.levelId) === levelId
     ));
-    const tree = teachingOutlineCatalogService.buildItemTree(levelItems, template);
-    return res.render('school/teachingOutline/outlineEditor', {
-      title: `${skillId} — ${level.title}`,
+    const tree = teachingOutlineCatalogService.buildItemTree(levelItems, template, { includeInactive: true });
+    const skillLabel = skillId.charAt(0).toUpperCase() + skillId.slice(1);
+    const exportPayload = teachingOutlineCatalogService.buildOutlineExportPayload(
       skillId,
       level,
       template,
+      levelItems
+    );
+    return res.render('school/teachingOutline/outlineEditor', {
+      title: `${skillLabel} — ${level.title}`,
+      skillId,
+      skillLabel,
+      level,
+      template,
       tree,
+      exportPayload,
       user: req.user,
       actionStateId: req.actionStateId
     });
@@ -345,8 +354,9 @@ exports.toggleOutlineItem = async (req, res) => {
     const id = String(req.params.id || '').trim();
     const row = await schoolDataService.getDataById('teachingOutlineItems', id, req.user);
     if (!row || !idsEqual(row.orgId, orgId)) throw new Error('Item not found.');
+    const currentlyActive = row.isActive !== false && String(row.isActive).toLowerCase() !== 'false';
     const saved = await schoolDataService.updateData('teachingOutlineItems', id, {
-      isActive: !row.isActive,
+      isActive: !currentlyActive,
       audit: { lastUpdateUser: req.user?.id || 'SYSTEM' }
     }, req.user);
     return res.json({ status: 'success', result: saved });
@@ -369,6 +379,39 @@ exports.importSeed = async (req, res) => {
     if (!seed) throw new Error('No seed data for this skill/level.');
     await teachingOutlineCatalogService.importItemsForSkillLevel(orgId, skillId, level.id, seed, req.user?.id || 'SYSTEM');
     return res.json({ status: 'success' });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.importOutlineData = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const skillId = String(req.body.skillId || '').trim().toLowerCase();
+    const levelId = String(req.body.levelId || '').trim();
+    if (!skillId || !levelId) throw new Error('Skill and level are required.');
+    const payload = parseJsonBody(req.body.exportJson, req.body);
+    const exportSkill = String(payload?.skillId || '').trim().toLowerCase();
+    const exportLevel = String(payload?.levelCode || '').trim();
+    if (exportSkill && exportSkill !== skillId) {
+      throw new Error('Import file skill does not match this outline.');
+    }
+    const levels = await schoolDataService.fetchData('teachingOutlineLevels', {}, req.user);
+    const level = (levels || []).find((row) => String(row.id) === levelId && idsEqual(row.orgId, orgId));
+    if (!level) throw new Error('Level not found.');
+    if (exportLevel && exportLevel !== level.code) {
+      throw new Error('Import file level does not match this outline.');
+    }
+    const seedRows = teachingOutlineCatalogService.normalizeOutlineImportRows(payload);
+    if (!seedRows.length) throw new Error('No items found in import file.');
+    await teachingOutlineCatalogService.importItemsForSkillLevel(
+      orgId,
+      skillId,
+      level.id,
+      seedRows,
+      req.user?.id || 'SYSTEM'
+    );
+    return res.json({ status: 'success', count: seedRows.length });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
   }

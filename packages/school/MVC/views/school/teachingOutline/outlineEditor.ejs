@@ -1,64 +1,509 @@
-<div class="sections-page">
-  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <h1 class="page-heading size-md m-0"><%= skillId %> — <%= level.title %></h1>
-    <div class="d-flex gap-2">
-      <button type="button" class="btn btn-outline-secondary btn-sm" id="btnImportSeed">Re-import seed</button>
-      <a href="/school/teaching-outlines" class="btn btn-outline-secondary btn-sm">Back</a>
+<style>
+  .outline-editor-page {
+    text-align: left;
+  }
+  .outline-editor-page .outline-page-header {
+    text-align: left;
+    margin-bottom: 1.25rem;
+  }
+  .outline-editor-page .outline-page-title {
+    font-size: 1.65rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0;
+    text-align: left;
+  }
+  .outline-editor-page .outline-page-subtitle {
+    color: #6c757d;
+    font-size: 0.92rem;
+    margin: 0.35rem 0 0;
+    text-align: left;
+  }
+  .outline-editor-page .outline-toolbar-card,
+  .outline-editor-page .outline-reseed-card {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.6rem;
+    background: #fff;
+    box-shadow: 0 0.125rem 0.35rem rgba(0, 0, 0, 0.04);
+  }
+  .outline-editor-page .outline-toolbar-card {
+    padding: 0.9rem 1rem;
+    margin-bottom: 1rem;
+  }
+  .outline-editor-page .outline-reseed-card {
+    padding: 1rem 1.1rem;
+    margin-bottom: 1.25rem;
+    background: #f8fbff;
+    border-color: #cfe2ff;
+  }
+  .outline-editor-page .outline-accordion .accordion-item {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.6rem !important;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 0.125rem 0.35rem rgba(0, 0, 0, 0.04);
+  }
+  .outline-editor-page .outline-accordion .accordion-button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 1rem 1.15rem;
+    font-size: 1rem;
+    font-weight: 700;
+    background: #f8f9fa;
+    box-shadow: none;
+    gap: 0.5rem;
+  }
+  .outline-editor-page .outline-accordion .accordion-button::after {
+    margin-left: 0.65rem;
+    flex-shrink: 0;
+  }
+  .outline-editor-page .outline-accordion .accordion-button:not(.collapsed) {
+    color: #0d3b66;
+    background: #e7f1ff;
+    border-bottom: 1px solid #cfe2ff;
+  }
+  .outline-editor-page .outline-section-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    margin-right: 0.65rem;
+    border-radius: 0.45rem;
+    background: #0d6efd;
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 800;
+  }
+  .outline-editor-page .outline-section-heading-main {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .outline-editor-page .outline-section-key {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #6c757d;
+    margin-left: 0.5rem;
+  }
+  .outline-editor-page .outline-section-count {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #495057;
+    background: #e9ecef;
+    border-radius: 999px;
+    padding: 0.25rem 0.65rem;
+    margin-left: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .outline-editor-page .outline-item-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+  .outline-editor-page .outline-item-row {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    gap: 0.75rem 1rem;
+    align-items: start;
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.5rem;
+    background: #fff;
+    transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  }
+  .outline-editor-page .outline-item-row.is-group {
+    background: #f0f7ff;
+    border-color: #b6d4fe;
+  }
+  .outline-editor-page .outline-item-row.is-reference {
+    background: #f8f9fa;
+    border-color: #dee2e6;
+  }
+  .outline-editor-page .outline-item-row.is-inactive {
+    background: #fff8e6;
+    border-color: #ffc107;
+    opacity: 0.92;
+  }
+  .outline-editor-page .outline-item-row.is-inactive .outline-item-label {
+    color: #6c757d;
+    text-decoration: line-through;
+    text-decoration-color: rgba(108, 117, 125, 0.55);
+  }
+  .outline-editor-page .outline-active-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    padding-top: 0.15rem;
+  }
+  .outline-editor-page .outline-active-wrap .form-check-input {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0;
+    cursor: pointer;
+  }
+  .outline-editor-page .outline-active-wrap .form-check-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6c757d;
+    cursor: pointer;
+    user-select: none;
+  }
+  .outline-editor-page .outline-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.45rem;
+  }
+  .outline-editor-page .outline-kind-badge {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.7rem;
+    border-radius: 0.4rem;
+  }
+  .outline-editor-page .outline-kind-badge.kind-checklist { background: #198754; color: #fff; }
+  .outline-editor-page .outline-kind-badge.kind-group { background: #0d6efd; color: #fff; }
+  .outline-editor-page .outline-kind-badge.kind-reference { background: #6f42c1; color: #fff; }
+  .outline-editor-page .outline-status-badge {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.7rem;
+    border-radius: 0.4rem;
+    background: #dc3545;
+    color: #fff;
+  }
+  .outline-editor-page .outline-item-label {
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: #212529;
+    word-break: break-word;
+  }
+  .outline-editor-page .outline-item-row.is-group .outline-item-label {
+    font-weight: 600;
+    color: #084298;
+  }
+  .outline-editor-page .outline-children {
+    margin-top: 0.65rem;
+    padding-left: 0.5rem;
+    border-left: 3px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+</style>
+
+<div class="sections-page outline-editor-page">
+  <header class="outline-page-header">
+    <h1 class="outline-page-title"><%= skillLabel %> — <%= level.title %></h1>
+    <p class="outline-page-subtitle">
+      Level <code><%= level.code %></code> · Use <strong>Active</strong> checkboxes to include items in session pickers. Expand one section at a time below.
+    </p>
+  </header>
+
+  <div class="outline-toolbar-card d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-outline-primary btn-sm" id="btnExportJson">
+        <i class="bi bi-download me-1"></i>Export JSON
+      </button>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="btnExportCsv">
+        <i class="bi bi-filetype-csv me-1"></i>Export CSV
+      </button>
+      <label class="btn btn-outline-secondary btn-sm mb-0" for="importOutlineFile">
+        <i class="bi bi-upload me-1"></i>Import file
+      </label>
+      <input type="file" id="importOutlineFile" accept=".json,application/json,text/csv,.csv" class="d-none">
+    </div>
+    <a href="/school/teaching-outlines" class="btn btn-outline-secondary btn-sm">Back to outlines</a>
+  </div>
+
+  <div class="outline-reseed-card">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+      <div class="flex-grow-1" style="min-width: 16rem;">
+        <h2 class="h6 fw-bold mb-2">Re-import built-in seed</h2>
+        <p class="small text-muted mb-0">
+          Replaces <strong>all items</strong> for this skill and level with the default seed content shipped in the application
+          (for example, the Equilibrium PDF outline for Writing). Manual edits you made on this page will be overwritten.
+          Use <strong>Export JSON</strong> first if you want to keep a backup.
+        </p>
+      </div>
+      <button type="button" class="btn btn-warning btn-sm align-self-center" id="btnImportSeed">
+        <i class="bi bi-arrow-repeat me-1"></i>Re-import seed
+      </button>
     </div>
   </div>
 
-  <% (tree || []).forEach((section) => { %>
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white fw-bold"><%= section.title %></div>
-      <div class="card-body">
-        <% function renderNodes(nodes, depth) { %>
-          <% (nodes || []).forEach((node) => { %>
-            <div class="mb-2" style="margin-left: <%= depth * 20 %>px">
-              <span class="badge bg-light text-dark border me-2"><%= node.itemKind %></span>
-              <%= node.label %>
-              <% if (node.isActive === false) { %><span class="badge bg-warning text-dark ms-1">inactive</span><% } %>
-              <button type="button" class="btn btn-link btn-sm p-0 ms-2 to-toggle" data-id="<%= node.id %>">toggle</button>
-              <% if ((node.children || []).length) { renderNodes(node.children, depth + 1); } %>
-            </div>
-          <% }) %>
-        <% } %>
-        <% renderNodes(section.items, 0); %>
-        <% if (!section.items || !section.items.length) { %>
-          <p class="text-muted small mb-0">No items yet.</p>
-        <% } %>
-        <form class="mt-3 row g-2 align-items-end add-item-form" data-section="<%= section.key %>">
-          <div class="col-md-2">
-            <label class="form-label small">Kind</label>
-            <select class="form-select form-select-sm item-kind">
-              <option value="checklist">checklist</option>
-              <option value="group">group</option>
-              <option value="reference">reference</option>
-            </select>
-          </div>
-          <div class="col-md-8">
-            <label class="form-label small">Label</label>
-            <input class="form-control form-control-sm item-label" required>
-          </div>
-          <div class="col-md-2">
-            <button type="submit" class="btn btn-primary btn-sm w-100">Add</button>
-          </div>
-        </form>
+  <% if (!tree || !tree.length) { %>
+    <div class="alert alert-warning" role="alert">
+      <strong>No section template found.</strong>
+      Outline items are grouped by skill section templates. Create or restore the section layout before adding items.
+      <div class="mt-2">
+        <a href="/school/teaching-outlines/<%= skillId %>/sections" class="btn btn-sm btn-outline-primary">Section Template</a>
       </div>
     </div>
-  <% }) %>
+  <% } %>
+
+  <% function countNodes(nodes) {
+    let total = 0;
+    (nodes || []).forEach((node) => {
+      total += 1;
+      total += countNodes(node.children);
+    });
+    return total;
+  } %>
+
+  <% function kindClass(kind) {
+    const k = String(kind || 'checklist').toLowerCase();
+    if (k === 'group') return 'kind-group';
+    if (k === 'reference') return 'kind-reference';
+    return 'kind-checklist';
+  } %>
+
+  <% function renderNodes(nodes) { %>
+    <div class="outline-item-list">
+      <% (nodes || []).forEach((node) => {
+        const isActive = node.isActive !== false;
+        const kind = String(node.itemKind || 'checklist').toLowerCase();
+        const rowClass = [
+          'outline-item-row',
+          kind === 'group' ? 'is-group' : '',
+          kind === 'reference' ? 'is-reference' : '',
+          !isActive ? 'is-inactive' : ''
+        ].filter(Boolean).join(' ');
+      %>
+        <div class="<%= rowClass %>">
+          <div class="outline-active-wrap">
+            <input
+              type="checkbox"
+              class="form-check-input outline-active-toggle"
+              id="active_<%= node.id %>"
+              data-id="<%= node.id %>"
+              <%= isActive ? 'checked' : '' %>
+              aria-label="Active"
+            >
+            <label class="form-check-label" for="active_<%= node.id %>">Active</label>
+          </div>
+          <div class="outline-item-body">
+            <div class="outline-item-meta">
+              <span class="badge outline-kind-badge <%= kindClass(kind) %>"><%= kind %></span>
+              <% if (!isActive) { %><span class="badge outline-status-badge">Inactive</span><% } %>
+            </div>
+            <div class="outline-item-label"><%= node.label %></div>
+            <% if ((node.children || []).length) { %>
+              <div class="outline-children">
+                <% renderNodes(node.children); %>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <div class="accordion outline-accordion" id="outlineSectionsAccordion">
+    <% (tree || []).forEach((section, sectionIndex) => {
+      const sectionCount = countNodes(section.items);
+      const sectionNo = String(sectionIndex + 1).padStart(2, '0');
+      const collapseId = 'outline-section-' + String(section.key || sectionIndex).replace(/[^a-z0-9_-]/gi, '-');
+      const isFirst = sectionIndex === 0;
+    %>
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="heading-<%= collapseId %>">
+          <button
+            class="accordion-button <%= isFirst ? '' : 'collapsed' %>"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#<%= collapseId %>"
+            aria-expanded="<%= isFirst ? 'true' : 'false' %>"
+            aria-controls="<%= collapseId %>"
+          >
+            <span class="outline-section-heading-main">
+              <span class="outline-section-index"><%= sectionNo %></span>
+              <span><%= section.title %></span>
+              <span class="outline-section-key"><%= section.key %></span>
+            </span>
+            <span class="outline-section-count"><%= sectionCount %> item<%= sectionCount === 1 ? '' : 's' %></span>
+          </button>
+        </h2>
+        <div
+          id="<%= collapseId %>"
+          class="accordion-collapse collapse <%= isFirst ? 'show' : '' %>"
+          aria-labelledby="heading-<%= collapseId %>"
+          data-bs-parent="#outlineSectionsAccordion"
+        >
+          <div class="accordion-body">
+            <% if (!section.items || !section.items.length) { %>
+              <p class="text-muted small mb-3">No items yet.</p>
+            <% } else { %>
+              <% renderNodes(section.items); %>
+            <% } %>
+            <form class="mt-4 pt-3 border-top row g-2 align-items-end add-item-form" data-section="<%= section.key %>">
+              <div class="col-md-2">
+                <label class="form-label small fw-semibold">Kind</label>
+                <select class="form-select form-select-sm item-kind">
+                  <option value="checklist">checklist</option>
+                  <option value="group">group</option>
+                  <option value="reference">reference</option>
+                </select>
+              </div>
+              <div class="col-md-8">
+                <label class="form-label small fw-semibold">Label</label>
+                <input class="form-control form-control-sm item-label" required placeholder="Enter outline item text">
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100">Add item</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
 </div>
 <script>
 (() => {
   const skillId = <%- JSON.stringify(skillId) %>;
   const levelId = <%- JSON.stringify(level.id) %>;
+  const levelCode = <%- JSON.stringify(level.code) %>;
   const actionStateId = <%- JSON.stringify(actionStateId || '') %>;
-  document.getElementById('btnImportSeed')?.addEventListener('click', async () => {
-    const body = new URLSearchParams({ skillId, levelCode: <%- JSON.stringify(level.code) %>, actionStateId });
-    const res = await fetch('/school/teaching-outlines/api/import-seed', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+  const exportPayload = <%- JSON.stringify(exportPayload || {}) %>;
+
+  function downloadBlob(filename, content, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function csvEscape(value) {
+    const text = String(value ?? '');
+    if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+    return text;
+  }
+
+  function buildCsvFromExport(payload) {
+    const header = ['sectionKey', 'parentKey', 'itemKind', 'label', 'description', 'displayOrder', 'isSelectable', 'isActive'];
+    const lines = [header.join(',')];
+    (payload.items || []).forEach((row) => {
+      lines.push([
+        csvEscape(row.sectionKey),
+        csvEscape(row.parentKey || ''),
+        csvEscape(row.itemKind),
+        csvEscape(row.label),
+        csvEscape(row.description || ''),
+        csvEscape(row.displayOrder),
+        csvEscape(row.isSelectable),
+        csvEscape(row.isActive)
+      ].join(','));
+    });
+    return lines.join('\n');
+  }
+
+  async function postOutlineApi(url, params) {
+    const body = new URLSearchParams({ ...params, actionStateId });
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-AJAX-Request': 'true'
+      },
+      body
+    });
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(`Server returned non-JSON response (status ${res.status})`);
+    }
     const data = await res.json();
-    if (data.status === 'success') location.reload();
-    else alert(data.message || 'Import failed');
+    if (data.status !== 'success') {
+      throw new Error(data.message || 'Request failed');
+    }
+    return data;
+  }
+
+  document.getElementById('btnExportJson')?.addEventListener('click', () => {
+    const filename = `outline-${skillId}-${levelCode}-${new Date().toISOString().slice(0, 10)}.json`;
+    downloadBlob(filename, JSON.stringify(exportPayload, null, 2), 'application/json');
   });
+
+  document.getElementById('btnExportCsv')?.addEventListener('click', () => {
+    const filename = `outline-${skillId}-${levelCode}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadBlob(filename, buildCsvFromExport(exportPayload), 'text/csv;charset=utf-8');
+  });
+
+  document.getElementById('importOutlineFile')?.addEventListener('change', async (event) => {
+    const input = event.target;
+    const file = input?.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      let payload;
+      if (file.name.toLowerCase().endsWith('.csv') || file.type.includes('csv')) {
+        const lines = text.split(/\r?\n/).filter((line) => line.trim());
+        const headers = (lines.shift() || '').split(',').map((h) => h.trim());
+        payload = {
+          format: 'school-teaching-outline-export',
+          version: 1,
+          skillId,
+          levelCode,
+          items: lines.map((line) => {
+            const cols = line.match(/("([^"]|"")*"|[^,]*)/g) || [];
+            const values = cols.map((col) => col.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+            const row = {};
+            headers.forEach((key, index) => {
+              const raw = values[index] ?? '';
+              if (key === 'isSelectable' || key === 'isActive') row[key] = ['true', '1', 'yes'].includes(String(raw).toLowerCase());
+              else if (key === 'displayOrder') row[key] = Number(raw) || 100;
+              else row[key] = raw || null;
+            });
+            return row;
+          })
+        };
+      } else {
+        payload = JSON.parse(text);
+      }
+      if (!window.confirm('Import will replace all outline items for this skill and level. Continue?')) {
+        input.value = '';
+        return;
+      }
+      await postOutlineApi('/school/teaching-outlines/api/import-data', {
+        skillId,
+        levelId,
+        exportJson: JSON.stringify(payload)
+      });
+      location.reload();
+    } catch (error) {
+      alert(error.message || 'Import failed');
+      input.value = '';
+    }
+  });
+
+  document.getElementById('btnImportSeed')?.addEventListener('click', async () => {
+    if (!window.confirm('Re-import seed will replace all items on this page with built-in default content. Export a backup first if needed. Continue?')) return;
+    try {
+      await postOutlineApi('/school/teaching-outlines/api/import-seed', { skillId, levelCode });
+      location.reload();
+    } catch (error) {
+      alert(error.message || 'Re-import failed');
+    }
+  });
+
   document.querySelectorAll('.add-item-form').forEach((form) => {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -71,20 +516,31 @@
         displayOrder: 100,
         isSelectable: form.querySelector('.item-kind').value === 'checklist'
       };
-      const body = new URLSearchParams({ itemJson: JSON.stringify(item), actionStateId });
-      const res = await fetch('/school/teaching-outlines/api/save-item', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-      const data = await res.json();
-      if (data.status === 'success') location.reload();
-      else alert(data.message || 'Save failed');
+      try {
+        await postOutlineApi('/school/teaching-outlines/api/save-item', {
+          itemJson: JSON.stringify(item)
+        });
+        location.reload();
+      } catch (error) {
+        alert(error.message || 'Save failed');
+      }
     });
   });
-  document.querySelectorAll('.to-toggle').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-id');
-      const body = new URLSearchParams({ actionStateId });
-      const res = await fetch('/school/teaching-outlines/api/toggle-active/' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-      const data = await res.json();
-      if (data.status === 'success') location.reload();
+
+  document.querySelectorAll('.outline-active-toggle').forEach((checkbox) => {
+    checkbox.addEventListener('change', async () => {
+      const id = checkbox.getAttribute('data-id');
+      if (!id) return;
+      const previous = checkbox.checked;
+      checkbox.disabled = true;
+      try {
+        await postOutlineApi('/school/teaching-outlines/api/toggle-active/' + encodeURIComponent(id), {});
+        location.reload();
+      } catch (error) {
+        checkbox.checked = !previous;
+        alert(error.message || 'Could not update active status');
+        checkbox.disabled = false;
+      }
     });
   });
 })();
