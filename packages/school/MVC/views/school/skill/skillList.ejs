@@ -1,0 +1,103 @@
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-backpack2 me-1"></i> School Academia</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search skills by code or label...',
+  fields: [
+    { name: 'active', label: 'Active', type: 'select', options: ['true', 'false'] },
+    { name: 'kind', label: 'Type', type: 'select', options: ['clb', 'digital_literacy', 'general'] }
+  ]
+}) %>
+
+<div class="alert alert-light border d-flex gap-3 align-items-start">
+  <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+  <div>
+    <div class="fw-semibold">One catalog controls class and session skill choices.</div>
+    <div class="small text-muted">Deactivate a skill to remove it from future selections while preserving historical records. Default skill codes are stable and cannot be deleted.</div>
+  </div>
+</div>
+
+<% if (typeof canCreateSkills !== 'undefined' && canCreateSkills === false) { %>
+  <div class="alert alert-warning border d-flex gap-3 align-items-start">
+    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+    <div>
+      <div class="fw-semibold">Organization required</div>
+      <div class="small">You are in <strong>SYSTEM / GLOBAL MODE</strong>. Switch to a real organization to add or manage skills for that organization.</div>
+    </div>
+  </div>
+<% } %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="code">Code</th>
+        <th class="draggable" data-column="label">Label</th>
+        <th class="draggable" data-column="kind">Type</th>
+        <th class="draggable" data-column="supportsTeachingOutline">Teaching Outline</th>
+        <th class="draggable" data-column="active">Status</th>
+        <th class="draggable" data-column="sortOrder">Order</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr><td colspan="7" class="text-center py-5 text-muted">No skills found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold font-monospace text-dark"><%= item.code %></div>
+            <div class="x-small text-muted"><%= item.id %></div>
+          </td>
+          <td><div class="fw-semibold text-dark"><%= item.label %></div></td>
+          <td>
+            <span class="badge <%= item.kind === 'clb' ? 'bg-primary' : (item.kind === 'digital_literacy' ? 'bg-info text-dark' : 'bg-secondary') %>">
+              <%= item.kind === 'clb' ? 'CLB' : (item.kind === 'digital_literacy' ? 'Digital literacy' : 'General') %>
+            </span>
+          </td>
+          <td>
+            <span class="badge <%= item.supportsTeachingOutline ? 'bg-success' : 'bg-light text-dark border' %>">
+              <%= item.supportsTeachingOutline ? 'Enabled' : 'Not enabled' %>
+            </span>
+          </td>
+          <td><span class="badge <%= item.active ? 'bg-success' : 'bg-danger' %>"><%= item.active ? 'Active' : 'Inactive' %></span></td>
+          <td><%= Number(item.sortOrder || 0) %></td>
+          <td class="table-actions text-end pe-4">
+            <% if (typeof canCreateSkills === 'undefined' || canCreateSkills !== false) { %>
+            <div class="row-actions-wrap">
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= item.id %>" title="Skill actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/skills/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>"><i class="bi bi-trash me-2"></i>Delete</button>
+              </div>
+            </div>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/pagination', {
+  pagination,
+  filters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('partials/tablePages-end') %>

@@ -1,0 +1,152 @@
+<%
+  const item = skillItem || {};
+  const isEdit = !!item.id;
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const locked = typeof codeLocked !== 'undefined' && codeLocked === true;
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h1 class="page-heading size-md m-0">
+        <i class="bi bi-stars me-2"></i><%= isEdit ? 'Edit Skill' : 'New Skill' %>
+      </h1>
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= item.id %></span>
+      <% } %>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/school/skills" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Back to List
+      </a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="skillForm" action="<%= isEdit ? '/school/skills/edit/' + item.id : '/school/skills/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-card-checklist me-2"></i>Skill definition</h6>
+          <div class="small text-muted mt-1">Manage the organization skill catalog used by class definitions, sessions, and teaching outlines.</div>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="skillCode">Code *</label>
+              <input id="skillCode" type="text" name="code" class="form-control size-md font-monospace" value="<%= item.code || '' %>" placeholder="e.g. digital_forms" required <%= locked ? 'readonly' : '' %>>
+              <div class="form-text small">Stable lowercase identifier used in class and session records.</div>
+              <% if (locked) { %>
+                <div class="small text-warning mt-1"><i class="bi bi-lock-fill me-1"></i>This code is locked because it is a default or referenced skill.</div>
+              <% } %>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label fw-bold" for="skillLabel">Label *</label>
+              <input id="skillLabel" type="text" name="label" class="form-control size-md" value="<%= item.label || '' %>" placeholder="Skill display label" required>
+              <div class="form-text small">Labels can be changed without changing historical skill codes.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold" for="skillSortOrder">Sort Order</label>
+              <input id="skillSortOrder" type="number" name="sortOrder" class="form-control size-md" value="<%= Number(item.sortOrder || 0) %>" min="0" max="9999">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="skillKind">Type *</label>
+              <select id="skillKind" name="kind" class="form-select size-md" required>
+                <option value="clb" <%= item.kind === 'clb' ? 'selected' : '' %>>CLB language skill</option>
+                <option value="digital_literacy" <%= item.kind === 'digital_literacy' ? 'selected' : '' %>>Digital literacy</option>
+                <option value="general" <%= !item.kind || item.kind === 'general' ? 'selected' : '' %>>General</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <div class="border rounded p-3 h-100 bg-light-subtle">
+                <div class="d-flex justify-content-between gap-3 align-items-start">
+                  <div>
+                    <label class="fw-semibold mb-1" for="skillActive">Active</label>
+                    <div class="small text-muted">Available for future class assignments and sessions.</div>
+                  </div>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="skillActive" name="active" value="true" <%= item.active === false ? '' : 'checked' %>>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="border rounded p-3 bg-light-subtle">
+                <div class="d-flex justify-content-between gap-3 align-items-start">
+                  <div>
+                    <label class="fw-semibold mb-1" for="supportsTeachingOutline">Supports Teaching Outline</label>
+                    <div class="small text-muted">Allows the skill to use CLB teaching-outline levels and instructional content. This is available only for CLB skill types.</div>
+                  </div>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="supportsTeachingOutline" name="supportsTeachingOutline" value="true" <%= item.supportsTeachingOutline ? 'checked' : '' %>>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <% if (isEdit && Number(typeof usageCount !== 'undefined' ? usageCount : 0) > 0) { %>
+        <div class="alert alert-info border">
+          <i class="bi bi-link-45deg me-2"></i>This skill has <strong><%= Number(usageCount) %></strong> reference(s). Deactivation is safe; code changes and deletion are blocked.
+        </div>
+      <% } %>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><%= isEdit ? 'Save Changes' : 'Create Skill' %></button>
+        <a href="/school/skills" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('skillForm');
+  const kind = document.getElementById('skillKind');
+  const outline = document.getElementById('supportsTeachingOutline');
+
+  function syncOutlineAvailability() {
+    if (!kind || !outline) return;
+    const enabled = kind.value === 'clb';
+    outline.disabled = !enabled;
+    if (!enabled) outline.checked = false;
+  }
+
+  kind?.addEventListener('change', syncOutlineAvailability);
+  syncOutlineAvailability();
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+        body: new URLSearchParams(new FormData(form)).toString()
+      });
+      const result = await response.json();
+      if (result.status !== 'success') throw new Error(result.message || 'Save failed.');
+      window.location.href = result.redirectTo || '/school/skills';
+    } catch (error) {
+      button.disabled = false;
+      button.innerHTML = original;
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Unable to save skill',
+          icon: 'error',
+          message: error.message || 'Save failed.',
+          buttons: [{ text: 'Close', class: 'btn-danger' }]
+        });
+      } else {
+        alert(error.message || 'Save failed.');
+      }
+    }
+  });
+});
+</script>

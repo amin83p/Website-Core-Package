@@ -7,6 +7,7 @@ const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
+const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/classes.json');
 const legacyStorageBasePath = path.join(resolveCoreRoot(), 'data/school/classes_storage');
@@ -83,6 +84,12 @@ function sanitizeAllowedProgramTerms(value, registrationMode = 'term_based') {
   }).sort((a, b) => a.order - b.order).map((item, index) => ({ ...item, order: index + 1 }));
 }
 
+function sanitizeSkillIds(value) {
+  if (value === undefined || value === null || value === '') return [];
+  if (!Array.isArray(value)) throw new Error('Class skillIds must be an array.');
+  return [...new Set(value.map((entry) => normalizeSkillCode(entry)).filter(Boolean))];
+}
+
 function sanitizeClassBasic(item) {
   if (!item || typeof item !== 'object') throw new Error('Invalid class payload.');
   const registrationMode = normalizeRegistrationMode(item.registrationMode);
@@ -111,6 +118,7 @@ function sanitizeClassBasic(item) {
     previousClassId: cleanId(item.previousClassId, { max: 64, allowEmpty: true }),
     nextClassId: cleanId(item.nextClassId, { max: 64, allowEmpty: true }),
     cycleNo,
+    skillIds: sanitizeSkillIds(item.skillIds),
     allowedProgramTerms,
     officialFinalGrades
   };
@@ -558,7 +566,9 @@ module.exports = {
   clearRuntimeStorageByOrg,
   getClassSessions,
   saveClassSessions,
-  removePhysicalClassStorageByClassIds
+  removePhysicalClassStorageByClassIds,
+  sanitizeClassBasic,
+  sanitizeSkillIds
 };
 
 

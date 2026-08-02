@@ -6,6 +6,8 @@ const schoolDependencyService = require('./schoolDependencyService');
 const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
 const classCycleLinkResolutionService = require('./classCycleLinkResolutionService');
 const classDeletePreparationHrefs = require('./classDeletePreparationHrefs');
+const skillUsageService = require('./skillUsageService');
+const { getDefaultSkillDefinition, normalizeSkillCode } = require('../../../config/skillDefinitions');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -40,6 +42,7 @@ const SECTION_HREFS = Object.freeze({
   activities: (id) => `/school/activities/edit/${encodeURIComponent(id)}`,
   activityCategories: (id) => `/school/activities/categories/edit/${encodeURIComponent(id)}`,
   sessionStatuses: (id) => `/school/session-statuses/edit/${encodeURIComponent(id)}`,
+  skills: (id) => `/school/skills/edit/${encodeURIComponent(id)}`,
   holidays: (id) => `/school/holidays/edit/${encodeURIComponent(id)}`,
   registrations: {
     program: (id) => `/school/students/program-registrations/${encodeURIComponent(id)}`,
@@ -1117,6 +1120,47 @@ const ENTITY_DEFINITIONS = Object.freeze({
     ]
   },
 
+  skill: {
+    entityKey: 'skill',
+    repositoryKey: 'skills',
+    deleteMode: 'hard',
+    labelFields: ['label', 'code'],
+    fieldRules: [],
+    customScanners: [
+      async (ctx) => {
+        const code = normalizeSkillCode(ctx.record?.code || ctx.id);
+        if (getDefaultSkillDefinition(code)) {
+          return buildBlocker({
+            code: 'SYSTEM_SKILL',
+            label: 'System skill definition',
+            count: 1,
+            samples: [{
+              id: ctx.id,
+              label: String(ctx.record?.label || code),
+              href: SECTION_HREFS.skills(ctx.id)
+            }],
+            resolveHint: 'Default skills are stable system definitions. Deactivate this skill instead of deleting it.',
+            section: 'skills'
+          });
+        }
+        const usages = await skillUsageService.findSkillUsage(code, ctx.orgId, ctx.reqUser);
+        if (!usages.length) return null;
+        return buildBlocker({
+          code: 'SKILL_USAGE',
+          label: 'Class, session, or outline references',
+          count: usages.length,
+          samples: usages.slice(0, MAX_SAMPLES).map((usage) => ({
+            id: usage.id,
+            label: `${usage.label}${usage.detail ? ` — ${usage.detail}` : ''}`,
+            href: usage.href
+          })),
+          resolveHint: 'Remove active references first, or deactivate the skill to preserve historical records.',
+          section: 'skills'
+        });
+      }
+    ]
+  },
+
   sessionStatus: {
     entityKey: 'sessionStatus',
     repositoryKey: 'sessionStatuses',
@@ -1419,6 +1463,7 @@ const REPOSITORY_KEY_TO_ENTITY_KEY = Object.freeze({
   activities: 'activity',
   activityCategories: 'activityCategory',
   sessionStatuses: 'sessionStatus',
+  skills: 'skill',
   holidays: 'holiday',
   students: 'student',
   teachers: 'teacher',

@@ -11,6 +11,7 @@ const activityCategoryModel = require('../../models/school/activityCategoryModel
 const activityModel = require('../../models/school/activityModel');
 const payRateModel = require('../../models/school/payRateModel');
 const sessionStatusModel = require('../../models/school/sessionStatusModel');
+const skillModel = require('../../models/school/skillModel');
 const teachingOutlineLevelModel = require('../../models/school/teachingOutlineLevelModel');
 const teachingOutlineSectionTemplateModel = require('../../models/school/teachingOutlineSectionTemplateModel');
 const teachingOutlineItemModel = require('../../models/school/teachingOutlineItemModel');
@@ -46,6 +47,7 @@ const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const taskModel = require('../../models/school/taskModel');
 const taskRoutingRuleModel = require('../../models/school/taskRoutingRuleModel');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
+const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 const { SCOPE_MODES } = require('../../services/school/schoolDataScopeBuilder');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { generateStudentSystemIdCandidate } = require('../../services/school/studentSystemIdGenerator');
@@ -420,6 +422,11 @@ function normalizeClassDataContract(record) {
   normalized.enforceEnrollmentSessionCount = record.enforceEnrollmentSessionCount === true || String(record.enforceEnrollmentSessionCount || '').trim().toLowerCase() === 'true';
   normalized.previousClassId = String(record.previousClassId || '').trim();
   normalized.nextClassId = String(record.nextClassId || '').trim();
+  normalized.skillIds = [...new Set(
+    (Array.isArray(record.skillIds) ? record.skillIds : [])
+      .map((value) => normalizeSkillCode(value))
+      .filter(Boolean)
+  )];
   const parsedCycleNo = Number.parseInt(String(record.cycleNo || '').trim(), 10);
   normalized.cycleNo = Number.isFinite(parsedCycleNo) && parsedCycleNo > 0 ? parsedCycleNo : 1;
   return normalized;
@@ -1137,6 +1144,17 @@ const schoolRepositories = {
     remove: sessionStatusModel.deleteSessionStatus,
     defaultSearchFields: ['id', 'orgId', 'code', 'label', 'description', 'timesheetFormula'],
     allowSystemFallback: true
+  }),
+  skills: createSchoolRepository({
+    entityName: 'skills',
+    collectionName: 'schoolSkills',
+    getAll: skillModel.getAllSkills,
+    getById: skillModel.getSkillById,
+    create: skillModel.addSkill,
+    update: skillModel.updateSkill,
+    remove: skillModel.deleteSkill,
+    defaultSearchFields: ['id', 'orgId', 'code', 'label', 'kind'],
+    allowSystemFallback: false
   }),
   teachingOutlineLevels: createSchoolRepository({
     entityName: 'teachingOutlineLevels',

@@ -6,6 +6,7 @@ const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue'); 
 const { FEE_CATEGORIES, FEE_CATEGORY_SET } = require('./feeCategoryCatalog');
 const { generateStudentSystemIdCandidate } = require('../../services/school/studentSystemIdGenerator');
+const { CLB_SKILL_CODES } = require('../../../config/skillDefinitions');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/students.json');
 
@@ -18,7 +19,7 @@ if (!fsSync.existsSync(dataPath)) {
 // -----------------------------
 
 const ACADEMIC_STATUSES = new Set(['Active', 'Probation', 'Graduated', 'Withdrawn', 'Archived']);
-const CLB_SKILLS = Object.freeze(['listening', 'speaking', 'reading', 'writing']);
+const CLB_SKILLS = CLB_SKILL_CODES;
 const CLB_LEVEL_HISTORY_MAX = 100;
 
 function isPlainObject(v) {

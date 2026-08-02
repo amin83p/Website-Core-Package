@@ -243,6 +243,11 @@ const INDEX_DEFINITIONS = Object.freeze({
     { key: { orgId: 1, cycleStartDate: 1, cycleEndDate: 1 }, options: { name: 'idx_school_classes_org_cycle_dates' } },
     { key: { 'enrollment.students.studentId': 1, orgId: 1 }, options: { name: 'idx_school_classes_enrollment_student_org' } }
   ],
+  schoolSkills: [
+    { key: { id: 1 }, options: { name: 'idx_school_skills_id', unique: true } },
+    { key: { orgId: 1, code: 1 }, options: { name: 'idx_school_skills_org_code', unique: true } },
+    { key: { orgId: 1, active: 1, sortOrder: 1 }, options: { name: 'idx_school_skills_org_active_order' } }
+  ],
   schoolClassEnrollmentPeriods: [
     { key: { id: 1 }, options: { name: 'idx_school_class_enrollment_periods_id' } },
     { key: { orgId: 1, status: 1 }, options: { name: 'idx_school_class_enrollment_periods_org_status' } },
