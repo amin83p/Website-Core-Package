@@ -1,0 +1,725 @@
+[
+  {
+    "id": "TOST_LISTENING_I5KL",
+    "orgId": "ORG_TEST_OUTLINE",
+    "skillId": "listening",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "Listening Outcomes",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "strategies",
+        "title": "Listening Strategies",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 6
+      }
+    ],
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.125Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.125Z"
+    }
+  },
+  {
+    "id": "TOST_SPEAKING_VM11",
+    "orgId": "ORG_TEST_OUTLINE",
+    "skillId": "speaking",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "Speaking Outcomes",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "pronunciation",
+        "title": "Pronunciation and Fluency",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "interaction",
+        "title": "Interaction Strategies",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 6
+      },
+      {
+        "key": "grammar",
+        "title": "Basic Grammatical Knowledge",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 7
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 8
+      }
+    ],
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.126Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.126Z"
+    }
+  },
+  {
+    "id": "TOST_READING_XTW6",
+    "orgId": "ORG_TEST_OUTLINE",
+    "skillId": "reading",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "Reading Outcomes",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "text_features",
+        "title": "Text Features and Vocabulary",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "strategies",
+        "title": "Reading Strategies",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 6
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 7
+      }
+    ],
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.128Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.128Z"
+    }
+  },
+  {
+    "id": "TOST_WRITING_LS0Y",
+    "orgId": "ORG_TEST_OUTLINE",
+    "skillId": "writing",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "General Writing Ability",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions for Writing Tasks",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "grammar",
+        "title": "Basic Grammatical Knowledge",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 6
+      }
+    ],
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.130Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.130Z"
+    }
+  },
+  {
+    "id": "TOST_LISTENING_AKOD",
+    "orgId": "900000",
+    "skillId": "listening",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "Listening Outcomes",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "strategies",
+        "title": "Listening Strategies",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 6
+      }
+    ],
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.648Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.648Z"
+    }
+  },
+  {
+    "id": "TOST_SPEAKING_ZWOD",
+    "orgId": "900000",
+    "skillId": "speaking",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "Speaking Outcomes",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "pronunciation",
+        "title": "Pronunciation and Fluency",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "interaction",
+        "title": "Interaction Strategies",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 6
+      },
+      {
+        "key": "grammar",
+        "title": "Basic Grammatical Knowledge",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 7
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 8
+      }
+    ],
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.649Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.649Z"
+    }
+  },
+  {
+    "id": "TOST_READING_0UQK",
+    "orgId": "900000",
+    "skillId": "reading",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "Reading Outcomes",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "text_features",
+        "title": "Text Features and Vocabulary",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "strategies",
+        "title": "Reading Strategies",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 6
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 7
+      }
+    ],
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.651Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.651Z"
+    }
+  },
+  {
+    "id": "TOST_WRITING_H136",
+    "orgId": "900000",
+    "skillId": "writing",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "General Writing Ability",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions for Writing Tasks",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "grammar",
+        "title": "Basic Grammatical Knowledge",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 6
+      }
+    ],
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.652Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.652Z"
+    }
+  },
+  {
+    "id": "TOST_LISTENING_L12Z",
+    "orgId": "SYSTEM",
+    "skillId": "listening",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "Listening Outcomes",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "strategies",
+        "title": "Listening Strategies",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 6
+      }
+    ],
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.046Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.046Z"
+    }
+  },
+  {
+    "id": "TOST_SPEAKING_MOYC",
+    "orgId": "SYSTEM",
+    "skillId": "speaking",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "Speaking Outcomes",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "pronunciation",
+        "title": "Pronunciation and Fluency",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "interaction",
+        "title": "Interaction Strategies",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 6
+      },
+      {
+        "key": "grammar",
+        "title": "Basic Grammatical Knowledge",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 7
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 8
+      }
+    ],
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.048Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.048Z"
+    }
+  },
+  {
+    "id": "TOST_READING_YM12",
+    "orgId": "SYSTEM",
+    "skillId": "reading",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "Reading Outcomes",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "text_features",
+        "title": "Text Features and Vocabulary",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "strategies",
+        "title": "Reading Strategies",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 6
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 7
+      }
+    ],
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.050Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.050Z"
+    }
+  },
+  {
+    "id": "TOST_WRITING_KI7G",
+    "orgId": "SYSTEM",
+    "skillId": "writing",
+    "sections": [
+      {
+        "key": "benchmark_description",
+        "title": "Description of Benchmark",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 1
+      },
+      {
+        "key": "client_profile",
+        "title": "Client Profile",
+        "isSelectable": false,
+        "allowsGroups": false,
+        "displayOrder": 2
+      },
+      {
+        "key": "outcomes_general",
+        "title": "General Writing Ability",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 3
+      },
+      {
+        "key": "outcomes_performance",
+        "title": "Performance Conditions for Writing Tasks",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 4
+      },
+      {
+        "key": "grammar",
+        "title": "Basic Grammatical Knowledge",
+        "isSelectable": true,
+        "allowsGroups": false,
+        "displayOrder": 5
+      },
+      {
+        "key": "tasks",
+        "title": "Examples of Tasks",
+        "isSelectable": true,
+        "allowsGroups": true,
+        "displayOrder": 6
+      }
+    ],
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.051Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.051Z"
+    }
+  }
+]

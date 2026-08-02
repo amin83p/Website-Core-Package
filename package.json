@@ -58,6 +58,7 @@
     "school:master-academia-hub:seed": "node scripts/seed-school-master-academia-hub-section.js --db app",
     "school:overall-reports:seed": "node scripts/seed-school-overall-report-sections.js --db app",
     "school:settings:seed": "node scripts/seed-school-settings-section.js --db app",
+    "school:teaching-outline-levels:seed": "node scripts/seed-school-teaching-outline-levels.js --db app --org 900000",
     "membership:period-org:migrate": "node scripts/migrate-membership-period-org-scope.js",
     "school:enrollment-periods:backfill": "node scripts/school/migration/backfillClassEnrollmentPeriods.js",
     "school:enrollment-periods:backfill:apply": "node scripts/school/migration/backfillClassEnrollmentPeriods.js --apply",

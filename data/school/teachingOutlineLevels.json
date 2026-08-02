@@ -1,0 +1,623 @@
+[
+  {
+    "id": "TOL-DXCU7V",
+    "orgId": "ORG_TEST_OUTLINE",
+    "code": "pre_beginner_limited_ed",
+    "title": "Pre-Beginner — Limited Prior Education",
+    "shortTitle": "Pre-Beginner (Limited Ed.)",
+    "levelKind": "pre_clb",
+    "sortOrder": 10,
+    "matchAliases": [
+      "Pre-Beginner Limited",
+      "Pre Beginner Limited",
+      "Pre-Benchmark NO",
+      "pre_beginner_limited_ed"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.109Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.109Z"
+    }
+  },
+  {
+    "id": "TOL-RNR1FM",
+    "orgId": "ORG_TEST_OUTLINE",
+    "code": "pre_beginner_prior_ed",
+    "title": "Pre-Beginner — Prior Education",
+    "shortTitle": "Pre-Beginner (Prior Ed.)",
+    "levelKind": "pre_clb",
+    "sortOrder": 11,
+    "matchAliases": [
+      "Pre-Beginner Prior",
+      "Pre Beginner Prior",
+      "Pre-Benchmark with Education",
+      "pre_beginner_prior_ed"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.113Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.113Z"
+    }
+  },
+  {
+    "id": "TOL-SH7BNJ",
+    "orgId": "ORG_TEST_OUTLINE",
+    "code": "clb_1",
+    "title": "CLB 1",
+    "shortTitle": "CLB 1",
+    "levelKind": "benchmark",
+    "sortOrder": 101,
+    "matchAliases": [
+      "CLB 1",
+      "CLB1",
+      "1",
+      "clb_1"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.114Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.114Z"
+    }
+  },
+  {
+    "id": "TOL-FAGNWJ",
+    "orgId": "ORG_TEST_OUTLINE",
+    "code": "clb_2",
+    "title": "CLB 2",
+    "shortTitle": "CLB 2",
+    "levelKind": "benchmark",
+    "sortOrder": 102,
+    "matchAliases": [
+      "CLB 2",
+      "CLB2",
+      "2",
+      "clb_2"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.115Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.115Z"
+    }
+  },
+  {
+    "id": "TOL-WXQLVY",
+    "orgId": "ORG_TEST_OUTLINE",
+    "code": "clb_3",
+    "title": "CLB 3",
+    "shortTitle": "CLB 3",
+    "levelKind": "benchmark",
+    "sortOrder": 103,
+    "matchAliases": [
+      "CLB 3",
+      "CLB3",
+      "3",
+      "clb_3"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.117Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.117Z"
+    }
+  },
+  {
+    "id": "TOL-HKRQJ8",
+    "orgId": "ORG_TEST_OUTLINE",
+    "code": "clb_4",
+    "title": "CLB 4",
+    "shortTitle": "CLB 4",
+    "levelKind": "benchmark",
+    "sortOrder": 104,
+    "matchAliases": [
+      "CLB 4",
+      "CLB4",
+      "4",
+      "clb_4"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.118Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.118Z"
+    }
+  },
+  {
+    "id": "TOL-X7FSAV",
+    "orgId": "ORG_TEST_OUTLINE",
+    "code": "clb_5",
+    "title": "CLB 5",
+    "shortTitle": "CLB 5",
+    "levelKind": "benchmark",
+    "sortOrder": 105,
+    "matchAliases": [
+      "CLB 5",
+      "CLB5",
+      "5",
+      "clb_5"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.120Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.120Z"
+    }
+  },
+  {
+    "id": "TOL-M4JXYF",
+    "orgId": "ORG_TEST_OUTLINE",
+    "code": "clb_6",
+    "title": "CLB 6",
+    "shortTitle": "CLB 6",
+    "levelKind": "benchmark",
+    "sortOrder": 106,
+    "matchAliases": [
+      "CLB 6",
+      "CLB6",
+      "6",
+      "clb_6"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.121Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.121Z"
+    }
+  },
+  {
+    "id": "TOL-0ECL9K",
+    "orgId": "ORG_TEST_OUTLINE",
+    "code": "clb_7",
+    "title": "CLB 7",
+    "shortTitle": "CLB 7",
+    "levelKind": "benchmark",
+    "sortOrder": 107,
+    "matchAliases": [
+      "CLB 7",
+      "CLB7",
+      "7",
+      "clb_7"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "test",
+      "createDateTime": "2026-08-02T06:29:21.123Z",
+      "lastUpdateUser": "test",
+      "lastUpdateDateTime": "2026-08-02T06:29:21.123Z"
+    }
+  },
+  {
+    "id": "TOL-J6UENJ",
+    "orgId": "900000",
+    "code": "pre_beginner_limited_ed",
+    "title": "Pre-Beginner — Limited Prior Education",
+    "shortTitle": "Pre-Beginner (Limited Ed.)",
+    "levelKind": "pre_clb",
+    "sortOrder": 10,
+    "matchAliases": [
+      "Pre-Beginner Limited",
+      "Pre Beginner Limited",
+      "Pre-Benchmark NO",
+      "pre_beginner_limited_ed"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.627Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.627Z"
+    }
+  },
+  {
+    "id": "TOL-U41ANP",
+    "orgId": "900000",
+    "code": "pre_beginner_prior_ed",
+    "title": "Pre-Beginner — Prior Education",
+    "shortTitle": "Pre-Beginner (Prior Ed.)",
+    "levelKind": "pre_clb",
+    "sortOrder": 11,
+    "matchAliases": [
+      "Pre-Beginner Prior",
+      "Pre Beginner Prior",
+      "Pre-Benchmark with Education",
+      "pre_beginner_prior_ed"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.629Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.629Z"
+    }
+  },
+  {
+    "id": "TOL-AY4GPT",
+    "orgId": "900000",
+    "code": "clb_1",
+    "title": "CLB 1",
+    "shortTitle": "CLB 1",
+    "levelKind": "benchmark",
+    "sortOrder": 101,
+    "matchAliases": [
+      "CLB 1",
+      "CLB1",
+      "1",
+      "clb_1"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.634Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.634Z"
+    }
+  },
+  {
+    "id": "TOL-9T9FY3",
+    "orgId": "900000",
+    "code": "clb_2",
+    "title": "CLB 2",
+    "shortTitle": "CLB 2",
+    "levelKind": "benchmark",
+    "sortOrder": 102,
+    "matchAliases": [
+      "CLB 2",
+      "CLB2",
+      "2",
+      "clb_2"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.636Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.636Z"
+    }
+  },
+  {
+    "id": "TOL-F8GBYV",
+    "orgId": "900000",
+    "code": "clb_3",
+    "title": "CLB 3",
+    "shortTitle": "CLB 3",
+    "levelKind": "benchmark",
+    "sortOrder": 103,
+    "matchAliases": [
+      "CLB 3",
+      "CLB3",
+      "3",
+      "clb_3"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.637Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.637Z"
+    }
+  },
+  {
+    "id": "TOL-LX5XHF",
+    "orgId": "900000",
+    "code": "clb_4",
+    "title": "CLB 4",
+    "shortTitle": "CLB 4",
+    "levelKind": "benchmark",
+    "sortOrder": 104,
+    "matchAliases": [
+      "CLB 4",
+      "CLB4",
+      "4",
+      "clb_4"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.639Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.639Z"
+    }
+  },
+  {
+    "id": "TOL-HK2LTR",
+    "orgId": "900000",
+    "code": "clb_5",
+    "title": "CLB 5",
+    "shortTitle": "CLB 5",
+    "levelKind": "benchmark",
+    "sortOrder": 105,
+    "matchAliases": [
+      "CLB 5",
+      "CLB5",
+      "5",
+      "clb_5"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.640Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.640Z"
+    }
+  },
+  {
+    "id": "TOL-RT4F73",
+    "orgId": "900000",
+    "code": "clb_6",
+    "title": "CLB 6",
+    "shortTitle": "CLB 6",
+    "levelKind": "benchmark",
+    "sortOrder": 106,
+    "matchAliases": [
+      "CLB 6",
+      "CLB6",
+      "6",
+      "clb_6"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.642Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.642Z"
+    }
+  },
+  {
+    "id": "TOL-8QWDSW",
+    "orgId": "900000",
+    "code": "clb_7",
+    "title": "CLB 7",
+    "shortTitle": "CLB 7",
+    "levelKind": "benchmark",
+    "sortOrder": 107,
+    "matchAliases": [
+      "CLB 7",
+      "CLB7",
+      "7",
+      "clb_7"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:24:03.645Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:24:03.645Z"
+    }
+  },
+  {
+    "id": "TOL-3I0FVG",
+    "orgId": "SYSTEM",
+    "code": "pre_beginner_limited_ed",
+    "title": "Pre-Beginner — Limited Prior Education",
+    "shortTitle": "Pre-Beginner (Limited Ed.)",
+    "levelKind": "pre_clb",
+    "sortOrder": 10,
+    "matchAliases": [
+      "Pre-Beginner Limited",
+      "Pre Beginner Limited",
+      "Pre-Benchmark NO",
+      "pre_beginner_limited_ed"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.029Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.029Z"
+    }
+  },
+  {
+    "id": "TOL-KYPCV4",
+    "orgId": "SYSTEM",
+    "code": "pre_beginner_prior_ed",
+    "title": "Pre-Beginner — Prior Education",
+    "shortTitle": "Pre-Beginner (Prior Ed.)",
+    "levelKind": "pre_clb",
+    "sortOrder": 11,
+    "matchAliases": [
+      "Pre-Beginner Prior",
+      "Pre Beginner Prior",
+      "Pre-Benchmark with Education",
+      "pre_beginner_prior_ed"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.032Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.032Z"
+    }
+  },
+  {
+    "id": "TOL-LZO07R",
+    "orgId": "SYSTEM",
+    "code": "clb_1",
+    "title": "CLB 1",
+    "shortTitle": "CLB 1",
+    "levelKind": "benchmark",
+    "sortOrder": 101,
+    "matchAliases": [
+      "CLB 1",
+      "CLB1",
+      "1",
+      "clb_1"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.034Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.034Z"
+    }
+  },
+  {
+    "id": "TOL-GL6XTW",
+    "orgId": "SYSTEM",
+    "code": "clb_2",
+    "title": "CLB 2",
+    "shortTitle": "CLB 2",
+    "levelKind": "benchmark",
+    "sortOrder": 102,
+    "matchAliases": [
+      "CLB 2",
+      "CLB2",
+      "2",
+      "clb_2"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.036Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.036Z"
+    }
+  },
+  {
+    "id": "TOL-TG5HHZ",
+    "orgId": "SYSTEM",
+    "code": "clb_3",
+    "title": "CLB 3",
+    "shortTitle": "CLB 3",
+    "levelKind": "benchmark",
+    "sortOrder": 103,
+    "matchAliases": [
+      "CLB 3",
+      "CLB3",
+      "3",
+      "clb_3"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.037Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.037Z"
+    }
+  },
+  {
+    "id": "TOL-7IWAOW",
+    "orgId": "SYSTEM",
+    "code": "clb_4",
+    "title": "CLB 4",
+    "shortTitle": "CLB 4",
+    "levelKind": "benchmark",
+    "sortOrder": 104,
+    "matchAliases": [
+      "CLB 4",
+      "CLB4",
+      "4",
+      "clb_4"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.039Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.039Z"
+    }
+  },
+  {
+    "id": "TOL-YSTDOX",
+    "orgId": "SYSTEM",
+    "code": "clb_5",
+    "title": "CLB 5",
+    "shortTitle": "CLB 5",
+    "levelKind": "benchmark",
+    "sortOrder": 105,
+    "matchAliases": [
+      "CLB 5",
+      "CLB5",
+      "5",
+      "clb_5"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.040Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.040Z"
+    }
+  },
+  {
+    "id": "TOL-QLDMXE",
+    "orgId": "SYSTEM",
+    "code": "clb_6",
+    "title": "CLB 6",
+    "shortTitle": "CLB 6",
+    "levelKind": "benchmark",
+    "sortOrder": 106,
+    "matchAliases": [
+      "CLB 6",
+      "CLB6",
+      "6",
+      "clb_6"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.042Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.042Z"
+    }
+  },
+  {
+    "id": "TOL-W7SHFQ",
+    "orgId": "SYSTEM",
+    "code": "clb_7",
+    "title": "CLB 7",
+    "shortTitle": "CLB 7",
+    "levelKind": "benchmark",
+    "sortOrder": 107,
+    "matchAliases": [
+      "CLB 7",
+      "CLB7",
+      "7",
+      "clb_7"
+    ],
+    "description": "",
+    "isActive": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-08-02T07:28:16.044Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-08-02T07:28:16.044Z"
+    }
+  }
+]

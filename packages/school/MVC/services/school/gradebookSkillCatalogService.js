@@ -91,10 +91,39 @@ function normalizeGradebookActivitySkills(activity = {}) {
 }
 
 /**
- * Session curriculum rows: one entry per gradebook skill with an optional coverage note.
- * @returns {{ skillId: string, skillLabel: string, note: string }[]}
+ * Session curriculum rows: one entry per gradebook skill with optional coverage note and outline items.
+ * @returns {{ skillId: string, skillLabel: string, note: string, outlineItems: object[] }[]}
  */
-function normalizeSessionSkillsCovered(raw = []) {
+function normalizeSessionOutlineItems(raw = [], catalogItems = [], levels = []) {
+  const itemById = new Map((Array.isArray(catalogItems) ? catalogItems : []).map((row) => [String(row.id), row]));
+  const levelById = new Map((Array.isArray(levels) ? levels : []).map((row) => [String(row.id), row]));
+  const source = Array.isArray(raw) ? raw : [];
+  const seen = new Set();
+  const output = [];
+  source.forEach((row) => {
+    if (!row || typeof row !== 'object') return;
+    const itemId = String(row.itemId || row.id || '').trim();
+    if (!itemId || seen.has(itemId)) return;
+    const catalog = itemById.get(itemId);
+  if (!catalog && !row.label) return;
+    seen.add(itemId);
+    const levelId = String(row.levelId || catalog?.levelId || '').trim();
+    const level = levelById.get(levelId);
+    output.push({
+      itemId,
+      label: String(row.label || catalog?.label || itemId).trim().slice(0, 2000),
+      sectionKey: String(row.sectionKey || catalog?.sectionKey || '').trim().slice(0, 60),
+      levelId,
+      levelCode: String(row.levelCode || level?.code || '').trim().slice(0, 80),
+      levelTitle: String(row.levelTitle || level?.title || '').trim().slice(0, 160)
+    });
+  });
+  return output;
+}
+
+function normalizeSessionSkillsCovered(raw = [], options = {}) {
+  const catalogItems = options.catalogItems || [];
+  const levels = options.levels || [];
   const source = typeof raw === 'string'
     ? (() => {
       try { return JSON.parse(raw || '[]'); } catch (_e) { return []; }
@@ -111,10 +140,12 @@ function normalizeSessionSkillsCovered(raw = []) {
     seen.add(skillId);
     const skill = SKILL_BY_ID.get(skillId);
     const note = String(row.note || row.notes || row.coverageNote || '').trim().slice(0, 2000);
+    const outlineItems = normalizeSessionOutlineItems(row.outlineItems, catalogItems, levels);
     output.push({
       skillId,
       skillLabel: skill?.label || String(row.skillLabel || row.label || skillId).trim().slice(0, 120),
-      note
+      note,
+      outlineItems
     });
   });
   return output;
@@ -128,5 +159,6 @@ module.exports = {
   formatGradebookSkillLabels,
   matchSkillIdsFromLegacyText,
   normalizeGradebookActivitySkills,
+  normalizeSessionOutlineItems,
   normalizeSessionSkillsCovered
 };

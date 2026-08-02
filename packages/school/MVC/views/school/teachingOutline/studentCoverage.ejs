@@ -1,0 +1,32 @@
+<div class="sections-page">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-journal-text me-2"></i>Curriculum Covered</h1>
+    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print</button>
+  </div>
+  <% if (period) { %>
+    <p class="text-muted small">Enrollment: <%= period.startDate || '—' %> to <%= period.endDate || period.completionDate || '—' %></p>
+  <% } %>
+  <% const bySkill = (report && report.bySkill) ? report.bySkill : {}; %>
+  <% Object.keys(bySkill).forEach((skillId) => { const block = bySkill[skillId]; %>
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white fw-bold text-capitalize"><%= skillId %></div>
+      <div class="card-body">
+        <p class="small text-muted">Sessions with outline coverage: <%= block.totalSessions || 0 %></p>
+        <% if ((block.levelsCovered || []).length) { %>
+          <p><strong>Levels:</strong> <%= block.levelsCovered.map((l) => l.levelTitle).join(', ') %></p>
+        <% } %>
+        <% Object.keys(block.bySection || {}).forEach((sectionKey) => { %>
+          <h6 class="fw-semibold mt-3"><%= (block.sectionTitles && block.sectionTitles[sectionKey]) || sectionKey %></h6>
+          <ul class="small mb-0">
+            <% (block.bySection[sectionKey] || []).forEach((item) => { %>
+              <li><%= item.label %> <span class="text-muted">(<%= (item.sessionDates || []).join(', ') %>)</span></li>
+            <% }) %>
+          </ul>
+        <% }) %>
+        <% if (!Object.keys(block.bySection || {}).length) { %>
+          <p class="text-muted small mb-0">No structured outline items recorded for this skill.</p>
+        <% } %>
+      </div>
+    </div>
+  <% }) %>
+</div>

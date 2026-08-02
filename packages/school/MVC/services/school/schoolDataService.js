@@ -58,6 +58,9 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   staff: { repository: schoolRepositories.staff },
   payRates: { repository: schoolRepositories.payRates },
   sessionStatuses: { repository: schoolRepositories.sessionStatuses },
+  teachingOutlineLevels: { repository: schoolRepositories.teachingOutlineLevels, allowSystemFallback: true },
+  teachingOutlineSectionTemplates: { repository: schoolRepositories.teachingOutlineSectionTemplates, allowSystemFallback: true },
+  teachingOutlineItems: { repository: schoolRepositories.teachingOutlineItems, allowSystemFallback: true },
   timesheetPeriods: { repository: schoolRepositories.timesheetPeriods },
   timesheets: { repository: schoolRepositories.timesheets },
   studentProgramRegistrations: { repository: schoolRepositories.studentProgramRegistrations },
@@ -124,7 +127,8 @@ function resolveEntityConfig(entityType) {
 }
 
 function allowsSystemFallbackEntity(entityType) {
-  return ['transactionDefinitions', 'feeDefinitions', 'transactionTemplates', 'sessionStatuses']
+  return ['transactionDefinitions', 'feeDefinitions', 'transactionTemplates', 'sessionStatuses',
+    'teachingOutlineLevels', 'teachingOutlineSectionTemplates', 'teachingOutlineItems']
     .includes(String(entityType || ''));
 }
 

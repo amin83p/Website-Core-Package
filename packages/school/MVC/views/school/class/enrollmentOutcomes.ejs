@@ -47,6 +47,7 @@
             <th class="text-end">Suggested final %</th>
             <th class="eo-actions">Outcome</th>
             <th>Notes</th>
+            <th>Curriculum</th>
             <th></th>
           </tr>
         </thead>
@@ -67,6 +68,13 @@
               </td>
               <td style="min-width: 12rem;">
                 <input type="text" class="form-control form-control-sm eo-notes" maxlength="2000" placeholder="Optional notes" value="<%= row.completionDecisionNotes || '' %>">
+              </td>
+              <td>
+                <% if (row.personId) { %>
+                  <a class="btn btn-sm btn-outline-secondary" href="/school/teaching-outlines/coverage/class/<%= encodeURIComponent(c.id) %>/student/<%= encodeURIComponent(row.personId) %>?enrollmentPeriodId=<%= encodeURIComponent(row.periodId) %>">Covered</a>
+                <% } else { %>
+                  <span class="text-muted small">—</span>
+                <% } %>
               </td>
               <td class="text-end">
                 <button type="button" class="btn btn-sm btn-primary eo-save">Save</button>

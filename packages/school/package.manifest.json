@@ -173,6 +173,9 @@
           "id": "536458"
         },
         {
+          "id": "445580"
+        },
+        {
           "id": "445562"
         },
         {
@@ -2130,6 +2133,31 @@
       "adoptExisting": true
     },
     {
+      "id": "445580",
+      "name": "SCHOOL_TEACHING_OUTLINES",
+      "category": "SCHOOL",
+      "description": "Manage CLB teaching content outlines, levels, and curriculum checklists.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/teaching-outlines",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
       "id": "358609",
       "name": "SCHOOL_SESSIONS",
       "category": "SCHOOL",
@@ -3575,6 +3603,18 @@
       "tags": [
         "SCHOOL_SCHEDULES",
         "938980"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_049",
+      "name": "SCHOOL_TEACHING_OUTLINES",
+      "type": "class",
+      "value": "bi bi-journal-check",
+      "tags": [
+        "SCHOOL_TEACHING_OUTLINES",
+        "445580"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -7902,6 +7942,18 @@
     {
       "entityType": "student_enrollments",
       "label": "Student Enrollments"
+    },
+    {
+      "entityType": "teachingOutlineLevels",
+      "label": "Teaching Outline Levels"
+    },
+    {
+      "entityType": "teachingOutlineSectionTemplates",
+      "label": "Teaching Outline Section Templates"
+    },
+    {
+      "entityType": "teachingOutlineItems",
+      "label": "Teaching Outline Items"
     },
     {
       "entityType": "subjects",

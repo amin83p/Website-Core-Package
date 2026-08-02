@@ -1,0 +1,53 @@
+<% const sections = (template && template.sections) ? template.sections : []; %>
+<div class="sections-page">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0">Section Template — <%= skillId %></h1>
+    <a href="/school/teaching-outlines" class="btn btn-outline-secondary btn-sm">Back</a>
+  </div>
+  <form id="sectionTemplateForm" method="POST" action="/school/teaching-outlines/<%= skillId %>/sections" class="card border-0 shadow-sm p-4">
+    <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+    <input type="hidden" name="sectionsJson" id="sectionsJson" value="">
+    <div id="sectionsEditor"></div>
+    <button type="button" class="btn btn-outline-primary btn-sm mt-3" id="btnAddSection">Add section</button>
+    <div class="mt-4">
+      <button type="submit" class="btn btn-primary">Save template</button>
+    </div>
+  </form>
+</div>
+<script>
+(() => {
+  let sections = <%- JSON.stringify(sections).replace(/</g, '\\u003c') %>;
+  const editor = document.getElementById('sectionsEditor');
+  const hidden = document.getElementById('sectionsJson');
+  function render() {
+    editor.innerHTML = sections.map((s, i) => `
+      <div class="border rounded p-3 mb-2" data-index="${i}">
+        <div class="row g-2">
+          <div class="col-md-3"><input class="form-control form-control-sm sec-key" value="${s.key || ''}" placeholder="key"></div>
+          <div class="col-md-5"><input class="form-control form-control-sm sec-title" value="${s.title || ''}" placeholder="title"></div>
+          <div class="col-md-2"><input type="number" class="form-control form-control-sm sec-order" value="${s.displayOrder || (i+1)*10}"></div>
+          <div class="col-md-2">
+            <div class="form-check"><input class="form-check-input sec-selectable" type="checkbox" ${s.isSelectable ? 'checked' : ''}> Selectable</div>
+            <div class="form-check"><input class="form-check-input sec-groups" type="checkbox" ${s.allowsGroups ? 'checked' : ''}> Groups</div>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+  function syncFromDom() {
+    sections = [...editor.querySelectorAll('[data-index]')].map((row, i) => ({
+      key: row.querySelector('.sec-key').value.trim(),
+      title: row.querySelector('.sec-title').value.trim(),
+      displayOrder: Number(row.querySelector('.sec-order').value || (i+1)*10),
+      isSelectable: row.querySelector('.sec-selectable').checked,
+      allowsGroups: row.querySelector('.sec-groups').checked
+    })).filter((s) => s.key && s.title);
+    hidden.value = JSON.stringify(sections);
+  }
+  document.getElementById('btnAddSection').addEventListener('click', () => {
+    sections.push({ key: '', title: '', displayOrder: (sections.length + 1) * 10, isSelectable: true, allowsGroups: false });
+    render();
+  });
+  document.getElementById('sectionTemplateForm').addEventListener('submit', () => syncFromDom());
+  render();
+})();
+</script>

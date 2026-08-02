@@ -1,0 +1,91 @@
+<div class="sections-page">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><%= skillId %> — <%= level.title %></h1>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="btnImportSeed">Re-import seed</button>
+      <a href="/school/teaching-outlines" class="btn btn-outline-secondary btn-sm">Back</a>
+    </div>
+  </div>
+
+  <% (tree || []).forEach((section) => { %>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white fw-bold"><%= section.title %></div>
+      <div class="card-body">
+        <% function renderNodes(nodes, depth) { %>
+          <% (nodes || []).forEach((node) => { %>
+            <div class="mb-2" style="margin-left: <%= depth * 20 %>px">
+              <span class="badge bg-light text-dark border me-2"><%= node.itemKind %></span>
+              <%= node.label %>
+              <% if (node.isActive === false) { %><span class="badge bg-warning text-dark ms-1">inactive</span><% } %>
+              <button type="button" class="btn btn-link btn-sm p-0 ms-2 to-toggle" data-id="<%= node.id %>">toggle</button>
+              <% if ((node.children || []).length) { renderNodes(node.children, depth + 1); } %>
+            </div>
+          <% }) %>
+        <% } %>
+        <% renderNodes(section.items, 0); %>
+        <% if (!section.items || !section.items.length) { %>
+          <p class="text-muted small mb-0">No items yet.</p>
+        <% } %>
+        <form class="mt-3 row g-2 align-items-end add-item-form" data-section="<%= section.key %>">
+          <div class="col-md-2">
+            <label class="form-label small">Kind</label>
+            <select class="form-select form-select-sm item-kind">
+              <option value="checklist">checklist</option>
+              <option value="group">group</option>
+              <option value="reference">reference</option>
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label small">Label</label>
+            <input class="form-control form-control-sm item-label" required>
+          </div>
+          <div class="col-md-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">Add</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  <% }) %>
+</div>
+<script>
+(() => {
+  const skillId = <%- JSON.stringify(skillId) %>;
+  const levelId = <%- JSON.stringify(level.id) %>;
+  const actionStateId = <%- JSON.stringify(actionStateId || '') %>;
+  document.getElementById('btnImportSeed')?.addEventListener('click', async () => {
+    const body = new URLSearchParams({ skillId, levelCode: <%- JSON.stringify(level.code) %>, actionStateId });
+    const res = await fetch('/school/teaching-outlines/api/import-seed', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+    const data = await res.json();
+    if (data.status === 'success') location.reload();
+    else alert(data.message || 'Import failed');
+  });
+  document.querySelectorAll('.add-item-form').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const item = {
+        skillId,
+        levelId,
+        sectionKey: form.getAttribute('data-section'),
+        itemKind: form.querySelector('.item-kind').value,
+        label: form.querySelector('.item-label').value.trim(),
+        displayOrder: 100,
+        isSelectable: form.querySelector('.item-kind').value === 'checklist'
+      };
+      const body = new URLSearchParams({ itemJson: JSON.stringify(item), actionStateId });
+      const res = await fetch('/school/teaching-outlines/api/save-item', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+      const data = await res.json();
+      if (data.status === 'success') location.reload();
+      else alert(data.message || 'Save failed');
+    });
+  });
+  document.querySelectorAll('.to-toggle').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      const body = new URLSearchParams({ actionStateId });
+      const res = await fetch('/school/teaching-outlines/api/toggle-active/' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+      const data = await res.json();
+      if (data.status === 'success') location.reload();
+    });
+  });
+})();
+</script>

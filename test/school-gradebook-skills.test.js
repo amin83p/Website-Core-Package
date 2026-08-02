@@ -56,9 +56,9 @@ test('normalizeSessionSkillsCovered keeps unique skills with notes and drops inv
     { id: 'writing', notes: 'Paragraph outlines' }
   ]);
   assert.deepEqual(normalized, [
-    { skillId: 'listening', skillLabel: 'Listening', note: 'Introduced short dialogues' },
-    { skillId: 'reading', skillLabel: 'Reading', note: 'Chapter 2 skim' },
-    { skillId: 'writing', skillLabel: 'Writing', note: 'Paragraph outlines' }
+    { skillId: 'listening', skillLabel: 'Listening', note: 'Introduced short dialogues', outlineItems: [] },
+    { skillId: 'reading', skillLabel: 'Reading', note: 'Chapter 2 skim', outlineItems: [] },
+    { skillId: 'writing', skillLabel: 'Writing', note: 'Paragraph outlines', outlineItems: [] }
   ]);
 });
 
@@ -67,7 +67,7 @@ test('normalizeSessionSkillsCovered accepts JSON string payloads', () => {
     JSON.stringify([{ skillId: 'zoom', note: 'Breakout rooms' }])
   );
   assert.deepEqual(normalized, [
-    { skillId: 'zoom', skillLabel: 'ZOOM', note: 'Breakout rooms' }
+    { skillId: 'zoom', skillLabel: 'ZOOM', note: 'Breakout rooms', outlineItems: [] }
   ]);
 });
 

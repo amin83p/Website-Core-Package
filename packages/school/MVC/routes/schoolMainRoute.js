@@ -52,6 +52,7 @@ router.use('/subjects', require('./subjectRoutes'));
 router.use('/terms', require('./termRoutes'));
 router.use('/payRates', require('./payRateRoutes'));
 router.use('/session-statuses', require('./sessionStatusRoutes'));
+router.use('/teaching-outlines', require('./teachingOutlineRoutes'));
 router.use('/timesheetPeriods', require('./timesheetPeriodRoutes'));
 router.use('/timesheets', require('./timesheetRoutes'));
 router.use('/classes', require('./classRoutes'));

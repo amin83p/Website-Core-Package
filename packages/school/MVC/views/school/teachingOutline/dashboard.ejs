@@ -1,0 +1,129 @@
+<%
+  const selectedSkill = String(selectedSkillId || '').trim();
+  const sectionTemplateUrl = selectedSkill
+    ? `/school/teaching-outlines/${encodeURIComponent(selectedSkill)}/sections`
+    : '/school/teaching-outlines';
+%>
+
+<%- include('partials/tablePages-start', {
+  title,
+  user,
+  tableName,
+  btn_export: true,
+  exportDataBaseUrl: listUrl || 'school/teaching-outlines',
+  print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-backpack2 me-1"></i> School Academia</a>',
+    '<a href="/school/teaching-outlines/levels" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-layers me-1"></i> Manage Levels</a>'
+  ],
+  manageBtns: [
+    '<a href="' + sectionTemplateUrl + '" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-layout-text-sidebar-reverse me-1"></i> Section Template</a>'
+  ]
+}) %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-3">
+    <form method="GET" action="/school/teaching-outlines" id="outlineSkillFilterForm" class="row g-3 align-items-end">
+      <div class="col-md-4 col-lg-3">
+        <label for="skillId" class="form-label fw-bold mb-1">Skill</label>
+        <select id="skillId" name="skillId" class="form-select size-md">
+          <% (skillOptions || []).forEach((skill) => { %>
+            <option value="<%= skill.id %>" <%= selectedSkill === skill.id ? 'selected' : '' %>><%= skill.label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-8 col-lg-9">
+        <div class="small text-muted">
+          Showing outline levels for <strong class="text-capitalize"><%= selectedSkill || 'selected skill' %></strong>.
+          Section template has <strong><%= Number(sectionCount || 0) %></strong> sections.
+          Choose a different skill to view another outline set.
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search outline levels...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="levelTitle">Level</th>
+        <th class="draggable" data-column="levelCode">Code</th>
+        <th class="draggable" data-column="itemCount">Items</th>
+        <th class="draggable" data-column="skillLabel">Skill</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr><td colspan="5" class="text-center py-5 text-muted">No outline levels found for this skill.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= item.levelTitle %></div>
+            <div class="x-small text-muted font-monospace"><%= item.levelId %></div>
+          </td>
+          <td>
+            <span class="badge bg-light text-dark border font-monospace"><%= item.levelCode %></span>
+          </td>
+          <td>
+            <span class="badge <%= item.itemCount > 0 ? 'bg-primary' : 'bg-light text-dark border' %>"><%= item.itemCount %></span>
+          </td>
+          <td class="text-capitalize"><%= item.skillLabel || item.skillId %></td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                title="Outline Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/teaching-outlines/<%= encodeURIComponent(item.skillId) %>/<%= encodeURIComponent(item.levelId) %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit Outline
+                </a>
+                <a href="<%= sectionTemplateUrl %>" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-layout-text-sidebar-reverse me-2"></i>Section Template
+                </a>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="<%= listUrl || 'school/teaching-outlines' %>" hidden></span>
+
+<%- include('partials/pagination', {
+  pagination,
+  filters,
+  baseUrlPath: listUrl || 'school/teaching-outlines'
+}) %>
+
+<%- include('partials/tablePages-end') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const skillSelect = document.getElementById('skillId');
+  const skillForm = document.getElementById('outlineSkillFilterForm');
+  if (!skillSelect || !skillForm) return;
+
+  skillSelect.addEventListener('change', function () {
+    const params = new URLSearchParams(window.location.search);
+    params.set('skillId', skillSelect.value);
+    params.delete('page');
+    const query = params.toString();
+    window.location.href = query ? `${skillForm.action}?${query}` : skillForm.action;
+  });
+});
+</script>

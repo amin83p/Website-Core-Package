@@ -11,6 +11,9 @@ const activityCategoryModel = require('../../models/school/activityCategoryModel
 const activityModel = require('../../models/school/activityModel');
 const payRateModel = require('../../models/school/payRateModel');
 const sessionStatusModel = require('../../models/school/sessionStatusModel');
+const teachingOutlineLevelModel = require('../../models/school/teachingOutlineLevelModel');
+const teachingOutlineSectionTemplateModel = require('../../models/school/teachingOutlineSectionTemplateModel');
+const teachingOutlineItemModel = require('../../models/school/teachingOutlineItemModel');
 const timesheetPeriodModel = require('../../models/school/timesheetPeriodModel');
 const timesheetModel = require('../../models/school/timesheetModel');
 const schoolAccountModel = require('../../models/school/schoolAccountModel');
@@ -1133,6 +1136,39 @@ const schoolRepositories = {
     update: sessionStatusModel.updateSessionStatus,
     remove: sessionStatusModel.deleteSessionStatus,
     defaultSearchFields: ['id', 'orgId', 'code', 'label', 'description', 'timesheetFormula'],
+    allowSystemFallback: true
+  }),
+  teachingOutlineLevels: createSchoolRepository({
+    entityName: 'teachingOutlineLevels',
+    collectionName: 'schoolTeachingOutlineLevels',
+    getAll: teachingOutlineLevelModel.getAllTeachingOutlineLevels,
+    getById: teachingOutlineLevelModel.getTeachingOutlineLevelById,
+    create: teachingOutlineLevelModel.addTeachingOutlineLevel,
+    update: teachingOutlineLevelModel.updateTeachingOutlineLevel,
+    remove: teachingOutlineLevelModel.deleteTeachingOutlineLevel,
+    defaultSearchFields: ['id', 'orgId', 'code', 'title', 'shortTitle', 'description'],
+    allowSystemFallback: true
+  }),
+  teachingOutlineSectionTemplates: createSchoolRepository({
+    entityName: 'teachingOutlineSectionTemplates',
+    collectionName: 'schoolTeachingOutlineSectionTemplates',
+    getAll: teachingOutlineSectionTemplateModel.getAllTeachingOutlineSectionTemplates,
+    getById: teachingOutlineSectionTemplateModel.getTeachingOutlineSectionTemplateById,
+    create: teachingOutlineSectionTemplateModel.addTeachingOutlineSectionTemplate,
+    update: teachingOutlineSectionTemplateModel.updateTeachingOutlineSectionTemplate,
+    remove: teachingOutlineSectionTemplateModel.deleteTeachingOutlineSectionTemplate,
+    defaultSearchFields: ['id', 'orgId', 'skillId'],
+    allowSystemFallback: true
+  }),
+  teachingOutlineItems: createSchoolRepository({
+    entityName: 'teachingOutlineItems',
+    collectionName: 'schoolTeachingOutlineItems',
+    getAll: teachingOutlineItemModel.getAllTeachingOutlineItems,
+    getById: teachingOutlineItemModel.getTeachingOutlineItemById,
+    create: teachingOutlineItemModel.addTeachingOutlineItem,
+    update: teachingOutlineItemModel.updateTeachingOutlineItem,
+    remove: teachingOutlineItemModel.deleteTeachingOutlineItem,
+    defaultSearchFields: ['id', 'orgId', 'skillId', 'levelId', 'sectionKey', 'label', 'description'],
     allowSystemFallback: true
   }),
   timesheetPeriods: createSchoolRepository({

@@ -1,0 +1,192 @@
+<%
+  const item = levelItem || {};
+  const isEdit = !!item.id;
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const levelKinds = [
+    { value: 'pre_clb', label: 'Pre-CLB' },
+    { value: 'benchmark', label: 'Benchmark (CLB)' },
+    { value: 'extended', label: 'Extended (CLB 8+)' },
+    { value: 'custom', label: 'Custom' }
+  ];
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h1 class="page-heading size-md m-0">
+        <i class="bi bi-layers me-2"></i><%= isEdit ? 'Edit Teaching Outline Level' : 'New Teaching Outline Level' %>
+      </h1>
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= item.id %></span>
+      <% } %>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/school/teaching-outlines/levels" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Back to List
+      </a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="levelForm" action="<%= isEdit ? '/school/teaching-outlines/levels/edit/' + item.id : '/school/teaching-outlines/levels/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-info-circle me-2"></i>Level Details</h6>
+          <div class="small text-muted mt-1">Define how this level appears in teaching outlines and session pickers.</div>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Code *</label>
+              <input type="text" name="code" class="form-control size-md font-monospace" value="<%= item.code || '' %>" placeholder="e.g. clb_3" required>
+              <div class="form-text small">Use lowercase with underscores. Example: <code>pre_beginner_prior_ed</code></div>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label fw-bold">Title *</label>
+              <input type="text" name="title" class="form-control size-md" value="<%= item.title || '' %>" placeholder="e.g. CLB 3" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold">Sort Order</label>
+              <input type="number" name="sortOrder" class="form-control size-md" value="<%= Number(item.sortOrder || 100) %>" min="0" max="99999">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Short Title</label>
+              <input type="text" name="shortTitle" class="form-control size-md" value="<%= item.shortTitle || '' %>" placeholder="Optional abbreviated label">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Kind</label>
+              <select name="levelKind" class="form-select size-md">
+                <% levelKinds.forEach((kind) => { %>
+                  <option value="<%= kind.value %>" <%= (item.levelKind || 'benchmark') === kind.value ? 'selected' : '' %>><%= kind.label %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Description</label>
+              <textarea name="description" class="form-control size-md" rows="2" placeholder="Optional notes about when to use this level…"><%= item.description || '' %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-person-badge me-2"></i>Student CLB Matching</h6>
+          <div class="small text-muted mt-1">Aliases map free-text CLB values on student profiles to this level for session suggestions.</div>
+        </div>
+        <div class="card-body p-4">
+          <label class="form-label fw-bold">Match Aliases</label>
+          <textarea name="matchAliases" class="form-control size-md" rows="4" placeholder="CLB 3&#10;3&#10;clb_3&#10;CLB3"><%= (item.matchAliases || []).join('\n') %></textarea>
+          <div class="form-text small">Enter one alias per line or separate with commas. Examples: <code>CLB 3</code>, <code>3</code>, <code>clb_3</code></div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-toggle-on me-2"></i>Status</h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Active</label>
+              <select name="isActive" class="form-select size-md">
+                <option value="true" <%= item.isActive !== false ? 'selected' : '' %>>Active</option>
+                <option value="false" <%= item.isActive === false ? 'selected' : '' %>>Inactive</option>
+              </select>
+              <div class="form-text small">Inactive levels are hidden from new sessions but remain on historical records.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md fw-bold px-4"><%= isEdit ? 'Save Changes' : 'Create Level' %></button>
+        <a href="/school/teaching-outlines/levels" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/school/teaching-outlines/levels">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('levelForm');
+  if (!form) return;
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+    try {
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        return;
+      }
+
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams(new FormData(form)).toString()
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+      }
+
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+        : { stop: false };
+      if (guarded.stop) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        return;
+      }
+
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: result.status === 'success' ? 'Success' : 'Error',
+          icon: result.status === 'success' ? 'success' : 'error',
+          message: result.message || (result.status === 'success' ? 'Level saved.' : 'Save failed.'),
+          buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
+        });
+      } else if (result.status !== 'success') {
+        alert(result.message || 'Save failed.');
+      }
+
+      if (result.status === 'success') {
+        window.location.href = result.redirectTo || '/school/teaching-outlines/levels';
+      } else {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+      }
+    } catch (error) {
+      console.error('Submission Error:', error);
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'System Error',
+          icon: 'error',
+          message: error.message || 'An unexpected network error occurred.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } else {
+        alert(error.message || 'An unexpected error occurred.');
+      }
+    }
+  });
+});
+</script>

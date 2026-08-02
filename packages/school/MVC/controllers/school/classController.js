@@ -73,6 +73,8 @@ const conductRatingScalePolicyModel = require('../../models/school/conductRating
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
+const teachingOutlineSuggestionService = require('../../services/school/teachingOutlineSuggestionService');
+const teachingOutlineCatalogService = require('../../services/school/teachingOutlineCatalogService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
 const { userCanOpenAttendanceMatrix } = require('../../services/school/attendanceMatrixAccessService');
 const { userCanViewSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
@@ -3696,6 +3698,17 @@ async function manageSession(req, res) {
             reqUser: req.user
         });
 
+        let teachingOutlineContext = null;
+        try {
+            teachingOutlineContext = await teachingOutlineSuggestionService.loadSessionOutlineContext(req.user, {
+                classId,
+                sessionId,
+                roster: session.roster || []
+            });
+        } catch (_outlineErr) {
+            teachingOutlineContext = null;
+        }
+
         const sessionCoTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
         const viewerPersonId = String(req.user?.personId || '').trim();
         const canManageCoTeachers = Boolean(canOverride);
@@ -3736,6 +3749,7 @@ async function manageSession(req, res) {
             sessionStudentCases,
             studentCaseDetailPresets: getPresetConfig(),
             gradebookSkills: gradebookSkillCatalogService.listGradebookSkills(),
+            teachingOutlineContext,
             includeModal: true,  
             user: req.user,
             actionStateId: req.actionStateId
@@ -4264,7 +4278,21 @@ async function saveSession(req, res) {
             originalSession.contentOrder = normalizeSessionContentOrder(parsedOrder);
         }
         if (!shouldSkipInstructionalPayload && skillsCovered !== undefined) {
-            originalSession.skillsCovered = gradebookSkillCatalogService.normalizeSessionSkillsCovered(skillsCovered);
+            let outlineCatalogItems = [];
+            let outlineLevels = [];
+            try {
+                const orgId = classData?.orgId || getActiveOrgIdOrThrow(req.user);
+                await teachingOutlineCatalogService.ensureOrgTeachingOutlineDefaults(orgId, req.user?.id || 'SYSTEM');
+                outlineCatalogItems = await schoolDataService.fetchData('teachingOutlineItems', {}, req.user);
+                outlineLevels = await schoolDataService.fetchData('teachingOutlineLevels', {}, req.user);
+            } catch (_e) {
+                outlineCatalogItems = [];
+                outlineLevels = [];
+            }
+            originalSession.skillsCovered = gradebookSkillCatalogService.normalizeSessionSkillsCovered(skillsCovered, {
+                catalogItems: outlineCatalogItems,
+                levels: outlineLevels
+            });
         }
 
         if (!shouldSkipInstructionalPayload && roster !== undefined) {
