@@ -1042,6 +1042,53 @@
     .skills-covered-note-display {
         white-space: pre-wrap;
     }
+    .outline-level-context .badge {
+        font-size: 0.78rem;
+    }
+    .outline-section-card {
+        border: 1px solid #dbe3ee;
+        border-radius: 0.65rem;
+        margin-bottom: 0.75rem;
+        overflow: hidden;
+        background: #fff;
+    }
+    .outline-section-card > summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 0.8rem 1rem;
+        background: #f8fafc;
+        font-weight: 650;
+    }
+    .outline-section-card > summary::-webkit-details-marker {
+        display: none;
+    }
+    .outline-section-content {
+        padding: 0.8rem 1rem;
+    }
+    .outline-tree-group {
+        border-left: 3px solid #93c5fd;
+        margin: 0.55rem 0;
+        padding: 0.25rem 0 0.25rem 0.8rem;
+    }
+    .outline-tree-child {
+        margin-left: 1rem;
+    }
+    .outline-reference-item {
+        border-left: 3px solid #cbd5e1;
+        padding: 0.35rem 0.65rem;
+        margin-bottom: 0.45rem;
+        white-space: pre-wrap;
+    }
+    .outline-selection-summary {
+        top: 0.5rem;
+        max-height: 60vh;
+        overflow: auto;
+    }
+    .outline-selected-group + .outline-selected-group {
+        border-top: 1px solid #e2e8f0;
+        margin-top: 0.65rem;
+        padding-top: 0.65rem;
+    }
 </style>
 
 <div class="sections-page session-manager-page">
@@ -1750,7 +1797,12 @@
             <div class="session-panel" id="session-panel-curriculum" role="tabpanel">
                 <div class="card border-0 shadow-sm mb-3">
                     <div class="card-header bg-white border-bottom py-3">
-                        <h5 class="m-0 fw-bold text-primary"><i class="bi bi-bullseye me-2"></i>Skills covered</h5>
+                        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-bullseye me-2"></i>Skills covered</h5>
+                            <span class="badge <%= isSessionCompleted ? 'bg-success' : 'bg-primary' %>">
+                                <%= isSessionCompleted ? 'Covered content' : 'Planned content' %>
+                            </span>
+                        </div>
                         <div class="small text-muted mt-1">Select gradebook skills and note what you covered in this session.</div>
                     </div>
                     <div class="card-body">
@@ -1758,18 +1810,18 @@
                         <div class="card bg-light border mb-3" id="outlineSuggestionsCard">
                             <div class="card-body py-3">
                                 <div class="fw-semibold mb-2"><i class="bi bi-lightbulb me-1"></i>Suggested for this session</div>
-                                <div class="small text-muted mb-2">Based on student CLB levels and items not yet covered in prior completed sessions.</div>
+                                <div class="small text-muted mb-2">Based on the roster's CLB distribution. Previously covered items remain available when repetition is useful.</div>
                                 <div id="outlineSuggestionsBody" class="small"></div>
                             </div>
                         </div>
                         <% } %>
-                        <% if (!isReadOnly && !isMakeupRequiredInactive) { %>
+                        <% if (!isReadOnly && isMakeupRequiredInactive !== true) { %>
                         <div class="row g-2 align-items-start mb-3" id="skillsCoveredAddForm">
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold mb-1" for="skillsCoveredSkillSelect">Skill</label>
                                 <select id="skillsCoveredSkillSelect" class="form-select">
                                     <option value="">Select a skill…</option>
-                                    <% (gradebookSkills || []).forEach((skill) => { %>
+                                    <% (gradebookSkills || []).filter((skill) => skill.selectable !== false).forEach((skill) => { %>
                                         <option value="<%= skill.id %>"><%= skill.label %></option>
                                     <% }) %>
                                 </select>
@@ -1797,7 +1849,7 @@
                                         <th scope="col" style="width: 18%;">Skill</th>
                                         <th scope="col" style="width: 14%;">Items</th>
                                         <th scope="col">Note / outline</th>
-                                        <% if (!isReadOnly && !isMakeupRequiredInactive) { %>
+                                        <% if (!isReadOnly && isMakeupRequiredInactive !== true) { %>
                                         <th scope="col" class="text-end" style="width: 5rem;"></th>
                                         <% } %>
                                     </tr>
@@ -1809,15 +1861,52 @@
                         <div class="text-muted small mt-2 d-none" id="skillsCoveredEmpty">No skills added for this session yet.</div>
                     </div>
                 </div>
-                <% if (!isReadOnly && !isMakeupRequiredInactive) { %>
+                <% if (!isReadOnly && isMakeupRequiredInactive !== true) { %>
                 <div class="modal fade" id="outlinePickerModal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-dialog modal-xl modal-dialog-scrollable">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">Select outline items</h5>
+                                <div>
+                                    <h5 class="modal-title">Build teaching outline</h5>
+                                    <div class="small text-muted" id="outlinePickerSubtitle"></div>
+                                </div>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <div class="modal-body" id="outlinePickerBody"></div>
+                            <div class="modal-body">
+                                <div class="outline-level-context rounded border bg-light p-3 mb-3" id="outlinePickerContext"></div>
+                                <div class="row g-3">
+                                    <div class="col-lg-8">
+                                        <div class="row g-2 align-items-end mb-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-semibold" for="outlinePickerLevelSelect">Browse level</label>
+                                                <select class="form-select form-select-sm" id="outlinePickerLevelSelect"></select>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <label class="form-label small fw-semibold" for="outlinePickerSearch">Search this level</label>
+                                                <input type="search" class="form-control form-control-sm" id="outlinePickerSearch" placeholder="Search objectives, grammar, or activities…">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <button type="button" class="btn btn-outline-primary btn-sm w-100" id="btnOutlineSetPrimary">Set as primary</button>
+                                            </div>
+                                        </div>
+                                        <div class="btn-group btn-group-sm flex-wrap mb-3" role="group" aria-label="Outline filters" id="outlinePickerFilters">
+                                            <button type="button" class="btn btn-outline-secondary active" data-outline-filter="all">All</button>
+                                            <button type="button" class="btn btn-outline-secondary" data-outline-filter="recommended">Recommended</button>
+                                            <button type="button" class="btn btn-outline-secondary" data-outline-filter="new">New</button>
+                                            <button type="button" class="btn btn-outline-secondary" data-outline-filter="covered">Previously covered</button>
+                                            <button type="button" class="btn btn-outline-secondary" data-outline-filter="selected">Selected</button>
+                                        </div>
+                                        <div id="outlinePickerBody"></div>
+                                    </div>
+                                    <div class="col-lg-4">
+                                        <div class="outline-selection-summary border rounded p-3 bg-white sticky-lg-top">
+                                            <div class="fw-semibold mb-2">Session plan</div>
+                                            <div class="small text-muted mb-2">Selections are retained while you browse other CLB levels.</div>
+                                            <div id="outlinePickerSelectionSummary"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="button" class="btn btn-primary" id="btnApplyOutlinePicker">Apply selection</button>
@@ -2181,7 +2270,7 @@
                     <div class="form-label fw-bold">Skills</div>
                     <div id="gbModalSkillsPicker" class="gb-skills-picker border rounded p-2 bg-light">
                         <div class="row g-1 g-md-2">
-                            <% (gradebookSkills || []).forEach((skill) => { %>
+                            <% (gradebookSkills || []).filter((skill) => skill.selectable !== false).forEach((skill) => { %>
                                 <div class="col-6 col-lg-4">
                                     <div class="form-check">
                                         <input class="form-check-input gb-skill-checkbox" type="checkbox" value="<%= skill.id %>" id="gbSkill_<%= skill.id %>">
@@ -5267,7 +5356,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const skillsCoveredReadOnly = <%= JSON.stringify(!!isReadOnly || !!isMakeupRequiredInactive) %>;
     const skillsCoveredCatalog = <%- jsonForScript(gradebookSkills || []) %>;
     const skillsCoveredLabelById = new Map(skillsCoveredCatalog.map((skill) => [skill.id, skill.label]));
-    const CLB_SKILL_IDS = new Set(['listening', 'speaking', 'reading', 'writing']);
+    const CLB_SKILL_IDS = new Set(
+        skillsCoveredCatalog
+            .filter((skill) => skill.kind === 'clb' || skill.supportsTeachingOutline === true)
+            .map((skill) => skill.id)
+    );
     const teachingOutlineCtx = <%- jsonForScript(teachingOutlineContext || null) %>;
     const outlineLevels = Array.isArray(teachingOutlineCtx?.levels) ? teachingOutlineCtx.levels : [];
     const outlineItemsAll = Array.isArray(teachingOutlineCtx?.items) ? teachingOutlineCtx.items : [];
@@ -5275,22 +5368,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const outlineSuggestionsBySkill = teachingOutlineCtx?.suggestionsBySkill || {};
     const levelTitleById = new Map(outlineLevels.map((l) => [String(l.id), l.title || l.code]));
     const levelCodeById = new Map(outlineLevels.map((l) => [String(l.id), l.code]));
-    let pendingOutlineSelection = [];
+    const outlineLevelById = new Map(outlineLevels.map((level) => [String(level.id), level]));
+    let pendingOutlineSelection = null;
+    let pendingPrimaryLevelId = '';
+    let outlinePickerState = null;
     const skillsCoveredInitial = <%- jsonForScript(session.skillsCovered || []) %>;
     let skillsCoveredState = (Array.isArray(skillsCoveredInitial) ? skillsCoveredInitial : [])
-        .map((row) => ({
-            skillId: String(row?.skillId || '').trim(),
-            skillLabel: String(row?.skillLabel || skillsCoveredLabelById.get(String(row?.skillId || '').trim()) || row?.skillId || '').trim(),
-            note: String(row?.note || '').trim(),
-            outlineItems: (Array.isArray(row?.outlineItems) ? row.outlineItems : []).map((item) => ({
+        .map((row) => {
+            const normalizedItems = (Array.isArray(row?.outlineItems) ? row.outlineItems : []).map((item) => ({
                 itemId: String(item?.itemId || item?.id || '').trim(),
                 label: String(item?.label || '').trim(),
                 sectionKey: String(item?.sectionKey || '').trim(),
                 levelId: String(item?.levelId || '').trim(),
                 levelCode: String(item?.levelCode || levelCodeById.get(String(item?.levelId || '')) || '').trim(),
                 levelTitle: String(item?.levelTitle || levelTitleById.get(String(item?.levelId || '')) || '').trim()
-            })).filter((item) => item.itemId && item.label)
-        }))
+            })).filter((item) => item.itemId && item.label);
+            const primaryLevelId = String(row?.primaryLevelId || normalizedItems[0]?.levelId || '').trim();
+            return {
+                skillId: String(row?.skillId || '').trim(),
+                skillLabel: String(row?.skillLabel || skillsCoveredLabelById.get(String(row?.skillId || '').trim()) || row?.skillId || '').trim(),
+                primaryLevelId,
+                primaryLevelCode: String(row?.primaryLevelCode || levelCodeById.get(primaryLevelId) || '').trim(),
+                primaryLevelTitle: String(row?.primaryLevelTitle || levelTitleById.get(primaryLevelId) || '').trim(),
+                note: String(row?.note || '').trim(),
+                outlineItems: normalizedItems
+            };
+        })
         .filter((row) => row.skillId && skillsCoveredLabelById.has(row.skillId));
 
     function isClbSkill(skillId) {
@@ -5316,7 +5419,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderOutlineItemList(items) {
         if (!items?.length) return '<span class="text-muted">—</span>';
-        return `<ul class="small mb-0 ps-3">${items.map((item) => `<li>${scEscapeHtml(item.label)}${item.levelTitle ? ` <span class="text-muted">(${scEscapeHtml(item.levelTitle)})</span>` : ''}</li>`).join('')}</ul>`;
+        const grouped = new Map();
+        (items || []).forEach((item) => {
+            const meta = outlinePlanGroupMeta(item.sectionKey);
+            if (!grouped.has(meta.key)) grouped.set(meta.key, { ...meta, items: [] });
+            grouped.get(meta.key).items.push(item);
+        });
+        return [...grouped.values()].map((group) => `
+            <div class="outline-selected-group">
+                <div class="x-small fw-semibold text-uppercase text-muted">${scEscapeHtml(group.title)}</div>
+                <ul class="small mb-0 ps-3">${group.items.map((item) => `<li>${scEscapeHtml(item.label)}${item.levelTitle ? ` <span class="badge bg-light text-dark border ms-1">${scEscapeHtml(item.levelTitle)}</span>` : ''}</li>`).join('')}</ul>
+            </div>`).join('');
+    }
+
+    function outlinePlanGroupMeta(sectionKey) {
+        const key = String(sectionKey || '').trim().toLowerCase();
+        if (key === 'outcomes_general') return { key: 'objectives', title: 'Objectives' };
+        if (key === 'grammar') return { key: 'language_focus', title: 'Language focus' };
+        if (key === 'tasks') return { key: 'activities', title: 'Activities' };
+        return { key: 'additional', title: 'Additional content' };
     }
 
     function renderSkillsCoveredTable() {
@@ -5331,6 +5452,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (emptyEl) emptyEl.classList.add('d-none');
         tbody.innerHTML = skillsCoveredState.map((row, index) => {
             const itemCount = (row.outlineItems || []).length;
+            const primaryBadge = row.primaryLevelTitle
+                ? `<div class="mt-1"><span class="badge bg-primary">${scEscapeHtml(row.primaryLevelTitle)} primary</span></div>`
+                : '';
             const detailCell = skillsCoveredReadOnly
                 ? `<td class="small">${renderOutlineItemList(row.outlineItems)}${row.note ? `<div class="mt-1">${scEscapeHtml(row.note)}</div>` : ''}</td>`
                 : `<td>
@@ -5342,7 +5466,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? ''
                 : `<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger skills-covered-remove" data-index="${index}" title="Remove" aria-label="Remove skill"><i class="bi bi-trash"></i></button></td>`;
             return `<tr data-index="${index}">
-                <td class="fw-semibold">${scEscapeHtml(row.skillLabel || row.skillId)}</td>
+                <td class="fw-semibold">${scEscapeHtml(row.skillLabel || row.skillId)}${primaryBadge}</td>
                 <td><span class="badge bg-light text-dark border">${itemCount}</span></td>
                 ${detailCell}
                 ${removeCell}
@@ -5362,65 +5486,239 @@ document.addEventListener('DOMContentLoaded', () => {
         populateLevelSelect(select.value);
     }
 
-    function buildOutlinePickerHtml(skillId, levelId, selectedIds) {
-        const selected = new Set((selectedIds || []).map(String));
+    function outlineItemSnapshotFromCatalog(itemId) {
+        const row = outlineItemsAll.find((item) => String(item.id) === String(itemId));
+        if (!row) return null;
+        const level = outlineLevelById.get(String(row.levelId || ''));
+        return {
+            itemId: String(row.id || '').trim(),
+            label: String(row.label || '').trim(),
+            sectionKey: String(row.sectionKey || '').trim(),
+            levelId: String(row.levelId || '').trim(),
+            levelCode: String(level?.code || '').trim(),
+            levelTitle: String(level?.title || level?.code || '').trim()
+        };
+    }
+
+    function getOutlineLevelBlock(skillId, levelId) {
+        const block = outlineSuggestionsBySkill?.[skillId]?.levelsById?.[String(levelId)];
+        if (block) return block;
         const template = outlineTemplatesBySkill?.[skillId];
         const sections = Array.isArray(template?.sections) ? template.sections : [];
-        const items = outlineItemsAll.filter((row) => row.skillId === skillId && String(row.levelId) === String(levelId) && row.isSelectable);
-        if (!items.length) return '<p class="text-muted small">No outline items for this skill and level.</p>';
-        const bySection = new Map();
-        sections.forEach((sec) => bySection.set(sec.key, { section: sec, items: [] }));
-        items.forEach((row) => {
-            const bucket = bySection.get(row.sectionKey);
-            if (bucket) bucket.items.push(row);
-        });
-        let html = '';
-        bySection.forEach((bucket) => {
-            if (!bucket.items.length) return;
-            html += `<div class="mb-3"><div class="fw-semibold">${scEscapeHtml(bucket.section.title || bucket.section.key)}</div>`;
-            bucket.items.forEach((item) => {
-                html += `<div class="form-check">
-                    <input class="form-check-input outline-pick-checkbox" type="checkbox" value="${scEscapeHtml(item.id)}" id="op_${scEscapeHtml(item.id)}" ${selected.has(String(item.id)) ? 'checked' : ''}>
-                    <label class="form-check-label small" for="op_${scEscapeHtml(item.id)}">${scEscapeHtml(item.label)}</label>
-                </div>`;
-            });
-            html += '</div>';
-        });
-        return html || '<p class="text-muted small">No selectable items.</p>';
-    }
-
-    function openOutlinePicker({ skillId, levelId, selectedIds, onApply }) {
-        const body = document.getElementById('outlinePickerBody');
-        const modalEl = document.getElementById('outlinePickerModal');
-        if (!body || !modalEl || !window.bootstrap) return;
-        body.innerHTML = buildOutlinePickerHtml(skillId, levelId, selectedIds);
-        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-        const applyBtn = document.getElementById('btnApplyOutlinePicker');
-        const handler = () => {
-            const picked = [...body.querySelectorAll('.outline-pick-checkbox:checked')].map((el) => el.value);
-            onApply(picked);
-            applyBtn?.removeEventListener('click', handler);
-            modal.hide();
+        const items = outlineItemsAll.filter((row) => (
+            row.skillId === skillId
+            && String(row.levelId) === String(levelId)
+            && row.isActive !== false
+        ));
+        return {
+            levelId,
+            tree: sections.map((section) => ({
+                ...section,
+                mode: section.isSelectable ? 'selectable' : 'reference',
+                items: items.filter((item) => item.sectionKey === section.key).map((item) => ({
+                    ...item,
+                    children: [],
+                    isSessionSelectable: section.isSelectable === true && item.isSelectable === true && item.itemKind !== 'group',
+                    isPreviouslyCovered: (teachingOutlineCtx?.priorCoveredItemIds || []).includes(String(item.id)),
+                    isRecommended: false
+                }))
+            }))
         };
-        applyBtn?.addEventListener('click', handler);
-        modal.show();
     }
 
-    function outlineItemsFromIds(itemIds, levelId) {
-        const level = outlineLevels.find((l) => String(l.id) === String(levelId));
-        return (itemIds || []).map((id) => {
-            const row = outlineItemsAll.find((item) => String(item.id) === String(id));
-            if (!row) return null;
-            return {
-                itemId: row.id,
-                label: row.label,
-                sectionKey: row.sectionKey,
-                levelId: row.levelId,
-                levelCode: level?.code || '',
-                levelTitle: level?.title || ''
-            };
+    function outlineNodeMatches(node, query, filter) {
+        const searchMatches = !query || String(node?.label || '').toLowerCase().includes(query);
+        if (!searchMatches) return false;
+        if (filter === 'recommended') return node?.isRecommended === true;
+        if (filter === 'new') return node?.isSessionSelectable === true && node?.isPreviouslyCovered !== true;
+        if (filter === 'covered') return node?.isPreviouslyCovered === true;
+        if (filter === 'selected') return outlinePickerState?.selectedById.has(String(node?.id || ''));
+        return true;
+    }
+
+    function filterOutlineNodes(nodes, query, filter) {
+        return (Array.isArray(nodes) ? nodes : []).map((node) => {
+            const children = filterOutlineNodes(node.children || [], query, filter);
+            const isContainer = String(node?.itemKind || '').toLowerCase() === 'group';
+            if (!outlineNodeMatches(node, query, filter) && !children.length) return null;
+            if (isContainer && !children.length && (query || filter !== 'all')) return null;
+            return { ...node, children };
         }).filter(Boolean);
     }
+
+    function renderOutlineNode(node, depth = 0) {
+        const itemId = String(node?.id || '');
+        const children = (node.children || []).map((child) => renderOutlineNode(child, depth + 1)).join('');
+        if (String(node?.itemKind || '').toLowerCase() === 'group') {
+            return `<div class="outline-tree-group ${depth ? 'outline-tree-child' : ''}">
+                <div class="fw-semibold small">${scEscapeHtml(node.label || 'Group')}</div>
+                ${children}
+            </div>`;
+        }
+        if (!node?.isSessionSelectable) {
+            return `<div class="outline-reference-item small ${depth ? 'outline-tree-child' : ''}">${scEscapeHtml(node?.label || '')}${children}</div>`;
+        }
+        const domId = `op_${itemId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+        const checked = outlinePickerState?.selectedById.has(itemId) ? 'checked' : '';
+        const statusBadges = [
+            node.isRecommended ? '<span class="badge bg-primary ms-1">Recommended</span>' : '',
+            node.isPreviouslyCovered
+                ? '<span class="badge bg-secondary ms-1">Previously covered</span>'
+                : '<span class="badge bg-success ms-1">New</span>'
+        ].join('');
+        return `<div class="form-check py-1 ${depth ? 'outline-tree-child' : ''}">
+            <input class="form-check-input outline-pick-checkbox" type="checkbox" value="${scEscapeHtml(itemId)}" id="${scEscapeHtml(domId)}" ${checked}>
+            <label class="form-check-label small" for="${scEscapeHtml(domId)}">${scEscapeHtml(node.label || '')}${statusBadges}</label>
+            ${children}
+        </div>`;
+    }
+
+    function renderOutlinePickerSelectionSummary() {
+        const host = document.getElementById('outlinePickerSelectionSummary');
+        if (!host || !outlinePickerState) return;
+        const selectedItems = [...outlinePickerState.selectedById.values()];
+        if (!selectedItems.length) {
+            host.innerHTML = '<div class="text-muted small">No instructional items selected.</div>';
+            return;
+        }
+        const grouped = new Map();
+        selectedItems.forEach((item) => {
+            const meta = outlinePlanGroupMeta(item.sectionKey);
+            if (!grouped.has(meta.key)) grouped.set(meta.key, { ...meta, items: [] });
+            grouped.get(meta.key).items.push(item);
+        });
+        host.innerHTML = [...grouped.values()].map((group) => `
+            <div class="outline-selected-group">
+                <div class="x-small text-uppercase fw-semibold text-muted">${scEscapeHtml(group.title)}</div>
+                ${group.items.map((item) => `<div class="small py-1">${scEscapeHtml(item.label)} <span class="badge bg-light text-dark border">${scEscapeHtml(item.levelTitle || item.levelCode || '')}</span></div>`).join('')}
+            </div>`).join('');
+    }
+
+    function renderOutlinePicker() {
+        if (!outlinePickerState) return;
+        const skillId = outlinePickerState.skillId;
+        const levelId = outlinePickerState.levelId;
+        const suggestion = outlineSuggestionsBySkill?.[skillId] || {};
+        const levelBlock = getOutlineLevelBlock(skillId, levelId);
+        const primaryLevel = outlineLevelById.get(String(outlinePickerState.primaryLevelId || ''));
+        const suggestedLevel = outlineLevelById.get(String(suggestion.suggestedLevelId || ''));
+        const currentLevel = outlineLevelById.get(String(levelId || ''));
+        const subtitle = document.getElementById('outlinePickerSubtitle');
+        const context = document.getElementById('outlinePickerContext');
+        const setPrimaryButton = document.getElementById('btnOutlineSetPrimary');
+        if (subtitle) subtitle.textContent = `${skillsCoveredLabelById.get(skillId) || skillId} · browse reference and instructional content`;
+        if (context) {
+            const distribution = (suggestion.levelDistribution || []).map((row) => (
+                `<span class="badge bg-white text-dark border me-1">${scEscapeHtml(row.levelTitle)}: ${Number(row.count || 0)} student${Number(row.count || 0) === 1 ? '' : 's'}</span>`
+            )).join('');
+            context.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                    <div><span class="fw-semibold">Primary level:</span> ${scEscapeHtml(primaryLevel?.title || primaryLevel?.code || 'Not set')}</div>
+                    ${suggestedLevel ? `<span class="badge bg-primary">Suggested ${scEscapeHtml(suggestedLevel.title || suggestedLevel.code)}</span>` : ''}
+                </div>
+                <div class="mt-2">${distribution || '<span class="small text-muted">No roster CLB levels were resolved for this skill.</span>'}</div>`;
+        }
+        if (setPrimaryButton) {
+            setPrimaryButton.disabled = String(outlinePickerState.primaryLevelId || '') === String(levelId || '');
+            setPrimaryButton.textContent = setPrimaryButton.disabled ? 'Current primary level' : `Make ${currentLevel?.title || currentLevel?.code || 'this level'} primary`;
+        }
+        const query = String(outlinePickerState.search || '').trim().toLowerCase();
+        const filter = outlinePickerState.filter || 'all';
+        const sectionHtml = (levelBlock?.tree || []).map((section) => {
+            if (section.mode === 'reference' && filter !== 'all' && !query) return '';
+            const nodes = filterOutlineNodes(section.items || [], query, filter);
+            if (!nodes.length) return '';
+            const titleBadge = section.mode === 'reference'
+                ? '<span class="badge bg-secondary ms-2">Reference</span>'
+                : `<span class="badge bg-primary ms-2">${Number(section.selectableCount || 0)} selectable</span>`;
+            return `<details class="outline-section-card" ${section.mode === 'selectable' ? 'open' : ''}>
+                <summary>${scEscapeHtml(section.title || section.key)}${titleBadge}</summary>
+                <div class="outline-section-content">${nodes.map((node) => renderOutlineNode(node)).join('')}</div>
+            </details>`;
+        }).join('');
+        const body = document.getElementById('outlinePickerBody');
+        if (body) body.innerHTML = sectionHtml || '<div class="text-muted small py-3">No outline content matches this filter.</div>';
+        renderOutlinePickerSelectionSummary();
+    }
+
+    function openOutlinePicker({ skillId, primaryLevelId, selectedItems, onApply }) {
+        const modalEl = document.getElementById('outlinePickerModal');
+        const levelSelect = document.getElementById('outlinePickerLevelSelect');
+        if (!modalEl || !levelSelect || !window.bootstrap) return;
+        const suggestion = outlineSuggestionsBySkill?.[skillId] || {};
+        const selectedById = new Map((selectedItems || []).map((item) => [String(item.itemId || ''), { ...item }]).filter(([id]) => id));
+        const inferredLevelId = String(primaryLevelId || selectedItems?.[0]?.levelId || suggestion.suggestedLevelId || outlineLevels[0]?.id || '');
+        outlinePickerState = {
+            skillId,
+            levelId: inferredLevelId,
+            primaryLevelId: inferredLevelId,
+            selectedById,
+            filter: 'all',
+            search: '',
+            onApply
+        };
+        levelSelect.innerHTML = outlineLevels.map((level) => (
+            `<option value="${scEscapeHtml(level.id)}">${scEscapeHtml(level.title || level.code)}</option>`
+        )).join('');
+        levelSelect.value = inferredLevelId;
+        const search = document.getElementById('outlinePickerSearch');
+        if (search) search.value = '';
+        document.querySelectorAll('#outlinePickerFilters [data-outline-filter]').forEach((button) => {
+            button.classList.toggle('active', button.getAttribute('data-outline-filter') === 'all');
+        });
+        renderOutlinePicker();
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    document.getElementById('outlinePickerLevelSelect')?.addEventListener('change', (event) => {
+        if (!outlinePickerState) return;
+        outlinePickerState.levelId = String(event.target.value || '');
+        renderOutlinePicker();
+    });
+    document.getElementById('outlinePickerSearch')?.addEventListener('input', (event) => {
+        if (!outlinePickerState) return;
+        outlinePickerState.search = String(event.target.value || '');
+        renderOutlinePicker();
+    });
+    document.getElementById('outlinePickerFilters')?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-outline-filter]');
+        if (!button || !outlinePickerState) return;
+        outlinePickerState.filter = button.getAttribute('data-outline-filter') || 'all';
+        document.querySelectorAll('#outlinePickerFilters [data-outline-filter]').forEach((row) => row.classList.toggle('active', row === button));
+        renderOutlinePicker();
+    });
+    document.getElementById('btnOutlineSetPrimary')?.addEventListener('click', () => {
+        if (!outlinePickerState) return;
+        outlinePickerState.primaryLevelId = outlinePickerState.levelId;
+        renderOutlinePicker();
+    });
+    document.getElementById('outlinePickerBody')?.addEventListener('change', (event) => {
+        const checkbox = event.target.closest('.outline-pick-checkbox');
+        if (!checkbox || !outlinePickerState) return;
+        const itemId = String(checkbox.value || '');
+        if (checkbox.checked) {
+            const snapshot = outlineItemSnapshotFromCatalog(itemId);
+            if (snapshot) outlinePickerState.selectedById.set(itemId, snapshot);
+        } else {
+            outlinePickerState.selectedById.delete(itemId);
+        }
+        if (outlinePickerState.filter === 'selected') renderOutlinePicker();
+        else renderOutlinePickerSelectionSummary();
+    });
+    document.getElementById('btnApplyOutlinePicker')?.addEventListener('click', () => {
+        if (!outlinePickerState) return;
+        const modalEl = document.getElementById('outlinePickerModal');
+        const callback = outlinePickerState.onApply;
+        const result = {
+            items: [...outlinePickerState.selectedById.values()],
+            primaryLevelId: outlinePickerState.primaryLevelId
+        };
+        if (typeof callback === 'function') callback(result);
+        if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    });
+    document.getElementById('outlinePickerModal')?.addEventListener('hidden.bs.modal', () => {
+        outlinePickerState = null;
+    });
 
     function addSkillCoveredRow() {
         if (skillsCoveredReadOnly) return;
@@ -5436,29 +5734,35 @@ document.addEventListener('DOMContentLoaded', () => {
         const existingIndex = skillsCoveredState.findIndex((row) => row.skillId === skillId);
         const existing = existingIndex >= 0 ? skillsCoveredState[existingIndex] : null;
         let outlineItems = existing?.outlineItems || [];
+        let primaryLevelId = String(existing?.primaryLevelId || levelSelect?.value || '').trim();
         if (isClbSkill(skillId)) {
-            const levelId = String(levelSelect?.value || '').trim();
-            if (!outlineItems.length && !note) {
-                alert('Pick outline items or add a session note for CLB skills.');
-                return;
+            if (pendingOutlineSelection !== null) {
+                outlineItems = pendingOutlineSelection;
+                primaryLevelId = String(pendingPrimaryLevelId || primaryLevelId).trim();
             }
-            if (pendingOutlineSelection.length) {
-                outlineItems = outlineItemsFromIds(pendingOutlineSelection, levelId);
-                pendingOutlineSelection = [];
+            if (!outlineItems.length && !note) {
+                alert('Pick at least one instructional outline item or add a session note for this CLB skill.');
+                return;
             }
         } else if (!note) {
             alert('Add a note for this skill.');
             noteInput?.focus();
             return;
         }
+        const primaryLevel = outlineLevelById.get(primaryLevelId);
         const entry = {
             skillId,
             skillLabel: skillsCoveredLabelById.get(skillId) || skillId,
+            primaryLevelId: isClbSkill(skillId) ? primaryLevelId : '',
+            primaryLevelCode: isClbSkill(skillId) ? String(primaryLevel?.code || '') : '',
+            primaryLevelTitle: isClbSkill(skillId) ? String(primaryLevel?.title || primaryLevel?.code || '') : '',
             note,
             outlineItems
         };
         if (existingIndex >= 0) skillsCoveredState[existingIndex] = entry;
         else skillsCoveredState.push(entry);
+        pendingOutlineSelection = null;
+        pendingPrimaryLevelId = '';
         if (noteInput) noteInput.value = '';
         renderSkillsCoveredTable();
         syncSkillsCoveredSelectOptions();
@@ -5466,7 +5770,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('skillsCoveredSkillSelect')?.addEventListener('change', (event) => {
         populateLevelSelect(event.target.value);
-        pendingOutlineSelection = [];
+        pendingOutlineSelection = null;
+        pendingPrimaryLevelId = '';
     });
 
     document.getElementById('btnPickOutlineItems')?.addEventListener('click', () => {
@@ -5477,9 +5782,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const existing = skillsCoveredState.find((row) => row.skillId === skillId);
         openOutlinePicker({
             skillId,
-            levelId,
-            selectedIds: (existing?.outlineItems || []).map((i) => i.itemId),
-            onApply: (picked) => { pendingOutlineSelection = picked; }
+            primaryLevelId: pendingPrimaryLevelId || existing?.primaryLevelId || levelId,
+            selectedItems: pendingOutlineSelection !== null ? pendingOutlineSelection : (existing?.outlineItems || []),
+            onApply: (result) => {
+                pendingOutlineSelection = result.items;
+                pendingPrimaryLevelId = result.primaryLevelId;
+            }
         });
     });
 
@@ -5499,13 +5807,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const index = Number(editBtn.getAttribute('data-index'));
             const row = skillsCoveredState[index];
             if (!row) return;
-            const levelId = row.outlineItems?.[0]?.levelId || outlineSuggestionsBySkill?.[row.skillId]?.suggestedLevelId || '';
             openOutlinePicker({
                 skillId: row.skillId,
-                levelId,
-                selectedIds: (row.outlineItems || []).map((i) => i.itemId),
-                onApply: (picked) => {
-                    row.outlineItems = outlineItemsFromIds(picked, levelId);
+                primaryLevelId: row.primaryLevelId || row.outlineItems?.[0]?.levelId || outlineSuggestionsBySkill?.[row.skillId]?.suggestedLevelId || '',
+                selectedItems: row.outlineItems || [],
+                onApply: (result) => {
+                    if (!result.items.length && !row.note) {
+                        alert('Keep at least one instructional outline item or add a session note before clearing this skill.');
+                        return;
+                    }
+                    const primaryLevel = outlineLevelById.get(String(result.primaryLevelId || ''));
+                    row.outlineItems = result.items;
+                    row.primaryLevelId = String(result.primaryLevelId || '');
+                    row.primaryLevelCode = String(primaryLevel?.code || '');
+                    row.primaryLevelTitle = String(primaryLevel?.title || primaryLevel?.code || '');
                     renderSkillsCoveredTable();
                 }
             });
@@ -5527,10 +5842,28 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.keys(outlineSuggestionsBySkill || {}).forEach((skillId) => {
             const block = outlineSuggestionsBySkill[skillId];
             const items = block?.items || [];
-            if (!items.length) return;
-            parts.push(`<div class="mb-2"><strong class="text-capitalize">${scEscapeHtml(skillId)}</strong>`);
-            items.slice(0, 5).forEach((item) => {
-                parts.push(`<button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1 outline-suggest-add" data-skill="${scEscapeHtml(skillId)}" data-item="${scEscapeHtml(item.itemId)}" data-level="${scEscapeHtml(item.levelId || block.suggestedLevelId || '')}">${scEscapeHtml(item.label).slice(0, 60)}${item.label.length > 60 ? '…' : ''}</button>`);
+            const suggestedLevel = outlineLevelById.get(String(block?.suggestedLevelId || ''));
+            if (!items.length && !suggestedLevel) return;
+            parts.push(`<div class="border-top pt-2 mt-2">
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-1">
+                    <strong>${scEscapeHtml(skillsCoveredLabelById.get(skillId) || skillId)}</strong>
+                    <div>
+                        ${suggestedLevel ? `<span class="badge bg-primary me-1">Suggested ${scEscapeHtml(suggestedLevel.title || suggestedLevel.code)}</span>` : ''}
+                        <button type="button" class="btn btn-sm btn-outline-primary outline-suggest-open" data-skill="${scEscapeHtml(skillId)}" data-level="${scEscapeHtml(block?.suggestedLevelId || outlineLevels[0]?.id || '')}">Open outline</button>
+                    </div>
+                </div>`);
+            const grouped = new Map();
+            items.forEach((item) => {
+                const meta = outlinePlanGroupMeta(item.sectionKey);
+                if (!grouped.has(meta.key)) grouped.set(meta.key, { ...meta, items: [] });
+                grouped.get(meta.key).items.push(item);
+            });
+            grouped.forEach((group) => {
+                parts.push(`<div class="x-small text-uppercase fw-semibold text-muted mt-2">${scEscapeHtml(group.title)}</div>`);
+                group.items.forEach((item) => {
+                    const coverage = item.isPreviouslyCovered ? ' · previously covered' : ' · new';
+                    parts.push(`<button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1 outline-suggest-add" data-skill="${scEscapeHtml(skillId)}" data-item="${scEscapeHtml(item.itemId)}" data-level="${scEscapeHtml(item.levelId || block.suggestedLevelId || '')}">${scEscapeHtml(item.label).slice(0, 60)}${item.label.length > 60 ? '…' : ''}${coverage}</button>`);
+                });
             });
             parts.push('</div>');
         });
@@ -5538,30 +5871,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('outlineSuggestionsBody')?.addEventListener('click', (event) => {
+        const openButton = event.target.closest('.outline-suggest-open');
+        if (openButton) {
+            const skillId = openButton.getAttribute('data-skill');
+            const levelId = openButton.getAttribute('data-level');
+            const row = skillsCoveredState.find((entry) => entry.skillId === skillId);
+            openOutlinePicker({
+                skillId,
+                primaryLevelId: row?.primaryLevelId || levelId,
+                selectedItems: row?.outlineItems || [],
+                onApply: (result) => {
+                    const primaryLevel = outlineLevelById.get(String(result.primaryLevelId || ''));
+                    let target = skillsCoveredState.find((entry) => entry.skillId === skillId);
+                    if (!target && !result.items.length) return;
+                    if (target && !target.note && !result.items.length) {
+                        alert('Keep at least one instructional outline item or add a session note before clearing this skill.');
+                        return;
+                    }
+                    if (!target) {
+                        target = { skillId, skillLabel: skillsCoveredLabelById.get(skillId) || skillId, note: '', outlineItems: [] };
+                        skillsCoveredState.push(target);
+                    }
+                    target.outlineItems = result.items;
+                    target.primaryLevelId = String(result.primaryLevelId || '');
+                    target.primaryLevelCode = String(primaryLevel?.code || '');
+                    target.primaryLevelTitle = String(primaryLevel?.title || primaryLevel?.code || '');
+                    renderSkillsCoveredTable();
+                    syncSkillsCoveredSelectOptions();
+                }
+            });
+            return;
+        }
         const btn = event.target.closest('.outline-suggest-add');
         if (!btn) return;
         const skillId = btn.getAttribute('data-skill');
         const itemId = btn.getAttribute('data-item');
         const levelId = btn.getAttribute('data-level');
-        const item = outlineItemsAll.find((row) => String(row.id) === String(itemId));
-        if (!item) return;
-        const level = outlineLevels.find((l) => String(l.id) === String(levelId));
-        const outlineItem = {
-            itemId: item.id,
-            label: item.label,
-            sectionKey: item.sectionKey,
-            levelId: item.levelId,
-            levelCode: level?.code || '',
-            levelTitle: level?.title || ''
-        };
-        let row = skillsCoveredState.find((r) => r.skillId === skillId);
+        const outlineItem = outlineItemSnapshotFromCatalog(itemId);
+        if (!outlineItem) return;
+        const level = outlineLevelById.get(String(levelId || outlineItem.levelId || ''));
+        let row = skillsCoveredState.find((entry) => entry.skillId === skillId);
         if (!row) {
-            row = { skillId, skillLabel: skillsCoveredLabelById.get(skillId) || skillId, note: '', outlineItems: [] };
+            row = {
+                skillId,
+                skillLabel: skillsCoveredLabelById.get(skillId) || skillId,
+                primaryLevelId: String(level?.id || levelId || ''),
+                primaryLevelCode: String(level?.code || ''),
+                primaryLevelTitle: String(level?.title || level?.code || ''),
+                note: '',
+                outlineItems: []
+            };
             skillsCoveredState.push(row);
         }
-        if (!row.outlineItems.some((i) => String(i.itemId) === String(itemId))) {
-            row.outlineItems.push(outlineItem);
-        }
+        if (!row.outlineItems.some((item) => String(item.itemId) === String(itemId))) row.outlineItems.push(outlineItem);
         renderSkillsCoveredTable();
         syncSkillsCoveredSelectOptions();
     });

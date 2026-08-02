@@ -28,6 +28,8 @@ const {
 const transactionDefinitionPreviewService = require('../../services/school/transactionDefinitionPreviewService');
 const programRegistrationDraftService = require('../../services/school/programRegistrationDraftService');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
+const skillCatalogService = require('../../services/school/skillCatalogService');
+const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
@@ -2245,6 +2247,159 @@ async function assertSessionInstructionalActiveForRequest(classId, sessionId, re
     }
     return { classData, sessions, sessionIndex, session, statusMap };
 }
+
+function normalizePostedSkillIds(value) {
+    const parsed = typeof value === 'string' ? parseData(value) : value;
+    const source = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : []);
+    return [...new Set(source.map((entry) => normalizeSkillCode(entry)).filter(Boolean))];
+}
+
+async function resolveClassSkillIdsOrThrow(skillIds, activeOrgId, reqUser, options = {}) {
+    const requested = normalizePostedSkillIds(skillIds);
+    if (!requested.length) return [];
+    const catalog = await skillCatalogService.loadOrgSkillCatalog(activeOrgId, reqUser?.id || 'SYSTEM', {
+        includeInactive: true,
+        allowFallback: false
+    });
+    const byCode = new Map(catalog.map((row) => [normalizeSkillCode(row?.code), row]));
+    const preserveInactive = new Set(normalizePostedSkillIds(options?.preserveInactiveSkillIds));
+    requested.forEach((code) => {
+        const row = byCode.get(code);
+        if (!row || !idsEqual(row.orgId, activeOrgId)) {
+            throw new Error(`Selected skill "${code}" is not available in this organization.`);
+        }
+        if (row.active === false && !preserveInactive.has(code)) {
+            throw new Error(`Selected skill "${row.label || code}" is inactive and cannot be newly assigned.`);
+        }
+    });
+    return requested;
+}
+
+async function loadClassFormSkillCatalog(activeOrgId, reqUser, assignedSkillIds = []) {
+    const assigned = new Set(normalizePostedSkillIds(assignedSkillIds));
+    const catalog = await skillCatalogService.loadOrgSkillCatalog(activeOrgId, reqUser?.id || 'SYSTEM', {
+        includeInactive: true,
+        allowFallback: true
+    });
+    return catalog.filter((row) => row?.active !== false || assigned.has(normalizeSkillCode(row?.code)));
+}
+
+function collectSessionSkillCodes(session = {}) {
+    const codes = new Set();
+    (Array.isArray(session?.skillsCovered) ? session.skillsCovered : []).forEach((row) => {
+        const code = normalizeSkillCode(row?.skillId || row?.id || row?.skill);
+        if (code) codes.add(code);
+    });
+    (Array.isArray(session?.gradebooks) ? session.gradebooks : []).forEach((row) => {
+        (Array.isArray(row?.skills) ? row.skills : []).forEach((value) => {
+            const code = normalizeSkillCode(value);
+            if (code) codes.add(code);
+        });
+    });
+    return codes;
+}
+
+async function loadSessionSkillPolicy(classData, session, reqUser) {
+    const orgId = classData?.orgId || getActiveOrgIdOrThrow(reqUser);
+    const orgRows = await skillCatalogService.loadOrgSkillCatalog(orgId, reqUser?.id || 'SYSTEM', {
+        includeInactive: true,
+        allowFallback: true
+    });
+    const catalog = skillCatalogService.toGradebookSkillCatalog(orgRows);
+    const catalogById = new Map(catalog.map((row) => [normalizeSkillCode(row.id), row]));
+    const assignedIds = new Set(normalizePostedSkillIds(classData?.skillIds || []));
+    const selectable = catalog
+        .filter((row) => row.active !== false && assignedIds.has(normalizeSkillCode(row.id)))
+        .map((row) => ({ ...row, selectable: true }));
+    const selectableIds = new Set(selectable.map((row) => normalizeSkillCode(row.id)));
+    const historicalIds = collectSessionSkillCodes(session);
+    const renderCatalog = [...selectable];
+    historicalIds.forEach((code) => {
+        if (selectableIds.has(code)) return;
+        const existingCoverage = (Array.isArray(session?.skillsCovered) ? session.skillsCovered : [])
+            .find((row) => normalizeSkillCode(row?.skillId) === code);
+        let catalogRow = catalogById.get(code);
+        if (!catalogRow) {
+            catalogRow = {
+                id: code,
+                label: String(existingCoverage?.skillLabel || existingCoverage?.label || code).trim(),
+                kind: '',
+                supportsTeachingOutline: false,
+                active: false,
+                sortOrder: 9999
+            };
+            catalog.push(catalogRow);
+            catalogById.set(code, catalogRow);
+        }
+        renderCatalog.push({
+            ...catalogRow,
+            selectable: false,
+            legacy: true
+        });
+    });
+    return {
+        orgId,
+        catalog,
+        catalogById,
+        assignedIds,
+        selectable,
+        selectableIds,
+        historicalIds,
+        renderCatalog
+    };
+}
+
+function parseSessionSkillsCoveredRows(raw) {
+    if (typeof raw !== 'string') return Array.isArray(raw) ? raw : [];
+    try {
+        const parsed = JSON.parse(raw || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+        throw new Error('Invalid skillsCovered payload.');
+    }
+}
+
+function mergeHistoricalSessionSkills(incomingRaw, existingRows, selectableIds) {
+    const incoming = parseSessionSkillsCoveredRows(incomingRaw);
+    const existing = Array.isArray(existingRows) ? existingRows : [];
+    const existingHistoricalById = new Map(
+        existing
+            .map((row) => [normalizeSkillCode(row?.skillId || row?.id || row?.skill), row])
+            .filter(([code]) => code && !selectableIds.has(code))
+    );
+    const mergedById = new Map();
+    incoming.forEach((row) => {
+        const code = normalizeSkillCode(row?.skillId || row?.id || row?.skill);
+        if (!code) return;
+        if (!selectableIds.has(code) && !existingHistoricalById.has(code)) {
+            throw new Error(`Skill "${code}" is not assigned and active for this class.`);
+        }
+        mergedById.set(code, existingHistoricalById.get(code) || row);
+    });
+    existingHistoricalById.forEach((row, code) => {
+        if (!mergedById.has(code)) mergedById.set(code, row);
+    });
+    return [...mergedById.values()];
+}
+
+function mergeHistoricalGradebookSkills(incomingGradebook, existingGradebook, selectableIds) {
+    const existingSkills = new Set(
+        (Array.isArray(existingGradebook?.skills) ? existingGradebook.skills : [])
+            .map((value) => normalizeSkillCode(value))
+            .filter(Boolean)
+    );
+    const historical = new Set([...existingSkills].filter((code) => !selectableIds.has(code)));
+    const requested = (Array.isArray(incomingGradebook?.skills) ? incomingGradebook.skills : [])
+        .map((value) => normalizeSkillCode(value))
+        .filter(Boolean);
+    requested.forEach((code) => {
+        if (!selectableIds.has(code) && !historical.has(code)) {
+            throw new Error(`Skill "${code}" is not assigned and active for this class.`);
+        }
+    });
+    return [...new Set([...requested.filter((code) => selectableIds.has(code)), ...historical])];
+}
+
 function buildClassFromBody(body, reqUserId, isNew = false, activeOrgId = '', existingRecord = null) {
   const now = new Date().toISOString();
   const curriculum = normalizeCurriculum(parseData(body.curriculum) || { subjects: [], totalHours: 0 });
@@ -2290,6 +2445,9 @@ function buildClassFromBody(body, reqUserId, isNew = false, activeOrgId = '', ex
   const nextClassId = String(fromBodyOrExisting('nextClassId', '') || '').trim();
   const parsedCycleNo = Number.parseInt(String(fromBodyOrExisting('cycleNo', existingRecord?.cycleNo || '') || '').trim(), 10);
   const cycleNo = Number.isFinite(parsedCycleNo) && parsedCycleNo > 0 ? parsedCycleNo : 1;
+  const skillIds = hasBodyField('skillIds')
+      ? normalizePostedSkillIds(body.skillIds)
+      : normalizePostedSkillIds(existingRecord?.skillIds || []);
 
   if (isNew && Array.isArray(instructors)) {
       instructors.forEach(inst => { inst.status = 'active'; inst.assignedAt = now; inst.unassignedAt = null; });
@@ -2312,6 +2470,7 @@ function buildClassFromBody(body, reqUserId, isNew = false, activeOrgId = '', ex
     cycleNo,
     billingMode,
     credits: normalizeCredits(body.credits),
+    skillIds,
     allowedProgramTerms,
     statusHistory: isNew ? [{ status: (body.status || 'active'), date: now, updatedBy: reqUserId, reason: 'Initial creation' }] : [],
     curriculum, pricing, postingTemplates, schedule, instructors, enrollment, evaluation,
@@ -2497,6 +2656,7 @@ async function showAddForm(req, res) {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
     const sessionStatusMeta = await getSessionStatusMetaForOrg(activeOrgId);
+    const skillCatalog = await loadClassFormSkillCatalog(activeOrgId, req.user);
     const subjectFeeCatalog = subjects.map((subject) => ({
       id: String(subject.id || ''),
       code: String(subject.code || '').trim(),
@@ -2513,6 +2673,7 @@ async function showAddForm(req, res) {
       allFeeCategoryLabel: ALL_FEE_CATEGORIES_LABEL,
       sessionStatusMeta,
       defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
+      skillCatalog,
       subjectFeeCatalog,
       actionStateId: req.actionStateId
     });
@@ -2527,6 +2688,7 @@ async function showAddWizardForm(req, res) {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
     const sessionStatusMeta = await getSessionStatusMetaForOrg(activeOrgId);
+    const skillCatalog = await loadClassFormSkillCatalog(activeOrgId, req.user);
     const subjectFeeCatalog = subjects.map((subject) => ({
       id: String(subject.id || ''),
       code: String(subject.code || '').trim(),
@@ -2544,6 +2706,7 @@ async function showAddWizardForm(req, res) {
       allFeeCategoryLabel: ALL_FEE_CATEGORIES_LABEL,
       sessionStatusMeta,
       defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
+      skillCatalog,
       subjectFeeCatalog,
       actionStateId: req.actionStateId
     });
@@ -2558,6 +2721,7 @@ async function showEditForm(req, res) {
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user, resolveOrgTodayFromRequest(req));
     const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
     const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
+    const skillCatalog = await loadClassFormSkillCatalog(classData?.orgId || getActiveOrgIdOrThrow(req.user), req.user, classData?.skillIds);
     const subjectFeeCatalog = subjects.map((subject) => ({
       id: String(subject.id || ''),
       code: String(subject.code || '').trim(),
@@ -2606,6 +2770,7 @@ async function showEditForm(req, res) {
       allFeeCategoryLabel: ALL_FEE_CATEGORIES_LABEL,
       sessionStatusMeta,
       defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
+      skillCatalog,
       subjectFeeCatalog,
       user: req.user,
       actionStateId: req.actionStateId
@@ -2621,6 +2786,7 @@ async function showEditWizardForm(req, res) {
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user, resolveOrgTodayFromRequest(req));
     const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
     const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
+    const skillCatalog = await loadClassFormSkillCatalog(classData?.orgId || getActiveOrgIdOrThrow(req.user), req.user, classData?.skillIds);
     const subjectFeeCatalog = subjects.map((subject) => ({
       id: String(subject.id || ''),
       code: String(subject.code || '').trim(),
@@ -2667,6 +2833,7 @@ async function showEditWizardForm(req, res) {
       allFeeCategoryLabel: ALL_FEE_CATEGORIES_LABEL,
       sessionStatusMeta,
       defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
+      skillCatalog,
       subjectFeeCatalog,
       user: req.user,
       actionStateId: req.actionStateId
@@ -2691,6 +2858,7 @@ async function getClassTemplate(req, res) {
       credits: normalizeCredits(classData.credits),
       deliveryDepartmentId: String(classData.deliveryDepartmentId || '').trim(),
       deliveryDepartmentName: String(classData.deliveryDepartmentName || '').trim(),
+      skillIds: normalizePostedSkillIds(classData.skillIds || []),
       curriculum: {
         subjects: Array.isArray(classData?.curriculum?.subjects)
           ? classData.curriculum.subjects.map((subject) => ({
@@ -2785,6 +2953,7 @@ async function addClass(req, res) {
     req.body.deliveryDepartmentId = resolvedDeliveryDepartment.deliveryDepartmentId;
     req.body.deliveryDepartmentName = resolvedDeliveryDepartment.deliveryDepartmentName;
     const item = buildClassFromBody(req.body, req.user?.id, true, activeOrgId);
+    item.skillIds = await resolveClassSkillIdsOrThrow(item.skillIds, activeOrgId, req.user);
     item.allowedProgramTerms = await resolveAllowedProgramTermsOrThrow(item.allowedProgramTerms, activeOrgId, req.user, {
         registrationMode: item.registrationMode
     });
@@ -2857,6 +3026,9 @@ async function editClass(req, res) {
     req.body.deliveryDepartmentName = resolvedDeliveryDepartment.deliveryDepartmentName;
 
     const updates = buildClassFromBody(req.body, req.user?.id, false, existing?.orgId || activeOrgId, existing);
+    updates.skillIds = await resolveClassSkillIdsOrThrow(updates.skillIds, existing?.orgId || activeOrgId, req.user, {
+        preserveInactiveSkillIds: existing?.skillIds || []
+    });
     updates.allowedProgramTerms = await resolveAllowedProgramTermsOrThrow(updates.allowedProgramTerms, existing?.orgId || activeOrgId, req.user, {
         registrationMode: updates.registrationMode
     });
@@ -3697,16 +3869,23 @@ async function manageSession(req, res) {
             sessionId,
             reqUser: req.user
         });
+        const sessionSkillPolicy = await loadSessionSkillPolicy(classData, session, req.user);
+        const assignedOutlineSkillIds = sessionSkillPolicy.selectable
+            .filter((skill) => skill.supportsTeachingOutline === true)
+            .map((skill) => skill.id);
 
         let teachingOutlineContext = null;
-        try {
-            teachingOutlineContext = await teachingOutlineSuggestionService.loadSessionOutlineContext(req.user, {
-                classId,
-                sessionId,
-                roster: session.roster || []
-            });
-        } catch (_outlineErr) {
-            teachingOutlineContext = null;
+        if (assignedOutlineSkillIds.length) {
+            try {
+                teachingOutlineContext = await teachingOutlineSuggestionService.loadSessionOutlineContext(req.user, {
+                    classId,
+                    sessionId,
+                    roster: session.roster || [],
+                    skillIds: assignedOutlineSkillIds
+                });
+            } catch (_outlineErr) {
+                teachingOutlineContext = null;
+            }
         }
 
         const sessionCoTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
@@ -3748,7 +3927,7 @@ async function manageSession(req, res) {
             conductRatingScaleResolved,
             sessionStudentCases,
             studentCaseDetailPresets: getPresetConfig(),
-            gradebookSkills: gradebookSkillCatalogService.listGradebookSkills(),
+            gradebookSkills: sessionSkillPolicy.renderCatalog,
             teachingOutlineContext,
             includeModal: true,  
             user: req.user,
@@ -4278,20 +4457,45 @@ async function saveSession(req, res) {
             originalSession.contentOrder = normalizeSessionContentOrder(parsedOrder);
         }
         if (!shouldSkipInstructionalPayload && skillsCovered !== undefined) {
+            const sessionSkillPolicy = await loadSessionSkillPolicy(classData, originalSession, req.user);
+            const mergedSkillsCovered = mergeHistoricalSessionSkills(
+                skillsCovered,
+                originalSession.skillsCovered,
+                sessionSkillPolicy.selectableIds
+            );
             let outlineCatalogItems = [];
             let outlineLevels = [];
+            let outlineTemplates = [];
             try {
                 const orgId = classData?.orgId || getActiveOrgIdOrThrow(req.user);
                 await teachingOutlineCatalogService.ensureOrgTeachingOutlineDefaults(orgId, req.user?.id || 'SYSTEM');
-                outlineCatalogItems = await schoolDataService.fetchData('teachingOutlineItems', {}, req.user);
-                outlineLevels = await schoolDataService.fetchData('teachingOutlineLevels', {}, req.user);
+                const [allOutlineItems, allOutlineLevels, allOutlineTemplates] = await Promise.all([
+                    schoolDataService.fetchData('teachingOutlineItems', {}, req.user),
+                    schoolDataService.fetchData('teachingOutlineLevels', {}, req.user),
+                    schoolDataService.fetchData('teachingOutlineSectionTemplates', {}, req.user)
+                ]);
+                outlineCatalogItems = (allOutlineItems || []).filter((row) => idsEqual(row?.orgId, orgId));
+                outlineLevels = (allOutlineLevels || []).filter((row) => idsEqual(row?.orgId, orgId));
+                outlineTemplates = (allOutlineTemplates || []).filter((row) => idsEqual(row?.orgId, orgId));
             } catch (_e) {
                 outlineCatalogItems = [];
                 outlineLevels = [];
+                outlineTemplates = [];
             }
-            originalSession.skillsCovered = gradebookSkillCatalogService.normalizeSessionSkillsCovered(skillsCovered, {
+            const preserveOutlineItemIdsBySkill = {};
+            (Array.isArray(originalSession.skillsCovered) ? originalSession.skillsCovered : []).forEach((row) => {
+                const skillId = String(row?.skillId || '').trim().toLowerCase();
+                if (!skillId) return;
+                preserveOutlineItemIdsBySkill[skillId] = (Array.isArray(row?.outlineItems) ? row.outlineItems : [])
+                    .map((item) => String(item?.itemId || item?.id || '').trim())
+                    .filter(Boolean);
+            });
+            originalSession.skillsCovered = gradebookSkillCatalogService.normalizeSessionSkillsCovered(mergedSkillsCovered, {
+                skillCatalog: sessionSkillPolicy.catalog,
                 catalogItems: outlineCatalogItems,
-                levels: outlineLevels
+                levels: outlineLevels,
+                templates: outlineTemplates,
+                preserveOutlineItemIdsBySkill
             });
         }
 
@@ -4506,6 +4710,12 @@ async function saveSessionGradebooks(req, res) {
         if (!Array.isArray(rawList)) {
             throw new Error('gradebooks must be an array.');
         }
+        const sessionSkillPolicy = await loadSessionSkillPolicy(classData, sessions[sessionIndex], req.user);
+        const existingGradebookById = new Map(
+            (Array.isArray(sessions[sessionIndex]?.gradebooks) ? sessions[sessionIndex].gradebooks : [])
+                .map((row) => [String(row?.id || '').trim(), row])
+                .filter(([id]) => id)
+        );
 
         const enrichedRoster = await buildEnrichedSessionRosterForMutation({
             classData,
@@ -4556,7 +4766,17 @@ async function saveSessionGradebooks(req, res) {
                 }
             }
 
-            const { skills, skillFocus } = gradebookSkillCatalogService.normalizeGradebookActivitySkills(gb);
+            const mergedSkillIds = mergeHistoricalGradebookSkills(
+                gb,
+                existingGradebookById.get(gbId),
+                sessionSkillPolicy.selectableIds
+            );
+            const { skills, skillFocus } = gradebookSkillCatalogService.normalizeGradebookActivitySkills({
+                ...gb,
+                skills: mergedSkillIds
+            }, {
+                skillCatalog: sessionSkillPolicy.catalog
+            });
             normalized.push({
                 id: gbId,
                 name: name.slice(0, 200),
@@ -4761,7 +4981,14 @@ module.exports = {
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,
-  postOfficialFinalGradesWorkflow
+  postOfficialFinalGradesWorkflow,
+  _skillAccessTest: {
+    normalizePostedSkillIds,
+    resolveClassSkillIdsOrThrow,
+    loadSessionSkillPolicy,
+    mergeHistoricalSessionSkills,
+    mergeHistoricalGradebookSkills
+  }
 };
 
 
