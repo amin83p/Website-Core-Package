@@ -1089,6 +1089,83 @@
         margin-top: 0.65rem;
         padding-top: 0.65rem;
     }
+    .outline-suggestion-skill-card {
+        border: 1px solid #dbe3ee;
+        border-radius: 0.65rem;
+        background: #fff;
+        overflow: hidden;
+    }
+    .outline-suggestion-skill-card + .outline-suggestion-skill-card {
+        margin-top: 0.85rem;
+    }
+    .outline-suggestion-skill-header {
+        padding: 0.85rem 1rem;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .outline-suggestion-skill-body {
+        padding: 0.35rem 1rem 0.85rem;
+    }
+    .outline-suggestion-group + .outline-suggestion-group {
+        margin-top: 0.85rem;
+        padding-top: 0.85rem;
+        border-top: 1px dashed #e2e8f0;
+    }
+    .outline-suggestion-group-title {
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: #64748b;
+        margin-bottom: 0.45rem;
+    }
+    .outline-suggestion-item {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.55rem 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .outline-suggestion-item:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+    }
+    .outline-suggestion-item-label {
+        font-size: 0.92rem;
+        line-height: 1.45;
+        color: #0f172a;
+    }
+    .outline-suggestion-item-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        flex-shrink: 0;
+    }
+    .outline-suggestion-roster {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-top: 0.45rem;
+    }
+    .skills-covered-accordion .accordion-button {
+        padding: 0.85rem 1rem;
+        background: #f8fafc;
+        box-shadow: none;
+    }
+    .skills-covered-accordion .accordion-button:not(.collapsed) {
+        background: #fff;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .skills-covered-accordion .accordion-item + .accordion-item {
+        border-top: 1px solid #e2e8f0;
+    }
+    .skills-covered-accordion .skills-covered-header-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+    }
 </style>
 
 <div class="sections-page session-manager-page">
@@ -1799,68 +1876,75 @@
                     <div class="card-header bg-white border-bottom py-3">
                         <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
                             <h5 class="m-0 fw-bold text-primary"><i class="bi bi-bullseye me-2"></i>Skills covered</h5>
-                            <span class="badge <%= isSessionCompleted ? 'bg-success' : 'bg-primary' %>">
-                                <%= isSessionCompleted ? 'Covered content' : 'Planned content' %>
-                            </span>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <% if (teachingOutlineContext && (teachingOutlineContext.suggestionsBySkill || teachingOutlineContext.levels)) { %>
+                                <button type="button" class="btn btn-sm btn-outline-primary d-none" id="btnOpenOutlineSuggestions" data-bs-toggle="modal" data-bs-target="#outlineSuggestionsModal">
+                                    <i class="bi bi-lightbulb me-1"></i>Session suggestions
+                                    <span class="badge bg-primary ms-1 d-none" id="outlineSuggestionsCount"></span>
+                                </button>
+                                <% } %>
+                                <span class="badge <%= isSessionCompleted ? 'bg-success' : 'bg-primary' %>">
+                                    <%= isSessionCompleted ? 'Covered content' : 'Planned content' %>
+                                </span>
+                            </div>
                         </div>
-                        <div class="small text-muted mt-1">Select gradebook skills and note what you covered in this session.</div>
+                        <div class="small text-muted mt-1">Select gradebook skills and note what you covered in this session.<% if (teachingOutlineContext && (teachingOutlineContext.suggestionsBySkill || teachingOutlineContext.levels)) { %> Use <strong>Session suggestions</strong> for roster-based teaching outline ideas.<% } %></div>
                     </div>
                     <div class="card-body">
-                        <% if (teachingOutlineContext && (teachingOutlineContext.suggestionsBySkill || teachingOutlineContext.levels)) { %>
-                        <div class="card bg-light border mb-3" id="outlineSuggestionsCard">
-                            <div class="card-body py-3">
-                                <div class="fw-semibold mb-2"><i class="bi bi-lightbulb me-1"></i>Suggested for this session</div>
-                                <div class="small text-muted mb-2">Based on the roster's CLB distribution. Previously covered items remain available when repetition is useful.</div>
-                                <div id="outlineSuggestionsBody" class="small"></div>
-                            </div>
-                        </div>
-                        <% } %>
                         <% if (!isReadOnly && isMakeupRequiredInactive !== true) { %>
-                        <div class="row g-2 align-items-start mb-3" id="skillsCoveredAddForm">
-                            <div class="col-md-3">
-                                <label class="form-label fw-semibold mb-1" for="skillsCoveredSkillSelect">Skill</label>
-                                <select id="skillsCoveredSkillSelect" class="form-select">
-                                    <option value="">Select a skill…</option>
-                                    <% (gradebookSkills || []).filter((skill) => skill.selectable !== false).forEach((skill) => { %>
-                                        <option value="<%= skill.id %>"><%= skill.label %></option>
-                                    <% }) %>
-                                </select>
+                        <div class="mb-3" id="skillsCoveredAddForm">
+                            <div class="row g-2 align-items-start">
+                                <div class="col-12 col-md-3 col-lg-2">
+                                    <label class="form-label fw-semibold mb-1" for="skillsCoveredSkillSelect">Skill</label>
+                                    <select id="skillsCoveredSkillSelect" class="form-select">
+                                        <option value="">Select a skill…</option>
+                                        <% (gradebookSkills || []).filter((skill) => skill.selectable !== false).forEach((skill) => { %>
+                                            <option value="<%= skill.id %>"><%= skill.label %></option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-3 col-lg-2" id="skillsCoveredLevelWrap">
+                                    <label class="form-label fw-semibold mb-1" for="skillsCoveredLevelSelect">CLB level</label>
+                                    <select id="skillsCoveredLevelSelect" class="form-select">
+                                        <option value="">Select level…</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md col-lg">
+                                    <label class="form-label fw-semibold mb-1" for="skillsCoveredNoteInput">Session note (optional)</label>
+                                    <textarea id="skillsCoveredNoteInput" class="form-control skills-covered-note-input" rows="2" maxlength="2000" placeholder="Optional comment for this skill…"></textarea>
+                                </div>
                             </div>
-                            <div class="col-md-3" id="skillsCoveredLevelWrap">
-                                <label class="form-label fw-semibold mb-1" for="skillsCoveredLevelSelect">CLB level</label>
-                                <select id="skillsCoveredLevelSelect" class="form-select">
-                                    <option value="">Select level…</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold mb-1" for="skillsCoveredNoteInput">Session note (optional)</label>
-                                <textarea id="skillsCoveredNoteInput" class="form-control skills-covered-note-input" rows="2" maxlength="2000" placeholder="Optional comment for this skill…"></textarea>
-                            </div>
-                            <div class="col-md-2 d-flex flex-column gap-2">
-                                <button type="button" class="btn btn-outline-primary w-100" id="btnPickOutlineItems"><i class="bi bi-list-check me-1"></i>Pick items</button>
-                                <button type="button" class="btn btn-primary w-100" id="btnAddSkillCovered"><i class="bi bi-plus-lg me-1"></i>Add skill</button>
+                            <div class="row g-2 mt-1">
+                                <div class="col-12 d-flex flex-wrap gap-2 justify-content-md-end">
+                                    <button type="button" class="btn btn-outline-primary" id="btnPickOutlineItems"><i class="bi bi-list-check me-1"></i>Pick items</button>
+                                    <button type="button" class="btn btn-primary" id="btnAddSkillCovered"><i class="bi bi-plus-lg me-1"></i>Add skill</button>
+                                </div>
                             </div>
                         </div>
                         <% } %>
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle mb-0" id="skillsCoveredTable">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th scope="col" style="width: 18%;">Skill</th>
-                                        <th scope="col" style="width: 14%;">Items</th>
-                                        <th scope="col">Note / outline</th>
-                                        <% if (!isReadOnly && isMakeupRequiredInactive !== true) { %>
-                                        <th scope="col" class="text-end" style="width: 5rem;"></th>
-                                        <% } %>
-                                    </tr>
-                                </thead>
-                                <tbody id="skillsCoveredTableBody">
-                                </tbody>
-                            </table>
-                        </div>
+                        <div id="skillsCoveredAccordion" class="accordion accordion-flush skills-covered-accordion border rounded"></div>
                         <div class="text-muted small mt-2 d-none" id="skillsCoveredEmpty">No skills added for this session yet.</div>
                     </div>
                 </div>
+                <% if (teachingOutlineContext && (teachingOutlineContext.suggestionsBySkill || teachingOutlineContext.levels)) { %>
+                <div class="modal fade" id="outlineSuggestionsModal" tabindex="-1" aria-labelledby="outlineSuggestionsModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <div>
+                                    <h5 class="modal-title" id="outlineSuggestionsModalLabel"><i class="bi bi-lightbulb me-2"></i>Suggested for this session</h5>
+                                    <div class="small text-muted mt-1">Based on the roster's CLB distribution. Previously covered items stay available when repetition is useful.</div>
+                                </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body" id="outlineSuggestionsBody"></div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <% } %>
                 <% if (!isReadOnly && isMakeupRequiredInactive !== true) { %>
                 <div class="modal fade" id="outlinePickerModal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -1900,8 +1984,12 @@
                                     </div>
                                     <div class="col-lg-4">
                                         <div class="outline-selection-summary border rounded p-3 bg-white sticky-lg-top">
-                                            <div class="fw-semibold mb-2">Session plan</div>
+                                            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                                <div class="fw-semibold">Session plan</div>
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-danger d-none" id="btnOutlineClearSelection">Clear all</button>
+                                            </div>
                                             <div class="small text-muted mb-2">Selections are retained while you browse other CLB levels.</div>
+                                            <div id="outlinePickerCoverageChips" class="d-flex flex-wrap mb-2"></div>
                                             <div id="outlinePickerSelectionSummary"></div>
                                         </div>
                                     </div>
@@ -1915,7 +2003,7 @@
                     </div>
                 </div>
                 <% } %>
-                <div class="card border-0 shadow-sm">
+                <div class="card border-0 shadow-sm d-none" id="curriculumReferenceCard" hidden>
                     <div class="card-header bg-white border-bottom py-3">
                         <h5 class="m-0 fw-bold text-primary"><i class="bi bi-book me-2"></i>Curriculum reference</h5>
                     </div>
@@ -2479,6 +2567,7 @@
     </div>
 </div>
 <%- include('partials/modal_GenericPicker') %>
+<script src="/scripts/outlineSessionPlanUtils.js"></script>
 
 <script>
 let detailsModalInstance = null;
@@ -2586,10 +2675,70 @@ document.addEventListener('DOMContentLoaded', () => {
     window.parseAttendanceAttachment = parseAttendanceAttachment;
     window.renderAttendanceAttachmentLink = renderAttendanceAttachmentLink;
 
+    function sessionEscapeMessage(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
+
+    async function sessionMessageBox({
+        title = 'Notice',
+        message = '',
+        icon = 'info',
+        okText = 'OK',
+        okClass = 'btn-primary',
+        buttons = null,
+        html = false,
+        size = undefined
+    } = {}) {
+        const displayMessage = html ? String(message ?? '') : sessionEscapeMessage(String(message ?? ''));
+        if (typeof window.showMessageModal === 'function') {
+            const options = {
+                title,
+                icon,
+                message: displayMessage,
+                buttons: buttons || [{ text: okText, class: okClass }]
+            };
+            if (size) options.size = size;
+            return window.showMessageModal(options);
+        }
+        const plain = html
+            ? displayMessage.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+            : displayMessage;
+        window.alert(plain || title);
+        return buttons?.[0]?.text || okText;
+    }
+
+    async function sessionConfirmBox({
+        title = 'Confirm',
+        message = '',
+        icon = 'warning',
+        confirmText = 'Confirm',
+        cancelText = 'Cancel',
+        confirmClass = 'btn-danger',
+        html = false
+    } = {}) {
+        const result = await sessionMessageBox({
+            title,
+            message,
+            icon,
+            html,
+            buttons: [
+                { text: cancelText, class: 'btn-secondary' },
+                { text: confirmText, class: confirmClass }
+            ]
+        });
+        return result === confirmText;
+    }
+
     function showMakeupMessage(options) {
-        if (typeof window.showMessageModal === 'function') return window.showMessageModal(options || {});
-        if (options?.message) window.alert(options.message);
-        return Promise.resolve('');
+        const payload = options || {};
+        const html = payload.html === true || (payload.html !== false && /<[a-z][\s\S]*>/i.test(String(payload.message || '')));
+        return sessionMessageBox({ ...payload, html });
     }
 
     function ensureMakeupSessionModal() {
@@ -2800,21 +2949,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnToggleSessionLock')?.addEventListener('click', async () => {
         const btn = document.getElementById('btnToggleSessionLock');
         if (!btn || !sessionCanToggleLock) return;
-        if (typeof showMessageModal !== 'function') return;
         const nextLocked = String(btn.dataset.nextLocked || '').toLowerCase() === 'true';
         const actionLabel = nextLocked ? 'lock' : 'unlock';
         const confirmButton = nextLocked ? 'Lock session' : 'Unlock session';
-        const proceed = (await showMessageModal({
+        const proceed = await sessionConfirmBox({
             title: nextLocked ? 'Lock session?' : 'Unlock session?',
-            icon: 'question',
+            icon: 'warning',
+            html: true,
             message: nextLocked
-                ? 'Teachers will no longer be able to edit this session until an administrator unlocks it.'
-                : 'Teachers will be able to edit this session again.',
-            buttons: [
-                { text: 'Cancel', class: 'btn-secondary' },
-                { text: confirmButton, class: nextLocked ? 'btn-warning' : 'btn-success' }
-            ]
-        })) === confirmButton;
+                ? '<p class="mb-0">Teachers will no longer be able to edit this session until an administrator unlocks it.</p>'
+                : '<p class="mb-0">Teachers will be able to edit this session again.</p>',
+            confirmText: confirmButton,
+            confirmClass: nextLocked ? 'btn-warning' : 'btn-success'
+        });
         if (!proceed) return;
         btn.disabled = true;
         try {
@@ -2836,11 +2983,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             window.location.reload();
         } catch (error) {
-            await showMessageModal({
+            await sessionMessageBox({
                 title: 'Lock update failed',
                 icon: 'error',
-                message: error?.message || `Failed to ${actionLabel} session.`,
-                buttons: [{ text: 'OK', class: 'btn-primary' }]
+                message: error?.message || `Failed to ${actionLabel} session.`
             });
             btn.disabled = false;
         }
@@ -3068,17 +3214,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showConductRequiredModal() {
-        const message = 'Complete and save class conduct (Step 1) before opening or filling reports for this session.';
-        if (typeof showMessageModal === 'function') {
-            return showMessageModal({
-                title: 'Class conduct required',
-                icon: 'warning',
-                message,
-                buttons: [{ text: 'OK', class: 'btn-primary' }]
-            });
-        }
-        window.alert(message);
-        return Promise.resolve();
+        return sessionMessageBox({
+            title: 'Class conduct required',
+            icon: 'warning',
+            message: '<p class="mb-0">Complete and save <strong>class conduct</strong> (Step 1) before opening or filling reports for this session.</p>',
+            html: true
+        });
     }
 
     function collectConductRosterPayload(rootSelector = '#conductTable') {
@@ -3127,25 +3268,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingMessage: 'Failed to save class conduct.'
             });
             setConductReadyUi(true);
-            if (typeof showMessageModal === 'function') {
-                await showMessageModal({
-                    title: 'Class conduct saved',
-                    icon: 'success',
-                    message: result.message || 'You can now fill reports for this session.',
-                    buttons: [{ text: 'OK', class: 'btn-primary' }]
-                });
-            }
+            await sessionMessageBox({
+                title: 'Class conduct saved',
+                icon: 'success',
+                message: result.message || 'You can now fill reports for this session.'
+            });
         } catch (error) {
-            if (typeof showMessageModal === 'function') {
-                await showMessageModal({
-                    title: 'Unable to save class conduct',
-                    icon: 'error',
-                    message: error?.message || 'Failed to save class conduct.',
-                    buttons: [{ text: 'OK', class: 'btn-danger' }]
-                });
-            } else {
-                window.alert(error?.message || 'Failed to save class conduct.');
-            }
+            await sessionMessageBox({
+                title: 'Unable to save class conduct',
+                icon: 'error',
+                message: error?.message || 'Failed to save class conduct.',
+                okClass: 'btn-danger'
+            });
         } finally {
             if (btn) btn.disabled = false;
             if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
@@ -3402,16 +3536,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function showStudentCaseMessage(title, message, icon = 'info') {
-        if (typeof window.showMessageModal === 'function') {
-            return window.showMessageModal({
-                title: title || 'Student Case',
-                message: message || '',
-                icon,
-                buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
-            });
-        }
-        console.warn(`${title || 'Student Case'}: ${message || ''}`);
-        return 'OK';
+        return sessionMessageBox({
+            title: title || 'Student Case',
+            message: message || '',
+            icon,
+            okClass: icon === 'error' ? 'btn-danger' : 'btn-primary'
+        });
     }
 
     let studentCaseBusyToken = null;
@@ -3975,19 +4105,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function confirmStudentCaseDelete(row) {
         const studentName = String(row?.studentName || row?.studentPersonId || 'this student').trim();
-        if (typeof window.showMessageModal === 'function') {
-            const selected = await window.showMessageModal({
-                title: 'Delete Student Case',
-                icon: 'warning',
-                message: `Permanently delete the student case for <strong>${scEscapeHtml(studentName)}</strong>? This action cannot be undone.`,
-                buttons: [
-                    { text: 'Cancel', class: 'btn-secondary' },
-                    { text: 'Delete', class: 'btn-danger' }
-                ]
-            });
-            return selected === 'Delete';
-        }
-        return window.confirm(`Permanently delete the student case for ${studentName}? This action cannot be undone.`);
+        return sessionConfirmBox({
+            title: 'Delete Student Case',
+            icon: 'warning',
+            html: true,
+            message: `<p class="mb-0">Permanently delete the student case for <strong>${scEscapeHtml(studentName)}</strong>? This action cannot be undone.</p>`,
+            confirmText: 'Delete',
+            confirmClass: 'btn-danger'
+        });
     }
 
     async function deleteStudentCase(caseId) {
@@ -4127,17 +4252,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const listHtml = names.length
             ? '<ul class="text-start mt-2 mb-0">' + names.map((name) => '<li>' + attendanceAttachmentEscape(name) + '</li>').join('') + (extraCount ? '<li>+' + extraCount + ' more</li>' : '') + '</ul>'
             : '';
-        const message = 'Late attendance needs either Late Arrival minutes or Left Early minutes before saving.' + listHtml;
-        if (typeof showMessageModal === 'function') {
-            await showMessageModal({
-                title: 'Late Minutes Required',
-                icon: 'warning',
-                message,
-                buttons: [{ text: 'OK', class: 'btn-warning' }]
-            });
-        } else {
-            window.alert('Late attendance needs either Late Arrival minutes or Left Early minutes before saving.');
-        }
+        const message = '<p class="mb-2">Late attendance needs either <strong>Late Arrival minutes</strong> or <strong>Left Early minutes</strong> before saving.</p>' + listHtml;
+        await sessionMessageBox({
+            title: 'Late Minutes Required',
+            icon: 'warning',
+            message,
+            okClass: 'btn-warning',
+            html: true
+        });
         if (options.openFirst !== false) openLateDetailsForRow(issueRows[0]);
         return false;
     }
@@ -4263,19 +4385,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function confirmSessionNavigation(title, message, confirmButtonText) {
         const msg = message || 'You may lose unsaved changes unless you save first. Continue?';
         const confirmLabel = confirmButtonText || 'Continue';
-        if (typeof showMessageModal === 'function') {
-            const res = await showMessageModal({
-                title: title || 'Leave this page?',
-                icon: 'question',
-                message: msg,
-                buttons: [
-                    { text: 'Stay', class: 'btn-secondary' },
-                    { text: confirmLabel, class: 'btn-primary' }
-                ]
-            });
-            return res === confirmLabel;
-        }
-        return window.confirm(msg);
+        return sessionConfirmBox({
+            title: title || 'Leave this page?',
+            icon: 'warning',
+            html: true,
+            message: `<p class="mb-0">${sessionEscapeMessage(msg)}</p>`,
+            cancelText: 'Stay',
+            confirmText: confirmLabel,
+            confirmClass: 'btn-primary'
+        });
     }
 
     document.querySelectorAll('a.session-manager-nav-away').forEach((link) => {
@@ -4369,18 +4487,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<div class="mt-3"><strong>Pending reports:</strong><ul class="mt-2 mb-0 text-start">${items}</ul></div><div class="mt-3">Open the <strong>Report instances</strong> panel to submit each report before marking this session completed.</div>`;
     }
     async function showPendingReportsBlockModal(rows) {
-        const message = 'This session cannot be marked completed until all assigned reports are submitted.'
+        const message = '<p class="mb-2">This session cannot be marked completed until all assigned reports are submitted.</p>'
             + buildPendingReportsMessageHtml(rows);
-        if (typeof showMessageModal === 'function') {
-            await showMessageModal({
-                title: 'Reports Still Pending',
-                icon: 'warning',
-                message,
-                buttons: [{ text: 'OK', class: 'btn-primary' }]
-            });
-        } else {
-            alert(message.replace(/<[^>]*>/g, ''));
-        }
+        await sessionMessageBox({
+            title: 'Reports Still Pending',
+            icon: 'warning',
+            message,
+            html: true
+        });
     }
     function syncSessionReportsNavBadge() {
         const badge = document.getElementById('sessionReportsNavBadge');
@@ -4514,9 +4628,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sessionPickTeacher')?.addEventListener('click', function () {
         if (!sessionCanEditMetadata) return;
         if (!window.GenericPicker || !window.GenericPickerPresets) {
-            if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-            }
+            void sessionMessageBox({
+                title: 'Teacher Picker',
+                icon: 'warning',
+                message: 'Teacher picker is not available yet.'
+            });
             return;
         }
         window.GenericPicker.open(window.GenericPickerPresets.teacher({
@@ -4591,9 +4707,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sessionAddCoTeacherBtn')?.addEventListener('click', function () {
         if (!sessionCanManageCoTeachers) return;
         if (!window.GenericPicker || !window.GenericPickerPresets) {
-            if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-            }
+            void sessionMessageBox({
+                title: 'Teacher Picker',
+                icon: 'warning',
+                message: 'Teacher picker is not available yet.'
+            });
             return;
         }
         window.GenericPicker.open(window.GenericPickerPresets.teacher({
@@ -4608,21 +4726,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!personId) return;
                 const mainId = getSessionMainTeacherIdForCoTeachers();
                 if (mainId && personId === mainId) {
-                    if (typeof showMessageModal === 'function') {
-                        showMessageModal({ title: 'Co-Teacher', icon: 'warning', message: 'The main teacher cannot also be listed as a co-teacher.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-                    }
+                    void sessionMessageBox({
+                        title: 'Co-Teacher',
+                        icon: 'warning',
+                        message: 'The main teacher cannot also be listed as a co-teacher.'
+                    });
                     return;
                 }
                 if ((sessionCoTeachersState || []).some((row) => String(row.personId) === personId)) {
-                    if (typeof showMessageModal === 'function') {
-                        showMessageModal({ title: 'Co-Teacher', icon: 'info', message: 'That person is already a co-teacher on this session.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-                    }
+                    void sessionMessageBox({
+                        title: 'Co-Teacher',
+                        icon: 'info',
+                        message: 'That person is already a co-teacher on this session.'
+                    });
                     return;
                 }
                 if ((sessionCoTeachersState || []).length >= 10) {
-                    if (typeof showMessageModal === 'function') {
-                        showMessageModal({ title: 'Co-Teacher', icon: 'warning', message: 'A session can have at most 10 co-teachers.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-                    }
+                    void sessionMessageBox({
+                        title: 'Co-Teacher',
+                        icon: 'warning',
+                        message: 'A session can have at most 10 co-teachers.'
+                    });
                     return;
                 }
                 sessionCoTeachersState = [...(sessionCoTeachersState || []), { personId, name, roleLabel: 'Co-Teacher', canEdit: false }];
@@ -4866,16 +4990,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
             } catch (err) {
-                if (typeof showMessageModal === 'function') {
-                    showMessageModal({
-                        title: 'Error Saving Note',
-                        icon: 'error',
-                        message: err.message,
-                        buttons: [{ text: 'Close', class: 'btn-secondary' }]
-                    });
-                } else {
-                    alert(err.message);
-                }
+                await sessionMessageBox({
+                    title: 'Error Saving Note',
+                    icon: 'error',
+                    message: err.message,
+                    okText: 'Close',
+                    okClass: 'btn-secondary'
+                });
             } finally {
                 btn.innerHTML = origBtn;
                 btn.disabled = false;
@@ -5172,27 +5293,27 @@ document.addEventListener('DOMContentLoaded', () => {
         let uploadedFile = null;
         const notes = String(document.getElementById('contentModalNotesInput').value || '').trim();
         if (!title) {
-            if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'Title Required', icon: 'warning', message: 'Please set a title for the content item.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-            } else {
-                alert('Please set a title for the content item.');
-            }
+            await sessionMessageBox({
+                title: 'Title Required',
+                icon: 'warning',
+                message: 'Please set a title for the content item.'
+            });
             return;
         }
         if (type === 'html' && !html) {
-            if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'HTML Required', icon: 'warning', message: 'Please provide HTML content.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-            } else {
-                alert('Please provide HTML content.');
-            }
+            await sessionMessageBox({
+                title: 'HTML Required',
+                icon: 'warning',
+                message: 'Please provide HTML content.'
+            });
             return;
         }
         if (type === 'file' && !fileUrl && !hasSelectedFile && !existingFile) {
-            if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'File Required', icon: 'warning', message: 'Please provide a file link or upload a file.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-            } else {
-                alert('Please provide a file link or upload a file.');
-            }
+            await sessionMessageBox({
+                title: 'File Required',
+                icon: 'warning',
+                message: 'Please provide a file link or upload a file.'
+            });
             return;
         }
         if (type === 'file' && hasSelectedFile) {
@@ -5251,17 +5372,14 @@ document.addEventListener('DOMContentLoaded', () => {
             : 'The exam is temporarily locked.';
         const errorTitle = isOpenAction ? 'Open failed' : 'Lock failed';
 
-        const proceed = typeof showMessageModal === 'function'
-            ? (await showMessageModal({
-                title: confirmTitle,
-                icon: 'question',
-                message: confirmMessage,
-                buttons: [
-                    { text: 'Cancel', class: 'btn-secondary' },
-                    { text: confirmButton, class: 'btn-primary' }
-                ]
-            })) === confirmButton
-            : window.confirm(isOpenAction ? 'Open this exam allocation for students?' : 'Pause (lock) this exam allocation?');
+        const proceed = await sessionConfirmBox({
+            title: confirmTitle,
+            icon: 'warning',
+            message: `<p class="mb-0">${sessionEscapeMessage(confirmMessage)}</p>`,
+            confirmText: confirmButton,
+            confirmClass: 'btn-primary',
+            html: true
+        });
         if (!proceed) return;
 
         toggle.checked = intendedOpen;
@@ -5283,26 +5401,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 .find((row) => String(row?.id || '').trim() === contentId);
             if (target) target.status = String(payload?.allocationStatus || targetStatus).trim().toLowerCase();
             renderSessionContentList();
-            if (typeof showMessageModal === 'function') {
-                await showMessageModal({
-                    title: successTitle,
-                    icon: 'success',
-                    message: String(payload?.message || successFallback),
-                    buttons: [{ text: 'OK', class: 'btn-primary' }]
-                });
-            }
+            await sessionMessageBox({
+                title: successTitle,
+                icon: 'success',
+                message: String(payload?.message || successFallback)
+            });
         } catch (error) {
             toggle.checked = !intendedOpen;
-            if (typeof showMessageModal === 'function') {
-                await showMessageModal({
-                    title: errorTitle,
-                    icon: 'warning',
-                    message: String(error?.message || error || 'Could not update exam allocation status.'),
-                    buttons: [{ text: 'OK', class: 'btn-secondary' }]
-                });
-            } else {
-                window.alert(String(error?.message || error || 'Could not update exam allocation status.'));
-            }
+            await sessionMessageBox({
+                title: errorTitle,
+                icon: 'warning',
+                message: String(error?.message || error || 'Could not update exam allocation status.'),
+                okClass: 'btn-secondary'
+            });
         } finally {
             toggle.disabled = false;
         }
@@ -5320,11 +5431,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             await saveSessionContentModal();
         } catch (error) {
-            if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'Content File', icon: 'error', message: error.message || 'Could not save content file.', buttons: [{ text: 'Close', class: 'btn-secondary' }] });
-            } else {
-                alert(error.message || 'Could not save content file.');
-            }
+            await sessionMessageBox({
+                title: 'Content File',
+                icon: 'error',
+                message: error.message || 'Could not save content file.',
+                okText: 'Close',
+                okClass: 'btn-secondary'
+            });
         } finally {
             if (button) {
                 button.disabled = false;
@@ -5369,20 +5482,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const levelTitleById = new Map(outlineLevels.map((l) => [String(l.id), l.title || l.code]));
     const levelCodeById = new Map(outlineLevels.map((l) => [String(l.id), l.code]));
     const outlineLevelById = new Map(outlineLevels.map((level) => [String(level.id), level]));
-    let pendingOutlineSelection = null;
+    const outlineCatalogById = new Map(outlineItemsAll.map((item) => [String(item.id), item]));
+    const outlinePlanUtils = window.OutlineSessionPlanUtils || {};
+    const skillsCoveredInitial = <%- jsonForScript(session.skillsCovered || []) %>;
+    let skillsCoveredCollapsedIds = new Set(
+        (Array.isArray(skillsCoveredInitial) ? skillsCoveredInitial : [])
+            .map((row) => String(row?.skillId || '').trim())
+            .filter(Boolean)
+    );
+    let skillsCoveredExpandNextId = null;
     let pendingPrimaryLevelId = '';
     let outlinePickerState = null;
-    const skillsCoveredInitial = <%- jsonForScript(session.skillsCovered || []) %>;
     let skillsCoveredState = (Array.isArray(skillsCoveredInitial) ? skillsCoveredInitial : [])
         .map((row) => {
-            const normalizedItems = (Array.isArray(row?.outlineItems) ? row.outlineItems : []).map((item) => ({
-                itemId: String(item?.itemId || item?.id || '').trim(),
-                label: String(item?.label || '').trim(),
-                sectionKey: String(item?.sectionKey || '').trim(),
-                levelId: String(item?.levelId || '').trim(),
-                levelCode: String(item?.levelCode || levelCodeById.get(String(item?.levelId || '')) || '').trim(),
-                levelTitle: String(item?.levelTitle || levelTitleById.get(String(item?.levelId || '')) || '').trim()
-            })).filter((item) => item.itemId && item.label);
+            const normalizedItems = (Array.isArray(row?.outlineItems) ? row.outlineItems : [])
+                .map((item) => normalizeOutlineItemSnapshot(item))
+                .filter((item) => item && item.itemId && item.label);
             const primaryLevelId = String(row?.primaryLevelId || normalizedItems[0]?.levelId || '').trim();
             return {
                 skillId: String(row?.skillId || '').trim(),
@@ -5417,22 +5532,48 @@ document.addEventListener('DOMContentLoaded', () => {
         if (suggested) levelSelect.value = suggested;
     }
 
+    function normalizeOutlineItemSnapshot(item) {
+        const itemId = String(item?.itemId || item?.id || '').trim();
+        const catalogRow = outlineCatalogById.get(itemId);
+        const merged = {
+            ...(catalogRow || {}),
+            ...(item || {}),
+            id: itemId,
+            itemId,
+            levelCode: String(item?.levelCode || levelCodeById.get(String(item?.levelId || catalogRow?.levelId || '')) || '').trim(),
+            levelTitle: String(item?.levelTitle || levelTitleById.get(String(item?.levelId || catalogRow?.levelId || '')) || '').trim()
+        };
+        if (typeof outlinePlanUtils.buildOutlineItemSnapshot === 'function') {
+            return outlinePlanUtils.buildOutlineItemSnapshot(
+                merged,
+                outlineCatalogById,
+                (levelId) => outlineLevelById.get(String(levelId || ''))
+            );
+        }
+        return {
+            itemId,
+            label: String(merged.label || '').trim(),
+            sectionKey: String(merged.sectionKey || '').trim(),
+            levelId: String(merged.levelId || '').trim(),
+            levelCode: String(merged.levelCode || '').trim(),
+            levelTitle: String(merged.levelTitle || '').trim(),
+            parentId: String(merged.parentId || '').trim(),
+            groupLabel: String(merged.groupLabel || '').trim()
+        };
+    }
+
     function renderOutlineItemList(items) {
         if (!items?.length) return '<span class="text-muted">—</span>';
-        const grouped = new Map();
-        (items || []).forEach((item) => {
-            const meta = outlinePlanGroupMeta(item.sectionKey);
-            if (!grouped.has(meta.key)) grouped.set(meta.key, { ...meta, items: [] });
-            grouped.get(meta.key).items.push(item);
-        });
-        return [...grouped.values()].map((group) => `
-            <div class="outline-selected-group">
-                <div class="x-small fw-semibold text-uppercase text-muted">${scEscapeHtml(group.title)}</div>
-                <ul class="small mb-0 ps-3">${group.items.map((item) => `<li>${scEscapeHtml(item.label)}${item.levelTitle ? ` <span class="badge bg-light text-dark border ms-1">${scEscapeHtml(item.levelTitle)}</span>` : ''}</li>`).join('')}</ul>
-            </div>`).join('');
+        if (typeof outlinePlanUtils.renderOutlinePlanHtml === 'function') {
+            return outlinePlanUtils.renderOutlinePlanHtml(items, scEscapeHtml, { listClass: 'small mb-0 ps-3' });
+        }
+        return '<span class="text-muted">—</span>';
     }
 
     function outlinePlanGroupMeta(sectionKey) {
+        if (typeof outlinePlanUtils.outlinePlanGroupMeta === 'function') {
+            return outlinePlanUtils.outlinePlanGroupMeta(sectionKey);
+        }
         const key = String(sectionKey || '').trim().toLowerCase();
         if (key === 'outcomes_general') return { key: 'objectives', title: 'Objectives' };
         if (key === 'grammar') return { key: 'language_focus', title: 'Language focus' };
@@ -5440,38 +5581,75 @@ document.addEventListener('DOMContentLoaded', () => {
         return { key: 'additional', title: 'Additional content' };
     }
 
+    function getOutlineSectionCoverage(items) {
+        if (typeof outlinePlanUtils.getOutlineSectionCoverage === 'function') {
+            return outlinePlanUtils.getOutlineSectionCoverage(items);
+        }
+        return { complete: true, missing: [] };
+    }
+
+    function formatIncompletePlanMessage(coverage) {
+        if (typeof outlinePlanUtils.formatIncompletePlanMessage === 'function') {
+            return outlinePlanUtils.formatIncompletePlanMessage(coverage, scEscapeHtml);
+        }
+        return 'Your session plan is missing one or more recommended sections.';
+    }
+
     function renderSkillsCoveredTable() {
-        const tbody = document.getElementById('skillsCoveredTableBody');
+        const host = document.getElementById('skillsCoveredAccordion');
         const emptyEl = document.getElementById('skillsCoveredEmpty');
-        if (!tbody) return;
+        if (!host) return;
         if (!skillsCoveredState.length) {
-            tbody.innerHTML = '';
+            host.innerHTML = '';
             if (emptyEl) emptyEl.classList.remove('d-none');
             return;
         }
         if (emptyEl) emptyEl.classList.add('d-none');
-        tbody.innerHTML = skillsCoveredState.map((row, index) => {
+        host.innerHTML = skillsCoveredState.map((row, index) => {
             const itemCount = (row.outlineItems || []).length;
+            const skillId = String(row.skillId || '').trim();
+            const collapseId = `skillsCoveredCollapse_${skillId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+            const headingId = `skillsCoveredHeading_${skillId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+            const isCollapsed = skillsCoveredExpandNextId === skillId
+                ? false
+                : skillsCoveredCollapsedIds.has(skillId);
             const primaryBadge = row.primaryLevelTitle
-                ? `<div class="mt-1"><span class="badge bg-primary">${scEscapeHtml(row.primaryLevelTitle)} primary</span></div>`
+                ? `<span class="badge bg-primary">${scEscapeHtml(row.primaryLevelTitle)} primary</span>`
                 : '';
-            const detailCell = skillsCoveredReadOnly
-                ? `<td class="small">${renderOutlineItemList(row.outlineItems)}${row.note ? `<div class="mt-1">${scEscapeHtml(row.note)}</div>` : ''}</td>`
-                : `<td>
-                    <div class="mb-1">${renderOutlineItemList(row.outlineItems)}</div>
-                    <textarea class="form-control form-control-sm skills-covered-note" data-index="${index}" rows="2" maxlength="2000" placeholder="Optional session note…">${scEscapeHtml(row.note || '')}</textarea>
-                    ${isClbSkill(row.skillId) ? `<button type="button" class="btn btn-link btn-sm p-0 mt-1 skills-covered-edit-items" data-index="${index}">Edit outline items</button>` : ''}
-                   </td>`;
-            const removeCell = skillsCoveredReadOnly
+            const outlineBlock = `<div class="mb-2">${renderOutlineItemList(row.outlineItems)}</div>`;
+            const noteBlock = skillsCoveredReadOnly
+                ? (row.note ? `<div class="small text-muted">${scEscapeHtml(row.note)}</div>` : '')
+                : `<textarea class="form-control form-control-sm skills-covered-note" data-index="${index}" rows="2" maxlength="2000" placeholder="Optional session note…">${scEscapeHtml(row.note || '')}</textarea>`;
+            const editButton = (!skillsCoveredReadOnly && isClbSkill(row.skillId))
+                ? `<button type="button" class="btn btn-link btn-sm p-0 mt-2 skills-covered-edit-items" data-index="${index}">Edit outline items</button>`
+                : '';
+            const removeButton = skillsCoveredReadOnly
                 ? ''
-                : `<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger skills-covered-remove" data-index="${index}" title="Remove" aria-label="Remove skill"><i class="bi bi-trash"></i></button></td>`;
-            return `<tr data-index="${index}">
-                <td class="fw-semibold">${scEscapeHtml(row.skillLabel || row.skillId)}${primaryBadge}</td>
-                <td><span class="badge bg-light text-dark border">${itemCount}</span></td>
-                ${detailCell}
-                ${removeCell}
-            </tr>`;
+                : `<button type="button" class="btn btn-sm btn-outline-danger skills-covered-remove" data-index="${index}" title="Remove" aria-label="Remove skill"><i class="bi bi-trash"></i></button>`;
+            return `<div class="accordion-item skills-covered-accordion-item" data-index="${index}" data-skill-id="${scEscapeHtml(skillId)}">
+                <h2 class="accordion-header" id="${scEscapeHtml(headingId)}">
+                    <button class="accordion-button ${isCollapsed ? 'collapsed' : ''} py-2" type="button" data-bs-toggle="collapse" data-bs-target="#${scEscapeHtml(collapseId)}" aria-expanded="${isCollapsed ? 'false' : 'true'}" aria-controls="${scEscapeHtml(collapseId)}">
+                        <span class="skills-covered-header-meta">
+                            <span class="fw-semibold">${scEscapeHtml(row.skillLabel || row.skillId)}</span>
+                            ${primaryBadge}
+                            <span class="badge bg-light text-dark border">${itemCount} item${itemCount === 1 ? '' : 's'}</span>
+                        </span>
+                    </button>
+                </h2>
+                <div id="${scEscapeHtml(collapseId)}" class="accordion-collapse collapse ${isCollapsed ? '' : 'show'}" aria-labelledby="${scEscapeHtml(headingId)}" data-bs-parent="#skillsCoveredAccordion">
+                    <div class="accordion-body">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <div class="small text-muted">Outline and session note for this skill</div>
+                            ${removeButton}
+                        </div>
+                        ${outlineBlock}
+                        ${noteBlock}
+                        ${editButton}
+                    </div>
+                </div>
+            </div>`;
         }).join('');
+        skillsCoveredExpandNextId = null;
     }
 
     function syncSkillsCoveredSelectOptions() {
@@ -5487,7 +5665,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function outlineItemSnapshotFromCatalog(itemId) {
-        const row = outlineItemsAll.find((item) => String(item.id) === String(itemId));
+        const row = outlineCatalogById.get(String(itemId)) || outlineItemsAll.find((item) => String(item.id) === String(itemId));
+        if (typeof outlinePlanUtils.buildOutlineItemSnapshot === 'function') {
+            return outlinePlanUtils.buildOutlineItemSnapshot(
+                row,
+                outlineCatalogById,
+                (levelId) => outlineLevelById.get(String(levelId || ''))
+            );
+        }
         if (!row) return null;
         const level = outlineLevelById.get(String(row.levelId || ''));
         return {
@@ -5496,7 +5681,9 @@ document.addEventListener('DOMContentLoaded', () => {
             sectionKey: String(row.sectionKey || '').trim(),
             levelId: String(row.levelId || '').trim(),
             levelCode: String(level?.code || '').trim(),
-            levelTitle: String(level?.title || level?.code || '').trim()
+            levelTitle: String(level?.title || level?.code || '').trim(),
+            parentId: String(row.parentId || '').trim(),
+            groupLabel: ''
         };
     }
 
@@ -5573,25 +5760,42 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`;
     }
 
+    function updateOutlineClearSelectionButton() {
+        const btn = document.getElementById('btnOutlineClearSelection');
+        if (!btn || !outlinePickerState) return;
+        btn.classList.toggle('d-none', outlinePickerState.selectedById.size === 0);
+    }
+
+    function clearOutlinePickerSelection() {
+        if (!outlinePickerState) return;
+        outlinePickerState.selectedById.clear();
+        renderOutlinePicker();
+        renderOutlinePickerSelectionSummary();
+    }
+
     function renderOutlinePickerSelectionSummary() {
         const host = document.getElementById('outlinePickerSelectionSummary');
+        const chipsHost = document.getElementById('outlinePickerCoverageChips');
         if (!host || !outlinePickerState) return;
         const selectedItems = [...outlinePickerState.selectedById.values()];
+        updateOutlineClearSelectionButton();
+        const coverage = getOutlineSectionCoverage(selectedItems);
+        if (chipsHost) {
+            if (typeof outlinePlanUtils.renderOutlineCoverageChips === 'function') {
+                chipsHost.innerHTML = outlinePlanUtils.renderOutlineCoverageChips(coverage, scEscapeHtml);
+            } else {
+                chipsHost.innerHTML = '';
+            }
+        }
         if (!selectedItems.length) {
             host.innerHTML = '<div class="text-muted small">No instructional items selected.</div>';
             return;
         }
-        const grouped = new Map();
-        selectedItems.forEach((item) => {
-            const meta = outlinePlanGroupMeta(item.sectionKey);
-            if (!grouped.has(meta.key)) grouped.set(meta.key, { ...meta, items: [] });
-            grouped.get(meta.key).items.push(item);
-        });
-        host.innerHTML = [...grouped.values()].map((group) => `
-            <div class="outline-selected-group">
-                <div class="x-small text-uppercase fw-semibold text-muted">${scEscapeHtml(group.title)}</div>
-                ${group.items.map((item) => `<div class="small py-1">${scEscapeHtml(item.label)} <span class="badge bg-light text-dark border">${scEscapeHtml(item.levelTitle || item.levelCode || '')}</span></div>`).join('')}
-            </div>`).join('');
+        if (typeof outlinePlanUtils.renderOutlinePlanHtml === 'function') {
+            host.innerHTML = outlinePlanUtils.renderOutlinePlanHtml(selectedItems, scEscapeHtml);
+            return;
+        }
+        host.innerHTML = '<div class="text-muted small">No instructional items selected.</div>';
     }
 
     function renderOutlinePicker() {
@@ -5646,7 +5850,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const levelSelect = document.getElementById('outlinePickerLevelSelect');
         if (!modalEl || !levelSelect || !window.bootstrap) return;
         const suggestion = outlineSuggestionsBySkill?.[skillId] || {};
-        const selectedById = new Map((selectedItems || []).map((item) => [String(item.itemId || ''), { ...item }]).filter(([id]) => id));
+        const selectedById = new Map((selectedItems || []).map((item) => {
+            const normalized = normalizeOutlineItemSnapshot(item);
+            const itemId = String(normalized?.itemId || '').trim();
+            return itemId ? [itemId, normalized] : null;
+        }).filter(Boolean));
         const inferredLevelId = String(primaryLevelId || selectedItems?.[0]?.levelId || suggestion.suggestedLevelId || outlineLevels[0]?.id || '');
         outlinePickerState = {
             skillId,
@@ -5692,6 +5900,9 @@ document.addEventListener('DOMContentLoaded', () => {
         outlinePickerState.primaryLevelId = outlinePickerState.levelId;
         renderOutlinePicker();
     });
+    document.getElementById('btnOutlineClearSelection')?.addEventListener('click', () => {
+        clearOutlinePickerSelection();
+    });
     document.getElementById('outlinePickerBody')?.addEventListener('change', (event) => {
         const checkbox = event.target.closest('.outline-pick-checkbox');
         if (!checkbox || !outlinePickerState) return;
@@ -5705,7 +5916,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (outlinePickerState.filter === 'selected') renderOutlinePicker();
         else renderOutlinePickerSelectionSummary();
     });
-    document.getElementById('btnApplyOutlinePicker')?.addEventListener('click', () => {
+    document.getElementById('btnApplyOutlinePicker')?.addEventListener('click', async () => {
         if (!outlinePickerState) return;
         const modalEl = document.getElementById('outlinePickerModal');
         const callback = outlinePickerState.onApply;
@@ -5713,12 +5924,74 @@ document.addEventListener('DOMContentLoaded', () => {
             items: [...outlinePickerState.selectedById.values()],
             primaryLevelId: outlinePickerState.primaryLevelId
         };
+        const coverage = getOutlineSectionCoverage(result.items);
+        if (!coverage.complete) {
+            const proceed = await sessionConfirmBox({
+                title: 'Incomplete session plan',
+                icon: 'warning',
+                html: true,
+                message: formatIncompletePlanMessage(coverage),
+                confirmText: 'Apply anyway',
+                confirmClass: 'btn-primary',
+                cancelText: 'Go back'
+            });
+            if (!proceed) return;
+        }
         if (typeof callback === 'function') callback(result);
         if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     });
     document.getElementById('outlinePickerModal')?.addEventListener('hidden.bs.modal', () => {
         outlinePickerState = null;
     });
+
+    const CLB_OUTLINE_SKILLS_MESSAGE = '<p class="mb-2">Teaching outline items apply only to the four CLB skills:</p><ul class="mb-0 ps-3"><li>Listening</li><li>Speaking</li><li>Reading</li><li>Writing</li></ul>';
+
+    function commitPickedOutlineToSkillsTable(skillId, result) {
+        if (!skillId || skillsCoveredReadOnly || !skillsCoveredLabelById.has(skillId)) return false;
+        const noteInput = document.getElementById('skillsCoveredNoteInput');
+        const formNote = String(noteInput?.value || '').trim().slice(0, 2000);
+        const existingIndex = skillsCoveredState.findIndex((row) => row.skillId === skillId);
+        const existing = existingIndex >= 0 ? skillsCoveredState[existingIndex] : null;
+        const outlineItems = Array.isArray(result?.items) ? result.items : [];
+        const primaryLevelId = String(result?.primaryLevelId || existing?.primaryLevelId || '').trim();
+        const note = formNote || existing?.note || '';
+        if (isClbSkill(skillId) && !outlineItems.length && !note) {
+            if (existingIndex >= 0) {
+                skillsCoveredState.splice(existingIndex, 1);
+                pendingOutlineSelection = null;
+                pendingPrimaryLevelId = '';
+                if (noteInput && formNote) noteInput.value = '';
+                renderSkillsCoveredTable();
+                syncSkillsCoveredSelectOptions();
+                return true;
+            }
+            return false;
+        }
+        if (!isClbSkill(skillId) && !note) return false;
+        const primaryLevel = outlineLevelById.get(primaryLevelId);
+        const entry = {
+            skillId,
+            skillLabel: skillsCoveredLabelById.get(skillId) || skillId,
+            primaryLevelId: isClbSkill(skillId) ? primaryLevelId : '',
+            primaryLevelCode: isClbSkill(skillId) ? String(primaryLevel?.code || '') : '',
+            primaryLevelTitle: isClbSkill(skillId) ? String(primaryLevel?.title || primaryLevel?.code || '') : '',
+            note,
+            outlineItems: isClbSkill(skillId) ? outlineItems : []
+        };
+        if (existingIndex >= 0) {
+            skillsCoveredState[existingIndex] = entry;
+            skillsCoveredExpandNextId = skillId;
+        } else {
+            skillsCoveredState.push(entry);
+            skillsCoveredExpandNextId = skillId;
+        }
+        pendingOutlineSelection = null;
+        pendingPrimaryLevelId = '';
+        if (noteInput && formNote) noteInput.value = '';
+        renderSkillsCoveredTable();
+        syncSkillsCoveredSelectOptions();
+        return true;
+    }
 
     function addSkillCoveredRow() {
         if (skillsCoveredReadOnly) return;
@@ -5728,7 +6001,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const skillId = String(select?.value || '').trim();
         const note = String(noteInput?.value || '').trim().slice(0, 2000);
         if (!skillId || !skillsCoveredLabelById.has(skillId)) {
-            alert('Select a skill before adding.');
+            void sessionMessageBox({
+                title: 'Skill required',
+                icon: 'warning',
+                message: 'Select a skill before adding.'
+            });
             return;
         }
         const existingIndex = skillsCoveredState.findIndex((row) => row.skillId === skillId);
@@ -5741,11 +6018,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 primaryLevelId = String(pendingPrimaryLevelId || primaryLevelId).trim();
             }
             if (!outlineItems.length && !note) {
-                alert('Pick at least one instructional outline item or add a session note for this CLB skill.');
+                void sessionMessageBox({
+                    title: 'Outline or note required',
+                    icon: 'warning',
+                    html: true,
+                    message: '<p class="mb-0">Pick at least one instructional outline item or add a session note for this CLB skill.</p>'
+                });
                 return;
             }
         } else if (!note) {
-            alert('Add a note for this skill.');
+            void sessionMessageBox({
+                title: 'Note required',
+                icon: 'warning',
+                message: 'Add a note for this skill.'
+            });
             noteInput?.focus();
             return;
         }
@@ -5759,8 +6045,13 @@ document.addEventListener('DOMContentLoaded', () => {
             note,
             outlineItems
         };
-        if (existingIndex >= 0) skillsCoveredState[existingIndex] = entry;
-        else skillsCoveredState.push(entry);
+        if (existingIndex >= 0) {
+            skillsCoveredState[existingIndex] = entry;
+            skillsCoveredExpandNextId = skillId;
+        } else {
+            skillsCoveredState.push(entry);
+            skillsCoveredExpandNextId = skillId;
+        }
         pendingOutlineSelection = null;
         pendingPrimaryLevelId = '';
         if (noteInput) noteInput.value = '';
@@ -5777,23 +6068,48 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnPickOutlineItems')?.addEventListener('click', () => {
         const skillId = String(document.getElementById('skillsCoveredSkillSelect')?.value || '').trim();
         const levelId = String(document.getElementById('skillsCoveredLevelSelect')?.value || '').trim();
-        if (!isClbSkill(skillId)) { alert('Outline items apply to Listening, Speaking, Reading, and Writing.'); return; }
-        if (!levelId) { alert('Select a CLB level first.'); return; }
+        if (!isClbSkill(skillId)) {
+            void sessionMessageBox({
+                title: 'CLB skills only',
+                icon: 'info',
+                html: true,
+                message: CLB_OUTLINE_SKILLS_MESSAGE
+            });
+            return;
+        }
+        if (!levelId) {
+            void sessionMessageBox({
+                title: 'CLB level required',
+                icon: 'warning',
+                message: 'Select a CLB level first.'
+            });
+            return;
+        }
         const existing = skillsCoveredState.find((row) => row.skillId === skillId);
         openOutlinePicker({
             skillId,
             primaryLevelId: pendingPrimaryLevelId || existing?.primaryLevelId || levelId,
             selectedItems: pendingOutlineSelection !== null ? pendingOutlineSelection : (existing?.outlineItems || []),
             onApply: (result) => {
-                pendingOutlineSelection = result.items;
-                pendingPrimaryLevelId = result.primaryLevelId;
+                commitPickedOutlineToSkillsTable(skillId, result);
             }
         });
     });
 
     document.getElementById('btnAddSkillCovered')?.addEventListener('click', addSkillCoveredRow);
 
-    document.getElementById('skillsCoveredTableBody')?.addEventListener('input', (event) => {
+    document.getElementById('skillsCoveredAccordion')?.addEventListener('hidden.bs.collapse', (event) => {
+        const item = event.target.closest('.skills-covered-accordion-item');
+        const skillId = String(item?.getAttribute('data-skill-id') || '').trim();
+        if (skillId) skillsCoveredCollapsedIds.add(skillId);
+    });
+    document.getElementById('skillsCoveredAccordion')?.addEventListener('shown.bs.collapse', (event) => {
+        const item = event.target.closest('.skills-covered-accordion-item');
+        const skillId = String(item?.getAttribute('data-skill-id') || '').trim();
+        if (skillId) skillsCoveredCollapsedIds.delete(skillId);
+    });
+
+    document.getElementById('skillsCoveredAccordion')?.addEventListener('input', (event) => {
         const input = event.target.closest('.skills-covered-note');
         if (!input) return;
         const index = Number(input.getAttribute('data-index'));
@@ -5801,7 +6117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         skillsCoveredState[index].note = String(input.value || '').slice(0, 2000);
     });
 
-    document.getElementById('skillsCoveredTableBody')?.addEventListener('click', (event) => {
+    document.getElementById('skillsCoveredAccordion')?.addEventListener('click', (event) => {
         const editBtn = event.target.closest('.skills-covered-edit-items');
         if (editBtn) {
             const index = Number(editBtn.getAttribute('data-index'));
@@ -5813,7 +6129,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedItems: row.outlineItems || [],
                 onApply: (result) => {
                     if (!result.items.length && !row.note) {
-                        alert('Keep at least one instructional outline item or add a session note before clearing this skill.');
+                        const removeIndex = skillsCoveredState.findIndex((entry) => entry.skillId === row.skillId);
+                        if (removeIndex >= 0) {
+                            skillsCoveredState.splice(removeIndex, 1);
+                            renderSkillsCoveredTable();
+                            syncSkillsCoveredSelectOptions();
+                        }
                         return;
                     }
                     const primaryLevel = outlineLevelById.get(String(result.primaryLevelId || ''));
@@ -5830,44 +6151,92 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!btn) return;
         const index = Number(btn.getAttribute('data-index'));
         if (!Number.isInteger(index) || index < 0 || index >= skillsCoveredState.length) return;
+        const removed = skillsCoveredState[index];
         skillsCoveredState.splice(index, 1);
+        if (removed?.skillId) skillsCoveredCollapsedIds.delete(String(removed.skillId));
         renderSkillsCoveredTable();
         syncSkillsCoveredSelectOptions();
     });
 
+    function renderOutlineSuggestionItemRow(skillId, block, item) {
+        const coverageBadge = item.isPreviouslyCovered
+            ? '<span class="badge bg-light text-secondary border">Previously covered</span>'
+            : '<span class="badge text-bg-success">New</span>';
+        const addButton = skillsCoveredReadOnly
+            ? ''
+            : `<button type="button" class="btn btn-sm btn-outline-primary outline-suggest-add" data-skill="${scEscapeHtml(skillId)}" data-item="${scEscapeHtml(item.itemId)}" data-level="${scEscapeHtml(item.levelId || block.suggestedLevelId || '')}"><i class="bi bi-plus-lg me-1"></i>Add</button>`;
+        const levelHint = item.levelTitle
+            ? `<div class="small text-muted mt-1">${scEscapeHtml(item.levelTitle)}</div>`
+            : '';
+        return `<div class="outline-suggestion-item">
+            <div class="flex-grow-1 min-w-0">
+                <div class="outline-suggestion-item-label">${scEscapeHtml(item.label)}</div>
+                ${levelHint}
+            </div>
+            <div class="outline-suggestion-item-meta">
+                ${coverageBadge}
+                ${addButton}
+            </div>
+        </div>`;
+    }
+
     function renderOutlineSuggestions() {
         const host = document.getElementById('outlineSuggestionsBody');
+        const trigger = document.getElementById('btnOpenOutlineSuggestions');
+        const countBadge = document.getElementById('outlineSuggestionsCount');
         if (!host) return;
         const parts = [];
+        let totalItems = 0;
         Object.keys(outlineSuggestionsBySkill || {}).forEach((skillId) => {
             const block = outlineSuggestionsBySkill[skillId];
             const items = block?.items || [];
             const suggestedLevel = outlineLevelById.get(String(block?.suggestedLevelId || ''));
             if (!items.length && !suggestedLevel) return;
-            parts.push(`<div class="border-top pt-2 mt-2">
-                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-1">
-                    <strong>${scEscapeHtml(skillsCoveredLabelById.get(skillId) || skillId)}</strong>
-                    <div>
-                        ${suggestedLevel ? `<span class="badge bg-primary me-1">Suggested ${scEscapeHtml(suggestedLevel.title || suggestedLevel.code)}</span>` : ''}
-                        <button type="button" class="btn btn-sm btn-outline-primary outline-suggest-open" data-skill="${scEscapeHtml(skillId)}" data-level="${scEscapeHtml(block?.suggestedLevelId || outlineLevels[0]?.id || '')}">Open outline</button>
-                    </div>
-                </div>`);
+            totalItems += items.length;
+            const distribution = (block.levelDistribution || []).map((row) => (
+                `<span class="badge bg-white text-dark border">${scEscapeHtml(row.levelTitle)}: ${Number(row.count || 0)} student${Number(row.count || 0) === 1 ? '' : 's'}</span>`
+            )).join('');
             const grouped = new Map();
             items.forEach((item) => {
                 const meta = outlinePlanGroupMeta(item.sectionKey);
                 if (!grouped.has(meta.key)) grouped.set(meta.key, { ...meta, items: [] });
                 grouped.get(meta.key).items.push(item);
             });
-            grouped.forEach((group) => {
-                parts.push(`<div class="x-small text-uppercase fw-semibold text-muted mt-2">${scEscapeHtml(group.title)}</div>`);
-                group.items.forEach((item) => {
-                    const coverage = item.isPreviouslyCovered ? ' · previously covered' : ' · new';
-                    parts.push(`<button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1 outline-suggest-add" data-skill="${scEscapeHtml(skillId)}" data-item="${scEscapeHtml(item.itemId)}" data-level="${scEscapeHtml(item.levelId || block.suggestedLevelId || '')}">${scEscapeHtml(item.label).slice(0, 60)}${item.label.length > 60 ? '…' : ''}${coverage}</button>`);
-                });
-            });
-            parts.push('</div>');
+            const groupHtml = [...grouped.values()].map((group) => `
+                <div class="outline-suggestion-group">
+                    <div class="outline-suggestion-group-title">${scEscapeHtml(group.title)}</div>
+                    ${group.items.map((item) => renderOutlineSuggestionItemRow(skillId, block, item)).join('')}
+                </div>`).join('');
+            parts.push(`<div class="outline-suggestion-skill-card">
+                <div class="outline-suggestion-skill-header">
+                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                        <div>
+                            <div class="fw-semibold">${scEscapeHtml(skillsCoveredLabelById.get(skillId) || skillId)}</div>
+                            ${distribution ? `<div class="outline-suggestion-roster">${distribution}</div>` : '<div class="small text-muted mt-1">No roster CLB levels were resolved for this skill.</div>'}
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            ${suggestedLevel ? `<span class="badge bg-primary">Suggested ${scEscapeHtml(suggestedLevel.title || suggestedLevel.code)}</span>` : ''}
+                            <button type="button" class="btn btn-sm btn-outline-primary outline-suggest-open" data-skill="${scEscapeHtml(skillId)}" data-level="${scEscapeHtml(block?.suggestedLevelId || outlineLevels[0]?.id || '')}"><i class="bi bi-journal-text me-1"></i>Open outline</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="outline-suggestion-skill-body">
+                    ${groupHtml || '<div class="text-muted small py-2">No specific instructional items were suggested for this skill.</div>'}
+                </div>
+            </div>`);
         });
-        host.innerHTML = parts.length ? parts.join('') : '<span class="text-muted">No suggestions available.</span>';
+        if (trigger) trigger.classList.toggle('d-none', parts.length === 0);
+        if (countBadge) {
+            if (totalItems > 0) {
+                countBadge.textContent = String(totalItems);
+                countBadge.classList.remove('d-none');
+            } else {
+                countBadge.classList.add('d-none');
+            }
+        }
+        host.innerHTML = parts.length
+            ? parts.join('')
+            : '<div class="text-center text-muted py-4">No suggestions available for this roster.</div>';
     }
 
     document.getElementById('outlineSuggestionsBody')?.addEventListener('click', (event) => {
@@ -5875,6 +6244,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (openButton) {
             const skillId = openButton.getAttribute('data-skill');
             const levelId = openButton.getAttribute('data-level');
+            const suggestionsModalEl = document.getElementById('outlineSuggestionsModal');
+            if (suggestionsModalEl && window.bootstrap) {
+                const suggestionsModal = bootstrap.Modal.getInstance(suggestionsModalEl);
+                if (suggestionsModal) suggestionsModal.hide();
+            }
             const row = skillsCoveredState.find((entry) => entry.skillId === skillId);
             openOutlinePicker({
                 skillId,
@@ -5885,7 +6259,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     let target = skillsCoveredState.find((entry) => entry.skillId === skillId);
                     if (!target && !result.items.length) return;
                     if (target && !target.note && !result.items.length) {
-                        alert('Keep at least one instructional outline item or add a session note before clearing this skill.');
+                        const removeIndex = skillsCoveredState.findIndex((entry) => entry.skillId === skillId);
+                        if (removeIndex >= 0) {
+                            skillsCoveredState.splice(removeIndex, 1);
+                            renderSkillsCoveredTable();
+                            syncSkillsCoveredSelectOptions();
+                        }
                         return;
                     }
                     if (!target) {
@@ -6287,24 +6666,22 @@ document.addEventListener('DOMContentLoaded', () => {
             gbRenderList();
             if (showSuccessModal) {
                 const msg = successMessage != null ? successMessage : (result.message || 'Gradebook activities saved.');
-                if (typeof showMessageModal === 'function') {
-                    await showMessageModal({
-                        title: successTitle,
-                        icon: 'success',
-                        message: msg,
-                        buttons: [{ text: 'OK', class: 'btn-success' }]
-                    });
-                } else {
-                    alert(msg);
-                }
+                await sessionMessageBox({
+                    title: successTitle,
+                    icon: 'success',
+                    message: msg,
+                    okClass: 'btn-success'
+                });
             }
             return { ok: true };
         } catch (err) {
-            if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'Error', icon: 'error', message: err.message, buttons: [{ text: 'Close', class: 'btn-secondary' }] });
-            } else {
-                alert(err.message);
-            }
+            await sessionMessageBox({
+                title: 'Error',
+                icon: 'error',
+                message: err.message,
+                okText: 'Close',
+                okClass: 'btn-secondary'
+            });
             return { ok: false, error: err.message };
         } finally {
             if (btn) {
@@ -6331,18 +6708,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 gbRenderList();
             }
         };
-        if (typeof showMessageModal === 'function') {
-            showMessageModal({
-                title: 'Remove activity?',
-                icon: 'question',
-                message: 'Remove this activity from the gradebook? The list will be saved immediately.',
-                buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: 'Remove', class: 'btn-danger' }]
-            }).then((res) => {
-                if (res === 'Remove') void run();
-            });
-            return;
-        }
-        if (window.confirm('Remove this activity from the gradebook? It will be saved immediately.')) void run();
+        void sessionConfirmBox({
+            title: 'Remove activity?',
+            icon: 'warning',
+            message: '<p class="mb-0">Remove this activity from the gradebook? The list will be saved immediately.</p>',
+            confirmText: 'Remove',
+            confirmClass: 'btn-danger',
+            html: true
+        }).then((confirmed) => {
+            if (confirmed) void run();
+        });
     }
 
     let gradebookModalInstance = null;
@@ -6387,15 +6762,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const includeInGradeCalculation = document.getElementById('gbModalInclude').checked;
 
         if (!name) {
-            if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'Name required', icon: 'warning', message: 'Please enter an activity name.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-            } else { alert('Please enter an activity name.'); }
+            void sessionMessageBox({
+                title: 'Name required',
+                icon: 'warning',
+                message: 'Please enter an activity name.'
+            });
             return;
         }
         if (!Number.isFinite(totalScore) || totalScore <= 0) {
-            if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'Invalid total', icon: 'warning', message: 'Total score must be a positive number.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-            } else { alert('Total score must be a positive number.'); }
+            void sessionMessageBox({
+                title: 'Invalid total',
+                icon: 'warning',
+                message: 'Total score must be a positive number.'
+            });
             return;
         }
 
@@ -6675,21 +7054,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             + '</ul></div>'
                         : '';
                     const warningMessage = attendanceAttachmentEscape(result.message || 'Make-up sessions already exist for this original session.');
-                    if (typeof showMessageModal === 'function') {
-                        const selected = await showMessageModal({
-                            title: 'Make-up Sessions Already Scheduled',
-                            icon: 'warning',
-                            message: `${warningMessage}${detailHtml}<div class="mt-3">Changing to a status that does not need make-up will remove all listed make-up sessions. Continue?</div>`,
-                            buttons: [
-                                { text: 'Cancel', class: 'btn-secondary' },
-                                { text: 'Remove Make-up Sessions and Continue', class: 'btn-warning' }
-                            ]
-                        });
-                        if (selected !== 'Remove Make-up Sessions and Continue') return;
-                    } else {
-                        const ok = window.confirm(`${result.message || 'Make-up sessions already exist.'}\n\nAll linked make-up sessions will be removed before status update. Continue?`);
-                        if (!ok) return;
-                    }
+                    const confirmed = await sessionConfirmBox({
+                        title: 'Make-up Sessions Already Scheduled',
+                        icon: 'warning',
+                        html: true,
+                        message: `${warningMessage}${detailHtml}<div class="mt-3">Changing to a status that does not need make-up will remove all listed make-up sessions. Continue?</div>`,
+                        confirmText: 'Remove Make-up Sessions and Continue',
+                        confirmClass: 'btn-warning'
+                    });
+                    if (!confirmed) return;
 
                     ({ result } = await submitSessionSave({ ...payload, forceRemoveMakeups: true }));
                     guarded = await applySaveGuard(result);
@@ -6710,48 +7083,37 @@ document.addEventListener('DOMContentLoaded', () => {
                             + '</ul></div>'
                         : '';
                     const warningMessage = attendanceAttachmentEscape(result.message || 'Schedule conflicts were detected for the updated session.');
-                    if (typeof showMessageModal === 'function') {
-                        const selected = await showMessageModal({
-                            title: 'Session Schedule Conflicts',
-                            icon: 'warning',
-                            message: `${warningMessage}${detailHtml}<div class="mt-3">Save anyway with these conflicts?</div>`,
-                            buttons: [
-                                { text: 'Cancel', class: 'btn-secondary' },
-                                { text: 'Save Anyway', class: 'btn-warning' }
-                            ]
-                        });
-                        if (selected !== 'Save Anyway') return;
-                    } else {
-                        const ok = window.confirm(`${result.message || 'Schedule conflicts were detected.'}\n\nSave anyway?`);
-                        if (!ok) return;
-                    }
+                    const confirmed = await sessionConfirmBox({
+                        title: 'Session Schedule Conflicts',
+                        icon: 'warning',
+                        html: true,
+                        message: `${warningMessage}${detailHtml}<div class="mt-3">Save anyway with these conflicts?</div>`,
+                        confirmText: 'Save Anyway',
+                        confirmClass: 'btn-warning'
+                    });
+                    if (!confirmed) return;
 
                     ({ result } = await submitSessionSave({ ...payload, force: true }));
                     guarded = await applySaveGuard(result);
                     if (guarded.stop) return;
                 }
 
-                if (typeof showMessageModal === 'function') {
-                    await showMessageModal({
-                        title: result.status === 'success' ? 'Saved' : 'Error',
-                        icon: result.status === 'success' ? 'success' : 'error',
-                        message: result.message,
-                        buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
-                    });
-                    if (result.status === 'success') window.location.reload();
-                } else {
-                    alert(result.message);
-                    if (result.status === 'success') window.location.reload();
-                }
+                await sessionMessageBox({
+                    title: result.status === 'success' ? 'Saved' : 'Error',
+                    icon: result.status === 'success' ? 'success' : 'error',
+                    message: result.message,
+                    okClass: result.status === 'success' ? 'btn-success' : 'btn-danger'
+                });
+                if (result.status === 'success') window.location.reload();
             } catch (error) {
                 console.error(error);
-                if (typeof showMessageModal === 'function') {
-                    showMessageModal({
-                        title: 'Network Error', icon: 'error',
-                        message: 'A network error occurred while trying to save the session.',
-                        buttons: [{ text: 'Close', class: 'btn-secondary' }]
-                    });
-                } else { alert('A network error occurred.'); }
+                await sessionMessageBox({
+                    title: 'Network Error',
+                    icon: 'error',
+                    message: 'A network error occurred while trying to save the session.',
+                    okText: 'Close',
+                    okClass: 'btn-secondary'
+                });
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;

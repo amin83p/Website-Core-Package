@@ -25,6 +25,10 @@ test('session manager teaching-outline UI template compiles', () => {
     .slice(start, end)
     .replace(/<%[-=][\s\S]*?%>/g, 'null');
   assert.doesNotThrow(() => new Function(clientScript)); // eslint-disable-line no-new-func
+  assert.match(source, /outlineSessionPlanUtils\.js/);
+  assert.match(source, /outlinePickerCoverageChips/);
+  assert.match(source, /skillsCoveredAccordion/);
+  assert.match(source, /curriculumReferenceCard/);
 });
 
 test('resolveLevelFromStudentText matches CLB aliases', () => {
@@ -586,4 +590,64 @@ test('aggregateCoverageForEnrollment groups by skill and section', async () => {
   assert.equal(report.bySkill.writing.bySection.tasks[0].label, 'Write email');
   assert.deepEqual(report.bySkill.writing.bySection.tasks[0].sessionDates, ['2026-01-10']);
   assert.equal(report.bySkill.writing.totalSessions, 1);
+});
+
+const outlineSessionPlanUtils = require('../public/scripts/outlineSessionPlanUtils.js');
+
+test('getOutlineSectionCoverage detects missing canonical sections', () => {
+  const complete = outlineSessionPlanUtils.getOutlineSectionCoverage([
+    { sectionKey: 'outcomes_general', label: 'Objective' },
+    { sectionKey: 'grammar', label: 'Past tense' },
+    { sectionKey: 'tasks', label: 'Write email' }
+  ]);
+  assert.equal(complete.complete, true);
+  assert.equal(complete.missing.length, 0);
+
+  const partial = outlineSessionPlanUtils.getOutlineSectionCoverage([
+    { sectionKey: 'grammar', label: 'Past tense' },
+    { sectionKey: 'tasks', label: 'Write email' }
+  ]);
+  assert.equal(partial.complete, false);
+  assert.deepEqual(partial.missing.map((row) => row.key), ['objectives']);
+  assert.equal(partial.objectives, false);
+  assert.equal(partial.language_focus, true);
+  assert.equal(partial.activities, true);
+});
+
+test('buildOutlineItemSnapshot resolves activity group label from parent group', () => {
+  const catalogById = new Map([
+    ['group1', { id: 'group1', itemKind: 'group', label: 'Convey personal messages in short correspondence.' }],
+    ['task1', {
+      id: 'task1',
+      parentId: 'group1',
+      sectionKey: 'tasks',
+      label: 'Write a personal message to cancel an appointment.',
+      levelId: 'l6',
+      itemKind: 'checklist'
+    }]
+  ]);
+  const snapshot = outlineSessionPlanUtils.buildOutlineItemSnapshot(
+    catalogById.get('task1'),
+    catalogById,
+    () => ({ code: 'clb_6', title: 'CLB 6' })
+  );
+  assert.equal(snapshot.groupLabel, 'Convey personal messages in short correspondence.');
+  assert.equal(snapshot.parentId, 'group1');
+  assert.equal(snapshot.levelTitle, 'CLB 6');
+});
+
+test('renderOutlinePlanHtml groups activities under parent competency text', () => {
+  const html = outlineSessionPlanUtils.renderOutlinePlanHtml([
+    { sectionKey: 'outcomes_general', label: 'Write connected paragraphs.', levelTitle: 'CLB 6' },
+    {
+      sectionKey: 'tasks',
+      label: 'Write a personal message to cancel an appointment.',
+      groupLabel: 'Convey personal messages in short correspondence.',
+      levelTitle: 'CLB 6'
+    }
+  ], (value) => String(value));
+  assert.match(html, /Objectives/);
+  assert.match(html, /Activities/);
+  assert.match(html, /Convey personal messages in short correspondence/);
+  assert.match(html, /Write a personal message to cancel an appointment/);
 });
