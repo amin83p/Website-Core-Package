@@ -5,6 +5,14 @@ const schoolDataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
+const PERIOD_ENROLLMENT_STATUSES = Object.freeze([
+  'active',
+  'planned',
+  'to_be_confirmed',
+  'completed',
+  'withdrawn'
+]);
+
 function getClassRegistrationModeKey(classData) {
   return String(classData?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
 }
@@ -33,6 +41,100 @@ function resolveSingleStudentNameFromPersonIds(personIds, personNameMap) {
   if (!(personIds instanceof Set) || personIds.size !== 1) return '';
   const pid = Array.from(personIds)[0];
   return String(personNameMap.get(pid) || '').trim();
+}
+
+function normalizeAttendance(value) {
+  return String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function buildDepartmentCodeMap(departments = []) {
+  const map = new Map();
+  (Array.isArray(departments) ? departments : []).forEach((department) => {
+    const id = toPublicId(department?.id);
+    const code = String(department?.code || '').trim();
+    if (id && code) map.set(id, code);
+  });
+  return map;
+}
+
+function resolveDepartmentCode(classData = {}, departmentCodeById = new Map()) {
+  const direct = String(classData?.deliveryDepartmentCode || classData?.departmentCode || '').trim();
+  if (direct) return direct;
+  const departmentId = toPublicId(classData?.deliveryDepartmentId || classData?.departmentId);
+  if (!departmentId) return '';
+  return String(departmentCodeById.get(departmentId) || '').trim();
+}
+
+function buildPeriodStudentContext(studentIds, {
+  studentToPersonMap = new Map(),
+  personNameMap = new Map()
+} = {}) {
+  const normalizedStudentIds = new Set(
+    Array.from(studentIds instanceof Set ? studentIds : [])
+      .map((studentId) => toPublicId(studentId))
+      .filter(Boolean)
+  );
+  const isOneOnOne = normalizedStudentIds.size === 1;
+  const singleStudentId = isOneOnOne ? Array.from(normalizedStudentIds)[0] : '';
+  const singleStudentPersonId = singleStudentId
+    ? toPublicId(studentToPersonMap.get(singleStudentId))
+    : '';
+  return {
+    studentIds: normalizedStudentIds,
+    isOneOnOne,
+    singleStudentId,
+    singleStudentPersonId,
+    singleStudentName: singleStudentPersonId
+      ? String(personNameMap.get(singleStudentPersonId) || '').trim()
+      : ''
+  };
+}
+
+async function buildPeriodClassStudentContextById(classRows = [], {
+  periodStartDate = '',
+  periodEndDate = '',
+  studentToPersonMap = new Map(),
+  personNameMap = new Map(),
+  activeOrgId = '',
+  reqUser
+} = {}) {
+  const out = new Map();
+  await Promise.all((Array.isArray(classRows) ? classRows : []).map(async (classData) => {
+    const classId = toPublicId(classData?.id);
+    if (!classId) return;
+    const snapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
+      classId,
+      classItem: classData,
+      reqUser,
+      activeOrgId,
+      startDate: periodStartDate,
+      endDate: periodEndDate,
+      canonicalStatuses: PERIOD_ENROLLMENT_STATUSES
+    });
+    out.set(classId, buildPeriodStudentContext(snapshot?.studentIds, {
+      studentToPersonMap,
+      personNameMap
+    }));
+  }));
+  return out;
+}
+
+function resolveSingleStudentAttendance(session = {}, context = {}) {
+  if (context?.isOneOnOne !== true) return '';
+  const candidateIds = [context?.singleStudentPersonId, context?.singleStudentId]
+    .map((value) => toPublicId(value))
+    .filter(Boolean);
+  if (!candidateIds.length) return '';
+  const rosterRow = (Array.isArray(session?.roster) ? session.roster : []).find((row) => {
+    const rowId = toPublicId(row?.personId || row?.studentId || row?.id);
+    return rowId && candidateIds.some((candidateId) => idsEqual(rowId, candidateId));
+  });
+  return normalizeAttendance(rosterRow?.attendance);
+}
+
+function shouldShowOptionalBadge({ isOneOnOne = false, attendance = '', makeUpRequired = false } = {}) {
+  if (isOneOnOne !== true) return false;
+  return normalizeAttendance(attendance) === 'absent' || makeUpRequired === true;
 }
 
 function resolveExpectedStudentPersonIdsForSession({
@@ -179,20 +281,32 @@ async function enrichClassLiveSessions({
   liveSessionBuilders = [],
   students = [],
   persons = [],
+  departments = [],
   statusMap,
+  periodStartDate = '',
+  periodEndDate = '',
   activeOrgId,
   reqUser
 }) {
   const studentToPersonMap = buildStudentToPersonMap(students);
   const personNameMap = buildPersonNameMap(persons);
-  const rollingApplicabilityByClassId = await buildRollingApplicabilityByClassId(classRows, {
-    sessionsByClassId,
-    students,
+  const targetClassIds = new Set(
+    (Array.isArray(liveSessionBuilders) ? liveSessionBuilders : [])
+      .map((item) => toPublicId(item?.classId))
+      .filter(Boolean)
+  );
+  const relevantClassRows = (Array.isArray(classRows) ? classRows : [])
+    .filter((row) => targetClassIds.has(toPublicId(row?.id)));
+  const periodClassStudentContextById = await buildPeriodClassStudentContextById(relevantClassRows, {
+    periodStartDate,
+    periodEndDate,
+    studentToPersonMap,
+    personNameMap,
     activeOrgId,
     reqUser
   });
-  const termEnrollmentCache = new Map();
-  const classMap = new Map((Array.isArray(classRows) ? classRows : []).map((row) => [String(row?.id || '').trim(), row]));
+  const departmentCodeById = buildDepartmentCodeMap(departments);
+  const classMap = new Map(relevantClassRows.map((row) => [String(row?.id || '').trim(), row]));
 
   const enriched = [];
   for (const item of liveSessionBuilders) {
@@ -200,17 +314,23 @@ async function enrichClassLiveSessions({
     const sessionRow = item?.sessionRow || null;
     const payload = { ...item.payload };
     if (classData && sessionRow) {
-      // eslint-disable-next-line no-await-in-loop
-      await enrichClassSessionPayloadWithSingleStudentName(payload, {
-        classData,
-        sessionRow,
-        studentToPersonMap,
-        personNameMap,
-        statusMap,
-        rollingApplicabilityByClassId,
-        termEnrollmentCache,
-        activeOrgId,
-        reqUser
+      const classId = toPublicId(classData?.id);
+      const context = periodClassStudentContextById.get(classId) || buildPeriodStudentContext(new Set());
+      const singleStudentAttendance = resolveSingleStudentAttendance(sessionRow, context);
+      const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(sessionRow?.status, sessionRow?.notes);
+      const statusDefinition = statusMap instanceof Map ? statusMap.get(normalizedStatus) : null;
+      const makeUpRequired = statusDefinition?.makeUpRequired === true;
+      payload.deliveryDepartmentCode = resolveDepartmentCode(classData, departmentCodeById);
+      payload.isOneOnOne = context.isOneOnOne === true;
+      payload.singleStudentId = context.singleStudentId || '';
+      payload.singleStudentPersonId = context.singleStudentPersonId || '';
+      payload.singleStudentName = context.singleStudentName || '';
+      payload.singleStudentAttendance = singleStudentAttendance;
+      payload.makeUpRequired = makeUpRequired;
+      payload.showOptionalBadge = shouldShowOptionalBadge({
+        isOneOnOne: context.isOneOnOne,
+        attendance: singleStudentAttendance,
+        makeUpRequired
       });
     }
     enriched.push(payload);
@@ -219,9 +339,17 @@ async function enrichClassLiveSessions({
 }
 
 module.exports = {
+  PERIOD_ENROLLMENT_STATUSES,
   getClassRegistrationModeKey,
   buildStudentToPersonMap,
   buildPersonNameMap,
+  normalizeAttendance,
+  buildDepartmentCodeMap,
+  resolveDepartmentCode,
+  buildPeriodStudentContext,
+  buildPeriodClassStudentContextById,
+  resolveSingleStudentAttendance,
+  shouldShowOptionalBadge,
   resolveSingleStudentNameFromPersonIds,
   resolveExpectedStudentPersonIdsForSession,
   enrichClassLiveSessions

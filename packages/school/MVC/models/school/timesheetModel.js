@@ -170,6 +170,27 @@ function applyPayrollFields(row, entry) {
     return row;
 }
 
+function applyClassSessionDisplayFields(row, entry) {
+    const deliveryDepartmentId = cleanString(entry?.deliveryDepartmentId, { max: 64, allowEmpty: true });
+    const deliveryDepartmentName = cleanString(entry?.deliveryDepartmentName, { max: 160, allowEmpty: true });
+    const deliveryDepartmentCode = cleanString(entry?.deliveryDepartmentCode, { max: 80, allowEmpty: true });
+    const singleStudentId = cleanString(entry?.singleStudentId, { max: 64, allowEmpty: true });
+    const singleStudentPersonId = cleanString(entry?.singleStudentPersonId, { max: 64, allowEmpty: true });
+    const singleStudentName = cleanString(entry?.singleStudentName, { max: 200, allowEmpty: true });
+    const singleStudentAttendance = cleanString(entry?.singleStudentAttendance, { max: 40, allowEmpty: true }).toLowerCase();
+    if (deliveryDepartmentId) row.deliveryDepartmentId = deliveryDepartmentId;
+    if (deliveryDepartmentName) row.deliveryDepartmentName = deliveryDepartmentName;
+    if (deliveryDepartmentCode) row.deliveryDepartmentCode = deliveryDepartmentCode;
+    if (typeof entry?.isOneOnOne === 'boolean') row.isOneOnOne = entry.isOneOnOne === true;
+    if (singleStudentId) row.singleStudentId = singleStudentId;
+    if (singleStudentPersonId) row.singleStudentPersonId = singleStudentPersonId;
+    if (singleStudentName) row.singleStudentName = singleStudentName;
+    if (singleStudentAttendance) row.singleStudentAttendance = singleStudentAttendance;
+    if (typeof entry?.makeUpRequired === 'boolean') row.makeUpRequired = entry.makeUpRequired === true;
+    if (typeof entry?.showOptionalBadge === 'boolean') row.showOptionalBadge = entry.showOptionalBadge === true;
+    return row;
+}
+
 function sanitizeSnapshotEntry(entry) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry) || entry.isDeleted === true) return null;
     const sessionId = cleanString(entry.sessionId, { max: 80, allowEmpty: false });
@@ -235,7 +256,7 @@ function sanitizeSnapshotEntry(entry) {
         if (decisionByName) row.decisionByName = decisionByName;
         if (decisionNote) row.decisionNote = decisionNote;
     }
-    return applyPayrollFields(row, entry);
+    return applyPayrollFields(applyClassSessionDisplayFields(row, entry), entry);
 }
 
 function sanitizeReviewHistoryEntry(input) {
@@ -409,7 +430,7 @@ function sanitizeEntry(entry) {
             }
             : {};
     }
-    return applyPayrollFields(row, entry);
+    return applyPayrollFields(applyClassSessionDisplayFields(row, entry), entry);
 }
 
 function sanitizeTimesheetPayload(input) {

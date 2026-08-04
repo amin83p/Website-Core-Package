@@ -2803,6 +2803,12 @@
           "sessionAttempts": 5,
           "sessionTime": 15,
           "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
         }
       ],
       "subsections": [],
@@ -2844,6 +2850,12 @@
         },
         {
           "id": "OP1006",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
           "sessionAttempts": 5,
           "sessionTime": 15,
           "active": true

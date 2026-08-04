@@ -31,10 +31,12 @@ test('school timesheet management section supports route read-all access', () =>
   assert.ok(operationIds(manifestSection).includes('OP1003'), 'manifest section should support READ_ALL');
   assert.ok(operationIds(manifestSection).includes('OP1005'), 'manifest section should support UPDATE');
   assert.ok(operationIds(manifestSection).includes('OP1006'), 'manifest section should support CONFIGURE');
+  assert.ok(operationIds(manifestSection).includes('OP1012'), 'manifest section should support EXPORT');
   assert.ok(operationIds(localSection).includes('OP1002'), 'local section should support READ');
   assert.ok(operationIds(localSection).includes('OP1003'), 'local section should support READ_ALL');
   assert.ok(operationIds(localSection).includes('OP1005'), 'local section should support UPDATE');
   assert.ok(operationIds(localSection).includes('OP1006'), 'local section should support CONFIGURE');
+  assert.ok(operationIds(localSection).includes('OP1012'), 'local section should support EXPORT');
 });
 
 test('school timesheet management is linked under accounting with non-colliding symbol metadata', () => {
@@ -65,7 +67,8 @@ test('timesheet mongo seed repairs both timesheet sections and symbol metadata',
   assert.match(seedSource, /name: 'SCHOOL_TIMESHEET_MANAGEMENT'/);
   assert.match(seedSource, /id: 'SYM_SYSTEM_047'/);
   assert.match(seedSource, /id: 'SYM_SYSTEM_123'/);
-  assert.match(seedSource, /operations: \['OP1002', 'OP1003', 'OP1005', 'OP1006'\]/);
+  assert.match(seedSource, /operations: \['OP1002', 'OP1003', 'OP1005', 'OP1001', 'OP1004', 'OP1012'\]/);
+  assert.match(seedSource, /operations: \['OP1002', 'OP1003', 'OP1005', 'OP1006', 'OP1012'\]/);
   assert.doesNotMatch(seedSource, /findOne\(\{ id: SYMBOL_ID \}\) \|\|/);
   assert.match(seedSource, /id: symbolDoc\.id/);
 });

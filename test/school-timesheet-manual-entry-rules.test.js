@@ -360,7 +360,7 @@ test('timesheet editor uses stacked header, readable table layout, and no day/we
   assert.match(editor, /buildDateCellHtml/);
   assert.match(editor, /ts-day-name/);
   assert.match(editor, /weekday: 'long'/);
-  assert.match(editor, /<th class="ts-col-time"[^>]*>Time<\/th>/);
+  assert.match(editor, /<th class="ts-col-hours-time"[^>]*>Hours \/ Time<\/th>/);
   assert.match(editor, /table-light border-bottom/);
   assert.doesNotMatch(editor, /Daily Total:/);
   assert.doesNotMatch(editor, /End of Week Total:/);

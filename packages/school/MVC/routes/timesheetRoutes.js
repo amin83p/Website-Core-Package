@@ -40,6 +40,11 @@ router.get('/manage/api/department-summary',
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.READ_ALL),
   ctrl.getTimesheetDepartmentSummary);
 
+router.post('/manage/print',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.EXPORT),
+  ctrl.printManagedTimesheets);
+
 router.get('/my-timesheets',
   requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),
@@ -69,6 +74,11 @@ router.get('/editor/:periodId',
   requireAccessAny([SECTIONS.SCHOOL_TIMESHEETS, SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT], OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),
   ctrl.viewTimesheet);
+
+router.post('/editor/:periodId/print',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.EXPORT),
+  ctrl.printOwnTimesheet);
 
 router.get('/editor/:periodId/prior-adjustments',
   requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),

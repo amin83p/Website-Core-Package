@@ -23,6 +23,11 @@
   const personDisplayName = typeof personName !== 'undefined' ? String(personName || '').trim() : '';
   const timesheetStatus = currentTimesheetStatus;
   const viewingOther = typeof viewingOtherPerson !== 'undefined' && viewingOtherPerson;
+  const canPrintFlag = typeof canPrintTimesheet !== 'undefined' && canPrintTimesheet === true;
+  const printMode = typeof timesheetPrintMode !== 'undefined' ? String(timesheetPrintMode || '') : '';
+  const printAction = printMode === 'management'
+    ? '/school/timesheets/manage/print'
+    : `/school/timesheets/editor/${encodeURIComponent(String(period.id || ''))}/print`;
 %>
 
 <style>
@@ -94,19 +99,97 @@
     text-align: left;
     margin-bottom: 0.25rem;
   }
+  .ts-timesheet-summary {
+    max-width: 880px;
+    margin-top: 0.65rem;
+    padding: 0.9rem 1rem;
+    background: linear-gradient(135deg, #f8fbff 0%, #ffffff 100%);
+    border: 1px solid #dbe7f3;
+    border-left: 4px solid #0d6efd;
+    border-radius: 0.65rem;
+    box-shadow: 0 0.2rem 0.6rem rgba(15, 23, 42, 0.06);
+  }
   .ts-period-name {
     font-size: 1.35rem;
-    font-weight: 600;
+    font-weight: 750;
     line-height: 1.3;
     color: #212529;
   }
+  .ts-timesheet-summary__identity {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+  }
   .ts-person-name {
     font-size: 1.1rem;
-    font-weight: 600;
+    font-weight: 700;
     color: #0d6efd;
   }
   .ts-meta-line {
-    line-height: 1.5;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(230px, 1fr));
+    gap: 0.6rem;
+    margin-top: 0.55rem;
+  }
+  .ts-meta-card {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+    padding: 0.6rem 0.75rem;
+    background-color: #ffffff;
+    border: 1px solid #dbe4ee;
+    border-radius: 0.55rem;
+  }
+  .ts-meta-card__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 2rem;
+    width: 2rem;
+    height: 2rem;
+    background-color: #e7f1ff;
+    border-radius: 50%;
+    color: #0d6efd;
+    font-size: 1rem;
+  }
+  .ts-meta-card__content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .ts-meta-card__label {
+    color: #6c757d;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.065em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .ts-meta-card__value {
+    margin-top: 0.15rem;
+    color: #212529;
+    font-size: 0.9rem;
+    font-weight: 750;
+    line-height: 1.35;
+  }
+  .ts-meta-card--deadline {
+    background-color: #fff8f8;
+    border-color: #f1aeb5;
+  }
+  .ts-meta-card--deadline .ts-meta-card__icon {
+    background-color: #f8d7da;
+    color: #b02a37;
+  }
+  .ts-meta-card--deadline .ts-meta-card__label,
+  .ts-meta-card--deadline .ts-meta-card__value {
+    color: #842029;
+  }
+  .ts-viewing-other-note {
+    grid-column: 1 / -1;
+    margin-top: 0.05rem;
   }
   .ts-page-header__aside {
     display: flex;
@@ -176,34 +259,146 @@
     padding-bottom: 0.65rem;
     vertical-align: middle;
   }
-  .ts-date-label {
+  .ts-date-label,
+  .ts-day-name {
     font-size: 1rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     color: #212529;
   }
   .ts-day-name {
-    font-size: 0.85rem;
-    font-weight: 500;
-    line-height: 1.25;
-    margin-top: 0.1rem;
-    color: #6c757d;
+    margin-bottom: 0.1rem;
   }
   .ts-time-label {
-    font-size: 0.95rem;
+    font-size: 0.8rem;
     font-weight: 500;
+    line-height: 1.3;
+    color: #6c757d;
+  }
+  .ts-class-primary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    color: #0d6efd;
+    font-weight: 700;
+  }
+  .ts-department-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.95rem;
+    letter-spacing: 0.025em;
+  }
+  .ts-class-primary-link {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: 100%;
+    color: inherit;
+    border-radius: 0.4rem;
+    text-decoration: none;
+  }
+  .ts-class-primary-link:hover .ts-department-code,
+  .ts-class-primary-link:hover .ts-class-fallback,
+  .ts-class-primary-link:focus-visible .ts-department-code,
+  .ts-class-primary-link:focus-visible .ts-class-fallback {
+    text-decoration: underline;
+    text-underline-offset: 0.18rem;
+  }
+  .ts-class-primary-link:focus-visible {
+    outline: 2px solid #0d6efd;
+    outline-offset: 3px;
+  }
+  .ts-one-on-one-badge {
+    background-color: #ede9fe;
+    border: 1px solid #c4b5fd;
+    color: #5b21b6;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+    white-space: nowrap;
+  }
+  .ts-hours-time-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+  .ts-hours-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    line-height: 1.2;
+  }
+  .ts-hours-value {
+    font-size: 1rem;
+    font-weight: 750;
+    color: #198754;
+  }
+  .ts-hours-unit {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #6c757d;
+  }
+  .ts-optional-badge {
+    background-color: #e0f2fe;
+    border: 1px solid #7dd3fc;
+    color: #075985;
+    font-size: 0.68rem;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
   }
   #tsTable th.ts-col-status,
   #tsTable td.ts-col-status {
     width: 56px;
+    min-width: 56px;
     max-width: 56px;
+    padding-right: 0.25rem !important;
+    padding-left: 0.25rem !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+  }
+  .ts-column-header-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 2rem;
     text-align: center;
   }
   #tsTable td.ts-col-status .ts-status-stack {
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 0.35rem;
+    width: 100%;
+  }
+  #tsTable th.ts-col-actions,
+  #tsTable td.ts-col-actions {
+    box-sizing: border-box;
+    width: 88px;
+    min-width: 88px;
+    max-width: 88px;
+    padding-right: 0.25rem !important;
+    padding-left: 0.25rem !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+  }
+  .ts-action-stack {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    width: 100%;
+  }
+  .ts-action-stack .btn {
+    flex: 0 0 auto;
+    margin: 0 !important;
   }
   .ts-status-chip {
     position: relative;
@@ -224,11 +419,11 @@
     outline: 2px solid #0d6efd;
     outline-offset: 2px;
   }
-  .ts-status-tip {
+  .ts-entry-tip {
     position: fixed;
     z-index: 2000;
     pointer-events: none;
-    max-width: min(280px, calc(100vw - 1.5rem));
+    max-width: min(380px, calc(100vw - 1.5rem));
     padding: 0.55rem 0.9rem;
     border-radius: 0.6rem;
     border: 2px solid transparent;
@@ -246,11 +441,18 @@
     transform: translate(-50%, calc(-100% - 14px)) scale(0.96);
     transition: opacity 0.12s ease, transform 0.12s ease;
   }
-  .ts-status-tip.is-visible {
+  .ts-entry-tip.is-details {
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1.45;
+    white-space: pre-line;
+    text-align: left;
+  }
+  .ts-entry-tip.is-visible {
     opacity: 1;
     transform: translate(-50%, calc(-100% - 10px)) scale(1);
   }
-  .ts-status-tip::after {
+  .ts-entry-tip::after {
     content: '';
     position: absolute;
     left: 50%;
@@ -265,10 +467,10 @@
     max-width: 4.5rem;
     white-space: normal;
   }
-  #tsTable th.ts-col-time,
-  #tsTable td.ts-col-time {
-    width: 180px;
-    min-width: 180px;
+  #tsTable th.ts-col-hours-time,
+  #tsTable td.ts-col-hours-time {
+    width: 210px;
+    min-width: 210px;
   }
   #tsTable tbody tr.ts-day-group-end > td {
     border-bottom: 3px solid #0d6efd !important;
@@ -288,36 +490,68 @@
   #tsDepartmentTotals .table {
     margin-bottom: 0;
   }
+  @media (max-width: 767.98px) {
+    .ts-page-header {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .ts-page-header__main,
+    .ts-timesheet-summary {
+      width: 100%;
+    }
+    .ts-page-header__aside {
+      align-items: flex-start;
+    }
+    .ts-meta-line {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
 
 <div class="sections-page">
     <div class="d-flex align-items-start justify-content-between mb-4 ts-page-header">
         <div class="ts-page-header__main">
             <h1 class="page-heading size-md text-start m-0 mb-1"><i class="bi bi-calendar2-week me-2"></i>Timesheet</h1>
-            <div class="ts-period-name"><%= period.name %></div>
-            <div class="d-flex flex-wrap align-items-center gap-2 mt-2 mb-2">
-                <% if (personDisplayName) { %>
-                    <span class="ts-person-name"><%= personDisplayName %></span>
-                <% } %>
-                <span class="badge bg-<%= timesheetStatus === 'submitted' ? 'warning text-dark' : (timesheetStatus === 'processed' ? 'primary' : 'secondary') %> text-uppercase"><%= timesheetStatus %></span>
-                <% if (timesheetStatus === 'submitted' && managerReviewApproved) { %>
-                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Manager Approved</span>
-                <% } %>
-                <% if (timesheetStatus === 'draft' && timesheet.returnReason) { %>
-                    <span class="badge bg-warning text-dark"><i class="bi bi-reply-fill me-1"></i>Returned for Revision</span>
-                <% } %>
-                <span id="badge_manualEdit" class="badge bg-warning text-dark shadow-sm <%= isManuallyEdited ? '' : 'd-none' %>">
-                    <i class="bi bi-pencil-square me-1"></i> Manually Edited
-                </span>
-            </div>
-            <div class="ts-meta-line text-muted small">
-                <strong>Period:</strong> <%= period.startDate %> to <%= period.endDate %>
-                <span class="mx-1">|</span>
-                <strong>Deadline:</strong> <span class="text-danger fw-bold"><%= deadlineLabel %></span>
-                <% if (viewingOther) { %>
-                    <span class="mx-1">|</span>
-                    <span class="text-info fw-semibold"><i class="bi bi-person-badge me-1"></i>Viewing another person's timesheet</span>
-                <% } %>
+            <div class="ts-timesheet-summary" aria-label="Timesheet details">
+                <div class="ts-period-name"><%= period.name %></div>
+                <div class="ts-timesheet-summary__identity">
+                    <% if (personDisplayName) { %>
+                        <span class="ts-person-name"><%= personDisplayName %></span>
+                    <% } %>
+                    <span class="badge bg-<%= timesheetStatus === 'submitted' ? 'warning text-dark' : (timesheetStatus === 'processed' ? 'primary' : 'secondary') %> text-uppercase"><%= timesheetStatus %></span>
+                    <% if (timesheetStatus === 'submitted' && managerReviewApproved) { %>
+                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Manager Approved</span>
+                    <% } %>
+                    <% if (timesheetStatus === 'draft' && timesheet.returnReason) { %>
+                        <span class="badge bg-warning text-dark"><i class="bi bi-reply-fill me-1"></i>Returned for Revision</span>
+                    <% } %>
+                    <span id="badge_manualEdit" class="badge bg-warning text-dark shadow-sm <%= isManuallyEdited ? '' : 'd-none' %>">
+                        <i class="bi bi-pencil-square me-1"></i> Manually Edited
+                    </span>
+                </div>
+                <div class="ts-meta-line">
+                    <div class="ts-meta-card ts-meta-card--period">
+                        <span class="ts-meta-card__icon" aria-hidden="true"><i class="bi bi-calendar-range"></i></span>
+                        <span class="ts-meta-card__content">
+                            <span class="ts-meta-card__label">Period</span>
+                            <span class="ts-meta-card__value">
+                                <time datetime="<%= period.startDate %>"><%= period.startDate %></time>
+                                <i class="bi bi-arrow-right mx-1 text-muted" aria-hidden="true"></i>
+                                <time datetime="<%= period.endDate %>"><%= period.endDate %></time>
+                            </span>
+                        </span>
+                    </div>
+                    <div class="ts-meta-card ts-meta-card--deadline">
+                        <span class="ts-meta-card__icon" aria-hidden="true"><i class="bi bi-alarm"></i></span>
+                        <span class="ts-meta-card__content">
+                            <span class="ts-meta-card__label">Submission Deadline</span>
+                            <time class="ts-meta-card__value" datetime="<%= deadlineDate === '-' ? '' : deadlineLabel %>"><%= deadlineLabel %></time>
+                        </span>
+                    </div>
+                    <% if (viewingOther) { %>
+                        <span class="ts-viewing-other-note text-info fw-semibold small"><i class="bi bi-person-badge me-1"></i>Viewing another person's timesheet</span>
+                    <% } %>
+                </div>
             </div>
         </div>
         <div class="ts-page-header__aside">
@@ -331,6 +565,18 @@
                 data-manager-approved="<%= managerReviewApproved ? 'true' : 'false' %>"
             ></div>
             <a href="/school/timesheets/my-timesheets" class="btn btn-outline-secondary btn-sm flex-shrink-0"><i class="bi bi-arrow-left"></i> Back</a>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap">
+        <div class="d-flex align-items-center flex-wrap">
+            <button
+                type="button"
+                id="btnPrintTimesheet"
+                class="btn btn-filled btn-edit btn-md me-2 mb-2"
+                <% if (!canPrintFlag) { %>disabled aria-disabled="true"<% } %>
+                title="<%= canPrintFlag ? 'Print this timesheet' : 'EXPORT access is required to print this timesheet.' %>"
+            >🖨 Print</button>
         </div>
     </div>
 
@@ -456,19 +702,19 @@
                             <th class="ps-4" style="width: 140px;">Date</th>
                             <th>Class / Description</th>
                             <th style="width: 160px;">Student Name</th>
-                            <th class="ts-col-time" style="width: 180px;">Time</th>
-                            <th class="ts-col-status" style="width: 56px;">Status</th>
+                            <th class="ts-col-hours-time">Hours / Time</th>
+                            <th class="ts-col-status"><span class="ts-column-header-center">Status</span></th>
                             <th style="min-width: 220px;">Comment</th>
-                            <th class="text-end" style="width: 90px;">Hours</th>
-                            <% if (!isEditorLocked) { %><th class="text-center" style="width: 120px;">Act</th><% } %>
+                            <% if (!isEditorLocked) { %><th class="ts-col-actions"><span class="ts-column-header-center">Act</span></th><% } %>
                         </tr>
                     </thead>
                     <tbody id="tsBody">
                     </tbody>
                     <tfoot class="table-light border-top border-3">
                         <tr>
-                            <td colspan="6" class="text-end fw-bold text-uppercase">Total Period Hours:</td>
-                            <td class="text-end pe-4 fw-bold text-success fs-5" id="lbl_grandTotal">0.00</td>
+                            <td colspan="3" class="text-end fw-bold text-uppercase">Total Period Hours:</td>
+                            <td class="ts-col-hours-time"><span class="ts-hours-value" id="lbl_grandTotal">0.00</span> <span class="ts-hours-unit">hrs</span></td>
+                            <td colspan="2"></td>
                             <% if (!isEditorLocked) { %><td></td><% } %>
                         </tr>
                     </tfoot>
@@ -480,6 +726,7 @@
     <div class="card border-0 shadow-sm mb-4" id="tsDepartmentTotals">
         <div class="card-header bg-light border-bottom py-3">
             <div class="fw-bold"><i class="bi bi-diagram-3 me-2 text-primary"></i>Hours by Department</div>
+            <div class="small text-muted mt-1">Optional Hours show the scheduled duration of Optional sessions and do not affect payroll totals.</div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -807,6 +1054,9 @@
     const SHOW_PRIOR_ADJUSTMENT_REVIEW = <%= showPriorAdjustmentReview ? 'true' : 'false' %>;
     const PERIOD_ID = "<%= period.id %>";
     const TARGET_TEACHER_ID = "<%= targetTeacherId %>";
+    const CAN_PRINT_TIMESHEET = <%= canPrintFlag ? 'true' : 'false' %>;
+    const TIMESHEET_PRINT_MODE = <%- JSON.stringify(printMode) %>;
+    const TIMESHEET_PRINT_ACTION = <%- JSON.stringify(printAction) %>;
     const MAX_DAILY_HOURS = <%= maxDailyHours || 24 %>;
     const MAX_SESSION_HOURS = <%= maxSessionHours || 12 %>;
     const PAYROLL_ROLES = <%- JSON.stringify(typeof payrollRoles !== 'undefined' ? payrollRoles : []) %>;
@@ -822,10 +1072,16 @@
         const classId = String(ls?.classId || '').trim();
         const deptName = String(ls?.deliveryDepartmentName || ls?.departmentName || '').trim();
         const deptId = String(ls?.deliveryDepartmentId || ls?.departmentId || '').trim();
-        if (classId && (deptName || deptId) && !liveDepartmentByClassId.has(classId)) {
+        const deptCode = String(ls?.deliveryDepartmentCode || ls?.departmentCode || '').trim();
+        if (classId && (deptName || deptId || deptCode) && !liveDepartmentByClassId.has(classId)) {
             liveDepartmentByClassId.set(classId, {
                 deliveryDepartmentId: deptId,
-                deliveryDepartmentName: deptName || deptId
+                deliveryDepartmentName: deptName || deptId,
+                deliveryDepartmentCode: deptCode,
+                isOneOnOne: ls?.isOneOnOne === true,
+                singleStudentId: String(ls?.singleStudentId || '').trim(),
+                singleStudentPersonId: String(ls?.singleStudentPersonId || '').trim(),
+                singleStudentName: String(ls?.singleStudentName || '').trim()
             });
         }
     });
@@ -1124,6 +1380,36 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     }
 
+    function timesheetClockSortValue(value) {
+        const normalized = normalizeClock(value);
+        if (!normalized) return Number.POSITIVE_INFINITY;
+        const [hours, minutes] = normalized.split(':').map(Number);
+        return (hours * 60) + minutes;
+    }
+
+    function sortTimesheetEntriesBySchedule(entries = []) {
+        return entries
+            .map((entry, originalIndex) => ({ entry, originalIndex }))
+            .sort((left, right) => {
+                const leftStart = timesheetClockSortValue(left.entry?.startTime);
+                const rightStart = timesheetClockSortValue(right.entry?.startTime);
+                const leftHasStart = Number.isFinite(leftStart);
+                const rightHasStart = Number.isFinite(rightStart);
+                if (leftHasStart !== rightHasStart) return leftHasStart ? -1 : 1;
+                if (!leftHasStart) return left.originalIndex - right.originalIndex;
+                if (leftStart !== rightStart) return leftStart - rightStart;
+
+                const leftEnd = timesheetClockSortValue(left.entry?.endTime);
+                const rightEnd = timesheetClockSortValue(right.entry?.endTime);
+                const leftHasEnd = Number.isFinite(leftEnd);
+                const rightHasEnd = Number.isFinite(rightEnd);
+                if (leftHasEnd !== rightHasEnd) return leftHasEnd ? -1 : 1;
+                if (leftHasEnd && leftEnd !== rightEnd) return leftEnd - rightEnd;
+                return left.originalIndex - right.originalIndex;
+            })
+            .map(({ entry }) => entry);
+    }
+
     function calculateHoursFromRange(startTime, endTime) {
         const start = normalizeClock(startTime);
         const end = normalizeClock(endTime);
@@ -1237,7 +1523,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const buildStatusChipHtml = ({ icon, label, colorBg, colorText, colorBorder }) => {
         const tip = escapeHtml(label);
-        return `<span class="ts-status-chip" style="background:${escapeHtml(colorBg)};color:${escapeHtml(colorText)};border-color:${escapeHtml(colorBorder)};" data-tip="${tip}" data-tip-bg="${escapeHtml(colorBg)}" data-tip-fg="${escapeHtml(colorText)}" data-tip-border="${escapeHtml(colorBorder)}" aria-label="${tip}" tabindex="0"><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i></span>`;
+        return `<span class="ts-status-chip ts-tooltip-trigger" style="background:${escapeHtml(colorBg)};color:${escapeHtml(colorText)};border-color:${escapeHtml(colorBorder)};" data-tip="${tip}" data-tip-bg="${escapeHtml(colorBg)}" data-tip-fg="${escapeHtml(colorText)}" data-tip-border="${escapeHtml(colorBorder)}" aria-label="${tip}" tabindex="0"><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i></span>`;
     };
     const buildStatusBadgeHtml = (entry) => {
         if (entry?.isPriorPeriodAdjustment === true) {
@@ -1457,6 +1743,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function normalizeTimesheetPrintFingerprintValue(value) {
+        if (Array.isArray(value)) return value.map((item) => normalizeTimesheetPrintFingerprintValue(item));
+        if (!value || typeof value !== 'object') return value;
+        return Object.keys(value).sort().reduce((out, key) => {
+            if (typeof value[key] !== 'function' && value[key] !== undefined) {
+                out[key] = normalizeTimesheetPrintFingerprintValue(value[key]);
+            }
+            return out;
+        }, {});
+    }
+
+    function buildTimesheetPrintFingerprint() {
+        const entries = activeEntries
+            .map((entry) => normalizeTimesheetPrintFingerprintValue(entry))
+            .sort((left, right) => String(left?.sessionId || '').localeCompare(String(right?.sessionId || '')));
+        const deleted = [...new Set(deletedAutoSessionIds.map((id) => String(id || '').trim()).filter(Boolean))].sort();
+        return JSON.stringify({ entries, deleted });
+    }
+
+    const savedTimesheetPrintFingerprint = buildTimesheetPrintFingerprint();
+
+    function hasUnsavedTimesheetPrintChanges() {
+        return buildTimesheetPrintFingerprint() !== savedTimesheetPrintFingerprint;
+    }
+
     function getDatesInRange(startStr, endStr) {
         const dates = [];
         let curr = String(startStr || '').trim();
@@ -1480,7 +1791,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatDateKey === 'function') {
             return window.AppOrgDateTime.formatDateKey(token, options);
         }
+        const parts = token.split('-').map((part) => Number(part));
+        if (parts.length === 3 && parts.every((part) => Number.isFinite(part))) {
+            return new Intl.DateTimeFormat(undefined, options).format(new Date(parts[0], parts[1] - 1, parts[2]));
+        }
         return token;
+    }
+
+    function formatTimesheetDatePart(dateStr, options) {
+        const token = String(dateStr || '').trim();
+        const parts = token.split('-').map((part) => Number(part));
+        if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return token;
+        const date = new Date(parts[0], parts[1] - 1, parts[2]);
+        return new Intl.DateTimeFormat(undefined, options).format(date);
     }
 
     function dateKeyWeekday(dateStr) {
@@ -1488,7 +1811,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return { dayName: '', dayOfWeek: -1 };
         const date = new Date(parts[0], parts[1] - 1, parts[2]);
         return {
-            dayName: formatTimesheetDateLabel(dateStr, { weekday: 'long' }),
+            dayName: formatTimesheetDatePart(dateStr, { weekday: 'long' }),
             dayOfWeek: date.getDay()
         };
     }
@@ -1653,8 +1976,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ? ''
             : `<button type="button" class="btn btn-primary btn-sm text-white ts-date-add-btn mt-2 fw-semibold" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg me-1"></i>Add</button>`;
         return `
-            <div class="ts-date-label">${formatTimesheetDateLabel(dateStr)}</div>
             <div class="ts-day-name ${dayClass}">${dayName}</div>
+            <div class="ts-date-label">${formatTimesheetDatePart(dateStr, { month: 'long', day: 'numeric' })}</div>
             ${holidayLine}
             ${addBtn}`;
     }
@@ -1662,7 +1985,178 @@ document.addEventListener('DOMContentLoaded', () => {
     function buildStudentNameCellHtml(ses) {
         const name = String(ses?.singleStudentName || '').trim();
         if (!name) return '<span class="text-muted">—</span>';
-        return `<span class="fw-semibold">${name}</span>`;
+        return `<span class="fw-semibold">${escapeHtml(name)}</span>`;
+    }
+
+    function resolveDisplayEntry(entry) {
+        const sessionId = String(entry?.sessionId || '').trim();
+        const liveSession = sessionId ? liveSessionById.get(sessionId) : null;
+        const classId = String(entry?.classId || liveSession?.classId || '').trim();
+        const liveClass = classId ? liveDepartmentByClassId.get(classId) : null;
+        return {
+            ...(liveClass || {}),
+            ...(liveSession || {}),
+            ...(entry || {})
+        };
+    }
+
+    function isTimesheetActivityEntry(entry) {
+        const sessionId = String(entry?.sessionId || '').trim().toLowerCase();
+        return entry?.isSchoolActivity === true
+            || Boolean(String(entry?.activityId || '').trim())
+            || sessionId.startsWith('act-');
+    }
+
+    function buildTimesheetEntryManagerHref(entry) {
+        if (!entry || entry.isPriorPeriodAdjustment === true || entry.isReportReflection === true) return '';
+
+        const sessionId = String(entry.sessionId || '').trim();
+        if (sessionId.toLowerCase().startsWith('rptref-') || sessionId.toLowerCase().startsWith('adj-')) return '';
+
+        const activityId = String(entry.activityId || '').trim();
+        const activityEntryId = String(entry.activityEntryId || '').trim();
+        if (activityId && activityEntryId) {
+            return `/school/activities/${encodeURIComponent(activityId)}/work-sessions/${encodeURIComponent(activityEntryId)}/manage`;
+        }
+        if (isTimesheetActivityEntry(entry)) return '';
+
+        const classId = String(entry.classId || '').trim();
+        const managedSessionId = entry.isManual === true
+            ? String(entry.materializedSessionId || '').trim()
+            : sessionId;
+        const normalizedManagedId = managedSessionId.toLowerCase();
+        if (!classId || !managedSessionId
+            || normalizedManagedId.startsWith('act-')
+            || normalizedManagedId.startsWith('rptref-')
+            || normalizedManagedId.startsWith('adj-')) {
+            return '';
+        }
+        return `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(managedSessionId)}`;
+    }
+
+    function normalizeTooltipDetailValue(value) {
+        return String(value || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function formatTooltipDetailLabel(value) {
+        const normalized = normalizeTooltipDetailValue(value).replace(/[_-]+/g, ' ');
+        return normalized.replace(/\b\w/g, (ch) => ch.toUpperCase());
+    }
+
+    function resolveTimesheetEntryStatusLabel(entry) {
+        if (entry?.isPriorPeriodAdjustment === true) return 'Prior Period Adjustment';
+        if (entry?.isReportReflection === true) return 'Report Task';
+        if (entry?.isManual === true) {
+            if (isPendingApprovalEntry(entry)) return 'Pending Approval';
+            if (isRejectedApprovalEntry(entry)) return 'Rejected';
+            if (isUnpaidApprovalEntry(entry)) return 'Unpaid';
+            if (String(entry?.approvalStatus || '').trim().toLowerCase() === 'approved') return 'Approved';
+            return 'Manual';
+        }
+        const status = normalizeTooltipDetailValue(entry?.status);
+        return status ? resolveStatusLabel(status) : '';
+    }
+
+    function buildTimesheetEntryTooltip(entry) {
+        const isActivity = isTimesheetActivityEntry(entry);
+        const name = normalizeTooltipDetailValue(isActivity
+            ? (entry?.activityName || entry?.className || entry?.description)
+            : (entry?.className || entry?.description));
+        const departmentCode = normalizeTooltipDetailValue(entry?.deliveryDepartmentCode || entry?.departmentCode);
+        const departmentName = normalizeTooltipDetailValue(
+            entry?.deliveryDepartmentName || entry?.departmentName || entry?.deliveryDepartmentId || entry?.departmentId
+        );
+        const department = Array.from(new Set([departmentCode, departmentName].filter(Boolean))).join(' · ');
+        const category = normalizeTooltipDetailValue(entry?.categoryName || entry?.categoryId);
+        const date = normalizeTooltipDetailValue(entry?.date);
+        const startTime = normalizeTooltipDetailValue(entry?.startTime);
+        const endTime = normalizeTooltipDetailValue(entry?.endTime);
+        const time = startTime ? `${startTime}${endTime ? ` – ${endTime}` : ''}` : '';
+        const studentName = normalizeTooltipDetailValue(entry?.singleStudentName);
+        const attendance = normalizeTooltipDetailValue(entry?.singleStudentAttendance);
+        const status = resolveTimesheetEntryStatusLabel(entry);
+        const room = normalizeTooltipDetailValue(entry?.room || entry?.roomName || entry?.location);
+        const roleParts = [entry?.personRole, entry?.isCoTeacherSession ? entry?.coTeacherRoleLabel : '']
+            .map(formatTooltipDetailLabel)
+            .filter(Boolean);
+        const role = Array.from(new Set(roleParts)).join(' · ');
+        const details = [];
+        const addDetail = (label, value) => {
+            const cleaned = normalizeTooltipDetailValue(value);
+            if (cleaned) details.push(`${label}: ${cleaned}`);
+        };
+
+        addDetail(isActivity ? 'Activity' : 'Class', name);
+        addDetail('Department', department);
+        if (isActivity) addDetail('Category', category);
+        addDetail('Date', date ? formatTimesheetDateLabel(date) : '');
+        addDetail('Time', time);
+        if (!isActivity) {
+            addDetail('Student', studentName);
+            addDetail('Attendance', attendance ? formatTooltipDetailLabel(attendance) : '');
+        }
+        addDetail('Status', status);
+        addDetail('Room', room);
+        addDetail('Role', role);
+        return details.join('\n');
+    }
+
+    function buildClassDescriptionCellHtml(entry) {
+        const departmentCode = String(entry?.deliveryDepartmentCode || entry?.departmentCode || '').trim();
+        const fallback = String(
+            entry?.description
+            || entry?.className
+            || entry?.activityName
+            || entry?.classId
+            || ''
+        ).trim();
+        const oneOnOneBadge = entry?.isOneOnOne === true
+            ? '<span class="badge rounded-pill ts-one-on-one-badge">One on One</span>'
+            : '';
+        const primaryContent = departmentCode
+            ? `<span class="ts-department-code">${escapeHtml(departmentCode)}</span>${oneOnOneBadge}`
+            : `<span class="ts-class-fallback">${escapeHtml(fallback)}</span>`;
+        const href = buildTimesheetEntryManagerHref(entry);
+        const tooltip = href ? buildTimesheetEntryTooltip(entry) : '';
+        const managerLabel = isTimesheetActivityEntry(entry) ? 'Open Manage Work Session' : 'Open Manage Session';
+        const primary = href
+            ? `<a href="${escapeHtml(href)}" class="ts-class-primary-link ts-tooltip-trigger" target="_blank" rel="noopener noreferrer" data-tip="${escapeHtml(tooltip)}" data-tip-variant="details" data-tip-bg="#0f172a" data-tip-fg="#ffffff" data-tip-border="#334155" aria-label="${escapeHtml(`${managerLabel}: ${fallback || departmentCode}`)}">${primaryContent}</a>`
+            : primaryContent;
+        return `<div class="ts-class-primary">${primary}${payrollRoleBadge(entry?.personRole)}${coTeacherBadge(entry)}</div>`;
+    }
+
+    function buildOptionalBadgeHtml(entry) {
+        if (entry?.showOptionalBadge !== true) return '';
+        return '<span class="badge rounded-pill ts-optional-badge" title="One-on-one class was not held; badge is informational only.">Optional</span>';
+    }
+
+    function buildHoursTimeCellHtml(entry, hours, requestedHours) {
+        const optionalBadge = buildOptionalBadgeHtml(entry);
+        let hoursHtml = '';
+        if (isPendingApprovalEntry(entry)) {
+            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><span class="ts-hours-unit">hrs</span>${optionalBadge}</div><div class="small text-warning fw-semibold">0.00 hrs payable (pending)</div>`;
+        } else if (isRejectedApprovalEntry(entry)) {
+            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><span class="ts-hours-unit">hrs</span>${optionalBadge}</div><div class="small text-danger fw-semibold">0.00 hrs payable (rejected)</div>`;
+        } else if (isUnpaidApprovalEntry(entry)) {
+            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><span class="ts-hours-unit">hrs</span>${optionalBadge}</div><div class="small text-secondary fw-semibold">0.00 hrs payable (unpaid)</div>`;
+        } else {
+            const valueClass = Number(hours) < 0 ? 'text-danger' : 'text-success';
+            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value ${valueClass}">${Number(hours || 0).toFixed(2)}</span><span class="ts-hours-unit">hrs</span>${optionalBadge}</div>`;
+        }
+
+        let timeHtml = '';
+        if (entry?.isPriorPeriodAdjustment === true) {
+            const referenceDate = String(entry?.adjustmentMeta?.sourceSessionDate || entry?.date || '').trim();
+            timeHtml = `<div class="ts-time-label"><i class="bi bi-arrow-counterclockwise me-1"></i>Prior period correction${referenceDate ? `<div class="small mt-1">Ref: ${escapeHtml(referenceDate)}</div>` : ''}</div>`;
+        } else {
+            const startTime = String(entry?.startTime || '').trim();
+            const endTime = String(entry?.endTime || '').trim();
+            const timeRange = startTime
+                ? `${escapeHtml(startTime)}${endTime ? ` – ${escapeHtml(endTime)}` : ''}`
+                : 'Manual time';
+            timeHtml = `<div class="ts-time-label"><i class="bi bi-clock me-1"></i>${timeRange}</div>`;
+        }
+        return `<div class="ts-hours-time-stack">${hoursHtml}${timeHtml}</div>`;
     }
 
     function resolveDepartmentLabel(entry) {
@@ -1711,21 +2205,44 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'No Department';
     }
 
+    function resolveOptionalReportingHours(entry) {
+        if (entry?.showOptionalBadge !== true) return 0;
+
+        const durationHours = Number.parseFloat(entry?.durationHours);
+        if (Number.isFinite(durationHours) && durationHours > 0) {
+            return Number(durationHours.toFixed(2));
+        }
+
+        const scheduledHours = calculateHoursFromRange(entry?.startTime, entry?.endTime);
+        if (Number.isFinite(scheduledHours) && scheduledHours > 0) {
+            return Number(scheduledHours.toFixed(2));
+        }
+
+        const fallbackHours = Number(resolveEntryHours(entry) || 0);
+        return Number.isFinite(fallbackHours) && fallbackHours > 0
+            ? Number(fallbackHours.toFixed(2))
+            : 0;
+    }
+
     function renderDepartmentTotals() {
         const totalsBody = document.getElementById('tsDepartmentTotalsBody');
         if (!totalsBody) return;
         const buckets = new Map();
         activeEntries.forEach((entry) => {
             if (entry?.isDeleted) return;
+            const displayEntry = resolveDisplayEntry(entry);
             const sessionHours = Number(resolveEntryHours(entry) || 0);
             const pendingHours = isPendingApprovalEntry(entry) ? Number(resolveRequestedHours(entry) || 0) : 0;
+            const optionalHours = resolveOptionalReportingHours(displayEntry);
             if ((!Number.isFinite(sessionHours) || sessionHours === 0)
-                && (!Number.isFinite(pendingHours) || pendingHours === 0)) {
+                && (!Number.isFinite(pendingHours) || pendingHours === 0)
+                && (!Number.isFinite(optionalHours) || optionalHours === 0)) {
                 return;
             }
-            const dept = resolveDepartmentLabel(entry);
-            const current = buckets.get(dept) || { sessionHours: 0, pendingHours: 0 };
+            const dept = resolveDepartmentLabel(displayEntry);
+            const current = buckets.get(dept) || { sessionHours: 0, optionalHours: 0, pendingHours: 0 };
             current.sessionHours = Number((current.sessionHours + (Number.isFinite(sessionHours) ? sessionHours : 0)).toFixed(2));
+            current.optionalHours = Number((current.optionalHours + optionalHours).toFixed(2));
             current.pendingHours = Number((current.pendingHours + (Number.isFinite(pendingHours) ? pendingHours : 0)).toFixed(2));
             buckets.set(dept, current);
         });
@@ -1735,19 +2252,29 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         let totalSession = 0;
+        let totalOptional = 0;
         let totalPending = 0;
         const html = rows.map(([dept, hrs]) => {
             const sessionHours = Number(hrs.sessionHours || 0);
+            const optionalHours = Number(hrs.optionalHours || 0);
             const pendingHours = Number(hrs.pendingHours || 0);
             const rowTotal = Number((sessionHours + pendingHours).toFixed(2));
             totalSession += sessionHours;
+            totalOptional += optionalHours;
             totalPending += pendingHours;
+            const optionalRow = `<tr class="table-info-subtle">
+                <td colspan="3" class="ps-5 text-info-emphasis">
+                    <i class="bi bi-arrow-return-right me-2" aria-hidden="true"></i><span class="fw-semibold">Optional Hours</span>
+                    <span class="small text-muted ms-1">(scheduled duration, informational only)</span>
+                </td>
+                <td class="text-end pe-4 fw-bold text-info-emphasis">${optionalHours.toFixed(2)}</td>
+            </tr>`;
             return `<tr>
                 <td class="ps-4">${dept}</td>
                 <td class="text-end pe-4 fw-semibold">${sessionHours.toFixed(2)}</td>
                 <td class="text-end pe-4 fw-semibold">${pendingHours.toFixed(2)}</td>
                 <td class="text-end pe-4 fw-semibold">${rowTotal.toFixed(2)}</td>
-            </tr>`;
+            </tr>${optionalRow}`;
         }).join('');
         const grandTotal = Number((totalSession + totalPending).toFixed(2));
         totalsBody.innerHTML = `${html}<tr class="table-light">
@@ -1755,6 +2282,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <td class="text-end pe-4 fw-bold text-success">${totalSession.toFixed(2)}</td>
             <td class="text-end pe-4 fw-bold text-warning">${totalPending.toFixed(2)}</td>
             <td class="text-end pe-4 fw-bold text-success">${grandTotal.toFixed(2)}</td>
+        </tr><tr class="table-info-subtle">
+            <td colspan="3" class="ps-4 fw-bold text-info-emphasis">Total Optional Hours <span class="small fw-normal text-muted">(informational only)</span></td>
+            <td class="text-end pe-4 fw-bold text-info-emphasis">${totalOptional.toFixed(2)}</td>
         </tr>`;
     }
 
@@ -1772,32 +2302,40 @@ document.addEventListener('DOMContentLoaded', () => {
             const isWeekend = isWeekendDay(dayOfWeek);
             const bgClass = resolveBgClass(isHoliday, isWeekend, dateStr);
 
-            const dayEntries = activeEntries.filter(e => e.date === dateStr);
+            const dayEntries = sortTimesheetEntriesBySchedule(
+                activeEntries.filter(e => e.date === dateStr)
+            );
             const dayRowSpan = Math.max(1, dayEntries.length);
 
             if (dayEntries.length === 0) {
                 const dateCell = buildDateCellHtml(dateStr, dayName, isHoliday, hol);
+                const zeroHoursCell = '<td class="ts-col-hours-time align-middle"><div class="ts-hours-line"><span class="ts-hours-value">0.00</span><span class="ts-hours-unit">hrs</span></div></td>';
                 if (isHoliday) {
                     tbody.innerHTML += `<tr class="${bgClass} row-hover ts-day-group-end">
                         <td class="ps-4 align-middle border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
-                        <td colspan="5" class="align-middle text-danger fw-bold"><i class="bi bi-calendar-x-fill me-1"></i> Holiday: ${holidayName(hol)}</td>
-                        <td class="text-end align-middle fw-bold">0.00</td>
-                        ${IS_READONLY ? '' : '<td></td>'}
+                        <td colspan="2" class="align-middle text-danger fw-bold"><i class="bi bi-calendar-x-fill me-1"></i> Holiday: ${holidayName(hol)}</td>
+                        ${zeroHoursCell}
+                        <td class="ts-col-status"></td>
+                        <td></td>
+                        ${IS_READONLY ? '' : '<td class="ts-col-actions"></td>'}
                     </tr>`;
                 } else {
                     tbody.innerHTML += `<tr class="${bgClass} row-hover ts-day-group-end">
                         <td class="ps-4 align-middle border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
-                        <td colspan="5" class="text-muted fst-italic align-middle">No sessions logged.</td>
-                        <td class="text-end align-middle fw-bold">0.00</td>
-                        ${IS_READONLY ? '' : '<td></td>'}
+                        <td colspan="2" class="text-muted fst-italic align-middle">No sessions logged.</td>
+                        ${zeroHoursCell}
+                        <td class="ts-col-status"></td>
+                        <td></td>
+                        ${IS_READONLY ? '' : '<td class="ts-col-actions"></td>'}
                     </tr>`;
                 }
             } else {
                 dayEntries.forEach((ses, sIdx) => {
+                    const displaySes = resolveDisplayEntry(ses);
                     const hrs = resolveEntryHours(ses);
                     grandTotalHours += hrs;
 
-                    const statusBadge = buildStatusBadgeHtml(ses);
+                    const statusBadge = buildStatusBadgeHtml(displaySes);
                     if (!ses.isManual && !ses.isPriorPeriodAdjustment && !isFinalAutoStatus(ses)) {
                         hasUncompletedSessions = true;
                     }
@@ -1836,7 +2374,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    const actHtml = IS_READONLY ? '' : `<td class="text-center align-middle text-nowrap">${actBtns}</td>`;
+                    const actHtml = IS_READONLY ? '' : `<td class="ts-col-actions"><div class="ts-action-stack">${actBtns}</div></td>`;
                     const dateCell = sIdx === 0
                         ? `<td class="ps-4 align-top border-end border-2" rowspan="${dayRowSpan}">
                             ${buildDateCellHtml(dateStr, dayName, isHoliday, hol)}
@@ -1844,31 +2382,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         : '';
 
                     const requestedHours = resolveRequestedHours(ses);
-                    const hoursDisplay = isPendingApprovalEntry(ses)
-                        ? `<span class="text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><br><small class="text-warning fw-semibold">0.00 payable (pending)</small>`
-                        : (isRejectedApprovalEntry(ses)
-                            ? `<span class="text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><br><small class="text-danger fw-semibold">0.00 payable (rejected)</small>`
-                            : (isUnpaidApprovalEntry(ses)
-                                ? `<span class="text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><br><small class="text-secondary fw-semibold">0.00 payable (unpaid)</small>`
-                                : (isPriorAdj && hrs < 0 ? hrs.toFixed(2) : hrs.toFixed(2))));
-                    const timeLabel = isPriorAdj
-                        ? `<div class="ts-time-label text-muted">Prior period correction<div class="small mt-1">Ref: ${(ses.adjustmentMeta?.sourceSessionDate || ses.date || '').toString()}</div></div>`
-                        : `<div class="ts-time-label">${ses.startTime ? `<i class="bi bi-clock me-1"></i>${ses.startTime} – ${ses.endTime}` : 'Manual Time'}</div>`;
-                    const classMeta = ses.isManual && ses.activityName
-                        ? `<div class="small text-muted"><i class="bi bi-list-check me-1"></i>${ses.activityName}${ses.activityPaid ? ' (paid)' : ' (unpaid)'}</div>`
-                        : (ses.isManual && ses.deliveryDepartmentName
-                            ? `<div class="small text-muted"><i class="bi bi-building me-1"></i>${ses.deliveryDepartmentName}</div>`
+                    const hoursTimeHtml = buildHoursTimeCellHtml(displaySes, hrs, requestedHours);
+                    const classMeta = displaySes.isManual && displaySes.activityName
+                        ? `<div class="small text-muted"><i class="bi bi-list-check me-1"></i>${escapeHtml(displaySes.activityName)}${displaySes.activityPaid ? ' (paid)' : ' (unpaid)'}</div>`
+                        : (displaySes.isManual && displaySes.deliveryDepartmentName
+                            ? `<div class="small text-muted"><i class="bi bi-building me-1"></i>${escapeHtml(displaySes.deliveryDepartmentName)}</div>`
                             : '');
 
                     tbody.innerHTML += `
                         <tr class="${rowClass}">
                             ${dateCell}
-                            <td><div class="fw-bold text-primary">${ses.className || ''}${payrollRoleBadge(ses.personRole)}${coTeacherBadge(ses)}</div>${classMeta}</td>
-                            <td>${buildStudentNameCellHtml(ses)}</td>
-                            <td class="ts-col-time">${timeLabel}</td>
-                            <td class="ts-col-status"><div class="ts-status-stack">${statusBadge}${buildMakeupSessionStatusHtml(ses)}</div></td>
+                            <td>${buildClassDescriptionCellHtml(displaySes)}${classMeta}</td>
+                            <td>${buildStudentNameCellHtml(displaySes)}</td>
+                            <td class="ts-col-hours-time">${hoursTimeHtml}</td>
+                            <td class="ts-col-status"><div class="ts-status-stack">${statusBadge}${buildMakeupSessionStatusHtml(displaySes)}</div></td>
                             <td>${commentInput}</td>
-                            <td class="text-end fw-bold align-middle">${hoursDisplay}</td>
                             ${actHtml}
                         </tr>
                     `;
@@ -1926,66 +2454,76 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const statusTipEl = document.createElement('div');
-    statusTipEl.className = 'ts-status-tip';
-    statusTipEl.setAttribute('role', 'tooltip');
-    statusTipEl.hidden = true;
-    document.body.appendChild(statusTipEl);
+    const entryTipEl = document.createElement('div');
+    entryTipEl.id = 'tsEntryTip';
+    entryTipEl.className = 'ts-entry-tip';
+    entryTipEl.setAttribute('role', 'tooltip');
+    entryTipEl.hidden = true;
+    document.body.appendChild(entryTipEl);
+    let activeTipTrigger = null;
 
-    const hideStatusTip = () => {
-        statusTipEl.classList.remove('is-visible');
-        statusTipEl.hidden = true;
+    const hideEntryTip = () => {
+        if (activeTipTrigger) activeTipTrigger.removeAttribute('aria-describedby');
+        activeTipTrigger = null;
+        entryTipEl.classList.remove('is-visible', 'is-details');
+        entryTipEl.hidden = true;
     };
-    const showStatusTip = (chip) => {
-        const label = String(chip?.getAttribute('data-tip') || '').trim();
+    const showEntryTip = (trigger) => {
+        const label = String(trigger?.getAttribute('data-tip') || '').trim();
         if (!label) {
-            hideStatusTip();
+            hideEntryTip();
             return;
         }
-        const tipBg = chip.getAttribute('data-tip-bg') || '#0f172a';
-        const tipFg = chip.getAttribute('data-tip-fg') || '#ffffff';
-        const tipBorder = chip.getAttribute('data-tip-border') || tipBg;
-        statusTipEl.textContent = label;
-        statusTipEl.style.background = tipBg;
-        statusTipEl.style.color = tipFg;
-        statusTipEl.style.borderColor = tipBorder;
-        statusTipEl.style.setProperty('--ts-tip-arrow', tipBg);
-        statusTipEl.hidden = false;
-        const rect = chip.getBoundingClientRect();
+        if (activeTipTrigger && activeTipTrigger !== trigger) {
+            activeTipTrigger.removeAttribute('aria-describedby');
+        }
+        activeTipTrigger = trigger;
+        trigger.setAttribute('aria-describedby', entryTipEl.id);
+        const tipBg = trigger.getAttribute('data-tip-bg') || '#0f172a';
+        const tipFg = trigger.getAttribute('data-tip-fg') || '#ffffff';
+        const tipBorder = trigger.getAttribute('data-tip-border') || tipBg;
+        entryTipEl.textContent = label;
+        entryTipEl.style.background = tipBg;
+        entryTipEl.style.color = tipFg;
+        entryTipEl.style.borderColor = tipBorder;
+        entryTipEl.style.setProperty('--ts-tip-arrow', tipBg);
+        entryTipEl.classList.toggle('is-details', trigger.getAttribute('data-tip-variant') === 'details');
+        entryTipEl.hidden = false;
+        const rect = trigger.getBoundingClientRect();
         let left = rect.left + (rect.width / 2);
-        const tipWidth = statusTipEl.offsetWidth || 120;
+        const tipWidth = entryTipEl.offsetWidth || 120;
         const pad = 10;
         left = Math.max(pad + tipWidth / 2, Math.min(left, window.innerWidth - pad - tipWidth / 2));
-        statusTipEl.style.left = `${left}px`;
-        statusTipEl.style.top = `${Math.max(8, rect.top)}px`;
-        statusTipEl.classList.add('is-visible');
+        entryTipEl.style.left = `${left}px`;
+        entryTipEl.style.top = `${Math.max(8, rect.top)}px`;
+        entryTipEl.classList.add('is-visible');
     };
 
     tbody.addEventListener('pointerover', (event) => {
-        const chip = event.target.closest('.ts-status-chip');
-        if (!chip || !tbody.contains(chip)) return;
-        showStatusTip(chip);
+        const trigger = event.target.closest('.ts-tooltip-trigger');
+        if (!trigger || !tbody.contains(trigger)) return;
+        showEntryTip(trigger);
     });
     tbody.addEventListener('pointerout', (event) => {
-        const chip = event.target.closest('.ts-status-chip');
-        if (!chip) return;
+        const trigger = event.target.closest('.ts-tooltip-trigger');
+        if (!trigger) return;
         const next = event.relatedTarget;
-        if (next && chip.contains(next)) return;
-        hideStatusTip();
+        if (next && trigger.contains(next)) return;
+        hideEntryTip();
     });
     tbody.addEventListener('focusin', (event) => {
-        const chip = event.target.closest('.ts-status-chip');
-        if (chip) showStatusTip(chip);
+        const trigger = event.target.closest('.ts-tooltip-trigger');
+        if (trigger) showEntryTip(trigger);
     });
     tbody.addEventListener('focusout', (event) => {
-        const chip = event.target.closest('.ts-status-chip');
-        if (!chip) return;
+        const trigger = event.target.closest('.ts-tooltip-trigger');
+        if (!trigger) return;
         const next = event.relatedTarget;
-        if (next && chip.contains(next)) return;
-        hideStatusTip();
+        if (next && trigger.contains(next)) return;
+        hideEntryTip();
     });
-    window.addEventListener('scroll', hideStatusTip, true);
-    window.addEventListener('resize', hideStatusTip);
+    window.addEventListener('scroll', hideEntryTip, true);
+    window.addEventListener('resize', hideEntryTip);
 
     function isIndividualManualActivityRow(entry = {}) {
         if (!entry || entry.isManual !== true) return false;
@@ -2772,6 +3310,95 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (document.getElementById('btnSaveDraft')) document.getElementById('btnSaveDraft').addEventListener('click', () => executeSave('draft'));
+
+    async function openTimesheetPrintPreview() {
+        const printButton = document.getElementById('btnPrintTimesheet');
+        if (!printButton) return;
+
+        if (!CAN_PRINT_TIMESHEET) {
+            await messageBox({
+                title: 'Print Access Required',
+                icon: 'warning',
+                message: 'EXPORT access is required to print this timesheet.'
+            });
+            return;
+        }
+        if (hasUnsavedTimesheetPrintChanges()) {
+            await messageBox({
+                title: 'Save Before Printing',
+                icon: 'warning',
+                message: 'This timesheet has unsaved changes. Save the timesheet before opening the print preview.'
+            });
+            return;
+        }
+
+        // Match Attendance printing: open the page synchronously, populate it,
+        // focus it, then launch the browser print dialog from that preview.
+        const printWindow = window.open('', '_blank', 'height=720,width=1100');
+        if (!printWindow) {
+            await messageBox({
+                title: 'Popup Blocked',
+                icon: 'warning',
+                message: 'Allow pop-ups for this site to open the timesheet print page.'
+            });
+            return;
+        }
+
+        try {
+            printWindow.opener = null;
+        } catch (_) { /* ignore */ }
+
+        printWindow.document.open();
+        printWindow.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Preparing Timesheet</title></head><body style="font:14px Segoe UI,Arial,sans-serif;padding:24px">Preparing timesheet print preview…</body></html>');
+        printWindow.document.close();
+
+        try {
+            const params = new URLSearchParams();
+            if (TIMESHEET_PRINT_MODE === 'management') {
+                params.set('periodId', PERIOD_ID);
+                params.set('personIds', TARGET_TEACHER_ID);
+            }
+            const response = await fetch(TIMESHEET_PRINT_ACTION, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'text/html',
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                },
+                body: params.toString()
+            });
+            const html = await response.text();
+            if (!response.ok) {
+                const parsed = new DOMParser().parseFromString(html, 'text/html');
+                const detail = String(parsed.querySelector('.alert-danger, .error-message, main')?.textContent || '').trim();
+                throw new Error(detail || 'The timesheet print preview could not be prepared.');
+            }
+
+            try {
+                printWindow.history.replaceState({}, '', `${location.pathname}?print=1&view=timesheet`);
+            } catch (_) { /* ignore */ }
+
+            printWindow.document.open();
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.focus();
+            window.setTimeout(() => {
+                try { printWindow.print(); } catch (_) { /* ignore */ }
+            }, 250);
+        } catch (error) {
+            try { printWindow.close(); } catch (_) { /* ignore */ }
+            await messageBox({
+                title: 'Print Error',
+                icon: 'error',
+                message: error.message || 'The timesheet print preview could not be prepared.'
+            });
+        }
+    }
+
+    const timesheetPrintButton = document.getElementById('btnPrintTimesheet');
+    if (timesheetPrintButton) {
+        timesheetPrintButton.addEventListener('click', () => openTimesheetPrintPreview());
+    }
 
     if (document.getElementById('btnSubmit')) {
         document.getElementById('btnSubmit').addEventListener('click', async () => {

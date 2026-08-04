@@ -19,7 +19,7 @@ const SECTION_DEFINITIONS = Object.freeze([
       value: 'bi bi-clock-history'
     },
     insertAfterSectionId: '445567',
-    operations: ['OP1002', 'OP1003', 'OP1005', 'OP1001', 'OP1004']
+    operations: ['OP1002', 'OP1003', 'OP1005', 'OP1001', 'OP1004', 'OP1012']
   },
   {
     id: '445579',
@@ -31,7 +31,7 @@ const SECTION_DEFINITIONS = Object.freeze([
       value: 'bi bi-table'
     },
     insertAfterSectionId: '445568',
-    operations: ['OP1002', 'OP1003', 'OP1005', 'OP1006']
+    operations: ['OP1002', 'OP1003', 'OP1005', 'OP1006', 'OP1012']
   }
 ]);
 

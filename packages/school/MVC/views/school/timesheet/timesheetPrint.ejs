@@ -1,0 +1,271 @@
+<%
+  const context = printContext || {};
+  const documents = Array.isArray(context.documents) ? context.documents : [];
+  const period = context.period || {};
+%>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title || 'Timesheet Print' %></title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5f6b7a;
+      --line: #cfd7e3;
+      --soft: #f4f7fb;
+      --blue: #174ea6;
+      --green: #176b3a;
+      --amber: #8a5a00;
+      --red: #9f2430;
+      --optional: #075985;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .screen-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .screen-actions button {
+      padding: 6px 12px;
+      cursor: pointer;
+      font: inherit;
+    }
+    .print-sheet {
+      break-after: page;
+      page-break-after: always;
+    }
+    .print-sheet:last-child { break-after: auto; page-break-after: auto; }
+    .identity-block { margin-bottom: 10px; }
+    .organization-name { margin: 0 0 2px; color: var(--ink); font-size: 19px; font-weight: 800; line-height: 1.1; }
+    .document-name { color: var(--blue); font-size: 15px; font-weight: 800; }
+    .person-name { color: var(--blue); font-size: 16px; font-weight: 700; }
+    .period-name { margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .badge {
+      display: inline-block;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 8.5px;
+      font-weight: 700;
+      line-height: 1.25;
+      letter-spacing: .02em;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .one-on-one-badge { margin-left: 5px; color: #5b21b6; background: #f5f0ff; }
+    .optional-badge { margin-left: 5px; color: var(--optional); background: #eaf7ff; }
+    .role-badge { margin-left: 5px; color: #46505d; background: #f5f6f8; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+    th, td { border: 1px solid var(--line); padding: 5px 6px; vertical-align: middle; overflow-wrap: anywhere; }
+    th { background: #eaf0f7; font-size: 8.5px; letter-spacing: .035em; text-align: left; text-transform: uppercase; }
+    tbody tr:nth-child(even) > td { background: #fafbfd; }
+    .col-date { width: 11%; }
+    .col-description { width: 23%; }
+    .col-student { width: 15%; }
+    .col-hours { width: 16%; }
+    .col-status { width: 13%; text-align: center; }
+    .col-comment { width: 22%; }
+    .date-day { font-size: 11px; font-weight: 700; }
+    .date-value { color: var(--muted); font-size: 10px; font-weight: 700; }
+    .holiday-label { margin-top: 3px; color: var(--red); font-size: 8.5px; font-weight: 700; }
+    .primary-label { font-weight: 800; }
+    .secondary-label, .cell-muted { margin-top: 2px; color: var(--muted); font-size: 9px; }
+    .hours-value { color: var(--green); font-size: 12px; font-weight: 800; }
+    .hours-value.is-struck { color: var(--muted); text-decoration: line-through; }
+    .payable-note { margin-top: 2px; color: var(--amber); font-size: 8.5px; font-weight: 700; }
+    .time-label { margin-top: 2px; color: var(--muted); font-size: 9px; }
+    .empty-row { color: var(--muted); font-style: italic; }
+    .total-row td { background: #eef7f1 !important; font-weight: 800; }
+    .total-label { text-align: right; }
+    .total-hours { color: var(--green); font-size: 12px; text-align: center; }
+    .department-section { margin-top: 8px; }
+    .department-heading { margin: 0 0 4px; font-size: 13px; }
+    .department-table th:not(:first-child),
+    .department-table td:not(:first-child) { text-align: right; }
+    .optional-row td { background: #eef9ff !important; color: var(--optional); }
+    .optional-row td:first-child { padding-left: 18px; font-weight: 700; }
+    /* Leave paper size and orientation unset so the browser's Layout control
+       can switch freely between Portrait and Landscape. */
+    @page { margin: 10mm; }
+    @media print {
+      html, body { width: auto; min-width: 0; max-width: none; }
+      body { margin: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .no-print { display: none !important; }
+      .print-sheet { width: auto; min-width: 0; max-width: none; margin: 0; padding: 0; }
+      .timesheet-table { width: 100%; max-width: none; }
+      /* Compact defaults keep a normal timesheet and its department summary
+         together on one printed page. Browser Scale remains fully available. */
+      body { font-size: 8px; line-height: 1.15; }
+      .identity-block { margin-bottom: 4px; }
+      .organization-name { font-size: 14px; }
+      .document-name { font-size: 11px; }
+      .person-name { font-size: 10px; }
+      .period-name { margin-top: 1px; font-size: 8px; }
+      th, td { padding: 2px 3px; }
+      th { font-size: 7px; }
+      .badge { padding: 1px 4px; font-size: 6.5px; }
+      .date-day, .date-value { font-size: 8px; }
+      .holiday-label, .secondary-label, .cell-muted, .payable-note, .time-label { margin-top: 1px; font-size: 7px; }
+      .hours-value, .total-hours { font-size: 9px; }
+      .department-section { margin-top: 5px; }
+      .department-heading { margin-bottom: 2px; font-size: 10px; }
+    }
+    @media screen {
+      body { background: #e9ecef; padding: 16px; }
+      .print-sheet {
+        width: 100%;
+        margin: 0 0 16px;
+        padding: 14px 16px;
+        background: #fff;
+        box-shadow: 0 1px 6px rgba(0,0,0,.12);
+      }
+    }
+    @media (max-width: 800px) {
+      .print-sheet { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="screen-actions no-print">
+    <button type="button" onclick="window.print()">Print</button>
+    <button type="button" onclick="window.close()">Close</button>
+  </div>
+
+  <% documents.forEach((document) => { %>
+    <section class="print-sheet">
+      <div class="identity-block">
+        <% if (context.organizationName) { %><h1 class="organization-name"><%= context.organizationName %></h1><% } %>
+        <div class="document-name">Timesheet</div>
+        <div class="person-name"><%= document.person.name %></div>
+        <div class="period-name"><%= period.name %></div>
+      </div>
+
+      <table class="timesheet-table">
+        <thead>
+          <tr>
+            <th class="col-date">Date</th>
+            <th class="col-description">Class / Description</th>
+            <th class="col-student">Student Name</th>
+            <th class="col-hours">Hours / Time</th>
+            <th class="col-status">Status</th>
+            <th class="col-comment">Comment</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% document.days.forEach((day) => { %>
+            <% if (!day.entries.length) { %>
+              <tr>
+                <td>
+                  <div class="date-day"><%= day.dayName %></div>
+                  <div class="date-value"><%= day.dateLabel %></div>
+                  <% if (day.holidayName) { %><div class="holiday-label"><%= day.holidayName %></div><% } %>
+                </td>
+                <td colspan="2" class="empty-row"><%= day.holidayName ? `Holiday: ${day.holidayName}` : 'No sessions logged.' %></td>
+                <td><span class="hours-value">0.00 hrs</span></td>
+                <td></td>
+                <td></td>
+              </tr>
+            <% } else { %>
+              <% day.entries.forEach((entry, entryIndex) => { %>
+                <tr>
+                  <% if (entryIndex === 0) { %>
+                    <td rowspan="<%= day.entries.length %>">
+                      <div class="date-day"><%= day.dayName %></div>
+                      <div class="date-value"><%= day.dateLabel %></div>
+                      <% if (day.holidayName) { %><div class="holiday-label"><%= day.holidayName %></div><% } %>
+                    </td>
+                  <% } %>
+                  <td>
+                    <div>
+                      <span class="primary-label"><%= entry.primaryLabel %></span>
+                      <% if (entry.isOneOnOne) { %><span class="badge one-on-one-badge">One on One</span><% } %>
+                      <% if (entry.roleLabel) { %><span class="badge role-badge"><%= entry.roleLabel %></span><% } %>
+                    </div>
+                    <% if (entry.secondaryLabel) { %><div class="secondary-label"><%= entry.secondaryLabel %></div><% } %>
+                  </td>
+                  <td>
+                    <div><%= entry.studentName || '—' %></div>
+                    <% if (entry.attendanceLabel) { %><div class="cell-muted"><%= entry.attendanceLabel %></div><% } %>
+                  </td>
+                  <td>
+                    <div>
+                      <span class="hours-value<%= entry.hoursIsStruck ? ' is-struck' : '' %>"><%= entry.hoursLabel %></span>
+                      <% if (entry.showOptionalBadge) { %><span class="badge optional-badge">Optional</span><% } %>
+                    </div>
+                    <% if (entry.payableNote) { %><div class="payable-note"><%= entry.payableNote %></div><% } %>
+                    <div class="time-label"><%= entry.timeLabel %></div>
+                  </td>
+                  <td class="col-status"><span class="badge"><%= entry.statusLabel %></span></td>
+                  <td><%= entry.commentLabel %></td>
+                </tr>
+              <% }); %>
+            <% } %>
+          <% }); %>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="3" class="total-label">Total Payable Hours</td>
+            <td class="total-hours"><%= document.payableTotalHours.toFixed(2) %> hrs</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <section class="department-section">
+        <h2 class="department-heading">Hours by Department</h2>
+        <table class="department-table">
+          <thead>
+            <tr><th>Department</th><th>Payable Hours</th><th>Pending Hours</th><th>Total</th></tr>
+          </thead>
+          <tbody>
+            <% if (!document.departmentTotals.rows.length) { %>
+              <tr><td colspan="4" class="empty-row">No department hours yet.</td></tr>
+            <% } %>
+            <% document.departmentTotals.rows.forEach((row) => { %>
+              <tr>
+                <td><%= row.departmentName %></td>
+                <td><%= row.payableHours.toFixed(2) %></td>
+                <td><%= row.pendingHours.toFixed(2) %></td>
+                <td><%= row.totalHours.toFixed(2) %></td>
+              </tr>
+              <tr class="optional-row">
+                <td colspan="3">Optional Hours</td>
+                <td><%= row.optionalHours.toFixed(2) %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+          <% if (document.departmentTotals.rows.length) { %>
+            <tfoot>
+              <tr class="total-row">
+                <td>Total</td>
+                <td><%= document.departmentTotals.totals.payableHours.toFixed(2) %></td>
+                <td><%= document.departmentTotals.totals.pendingHours.toFixed(2) %></td>
+                <td><%= document.departmentTotals.totals.totalHours.toFixed(2) %></td>
+              </tr>
+              <tr class="optional-row">
+                <td colspan="3">Total Optional Hours</td>
+                <td><%= document.departmentTotals.totals.optionalHours.toFixed(2) %></td>
+              </tr>
+            </tfoot>
+          <% } %>
+        </table>
+      </section>
+
+    </section>
+  <% }); %>
+
+</body>
+</html>
