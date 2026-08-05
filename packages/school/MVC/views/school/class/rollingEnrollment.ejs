@@ -3438,6 +3438,19 @@
     return result;
   }
 
+  function resolveStudentRowDisplay(row) {
+    const studentId = String(row?.studentId || '').trim();
+    const mapped = studentMap.get(studentId)
+      || [...studentMap.values()].find((item) => String(item?.id || '') === studentId)
+      || [...studentMap.values()].find((item) => String(item?.personId || '') === studentId);
+    const label = String(row?.studentLabel || mapped?.label || '').trim();
+    const recordId = String(row?.studentRecordId || mapped?.id || studentId).trim();
+    return {
+      label: label || studentId || '-',
+      recordId: recordId || studentId
+    };
+  }
+
   function renderRows() {
     closeAllActionMenus();
     const rows = Array.isArray(periodRows) ? [...periodRows] : [];
@@ -3453,6 +3466,7 @@
 
     tbody.innerHTML = rows.map((row) => {
       const studentId = String(row?.studentId || '');
+      const studentDisplay = resolveStudentRowDisplay(row);
       const status = String(row?.status || '').trim().toLowerCase();
       const badgeClass = status === 'active' ? 'bg-success'
         : (status === 'to_be_confirmed' ? 'bg-info text-dark'
@@ -3501,7 +3515,7 @@
       return `
         <tr>
           <td class="ps-4">
-            <div class="fw-semibold">${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(String(row?.studentLabel || studentMap.get(studentId)?.label || studentId || '-'), row?.studentRecordId || studentId, { className: 'text-decoration-none fw-semibold' }) : htmlEscape(String(row?.studentLabel || studentMap.get(studentId)?.label || studentId || '-')))}</div>
+            <div class="fw-semibold">${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(studentDisplay.label, studentDisplay.recordId, { className: 'text-decoration-none fw-semibold' }) : htmlEscape(studentDisplay.label))}</div>
             <div class="x-small text-muted font-monospace">${htmlEscape(studentId)}</div>
           </td>
           <td>${htmlEscape(String(row?.startDate || '-'))}</td>

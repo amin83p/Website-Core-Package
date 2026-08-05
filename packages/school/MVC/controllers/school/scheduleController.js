@@ -13,6 +13,7 @@ const leaveRequestService = require('../../services/school/leaveRequestService')
 const activityService = require('../../services/school/activityService');
 const teacherIdentityService = require('../../services/school/teacherIdentityService');
 const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
+const sessionNavigationService = require('../../services/school/sessionNavigationService');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
@@ -1201,13 +1202,13 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
             if (isStudentEvent) roles.push('Student');
             if (!roles.length) roles.push('Participant');
 
-            const sessionId = normalizeId(session?.sessionId);
+            const sessionId = normalizeId(session?.sessionId || session?.id);
             const eventId = sessionId || `${classId}-${sessionDate}-${normalizeTime(session?.startTime) || '00:00'}`;
             const className = classDef?.title || classDef?.name || `Class ${classId}`;
             const classLifecycle = buildClassLifecycleSnapshot(classDef);
             const scheduledDuration = computeDurationHours(session);
             const detailsUrl = sessionId
-                ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`
+                ? sessionNavigationService.buildManageSessionHref(classId, { sessionId, date: sessionDate })
                 : '';
 
             events.push({

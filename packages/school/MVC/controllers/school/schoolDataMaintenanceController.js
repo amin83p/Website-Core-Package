@@ -242,3 +242,46 @@ exports.clearAll = async (req, res) => {
     return res.status(400).json({ status: 'error', message });
   }
 };
+
+exports.migrateClassSessionIds = async (req, res) => {
+  let guardKey = '';
+  try {
+    const activeOrgId = await assertMaintenanceOrgContextOrThrow(req.user);
+    const dryRun = req.body?.apply !== true;
+    const classIds = schoolDataMaintenanceService.normalizeIdList(req.body?.classIds || []);
+
+    guardKey = idempotencyGuardService.createGuardKey([
+      'school_data_maintenance_migrate_session_ids',
+      activeOrgId,
+      dryRun ? 'dry-run' : 'apply',
+      classIds.join('|')
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 300000,
+      replayTtlMs: 15000
+    });
+    if (sendGuardedResponse(req, res, guardResult, 'Session ID migration is already in progress. Please wait.')) return;
+
+    const result = await schoolDataMaintenanceService.migrateClassSessionIdsForActiveOrg({
+      orgId: activeOrgId,
+      reqUser: req.user,
+      dryRun,
+      classIds
+    });
+
+    const payloadOut = {
+      status: 'success',
+      message: dryRun
+        ? `Dry run completed for ${result.classesScanned} class(es). ${result.classesUpdated} class(es) would be updated (${result.sessionsReassigned} session ID changes).`
+        : `Migrated session IDs for ${result.classesUpdated} class(es) (${result.sessionsReassigned} session changes, ${result.dependentsUpdated} dependent updates).`,
+      result
+    };
+    idempotencyGuardService.completeGuard(guardKey, payloadOut);
+    return res.json(payloadOut);
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    const message = String(error?.message || 'Session ID migration failed.');
+    return res.status(400).json({ status: 'error', message });
+  }
+};

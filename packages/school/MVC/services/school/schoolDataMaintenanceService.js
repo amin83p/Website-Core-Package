@@ -2,6 +2,7 @@ const schoolDataService = require('./schoolDataService');
 const schoolRepositories = require('../../repositories/school');
 const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
 const classDeleteCascadeService = require('./classDeleteCascadeService');
+const sessionIdRemapService = require('./sessionIdRemapService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -680,6 +681,20 @@ async function clearCollectionForOrg({ entityType, orgId, reqUser }) {
   };
 }
 
+async function migrateClassSessionIdsForActiveOrg({
+  orgId,
+  reqUser,
+  dryRun = true,
+  classIds = []
+} = {}) {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('Organization id is required.');
+  return sessionIdRemapService.migrateClassSessionIdsForOrg(targetOrgId, reqUser, {
+    dryRun: dryRun !== false,
+    classIds: normalizeIdList(classIds)
+  });
+}
+
 module.exports = {
   buildCollectionSummaries,
   listCollectionRows,
@@ -691,5 +706,6 @@ module.exports = {
   classifyRowForDelete,
   isHeadSchoolAccount,
   buildClassSessionCompositeId,
-  parseClassSessionCompositeId
+  parseClassSessionCompositeId,
+  migrateClassSessionIdsForActiveOrg
 };

@@ -409,14 +409,19 @@ const schoolDataService = {
   getClassSessions: async (classId, requestingUser = null, accessContext = null) => {
     const cls = await schoolDataService.getDataById('classes', classId, requestingUser, accessContext);
     if (!cls) return [];
-    return Array.isArray(cls.sessions) ? cls.sessions : [];
+    const sessions = Array.isArray(cls.sessions) ? cls.sessions : [];
+    const sessionIdService = require('./sessionIdService');
+    sessionIdService.assertUniqueSessionIds(sessions, `class ${classId}`);
+    return sessions;
   },
 
   saveClassSessions: async (classId, sessions, requestingUser = null, accessContext = null) => {
     const cls = await schoolDataService.getDataById('classes', classId, requestingUser, accessContext);
     if (!cls) throw new Error('Class not found or inaccessible.');
+    const sessionIdService = require('./sessionIdService');
+    const ensured = sessionIdService.ensureClassSessionIds(classId, Array.isArray(sessions) ? sessions : []);
     const updated = await schoolDataService.updateData('classes', classId, {
-      sessions: Array.isArray(sessions) ? sessions : []
+      sessions: ensured.sessions
     }, requestingUser);
     return Array.isArray(updated?.sessions) ? updated.sessions : [];
   },

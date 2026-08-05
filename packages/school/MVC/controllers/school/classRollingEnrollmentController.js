@@ -1290,29 +1290,59 @@ function filterPeriodRowsBySearchQuery(rows, query) {
   });
 }
 
-async function attachStudentLabelsToEnrollmentPeriodRows(periodRows, user) {
-  const students = await schoolDataService.fetchData('students', {}, user);
+async function attachStudentLabelsToEnrollmentPeriodRows(periodRows, user, students = null) {
+  const effectiveStudents = Array.isArray(students)
+    ? students
+    : await schoolDataService.fetchData('students', {}, user);
   const personById = await schoolPersonAccessService.buildPersonByIdMap({
     reqUser: user,
-    personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
+    personIds: (Array.isArray(effectiveStudents) ? effectiveStudents : []).map((student) => student.personId)
   });
-  const studentOptions = (Array.isArray(students) ? students : [])
-    .map((student) => {
-      const studentId = toPublicId(student?.id);
-      const personId = toPublicId(student?.personId);
-      const label = schoolPersonAccessService.formatPersonName(personById.get(personId), studentId);
-      return {
-        id: studentId,
-        label: student?.studentNumber ? `${label} (${student.studentNumber})` : label
-      };
-    })
-    .filter((row) => row.id);
-  const studentLabelMap = new Map(studentOptions.map((row) => [row.id, row.label]));
-  return (Array.isArray(periodRows) ? periodRows : []).map((row) => ({
-    ...row,
-    studentLabel: studentLabelMap.get(toPublicId(row?.studentId)) || toPublicId(row?.studentId),
-    studentRecordId: toPublicId(row?.studentId)
-  }));
+  const lookup = buildEnrollmentPeriodStudentLabelLookup(effectiveStudents, personById);
+  return (Array.isArray(periodRows) ? periodRows : []).map((row) => {
+    const display = resolveEnrollmentPeriodStudentDisplay(row?.studentId, lookup);
+    return {
+      ...row,
+      studentLabel: display.studentLabel,
+      studentRecordId: display.studentRecordId
+    };
+  });
+}
+
+function buildEnrollmentPeriodStudentLabelLookup(students = [], personById = new Map()) {
+  const byStudentId = new Map();
+  const byPersonId = new Map();
+  (Array.isArray(students) ? students : []).forEach((student) => {
+    const studentId = toPublicId(student?.id);
+    const personId = toPublicId(student?.personId);
+    if (!studentId) return;
+    const name = schoolPersonAccessService.formatPersonName(personById.get(personId), studentId);
+    const label = student?.studentNumber ? `${name} (${student.studentNumber})` : name;
+    const entry = { label, studentRecordId: studentId };
+    byStudentId.set(studentId, entry);
+    if (personId) byPersonId.set(personId, entry);
+  });
+  return { byStudentId, byPersonId };
+}
+
+function resolveEnrollmentPeriodStudentDisplay(studentId, lookup = {}) {
+  const token = toPublicId(studentId);
+  if (!token) return { studentLabel: '', studentRecordId: '' };
+  const direct = lookup.byStudentId?.get(token);
+  if (direct) {
+    return {
+      studentLabel: direct.label || token,
+      studentRecordId: direct.studentRecordId || token
+    };
+  }
+  const byPerson = lookup.byPersonId?.get(token);
+  if (byPerson) {
+    return {
+      studentLabel: byPerson.label || token,
+      studentRecordId: byPerson.studentRecordId || token
+    };
+  }
+  return { studentLabel: token, studentRecordId: token };
 }
 
 async function attachSessionProgressToEnrollmentPeriodRows(periodRows, classData, user, students = null) {
@@ -1374,6 +1404,7 @@ async function showRollingEnrollmentPage(req, res) {
       reqUser: req.user,
       personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
     });
+    const studentLabelLookup = buildEnrollmentPeriodStudentLabelLookup(students, personById);
     const studentOptions = (Array.isArray(students) ? students : [])
       .map((student) => {
         const studentId = toPublicId(student?.id);
@@ -1389,15 +1420,17 @@ async function showRollingEnrollmentPage(req, res) {
       .filter((row) => row.id)
       .sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
 
-    const studentLabelMap = new Map(studentOptions.map((row) => [row.id, row.label]));
     let periodRows = (Array.isArray(periods) ? periods : [])
       .slice()
       .sort((a, b) => String(a?.startDate || '').localeCompare(String(b?.startDate || '')))
-      .map((row) => ({
-        ...row,
-        studentLabel: studentLabelMap.get(toPublicId(row?.studentId)) || toPublicId(row?.studentId),
-        studentRecordId: toPublicId(row?.studentId)
-      }));
+      .map((row) => {
+        const display = resolveEnrollmentPeriodStudentDisplay(row?.studentId, studentLabelLookup);
+        return {
+          ...row,
+          studentLabel: display.studentLabel,
+          studentRecordId: display.studentRecordId
+        };
+      });
     periodRows = attachFunderLabelsToPeriodRows(periodRows, funderOptions);
 
     periodRows = filterPeriodRowsBySearchQuery(periodRows, req.query);
@@ -1449,15 +1482,15 @@ async function listClassEnrollmentPeriods(req, res) {
     const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
     const qRaw = String(req.query.q || '').trim();
     const searchActive = qRaw && qRaw !== searchDefaultKeyword;
-    if (searchActive) {
-      rows = await attachStudentLabelsToEnrollmentPeriodRows(rows, req.user);
-      rows = filterPeriodRowsBySearchQuery(rows, req.query);
-    }
 
     const [students, funderOptions] = await Promise.all([
       schoolDataService.fetchData('students', {}, req.user),
       loadActiveFunderOptions(req.user, classData.orgId)
     ]);
+    rows = await attachStudentLabelsToEnrollmentPeriodRows(rows, req.user, students);
+    if (searchActive) {
+      rows = filterPeriodRowsBySearchQuery(rows, req.query);
+    }
     rows = await attachSessionProgressToEnrollmentPeriodRows(rows, classData, req.user, students);
     rows = attachFunderLabelsToPeriodRows(rows, funderOptions);
 

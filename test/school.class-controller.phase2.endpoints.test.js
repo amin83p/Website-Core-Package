@@ -9,6 +9,7 @@ const schoolIndexService = require('../packages/school/MVC/services/school/schoo
 const classEnrollmentSessionApplicabilityService = require('../packages/school/MVC/services/school/classEnrollmentSessionApplicabilityService');
 const classEnrollmentReadService = require('../packages/school/MVC/services/school/classEnrollmentReadService');
 const activityService = require('../packages/school/MVC/services/school/activityService');
+const schoolPersonAccessService = require('../packages/school/MVC/services/school/schoolPersonAccessService');
 const schoolRepositories = require('../packages/school/MVC/repositories/school');
 
 const schoolMethodNames = [
@@ -54,6 +55,9 @@ const classEnrollmentReadOriginals = {
 const activityOriginals = {
   getScheduleEventsForPerson: activityService.getScheduleEventsForPerson
 };
+const schoolPersonAccessOriginals = {
+  buildPersonByIdMap: schoolPersonAccessService.buildPersonByIdMap
+};
 const reportAssignmentOriginals = {
   list: schoolRepositories.reportAssignments.list
 };
@@ -69,6 +73,7 @@ function restoreStubs() {
   classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = applicabilityOriginals.recomputeSessionCappedEnrollmentCompletionsForClass;
   classEnrollmentReadService.listActiveStudentIdsForClass = classEnrollmentReadOriginals.listActiveStudentIdsForClass;
   activityService.getScheduleEventsForPerson = activityOriginals.getScheduleEventsForPerson;
+  schoolPersonAccessService.buildPersonByIdMap = schoolPersonAccessOriginals.buildPersonByIdMap;
   schoolRepositories.reportAssignments.list = reportAssignmentOriginals.list;
 }
 
@@ -269,6 +274,37 @@ test('listClassEnrollmentPeriods returns sorted periods', async () => {
   assert.equal(res.payload.count, 2);
   assert.equal(res.payload.items[0].id, 'CEP-1');
   assert.equal(res.payload.items[1].id, 'CEP-2');
+});
+
+test('listClassEnrollmentPeriods attaches student labels even without search query', async () => {
+  applyDefaultGuardStubs();
+  schoolPersonAccessService.buildPersonByIdMap = async () => new Map([
+    ['PER-1', { name: { first: 'Maria', last: 'Maria' } }]
+  ]);
+  applyClassLookupStubs({
+    getClassEnrollmentPeriodsByClassId: async () => ([
+      { id: 'CEP-1', studentId: 'STU-1', startDate: '2026-01-01', sequenceNo: 1 }
+    ]),
+    fetchData: async (entityType) => {
+      if (entityType === 'students') {
+        return [{ id: 'STU-1', personId: 'PER-1', studentNumber: 'S001', orgId: 'ORG-1' }];
+      }
+      if (entityType === 'funders') return [];
+      if (entityType === 'studentProgramRegistrations') return [];
+      if (entityType === 'studentTermRegistrations') return [];
+      if (entityType === 'subjects') return [];
+      return [];
+    },
+    getClassSessions: async () => []
+  });
+
+  const req = createReq({ params: { classId: 'CLS-1' } });
+  const res = createRes();
+  await rollingController.listClassEnrollmentPeriods(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.payload.items[0].studentLabel, 'Maria Maria (S001)');
+  assert.equal(res.payload.items[0].studentRecordId, 'STU-1');
 });
 
 test('createClassEnrollmentPeriod uses guard + writes period', async () => {

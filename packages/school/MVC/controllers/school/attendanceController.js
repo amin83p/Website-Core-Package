@@ -7,6 +7,7 @@ const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreMo
 const chatRepository = requireCoreModule('MVC/repositories/chatRepository');
 const socketService = requireCoreModule('MVC/services/socketService'); // IMPORT SOCKET SERVICE
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
+const sessionNavigationService = require('../../services/school/sessionNavigationService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
@@ -22,6 +23,19 @@ const schoolRecordAccessService = require('../../services/school/schoolRecordAcc
 
 function buildAttendanceRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
+}
+
+function resolveSessionDateFromRequest(req) {
+    return sessionNavigationService.normalizeSessionDate(
+        req?.query?.sessionDate
+        || req?.body?.sessionDate
+        || req?.body?.date
+        || ''
+    );
+}
+
+function findAttendanceSessionIndex(sessions, sessionId, sessionDate = '') {
+    return sessionNavigationService.findSessionIndexInList(sessions, sessionId, sessionDate);
 }
 
 async function getAttendanceClassOrThrow(req, classId) {
@@ -680,7 +694,7 @@ async function addAttendanceComment(req, res) {
         const accessContext = buildAttendanceRouteAccessContext(req);
         const classData = await getAttendanceClassOrThrow(req, classId);
         const sessions = await schoolDataService.getClassSessions(classId, req.user, accessContext);
-        const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
+        const sessionIndex = findAttendanceSessionIndex(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (sessionIndex === -1) throw new Error('Session not found.');
 
         const session = sessions[sessionIndex];
@@ -824,7 +838,7 @@ async function updateAttendanceRosterCell(req, res) {
         const classData = await getAttendanceClassOrThrow(req, classId);
 
         const sessions = await schoolDataService.getClassSessions(classId, req.user, routeAccessContext);
-        const sessionIndex = sessions.findIndex((s) => s.sessionId === sessionId);
+        const sessionIndex = findAttendanceSessionIndex(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (sessionIndex === -1) throw new Error('Session not found.');
 
         const session = sessions[sessionIndex];

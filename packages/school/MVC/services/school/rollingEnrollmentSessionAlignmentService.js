@@ -2,6 +2,7 @@ const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
+const sessionIdService = require('./sessionIdService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -292,17 +293,8 @@ function computeDurationHours(startTime, endTime) {
   return hours > 0 ? Number(hours.toFixed(2)) : 0;
 }
 
-function buildNextSessionId(existingSessions = []) {
-  const used = new Set(
-    (Array.isArray(existingSessions) ? existingSessions : [])
-      .map((row) => getSessionId(row))
-      .filter(Boolean)
-  );
-  for (let i = 0; i < 50; i += 1) {
-    const candidate = `SES_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
-    if (!used.has(candidate)) return candidate;
-  }
-  return `SES_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+function buildNextSessionId(classId, existingSessions = []) {
+  return sessionIdService.buildNextSessionId(classId, existingSessions);
 }
 
 function collectRollingSessionDateViolations({
@@ -434,7 +426,7 @@ function generateBatchSessionRows({
     if (daysOfWeek.includes(current.getDay()) && !exceptions.has(dateString)) {
       if (!skipExistingDates || !existingDates.has(dateString)) {
         created.push({
-          sessionId: buildNextSessionId([...(Array.isArray(existingSessions) ? existingSessions : []), ...created]),
+          sessionId: buildNextSessionId(classData?.id, [...(Array.isArray(existingSessions) ? existingSessions : []), ...created]),
           date: dateString,
           originalDate: dateString,
           startTime,
@@ -760,10 +752,10 @@ async function commitStagedSessions({
     if (existingDates.has(row.date)) return;
     const nextRow = { ...row };
     if (!getSessionId(nextRow) || existingIds.has(getSessionId(nextRow))) {
-      nextRow.sessionId = buildNextSessionId(working);
+      nextRow.sessionId = buildNextSessionId(classData.id, working);
     }
     while (existingIds.has(getSessionId(nextRow))) {
-      nextRow.sessionId = buildNextSessionId([...working, ...created, nextRow]);
+      nextRow.sessionId = buildNextSessionId(classData.id, [...working, ...created, nextRow]);
     }
     created.push(nextRow);
     working.push(nextRow);

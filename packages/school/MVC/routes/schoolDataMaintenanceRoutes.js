@@ -58,4 +58,14 @@ router.post('/api/:entityType/clear-all',
   adminApproval,
   ctrl.clearAll);
 
+router.post('/api/session-ids/migrate',
+  requireAccess(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_DATA_MAINTENANCE, OPERATIONS.CREATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  adminApproval,
+  ctrl.migrateClassSessionIds);
+
 module.exports = router;

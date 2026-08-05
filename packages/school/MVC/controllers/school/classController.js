@@ -1,6 +1,5 @@
 ﻿// MVC/controllers/school/classController.js
 const fs = require('fs').promises;
-const fsSync = require('fs');
 const path = require('path');
 const schoolDataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
@@ -49,6 +48,8 @@ const activityService = require('../../services/school/activityService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const { getPresetConfig } = require('../../services/school/sessionStudentCasePresetService');
 const sessionReportAssignmentService = require('../../services/school/sessionReportAssignmentService');
+const sessionNavigationService = require('../../services/school/sessionNavigationService');
+const sessionIdService = require('../../services/school/sessionIdService');
 const sessionConductService = require('../../services/school/sessionConductService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
@@ -1309,10 +1310,24 @@ async function assertSessionRosterEnrollmentWindows({ classData, session, incomi
     throw new Error(`Attendance cannot be updated because a roster student was not enrolled in the class on ${sessionDate}.`);
 }
 
-function findSessionInList(sessions, sessionId) {
+function findSessionInList(sessions, sessionId, sessionDate = '') {
     const list = Array.isArray(sessions) ? sessions : [];
+    const normalizedDate = sessionNavigationService.normalizeSessionDate(sessionDate);
+    if (normalizedDate) {
+        const datedIndex = list.findIndex((row) => sessionNavigationService.sessionMatchesIdentity(row, sessionId, normalizedDate));
+        if (datedIndex >= 0) return { index: datedIndex, session: list[datedIndex] };
+    }
     const index = list.findIndex((row) => idsEqual(row?.sessionId || row?.id, sessionId));
     return { index, session: index >= 0 ? list[index] : null };
+}
+
+function resolveSessionDateFromRequest(req) {
+    return sessionNavigationService.normalizeSessionDate(
+        req?.query?.sessionDate
+        || req?.body?.sessionDate
+        || req?.body?.date
+        || ''
+    );
 }
 
 /**
@@ -1472,9 +1487,9 @@ async function buildClassLifecycleContext(classData, reqUser, orgToday = '') {
     };
 }
 
-function normalizeIncomingSessions(rawSessions = []) {
+function normalizeIncomingSessions(rawSessions = [], classId = '') {
     const sessions = Array.isArray(rawSessions) ? rawSessions : [];
-    return sessions.map((session) => {
+    const normalized = sessions.map((session) => {
         const normalized = session && typeof session === 'object' ? { ...session } : {};
         if (!normalized.delivery || typeof normalized.delivery !== 'object') normalized.delivery = {};
         const resolvedDeliveredBy = cleanPersonId(
@@ -1506,6 +1521,9 @@ function normalizeIncomingSessions(rawSessions = []) {
         }
         return normalized;
     });
+    const classToken = toPublicId(classId);
+    if (!classToken) return normalized;
+    return sessionIdService.ensureClassSessionIds(classToken, normalized).sessions;
 }
 
 function resolveSessionTeacherId(sessionRow = {}, fallbackTeacherId = '') {
@@ -2094,15 +2112,8 @@ function applyAdminSessionMetadataUpdate(session = {}, body = {}, canOverrideOrO
     return { changed };
 }
 
-function generateMakeupSessionId(existingSessions = []) {
-    const used = new Set((Array.isArray(existingSessions) ? existingSessions : [])
-        .map((row) => toPublicId(row?.sessionId || row?.id))
-        .filter(Boolean));
-    let id = '';
-    do {
-        id = `SES_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    } while (used.has(id));
-    return id;
+function generateMakeupSessionId(classId, existingSessions = []) {
+    return sessionIdService.buildNextSessionId(classId, existingSessions);
 }
 
 function resetRosterForMakeup(roster = []) {
@@ -3010,7 +3021,7 @@ async function editClass(req, res) {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Class update is already in progress. Please wait.')) return;
     const incomingSessionsRaw = req.body.sessions ? JSON.parse(req.body.sessions) : [];
-    const sessions = normalizeIncomingSessions(incomingSessionsRaw);
+    const sessions = normalizeIncomingSessions(incomingSessionsRaw, classId);
     const fallbackTeacherId = resolveFallbackTeacherIdFromBody(req.body);
     const updateConflicts = await detectSessionConflicts({
         classId,
@@ -3327,7 +3338,10 @@ async function checkConflicts(req, res) {
         classData = scopedResult.classData;
         conflictScopeOrgId = String(classData?.orgId || activeOrgId || '').trim();
     }
-    const parsedSessions = normalizeIncomingSessions(typeof sessions === 'string' ? JSON.parse(sessions) : sessions);
+    const parsedSessions = normalizeIncomingSessions(
+        typeof sessions === 'string' ? JSON.parse(sessions) : sessions,
+        resolvedClassId
+    );
     const requestedMode = String(req.body?.registrationMode || classData?.registrationMode || 'term_based').trim().toLowerCase();
     const requestedCycleStart = String(req.body?.cycleStartDate || classData?.cycleStartDate || '').trim();
     const requestedCycleEnd = String(req.body?.cycleEndDate || classData?.cycleEndDate || '').trim();
@@ -3618,7 +3632,8 @@ async function manageSession(req, res) {
         const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
         
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { session } = findSessionInList(sessions, sessionId);
+        const requestedSessionDate = sessionNavigationService.normalizeSessionDate(req.query?.sessionDate || req.query?.date);
+        const { session } = findSessionInList(sessions, sessionId, requestedSessionDate);
         if (!session) throw new Error('Session not found');
         const sessionAccess = schoolRecordAccessService.resolveAccessFromRequest(req);
         let canEditSession = true;
@@ -3638,11 +3653,20 @@ async function manageSession(req, res) {
             });
             canEditSession = false;
         }
-        const sortedSessions = [...sessions].sort((a, b) => new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`));
-        const currentIndex = sortedSessions.findIndex(s => s.sessionId === sessionId);
-        
-        const prevSessionId = currentIndex > 0 ? sortedSessions[currentIndex - 1].sessionId : null;
-        const nextSessionId = currentIndex < sortedSessions.length - 1 ? sortedSessions[currentIndex + 1].sessionId : null;
+        const {
+            sortedSessions,
+            currentIndex,
+            prevSessionId,
+            prevSessionDate,
+            nextSessionId,
+            nextSessionDate
+        } = sessionNavigationService.resolveAdjacentSessionIds(sessions, sessionId, session?.date || requestedSessionDate);
+        const prevSessionHref = prevSessionId
+            ? sessionNavigationService.buildManageSessionHref(classId, { sessionId: prevSessionId, date: prevSessionDate })
+            : '';
+        const nextSessionHref = nextSessionId
+            ? sessionNavigationService.buildManageSessionHref(classId, { sessionId: nextSessionId, date: nextSessionDate })
+            : '';
 
         // --- Lock Security Check ---
         const isSessionLocked = session.locked === true || String(session.locked) === 'true';
@@ -3954,8 +3978,12 @@ async function manageSession(req, res) {
             sessionConductReportPeriod,
             sessionStatusMeta: getActiveSessionStatusMeta(sessionStatusMeta),
             defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
-            prevSessionId,    
-            nextSessionId,    
+            prevSessionId,
+            prevSessionDate,
+            nextSessionId,
+            nextSessionDate,
+            prevSessionHref,
+            nextSessionHref,
             isSessionLocked, 
             isReadOnly,
             canEditSessionMetadata: canOverride,
@@ -3990,7 +4018,7 @@ async function assignReportToSession(req, res) {
         const { id: classId, sessionId } = req.params;
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { session } = findSessionInList(sessions, sessionId);
+        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (!session) throw new Error('Session not found.');
         assertSessionScopeForRequest(req, classData, session);
 
@@ -4039,7 +4067,7 @@ async function listSessionReportInstances(req, res) {
         const { id: classId, sessionId } = req.params;
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { index: sessionIndex, session } = findSessionInList(sessions, sessionId);
+        const { index: sessionIndex, session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (!session) throw new Error('Session not found.');
 
         assertSessionScopeForRequest(req, classData, session);
@@ -4290,7 +4318,7 @@ async function createMakeupSession(req, res) {
                 allocationSummary,
                 allocationProjection
             });
-            makeupSession.sessionId = generateMakeupSessionId(sessions);
+            makeupSession.sessionId = generateMakeupSessionId(classId, sessions);
             await assertSessionManagerSessionWithinClassWindowOrThrow(classData, makeupSession, req.user);
 
             if (!canOverrideMakeupDuration) {
@@ -4409,7 +4437,7 @@ async function saveSession(req, res) {
         const forceMetadataConflicts = parseBoolean(req.body?.force, false);
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { index: sessionIndex } = findSessionInList(sessions, sessionId);
+        const { index: sessionIndex } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (sessionIndex === -1) throw new Error('Session not found');
         assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
         const originalSession = sessions[sessionIndex];
@@ -4782,7 +4810,7 @@ async function saveSessionGradebooks(req, res) {
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
 
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { index: sessionIndex } = findSessionInList(sessions, sessionId);
+        const { index: sessionIndex } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (sessionIndex === -1) throw new Error('Session not found');
         assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, sessions[sessionIndex], req.user);
@@ -4978,7 +5006,7 @@ async function saveSessionConduct(req, res) {
         const { id: classId, sessionId } = req.params;
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { index: sessionIndex } = findSessionInList(sessions, sessionId);
+        const { index: sessionIndex } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (sessionIndex === -1) {
             return res.status(404).json({ status: 'error', message: 'Session not found.' });
         }
@@ -5052,7 +5080,7 @@ async function setSessionLock(req, res) {
 
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { index: sessionIndex } = findSessionInList(sessions, sessionId);
+        const { index: sessionIndex } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (sessionIndex === -1) {
             return res.status(404).json({ status: 'error', message: 'Session not found.' });
         }
