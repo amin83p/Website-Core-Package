@@ -1361,13 +1361,13 @@
         </div>
         <div class="session-manager-toolbar-actions">
             <div class="btn-group shadow-sm">
-                <% if (prevSessionId) { %>
-                    <a href="/school/classes/<%= classData.id %>/sessions/<%= prevSessionId %>" class="btn btn-outline-primary bg-grey btn-md session-manager-nav-away" id="linkPrevSession" title="Previous session" data-confirm-title="Open previous session?" data-confirm-message="Leave this page and open the previous class session? Unsaved changes will be lost unless you save first."><i class="bi bi-chevron-left"></i></a>
+                <% if (prevSessionHref) { %>
+                    <a href="<%= prevSessionHref %>" class="btn btn-outline-primary bg-grey btn-md session-manager-nav-away" id="linkPrevSession" title="Previous session" data-confirm-title="Open previous session?" data-confirm-message="Leave this page and open the previous class session? Unsaved changes will be lost unless you save first."><i class="bi bi-chevron-left"></i></a>
                 <% } else { %>
                     <button type="button" class="btn btn-outline-secondary bg-light btn-md" disabled><i class="bi bi-chevron-left"></i></button>
                 <% } %>
-                <% if (nextSessionId) { %>
-                    <a href="/school/classes/<%= classData.id %>/sessions/<%= nextSessionId %>" class="btn btn-outline-primary bg-grey btn-md session-manager-nav-away" id="linkNextSession" title="Next session" data-confirm-title="Open next session?" data-confirm-message="Leave this page and open the next class session? Unsaved changes will be lost unless you save first."><i class="bi bi-chevron-right"></i></a>
+                <% if (nextSessionHref) { %>
+                    <a href="<%= nextSessionHref %>" class="btn btn-outline-primary bg-grey btn-md session-manager-nav-away" id="linkNextSession" title="Next session" data-confirm-title="Open next session?" data-confirm-message="Leave this page and open the next class session? Unsaved changes will be lost unless you save first."><i class="bi bi-chevron-right"></i></a>
                 <% } else { %>
                     <button type="button" class="btn btn-outline-secondary bg-light btn-md" disabled><i class="bi bi-chevron-right"></i></button>
                 <% } %>
@@ -1857,8 +1857,8 @@
                                                     <input type="hidden" class="att-late" value="<%= student.lateMinutes || '' %>">
                                                     <input type="hidden" class="att-leave" value="<%= student.earlyLeaveMinutes || '' %>">
                                                     <input type="hidden" class="att-excuse" value="<%= student.excuseRef || '' %>">
-                                                    <input type="hidden" class="att-excuse-attachment" value='<%- JSON.stringify(student.excuseAttachment || null).replace(/</g, "\\u003c").replace(/'/g, "&#39;") %>'>
-                                                    <input type="hidden" class="att-comments" value='<%- JSON.stringify(student.comments || []).replace(/</g, "\\u003c").replace(/'/g, "&#39;") %>'>
+                                                    <input type="hidden" class="att-excuse-attachment" value="">
+                                                    <input type="hidden" class="att-comments" value="">
                                                 </td>
                                             </tr>
                                         <% }) %>
@@ -3165,6 +3165,24 @@ document.addEventListener('DOMContentLoaded', () => {
         respectsStudentsPercent: student.respectsStudentsPercent == null ? null : student.respectsStudentsPercent,
         conductSavedAt: student.conductSavedAt || null
     }))) %>;
+    const attendanceDetailsState = <%- jsonForScript((session.roster || []).reduce((acc, student) => {
+        const personId = String(student.personId || '').trim();
+        if (!personId) return acc;
+        acc[personId] = {
+            comments: Array.isArray(student.comments) ? student.comments : [],
+            excuseAttachment: student.excuseAttachment || null
+        };
+        return acc;
+    }, {})) %>;
+
+    function getAttendanceDetails(personId) {
+        const key = String(personId || '').trim();
+        if (!key) return { comments: [], excuseAttachment: null };
+        if (!attendanceDetailsState[key]) {
+            attendanceDetailsState[key] = { comments: [], excuseAttachment: null };
+        }
+        return attendanceDetailsState[key];
+    }
 
     function conductEscapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (ch) => ({
@@ -5123,12 +5141,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const row = document.querySelector(`.roster-row[data-personid="${studentId}"]`);
                 if (row) {
-                    const commentsInput = row.querySelector('.att-comments');
-                    if (commentsInput) {
-                        const existingComments = JSON.parse(commentsInput.value || "[]");
-                        existingComments.push(result.comment);
-                        commentsInput.value = JSON.stringify(existingComments);
-                    }
+                    const details = getAttendanceDetails(studentId);
+                    details.comments = Array.isArray(details.comments) ? details.comments : [];
+                    details.comments.push(result.comment);
 
                     const btnDetails = row.querySelector('.btn-details');
                     const iconDetails = btnDetails.querySelector('i');
@@ -5166,16 +5181,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const lateVal = document.getElementById('modalLateMins').value;
                 const leaveVal = document.getElementById('modalLeaveMins').value;
                 const excuseVal = document.getElementById('modalExcuseRef').value;
-                const commentsStr = row.querySelector('.att-comments').value;
-                const excuseAttachmentInput = row.querySelector('.att-excuse-attachment');
+                const details = getAttendanceDetails(personId);
                 const selectedExcuseAttachment = await uploadSchoolSessionFile(document.getElementById('modalExcuseFile'), 'excuse', personId);
-                const currentExcuseAttachment = parseAttendanceAttachment(excuseAttachmentInput?.value);
-                const excuseAttachment = selectedExcuseAttachment || currentExcuseAttachment;
+                const excuseAttachment = selectedExcuseAttachment || details.excuseAttachment || null;
+                details.excuseAttachment = excuseAttachment || null;
 
                 row.querySelector('.att-late').value = lateVal;
                 row.querySelector('.att-leave').value = leaveVal;
                 row.querySelector('.att-excuse').value = excuseVal;
-                if (excuseAttachmentInput) excuseAttachmentInput.value = JSON.stringify(excuseAttachment || null);
 
                 applyAttendanceRulesToRow(row);
                 updateLateMissingMinuteState(row);
@@ -5184,7 +5197,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const btn = row.querySelector('.btn-details');
                 const icon = btn.querySelector('i');
 
-                const hasComments = (JSON.parse(commentsStr) || []).length > 0;
+                const hasComments = (details.comments || []).length > 0;
                 if (lateVal || leaveVal || excuseVal || excuseAttachment || hasComments) {
                     btn.className = 'btn btn-sm btn-details btn-warning text-dark';
                     icon.className = 'bi bi-sticky-fill';
@@ -7094,7 +7107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const lateMinutes = row.querySelector('.att-late').value || null;
                 const earlyLeaveMinutes = row.querySelector('.att-leave').value || null;
                 const excuseRef = row.querySelector('.att-excuse').value || '';
-                const excuseAttachment = parseAttendanceAttachment(row.querySelector('.att-excuse-attachment')?.value);
+                const excuseAttachment = getAttendanceDetails(personId).excuseAttachment || null;
                 const conductRow = conductRowsByPersonId.get(personId);
                 const classEffortPercent = readConductRating(conductRow, '.conduct-class-effort');
                 const classParticipationPercent = readConductRating(conductRow, '.conduct-class-participation');
@@ -7283,14 +7296,14 @@ function openDetailsModal(personId, name) {
         document.getElementById('modalLateMins').value = row.querySelector('.att-late').value;
         document.getElementById('modalLeaveMins').value = row.querySelector('.att-leave').value;
         document.getElementById('modalExcuseRef').value = row.querySelector('.att-excuse').value;
-        const excuseAttachment = parseAttendanceAttachment(row.querySelector('.att-excuse-attachment')?.value);
+        const details = getAttendanceDetails(personId);
+        const excuseAttachment = details.excuseAttachment || null;
         const excuseFileInput = document.getElementById('modalExcuseFile');
         if (excuseFileInput) excuseFileInput.value = '';
         const excusePreview = document.getElementById('modalExcuseAttachmentPreview');
         if (excusePreview) excusePreview.innerHTML = renderAttendanceAttachmentLink(excuseAttachment, '<span class="text-muted">No file attached.</span>');
 
-        const commentsStr = row.querySelector('.att-comments').value;
-        const comments = JSON.parse(commentsStr || "[]");
+        const comments = Array.isArray(details.comments) ? details.comments : [];
         const thread = document.getElementById('det_commentsThread');
         thread.innerHTML = '';
 
