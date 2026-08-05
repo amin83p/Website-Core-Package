@@ -19,11 +19,8 @@
   const revisionDepth = Number(template?.revisionDepth || 0) || 0;
   const qbRevisionId = String(questionRevision?.id || '').trim();
   const qbRows = Array.isArray(questionRows) ? questionRows : [];
-  const qbRowsJsonAttr = JSON.stringify(qbRows)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  const initQbRowsJson = JSON.stringify(qbRows);
+  const initSubjectsJson = JSON.stringify(initialSubjects);
 %>
 
 <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
@@ -134,7 +131,8 @@
       <input type="hidden" name="departmentId" id="inp_departmentId" value="<%= initialDepartment.id %>">
       <input type="hidden" name="departmentCode" id="inp_departmentCode" value="<%= initialDepartment.code %>">
       <input type="hidden" name="departmentName" id="inp_departmentName" value="<%= initialDepartment.name %>">
-      <input type="hidden" name="subjectIdsJson" id="inp_subjectIdsJson" value="<%- initialSubjectsJsonAttr %>">
+      <input type="hidden" name="subjectIdsJson" id="inp_subjectIdsJson" value="[]">
+      <script type="application/json" id="init_subjectIdsJson"><%- initSubjectsJson %></script>
 
       <ul class="nav nav-tabs mb-4" id="templateTabs" role="tablist">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">General Info</button></li>
@@ -345,7 +343,7 @@
                 </div>
               </div>
             </div>
-            <input type="hidden" id="qbRowsJson" value="<%- qbRowsJsonAttr %>">
+            <script type="application/json" id="init_qbRows"><%- initQbRowsJson %></script>
             <input type="hidden" id="qbRevisionId" value="<%= qbRevisionId %>">
           <% } %>
         </div>
@@ -835,7 +833,7 @@
 
     let subjectsState = [];
     try {
-      const parsed = JSON.parse(subjectsJsonInput.value || '[]');
+      const parsed = JSON.parse(document.getElementById('init_subjectIdsJson')?.textContent || subjectsJsonInput?.value || '[]');
       subjectsState = Array.isArray(parsed) ? parsed.map(function (row) {
         const id = String(row?.id || row?.subjectId || '').trim();
         return {
@@ -1137,7 +1135,7 @@
     syncHiddenSubjects();
 
     if (isEditTemplate) {
-      const qbRowsInput = document.getElementById('qbRowsJson');
+      const qbRowsInitEl = document.getElementById('init_qbRows');
       const qbRevisionIdInput = document.getElementById('qbRevisionId');
       const qbTbody = document.getElementById('qbTbody');
       const btnQbAdd = document.getElementById('btnQbAdd');
@@ -1268,7 +1266,7 @@
       let qbDragId = '';
       let qbRestoreQuestionModalAfterMedia = false;
       try {
-        const parsed = JSON.parse(String(qbRowsInput?.value || '[]'));
+        const parsed = JSON.parse(String(qbRowsInitEl?.textContent || '[]'));
         qbRows = Array.isArray(parsed) ? parsed : [];
       } catch (_) {
         qbRows = [];

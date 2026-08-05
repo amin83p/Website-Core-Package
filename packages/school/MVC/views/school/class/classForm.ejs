@@ -94,17 +94,27 @@
   <div class="form-container wide" style="max-width: 1400px;">
     <form id="classForm" action="<%= isEdit ? '/school/classes/edit/'+c.id : '/school/classes/new' %>" method="POST">
       
-      <input type="hidden" name="curriculum" id="hid_curriculum" value='<%- initCurriculum %>'>
+      <input type="hidden" name="curriculum" id="hid_curriculum" value="">
       <input type="hidden" name="billingMode" id="hid_billingMode" value="<%= initBillingMode %>">
-      <input type="hidden" name="pricing" id="hid_pricing" value='<%- initPricing %>'>
-      <input type="hidden" name="postingTemplates" id="hid_postingTemplates" value='<%- initPostingTemplates %>'>
-      <input type="hidden" name="allowedProgramTerms" id="hid_allowedProgramTerms" value='<%- initAllowedProgramTerms %>'>
-      <input type="hidden" name="instructors" id="hid_instructors" value='<%- initInstructors %>'>
-      <input type="hidden" name="skillIds" id="hid_skillIds" value='<%- initSkillIds %>'>
-      <input type="hidden" name="enrollment" id="hid_enrollment" value='<%- initEnrollment %>'>
-      <input type="hidden" name="evaluation" id="hid_evaluation" value='<%- initEvaluation %>'>
-      <input type="hidden" name="enabledAttendanceStatuses" id="hid_enabledAttendanceStatuses" value='<%- initEnabledAttendanceStatuses %>'>
-      <input type="hidden" name="sessions" id="hid_sessions" value='<%- initSessions %>'>
+      <input type="hidden" name="pricing" id="hid_pricing" value="">
+      <input type="hidden" name="postingTemplates" id="hid_postingTemplates" value="">
+      <input type="hidden" name="allowedProgramTerms" id="hid_allowedProgramTerms" value="">
+      <input type="hidden" name="instructors" id="hid_instructors" value="">
+      <input type="hidden" name="skillIds" id="hid_skillIds" value="">
+      <input type="hidden" name="enrollment" id="hid_enrollment" value="">
+      <input type="hidden" name="evaluation" id="hid_evaluation" value="">
+      <input type="hidden" name="enabledAttendanceStatuses" id="hid_enabledAttendanceStatuses" value="">
+      <input type="hidden" name="sessions" id="hid_sessions" value="[]">
+      <script type="application/json" id="init_curriculum"><%- initCurriculum %></script>
+      <script type="application/json" id="init_pricing"><%- initPricing %></script>
+      <script type="application/json" id="init_postingTemplates"><%- initPostingTemplates %></script>
+      <script type="application/json" id="init_allowedProgramTerms"><%- initAllowedProgramTerms %></script>
+      <script type="application/json" id="init_instructors"><%- initInstructors %></script>
+      <script type="application/json" id="init_skillIds"><%- initSkillIds %></script>
+      <script type="application/json" id="init_enrollment"><%- initEnrollment %></script>
+      <script type="application/json" id="init_evaluation"><%- initEvaluation %></script>
+      <script type="application/json" id="init_enabledAttendanceStatuses"><%- initEnabledAttendanceStatuses %></script>
+      <script type="application/json" id="init_sessions"><%- initSessions %></script>
       <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
 
       <ul class="nav nav-tabs mb-4" id="classTabs" role="tablist">
@@ -947,6 +957,7 @@
 </div>
 
 
+<script src="/scripts/sessionIdHelper.js"></script>
 <script>
 const ORG_TODAY = <%- JSON.stringify(typeof orgToday !== 'undefined' ? orgToday : '') %>;
 function orgTodayFallback() {
@@ -984,14 +995,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return confirm(message);
     }
+    function parseInitJson(elementId, fallback) {
+        try {
+            const raw = document.getElementById(elementId)?.textContent;
+            if (raw == null || raw === '') return fallback;
+            return JSON.parse(raw);
+        } catch (_) {
+            return fallback;
+        }
+    }
+
+    const initCurriculumData = parseInitJson('init_curriculum', { subjects: [], totalHours: 0 });
     // State
-    let curriculumState = JSON.parse(document.getElementById('hid_curriculum').value).subjects || [];
+    let curriculumState = Array.isArray(initCurriculumData?.subjects) ? initCurriculumData.subjects : [];
     let billingModeState = String(document.getElementById('hid_billingMode')?.value || 'chargeable').trim().toLowerCase() === 'no_charge' ? 'no_charge' : 'chargeable';
-    let pricingState = JSON.parse(document.getElementById('hid_pricing').value || '{"mode":"auto","feeRules":[]}') || { mode: 'auto', feeRules: [] };
-    let postingTemplateState = JSON.parse(document.getElementById('hid_postingTemplates').value || '[]') || [];
-    let allowedProgramTermsState = JSON.parse(document.getElementById('hid_allowedProgramTerms').value || '[]') || [];
-    let classSkillIdsState = JSON.parse(document.getElementById('hid_skillIds').value || '[]') || [];
-    let sessionsState = JSON.parse(document.getElementById('hid_sessions').value) || [];
+    let pricingState = parseInitJson('init_pricing', { mode: 'auto', feeRules: [] }) || { mode: 'auto', feeRules: [] };
+    let postingTemplateState = parseInitJson('init_postingTemplates', []) || [];
+    let allowedProgramTermsState = parseInitJson('init_allowedProgramTerms', []) || [];
+    let classSkillIdsState = parseInitJson('init_skillIds', []) || [];
+    let sessionsState = parseInitJson('init_sessions', []) || [];
+    let enrollmentState = parseInitJson('init_enrollment', { maxCapacity: 30, students: [] }) || { maxCapacity: 30, students: [] };
+    let instructorsState = parseInitJson('init_instructors', []) || [];
+    const dEval = parseInitJson('init_evaluation', { passingScore: 60, weights: { attendance: 10, assignments: 40, midterm: 20, finalExam: 30 } });
     let pendingEligibilityProgram = null;
 
     function syncClassSkillSelection() {
@@ -1012,10 +1037,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // FIX 1: Mark all initially loaded sessions as saved from the DB, so they are always clickable
     sessionsState.forEach(s => s._isSaved = true);
 
-    const dInst = JSON.parse(document.getElementById('hid_instructors').value);
-    const dEnrl = JSON.parse(document.getElementById('hid_enrollment').value);
-    const dEval = JSON.parse(document.getElementById('hid_evaluation').value);
+    const dInst = instructorsState;
+    const dEnrl = enrollmentState;
     const classId = '<%= c.id || "" %>';
+
+    function buildNextClientSessionId() {
+        if (window.SchoolSessionIdHelper && typeof window.SchoolSessionIdHelper.buildNextSessionId === 'function') {
+            return window.SchoolSessionIdHelper.buildNextSessionId(classId || 'NEW', sessionsState);
+        }
+        return `SES-NEW-${Date.now()}`;
+    }
+
     const registrationModeInput = document.getElementById('inp_registrationMode');
     const cycleGroupIdInput = document.getElementById('inp_cycleGroupId');
     const cycleStartDateInput = document.getElementById('inp_cycleStartDate');
@@ -1198,7 +1230,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Populate Initial UI
     document.getElementById('inp_capacity').value = dEnrl.maxCapacity || 30;
-    const initialHours = JSON.parse(document.getElementById('hid_curriculum').value).totalHours || 0;
+    const initialHours = Number(initCurriculumData?.totalHours || 0);
     document.getElementById('inp_totalHours').value = initialHours;
     document.getElementById('lbl_targetHours').innerText = initialHours;
 
@@ -1239,7 +1271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function readEnabledAttendanceStatusesFromHidden() {
         try {
-            const parsed = JSON.parse(hidEnabledAttendanceStatuses?.value || '[]');
+            const parsed = parseInitJson('init_enabledAttendanceStatuses', ALL_ATTENDANCE_STATUSES_ORDERED);
             if (Array.isArray(parsed) && parsed.length) return parsed.map((s) => String(s || '').trim().toLowerCase()).filter(Boolean);
         } catch (_) { /* ignore */ }
         return [...ALL_ATTENDANCE_STATUSES_ORDERED];
@@ -2671,8 +2703,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function normalizeCopiedSessions(sessionRows) {
         const rows = Array.isArray(sessionRows) ? sessionRows : [];
-        return rows.map((session, index) => ({
-            sessionId: String(session?.sessionId || `SES_${Date.now()}_${index}_${Math.floor(Math.random() * 1000)}`),
+        const allocated = [];
+        return rows.map((session) => {
+            const existingId = String(session?.sessionId || '').trim();
+            let sessionId = existingId;
+            if (!sessionId) {
+                sessionId = window.SchoolSessionIdHelper
+                    ? window.SchoolSessionIdHelper.buildNextSessionId(classId || 'NEW', [...sessionsState, ...allocated])
+                    : `SES-NEW-${Date.now()}_${allocated.length}`;
+                allocated.push({ sessionId });
+            }
+            return {
+            sessionId,
             date: String(session?.date || '').trim(),
             originalDate: String(session?.originalDate || session?.date || '').trim(),
             startTime: String(session?.startTime || '').trim(),
@@ -2689,7 +2731,8 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             roster: [],
             _isSaved: false
-        }));
+            };
+        });
     }
 
     function applyClassTemplate(template) {
@@ -3965,9 +4008,10 @@ form.addEventListener('submit', async (e) => {
             
             params.append('instructors', JSON.stringify(getInstructorRowsForSubmit()));
             
-            const dEnrl = JSON.parse(document.getElementById('hid_enrollment').value || '{}');
-            dEnrl.maxCapacity = parseInt(document.getElementById('inp_capacity').value) || 30;
-            params.append('enrollment', JSON.stringify(dEnrl));
+            const dEnrlSubmit = { ...enrollmentState };
+            dEnrlSubmit.maxCapacity = parseInt(document.getElementById('inp_capacity').value) || 30;
+            enrollmentState = dEnrlSubmit;
+            params.append('enrollment', JSON.stringify(dEnrlSubmit));
             
             const rollingSave = isRollingMode();
             params.append('evaluation', JSON.stringify({
@@ -4063,7 +4107,7 @@ form.addEventListener('submit', async (e) => {
         }
 
         sessionsState.push({
-            sessionId: "SES_" + Date.now() + Math.random().toString().slice(2, 6),
+            sessionId: buildNextClientSessionId(),
             date: date, originalDate: date, startTime: sTime, endTime: eTime, durationHours: getDuration(sTime, eTime),
             room: "", // <--- NEW FIELD
             status: normalizeStatusCode(defaultSessionStatusCode) || 'scheduled', notes: notes, locked: false,
@@ -4155,7 +4199,7 @@ form.addEventListener('submit', async (e) => {
             
             if (selectedDays.includes(current.getDay()) && !exceptions.has(dateString)) {
                 sessionsState.push({
-                    sessionId: "SES_" + Date.now() + Math.random().toString().slice(2, 6),
+                    sessionId: buildNextClientSessionId(),
                     date: dateString, originalDate: dateString, startTime: sTime, endTime: eTime, durationHours: hrs,
                     room: defaultRoom, // <--- NEW FIELD
                     status: normalizeStatusCode(defaultSessionStatusCode) || 'scheduled', notes: "", locked: false,
@@ -4265,12 +4309,7 @@ function computeBulkPreview() {
 }
 
 function parseInstructorRowsFromHidden() {
-    try {
-        const parsed = JSON.parse(document.getElementById('hid_instructors')?.value || '[]');
-        return Array.isArray(parsed) ? parsed.filter(Boolean).map((row) => ({ ...row })) : [];
-    } catch (e) {
-        return [];
-    }
+    return Array.isArray(instructorsState) ? instructorsState.filter(Boolean).map((row) => ({ ...row })) : [];
 }
 
 function escapeInstructorListHtml(value) {
@@ -4340,6 +4379,7 @@ function writeInstructorRowsToHidden(rows = []) {
             unassignedAt: row?.unassignedAt || null
         });
     });
+    instructorsState = cleaned;
     const hidden = document.getElementById('hid_instructors');
     if (hidden) hidden.value = JSON.stringify(cleaned);
     renderAdditionalInstructors();
