@@ -1,4 +1,5 @@
 const schoolDataService = require('./schoolDataService');
+const activityEntryIdService = require('./activityEntryIdService');
 const schoolDependencyService = require('./schoolDependencyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -617,6 +618,11 @@ async function saveActivity(payload = {}, reqUser) {
     durationHours: Number(firstEntry.durationHours || normalized.durationHours || 0),
     totalDurationHours
   };
+  const targetActivityId = normalizeId(payload.id);
+  if (targetActivityId && Array.isArray(normalizedData.entries)) {
+    const ensuredEntries = activityEntryIdService.ensureActivityEntryIds(targetActivityId, normalizedData.entries);
+    normalizedData.entries = ensuredEntries.entries;
+  }
   if (payload.id) {
     const existing = await schoolDataService.getDataById('activities', payload.id, reqUser);
     if (existing) {
@@ -626,7 +632,15 @@ async function saveActivity(payload = {}, reqUser) {
     }
     return schoolDataService.updateData('activities', payload.id, normalizedData, reqUser);
   }
-  return schoolDataService.addData('activities', normalizedData, reqUser);
+  const created = await schoolDataService.addData('activities', normalizedData, reqUser);
+  const createdId = normalizeId(created?.id);
+  if (createdId && Array.isArray(created?.entries) && created.entries.length) {
+    const ensuredEntries = activityEntryIdService.ensureActivityEntryIds(createdId, created.entries);
+    if (ensuredEntries.reassigned > 0) {
+      return schoolDataService.updateData('activities', createdId, { entries: ensuredEntries.entries }, reqUser);
+    }
+  }
+  return created;
 }
 
 async function saveActivityCategory(payload = {}, reqUser) {
