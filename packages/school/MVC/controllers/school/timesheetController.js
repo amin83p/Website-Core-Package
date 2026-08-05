@@ -17,6 +17,7 @@ const timesheetManualConflictService = require('../../services/school/timesheetM
 const priorPeriodAdjustmentService = require('../../services/school/timesheetPriorPeriodAdjustmentService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const timesheetManualMaterializationService = require('../../services/school/timesheetManualMaterializationService');
+const manualSessionIdService = require('../../services/school/manualSessionIdService');
 const timesheetUnprocessService = require('../../services/school/timesheetUnprocessService');
 const timesheetPayrollContextService = require('../../services/school/timesheetPayrollContextService');
 const timesheetPayRateService = require('../../services/school/timesheetPayRateService');
@@ -2331,15 +2332,20 @@ exports.saveTimesheet = async (req, res) => {
             return withPayrollStamp(entry, payrollContext, period);
         });
 
-        const manualRows = payrollStampedEntries.filter((entry) => entry && entry.isDeleted !== true && entry.isManual === true);
-        if (manualRows.length || payrollStampedEntries.some((entry) => entry?.startTime && entry?.endTime)) {
+        const manualSessionNormalizedEntries = manualSessionIdService.ensureTimesheetManualSessionIds(
+            existing?.id || periodId,
+            payrollStampedEntries
+        );
+
+        const manualRows = manualSessionNormalizedEntries.filter((entry) => entry && entry.isDeleted !== true && entry.isManual === true);
+        if (manualRows.length || manualSessionNormalizedEntries.some((entry) => entry?.startTime && entry?.endTime)) {
             const conflicts = await runTimesheetConflictValidation({
                 activeOrgId,
                 personId: teacherContext.targetTeacherId,
                 period,
                 candidateEntries: manualRows,
                 draftEntries: manualRows,
-                timesheetEntries: payrollStampedEntries.filter((entry) => entry && entry.isDeleted !== true),
+                timesheetEntries: manualSessionNormalizedEntries.filter((entry) => entry && entry.isDeleted !== true),
                 reqUser: req.user
             });
             if (Array.isArray(conflicts) && conflicts.length) {
@@ -2358,7 +2364,7 @@ exports.saveTimesheet = async (req, res) => {
                     + 'Ask a timesheet manager to allow late submission before you can submit.'
                 );
             }
-            const hasNonFinalAutoSession = payrollStampedEntries.some((entry) => {
+            const hasNonFinalAutoSession = manualSessionNormalizedEntries.some((entry) => {
                 if (!entry || entry.isDeleted || entry.isManual) return false;
                 if (entry.isPriorPeriodAdjustment === true) return false;
                 return entry.isFinalStatus === false && entry.isProvisional !== true;
@@ -2375,7 +2381,7 @@ exports.saveTimesheet = async (req, res) => {
             }
         }
 
-        let entriesForSave = payrollStampedEntries;
+        let entriesForSave = manualSessionNormalizedEntries;
         if (reviewerEdit && isManagerApproved(existing)) {
             const revertSummary = await timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet({
                 timesheetId: existing.id,

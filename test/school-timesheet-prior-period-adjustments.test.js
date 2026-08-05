@@ -160,6 +160,40 @@ test('timesheet controller captures submission snapshot on submit', () => {
     assert.match(source, /applyPriorAdjustments/);
 });
 
+test('prior-period adjustment rows are excluded from manual schedule conflict checks', async () => {
+    const conflictService = require('../packages/school/MVC/services/school/timesheetManualConflictService');
+    const adjustmentRows = [
+        {
+            sessionId: 'adj-TSP1-SES1',
+            classId: 'CLS1',
+            date: '2026-08-01',
+            isManual: true,
+            isPriorPeriodAdjustment: true,
+            hours: 1
+        },
+        {
+            sessionId: 'adj-TSP1-SES2',
+            classId: 'CLS1',
+            date: '2026-08-01',
+            isManual: true,
+            isPriorPeriodAdjustment: true,
+            hours: -1.5
+        }
+    ];
+    const conflicts = await conflictService.detectRoleAwareManualEntryConflicts({
+        activeOrgId: 'ORG_1',
+        personId: 'P_1',
+        activeRoles: ['teacher'],
+        startDate: '2026-08-01',
+        endDate: '2026-08-31',
+        candidateEntries: adjustmentRows,
+        draftEntries: adjustmentRows,
+        timesheetEntries: adjustmentRows,
+        reqUser: {}
+    });
+    assert.equal(conflicts.length, 0);
+});
+
 test('timesheet editor includes prior-period adjustment review modal and locked row styling', () => {
     const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
     assert.match(editor, /priorAdjustmentModal/);

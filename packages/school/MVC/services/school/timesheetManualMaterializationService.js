@@ -1,6 +1,8 @@
 const schoolDataService = require('./schoolDataService');
 const activityService = require('./activityService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const sessionIdService = require('./sessionIdService');
+const manualSessionIdService = require('./manualSessionIdService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -18,7 +20,7 @@ function isManualMaterializationCandidate(entry = {}) {
   if (entry.materializedAt || entry.materializedSessionId) return false;
   if (String(entry.approvalStatus || '').trim().toLowerCase() !== 'approved') return false;
   const sessionId = normalizeId(entry.sessionId);
-  if (!sessionId.startsWith('MAN_')) return false;
+  if (!manualSessionIdService.isManualSessionId(sessionId)) return false;
   return Boolean(normalizeId(entry.classId) || normalizeId(entry.activityId));
 }
 
@@ -34,16 +36,8 @@ function nextActivityEntryId(entries = []) {
   return `ENTRY-${next}`;
 }
 
-function nextClassSessionId(sessions = []) {
-  const nums = (Array.isArray(sessions) ? sessions : [])
-    .map((row) => {
-      const token = normalizeId(row?.sessionId || row?.id);
-      const match = token.match(/^SES-(\d+)$/i);
-      return match ? Number(match[1]) : 0;
-    })
-    .filter((n) => Number.isFinite(n));
-  const next = (nums.length ? Math.max(...nums) : 0) + 1;
-  return `SES-${String(next).padStart(3, '0')}`;
+function nextClassSessionId(classId, sessions = []) {
+  return sessionIdService.buildNextSessionId(classId, sessions);
 }
 
 async function resolveNextTimesheetPeriodId({ orgId, currentPeriod = {}, reqUser } = {}) {
@@ -70,7 +64,7 @@ async function materializeClassManualEntry({
   if (!classRow) throw new Error(`Class ${classId} is no longer available for manual session materialization.`);
 
   const sessions = await schoolDataService.getClassSessions(classId, reqUser);
-  const sessionId = nextClassSessionId(sessions);
+  const sessionId = nextClassSessionId(classId, sessions);
   const statusMeta = await sessionStatusPolicyService.getClientStatusMeta(timesheet?.orgId || classRow?.orgId || '', { includeInactive: true });
   const defaultStatus = sessionStatusPolicyService.normalizeStatusCode(
     (Array.isArray(statusMeta) ? statusMeta : []).find((row) => row?.isDefault)?.code || 'scheduled'

@@ -210,6 +210,11 @@ async function listRoleAwareActivityScheduleEvents({ activeOrgId, personId, acti
     .filter((row) => row.date && row.startTime && row.endTime);
 }
 
+function isPriorPeriodAdjustmentRow(row = {}) {
+  const sessionId = normalizeId(row?.sessionId);
+  return row?.isPriorPeriodAdjustment === true || sessionId.startsWith('adj-');
+}
+
 function detectManualOverlapConflicts(candidates = [], scheduleEvents = []) {
   const conflicts = [];
   candidates.forEach((entry, index) => {
@@ -311,6 +316,7 @@ async function detectRoleAwareManualEntryConflicts({
   const periodStart = normalizeDate(startDate);
   const periodEnd = normalizeDate(endDate);
   const candidates = (Array.isArray(candidateEntries) ? candidateEntries : [])
+    .filter((row) => !isPriorPeriodAdjustmentRow(row))
     .map((row, index) => normalizeManualConflictCandidate(row, { provisionalSessionId: `candidate-${index}` }))
     .filter(Boolean);
   if (!normalizedPersonId || !normalizedOrgId || !periodStart || !periodEnd || !candidates.length) {
@@ -341,6 +347,7 @@ async function detectRoleAwareManualEntryConflicts({
 
   const draftManualCandidates = (Array.isArray(draftEntries) ? draftEntries : [])
     .filter((row) => row?.isManual === true && row?.isDeleted !== true)
+    .filter((row) => !isPriorPeriodAdjustmentRow(row))
     .filter((row) => !ignoreSessionId || normalizeId(row?.sessionId) !== normalizeId(ignoreSessionId))
     .map((row, index) => normalizeManualConflictCandidate(row, { provisionalSessionId: `draft-${index}` }))
     .filter(Boolean);

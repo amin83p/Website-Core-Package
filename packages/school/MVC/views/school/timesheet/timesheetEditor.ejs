@@ -1230,6 +1230,7 @@
   </div>
 </div>
 
+<script src="/scripts/manualSessionIdHelper.js"></script>
 <script>
     const P_START = "<%= period.startDate %>";
     const P_END = "<%= period.endDate %>";
@@ -1251,6 +1252,7 @@
     const ALLOW_LATE_SUBMISSION = <%= allowLateSubmissionFlag ? 'true' : 'false' %>;
     const SHOW_PRIOR_ADJUSTMENT_REVIEW = <%= showPriorAdjustmentReview ? 'true' : 'false' %>;
     const PERIOD_ID = "<%= period.id %>";
+    const TIMESHEET_RECORD_ID = "<%= timesheet.id || '' %>";
     const TARGET_TEACHER_ID = "<%= targetTeacherId %>";
     const CAN_PRINT_TIMESHEET = <%= canPrintFlag ? 'true' : 'false' %>;
     const TIMESHEET_PRINT_MODE = <%- JSON.stringify(printMode) %>;
@@ -2819,7 +2821,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return String(meta?.visibilityScope || '').trim().toLowerCase() === 'individual';
     }
 
-    function createManualSessionId() {
+    function createManualSessionId(entryContext = {}) {
+        const scopeId = String(
+            entryContext.classId
+            || entryContext.activityId
+            || TIMESHEET_RECORD_ID
+            || TARGET_TEACHER_ID
+            || PERIOD_ID
+            || ''
+        ).trim();
+        if (window.SchoolManualSessionIdHelper && scopeId) {
+            return window.SchoolManualSessionIdHelper.buildNextManualSessionId(scopeId, activeEntries);
+        }
         return 'MAN_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
     }
 
@@ -2972,7 +2985,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const stillOk = await isCopyTargetDayEligible(source, dateStr);
             if (!stillOk) continue;
             activeEntries.push({
-                sessionId: createManualSessionId(),
+                sessionId: createManualSessionId({ classId: null, activityId: String(source.activityId || '').trim() }),
                 date: dateStr,
                 className: String(source.className || source.description || source.activityName || '').trim(),
                 classId: null,
@@ -3456,7 +3469,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.comment = comment;
         } else {
             activeEntries.push({
-                sessionId: createManualSessionId(),
+                sessionId: createManualSessionId({ classId: finalClassId, activityId: finalActivityId }),
                 date: d,
                 className: finalClassName,
                 classId: finalClassId,
