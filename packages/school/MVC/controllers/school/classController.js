@@ -1358,9 +1358,10 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
 
     activePersonIds.forEach((pid) => {
         if (!workingSession.roster.find((r) => idsEqual(r.personId, pid))) {
+            const defaultAttendance = (forceSessionNotApplicable || hasApprovedLeaveFor(pid)) ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : '';
             workingSession.roster.push({
                 personId: pid,
-                attendance: (forceSessionNotApplicable || hasApprovedLeaveFor(pid)) ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : 'present',
+                attendance: defaultAttendance,
                 notes: '',
                 comments: [],
                 ...emptyConductPercents()
@@ -3423,7 +3424,7 @@ async function manageSession1(req, res) {
             if (!session.roster.find((r) => idsEqual(r.personId, pid))) {
                 session.roster.push({
                     personId: pid,
-                    attendance: 'present',
+                    attendance: '',
                     notes: '',
                     comments: [],
                     ...emptyConductPercents()
