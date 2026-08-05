@@ -220,6 +220,10 @@
         bottom: 2px;
         right: 18px;
     }
+    .cal-badge-makeup {
+        bottom: 2px;
+        right: 36px;
+    }
     .single-day-list .event-time {
         font-weight: 700;
         color: #0d6efd;
@@ -577,6 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCategoryHourTotals(events) {
         const totals = new Map();
         (Array.isArray(events) ? events : []).forEach((event) => {
+            if (event?.scheduleDisplayOnly === true || event?.countsTowardHours === false) return;
             const duration = Number(event?.duration || 0);
             if (!Number.isFinite(duration) || duration <= 0) return;
             getEventCategoryLabels(event).forEach((label) => {
@@ -822,12 +827,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const { eventsByDate, startStr, endStr, diffDays } = data;
         if (scheduleViewMode === 'timeline' || (scheduleViewMode === 'auto' && (startStr === endStr || diffDays <= 10))) {
             document.getElementById('viewModeIndicator').innerHTML = '<i class="bi bi-distribute-vertical"></i> Day View';
-            legend.innerHTML = '<div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</div><div class="text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</div><button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-month aria-label="Switch to month view" title="Show the calendar month view"><i class="bi bi-calendar3 me-1"></i>Switch to month view</button>';
+            legend.innerHTML = '<div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</div><div class="text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</div><div class="text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</div><button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-month aria-label="Switch to month view" title="Show the calendar month view"><i class="bi bi-calendar3 me-1"></i>Switch to month view</button>';
             renderTimelineView(eventsByDate, container);
             return;
         }
         document.getElementById('viewModeIndicator').innerHTML = '<i class="bi bi-grid-3x3-gap"></i> Month View';
-        legend.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</div><div class="text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</div><div class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</div><div class="text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</div><div class="text-muted small">Click any day to zoom in</div><button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-timeline aria-label="Switch to day view" title="Show scheduled sessions in the colored time timeline"><i class="bi bi-calendar-day me-1"></i>Switch to day view</button>';
+        legend.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</div><div class="text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</div><div class="text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> M = Make-up required</div><div class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</div><div class="text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</div><div class="text-muted small">Click any day to zoom in</div><button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-timeline aria-label="Switch to day view" title="Show scheduled sessions in the colored time timeline"><i class="bi bi-calendar-day me-1"></i>Switch to day view</button>';
         renderCalendarView(eventsByDate, startStr, endStr, container);
     }
 
@@ -981,6 +986,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusBadge = scd
                     ? scd.buildScheduleStatusBadge(scan, formatStatusLabel(ev?.status), getStatusTagStyle(ev?.status))
                     : `<span class="session-status-tag" style="${getStatusTagStyle(ev?.status)}">${escapeHtml(formatStatusLabel(ev?.status))}</span>`;
+                const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev) : '';
                 const detailsUrl = String(ev?.detailsUrl || '').trim();
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
                 const openButton = detailsUrl
@@ -995,6 +1001,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="event-meta-line">
                                 <span class="badge ${leaveEvent ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : (String(ev?.role || '').toLowerCase() === 'student' ? 'bg-primary-subtle text-primary border' : 'bg-info-subtle text-info-emphasis border')}">${escapeHtml(leaveEvent ? 'Approved Leave' : (ev?.role || '-'))}</span>
                                 ${statusBadge}
+                                ${makeupBadge}
                                 ${caseBadge}
                                 <span class="text-muted">${Number(ev?.duration || 0).toFixed(2)} h</span>
                             </div>
@@ -1061,6 +1068,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusBadge = scd
                     ? scd.buildScheduleStatusBadge(scan, formatStatusLabel(ev.status), getStatusTagStyle(ev.status))
                     : `<span class="session-status-tag" style="${getStatusTagStyle(ev.status)}">${escapeHtml(formatStatusLabel(ev.status))}</span>`;
+                const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
                 const scanIcon = scd && scan && scan.state !== 'leave' ? `<i class="bi ${scan.iconClass} block-scan-icon" aria-hidden="true"></i>` : '';
                 const detailsUrl = String(ev.detailsUrl || '').trim();
                 const encodedDetailsUrl = encodeURIComponent(detailsUrl);
@@ -1071,7 +1079,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const openHint = detailsUrl ? 'Open item details' : 'No linked details';
                 const scanLabel = scan?.scanLabel || formatStatusLabel(ev.status);
                 const rollingNote = String(ev?.classLifecycle?.registrationMode || '').trim().toLowerCase() === 'rolling' ? ' | Rolling' : '';
-                const tipLabel = `${openHint}: ${eventTitle} | ${ev.start} - ${ev.end} | ${scanLabel}${rollingNote}`;
+                const makeupNote = scd && scd.isMakeupRequiredDisplayEvent(ev) ? ` | ${scd.MAKEUP_DISPLAY_TEXT}` : '';
+                const tipLabel = `${openHint}: ${eventTitle} | ${ev.start} - ${ev.end} | ${scanLabel}${makeupNote}${rollingNote}`;
                 const statusMeta = getStatusMeta(ev.status);
                 const tipBg = String(statusMeta?.colorBg || (leaveEvent ? '#ffd43b' : '#0f172a')).trim() || '#0f172a';
                 const tipFg = String(statusMeta?.colorText || (leaveEvent ? '#4d3200' : '#ffffff')).trim() || '#ffffff';
@@ -1093,6 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                              <div class="event-meta x-small">
                                     <span class="text-truncate">${escapeHtml(ev.start)} - ${escapeHtml(ev.end)}</span>
                             ${statusBadge}
+                            ${makeupBadge}
                          </div>
                     </div>
                 `;

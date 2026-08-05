@@ -28,6 +28,7 @@ const {
 const transactionDefinitionPreviewService = require('../../services/school/transactionDefinitionPreviewService');
 const programRegistrationDraftService = require('../../services/school/programRegistrationDraftService');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
+const makeupSessionAllocationService = require('../../services/school/makeupSessionAllocationService');
 const skillCatalogService = require('../../services/school/skillCatalogService');
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
@@ -2143,40 +2144,37 @@ async function assertCanCreateMakeupSession(req, classData, originalSession) {
     assertSessionScopeForRequest(req, classData, originalSession, 'manageSession');
 }
 
-function buildMakeupSession({ originalSession, classId, input, reqUser, defaultStatus, statusDefinition = null }) {
+function buildMakeupSession({
+    originalSession,
+    classId,
+    input,
+    reqUser,
+    defaultStatus,
+    allocationSummary,
+    allocationProjection
+}) {
     const now = new Date().toISOString();
     const date = normalizeDateOnlyValue(input?.date);
     const startTime = normalizeClockTime(input?.startTime || originalSession?.startTime);
-    const originalDurationHours = calculateSessionDurationHours(
-        originalSession?.startTime,
-        originalSession?.endTime,
-        originalSession?.durationHours
-    );
-    const makeupDurationPercent = sessionStatusPolicyService.normalizeMakeupDurationPercent(
-        input?.makeupDurationPercent ?? statusDefinition?.makeupDurationPercent,
-        statusDefinition?.makeupDurationPercent ?? 100
-    );
-    const makeupDurationHours = sessionStatusPolicyService.calculateMakeupSessionDurationHours(
-        originalDurationHours,
-        makeupDurationPercent
-    );
-    const computedEndTime = sessionStatusPolicyService.addMinutesToClockTime(
-        startTime,
-        Math.round(makeupDurationHours * 60)
-    );
-    const endTime = normalizeClockTime(input?.endTime || computedEndTime || originalSession?.endTime);
+    const endTime = normalizeClockTime(input?.endTime);
     if (!date) throw new Error('Make-up session date is required.');
     if (!startTime || !endTime || startTime >= endTime) throw new Error('Make-up session start time must be before end time.');
 
     const teacherId = cleanPersonId(input?.teacherId || originalSession?.delivery?.deliveredBy || '');
     const teacherName = String(input?.teacherName || originalSession?.delivery?.deliveredByName || teacherId || '').trim().slice(0, 180);
     const originalSessionId = toPublicId(originalSession?.sessionId || originalSession?.id);
+    const originalDurationMinutes = Number(allocationSummary?.originalDurationMinutes || 0);
+    const proposedDurationMinutes = Number(allocationProjection?.proposedDurationMinutes || 0);
+    const makeupDurationHours = Number((proposedDurationMinutes / 60).toFixed(4));
+    const makeupDurationPercent = originalDurationMinutes > 0
+        ? Number(((proposedDurationMinutes / originalDurationMinutes) * 100).toFixed(2))
+        : 0;
     const newSession = {
         sessionId: '',
         date,
         startTime,
         endTime,
-        durationHours: calculateSessionDurationHours(startTime, endTime, makeupDurationHours || originalDurationHours),
+        durationHours: makeupDurationHours,
         status: String(defaultStatus || 'scheduled').trim() || 'scheduled',
         notes: String(input?.notes || '').trim().slice(0, 2000),
         room: String(input?.room || originalSession?.room || '').trim().slice(0, 200),
@@ -2199,10 +2197,13 @@ function buildMakeupSession({ originalSession, classId, input, reqUser, defaultS
             originalClassId: toPublicId(classId),
             originalSessionId,
             originalStatus: sessionStatusPolicyService.normalizeSessionStatus(originalSession?.status, originalSession?.notes),
-            originalDurationHours,
+            originalDurationHours: Number(allocationSummary?.originalDurationHours || 0),
             durationPercent: makeupDurationPercent,
             makeupDurationHours,
-            remainingDurationHours: Number(Math.max(0, originalDurationHours - makeupDurationHours).toFixed(4)),
+            allowedDurationPercent: Number(allocationSummary?.allowedDurationPercent || 100),
+            allowedDurationHours: Number(allocationSummary?.allowedDurationHours || 0),
+            allocatedDurationHours: Number(allocationProjection?.allocatedAfterHours || 0),
+            remainingDurationHours: Number(allocationProjection?.remainingAfterHours || 0),
             createdAt: now,
             createdBy: toPublicId(reqUser?.id || reqUser?.username || ''),
             createdByPersonId: cleanPersonId(reqUser?.personId),
@@ -3650,6 +3651,43 @@ async function manageSession(req, res) {
             OPERATIONS.UPDATE,
             { section: { id: SECTIONS.SCHOOL_CLASSES } }
         );
+        const canOverrideMakeupDuration = await adminAuthorityService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_SESSIONS,
+            OPERATIONS.UPDATE,
+            { section: { id: SECTIONS.SCHOOL_SESSIONS } }
+        );
+        const makeupSummary = makeupSessionAllocationService.buildMakeupAllocationSummary({
+            classId,
+            originalSession: session,
+            sessions,
+            statusDefinitions: sessionStatusMeta
+        });
+        const makeupOriginalSessionReference = (() => {
+            if (session?.makeup?.isMakeup !== true) return null;
+            const originalClassId = toPublicId(session?.makeup?.originalClassId || classId);
+            const originalSessionId = toPublicId(session?.makeup?.originalSessionId);
+            const baseReference = {
+                classId: originalClassId,
+                className: String(classData?.title || classData?.name || originalClassId || '').trim(),
+                sessionId: originalSessionId,
+                found: false,
+                manageUrl: ''
+            };
+            if (!originalClassId || !originalSessionId || !idsEqual(originalClassId, classId)) {
+                return baseReference;
+            }
+            const originalSession = sessions.find((row) => idsEqual(row?.sessionId || row?.id, originalSessionId)) || null;
+            if (!originalSession) return baseReference;
+            return {
+                ...makeupSessionAllocationService.buildSessionReference(originalSession, {
+                    classId: originalClassId,
+                    statusDefinitions: sessionStatusMeta
+                }),
+                className: baseReference.className,
+                found: true
+            };
+        })();
         const canDeleteStudentCases = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_SESSIONS,
@@ -3916,6 +3954,9 @@ async function manageSession(req, res) {
             isSessionLocked, 
             isReadOnly,
             canEditSessionMetadata: canOverride,
+            canOverrideMakeupDuration,
+            makeupSummary,
+            makeupOriginalSessionReference,
             canViewSchoolSettings,
             canDeleteStudentCases,
             sessionCoTeachers,
@@ -4174,126 +4215,175 @@ async function createMakeupSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const originalIndex = (Array.isArray(sessions) ? sessions : [])
-            .findIndex((row) => idsEqual(row?.sessionId || row?.id, sessionId));
-        if (originalIndex < 0) throw new Error('Original session not found.');
+        const canOverrideMakeupDuration = await adminAuthorityService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_SESSIONS,
+            OPERATIONS.UPDATE,
+            { section: { id: SECTIONS.SCHOOL_SESSIONS } }
+        );
 
-        const originalSession = sessions[originalIndex];
-        await assertCanCreateMakeupSession(req, classData, originalSession);
+        return await makeupSessionAllocationService.withMakeupAllocationLock(classId, sessionId, async () => {
+            const sessions = await schoolDataService.getClassSessions(classId, req.user);
+            const originalIndex = (Array.isArray(sessions) ? sessions : [])
+                .findIndex((row) => idsEqual(row?.sessionId || row?.id, sessionId));
+            if (originalIndex < 0) throw new Error('Original session not found.');
 
-        const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
-            includeInactive: true
-        });
-        const resolvedStatus = sessionStatusPolicyService.resolveStatusDefinition(statusMap, {
-            status: originalSession?.status,
-            notes: originalSession?.notes
-        });
-        const statusDefinition = resolvedStatus.definition || null;
-        if (statusDefinition?.makeUpRequired !== true) {
-            throw new Error(`Session status "${statusDefinition?.label || resolvedStatus.normalized || 'Unknown'}" does not allow a make-up session.`);
-        }
+            const originalSession = sessions[originalIndex];
+            await assertCanCreateMakeupSession(req, classData, originalSession);
 
-        const statusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
-        const makeupSession = buildMakeupSession({
-            originalSession,
-            classId,
-            input: req.body || {},
-            reqUser: req.user,
-            defaultStatus: resolveDefaultSessionStatusCode(statusMeta),
-            statusDefinition
-        });
-        makeupSession.sessionId = generateMakeupSessionId(sessions);
-        await assertSessionManagerSessionWithinClassWindowOrThrow(classData, makeupSession, req.user);
-
-        if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE)) {
-            const currentPersonId = cleanPersonId(req.user?.personId);
-            const targetTeacherId = cleanPersonId(makeupSession?.delivery?.deliveredBy);
-            if (targetTeacherId && currentPersonId && !idsEqual(targetTeacherId, currentPersonId)) {
-                throw new Error('Teachers can create make-up sessions only for themselves. Ask an administrator to assign another teacher.');
-            }
-        }
-
-        const warnings = [];
-        const existingMakeups = (Array.isArray(sessions) ? sessions : []).filter((row) => (
-            row?.makeup?.isMakeup === true
-            && idsEqual(row?.makeup?.originalClassId, classId)
-            && idsEqual(row?.makeup?.originalSessionId, sessionId)
-        ));
-        if (existingMakeups.length) {
-            warnings.push(`${existingMakeups.length} make-up session(s) already exist for this original session.`);
-        }
-        try {
-            const conflicts = await detectSessionConflicts({
-                classId,
-                sessions: [makeupSession],
-                activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
-                reqUser: req.user,
-                fallbackTeacherId: cleanPersonId(makeupSession?.delivery?.deliveredBy)
+            const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
+                includeInactive: true
             });
-            if (Array.isArray(conflicts) && conflicts.length) {
-                warnings.push(...conflicts.slice(0, 6).map((row) => `${row.teacherName || 'Teacher'} has a conflict on ${row.date || makeupSession.date}: ${row.conflictClass || 'schedule conflict'} ${row.existTime ? `(${row.existTime})` : ''}`.trim()));
-                if (conflicts.length > 6) warnings.push(`${conflicts.length - 6} more conflict warning(s) were detected.`);
+            const resolvedStatus = sessionStatusPolicyService.resolveStatusDefinition(statusMap, {
+                status: originalSession?.status,
+                notes: originalSession?.notes
+            });
+            const statusDefinition = resolvedStatus.definition || null;
+            if (statusDefinition?.makeUpRequired !== true) {
+                throw new Error(`Session status "${statusDefinition?.label || resolvedStatus.normalized || 'Unknown'}" does not allow a make-up session.`);
             }
-        } catch (warningError) {
-            warnings.push(`Conflict preview was not available: ${warningError.message}`);
-        }
 
-        if (warnings.length && !parseBoolean(req.body?.force, false)) {
-            return res.status(409).json({
-                status: 'warning',
-                code: 'MAKEUP_SESSION_WARNINGS',
-                message: 'Review make-up session warnings before creating this session.',
+            const allowedDurationPercent = makeupSessionAllocationService.resolveAllowedDurationPercent({
+                originalSession,
+                statusDefinition,
+                requestedPercent: req.body?.makeupDurationPercent,
+                allowOverride: canOverrideMakeupDuration
+            });
+            const allocationSummary = makeupSessionAllocationService.buildMakeupAllocationSummary({
+                classId,
+                originalSession,
+                sessions,
+                statusDefinitions: statusMap,
+                allowedDurationPercent
+            });
+            makeupSessionAllocationService.assertAllowedPercentCoversAllocated(allocationSummary);
+            const proposedDurationMinutes = makeupSessionAllocationService.calculateDurationMinutes({
+                startTime: req.body?.startTime,
+                endTime: req.body?.endTime
+            });
+            const allocationProjection = makeupSessionAllocationService.assertMakeupAllocationAvailable(
+                allocationSummary,
+                proposedDurationMinutes
+            );
+
+            const statusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
+            const makeupSession = buildMakeupSession({
+                originalSession,
+                classId,
+                input: req.body || {},
+                reqUser: req.user,
+                defaultStatus: resolveDefaultSessionStatusCode(statusMeta),
+                allocationSummary,
+                allocationProjection
+            });
+            makeupSession.sessionId = generateMakeupSessionId(sessions);
+            await assertSessionManagerSessionWithinClassWindowOrThrow(classData, makeupSession, req.user);
+
+            if (!canOverrideMakeupDuration) {
+                const currentPersonId = cleanPersonId(req.user?.personId);
+                const targetTeacherId = cleanPersonId(makeupSession?.delivery?.deliveredBy);
+                if (targetTeacherId && currentPersonId && !idsEqual(targetTeacherId, currentPersonId)) {
+                    throw new Error('Teachers can create make-up sessions only for themselves. Ask an administrator to assign another teacher.');
+                }
+            }
+
+            const warnings = [];
+            try {
+                const conflicts = await detectSessionConflicts({
+                    classId,
+                    sessions: [makeupSession],
+                    activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+                    reqUser: req.user,
+                    fallbackTeacherId: cleanPersonId(makeupSession?.delivery?.deliveredBy)
+                });
+                if (Array.isArray(conflicts) && conflicts.length) {
+                    warnings.push(...conflicts.slice(0, 6).map((row) => `${row.teacherName || 'Teacher'} has a conflict on ${row.date || makeupSession.date}: ${row.conflictClass || 'schedule conflict'} ${row.existTime ? `(${row.existTime})` : ''}`.trim()));
+                    if (conflicts.length > 6) warnings.push(`${conflicts.length - 6} more conflict warning(s) were detected.`);
+                }
+            } catch (warningError) {
+                warnings.push(`Conflict preview was not available: ${warningError.message}`);
+            }
+
+            if (warnings.length && !parseBoolean(req.body?.force, false)) {
+                return res.status(409).json({
+                    status: 'warning',
+                    code: 'MAKEUP_SESSION_WARNINGS',
+                    message: 'Review make-up session warnings before creating this session.',
+                    data: {
+                        requiresConfirmation: true,
+                        warnings,
+                        makeupSummary: allocationSummary
+                    }
+                });
+            }
+
+            const historyRow = {
+                makeupSessionId: makeupSession.sessionId,
+                makeupDate: makeupSession.date,
+                makeupStartTime: makeupSession.startTime,
+                makeupEndTime: makeupSession.endTime,
+                makeupDurationPercent: makeupSession.makeup?.durationPercent || null,
+                makeupDurationHours: makeupSession.makeup?.makeupDurationHours || makeupSession.durationHours || null,
+                allowedDurationPercent: allocationSummary.allowedDurationPercent,
+                allowedDurationHours: allocationSummary.allowedDurationHours,
+                allocatedDurationHours: allocationProjection.allocatedAfterHours,
+                remainingDurationHours: allocationProjection.remainingAfterHours,
+                teacherId: makeupSession.delivery?.deliveredBy || '',
+                teacherName: makeupSession.delivery?.deliveredByName || '',
+                createdAt: makeupSession.makeup.createdAt,
+                createdBy: makeupSession.makeup.createdBy,
+                reason: makeupSession.makeup.reason
+            };
+            originalSession.makeupScheduling = {
+                ...(originalSession.makeupScheduling || {}),
+                durationPercent: allocationSummary.allowedDurationPercent,
+                allowedDurationHours: allocationSummary.allowedDurationHours,
+                allocatedDurationHours: allocationProjection.allocatedAfterHours,
+                remainingDurationHours: allocationProjection.remainingAfterHours,
+                configuredAt: makeupSession.makeup.createdAt,
+                configuredBy: makeupSession.makeup.createdBy,
+                configuredByPersonId: makeupSession.makeup.createdByPersonId
+            };
+            originalSession.makeupHistory = Array.isArray(originalSession.makeupHistory)
+                ? [...originalSession.makeupHistory, historyRow]
+                : [historyRow];
+            originalSession.audit = {
+                ...(originalSession.audit || {}),
+                lastUpdateUser: toPublicId(req.user?.id || req.user?.username || ''),
+                lastUpdateDateTime: new Date().toISOString()
+            };
+
+            sessions.push(makeupSession);
+            const updatedSummary = makeupSessionAllocationService.buildMakeupAllocationSummary({
+                classId,
+                originalSession,
+                sessions,
+                statusDefinitions: statusMap,
+                allowedDurationPercent: allocationSummary.allowedDurationPercent
+            });
+            await schoolDataService.saveClassSessions(classId, sessions, req.user);
+            await indexService.rebuildIndexesForClass(classId);
+
+            return res.json({
+                status: 'success',
+                message: 'Make-up session created.',
                 data: {
-                    requiresConfirmation: true,
+                    classId: toPublicId(classId),
+                    originalSessionId: toPublicId(sessionId),
+                    makeupSession,
+                    makeupHistory: originalSession.makeupHistory,
+                    makeupSummary: updatedSummary,
                     warnings
                 }
             });
-        }
-
-        const historyRow = {
-            makeupSessionId: makeupSession.sessionId,
-            makeupDate: makeupSession.date,
-            makeupStartTime: makeupSession.startTime,
-            makeupEndTime: makeupSession.endTime,
-            makeupDurationPercent: makeupSession.makeup?.durationPercent || null,
-            makeupDurationHours: makeupSession.makeup?.makeupDurationHours || makeupSession.durationHours || null,
-            teacherId: makeupSession.delivery?.deliveredBy || '',
-            teacherName: makeupSession.delivery?.deliveredByName || '',
-            createdAt: makeupSession.makeup.createdAt,
-            createdBy: makeupSession.makeup.createdBy,
-            reason: makeupSession.makeup.reason
-        };
-        originalSession.makeupScheduling = {
-            durationPercent: makeupSession.makeup?.durationPercent || statusDefinition?.makeupDurationPercent || 100,
-            configuredAt: makeupSession.makeup.createdAt
-        };
-        originalSession.makeupHistory = Array.isArray(originalSession.makeupHistory)
-            ? [...originalSession.makeupHistory, historyRow]
-            : [historyRow];
-        originalSession.audit = {
-            ...(originalSession.audit || {}),
-            lastUpdateUser: toPublicId(req.user?.id || req.user?.username || ''),
-            lastUpdateDateTime: new Date().toISOString()
-        };
-
-        sessions.push(makeupSession);
-        await schoolDataService.saveClassSessions(classId, sessions, req.user);
-        await indexService.rebuildIndexesForClass(classId);
-
-        return res.json({
-            status: 'success',
-            message: 'Make-up session created.',
-            data: {
-                classId: toPublicId(classId),
-                originalSessionId: toPublicId(sessionId),
-                makeupSession,
-                makeupHistory: originalSession.makeupHistory,
-                warnings
-            }
         });
     } catch (error) {
-        return res.status(400).json({ status: 'error', message: error.message });
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: String(error?.code || ''),
+            message: error.message,
+            data: error?.data || undefined
+        });
     }
 }
 

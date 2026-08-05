@@ -8,6 +8,7 @@ const {
   canBypassOrgScope
 } = require('./schoolDataScopeBuilder');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
+const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const reportScopePolicy = require('./reportScopePolicy');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -391,6 +392,7 @@ async function assertNoAssignmentScheduleConflicts({
 
   const allClasses = await schoolDataService.fetchData('classes', {}, reqUser);
   const orgClasses = (Array.isArray(allClasses) ? allClasses : []).filter((row) => String(row?.orgId || '').trim() === String(classData?.orgId || '').trim());
+  const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || '', { includeInactive: true });
 
   const classSessionsMap = new Map();
   const classInstructorMap = new Map();
@@ -421,6 +423,10 @@ async function assertNoAssignmentScheduleConflicts({
         const classSessions = classSessionsMap.get(rowClassId) || [];
 
         for (const session of classSessions) {
+          if (sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(statusMap, {
+            status: session?.status,
+            notes: session?.notes
+          })) continue;
           const sessionDate = String(session?.date || '').trim();
           if (!sessionDate || sessionDate !== target.date) continue;
           const teacherAssigned = sessionDeliveryTeamService.isPersonOnSessionDelivery(session, teacherId)

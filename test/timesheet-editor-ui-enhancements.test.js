@@ -166,6 +166,24 @@ test('live session enrichment applies department, whole-period one-on-one, atten
         {
           classId: 'CLASS-ONE',
           sessionRow: {
+            sessionId: 'SES-EXCUSED',
+            status: 'completed',
+            roster: [{ personId: 'PER-1', attendance: 'excused' }]
+          },
+          payload: { sessionId: 'SES-EXCUSED', classId: 'CLASS-ONE', hours: 0 }
+        },
+        {
+          classId: 'CLASS-ONE',
+          sessionRow: {
+            sessionId: 'SES-ACF',
+            status: 'completed',
+            roster: [{ personId: 'PER-1', attendance: 'acf' }]
+          },
+          payload: { sessionId: 'SES-ACF', classId: 'CLASS-ONE', hours: 0 }
+        },
+        {
+          classId: 'CLASS-ONE',
+          sessionRow: {
             sessionId: 'SES-MAKEUP',
             status: 'missed',
             roster: [{ personId: 'PER-1', attendance: 'not_applicable' }]
@@ -214,6 +232,8 @@ test('live session enrichment applies department, whole-period one-on-one, atten
       optional: row.showOptionalBadge
     })), [
       { id: 'SES-ABSENT', departmentCode: 'EAL', oneOnOne: true, attendance: 'absent', optional: true },
+      { id: 'SES-EXCUSED', departmentCode: 'EAL', oneOnOne: true, attendance: 'excused', optional: true },
+      { id: 'SES-ACF', departmentCode: 'EAL', oneOnOne: true, attendance: 'acf', optional: true },
       { id: 'SES-MAKEUP', departmentCode: 'EAL', oneOnOne: true, attendance: 'not_applicable', optional: true },
       { id: 'SES-MULTI', departmentCode: 'CMP', oneOnOne: false, attendance: '', optional: false }
     ]);
@@ -222,20 +242,22 @@ test('live session enrichment applies department, whole-period one-on-one, atten
   }
 });
 
-test('Optional badge metadata is informational for absent and makeup-required one-on-one sessions', () => {
-  assert.equal(studentLabelService.shouldShowOptionalBadge({
-    isOneOnOne: true,
-    attendance: 'absent',
-    makeUpRequired: false,
-    hours: 0
-  }), true);
+test('Optional badge metadata is informational for absent-like and makeup-required one-on-one sessions', () => {
+  ['absent', 'excused', 'acf', 'Absent Camera Off'].forEach((attendance) => {
+    assert.equal(studentLabelService.shouldShowOptionalBadge({
+      isOneOnOne: true,
+      attendance,
+      makeUpRequired: false,
+      hours: 0
+    }), true);
+  });
   assert.equal(studentLabelService.shouldShowOptionalBadge({
     isOneOnOne: true,
     attendance: 'present',
     makeUpRequired: true,
     hours: 0
   }), true);
-  ['present', 'late', 'excused', 'acf', '', 'not_applicable'].forEach((attendance) => {
+  ['present', 'late', '', 'not_applicable'].forEach((attendance) => {
     assert.equal(studentLabelService.shouldShowOptionalBadge({
       isOneOnOne: true,
       attendance,

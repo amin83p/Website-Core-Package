@@ -1222,8 +1222,15 @@
             : currentSessionStatus === 'completed';
         const isMakeupRequiredInactive = currentSessionStatusMeta && currentSessionStatusMeta.makeUpRequired === true;
         const canCreateMakeupSession = !isReadOnly && currentSessionStatusMeta && currentSessionStatusMeta.makeUpRequired === true;
-        const existingMakeupHistory = Array.isArray(session.makeupHistory) ? session.makeupHistory : [];
+        const makeupAllocationSummary = (typeof makeupSummary !== 'undefined' && makeupSummary && typeof makeupSummary === 'object')
+            ? makeupSummary
+            : { sessions: [], sessionCount: 0, originalDurationHours: 0, allowedDurationPercent: Number(currentSessionStatusMeta?.makeupDurationPercent || 100), allowedDurationHours: 0, allocatedDurationHours: 0, remainingDurationHours: 0, excessDurationHours: 0, isOverAllocated: false };
+        const existingMakeupHistory = Array.isArray(makeupAllocationSummary.sessions) ? makeupAllocationSummary.sessions : [];
         const isMakeupSession = session.makeup && session.makeup.isMakeup === true;
+        const originalSessionReference = (typeof makeupOriginalSessionReference !== 'undefined' && makeupOriginalSessionReference && typeof makeupOriginalSessionReference === 'object')
+            ? makeupOriginalSessionReference
+            : null;
+        const originalSessionReferenceId = String(originalSessionReference?.sessionId || session?.makeup?.originalSessionId || '').trim();
         const workDisabledAttr = (isReadOnly || isMakeupRequiredInactive) ? 'disabled' : '';
         const attendanceMatrixHref = '/school/attendances?classId=' + encodeURIComponent(classData.id) + '&range=allTime';
         const gradesMatrixHref = '/school/grades-matrix?classId=' + encodeURIComponent(classData.id) + '&range=allTime';
@@ -1540,7 +1547,11 @@
                         <div class="session-info-tile-label">Make-up</div>
                         <div class="session-info-tile-value session-info-tile-value-sm">
                             <% if (isMakeupSession) { %>
-                                <span><i class="bi bi-arrow-return-left me-1 text-warning"></i>For <%= session.makeup.originalSessionId || 'original session' %></span>
+                                <% if (originalSessionReference?.found === true && originalSessionReference.manageUrl) { %>
+                                    <a href="<%= originalSessionReference.manageUrl %>" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none" title="Open original session <%= originalSessionReferenceId %>"><i class="bi bi-arrow-return-left me-1 text-warning"></i>For <%= originalSessionReferenceId || 'original session' %><i class="bi bi-box-arrow-up-right ms-1 small"></i></a>
+                                <% } else { %>
+                                    <span><i class="bi bi-arrow-return-left me-1 text-warning"></i>For <%= originalSessionReferenceId || 'original session' %></span>
+                                <% } %>
                             <% } else if (existingMakeupHistory.length) { %>
                                 <span><i class="bi bi-calendar-check me-1 text-success"></i><%= existingMakeupHistory.length %> created</span>
                             <% } else if (canCreateMakeupSession) { %>
@@ -1576,19 +1587,85 @@
             </div>
         </div>
     <% } %>
+    <% if (isMakeupSession) { %>
+        <div class="alert alert-info border-info shadow-sm d-flex align-items-start mb-3">
+            <i class="bi bi-arrow-return-left fs-3 me-3 text-info"></i>
+            <div class="flex-grow-1 min-w-0">
+                <h6 class="fw-bold mb-1">Original session</h6>
+                <div class="small mb-2">This make-up session was created for the original session shown below.</div>
+                <% if (originalSessionReference?.found === true) { %>
+                    <div class="table-responsive border rounded bg-white">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr><th>Class / Session</th><th>Date / Time</th><th class="text-end">Duration</th><th>Teacher</th><th>Room</th><th>Status</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <a href="<%= originalSessionReference.manageUrl %>" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none" title="Open original session <%= originalSessionReference.sessionId %>">
+                                            <i class="bi bi-box-arrow-up-right me-1"></i><%= originalSessionReference.className || originalSessionReference.classId || 'Class' %>
+                                            <span class="d-block small text-muted"><%= originalSessionReference.sessionId %></span>
+                                        </a>
+                                    </td>
+                                    <td><div><%= originalSessionReference.date || '-' %></div><div class="small text-muted"><%= originalSessionReference.startTime || '-' %> – <%= originalSessionReference.endTime || '-' %></div></td>
+                                    <td class="text-end fw-semibold"><%= Number(originalSessionReference.durationHours || 0).toFixed(2) %> hrs</td>
+                                    <td><%= originalSessionReference.teacherName || originalSessionReference.teacherId || '-' %></td>
+                                    <td><%= originalSessionReference.room || '-' %></td>
+                                    <td><span class="badge bg-light text-dark border"><%= originalSessionReference.statusLabel || originalSessionReference.status || '-' %></span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } else { %>
+                    <div class="bg-white bg-opacity-75 border rounded p-2 small">
+                        <span class="fw-semibold"><%= originalSessionReferenceId || 'Original session' %></span>
+                        <span class="text-muted ms-1">The original session details are no longer available.</span>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    <% } %>
     <% if (isMakeupRequiredInactive) { %>
         <div class="alert alert-warning border-warning shadow-sm d-flex align-items-start mb-3">
             <i class="bi bi-calendar-plus fs-3 me-3 text-warning"></i>
-            <div>
+            <div class="flex-grow-1 min-w-0">
                 <h6 class="fw-bold mb-1">Original session requires a make-up</h6>
                 <div class="small">
                     This original session requires a make-up session. Attendance remains visible as N/A for tracking and is excluded from attendance calculations.
                     Create or open the make-up session to complete instructional work, gradebook, content, student cases, and file work.
                 </div>
-                <% if (existingMakeupHistory.length) { %>
-                    <div class="small mt-2">
-                        <strong>Existing make-up session(s):</strong>
-                        <%= existingMakeupHistory.map((row) => row.makeupSessionId || row.sessionId || '').filter(Boolean).join(', ') %>
+                <div class="row g-2 mt-2">
+                    <div class="col-6 col-lg-3"><div class="bg-white bg-opacity-75 border rounded p-2 h-100"><div class="text-muted small">Created sessions</div><div class="fw-bold"><%= Number(makeupAllocationSummary.sessionCount || 0) %></div></div></div>
+                    <div class="col-6 col-lg-3"><div class="bg-white bg-opacity-75 border rounded p-2 h-100"><div class="text-muted small">Allowed</div><div class="fw-bold"><%= Number(makeupAllocationSummary.allowedDurationHours || 0).toFixed(2) %> hrs <span class="small text-muted">(<%= Number(makeupAllocationSummary.allowedDurationPercent || 100) %>%)</span></div></div></div>
+                    <div class="col-6 col-lg-3"><div class="bg-white bg-opacity-75 border rounded p-2 h-100"><div class="text-muted small">Defined</div><div class="fw-bold"><%= Number(makeupAllocationSummary.allocatedDurationHours || 0).toFixed(2) %> hrs</div></div></div>
+                    <div class="col-6 col-lg-3"><div class="bg-white bg-opacity-75 border rounded p-2 h-100"><div class="text-muted small"><%= makeupAllocationSummary.isOverAllocated ? 'Excess' : 'Missing' %></div><div class="fw-bold <%= makeupAllocationSummary.isOverAllocated ? 'text-danger' : 'text-primary' %>"><%= Number(makeupAllocationSummary.isOverAllocated ? makeupAllocationSummary.excessDurationHours : makeupAllocationSummary.remainingDurationHours).toFixed(2) %> hrs</div></div></div>
+                </div>
+                <div class="table-responsive mt-3 border rounded bg-white">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr><th>Session</th><th>Date / Time</th><th class="text-end">Duration</th><th>Teacher</th><th>Room</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                            <% if (existingMakeupHistory.length) { %>
+                                <% existingMakeupHistory.forEach((row) => { %>
+                                    <tr>
+                                        <td><a href="<%= row.manageUrl %>" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none"><i class="bi bi-box-arrow-up-right me-1"></i><%= row.sessionId %></a></td>
+                                        <td><div><%= row.date || '-' %></div><div class="small text-muted"><%= row.startTime || '-' %> – <%= row.endTime || '-' %></div></td>
+                                        <td class="text-end fw-semibold"><%= Number(row.durationHours || 0).toFixed(2) %> hrs</td>
+                                        <td><%= row.teacherName || row.teacherId || '-' %></td>
+                                        <td><%= row.room || '-' %></td>
+                                        <td><span class="badge bg-light text-dark border"><%= row.statusLabel || row.status || '-' %></span></td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr><td colspan="6" class="text-center text-muted py-3">No make-up sessions have been created yet.</td></tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+                <% if (makeupAllocationSummary.isOverAllocated) { %>
+                    <div class="small text-danger fw-semibold mt-2">
+                        <i class="bi bi-exclamation-octagon-fill me-1"></i>This legacy allocation exceeds the current allowance. Remove linked sessions or have an administrator increase the percentage before creating another.
                     </div>
                 <% } %>
             </div>
@@ -2591,8 +2668,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionManagerClassId = <%- jsonForScript(classData.id) %>;
     const sessionManagerSessionId = <%- jsonForScript(session.sessionId) %>;
     const sessionStatusMeta = <%- jsonForScript(availableStatusRows || []) %>;
-    const sessionMakeupHistory = <%- jsonForScript(existingMakeupHistory || []) %>;
+    let sessionMakeupSummary = <%- jsonForScript(makeupAllocationSummary || {}) %>;
+    const sessionMakeupHistory = Array.isArray(sessionMakeupSummary.sessions) ? sessionMakeupSummary.sessions : [];
     const sessionCanCreateMakeup = <%- jsonForScript(Boolean(canCreateMakeupSession)) %>;
+    const sessionCanOverrideMakeupDuration = <%- jsonForScript(Boolean(typeof canOverrideMakeupDuration !== 'undefined' && canOverrideMakeupDuration === true)) %>;
     const sessionInstructionalInactive = <%- jsonForScript(Boolean(isMakeupRequiredInactive)) %>;
     const sessionDefaultTeacherId = <%- jsonForScript(session.delivery?.deliveredBy || '') %>;
     const sessionDefaultTeacherName = <%- jsonForScript(session.delivery?.deliveredByName || '') %>;
@@ -2750,7 +2829,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.tabIndex = -1;
         modal.setAttribute('aria-hidden', 'true');
         modal.innerHTML = [
-            '<div class="modal-dialog modal-lg modal-dialog-scrollable">',
+            '<div class="modal-dialog modal-xl modal-dialog-scrollable">',
             '<div class="modal-content">',
             '<div class="modal-header bg-warning text-dark">',
             '<h5 class="modal-title fw-bold"><i class="bi bi-calendar-plus me-2"></i>Create Make-up Session</h5>',
@@ -2763,12 +2842,14 @@ document.addEventListener('DOMContentLoaded', () => {
             '<div class="col-md-4"><label class="form-label fw-bold">Date</label><input type="date" class="form-control" id="makeupSessionDate"></div>',
             '<div class="col-md-4"><label class="form-label fw-bold">Start Time</label><input type="time" class="form-control" id="makeupSessionStart"></div>',
             '<div class="col-md-4"><label class="form-label fw-bold">End Time</label><input type="time" class="form-control" id="makeupSessionEnd"></div>',
-            '<div class="col-md-4"><label class="form-label fw-bold">Make-up Duration %</label><input type="number" class="form-control" id="makeupSessionDurationPercent" min="1" max="100" step="1"></div>',
+            '<div class="col-md-4"><label class="form-label fw-bold">Make-up Duration %</label><input type="number" class="form-control" id="makeupSessionDurationPercent" min="1" max="100" step="1"><div class="form-text" id="makeupSessionDurationAccessNote"></div></div>',
             '<div class="col-md-8"><div class="alert alert-light border small mb-0 h-100" id="makeupSessionDurationSummary"></div></div>',
             '<div class="col-md-6"><label class="form-label fw-bold">Teacher</label><div class="input-group"><input type="text" class="form-control bg-white" id="makeupSessionTeacherName" readonly><button type="button" class="btn btn-outline-primary" id="makeupSessionPickTeacher"><i class="bi bi-person-check"></i></button></div></div>',
             '<div class="col-md-6"><label class="form-label fw-bold">Location</label><input type="text" class="form-control" id="makeupSessionRoom" maxlength="200"></div>',
             '<div class="col-12"><label class="form-label fw-bold">Reason</label><textarea class="form-control" id="makeupSessionReason" rows="3" maxlength="1000" placeholder="Why is this make-up session needed?"></textarea></div>',
             '</div>',
+            '<hr class="my-4">',
+            '<div id="makeupSessionAllocationOverview"></div>',
             '</div>',
             '<div class="modal-footer bg-light">',
             '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>',
@@ -2798,8 +2879,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         });
         modal.querySelector('#makeupSessionCreate')?.addEventListener('click', createMakeupSessionFromModal);
-        modal.querySelector('#makeupSessionDurationPercent')?.addEventListener('input', syncMakeupSessionDurationPreview);
-        modal.querySelector('#makeupSessionStart')?.addEventListener('input', syncMakeupSessionDurationPreview);
+        modal.querySelector('#makeupSessionDurationPercent')?.addEventListener('input', () => syncMakeupSessionDurationPreview({ updateEndTime: true }));
+        modal.querySelector('#makeupSessionStart')?.addEventListener('input', () => syncMakeupSessionDurationPreview({ updateEndTime: true }));
+        modal.querySelector('#makeupSessionEnd')?.addEventListener('input', () => syncMakeupSessionDurationPreview());
         return modal;
     }
 
@@ -2825,41 +2907,107 @@ document.addEventListener('DOMContentLoaded', () => {
         return remainderMinutes + ' min';
     }
 
-    function syncMakeupSessionDurationPreview() {
+    function calculateClockRangeMinutesClient(startTime, endTime) {
+        const start = String(startTime || '').trim();
+        const end = String(endTime || '').trim();
+        if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end) || start >= end) return 0;
+        const [startHour, startMinute] = start.split(':').map(Number);
+        const [endHour, endMinute] = end.split(':').map(Number);
+        return Math.max(0, ((endHour * 60) + endMinute) - ((startHour * 60) + startMinute));
+    }
+
+    function renderMakeupSessionAllocationTable() {
+        const modal = document.getElementById('makeupSessionModal');
+        const overview = modal?.querySelector('#makeupSessionAllocationOverview');
+        if (!overview) return;
+        const rows = Array.isArray(sessionMakeupSummary?.sessions) ? sessionMakeupSummary.sessions : [];
+        const rowHtml = rows.length
+            ? rows.map((row) => {
+                const href = String(row?.manageUrl || '').trim();
+                const sessionLabel = attendanceAttachmentEscape(row?.sessionId || '-');
+                const sessionLink = href
+                    ? '<a href="' + attendanceAttachmentEscape(href) + '" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none"><i class="bi bi-box-arrow-up-right me-1"></i>' + sessionLabel + '</a>'
+                    : sessionLabel;
+                return '<tr>'
+                    + '<td>' + sessionLink + '</td>'
+                    + '<td><div>' + attendanceAttachmentEscape(row?.date || '-') + '</div><div class="small text-muted">' + attendanceAttachmentEscape(row?.startTime || '-') + ' &ndash; ' + attendanceAttachmentEscape(row?.endTime || '-') + '</div></td>'
+                    + '<td class="text-end fw-semibold">' + Number(row?.durationHours || 0).toFixed(2) + ' hrs</td>'
+                    + '<td>' + attendanceAttachmentEscape(row?.teacherName || row?.teacherId || '-') + '</td>'
+                    + '<td>' + attendanceAttachmentEscape(row?.room || '-') + '</td>'
+                    + '<td><span class="badge bg-light text-dark border">' + attendanceAttachmentEscape(row?.statusLabel || row?.status || '-') + '</span></td>'
+                    + '</tr>';
+            }).join('')
+            : '<tr><td colspan="6" class="text-center text-muted py-3">No make-up sessions have been created yet.</td></tr>';
+        overview.innerHTML = '<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">'
+            + '<div><h6 class="fw-bold mb-0">Created Make-up Sessions</h6><div class="small text-muted">Every directly linked session counts toward this original session\'s allowance, regardless of status.</div></div>'
+            + '<span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle">' + rows.length + ' session(s)</span>'
+            + '</div>'
+            + '<div class="table-responsive border rounded"><table class="table table-sm table-hover align-middle mb-0">'
+            + '<thead class="table-light"><tr><th>Session</th><th>Date / Time</th><th class="text-end">Duration</th><th>Teacher</th><th>Room</th><th>Status</th></tr></thead>'
+            + '<tbody>' + rowHtml + '</tbody></table></div>';
+    }
+
+    function syncMakeupSessionDurationPreview({ updateEndTime = false } = {}) {
         const modal = document.getElementById('makeupSessionModal');
         if (!modal) return;
         const percentInput = modal.querySelector('#makeupSessionDurationPercent');
         const startInput = modal.querySelector('#makeupSessionStart');
         const endInput = modal.querySelector('#makeupSessionEnd');
         const summary = modal.querySelector('#makeupSessionDurationSummary');
+        const createButton = modal.querySelector('#makeupSessionCreate');
         const percent = Math.max(1, Math.min(100, Number(percentInput?.value || sessionMakeupDefaultPercent || 100)));
         if (percentInput) percentInput.value = String(percent);
-        const makeupHours = Number((Number(sessionOriginalDurationHours || 0) * (percent / 100)).toFixed(2));
-        if (startInput?.value) {
-            const computedEnd = addMinutesToClockTimeClient(startInput.value, Math.round(makeupHours * 60));
+        const originalMinutes = Number(sessionMakeupSummary?.originalDurationMinutes || Math.round(Number(sessionOriginalDurationHours || 0) * 60));
+        const allocatedMinutes = Number(sessionMakeupSummary?.allocatedDurationMinutes || 0);
+        const allowedMinutes = Math.max(0, Math.round(originalMinutes * (percent / 100)));
+        const availableMinutes = Math.max(0, allowedMinutes - allocatedMinutes);
+        const excessMinutes = Math.max(0, allocatedMinutes - allowedMinutes);
+        if (updateEndTime && startInput?.value && availableMinutes > 0) {
+            const computedEnd = addMinutesToClockTimeClient(startInput.value, availableMinutes);
             if (computedEnd && endInput) endInput.value = computedEnd;
+        }
+        const proposedMinutes = calculateClockRangeMinutesClient(startInput?.value, endInput?.value);
+        const remainingAfterMinutes = Math.max(0, availableMinutes - proposedMinutes);
+        const exceedsAllowance = excessMinutes > 0 || availableMinutes <= 0 || proposedMinutes <= 0 || proposedMinutes > availableMinutes;
+        if (createButton) {
+            createButton.disabled = exceedsAllowance;
+            createButton.title = excessMinutes > 0
+                ? 'The selected percentage is below the hours already defined.'
+                : (availableMinutes <= 0 ? 'The full make-up allowance has already been defined.' : (proposedMinutes > availableMinutes ? 'The proposed session exceeds the remaining allowance.' : ''));
         }
         if (!summary) return;
         summary.innerHTML = '<strong>Original session:</strong> ' + formatDurationHoursLabel(sessionOriginalDurationHours)
-            + '<br><strong>Make-up at ' + percent + '%:</strong> ' + formatDurationHoursLabel(makeupHours)
-            + '<br><span class="text-muted">Original session payroll uses Timesheet Formula on the full duration. Make-up payroll applies when the make-up session is completed.</span>';
+            + '<br><strong>Allowed at ' + percent + '%:</strong> ' + formatDurationHoursLabel(allowedMinutes / 60)
+            + '<br><strong>Already defined:</strong> ' + formatDurationHoursLabel(allocatedMinutes / 60)
+            + '<br><strong>Proposed session:</strong> ' + formatDurationHoursLabel(proposedMinutes / 60)
+            + '<br><strong>' + (excessMinutes > 0 ? 'Excess' : 'Missing after creation') + ':</strong> <span class="' + (excessMinutes > 0 || proposedMinutes > availableMinutes ? 'text-danger' : 'text-primary') + '">' + formatDurationHoursLabel((excessMinutes > 0 ? excessMinutes : remainingAfterMinutes) / 60) + '</span>'
+            + (proposedMinutes > availableMinutes && availableMinutes > 0 ? '<div class="text-danger fw-semibold mt-2"><i class="bi bi-exclamation-octagon-fill me-1"></i>The proposed session is longer than the remaining allowance.</div>' : '')
+            + (availableMinutes <= 0 && excessMinutes <= 0 ? '<div class="text-success fw-semibold mt-2"><i class="bi bi-check-circle-fill me-1"></i>The full allowed make-up duration has already been defined.</div>' : '')
+            + '<br><span class="text-muted">The percentage limits all linked make-up sessions combined. Payroll calculations are unchanged.</span>';
     }
 
     function openMakeupSessionModal() {
         const modal = ensureMakeupSessionModal();
         modal.querySelector('#makeupSessionDate').value = '';
         modal.querySelector('#makeupSessionStart').value = sessionDefaultStartTime || '';
-        modal.querySelector('#makeupSessionEnd').value = sessionDefaultEndTime || '';
-        modal.querySelector('#makeupSessionDurationPercent').value = String(sessionMakeupDefaultPercent || 100);
+        modal.querySelector('#makeupSessionEnd').value = '';
+        const durationPercentInput = modal.querySelector('#makeupSessionDurationPercent');
+        durationPercentInput.value = String(sessionMakeupSummary?.allowedDurationPercent || sessionMakeupDefaultPercent || 100);
+        durationPercentInput.disabled = !sessionCanOverrideMakeupDuration;
+        const accessNote = modal.querySelector('#makeupSessionDurationAccessNote');
+        if (accessNote) {
+            accessNote.innerHTML = sessionCanOverrideMakeupDuration
+                ? '<i class="bi bi-shield-check me-1"></i>Administrators may adjust the combined allowance.'
+                : '<i class="bi bi-lock-fill me-1"></i>Set by the session status policy; only administrators can change it.';
+        }
         modal.querySelector('#makeupSessionTeacherId').value = sessionDefaultTeacherId || '';
         modal.querySelector('#makeupSessionTeacherName').value = sessionDefaultTeacherName || sessionDefaultTeacherId || '';
         modal.querySelector('#makeupSessionRoom').value = sessionDefaultRoom || '';
         modal.querySelector('#makeupSessionReason').value = '';
-        const historyNote = sessionMakeupHistory.length
-            ? '<div class="mt-2 text-warning"><i class="bi bi-exclamation-triangle me-1"></i>' + sessionMakeupHistory.length + ' make-up session(s) already exist for this original session.</div>'
-            : '';
-        modal.querySelector('#makeupSessionContext').innerHTML = '<strong>Original session:</strong> ' + attendanceAttachmentEscape(sessionManagerSessionId) + historyNote;
-        syncMakeupSessionDurationPreview();
+        modal.querySelector('#makeupSessionContext').innerHTML = '<strong>Original session:</strong> ' + attendanceAttachmentEscape(sessionManagerSessionId)
+            + '<div class="small text-muted mt-1">Defined: ' + Number(sessionMakeupSummary?.allocatedDurationHours || 0).toFixed(2) + ' hrs of ' + Number(sessionMakeupSummary?.allowedDurationHours || 0).toFixed(2) + ' hrs allowed.</div>';
+        renderMakeupSessionAllocationTable();
+        syncMakeupSessionDurationPreview({ updateEndTime: true });
         if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).show();
     }
 
@@ -2935,9 +3083,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
             if (button) {
-                button.disabled = false;
                 button.innerHTML = oldHtml;
             }
+            syncMakeupSessionDurationPreview();
         }
     }
 

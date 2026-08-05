@@ -243,6 +243,7 @@
 <%- include('partials/modal_GenericPicker') %>
 <%- include('partials/tablePages-end') %>
 
+<script src="/scripts/scheduleCompletionDisplay.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     function bindCollapseToggle(options = {}) {
@@ -683,10 +684,12 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
 
             dayEvents.forEach((ev) => {
+                const scd = window.ScheduleCompletionDisplay;
                 const chipKey = `${ev?.personId}::${ev?.selectionRole || ''}`;
                 const eventColor = colorMap[chipKey] || colorMap[ev?.personId] || '#6c757d';
                 const detailsUrl = String(ev?.detailsUrl || '').trim();
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+                const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev) : '';
                 const openButton = detailsUrl
                     ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
                     : '<span class="text-muted small">No details</span>';
@@ -698,6 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="event-meta-line">
                                 <span class="person-chip" style="background:${escapeHtml(eventColor)}">${escapeHtml(ev?.personName || ev?.personId || '-')}</span>
                                 <span>${escapeHtml(ev?.role || '-')}</span>
+                                ${makeupBadge}
                                 ${caseBadge}
                                 <span class="text-muted">${Number(ev?.duration || 0).toFixed(2)} h</span>
                             </div>
@@ -819,12 +823,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
 
                 dayEvents.forEach((ev) => {
+                    const scd = window.ScheduleCompletionDisplay;
                     const topPos = (ev.trackIndex * 42) + 5;
                     const chipKey = `${ev?.personId}::${ev?.selectionRole || ''}`;
                     const eventColor = colorMap[chipKey] || colorMap[ev.personId] || '#6c757d';
                     const detailsUrl = String(ev.detailsUrl || '').trim();
                     const encodedDetailsUrl = encodeURIComponent(detailsUrl);
                     const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+                    const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
+                    const tooltipMeta = [
+                        ev.hasOverlap ? 'Double booking overlap' : '',
+                        scd && scd.isMakeupRequiredDisplayEvent(ev) ? scd.MAKEUP_DISPLAY_TEXT : ''
+                    ].filter(Boolean).join(' | ');
                     const clickHandler = detailsUrl
                         ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"`
                         : '';
@@ -835,10 +845,11 @@ document.addEventListener('DOMContentLoaded', () => {
                              data-tt-person="${escapeHtml(ev.personName)}"
                              data-tt-class="${escapeHtml(ev.className)}"
                              data-tt-time="${escapeHtml(ev.start)} – ${escapeHtml(ev.end)}"
-                             data-tt-meta="${ev.hasOverlap ? 'Double booking overlap' : ''}"
+                             data-tt-meta="${escapeHtml(tooltipMeta)}"
                              ${clickHandler}>
                              <div class="fw-bold text-truncate"><i class="bi bi-person-fill"></i> ${escapeHtml(ev.personName)}</div>
                              <div class="x-small text-truncate">${escapeHtml(ev.className)} (${escapeHtml(ev.start)}-${escapeHtml(ev.end)})</div>
+                             ${makeupBadge ? `<div class="x-small">${makeupBadge}</div>` : ''}
                              ${caseBadge ? `<div class="x-small">${caseBadge}</div>` : ''}
                         </div>
                     `;

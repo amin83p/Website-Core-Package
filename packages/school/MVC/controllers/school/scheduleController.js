@@ -136,6 +136,40 @@ function computeDurationHours(session) {
     return Number(((endMinutes - startMinutes) / 60).toFixed(2));
 }
 
+function resolveClassSessionSchedulePolicy(statusMap, session, { teacherAssigned = false } = {}) {
+    const makeUpRequired = sessionStatusPolicyService.isMakeUpRequiredByMap(statusMap, {
+        status: session?.status,
+        notes: session?.notes
+    });
+    const excludedFromTeacherIndex = sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(statusMap, {
+        status: session?.status,
+        notes: session?.notes
+    });
+    const excludedFromStudentIndex = sessionStatusPolicyService.shouldExcludeFromStudentIndexByMap(statusMap, {
+        status: session?.status,
+        notes: session?.notes
+    });
+    const teacherVisible = Boolean(teacherAssigned) && (makeUpRequired || !excludedFromTeacherIndex);
+    const scheduleDisplayOnly = teacherVisible && makeUpRequired;
+
+    return {
+        makeUpRequired,
+        teacherVisible,
+        studentVisible: !excludedFromStudentIndex,
+        scheduleDisplayOnly,
+        countsTowardHours: !scheduleDisplayOnly,
+        blocksConflicts: !scheduleDisplayOnly
+    };
+}
+
+function doesScheduleEventCountTowardHours(event) {
+    return event?.scheduleDisplayOnly !== true && event?.countsTowardHours !== false;
+}
+
+function doesScheduleEventBlockConflicts(event) {
+    return event?.scheduleDisplayOnly !== true && event?.blocksConflicts !== false;
+}
+
 function inferAssignmentTargetType(assignment) {
     const explicit = String(assignment?.targetType || '').trim().toLowerCase();
     if (explicit === 'date') return 'date';
@@ -691,17 +725,30 @@ function isAllowedSessionEmbeddedReportOverlap(leftEvent, rightEvent) {
     return true;
 }
 
-function markOverlappingEvents(events) {
-    for (let i = 0; i < events.length - 1; i++) {
-        const current = events[i];
-        const next = events[i + 1];
+function markOverlappingEvents(events, { samePersonOnly = false } = {}) {
+    const list = Array.isArray(events) ? events : [];
+    list.forEach((event) => {
+        if (event && typeof event === 'object') event.hasOverlap = false;
+    });
 
-        if (current.date !== next.date) continue;
+    for (let i = 0; i < list.length - 1; i += 1) {
+        const current = list[i];
+        if (!doesScheduleEventBlockConflicts(current)) continue;
+        const currentStart = parseTimeToMinutes(current?.start);
+        const currentEnd = parseTimeToMinutes(current?.end);
+        if (currentStart == null || currentEnd == null || currentEnd <= currentStart) continue;
 
-        const currentEnd = new Date(`${current.date}T${current.end || '00:00'}`);
-        const nextStart = new Date(`${next.date}T${next.start || '00:00'}`);
-        if (currentEnd > nextStart) {
+        for (let j = i + 1; j < list.length; j += 1) {
+            const next = list[j];
+            if (current?.date !== next?.date) break;
+            const nextStart = parseTimeToMinutes(next?.start);
+            const nextEnd = parseTimeToMinutes(next?.end);
+            if (nextStart == null || nextEnd == null || nextEnd <= nextStart) continue;
+            if (nextStart >= currentEnd) break;
+            if (samePersonOnly && !idsEqual(current?.personId, next?.personId)) continue;
+            if (!doesScheduleEventBlockConflicts(next)) continue;
             if (isAllowedSessionEmbeddedReportOverlap(current, next)) continue;
+
             current.hasOverlap = true;
             next.hasOverlap = true;
         }
@@ -903,7 +950,9 @@ function summarizeEvents(events, statusMeta = []) {
 
     let totalHours = 0;
     for (const event of events) {
-        totalHours += Number(event?.duration || 0);
+        if (doesScheduleEventCountTowardHours(event)) {
+            totalHours += Number(event?.duration || 0);
+        }
         const status = sessionStatusPolicyService.normalizeStatusCode(event?.status || '');
         if (status && Object.prototype.hasOwnProperty.call(statusCounts, status)) {
             statusCounts[status] += 1;
@@ -926,6 +975,10 @@ function summarizeTimesheetHoursForEvents(events, statusMap) {
 
     for (const event of list) {
         if (event?.hasOverlap) overlapCount += 1;
+
+        if (!doesScheduleEventCountTowardHours(event)) {
+            continue;
+        }
 
         if (isApprovedLeaveScheduleEvent(event)) {
             continue;
@@ -1123,25 +1176,19 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
             if (!sessionDate || sessionDate < startDate || sessionDate > endDate) continue;
 
             const deliveredBy = resolveLinkedPersonId(session?.delivery?.deliveredBy, teacherPersonMap);
-            const excludeTeacher = sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(effectiveStatusMap, {
-                status: session?.status,
-                notes: session?.notes
-            });
-            const excludeStudent = sessionStatusPolicyService.shouldExcludeFromStudentIndexByMap(effectiveStatusMap, {
-                status: session?.status,
-                notes: session?.notes
-            });
             const isOnDeliveryTeam = sessionDeliveryTeamService.isPersonOnSessionDelivery(
                 session,
                 normalizedPersonId,
                 teacherPersonMap
             );
-            const isInstructorEvent = !excludeTeacher && (
+            const teacherAssigned = (
                 deliveredBy || sessionDeliveryTeamService.getSessionCoTeachers(session).length
                     ? isOnDeliveryTeam
                     : classHasInstructor
             );
-            const isStudentEvent = !excludeStudent && (await isStudentActiveOnDate({
+            const schedulePolicy = resolveClassSessionSchedulePolicy(effectiveStatusMap, session, { teacherAssigned });
+            const isInstructorEvent = schedulePolicy.teacherVisible;
+            const isStudentEvent = schedulePolicy.studentVisible && (await isStudentActiveOnDate({
                 classId,
                 classRow: classDef,
                 sessions,
@@ -1158,6 +1205,10 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
             const eventId = sessionId || `${classId}-${sessionDate}-${normalizeTime(session?.startTime) || '00:00'}`;
             const className = classDef?.title || classDef?.name || `Class ${classId}`;
             const classLifecycle = buildClassLifecycleSnapshot(classDef);
+            const scheduledDuration = computeDurationHours(session);
+            const detailsUrl = sessionId
+                ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`
+                : '';
 
             events.push({
                 id: eventId,
@@ -1172,13 +1223,19 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
                 classId,
                 className: String(className || '').trim() || `Class ${classId}`,
                 classLifecycle,
-                duration: computeDurationHours(session),
+                duration: schedulePolicy.countsTowardHours ? scheduledDuration : 0,
+                scheduledDuration,
+                makeUpRequired: schedulePolicy.makeUpRequired,
+                scheduleDisplayOnly: schedulePolicy.scheduleDisplayOnly,
+                countsTowardHours: schedulePolicy.countsTowardHours,
+                blocksConflicts: schedulePolicy.blocksConflicts,
                 status: normalizeSessionStatus(session),
                 locked: session?.locked === true || String(session?.locked) === 'true',
                 roles,
                 roleLabel: roles.join(' / '),
                 hasOverlap: false,
-                eventType: 'class_session'
+                eventType: 'class_session',
+                detailsUrl
             });
         }
     }
@@ -1614,24 +1671,8 @@ async function getGlobalSchedule(req, res) {
             return dateA - dateB;
         });
 
-        // Overlap Detection (Only flag overlaps if the SAME person is double booked)
-        for (let i = 0; i < events.length; i++) {
-            for (let j = i + 1; j < events.length; j++) {
-                const current = events[i];
-                const next = events[j];
-                if (current.date !== next.date) break;
-
-                if (current.personId === next.personId) {
-                    const currentEnd = new Date(`${current.date}T${current.end}`);
-                    const nextStart = new Date(`${next.date}T${next.start}`);
-                    if (currentEnd > nextStart) {
-                        if (isAllowedSessionEmbeddedReportOverlap(current, next)) continue;
-                        current.hasOverlap = true;
-                        next.hasOverlap = true;
-                    }
-                }
-            }
-        }
+        // Overlap detection only flags blocking events owned by the same person.
+        markOverlappingEvents(events, { samePersonOnly: true });
 
         for (let i = 0; i < personSummaries.length; i += 1) {
             const selectionEvents = events.filter((event) => event.selectionIndex === i);
@@ -1660,7 +1701,12 @@ module.exports = {
     buildSchoolSchedulePersonPickerRows,
     buildEventsForPersonAndRange,
     filterScheduleEventsForRole,
+    summarizeEvents,
     summarizeTimesheetHoursForEvents,
-    getScheduleEventHourCategoryLabels
+    getScheduleEventHourCategoryLabels,
+    resolveClassSessionSchedulePolicy,
+    doesScheduleEventCountTowardHours,
+    doesScheduleEventBlockConflicts,
+    markOverlappingEvents
 };
 

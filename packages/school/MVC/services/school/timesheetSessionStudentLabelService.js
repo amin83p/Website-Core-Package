@@ -13,6 +13,13 @@ const PERIOD_ENROLLMENT_STATUSES = Object.freeze([
   'withdrawn'
 ]);
 
+const OPTIONAL_BADGE_ATTENDANCE_STATUSES = new Set([
+  'absent',
+  'excused',
+  'acf',
+  'absent_camera_off'
+]);
+
 function getClassRegistrationModeKey(classData) {
   return String(classData?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
 }
@@ -134,7 +141,7 @@ function resolveSingleStudentAttendance(session = {}, context = {}) {
 
 function shouldShowOptionalBadge({ isOneOnOne = false, attendance = '', makeUpRequired = false } = {}) {
   if (isOneOnOne !== true) return false;
-  return normalizeAttendance(attendance) === 'absent' || makeUpRequired === true;
+  return OPTIONAL_BADGE_ATTENDANCE_STATUSES.has(normalizeAttendance(attendance)) || makeUpRequired === true;
 }
 
 function resolveExpectedStudentPersonIdsForSession({

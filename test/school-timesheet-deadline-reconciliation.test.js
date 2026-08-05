@@ -464,3 +464,15 @@ test('controller and views expose trusted rebuild, conflict codes, and reconcili
   assert.match(printView, />Reconciliation<\/span>/);
   assert.doesNotMatch(printView, /recheck-badge/);
 });
+
+test('timesheet load warnings are serialized and prior review refreshes explicitly', () => {
+  const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
+
+  assert.match(editor, /function waitForTimesheetPageLoad\(\)/);
+  assert.match(editor, /document\.readyState === 'complete'/);
+  assert.match(editor, /async function initializeTimesheetLoadWarnings\(\)[\s\S]*await showIncompleteSessionWarningOnLoad\(\);[\s\S]*await waitForTimesheetPageLoad\(\);[\s\S]*await loadPriorAdjustmentsReview\(\);/);
+  assert.match(editor, /void initializeTimesheetLoadWarnings\(\);/);
+  assert.match(editor, /id="btnPriorAdjustmentLater"[^>]*>[\s\S]*Refresh Timesheet<\/button>/);
+  assert.match(editor, /function refreshTimesheetAfterPriorReview\(\)[\s\S]*showTimesheetWaitingModal\([\s\S]*window\.location\.reload\(\);/);
+  assert.match(editor, /btnPriorAdjustmentLater'\)\.onclick = refreshTimesheetAfterPriorReview/);
+});

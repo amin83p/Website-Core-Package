@@ -1097,6 +1097,12 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       sectionId: SECTIONS.SCHOOL_SESSIONS,
       operationId: OPERATIONS.UPDATE
     });
+    const canOverrideMakeupDuration = await adminAuthorityService.isAdminForRequestAsync(
+      req.user,
+      SECTIONS.SCHOOL_SESSIONS,
+      OPERATIONS.UPDATE,
+      { section: { id: SECTIONS.SCHOOL_SESSIONS } }
+    );
     const result = await sessionExplorerService.listSessions(req, queryInput || {});
     const rows = Array.isArray(result.rows) ? result.rows : [];
     return {
@@ -1111,6 +1117,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       pagination: result.pagination,
       statusMeta: result.statusMeta,
       canUpdateSessions: updateAccess.allowed === true,
+      canOverrideMakeupDuration: canOverrideMakeupDuration === true,
       filters: result.filters,
       searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()

@@ -57,7 +57,7 @@ test('session manager handles make-up warning with confirmation and force resubm
   assert.match(source, /result\.status === 'warning' && result\.code === 'MAKEUP_SESSIONS_EXIST'/);
   assert.match(source, /Linked make-up sessions:/);
   assert.match(source, /Remove Make-up Sessions and Continue/);
-  assert.match(source, /selected !== 'Remove Make-up Sessions and Continue'/);
+  assert.match(source, /if \(!confirmed\) return;/);
   assert.match(source, /submitSessionSave\(\{ \.\.\.payload,\s*forceRemoveMakeups:\s*true \}\)/);
 });
 

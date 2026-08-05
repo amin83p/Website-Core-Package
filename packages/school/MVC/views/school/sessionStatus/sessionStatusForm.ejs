@@ -158,13 +158,13 @@
                   <div class="col-12">
                     <label class="form-label fw-bold" for="makeupDurationPercent">Make-up Duration %</label>
                     <input type="number" class="form-control size-md" id="makeupDurationPercent" name="makeupDurationPercent" min="1" max="100" step="1" value="<%= Number(item.makeupDurationPercent || 100) %>">
-                    <div class="form-text small">Default share of the original session length for the make-up session.</div>
+                    <div class="form-text small">Maximum combined make-up allowance for all directly linked sessions, as a percentage of the original session length.</div>
                   </div>
                 </div>
                 <div class="alert alert-light border small mb-0 mt-3 py-2">
                   Original session payroll is controlled by <strong>Timesheet Formula</strong> above (on the full session duration).
                   The make-up session is paid when completed, using normal timesheet rules on the make-up session duration.
-                  Example: a 3 hr session at 50% creates a 1.5 hr make-up session.
+                  Example: a 3 hr session at 50% allows up to 1.5 combined make-up hours across one or more sessions.
                 </div>
               </div>
             </div>

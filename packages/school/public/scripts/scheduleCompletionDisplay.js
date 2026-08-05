@@ -11,6 +11,7 @@
     text: '#664d03',
     border: '#ffc107'
   });
+  const MAKEUP_DISPLAY_TEXT = 'Make-up required · 0 schedule hours · non-blocking';
 
   function normalizeStatusCode(status) {
     return String(status || '').trim().toLowerCase().replace(/\s+/g, '_');
@@ -40,6 +41,17 @@
       || value === 'approved_leave_snapshot'
       || value === 'leave'
     ));
+  }
+
+  function isMakeupRequiredDisplayEvent(event) {
+    return event?.makeUpRequired === true && event?.scheduleDisplayOnly === true;
+  }
+
+  function buildMakeupRequiredBadge(event, options) {
+    if (!isMakeupRequiredDisplayEvent(event)) return '';
+    const compact = options?.compact === true;
+    const label = compact ? 'Make-up' : MAKEUP_DISPLAY_TEXT;
+    return `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle schedule-makeup-required-badge ms-1" title="${escapeHtml(MAKEUP_DISPLAY_TEXT)}"><i class="bi bi-calendar-plus me-1" aria-hidden="true"></i>${escapeHtml(label)}</span>`;
   }
 
   function toStatusMap(statusMetaMap) {
@@ -166,11 +178,15 @@
     const hasConflict = opts.hasConflict === true;
     const hasLeave = opts.hasLeave === true;
     const count = Array.isArray(dayEvents) ? dayEvents.length : 0;
+    const makeupCount = (Array.isArray(dayEvents) ? dayEvents : []).filter(isMakeupRequiredDisplayEvent).length;
+    const makeupBadge = makeupCount > 0
+      ? `<div class="cal-badge cal-badge-makeup bg-warning text-dark" title="${escapeHtml(MAKEUP_DISPLAY_TEXT)}">M${makeupCount}</div>`
+      : '';
     if (hasConflict) {
-      return `<div class="cal-badge bg-danger">${count}</div>`;
+      return `<div class="cal-badge bg-danger">${count}</div>${makeupBadge}`;
     }
     if (hasLeave) {
-      return `<div class="cal-badge bg-warning text-dark">${count}</div>`;
+      return `<div class="cal-badge bg-warning text-dark">${count}</div>${makeupBadge}`;
     }
     if (count <= 0) return '';
     const summary = summarizeDayCompletion(dayEvents, statusMetaMap);
@@ -182,7 +198,7 @@
     if (summary.pending > 0) {
       parts.push(`<div class="cal-badge cal-badge-pending bg-warning text-dark">${summary.pending}</div>`);
     }
-    return parts.join('');
+    return `${parts.join('')}${makeupBadge}`;
   }
 
   function buildScheduleStatusBadge(scan, fallbackLabel, fallbackStyle) {
@@ -201,6 +217,9 @@
     buildDayCompletionChip,
     buildCalendarDayBadges,
     buildScheduleStatusBadge,
+    buildMakeupRequiredBadge,
+    isMakeupRequiredDisplayEvent,
+    MAKEUP_DISPLAY_TEXT,
     isLeaveEvent
   };
 }(typeof window !== 'undefined' ? window : global));

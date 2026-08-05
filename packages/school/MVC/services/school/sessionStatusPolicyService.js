@@ -244,6 +244,11 @@ function shouldForceNotApplicableAttendanceByMap(statusMap, { status, notes = ''
   return definition?.makeUpRequired === true;
 }
 
+function isMakeUpRequiredByMap(statusMap, { status, notes = '' } = {}) {
+  const { definition } = resolveStatusDefinition(statusMap, { status, notes });
+  return definition?.makeUpRequired === true;
+}
+
 function shouldExcludeFromAttendanceByMap(statusMap, { status, notes = '' } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
   if (normalized === 'holiday') return true;
@@ -416,6 +421,7 @@ module.exports = {
   resolveStatusDefinition,
   isFinalStatusByMap,
   isSessionCompletionStatusByMap,
+  isMakeUpRequiredByMap,
   shouldForceNotApplicableAttendanceByMap,
   buildForceNotApplicableAttendanceSessionKeys,
   shouldExcludeFromAttendanceByMap,

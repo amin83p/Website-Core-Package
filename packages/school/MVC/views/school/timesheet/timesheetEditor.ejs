@@ -1211,7 +1211,7 @@
         </div>
       </div>
       <div class="modal-footer bg-light border-0">
-        <button type="button" class="btn btn-outline-secondary" id="btnPriorAdjustmentLater">Review Later</button>
+        <button type="button" class="btn btn-outline-secondary" id="btnPriorAdjustmentLater"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Timesheet</button>
         <button type="button" class="btn btn-warning fw-bold d-none" id="btnPriorAdjustmentApply">Apply Adjustments</button>
         <button type="button" class="btn btn-primary fw-bold d-none" id="btnPriorAdjustmentContinue">Continue to Timesheet</button>
       </div>
@@ -1522,6 +1522,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         window.hideLoading();
+    }
+
+    function waitForTimesheetPageLoad() {
+        if (document.readyState === 'complete') return Promise.resolve();
+        return new Promise((resolve) => window.addEventListener('load', resolve, { once: true }));
+    }
+
+    function refreshTimesheetAfterPriorReview() {
+        showTimesheetWaitingModal({
+            title: 'Refreshing Timesheet',
+            note: 'Checking the latest reconciliation session status...',
+            operation: 'Prior-period review'
+        });
+        window.location.reload();
     }
 
     function setManualSaveBusy(isBusy) {
@@ -4059,7 +4073,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const modalEl = document.getElementById('priorAdjustmentModal');
             const modal = new bootstrap.Modal(modalEl);
 
-            document.getElementById('btnPriorAdjustmentLater').onclick = () => modal.hide();
+            document.getElementById('btnPriorAdjustmentLater').onclick = refreshTimesheetAfterPriorReview;
 
             const runAcknowledgement = async (buttonEl, successTitle) => {
                 buttonEl.disabled = true;
@@ -4252,6 +4266,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function initializeTimesheetLoadWarnings() {
+        await showIncompleteSessionWarningOnLoad();
+        await waitForTimesheetPageLoad();
+        await loadPriorAdjustmentsReview();
+    }
+
     const incompleteSessionsCollapse = document.getElementById('incompleteSessionsCollapse');
     const incompleteSessionsToggle = document.getElementById('incompleteSessionsToggle');
     if (incompleteSessionsCollapse && incompleteSessionsToggle) {
@@ -4267,7 +4287,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderIncompleteSessionsPanel();
     renderTable();
-    showIncompleteSessionWarningOnLoad();
-    loadPriorAdjustmentsReview();
+    void initializeTimesheetLoadWarnings();
 });
 </script>

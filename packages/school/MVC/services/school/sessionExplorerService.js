@@ -5,6 +5,7 @@ const schoolPersonAccessService = require('./schoolPersonAccessService');
 const schoolRecordAccessService = require('./schoolRecordAccessService');
 const teacherIdentityService = require('./teacherIdentityService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
+const makeupSessionAllocationService = require('./makeupSessionAllocationService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const schoolAdminAccessService = require('./schoolAdminAccessService');
 
@@ -269,6 +270,12 @@ async function listSessions(req, query = {}) {
       const statusDefinition = (Array.isArray(statusMeta) ? statusMeta : [])
         .find((row) => normalizeStatusCode(row?.code) === normalizedStatus) || null;
       const sessionId = resolveSessionId(session);
+      const makeupSummary = makeupSessionAllocationService.buildMakeupAllocationSummary({
+        classId: classRow?.id,
+        originalSession: session,
+        sessions,
+        statusDefinitions: statusMeta
+      });
       const matchedAsCoTeacher = Boolean(
         filters.teacherIds.length
         && !filters.teacherIds.some((teacherFilterId) => (
@@ -300,6 +307,7 @@ async function listSessions(req, query = {}) {
         makeUpRequired: statusDefinition?.makeUpRequired === true,
         makeup: session?.makeup && typeof session.makeup === 'object' ? session.makeup : null,
         makeupHistory: Array.isArray(session?.makeupHistory) ? session.makeupHistory : [],
+        makeupSummary,
         hasComments: (Array.isArray(session?.roster) ? session.roster : []).some((row) => row?.comments && row.comments.length > 0)
       });
     });

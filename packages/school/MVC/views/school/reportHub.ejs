@@ -2536,6 +2536,7 @@
   let hubSessionRowsByKey = new Map();
   let hubSessionStatusMeta = [];
   let hubSessionCanUpdateSessions = false;
+  let hubSessionCanOverrideMakeupDuration = false;
 
   function resolveHubTeacherId(item) {
     if (!item || typeof item !== 'object') return '';
@@ -2874,7 +2875,7 @@
     modal.tabIndex = -1;
     modal.setAttribute('aria-hidden', 'true');
     modal.innerHTML = [
-      '<div class="modal-dialog modal-lg modal-dialog-scrollable">',
+      '<div class="modal-dialog modal-xl modal-dialog-scrollable">',
       '<div class="modal-content">',
       '<div class="modal-header bg-warning text-dark">',
       '<h5 class="modal-title fw-bold"><i class="bi bi-calendar-plus me-2"></i>Create Make-up Session</h5>',
@@ -2889,12 +2890,14 @@
       '<div class="col-md-4"><label class="form-label fw-bold">Date</label><input type="date" class="form-control" id="hubMakeupSessionDate"></div>',
       '<div class="col-md-4"><label class="form-label fw-bold">Start Time</label><input type="time" class="form-control" id="hubMakeupSessionStart"></div>',
       '<div class="col-md-4"><label class="form-label fw-bold">End Time</label><input type="time" class="form-control" id="hubMakeupSessionEnd"></div>',
-      '<div class="col-md-4"><label class="form-label fw-bold">Make-up Duration %</label><input type="number" class="form-control" id="hubMakeupSessionDurationPercent" min="1" max="100" step="1"></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold">Make-up Duration %</label><input type="number" class="form-control" id="hubMakeupSessionDurationPercent" min="1" max="100" step="1"><div class="form-text" id="hubMakeupSessionDurationAccessNote"></div></div>',
       '<div class="col-md-8"><div class="alert alert-light border small mb-0 h-100" id="hubMakeupSessionDurationSummary"></div></div>',
       '<div class="col-md-6"><label class="form-label fw-bold">Teacher</label><div class="input-group"><input type="text" class="form-control bg-white" id="hubMakeupSessionTeacherName" readonly><button type="button" class="btn btn-outline-primary" id="hubMakeupSessionPickTeacher"><i class="bi bi-person-check"></i></button></div></div>',
       '<div class="col-md-6"><label class="form-label fw-bold">Location</label><input type="text" class="form-control" id="hubMakeupSessionRoom" maxlength="200"></div>',
       '<div class="col-12"><label class="form-label fw-bold">Reason</label><textarea class="form-control" id="hubMakeupSessionReason" rows="3" maxlength="1000"></textarea></div>',
       '</div>',
+      '<hr class="my-4">',
+      '<div id="hubMakeupSessionAllocationOverview"></div>',
       '</div>',
       '<div class="modal-footer bg-light">',
       '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>',
@@ -2924,13 +2927,15 @@
       }));
     });
     modal.querySelector('#hubMakeupSessionCreate')?.addEventListener('click', createHubMakeupSessionFromModal);
-    modal.querySelector('#hubMakeupSessionDurationPercent')?.addEventListener('input', syncHubMakeupSessionDurationPreview);
-    modal.querySelector('#hubMakeupSessionStart')?.addEventListener('input', syncHubMakeupSessionDurationPreview);
+    modal.querySelector('#hubMakeupSessionDurationPercent')?.addEventListener('input', function () { syncHubMakeupSessionDurationPreview({ updateEndTime: true }); });
+    modal.querySelector('#hubMakeupSessionStart')?.addEventListener('input', function () { syncHubMakeupSessionDurationPreview({ updateEndTime: true }); });
+    modal.querySelector('#hubMakeupSessionEnd')?.addEventListener('input', function () { syncHubMakeupSessionDurationPreview(); });
     return modal;
   }
 
   let hubMakeupOriginalDurationHours = 0;
   let hubMakeupDefaultPercent = 100;
+  let hubMakeupSummary = { sessions: [], allocatedDurationMinutes: 0, allowedDurationPercent: 100 };
 
   function hubAddMinutesToClockTime(startTime, minutesToAdd) {
     const start = String(startTime || '').trim();
@@ -2967,24 +2972,73 @@
     return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
   }
 
-  function syncHubMakeupSessionDurationPreview() {
+  function hubCalculateClockRangeMinutes(startTime, endTime) {
+    const start = String(startTime || '').trim();
+    const end = String(endTime || '').trim();
+    if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end) || start >= end) return 0;
+    const startParts = start.split(':').map(Number);
+    const endParts = end.split(':').map(Number);
+    return Math.max(0, ((endParts[0] * 60) + endParts[1]) - ((startParts[0] * 60) + startParts[1]));
+  }
+
+  function renderHubMakeupAllocationTable() {
+    const modal = document.getElementById('hubSessionMakeupModal');
+    const overview = modal?.querySelector('#hubMakeupSessionAllocationOverview');
+    if (!overview) return;
+    const rows = Array.isArray(hubMakeupSummary?.sessions) ? hubMakeupSummary.sessions : [];
+    const body = rows.length ? rows.map(function (item) {
+      const href = String(item?.manageUrl || '').trim();
+      const link = href
+        ? '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none"><i class="bi bi-box-arrow-up-right me-1"></i>' + escapeHtml(item?.sessionId || '-') + '</a>'
+        : escapeHtml(item?.sessionId || '-');
+      return '<tr><td>' + link + '</td>'
+        + '<td><div>' + escapeHtml(item?.date || '-') + '</div><div class="small text-muted">' + escapeHtml(item?.startTime || '-') + ' &ndash; ' + escapeHtml(item?.endTime || '-') + '</div></td>'
+        + '<td class="text-end fw-semibold">' + Number(item?.durationHours || 0).toFixed(2) + ' hrs</td>'
+        + '<td>' + escapeHtml(item?.teacherName || item?.teacherId || '-') + '</td>'
+        + '<td>' + escapeHtml(item?.room || '-') + '</td>'
+        + '<td><span class="badge bg-light text-dark border">' + escapeHtml(item?.statusLabel || item?.status || '-') + '</span></td></tr>';
+    }).join('') : '<tr><td colspan="6" class="text-center text-muted py-3">No make-up sessions have been created yet.</td></tr>';
+    overview.innerHTML = '<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2"><div><h6 class="fw-bold mb-0">Created Make-up Sessions</h6><div class="small text-muted">Every directly linked session counts regardless of status.</div></div><span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle">' + rows.length + ' session(s)</span></div>'
+      + '<div class="table-responsive border rounded"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Session</th><th>Date / Time</th><th class="text-end">Duration</th><th>Teacher</th><th>Room</th><th>Status</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+  }
+
+  function syncHubMakeupSessionDurationPreview(options) {
+    options = options || {};
     const modal = document.getElementById('hubSessionMakeupModal');
     if (!modal) return;
     const percentInput = modal.querySelector('#hubMakeupSessionDurationPercent');
     const startInput = modal.querySelector('#hubMakeupSessionStart');
     const endInput = modal.querySelector('#hubMakeupSessionEnd');
     const summary = modal.querySelector('#hubMakeupSessionDurationSummary');
+    const createButton = modal.querySelector('#hubMakeupSessionCreate');
     const percent = Math.max(1, Math.min(100, Number(percentInput?.value || hubMakeupDefaultPercent || 100)));
     if (percentInput) percentInput.value = String(percent);
-    const makeupHours = Number((Number(hubMakeupOriginalDurationHours || 0) * (percent / 100)).toFixed(2));
-    if (startInput?.value) {
-      const computedEnd = hubAddMinutesToClockTime(startInput.value, Math.round(makeupHours * 60));
+    const originalMinutes = Number(hubMakeupSummary?.originalDurationMinutes || Math.round(Number(hubMakeupOriginalDurationHours || 0) * 60));
+    const allocatedMinutes = Number(hubMakeupSummary?.allocatedDurationMinutes || 0);
+    const allowedMinutes = Math.max(0, Math.round(originalMinutes * (percent / 100)));
+    const availableMinutes = Math.max(0, allowedMinutes - allocatedMinutes);
+    const excessMinutes = Math.max(0, allocatedMinutes - allowedMinutes);
+    if (options.updateEndTime === true && startInput?.value && availableMinutes > 0) {
+      const computedEnd = hubAddMinutesToClockTime(startInput.value, availableMinutes);
       if (computedEnd && endInput) endInput.value = computedEnd;
+    }
+    const proposedMinutes = hubCalculateClockRangeMinutes(startInput?.value, endInput?.value);
+    const remainingAfterMinutes = Math.max(0, availableMinutes - proposedMinutes);
+    const invalid = excessMinutes > 0 || availableMinutes <= 0 || proposedMinutes <= 0 || proposedMinutes > availableMinutes;
+    if (createButton) {
+      createButton.disabled = invalid;
+      createButton.title = excessMinutes > 0 ? 'The selected percentage is below the hours already defined.'
+        : (availableMinutes <= 0 ? 'The full make-up allowance has already been defined.' : (proposedMinutes > availableMinutes ? 'The proposed session exceeds the remaining allowance.' : ''));
     }
     if (!summary) return;
     summary.innerHTML = '<strong>Original session:</strong> ' + hubFormatDurationHoursLabel(hubMakeupOriginalDurationHours)
-      + '<br><strong>Make-up at ' + percent + '%:</strong> ' + hubFormatDurationHoursLabel(makeupHours)
-      + '<br><span class="text-muted">Original session payroll uses Timesheet Formula on the full duration. Make-up payroll applies when the make-up session is completed.</span>';
+      + '<br><strong>Allowed at ' + percent + '%:</strong> ' + hubFormatDurationHoursLabel(allowedMinutes / 60)
+      + '<br><strong>Already defined:</strong> ' + hubFormatDurationHoursLabel(allocatedMinutes / 60)
+      + '<br><strong>Proposed session:</strong> ' + hubFormatDurationHoursLabel(proposedMinutes / 60)
+      + '<br><strong>' + (excessMinutes > 0 ? 'Excess' : 'Missing after creation') + ':</strong> <span class="' + (excessMinutes > 0 || proposedMinutes > availableMinutes ? 'text-danger' : 'text-primary') + '">' + hubFormatDurationHoursLabel((excessMinutes > 0 ? excessMinutes : remainingAfterMinutes) / 60) + '</span>'
+      + (proposedMinutes > availableMinutes && availableMinutes > 0 ? '<div class="text-danger fw-semibold mt-2"><i class="bi bi-exclamation-octagon-fill me-1"></i>The proposed session is longer than the remaining allowance.</div>' : '')
+      + (availableMinutes <= 0 && excessMinutes <= 0 ? '<div class="text-success fw-semibold mt-2"><i class="bi bi-check-circle-fill me-1"></i>The full allowed duration has already been defined.</div>' : '')
+      + '<br><span class="text-muted">The percentage limits all linked make-up sessions combined. Payroll calculations are unchanged.</span>';
   }
 
   function openHubSessionMakeupModal(row) {
@@ -2993,20 +3047,29 @@
     const statusMap = buildSessionStatusMetaMap(hubSessionStatusMeta || []);
     const statusMeta = statusMap.get(normalizeSessionStatusCode(row.status)) || null;
     hubMakeupOriginalDurationHours = hubResolveOriginalDurationHours(row);
-    hubMakeupDefaultPercent = Number(statusMeta?.makeupDurationPercent || 100);
+    hubMakeupSummary = row.makeupSummary && typeof row.makeupSummary === 'object'
+      ? row.makeupSummary
+      : { sessions: [], originalDurationMinutes: Math.round(hubMakeupOriginalDurationHours * 60), allocatedDurationMinutes: 0, allowedDurationPercent: Number(statusMeta?.makeupDurationPercent || 100), allowedDurationHours: Number((hubMakeupOriginalDurationHours * (Number(statusMeta?.makeupDurationPercent || 100) / 100)).toFixed(2)) };
+    hubMakeupDefaultPercent = Number(hubMakeupSummary?.allowedDurationPercent || statusMeta?.makeupDurationPercent || 100);
     modal.querySelector('#hubMakeupSessionClassId').value = row.classId || '';
     modal.querySelector('#hubMakeupSessionSessionId').value = row.sessionId || '';
     modal.querySelector('#hubMakeupSessionTeacherId').value = row.teacherId || '';
     modal.querySelector('#hubMakeupSessionDate').value = '';
     modal.querySelector('#hubMakeupSessionStart').value = row.startTime || '';
-    modal.querySelector('#hubMakeupSessionEnd').value = row.endTime || '';
-    modal.querySelector('#hubMakeupSessionDurationPercent').value = String(hubMakeupDefaultPercent || 100);
+    modal.querySelector('#hubMakeupSessionEnd').value = '';
+    const percentInput = modal.querySelector('#hubMakeupSessionDurationPercent');
+    percentInput.value = String(hubMakeupDefaultPercent || 100);
+    percentInput.disabled = !hubSessionCanOverrideMakeupDuration;
+    const accessNote = modal.querySelector('#hubMakeupSessionDurationAccessNote');
+    if (accessNote) accessNote.innerHTML = hubSessionCanOverrideMakeupDuration
+      ? '<i class="bi bi-shield-check me-1"></i>Administrators may adjust the combined allowance.'
+      : '<i class="bi bi-lock-fill me-1"></i>Set by policy; only administrators can change it.';
     modal.querySelector('#hubMakeupSessionTeacherName').value = row.teacherName || '';
     modal.querySelector('#hubMakeupSessionRoom').value = row.room || '';
     modal.querySelector('#hubMakeupSessionReason').value = '';
-    const count = Array.isArray(row.makeupHistory) ? row.makeupHistory.length : 0;
-    modal.querySelector('#hubMakeupSessionContext').innerHTML = '<strong>' + escapeHtml(row.className || row.classId || 'Class') + '</strong><div class="text-muted font-monospace">' + escapeHtml(row.sessionId || '') + '</div>' + (count ? '<div class="text-warning mt-2"><i class="bi bi-exclamation-triangle me-1"></i>' + escapeHtml(String(count)) + ' make-up session(s) already exist for this original session.</div>' : '');
-    syncHubMakeupSessionDurationPreview();
+    modal.querySelector('#hubMakeupSessionContext').innerHTML = '<strong>' + escapeHtml(row.className || row.classId || 'Class') + '</strong><div class="text-muted font-monospace">' + escapeHtml(row.sessionId || '') + '</div><div class="small text-muted mt-1">Defined: ' + Number(hubMakeupSummary?.allocatedDurationHours || 0).toFixed(2) + ' hrs of ' + Number(hubMakeupSummary?.allowedDurationHours || 0).toFixed(2) + ' hrs allowed.</div>';
+    renderHubMakeupAllocationTable();
+    syncHubMakeupSessionDurationPreview({ updateEndTime: true });
     if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).show();
   }
 
@@ -3084,9 +3147,9 @@
     } finally {
       if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
       if (button) {
-        button.disabled = false;
         button.innerHTML = oldHtml;
       }
+      syncHubMakeupSessionDurationPreview();
     }
   }
 
@@ -3299,6 +3362,7 @@
     const section = payload && payload.section ? payload.section : {};
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
     const canUpdateSessions = payload && payload.canUpdateSessions === true;
+    hubSessionCanOverrideMakeupDuration = payload && payload.canOverrideMakeupDuration === true;
     hubSessionCanUpdateSessions = canUpdateSessions;
     const notLoaded = payload && payload.notLoaded === true;
     const filters = payload && payload.filters ? payload.filters : {};
