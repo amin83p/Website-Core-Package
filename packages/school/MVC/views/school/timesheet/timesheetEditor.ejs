@@ -61,6 +61,9 @@
         --bs-table-accent-bg: #ffe8a1 !important;
         background-color: #ffe8a1 !important;
     }
+    .row-provisional > * {
+        box-shadow: inset 4px 0 0 #0d6efd;
+    }
 
   .incomplete-sessions-table thead th {
     font-size: 0.85rem;
@@ -82,10 +85,166 @@
   }
   #timesheetReviewHistoryToggle .review-history-chevron {
     transition: transform 0.2s ease;
+    transform: rotate(180deg);
   }
   #timesheetReviewHistoryToggle.collapsed .review-history-chevron,
   #timesheetReviewHistoryToggle[aria-expanded="false"] .review-history-chevron {
-    transform: rotate(-90deg);
+    transform: rotate(0deg);
+  }
+  .ts-notice-hub {
+    margin-bottom: 1.25rem;
+  }
+  .ts-notice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 0.85rem;
+  }
+  .ts-notice-tile {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    min-width: 0;
+    min-height: 132px;
+    padding: 1rem;
+    color: #1f2937;
+    background: #ffffff;
+    border: 1px solid #dbe4ee;
+    border-left: 4px solid #6c757d;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.2rem 0.65rem rgba(15, 23, 42, 0.06);
+  }
+  button.ts-notice-tile {
+    width: 100%;
+    font: inherit;
+    text-align: left;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  button.ts-notice-tile:hover,
+  button.ts-notice-tile:focus-visible {
+    border-color: #86b7fe;
+    box-shadow: 0 0.35rem 0.9rem rgba(13, 110, 253, 0.12);
+    transform: translateY(-1px);
+  }
+  button.ts-notice-tile:focus-visible {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+  }
+  .ts-notice-tile--instructions {
+    border-left-color: #0d6efd;
+    background: linear-gradient(135deg, #f4f8ff 0%, #ffffff 70%);
+  }
+  .ts-notice-tile--revision {
+    border-left-color: #f59f00;
+    background: linear-gradient(135deg, #fff8e6 0%, #ffffff 70%);
+  }
+  .ts-notice-tile--locked {
+    border-left-color: #198754;
+    background: linear-gradient(135deg, #eefaf3 0%, #ffffff 70%);
+  }
+  .ts-notice-tile--history {
+    border-left-color: #6f42c1;
+    background: linear-gradient(135deg, #f7f3ff 0%, #ffffff 70%);
+  }
+  .ts-notice-tile__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 2.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    color: #0d6efd;
+    background: #e7f1ff;
+    border-radius: 0.7rem;
+    font-size: 1.15rem;
+  }
+  .ts-notice-tile--revision .ts-notice-tile__icon { color: #8a5700; background: #ffe69c; }
+  .ts-notice-tile--locked .ts-notice-tile__icon { color: #146c43; background: #d1e7dd; }
+  .ts-notice-tile--history .ts-notice-tile__icon { color: #59359a; background: #e9ddff; }
+  .ts-notice-tile__content {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .ts-notice-tile__eyebrow {
+    margin-bottom: 0.2rem;
+    color: #6c757d;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.065em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .ts-notice-tile__title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+    color: #212529;
+    font-size: 0.98rem;
+    font-weight: 750;
+    line-height: 1.3;
+  }
+  .ts-notice-tile__body {
+    margin-top: 0.35rem;
+    color: #5b6470;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+  .ts-notice-tile__reason {
+    margin-top: 0.45rem;
+    padding: 0.45rem 0.55rem;
+    color: #664d03;
+    background: rgba(255, 243, 205, 0.75);
+    border-radius: 0.45rem;
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+  .ts-notice-tile__chevron {
+    align-self: center;
+    flex-shrink: 0;
+    color: #6f42c1;
+  }
+  .ts-review-history-panel {
+    margin-top: 0.85rem;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid #ded5ef;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.2rem 0.65rem rgba(15, 23, 42, 0.06);
+  }
+  .ts-reconciliation-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    padding: 0.9rem 1rem;
+    color: #084298;
+    background: linear-gradient(135deg, #eef5ff 0%, #ffffff 80%);
+    border: 1px solid #9ec5fe;
+    border-left: 4px solid #0d6efd;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.2rem 0.65rem rgba(13, 110, 253, 0.08);
+  }
+  .ts-reconciliation-note__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 2.25rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    background: #cfe2ff;
+    border-radius: 50%;
+    font-size: 1rem;
+  }
+  .ts-reconciliation-note__title {
+    font-weight: 750;
+    line-height: 1.3;
+  }
+  .ts-reconciliation-note__body {
+    margin-top: 0.25rem;
+    color: #315a87;
+    font-size: 0.82rem;
+    line-height: 1.45;
   }
 
   .ts-page-header {
@@ -505,6 +664,12 @@
     .ts-meta-line {
       grid-template-columns: 1fr;
     }
+    .ts-notice-grid {
+      grid-template-columns: 1fr;
+    }
+    .ts-notice-tile {
+      min-height: 0;
+    }
   }
 </style>
 
@@ -580,29 +745,94 @@
         </div>
     </div>
 
-    <% if (pageIsReadOnly) { %>
-        <div class="alert alert-success border-success shadow-sm d-flex align-items-center mb-4">
-            <i class="bi bi-check-circle-fill fs-3 me-3 text-success"></i>
-            <div>
-                <h6 class="fw-bold mb-1">Timesheet Locked</h6>
-                <div class="small">This timesheet is currently marked as <strong><%= timesheet.status.toUpperCase() %></strong> and cannot be modified.</div>
-            </div>
-        </div>
-    <% } else { %>
-        <div class="alert alert-info border-info shadow-sm d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <strong>Instructions:</strong> Review auto-pulled sessions or add manual entries if required.
-                <div class="text-danger fw-bold small mt-1">All auto-pulled sessions must be in a final status before submission.</div>
-            </div>
-        </div>
-    <% } %>
+    <% const reviewHistoryRows = Array.isArray(reviewHistory) ? reviewHistory : []; %>
+    <section class="ts-notice-hub" aria-label="Timesheet guidance and review information">
+        <div class="ts-notice-grid">
+            <% if (timesheetStatus === 'draft' && timesheet.returnReason) { %>
+                <article class="ts-notice-tile ts-notice-tile--revision">
+                    <span class="ts-notice-tile__icon" aria-hidden="true"><i class="bi bi-reply-fill"></i></span>
+                    <div class="ts-notice-tile__content">
+                        <div class="ts-notice-tile__eyebrow">Action required</div>
+                        <h2 class="ts-notice-tile__title">Returned for Revision</h2>
+                        <div class="ts-notice-tile__reason"><%= timesheet.returnReason %></div>
+                    </div>
+                </article>
+            <% } %>
 
-    <% if (timesheetStatus === 'draft' && timesheet.returnReason) { %>
-        <div class="alert alert-warning border-warning shadow-sm mb-4">
-            <div class="fw-bold mb-1"><i class="bi bi-reply-fill me-1"></i> Returned for Revision</div>
-            <div class="small"><%= timesheet.returnReason %></div>
+            <% if (pageIsReadOnly) { %>
+                <article class="ts-notice-tile ts-notice-tile--locked">
+                    <span class="ts-notice-tile__icon" aria-hidden="true"><i class="bi bi-lock-fill"></i></span>
+                    <div class="ts-notice-tile__content">
+                        <div class="ts-notice-tile__eyebrow">Editing unavailable</div>
+                        <h2 class="ts-notice-tile__title">Timesheet Locked</h2>
+                        <div class="ts-notice-tile__body">This timesheet is marked as <strong><%= timesheet.status.toUpperCase() %></strong> and cannot be modified.</div>
+                    </div>
+                </article>
+            <% } else { %>
+                <article class="ts-notice-tile ts-notice-tile--instructions">
+                    <span class="ts-notice-tile__icon" aria-hidden="true"><i class="bi bi-info-circle-fill"></i></span>
+                    <div class="ts-notice-tile__content">
+                        <div class="ts-notice-tile__eyebrow">Before you submit</div>
+                        <h2 class="ts-notice-tile__title">Instructions</h2>
+                        <div class="ts-notice-tile__body">
+                            Review auto-pulled sessions and add manual entries only when required.
+                            <div class="mt-1">Sessions before the deadline window must be final. Later non-final sessions are included provisionally and reconciled in the next timesheet.</div>
+                        </div>
+                    </div>
+                </article>
+            <% } %>
+
+            <% if (reviewHistoryRows.length) { %>
+                <button type="button" class="ts-notice-tile ts-notice-tile--history collapsed" data-bs-toggle="collapse" data-bs-target="#timesheetReviewHistoryCollapse" aria-expanded="false" aria-controls="timesheetReviewHistoryCollapse" id="timesheetReviewHistoryToggle">
+                    <span class="ts-notice-tile__icon" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
+                    <span class="ts-notice-tile__content">
+                        <span class="ts-notice-tile__eyebrow d-block">Audit trail</span>
+                        <span class="ts-notice-tile__title">
+                            Review History
+                            <span class="badge bg-secondary-subtle text-secondary-emphasis border"><%= reviewHistoryRows.length %></span>
+                        </span>
+                        <span class="ts-notice-tile__body d-block">Open submission, return, approval, and processing events.</span>
+                    </span>
+                    <i class="bi bi-chevron-down review-history-chevron ts-notice-tile__chevron" aria-hidden="true"></i>
+                </button>
+            <% } %>
         </div>
-    <% } %>
+
+        <% if (reviewHistoryRows.length) { %>
+            <div id="timesheetReviewHistoryPanel">
+                <div id="timesheetReviewHistoryCollapse" class="collapse ts-review-history-panel">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">When</th>
+                                        <th>Event</th>
+                                        <th>By</th>
+                                        <th>Status</th>
+                                        <th class="text-end">Hours</th>
+                                        <th class="pe-4">Note</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% reviewHistoryRows.slice().reverse().forEach((row) => { %>
+                                        <tr>
+                                            <td class="ps-4 small text-muted"><%= row.at ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.at) : row.at) : '-' %></td>
+                                            <td><span class="badge bg-light text-dark border text-uppercase"><%= row.event || '-' %></span></td>
+                                            <td class="small"><%= row.byName || row.by || '-' %></td>
+                                            <td class="small text-muted"><%= row.statusBefore ? row.statusBefore + ' → ' + (row.statusAfter || '-') : (row.statusAfter || '-') %></td>
+                                            <td class="text-end small fw-semibold"><%= Number(row.totalHours || 0).toFixed(2) %></td>
+                                            <td class="pe-4 small"><%= row.note || '-' %></td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <% } %>
+    </section>
 
     <% if (typeof payrollWarnings !== 'undefined' && Array.isArray(payrollWarnings) && payrollWarnings.length) { %>
         <div class="alert alert-warning border-warning shadow-sm mb-4">
@@ -615,51 +845,7 @@
         </div>
     <% } %>
 
-    <% const reviewHistoryRows = Array.isArray(reviewHistory) ? reviewHistory : []; %>
-    <% if (reviewHistoryRows.length) { %>
-        <div class="card border-0 shadow-sm mb-4" id="timesheetReviewHistoryPanel">
-            <button type="button" class="card-header bg-light border-bottom d-flex align-items-center justify-content-between py-3 w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#timesheetReviewHistoryCollapse" aria-expanded="false" aria-controls="timesheetReviewHistoryCollapse" id="timesheetReviewHistoryToggle">
-                <div>
-                    <div class="fw-bold">
-                        <i class="bi bi-clock-history me-2 text-primary"></i>Review History
-                        <span class="badge bg-secondary-subtle text-secondary-emphasis border ms-2"><%= reviewHistoryRows.length %></span>
-                    </div>
-                    <div class="small text-muted">Submission and approval cycles for this timesheet.</div>
-                </div>
-                <i class="bi bi-chevron-down review-history-chevron flex-shrink-0 ms-3" aria-hidden="true"></i>
-            </button>
-            <div id="timesheetReviewHistoryCollapse" class="collapse">
-                <div class="card-body p-0 border-top">
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th class="ps-4">When</th>
-                                    <th>Event</th>
-                                    <th>By</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Hours</th>
-                                    <th class="pe-4">Note</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <% reviewHistoryRows.slice().reverse().forEach((row) => { %>
-                                    <tr>
-                                        <td class="ps-4 small text-muted"><%= row.at ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.at) : row.at) : '-' %></td>
-                                        <td><span class="badge bg-light text-dark border text-uppercase"><%= row.event || '-' %></span></td>
-                                        <td class="small"><%= row.byName || row.by || '-' %></td>
-                                        <td class="small text-muted"><%= row.statusBefore ? row.statusBefore + ' → ' + (row.statusAfter || '-') : (row.statusAfter || '-') %></td>
-                                        <td class="text-end small fw-semibold"><%= Number(row.totalHours || 0).toFixed(2) %></td>
-                                        <td class="pe-4 small"><%= row.note || '-' %></td>
-                                    </tr>
-                                <% }) %>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    <% } %>
+    <div id="provisionalSessionsSummary" class="ts-reconciliation-note mb-4 d-none" role="status" aria-live="polite"></div>
 
     <div id="incompleteSessionsPanel" class="card border-warning shadow-sm mb-4 d-none">
         <button type="button" class="card-header bg-warning-subtle border-warning d-flex align-items-center justify-content-between py-3 w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#incompleteSessionsCollapse" aria-expanded="false" aria-controls="incompleteSessionsCollapse" id="incompleteSessionsToggle">
@@ -1015,9 +1201,9 @@
                 <th>Session Date</th>
                 <th>Class / Description</th>
                 <th>Change</th>
-                <th class="text-end">Paid Hrs</th>
-                <th class="text-end">Current Hrs</th>
-                <th class="text-end">Adjustment</th>
+                <th class="text-end">Baseline Hrs</th>
+                <th class="text-end">Final Hrs</th>
+                <th class="text-end">Difference</th>
               </tr>
             </thead>
             <tbody id="priorAdjustmentTableBody"></tbody>
@@ -1596,13 +1782,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const colorText = statusMeta?.colorText || '#664d03';
         const colorBorder = statusMeta?.colorBorder || '#ffe69c';
         const warn = !isFinalAutoStatus(entry);
-        return buildStatusChipHtml({
+        const statusChip = buildStatusChipHtml({
             icon: resolveStatusIcon(normalized, { warn }),
             label: statusLabel,
             colorBg,
             colorText,
             colorBorder
         });
+        if (entry?.reconciliationRequired !== true) return statusChip;
+
+        const reconciliationLabel = entry?.isProvisional === true
+            ? 'Reconciliation. This session is provisional; its hours use the current status formula and will be reconciled in the next timesheet.'
+            : 'Reconciliation. This deadline-window session will be reviewed in the next timesheet.';
+        const reconciliationChip = buildStatusChipHtml({
+            icon: 'bi-arrow-repeat',
+            label: reconciliationLabel,
+            colorBg: '#cfe2ff',
+            colorText: '#084298',
+            colorBorder: '#0d6efd'
+        });
+        return `${statusChip}${reconciliationChip}`;
     };
 
     // Class manuals are frozen — picker stays disabled.
@@ -1705,6 +1904,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const tbody = document.getElementById('tsBody');
     let grandTotalHours = 0;
+    let provisionalSessionCount = 0;
+    let provisionalHours = 0;
+    let reconciliationSessionCount = 0;
+    let reconciliationHours = 0;
     let hasUncompletedSessions = Array.isArray(INCOMPLETE_SESSIONS) && INCOMPLETE_SESSIONS.length > 0;
     let hasPendingApprovals = false;
     
@@ -2291,6 +2494,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTable() {
         tbody.innerHTML = '';
         grandTotalHours = 0;
+        provisionalSessionCount = 0;
+        provisionalHours = 0;
+        reconciliationSessionCount = 0;
+        reconciliationHours = 0;
         hasUncompletedSessions = Array.isArray(INCOMPLETE_SESSIONS) && INCOMPLETE_SESSIONS.length > 0;
         hasPendingApprovals = false;
 
@@ -2334,9 +2541,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     const displaySes = resolveDisplayEntry(ses);
                     const hrs = resolveEntryHours(ses);
                     grandTotalHours += hrs;
+                    if (ses.reconciliationRequired === true) {
+                        reconciliationSessionCount += 1;
+                        reconciliationHours += Math.max(0, hrs);
+                    }
+                    if (ses.isProvisional === true) {
+                        provisionalSessionCount += 1;
+                        provisionalHours += hrs;
+                    }
 
                     const statusBadge = buildStatusBadgeHtml(displaySes);
-                    if (!ses.isManual && !ses.isPriorPeriodAdjustment && !isFinalAutoStatus(ses)) {
+                    if (!ses.isManual && !ses.isPriorPeriodAdjustment && ses.isProvisional !== true && !isFinalAutoStatus(ses)) {
                         hasUncompletedSessions = true;
                     }
                     if (isPendingApprovalEntry(ses)) {
@@ -2349,6 +2564,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         bgClass,
                         'row-hover',
                         isPriorAdj ? 'row-prior-adjustment' : '',
+                        ses.isProvisional === true ? 'row-provisional' : '',
                         isDayEnd ? 'ts-day-group-end' : ''
                     ].filter(Boolean).join(' ');
 
@@ -2356,7 +2572,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     let actBtns = '';
                     if (!IS_READONLY) {
-                        if (isPriorAdj && !IS_ADMIN) {
+                        if (ses.reconciliationRequired === true) {
+                            actBtns = `<span class="text-muted small ts-tooltip-trigger" data-tip="Deadline-window sessions are required and cannot be removed from this timesheet." tabindex="0"><i class="bi bi-lock-fill"></i></span>`;
+                        } else if (isPriorAdj) {
                             actBtns = `<span class="text-muted small"><i class="bi bi-lock-fill"></i></span>`;
                         } else if (ses.isManual) {
                             const reviewBtns = CAN_MANAGER_REVIEW && isPendingApprovalEntry(ses) && ses.activityPaid === true
@@ -2405,6 +2623,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.getElementById('lbl_grandTotal').innerText = grandTotalHours.toFixed(2);
+        const provisionalSummary = document.getElementById('provisionalSessionsSummary');
+        if (provisionalSummary) {
+            if (reconciliationHours > 0) {
+                const provisionalDetail = provisionalSessionCount > 0
+                    ? `<strong>${provisionalSessionCount}</strong> provisional session(s), totaling <strong>${provisionalHours.toFixed(2)} hours</strong>, use their current status formula.`
+                    : 'All qualifying sessions currently have final statuses.';
+                provisionalSummary.classList.remove('d-none');
+                provisionalSummary.innerHTML = `<span class="ts-reconciliation-note__icon" aria-hidden="true"><i class="bi bi-arrow-repeat"></i></span>
+                    <div>
+                        <div class="ts-notice-tile__eyebrow">Next-period review</div>
+                        <div class="ts-reconciliation-note__title">Deadline-window reconciliation</div>
+                        <div class="ts-reconciliation-note__body"><strong>${reconciliationHours.toFixed(2)} hours</strong> across <strong>${reconciliationSessionCount}</strong> deadline-window session(s) qualify for reconciliation. ${provisionalDetail} Finalized differences will be applied in the next timesheet.</div>
+                    </div>`;
+            } else {
+                provisionalSummary.classList.add('d-none');
+                provisionalSummary.innerHTML = '';
+            }
+        }
         renderDepartmentTotals();
 
         const btnSubmit = document.getElementById('btnSubmit');
@@ -2759,7 +2995,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openManualModal = function(dateStr, editId = null) {
         if (editId) {
             const existing = activeEntries.find(x => x.sessionId === editId);
-            if (existing?.isPriorPeriodAdjustment && !IS_ADMIN) {
+            if (existing?.isPriorPeriodAdjustment) {
                 messageBox({ title: 'Locked Entry', icon: 'warning', message: 'Prior-period adjustment rows cannot be edited.' });
                 return;
             }
@@ -2847,8 +3083,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.removeEntry = async function(sesId) {
         const entry = activeEntries.find(x => x.sessionId === sesId);
-        if (entry?.isPriorPeriodAdjustment && !IS_ADMIN) {
+        if (entry?.isPriorPeriodAdjustment) {
             await messageBox({ title: 'Locked Entry', icon: 'warning', message: 'Prior-period adjustment rows cannot be removed.' });
+            return;
+        }
+        if (entry?.reconciliationRequired === true) {
+            await messageBox({ title: 'Required Entry', icon: 'warning', message: 'Deadline-window sessions must remain in the timesheet for later reconciliation.' });
             return;
         }
         const ok = await confirmAction({
@@ -3295,6 +3535,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 return;
             }
+            if (result.status === 'warning' && [
+                'PRIOR_RECONCILIATION_UNRESOLVED',
+                'PRIOR_RECONCILIATION_REVIEW_REQUIRED',
+                'PRIOR_TIMESHEET_NOT_PROCESSED'
+            ].includes(result.code)) {
+                const unresolved = Array.isArray(result?.data?.unresolved) ? result.data.unresolved : [];
+                const sessionLinks = unresolved
+                    .filter((row) => row?.manageUrl)
+                    .map((row) => `<li><a href="${escapeHtml(row.manageUrl)}" target="_blank" rel="noopener">${escapeHtml(row.className || row.sourceSessionId || 'Open session')}</a> - ${escapeHtml(row.currentStatus || 'non-final')}</li>`)
+                    .join('');
+                await messageBox({
+                    title: result.code === 'PRIOR_RECONCILIATION_UNRESOLVED' ? 'Prior Sessions Need Action' : 'Prior Review Required',
+                    icon: 'warning',
+                    message: `${result.message || 'Prior-period reconciliation must be completed before submission.'}${sessionLinks ? `<ul class="text-start mt-2 mb-0">${sessionLinks}</ul>` : ''}`
+                });
+                if (result.code === 'PRIOR_RECONCILIATION_REVIEW_REQUIRED') {
+                    await loadPriorAdjustmentsReview();
+                }
+                return;
+            }
             
             if (result.status !== 'success') throw new Error(result.message);
 
@@ -3414,7 +3674,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const ok = await confirmAction({
                 title: 'Submit Timesheet',
-                message: 'Are you sure? Once submitted, you cannot edit this timesheet unless a reviewer sends it back to Draft for revision.',
+                message: provisionalSessionCount > 0
+                    ? `This timesheet includes ${provisionalSessionCount} provisional session(s), totaling ${provisionalHours.toFixed(2)} hours. Their finalized hour differences will appear in the next timesheet. Once submitted, you cannot edit this timesheet unless a reviewer sends it back to Draft for revision.`
+                    : 'Are you sure? Once submitted, you cannot edit this timesheet unless a reviewer sends it back to Draft for revision.',
                 confirmText: 'Submit',
                 cancelText: 'Cancel',
                 icon: 'warning',
@@ -3702,14 +3964,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const priorRange = result.priorPeriod
                 ? `${result.priorPeriod.startDate || ''} to ${result.priorPeriod.endDate || ''}`
                 : '';
-            const hasAdjustments = Array.isArray(result.adjustments) && result.adjustments.length > 0;
+            const adjustments = Array.isArray(result.adjustments) ? result.adjustments : [];
+            const unresolved = Array.isArray(result.unresolved) ? result.unresolved : [];
+            const reconciliationResults = Array.isArray(result.reconciliationResults) ? result.reconciliationResults : [];
+            const resolvedNoChange = reconciliationResults.filter((row) => row?.state === 'resolved' && Math.abs(Number(row?.adjustmentHours || 0)) < 0.005);
+            const hasAdjustments = adjustments.length > 0;
+            const hasUnresolved = unresolved.length > 0;
+            const awaitingPriorProcessing = result.reconciliationState === 'awaiting_prior_processing';
             const summary = result.priorReviewSummary || {};
 
             const intro = document.getElementById('priorAdjustmentIntro');
             if (intro) {
-                intro.textContent = hasAdjustments
-                    ? `Schedule changes were detected after your submitted timesheet for "${priorName}". Review the adjustments below before continuing.`
-                    : `We reviewed your submitted timesheet for "${priorName}" (${priorRange}). No schedule changes require adjustment for this period.`;
+                if (awaitingPriorProcessing) {
+                    intro.textContent = `The prior timesheet for "${priorName}" must be payroll processed before its deadline-window sessions can be reconciled. Current submission remains blocked until then.`;
+                } else if (hasUnresolved) {
+                    intro.textContent = `${unresolved.length} prior-period session(s) are still non-final. Finalize them using the links below, then reopen this review.`;
+                } else if (hasAdjustments) {
+                    intro.textContent = `Finalized differences were detected for "${priorName}". Review the signed adjustments below before continuing.`;
+                } else {
+                    intro.textContent = `We reviewed the deadline-window sessions from "${priorName}" (${priorRange}). No hour adjustment is required.`;
+                }
             }
 
             const summaryEl = document.getElementById('priorAdjustmentSummary');
@@ -3717,7 +3991,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 summaryEl.classList.remove('d-none');
                 summaryEl.innerHTML = `
                     <div><strong>Prior period:</strong> ${priorName} (${priorRange})</div>
-                    <div class="small text-muted mt-1">Submitted entries reviewed: ${Number(summary.entryCount || 0)} | Paid hours in snapshot: ${Number(summary.totalSnapshotHours || 0).toFixed(2)}</div>
+                    <div class="small text-muted mt-1">Submitted entries: ${Number(summary.entryCount || 0)} | Snapshot hours: ${Number(summary.totalSnapshotHours || 0).toFixed(2)}</div>
+                    <div class="small mt-1">Deadline-window sessions: <strong>${Number(summary.reconciliationCount || 0)}</strong> (${Number(summary.reconciliationHours || 0).toFixed(2)} hrs) | Provisional: <strong>${Number(summary.provisionalCount || 0)}</strong> (${Number(summary.provisionalHours || 0).toFixed(2)} hrs) | Unresolved: <strong>${Number(summary.unresolvedCount || 0)}</strong> | No-change resolutions: <strong>${Number(summary.resolvedNoChangeCount || 0)}</strong></div>
                 `;
             }
 
@@ -3726,23 +4001,52 @@ document.addEventListener('DOMContentLoaded', () => {
             const applyBtn = document.getElementById('btnPriorAdjustmentApply');
             const continueBtn = document.getElementById('btnPriorAdjustmentContinue');
 
-            if (hasAdjustments) {
+            const resolvedRows = adjustments.map((adj) => `
+                <tr>
+                    <td>${escapeHtml(adj.sourceSessionDate || '-')}</td>
+                    <td>${escapeHtml(adj.className || '-')}</td>
+                    <td>${escapeHtml(adj.changeSummary || adj.comment || '-')}</td>
+                    <td class="text-end">${Number(adj.snapshotHours ?? adj.baselineHours ?? 0).toFixed(2)}</td>
+                    <td class="text-end">${Number(adj.currentHours || 0).toFixed(2)}</td>
+                    <td class="text-end fw-bold ${Number(adj.deltaHours) < 0 ? 'text-danger' : 'text-success'}">${formatSignedHours(adj.deltaHours)}</td>
+                </tr>
+            `);
+            const unresolvedRows = unresolved.map((row) => `
+                <tr class="table-warning">
+                    <td>${escapeHtml(row.sourceSessionDate || '-')}</td>
+                    <td>${escapeHtml(row.className || '-')}</td>
+                    <td>${escapeHtml(row.changeSummary || 'Session is still non-final.')}${row.manageUrl ? ` <a href="${escapeHtml(row.manageUrl)}" target="_blank" rel="noopener">Open session</a>` : ''}</td>
+                    <td class="text-end">${Number(row.baselineHours || 0).toFixed(2)}</td>
+                    <td class="text-end text-muted">Pending</td>
+                    <td class="text-end text-muted">-</td>
+                </tr>
+            `);
+            const noChangeRows = resolvedNoChange.map((row) => `
+                <tr class="table-success">
+                    <td>${escapeHtml(row.sourceSessionDate || '-')}</td>
+                    <td>${escapeHtml(row.className || '-')}</td>
+                    <td>Resolved with no payable-hour difference (${escapeHtml(row.currentStatus || row.baselineStatus || 'final')}).</td>
+                    <td class="text-end">${Number(row.baselineHours || 0).toFixed(2)}</td>
+                    <td class="text-end">${Number(row.currentHours || 0).toFixed(2)}</td>
+                    <td class="text-end fw-bold text-muted">0.00</td>
+                </tr>
+            `);
+
+            if (!awaitingPriorProcessing && (resolvedRows.length || unresolvedRows.length || noChangeRows.length)) {
                 if (tableWrap) tableWrap.classList.remove('d-none');
-                tbodyPrior.innerHTML = result.adjustments.map((adj) => `
-                    <tr>
-                        <td>${adj.sourceSessionDate || '-'}</td>
-                        <td>${adj.className || '-'}</td>
-                        <td>${adj.changeSummary || adj.comment || '-'}</td>
-                        <td class="text-end">${Number(adj.snapshotHours || 0).toFixed(2)}</td>
-                        <td class="text-end">${Number(adj.currentHours || 0).toFixed(2)}</td>
-                        <td class="text-end fw-bold ${Number(adj.deltaHours) < 0 ? 'text-danger' : 'text-success'}">${formatSignedHours(adj.deltaHours)}</td>
-                    </tr>
-                `).join('');
-                if (applyBtn) applyBtn.classList.remove('d-none');
-                if (continueBtn) continueBtn.classList.add('d-none');
+                if (tbodyPrior) tbodyPrior.innerHTML = [...unresolvedRows, ...resolvedRows, ...noChangeRows].join('');
             } else {
                 if (tableWrap) tableWrap.classList.add('d-none');
                 if (tbodyPrior) tbodyPrior.innerHTML = '';
+            }
+
+            if (awaitingPriorProcessing || hasUnresolved) {
+                if (applyBtn) applyBtn.classList.add('d-none');
+                if (continueBtn) continueBtn.classList.add('d-none');
+            } else if (hasAdjustments) {
+                if (applyBtn) applyBtn.classList.remove('d-none');
+                if (continueBtn) continueBtn.classList.add('d-none');
+            } else {
                 if (applyBtn) applyBtn.classList.add('d-none');
                 if (continueBtn) continueBtn.classList.remove('d-none');
             }

@@ -225,6 +225,7 @@
           <td class="text-center">
             ${statusBadge(row.status)}
             ${row.status === 'submitted' && row.managerApproved ? '<div><span class="badge bg-success mt-1">MANAGER APPROVED</span></div>' : ''}
+            ${Number(row.reconciliationCount || 0) > 0 ? `<div class="small text-primary mt-1" title="Deadline-window sessions will be reconciled in the next timesheet."><i class="bi bi-arrow-repeat me-1"></i>${Number(row.reconciliationCount)} reconciliation session${Number(row.reconciliationCount) === 1 ? '' : 's'} · ${Number(row.provisionalCount || 0)} provisional (${Number(row.provisionalHours || 0).toFixed(2)} hrs)</div>` : ''}
             ${Number(row.revisionCount || 0) > 0 ? `<div class="small text-muted mt-1" title="${escapeHtml(row.lastReopenNote || '')}"><i class="bi bi-arrow-repeat me-1"></i>${Number(row.revisionCount)} revision${Number(row.revisionCount) === 1 ? '' : 's'}</div>` : ''}
           </td>
           <td class="text-end fw-bold text-success">${hours} Hrs</td>

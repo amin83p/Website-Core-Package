@@ -9,6 +9,7 @@ const { buildReportReflectionLiveSessions } = require('./reportTimesheetReflecti
 const activityService = require('./activityService');
 const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const timesheetSessionStudentLabelService = require('./timesheetSessionStudentLabelService');
+const deadlineReconciliationService = require('./timesheetDeadlineReconciliationService');
 
 function buildTimesheetMakeupMeta(sessionRow, classRow, sessionsByClassId = null) {
   const isMakeupSession = sessionRow?.makeup?.isMakeup === true;
@@ -87,7 +88,12 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
           status: sessionRow?.status,
           notes: sessionRow?.notes
         });
-        if (!isFinalStatus) return;
+        const isBlockingNonFinal = deadlineReconciliationService.isBlockingNonFinalSession({
+          period,
+          sessionDate: sessionRow?.date,
+          isFinalStatus
+        });
+        if (isBlockingNonFinal) return;
         const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
           status: sessionRow?.status,
           notes: sessionRow?.notes,
@@ -99,7 +105,7 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
         liveSessionBuilders.push({
           classId: String(classRow?.id || ''),
           sessionRow,
-          payload: {
+          payload: deadlineReconciliationService.applySessionClassification({
             sessionId: sessionRow?.sessionId,
             classId: String(classRow?.id || ''),
             className: String(classRow?.title || classRow?.name || ''),
@@ -120,7 +126,7 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
               ? String(sessionDeliveryTeamService.findCoTeacherEntry(sessionRow, personId)?.roleLabel || 'Co-Teacher')
               : '',
             ...buildTimesheetMakeupMeta(sessionRow, classRow, sessionsByClassId)
-          }
+          }, { period, isFinalStatus })
         });
       });
   }

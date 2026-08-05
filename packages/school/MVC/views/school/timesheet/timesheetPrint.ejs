@@ -2,6 +2,9 @@
   const context = printContext || {};
   const documents = Array.isArray(context.documents) ? context.documents : [];
   const period = context.period || {};
+  const printBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
+  const printLogoUrl = printBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
+  const printLogoAlt = `${printBrand.appName || printBrand.ownerDisplayName || context.organizationName || 'Website'} Logo`;
 %>
 <!doctype html>
 <html lang="en">
@@ -45,7 +48,9 @@
       page-break-after: always;
     }
     .print-sheet:last-child { break-after: auto; page-break-after: auto; }
-    .identity-block { margin-bottom: 10px; }
+    .identity-block { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
+    .identity-copy { min-width: 0; flex: 1 1 auto; }
+    .print-logo { display: block; flex: 0 0 auto; width: auto; height: 58px; max-width: 180px; object-fit: contain; object-position: right top; }
     .organization-name { margin: 0 0 2px; color: var(--ink); font-size: 19px; font-weight: 800; line-height: 1.1; }
     .document-name { color: var(--blue); font-size: 15px; font-weight: 800; }
     .person-name { color: var(--blue); font-size: 16px; font-weight: 700; }
@@ -65,6 +70,9 @@
     .one-on-one-badge { margin-left: 5px; color: #5b21b6; background: #f5f0ff; }
     .optional-badge { margin-left: 5px; color: var(--optional); background: #eaf7ff; }
     .role-badge { margin-left: 5px; color: #46505d; background: #f5f6f8; }
+    .reconciliation-badge { display: block; width: fit-content; margin: 3px auto 0; color: #084298; background: #cfe2ff; }
+    .provisional-row td { box-shadow: inset 3px 0 0 #0d6efd; }
+    .reconciliation-summary { margin-top: 4px; padding: 4px 6px; color: #084298; background: #eef5ff; border: 1px solid #b6d4fe; font-size: 9px; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     thead { display: table-header-group; }
     tfoot { display: table-footer-group; }
@@ -109,7 +117,8 @@
       /* Compact defaults keep a normal timesheet and its department summary
          together on one printed page. Browser Scale remains fully available. */
       body { font-size: 8px; line-height: 1.15; }
-      .identity-block { margin-bottom: 4px; }
+      .identity-block { gap: 8px; margin-bottom: 4px; }
+      .print-logo { height: 42px; max-width: 140px; }
       .organization-name { font-size: 14px; }
       .document-name { font-size: 11px; }
       .person-name { font-size: 10px; }
@@ -147,10 +156,20 @@
   <% documents.forEach((document) => { %>
     <section class="print-sheet">
       <div class="identity-block">
-        <% if (context.organizationName) { %><h1 class="organization-name"><%= context.organizationName %></h1><% } %>
-        <div class="document-name">Timesheet</div>
-        <div class="person-name"><%= document.person.name %></div>
-        <div class="period-name"><%= period.name %></div>
+        <div class="identity-copy">
+          <% if (context.organizationName) { %><h1 class="organization-name"><%= context.organizationName %></h1><% } %>
+          <div class="document-name">Timesheet</div>
+          <div class="person-name"><%= document.person.name %></div>
+          <div class="period-name"><%= period.name %></div>
+          <% if (document.reconciliationEntryCount > 0) { %>
+            <div class="reconciliation-summary">
+              Deadline-window reconciliation: <strong><%= document.provisionalEntryCount %></strong> provisional session(s),
+              <strong><%= Number(document.provisionalHours || 0).toFixed(2) %> hrs</strong>; all
+              <strong><%= document.reconciliationEntryCount %></strong> window session(s) will be checked in the next timesheet.
+            </div>
+          <% } %>
+        </div>
+        <img class="print-logo" src="<%= printLogoUrl %>" alt="<%= printLogoAlt %>" onerror="this.style.display='none'">
       </div>
 
       <table class="timesheet-table">
@@ -180,7 +199,7 @@
               </tr>
             <% } else { %>
               <% day.entries.forEach((entry, entryIndex) => { %>
-                <tr>
+                <tr class="<%= entry.isProvisional ? 'provisional-row' : '' %>">
                   <% if (entryIndex === 0) { %>
                     <td rowspan="<%= day.entries.length %>">
                       <div class="date-day"><%= day.dayName %></div>
@@ -208,7 +227,10 @@
                     <% if (entry.payableNote) { %><div class="payable-note"><%= entry.payableNote %></div><% } %>
                     <div class="time-label"><%= entry.timeLabel %></div>
                   </td>
-                  <td class="col-status"><span class="badge"><%= entry.statusLabel %></span></td>
+                  <td class="col-status">
+                    <span class="badge"><%= entry.statusLabel %></span>
+                    <% if (entry.showReconciliationBadge) { %><span class="badge reconciliation-badge">Reconciliation</span><% } %>
+                  </td>
                   <td><%= entry.commentLabel %></td>
                 </tr>
               <% }); %>

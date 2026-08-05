@@ -29,6 +29,13 @@ const REVIEW_HISTORY_EVENTS = new Set([
 ]);
 const REVIEW_HISTORY_STATUSES = new Set([...TIMESHEET_STATUSES, ...LEGACY_TIMESHEET_STATUSES]);
 const MANAGER_REVIEW_STATUSES = new Set(['pending', 'approved']);
+const PRIOR_RECONCILIATION_STATES = new Set([
+    'awaiting_prior_processing',
+    'pending',
+    'reviewed',
+    'unresolved',
+    'resolved'
+]);
 const MAX_REVIEW_HISTORY_ENTRIES = 100;
 
 function cleanString(v, { max = 500, allowEmpty = true } = {}) {
@@ -191,18 +198,42 @@ function applyClassSessionDisplayFields(row, entry) {
     return row;
 }
 
+function sanitizeProvisionalMeta(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+    const sourceType = cleanString(input.sourceType, { max: 40, allowEmpty: true }).toLowerCase() || 'class_session';
+    return {
+        policyVersion: cleanNonNegativeInteger(input.policyVersion, 1),
+        cutoffDate: cleanDate(input.cutoffDate, { allowEmpty: true }),
+        baselineStatus: cleanString(input.baselineStatus, { max: 40, allowEmpty: true }).toLowerCase(),
+        baselineHours: cleanHours(input.baselineHours ?? 0, { min: 0, max: 24 }),
+        sourceType
+    };
+}
+
+function applyReconciliationEntryFields(row, entry) {
+    if (entry?.isFinalStatus === true) row.isFinalStatus = true;
+    if (entry?.isFinalStatus === false) row.isFinalStatus = false;
+    const reconciliationRequired = entry?.reconciliationRequired === true || entry?.isProvisional === true;
+    if (!reconciliationRequired) return row;
+    row.reconciliationRequired = true;
+    row.isProvisional = entry?.isProvisional === true;
+    row.provisionalMeta = sanitizeProvisionalMeta(entry?.provisionalMeta);
+    return row;
+}
+
 function sanitizeSnapshotEntry(entry) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry) || entry.isDeleted === true) return null;
     const sessionId = cleanString(entry.sessionId, { max: 80, allowEmpty: false });
     if (!sessionId) return null;
+    const isPriorPeriodAdjustment = entry.isPriorPeriodAdjustment === true || sessionId.startsWith('adj-');
     const row = {
         sessionId,
         date: cleanDate(entry.date, { allowEmpty: true }),
         className: cleanString(entry.className, { max: 200, allowEmpty: true }),
         classId: cleanString(entry.classId, { max: 64, allowEmpty: true }) || null,
-        hours: cleanHours(entry.hours ?? entry.durationHours ?? 0, { min: 0, max: 24 }),
+        hours: cleanHours(entry.hours ?? entry.durationHours ?? 0, { min: isPriorPeriodAdjustment ? -24 : 0, max: 24 }),
         status: cleanString(entry.status, { max: 40, allowEmpty: true }).toLowerCase() || 'manual',
-        isManual: Boolean(entry.isManual),
+        isManual: Boolean(entry.isManual) || isPriorPeriodAdjustment,
         comment: cleanString(entry.comment, { max: 1000, allowEmpty: true })
     };
     const startTime = cleanTime(entry.startTime, { allowEmpty: true });
@@ -221,8 +252,12 @@ function sanitizeSnapshotEntry(entry) {
     if (visibilityScope === 'school' || visibilityScope === 'individual') row.visibilityScope = visibilityScope;
     if (entry.isReportReflection === true || sessionId.startsWith('rptref-')) row.isReportReflection = true;
     if (entry.isSchoolActivity === true || sessionId.startsWith('act-')) row.isSchoolActivity = true;
-    if (entry.isFinalStatus === true) row.isFinalStatus = true;
-    if (entry.isFinalStatus === false) row.isFinalStatus = false;
+    if (isPriorPeriodAdjustment) {
+        row.isPriorPeriodAdjustment = true;
+        row.requestedHours = cleanHours(entry.requestedHours ?? entry.durationHours ?? entry.hours ?? 0, { min: -24, max: 24 });
+        row.durationHours = row.requestedHours;
+        row.adjustmentMeta = sanitizeAdjustmentMeta(entry.adjustmentMeta || {});
+    }
     if (entry.isMakeupSession === true) {
         row.isMakeupSession = true;
         const makeupOriginalSessionId = cleanString(entry.makeupOriginalSessionId, { max: 80, allowEmpty: true });
@@ -236,7 +271,7 @@ function sanitizeSnapshotEntry(entry) {
         if (makeupOriginalStartTime) row.makeupOriginalStartTime = makeupOriginalStartTime;
         if (makeupOriginalEndTime) row.makeupOriginalEndTime = makeupOriginalEndTime;
     }
-    if (row.isManual) {
+    if (row.isManual && !isPriorPeriodAdjustment) {
         const requestedHours = cleanHours(entry.requestedHours ?? entry.durationHours ?? entry.hours ?? 0, { min: 0, max: 24 });
         const approvalToken = cleanString(entry.approvalStatus, { max: 40, allowEmpty: true }).toLowerCase();
         const approvalStatus = ['pending_approval', 'approved', 'rejected', 'unpaid'].includes(approvalToken)
@@ -256,7 +291,7 @@ function sanitizeSnapshotEntry(entry) {
         if (decisionByName) row.decisionByName = decisionByName;
         if (decisionNote) row.decisionNote = decisionNote;
     }
-    return applyPayrollFields(applyClassSessionDisplayFields(row, entry), entry);
+    return applyPayrollFields(applyClassSessionDisplayFields(applyReconciliationEntryFields(row, entry), entry), entry);
 }
 
 function sanitizeReviewHistoryEntry(input) {
@@ -331,10 +366,63 @@ function sanitizeAdjustmentMeta(input) {
         sourcePeriodId: cleanString(input.sourcePeriodId, { max: 64, allowEmpty: true }),
         sourceSessionId: cleanString(input.sourceSessionId, { max: 80, allowEmpty: true }),
         sourceSessionDate: cleanDate(input.sourceSessionDate, { allowEmpty: true }),
+        sourceType: cleanString(input.sourceType, { max: 40, allowEmpty: true }).toLowerCase() || 'class_session',
+        baselineStatus: cleanString(input.baselineStatus, { max: 40, allowEmpty: true }).toLowerCase(),
+        currentStatus: cleanString(input.currentStatus, { max: 40, allowEmpty: true }).toLowerCase(),
+        finalStatus: cleanString(input.finalStatus, { max: 40, allowEmpty: true }).toLowerCase(),
+        reconciliationReason: cleanString(input.reconciliationReason, { max: 80, allowEmpty: true }).toLowerCase(),
         snapshotHours: cleanHours(input.snapshotHours ?? 0, { min: -24, max: 24 }),
         currentHours: cleanHours(input.currentHours ?? 0, { min: -24, max: 24 }),
         deltaHours: cleanHours(input.deltaHours ?? 0, { min: -24, max: 24 })
     };
+}
+
+function sanitizePriorPeriodReconciliationItem(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const sourceSessionId = cleanString(input.sourceSessionId, { max: 80, allowEmpty: false });
+    if (!sourceSessionId) return null;
+    const stateToken = cleanString(input.state, { max: 30, allowEmpty: true }).toLowerCase();
+    const state = stateToken === 'unresolved' ? 'unresolved' : 'resolved';
+    return {
+        sourceSessionId,
+        sourceType: cleanString(input.sourceType, { max: 40, allowEmpty: true }).toLowerCase() || 'class_session',
+        classId: cleanString(input.classId, { max: 64, allowEmpty: true }),
+        sourceSessionDate: cleanDate(input.sourceSessionDate, { allowEmpty: true }),
+        currentSessionDate: cleanDate(input.currentSessionDate, { allowEmpty: true }),
+        baselineStatus: cleanString(input.baselineStatus, { max: 40, allowEmpty: true }).toLowerCase(),
+        currentStatus: cleanString(input.currentStatus, { max: 40, allowEmpty: true }).toLowerCase(),
+        finalStatus: cleanString(input.finalStatus, { max: 40, allowEmpty: true }).toLowerCase(),
+        baselineHours: cleanHours(input.baselineHours ?? 0, { min: 0, max: 24 }),
+        currentHours: cleanHours(input.currentHours ?? 0, { min: 0, max: 24 }),
+        deltaHours: cleanHours(input.deltaHours ?? 0, { min: -24, max: 24 }),
+        adjustmentHours: cleanHours(input.adjustmentHours ?? input.deltaHours ?? 0, { min: -24, max: 24 }),
+        state,
+        resolutionReason: cleanString(input.resolutionReason, { max: 80, allowEmpty: true }).toLowerCase(),
+        movedIntoCurrentPeriod: input.movedIntoCurrentPeriod === true
+    };
+}
+
+function sanitizePriorPeriodReconciliation(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const sourcePeriodId = cleanId(input.sourcePeriodId, { max: 64, allowEmpty: false });
+    if (!sourcePeriodId) return null;
+    const stateToken = cleanString(input.state, { max: 40, allowEmpty: true }).toLowerCase();
+    const state = PRIOR_RECONCILIATION_STATES.has(stateToken) ? stateToken : 'pending';
+    const result = {
+        sourcePeriodId: String(sourcePeriodId),
+        state,
+        items: (Array.isArray(input.items) ? input.items : [])
+            .map(sanitizePriorPeriodReconciliationItem)
+            .filter(Boolean)
+            .slice(0, 3000)
+    };
+    const reviewedAt = cleanString(input.reviewedAt, { max: 40, allowEmpty: true });
+    const lastCheckedAt = cleanString(input.lastCheckedAt, { max: 40, allowEmpty: true });
+    const fingerprint = cleanString(input.fingerprint, { max: 128, allowEmpty: true }).toLowerCase();
+    if (reviewedAt) result.reviewedAt = reviewedAt;
+    if (lastCheckedAt) result.lastCheckedAt = lastCheckedAt;
+    if (fingerprint) result.fingerprint = fingerprint;
+    return result;
 }
 
 function sanitizeEntry(entry) {
@@ -430,7 +518,7 @@ function sanitizeEntry(entry) {
             }
             : {};
     }
-    return applyPayrollFields(applyClassSessionDisplayFields(row, entry), entry);
+    return applyPayrollFields(applyClassSessionDisplayFields(applyReconciliationEntryFields(row, entry), entry), entry);
 }
 
 function sanitizeTimesheetPayload(input) {
@@ -492,6 +580,11 @@ function sanitizeTimesheetPayload(input) {
     if (input.priorPeriodAdjustmentsAppliedFrom !== undefined) {
         const appliedFrom = cleanId(input.priorPeriodAdjustmentsAppliedFrom, { max: 64, allowEmpty: true });
         if (appliedFrom) result.priorPeriodAdjustmentsAppliedFrom = String(appliedFrom);
+    }
+
+    if (input.priorPeriodReconciliation !== undefined) {
+        const reconciliation = sanitizePriorPeriodReconciliation(input.priorPeriodReconciliation);
+        if (reconciliation) result.priorPeriodReconciliation = reconciliation;
     }
 
     const optionalStrings = [
@@ -578,6 +671,9 @@ async function saveTimesheet(data) {
             if (sanitized.priorPeriodAdjustmentsAppliedFrom === undefined && existing.priorPeriodAdjustmentsAppliedFrom) {
                 merged.priorPeriodAdjustmentsAppliedFrom = existing.priorPeriodAdjustmentsAppliedFrom;
             }
+            if (sanitized.priorPeriodReconciliation === undefined && existing.priorPeriodReconciliation) {
+                merged.priorPeriodReconciliation = existing.priorPeriodReconciliation;
+            }
             if (sanitized.approvedAt === undefined && existing.approvedAt) merged.approvedAt = existing.approvedAt;
             if (sanitized.approvedBy === undefined && existing.approvedBy) merged.approvedBy = existing.approvedBy;
             if (sanitized.managerReview === undefined && existing.managerReview) merged.managerReview = existing.managerReview;
@@ -649,6 +745,7 @@ module.exports = {
     sanitizeTimesheetPayload,
     sanitizeSubmissionSnapshot,
     sanitizeSnapshotEntry,
+    sanitizePriorPeriodReconciliation,
     sanitizeReviewHistory,
     sanitizeReviewHistoryEntry,
     sanitizeManagerReview,

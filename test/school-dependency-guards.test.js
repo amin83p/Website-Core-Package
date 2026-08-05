@@ -203,7 +203,8 @@ test('timesheet editor shows admin approve independently of teacher read-only st
   assert.match(source, /btnApproveTimesheet[\s\S]*btnReopenTimesheet/);
 });
 
-test('prior period adjustment service treats approved timesheets as frozen', () => {
+test('prior period reconciliation requires a payroll-processed timesheet or period', () => {
   const source = read('packages/school/MVC/services/school/timesheetPriorPeriodAdjustmentService.js');
-  assert.match(source, /tsStatus === 'approved'/);
+  assert.match(source, /priorTimesheet\?\.status[\s\S]*=== 'processed'/);
+  assert.match(source, /priorPeriod\?\.status[\s\S]*=== 'processed'/);
 });

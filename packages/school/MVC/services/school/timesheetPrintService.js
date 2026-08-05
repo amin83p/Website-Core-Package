@@ -274,7 +274,15 @@ function shapePrintEntry(entry = {}, lookups = {}) {
   let timeLabel = '';
   if (entry.isPriorPeriodAdjustment === true) {
     const referenceDate = cleanText(entry?.adjustmentMeta?.sourceSessionDate || entry.date);
-    timeLabel = `Prior period correction${referenceDate ? ` · Ref: ${referenceDate}` : ''}`;
+    const baselineStatus = titleCase(entry?.adjustmentMeta?.baselineStatus);
+    const finalStatus = titleCase(entry?.adjustmentMeta?.finalStatus || entry?.adjustmentMeta?.currentStatus);
+    const reason = titleCase(entry?.adjustmentMeta?.reconciliationReason);
+    const auditParts = [
+      referenceDate ? `Ref: ${referenceDate}` : '',
+      baselineStatus || finalStatus ? `${baselineStatus || 'Unknown'} -> ${finalStatus || 'Removed'}` : '',
+      reason
+    ].filter(Boolean);
+    timeLabel = `Prior period correction${auditParts.length ? ` - ${auditParts.join(' - ')}` : ''}`;
   } else {
     const startTime = cleanText(entry.startTime);
     const endTime = cleanText(entry.endTime);
@@ -295,6 +303,7 @@ function shapePrintEntry(entry = {}, lookups = {}) {
     hoursIsStruck: Boolean(payableNote),
     timeLabel,
     statusLabel: resolveStatusLabel(entry),
+    showReconciliationBadge: entry.reconciliationRequired === true,
     studentName: cleanText(entry.singleStudentName || entry.studentName),
     attendanceLabel: titleCase(entry.singleStudentAttendance || entry.attendance),
     commentLabel: cleanText(entry.comment),
@@ -363,6 +372,8 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
   }));
   const timesheet = effective.timesheet || {};
   const departmentTotals = buildDepartmentTotals(entries);
+  const reconciliationEntries = entries.filter((entry) => entry.reconciliationRequired === true);
+  const provisionalEntries = reconciliationEntries.filter((entry) => entry.isProvisional === true);
   return {
     person: {
       id: personId,
@@ -379,6 +390,9 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
     days,
     entries,
     departmentTotals,
+    reconciliationEntryCount: reconciliationEntries.length,
+    provisionalEntryCount: provisionalEntries.length,
+    provisionalHours: roundHours(provisionalEntries.reduce((sum, entry) => sum + entry.payableHours, 0)),
     payableTotalHours: roundHours(entries.reduce((sum, entry) => sum + entry.payableHours, 0))
   };
 }

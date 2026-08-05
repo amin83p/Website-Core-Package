@@ -114,10 +114,14 @@ function dedupeRefs(refs = []) {
 function collectTimesheetSourceRefs(timesheet = {}) {
   const entries = [];
   if (Array.isArray(timesheet?.submissionSnapshot?.entries)) {
-    entries.push(...timesheet.submissionSnapshot.entries);
+    entries.push(...timesheet.submissionSnapshot.entries.filter((entry) => (
+      entry?.reconciliationRequired !== true && entry?.isPriorPeriodAdjustment !== true
+    )));
   }
   if (Array.isArray(timesheet?.entries)) {
-    entries.push(...timesheet.entries);
+    entries.push(...timesheet.entries.filter((entry) => (
+      entry?.reconciliationRequired !== true && entry?.isPriorPeriodAdjustment !== true
+    )));
   }
   return dedupeRefs(entries.flatMap(collectRefsFromEntry));
 }
@@ -148,8 +152,16 @@ function timesheetReferencesSource(timesheet = {}, sourceType, sourceRef = {}) {
   const status = String(timesheet?.status || 'draft').trim().toLowerCase();
   if (!meetsMinTimesheetStatus(status)) return false;
   const entries = [];
-  if (Array.isArray(timesheet?.submissionSnapshot?.entries)) entries.push(...timesheet.submissionSnapshot.entries);
-  if (Array.isArray(timesheet?.entries)) entries.push(...timesheet.entries);
+  if (Array.isArray(timesheet?.submissionSnapshot?.entries)) {
+    entries.push(...timesheet.submissionSnapshot.entries.filter((entry) => (
+      entry?.reconciliationRequired !== true && entry?.isPriorPeriodAdjustment !== true
+    )));
+  }
+  if (Array.isArray(timesheet?.entries)) {
+    entries.push(...timesheet.entries.filter((entry) => (
+      entry?.reconciliationRequired !== true && entry?.isPriorPeriodAdjustment !== true
+    )));
+  }
   if (sourceType === 'timesheetPeriod' && idsEqual(timesheet?.periodId, sourceRef.periodId)) {
     return meetsMinTimesheetStatus(status);
   }
@@ -469,6 +481,37 @@ async function lockSourcesForApprovedTimesheet(timesheet = {}, reqUser) {
   }
 
   return summary;
+}
+
+async function lockReconciliationSourceRefs({ refs = [], timesheetId = '', reqUser } = {}) {
+  const normalizedRefs = dedupeRefs((Array.isArray(refs) ? refs : [])
+    .filter((ref) => ref?.type === 'classSession' && ref?.classId && ref?.sessionId)
+    .map((ref) => ({
+      type: 'classSession',
+      classId: normalizeId(ref.classId),
+      sessionId: normalizeId(ref.sessionId)
+    })));
+  const byClass = new Map();
+  normalizedRefs.forEach((ref) => {
+    if (!byClass.has(ref.classId)) byClass.set(ref.classId, new Set());
+    byClass.get(ref.classId).add(ref.sessionId);
+  });
+  const classSessions = [];
+  for (const [classId, sessionIds] of byClass.entries()) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await lockClassSessions({
+      classId,
+      sessionIds: [...sessionIds],
+      timesheetId,
+      reqUser
+    });
+    classSessions.push({ classId, ...result });
+  }
+  return { classSessions, lockedSourceRefs: normalizedRefs };
+}
+
+function dedupeSourceRefs(refs = []) {
+  return dedupeRefs(refs);
 }
 
 async function unlockClassSessionsForTimesheet({ timesheetId, reqUser }) {
@@ -998,6 +1041,8 @@ module.exports = {
   lockActivityAssignees,
   lockActivitySources,
   lockSourcesForApprovedTimesheet,
+  dedupeSourceRefs,
+  lockReconciliationSourceRefs,
   unlockSourcesForTimesheet,
   entryHasTimesheetApprovedLock,
   isOrphanTimesheetLock,

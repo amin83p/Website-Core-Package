@@ -619,6 +619,20 @@ test('timesheet editor template compiles after interaction polish', () => {
   });
 });
 
+test('timesheet guidance uses a responsive notice hub with expandable review history', () => {
+  const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
+
+  assert.match(editor, /class="ts-notice-hub" aria-label="Timesheet guidance and review information"/);
+  assert.match(editor, /\.ts-notice-grid \{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(260px, 1fr\)\);/);
+  assert.match(editor, /ts-notice-tile--revision/);
+  assert.match(editor, /ts-notice-tile--instructions/);
+  assert.match(editor, /ts-notice-tile--locked/);
+  assert.match(editor, /ts-notice-tile--history collapsed/);
+  assert.match(editor, /id="timesheetReviewHistoryCollapse" class="collapse ts-review-history-panel"/);
+  assert.match(editor, /@media \(max-width: 767\.98px\)[\s\S]*?\.ts-notice-grid \{\s*grid-template-columns: 1fr;/);
+  assert.doesNotMatch(editor, /<strong>Instructions:<\/strong>/);
+});
+
 test('timesheet editor and controller expose makeup session status metadata', () => {
   const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
   const controller = read('packages/school/MVC/controllers/school/timesheetController.js');

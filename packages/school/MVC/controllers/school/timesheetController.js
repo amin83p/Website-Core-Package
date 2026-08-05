@@ -25,6 +25,7 @@ const schoolIdentityLookupService = require('../../services/school/schoolIdentit
 const timesheetSessionStudentLabelService = require('../../services/school/timesheetSessionStudentLabelService');
 const timesheetEffectiveEntryService = require('../../services/school/timesheetEffectiveEntryService');
 const timesheetPrintService = require('../../services/school/timesheetPrintService');
+const deadlineReconciliationService = require('../../services/school/timesheetDeadlineReconciliationService');
 const {
     resolveOrgTodayFromRequest,
     resolveOrgYearFromRequest,
@@ -561,7 +562,7 @@ function countActiveTimesheetEntries(entries = []) {
 
 function buildSubmissionSnapshot({ normalizedEntries, period, reviewVersion = 0, submittedAt = '', lastModifiedAt = '' }) {
     const entries = normalizedEntries
-        .filter((entry) => entry && entry.isDeleted !== true && entry.isPriorPeriodAdjustment !== true)
+        .filter((entry) => entry && entry.isDeleted !== true)
         .map((entry) => sanitizeSnapshotEntry(entry))
         .filter(Boolean);
     return {
@@ -572,6 +573,65 @@ function buildSubmissionSnapshot({ normalizedEntries, period, reviewVersion = 0,
         sourcePeriodName: String(period.name || ''),
         entries
     };
+}
+
+function buildPriorReconciliationSummary(priorTimesheet, result = {}) {
+    const snapshotEntries = priorPeriodAdjustmentService.resolveSnapshotEntries(priorTimesheet);
+    const reconciliationEntries = snapshotEntries.filter((entry) => entry?.reconciliationRequired === true);
+    const provisionalEntries = reconciliationEntries.filter((entry) => entry?.isProvisional === true);
+    const resolvedNoChangeCount = (Array.isArray(result?.items) ? result.items : [])
+        .filter((item) => item?.state === 'resolved' && Number(item?.adjustmentHours || 0) === 0).length;
+    return {
+        entryCount: snapshotEntries.length,
+        totalSnapshotHours: Number(snapshotEntries.reduce((sum, entry) => sum + (Number(entry?.hours) || 0), 0).toFixed(2)),
+        reconciliationCount: reconciliationEntries.length,
+        reconciliationHours: Number(reconciliationEntries.reduce((sum, entry) => sum + (Number(entry?.hours) || 0), 0).toFixed(2)),
+        provisionalCount: provisionalEntries.length,
+        provisionalHours: Number(provisionalEntries.reduce((sum, entry) => sum + (Number(entry?.hours) || 0), 0).toFixed(2)),
+        unresolvedCount: Array.isArray(result?.unresolved) ? result.unresolved.length : 0,
+        resolvedNoChangeCount,
+        submittedAt: String(priorTimesheet?.submissionSnapshot?.submittedAt || priorTimesheet?.audit?.lastUpdateDateTime || '')
+    };
+}
+
+async function resolvePriorReconciliationContext({ period, teacherId, activeOrgId, reqUser }) {
+    const prior = await priorPeriodAdjustmentService.findPriorSubmittedTimesheet({
+        teacherId,
+        currentPeriod: period,
+        activeOrgId,
+        reqUser
+    });
+    if (!prior) return { prior: null, reconciliationState: 'none', result: null };
+    if (!prior.isPayrollFinal) {
+        return {
+            prior,
+            reconciliationState: 'awaiting_prior_processing',
+            result: null,
+            priorReviewSummary: buildPriorReconciliationSummary(prior.priorTimesheet)
+        };
+    }
+    const result = await priorPeriodAdjustmentService.detectReconciliation({
+        priorTimesheet: prior.priorTimesheet,
+        priorPeriod: prior.priorPeriod,
+        currentPeriod: period,
+        teacherId,
+        activeOrgId,
+        reqUser
+    });
+    return {
+        prior,
+        reconciliationState: result.unresolved.length ? 'unresolved' : 'resolved',
+        result,
+        priorReviewSummary: buildPriorReconciliationSummary(prior.priorTimesheet, result)
+    };
+}
+
+function throwPriorReconciliationWarning(code, message, unresolved = []) {
+    const warning = new Error(message);
+    warning.status = 'warning';
+    warning.code = code;
+    warning.unresolved = Array.isArray(unresolved) ? unresolved : [];
+    throw warning;
 }
 
 function normalizeStatusCode(value) {
@@ -1065,6 +1125,13 @@ exports.getTimesheetManagementRoster = async (req, res) => {
         const rows = eligiblePeople.map((personRow) => {
             const timesheet = timesheetByPersonId.get(personRow.personId) || null;
             const status = String(timesheet?.status || 'not_started').toLowerCase();
+            const summaryEntries = ['submitted', 'processed'].includes(status)
+                && Array.isArray(timesheet?.submissionSnapshot?.entries)
+                && timesheet.submissionSnapshot.entries.length
+                ? timesheet.submissionSnapshot.entries
+                : (Array.isArray(timesheet?.entries) ? timesheet.entries : []);
+            const reconciliationEntries = summaryEntries.filter((entry) => entry?.reconciliationRequired === true && entry?.isDeleted !== true);
+            const provisionalEntries = reconciliationEntries.filter((entry) => entry?.isProvisional === true);
             return {
                 personId: personRow.personId,
                 name: personRow.name,
@@ -1075,6 +1142,11 @@ exports.getTimesheetManagementRoster = async (req, res) => {
                 status,
                 managerApproved: Boolean(timesheet && isManagerApproved(timesheet)),
                 totalHours: Number(parseFloat(timesheet?.totalHours) || 0),
+                reconciliationCount: reconciliationEntries.length,
+                provisionalCount: provisionalEntries.length,
+                provisionalHours: Number(provisionalEntries.reduce((sum, entry) => (
+                    sum + (Number(entry?.hours ?? entry?.timesheetHours) || 0)
+                ), 0).toFixed(2)),
                 revisionCount: countReviewReopenCycles(timesheet),
                 lastReopenNote: getLastReopenNote(timesheet),
                 openUrl: `/school/timesheets/editor/${encodeURIComponent(periodId)}?teacherId=${encodeURIComponent(personRow.personId)}`
@@ -1509,13 +1581,27 @@ exports.viewTimesheet = async (req, res) => {
                     if (meta?.label) return String(meta.label);
                     return normalizedStatus || normalizedCode;
                 })();
+                const deadlineClassification = deadlineReconciliationService.classifySession({
+                    period,
+                    sessionDate: s.date,
+                    isFinalStatus,
+                    baselineStatus: normalizedStatus,
+                    baselineHours: sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
+                        status: s.status,
+                        notes: s.notes,
+                        durationHours: rawDurationHours,
+                        session: s
+                    })
+                });
                 if (!isFinalStatus) {
                     const duePeriodId = String(s?.attendanceDuePeriodId || '').trim();
                     if (duePeriodId && !idsEqual(duePeriodId, period.id)) {
                         return;
                     }
-                    incompleteSessions.push(buildIncompleteSessionWarningRow(c, s, statusLabel));
-                    return;
+                    if (!deadlineClassification.isProvisional) {
+                        incompleteSessions.push(buildIncompleteSessionWarningRow(c, s, statusLabel));
+                        return;
+                    }
                 }
                 const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                     status: s.status,
@@ -1547,6 +1633,7 @@ exports.viewTimesheet = async (req, res) => {
                         coTeacherRoleLabel: isCoTeacherSession
                             ? String(sessionDeliveryTeamService.findCoTeacherEntry(s, teacherContext.targetTeacherId)?.roleLabel || 'Co-Teacher')
                             : '',
+                        ...deadlineClassification,
                         ...buildTimesheetMakeupMeta(s, c, sessionsByClassId)
                     }
                 });
@@ -1588,6 +1675,19 @@ exports.viewTimesheet = async (req, res) => {
                     notes: s.notes
                 });
                 if (isFinalStatus) return;
+                const deadlineClassification = deadlineReconciliationService.classifySession({
+                    period,
+                    sessionDate: s.date,
+                    isFinalStatus,
+                    baselineStatus: normalizedStatus,
+                    baselineHours: sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
+                        status: s.status,
+                        notes: s.notes,
+                        durationHours: Number.parseFloat(s.durationHours) || 0,
+                        session: s
+                    })
+                });
+                if (deadlineClassification.isProvisional) return;
                 const statusLabel = (() => {
                     const normalizedCode = normalizeStatusCode(s.status);
                     const meta = (Array.isArray(sessionStatusMeta) ? sessionStatusMeta : []).find((row) => normalizeStatusCode(row?.code) === normalizedCode);
@@ -1679,8 +1779,9 @@ exports.viewTimesheet = async (req, res) => {
             });
             if (prior) {
                 const alreadyReviewed = Boolean(
-                    timesheet.priorPeriodAdjustmentsAppliedFrom &&
-                    idsEqual(timesheet.priorPeriodAdjustmentsAppliedFrom, prior.priorPeriod.id)
+                    timesheet.priorPeriodReconciliation
+                    && idsEqual(timesheet.priorPeriodReconciliation.sourcePeriodId, prior.priorPeriod.id)
+                    && timesheet.priorPeriodReconciliation.state === 'resolved'
                 );
                 priorReviewPending = !alreadyReviewed;
             }
@@ -1834,7 +1935,7 @@ exports.saveTimesheet = async (req, res) => {
         const scopedClasses = (Array.isArray(classes) ? classes : []).filter((row) => idsEqual(row?.orgId, activeOrgId));
         const liveSessionBuilders = [];
         const sessionsByClassId = new Map();
-        let hasIncompleteClassSource = false;
+        let hasBlockingIncompleteClassSource = false;
 
         for (const classRow of scopedClasses || []) {
             const sessions = await dataService.getClassSessions(classRow.id, req.user);
@@ -1848,7 +1949,22 @@ exports.saveTimesheet = async (req, res) => {
                     status: sessionRow?.status,
                     notes: sessionRow?.notes
                 });
-                if (!isFinalStatus) hasIncompleteClassSource = true;
+                const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(sessionRow?.status, sessionRow?.notes);
+                const durationHours = Number(parseFloat(sessionRow?.durationHours) || 0);
+                const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
+                    status: sessionRow?.status,
+                    notes: sessionRow?.notes,
+                    durationHours,
+                    session: sessionRow
+                });
+                const deadlineClassification = deadlineReconciliationService.classifySession({
+                    period,
+                    sessionDate: sessionRow?.date,
+                    isFinalStatus,
+                    baselineStatus: normalizedStatus,
+                    baselineHours: timesheetHours
+                });
+                if (!isFinalStatus && !deadlineClassification.isProvisional) hasBlockingIncompleteClassSource = true;
                 liveSessionBuilders.push({
                     classId: String(classRow?.id || ''),
                     sessionRow,
@@ -1861,10 +1977,12 @@ exports.saveTimesheet = async (req, res) => {
                         date: String(sessionRow?.date || ''),
                         startTime: String(sessionRow?.startTime || ''),
                         endTime: String(sessionRow?.endTime || ''),
-                        status: sessionRow?.status,
+                        status: normalizedStatus,
                         notes: sessionRow?.notes,
-                        durationHours: Number(parseFloat(sessionRow?.durationHours) || 0),
+                        durationHours,
+                        timesheetHours,
                         isFinalStatus,
+                        ...deadlineClassification,
                         ...buildTimesheetMakeupMeta(sessionRow, classRow, sessionsByClassId)
                     }
                 });
@@ -1921,10 +2039,44 @@ exports.saveTimesheet = async (req, res) => {
                 .filter(([id]) => Boolean(id)));
         }
 
-        const normalizedEntries = entryRows.map((entry) => {
+        const buildTrustedClassEntry = (entry, sessionRef) => {
+            const sessionId = String(sessionRef?.sessionId || '').trim();
+            const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(sessionRef?.status, sessionRef?.notes);
+            const hours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
+                status: sessionRef?.status,
+                notes: sessionRef?.notes,
+                durationHours: sessionRef?.durationHours,
+                session: sessionRef
+            });
+            const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
+                status: sessionRef?.status,
+                notes: sessionRef?.notes
+            });
+            return deadlineReconciliationService.applySessionClassification({
+                ...entry,
+                sessionId,
+                ...buildTrustedClassSessionDisplayFields(sessionRef),
+                status: normalizedStatus,
+                hours,
+                timesheetHours: hours,
+                isFinalStatus,
+                isManual: false
+            }, { period, isFinalStatus });
+        };
+
+        let normalizedEntries = entryRows.map((entry) => {
             if (!entry || typeof entry !== 'object') return entry;
             if (entry.isDeleted === true) {
                 return { sessionId: String(entry.sessionId || ''), isDeleted: true };
+            }
+            const trustedClassRef = liveSessionById.get(String(entry.sessionId || '').trim());
+            if (trustedClassRef) return buildTrustedClassEntry(entry, trustedClassRef);
+            if (entry.isPriorPeriodAdjustment === true || String(entry.sessionId || '').startsWith('adj-')) {
+                const trustedAdjustment = (Array.isArray(existing?.entries) ? existing.entries : [])
+                    .find((row) => row?.isPriorPeriodAdjustment === true && idsEqual(row?.sessionId, entry?.sessionId));
+                return trustedAdjustment
+                    ? { ...trustedAdjustment }
+                    : { sessionId: String(entry.sessionId || ''), isDeleted: true, ignoredReason: 'unknown_prior_adjustment' };
             }
             if (entry.isManual === true) {
                 const sessionId = String(entry.sessionId || '').trim();
@@ -2067,16 +2219,6 @@ exports.saveTimesheet = async (req, res) => {
                 return normalizedManual;
             }
 
-            if (reviewerEdit) {
-                const sessionId = String(entry.sessionId || '').trim();
-                const sessionRef = liveSessionById.get(sessionId);
-                return {
-                    ...entry,
-                    sessionId,
-                    ...(sessionRef ? buildTrustedClassSessionDisplayFields(sessionRef) : {})
-                };
-            }
-
             const sessionId = String(entry.sessionId || '').trim();
             if (entry.isReportReflection === true || sessionId.startsWith('rptref-')) {
                 const hours = Number(parseFloat(entry.hours ?? entry.timesheetHours ?? entry.durationHours) || 0);
@@ -2131,28 +2273,35 @@ exports.saveTimesheet = async (req, res) => {
                 };
             }
 
-            const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(sessionRef.status, sessionRef.notes);
-            const hours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
-                status: sessionRef.status,
-                notes: sessionRef.notes,
-                durationHours: sessionRef.durationHours,
-                session: sessionRef
-            });
-            const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
-                status: sessionRef.status,
-                notes: sessionRef.notes
-            });
-
-            return {
-                ...entry,
-                sessionId,
-                ...buildTrustedClassSessionDisplayFields(sessionRef),
-                status: normalizedStatus,
-                hours,
-                timesheetHours: hours,
-                isFinalStatus
-            };
+            return buildTrustedClassEntry(entry, sessionRef);
         });
+
+        const requiredWindowSessions = trustedLiveSessions.filter((entry) => entry?.reconciliationRequired === true);
+        if (requiredWindowSessions.length) {
+            const requiredSessionIds = new Set(requiredWindowSessions
+                .map((entry) => String(entry?.sessionId || '').trim())
+                .filter(Boolean));
+            const submittedComments = new Map();
+            [...(Array.isArray(existing?.entries) ? existing.entries : []), ...entryRows].forEach((entry) => {
+                const sessionId = String(entry?.sessionId || '').trim();
+                if (!requiredSessionIds.has(sessionId)) return;
+                if (entry?.isDeleted === true || entry?.comment === undefined) return;
+                submittedComments.set(sessionId, String(entry.comment || '').trim());
+            });
+            normalizedEntries = normalizedEntries.filter((entry) => (
+                !requiredSessionIds.has(String(entry?.sessionId || '').trim())
+            ));
+            requiredWindowSessions.forEach((entry) => {
+                const sessionId = String(entry?.sessionId || '').trim();
+                normalizedEntries.push({
+                    ...entry,
+                    sessionId,
+                    hours: Number(entry?.timesheetHours ?? entry?.hours ?? 0),
+                    isManual: false,
+                    comment: submittedComments.get(sessionId) || ''
+                });
+            });
+        }
 
         const payrollStampedEntries = normalizedEntries.map((entry) => {
             if (!entry || entry.isDeleted === true) return entry;
@@ -2189,7 +2338,7 @@ exports.saveTimesheet = async (req, res) => {
             const hasNonFinalAutoSession = payrollStampedEntries.some((entry) => {
                 if (!entry || entry.isDeleted || entry.isManual) return false;
                 if (entry.isPriorPeriodAdjustment === true) return false;
-                return entry.isFinalStatus === false;
+                return entry.isFinalStatus === false && entry.isProvisional !== true;
             });
             const incompleteActivitySources = await activityService.getIncompleteActivityWorkSessionsForPerson({
                 orgId: activeOrgId,
@@ -2198,7 +2347,7 @@ exports.saveTimesheet = async (req, res) => {
                 periodEndDate: period.endDate,
                 reqUser: req.user
             });
-            if (hasIncompleteClassSource || hasNonFinalAutoSession || (Array.isArray(incompleteActivitySources) && incompleteActivitySources.length)) {
+            if (hasBlockingIncompleteClassSource || hasNonFinalAutoSession || (Array.isArray(incompleteActivitySources) && incompleteActivitySources.length)) {
                 throw new Error('Some auto sessions are not in a final status. Update session statuses before submission.');
             }
         }
@@ -2211,6 +2360,91 @@ exports.saveTimesheet = async (req, res) => {
             });
             await schoolDependencyService.unlockSourcesForTimesheet(existing, req.user);
             entriesForSave = restoreRevertedManualEntryIds(entriesForSave, revertSummary);
+        }
+
+        let priorReconciliationContext = null;
+        let priorReconciliationReceipt = existing?.priorPeriodReconciliation || null;
+        let reconciliationLockRefs = [];
+        if (nextStatus === 'submitted') {
+            priorReconciliationContext = await resolvePriorReconciliationContext({
+                period,
+                teacherId: teacherContext.targetTeacherId,
+                activeOrgId,
+                reqUser: req.user
+            });
+            if (priorReconciliationContext.prior) {
+                const priorPeriodId = String(priorReconciliationContext.prior.priorPeriod?.id || '');
+                if (priorReconciliationContext.reconciliationState === 'awaiting_prior_processing') {
+                    throwPriorReconciliationWarning(
+                        'PRIOR_TIMESHEET_NOT_PROCESSED',
+                        'The previous timesheet must be payroll processed before its deadline-window sessions can be reconciled.'
+                    );
+                }
+                const reviewedReceipt = existing?.priorPeriodReconciliation;
+                const reviewIsCurrent = reviewedReceipt
+                    && idsEqual(reviewedReceipt.sourcePeriodId, priorPeriodId)
+                    && reviewedReceipt.state === 'resolved'
+                    && priorPeriodAdjustmentService.isReconciliationReceiptCurrent(
+                        reviewedReceipt,
+                        priorReconciliationContext.result
+                    );
+                if (priorReconciliationContext.result?.unresolved?.length) {
+                    throwPriorReconciliationWarning(
+                        'PRIOR_RECONCILIATION_UNRESOLVED',
+                        'One or more prior-period sessions are still non-final. Finalize them before submitting this timesheet.',
+                        priorReconciliationContext.result.unresolved
+                    );
+                }
+                if (!reviewIsCurrent) {
+                    throwPriorReconciliationWarning(
+                        'PRIOR_RECONCILIATION_REVIEW_REQUIRED',
+                        'Complete the prior-period reconciliation review before submitting this timesheet.'
+                    );
+                }
+                const movedIntoCurrentIds = new Set((priorReconciliationContext.result?.items || [])
+                    .filter((item) => item?.state === 'resolved' && item?.movedIntoCurrentPeriod === true)
+                    .map((item) => String(item?.sourceSessionId || '').trim())
+                    .filter(Boolean));
+                if (movedIntoCurrentIds.size) {
+                    const currentComments = new Map();
+                    [...(Array.isArray(existing?.entries) ? existing.entries : []), ...entryRows].forEach((entry) => {
+                        const sessionId = String(entry?.sessionId || '').trim();
+                        if (!movedIntoCurrentIds.has(sessionId) || entry?.isDeleted === true || entry?.comment === undefined) return;
+                        currentComments.set(sessionId, String(entry.comment || '').trim());
+                    });
+                    entriesForSave = entriesForSave.filter((entry) => (
+                        !movedIntoCurrentIds.has(String(entry?.sessionId || '').trim())
+                    ));
+                    movedIntoCurrentIds.forEach((sessionId) => {
+                        const liveEntry = liveSessionById.get(sessionId);
+                        if (!liveEntry) return;
+                        const trustedEntry = {
+                            ...liveEntry,
+                            sessionId,
+                            hours: Number(liveEntry?.timesheetHours ?? liveEntry?.hours ?? 0),
+                            isManual: false,
+                            comment: currentComments.get(sessionId) || ''
+                        };
+                        entriesForSave.push(withPayrollStamp(trustedEntry, payrollContext, period));
+                    });
+                }
+                const adjustmentEntries = priorPeriodAdjustmentService.buildAdjustmentEntries({
+                    adjustments: priorReconciliationContext.result?.adjustments || [],
+                    applyDate: period.startDate
+                });
+                entriesForSave = priorPeriodAdjustmentService.mergeAdjustmentEntriesForSource(
+                    entriesForSave,
+                    adjustmentEntries,
+                    priorPeriodId
+                );
+                priorReconciliationReceipt = priorPeriodAdjustmentService.buildReconciliationReceipt({
+                    priorPeriod: priorReconciliationContext.prior.priorPeriod,
+                    result: priorReconciliationContext.result
+                });
+                reconciliationLockRefs = priorPeriodAdjustmentService.buildResolvedSourceRefs(
+                    priorReconciliationContext.result
+                );
+            }
         }
 
         const nextReviewVersion = nextStatus === 'submitted'
@@ -2267,12 +2501,35 @@ exports.saveTimesheet = async (req, res) => {
         if (existing?.priorPeriodAdjustmentsAppliedFrom) {
             payload.priorPeriodAdjustmentsAppliedFrom = existing.priorPeriodAdjustmentsAppliedFrom;
         }
+        if (priorReconciliationContext?.prior) {
+            payload.priorPeriodAdjustmentsAppliedFrom = String(priorReconciliationContext.prior.priorPeriod.id);
+        }
+        if (priorReconciliationReceipt) {
+            payload.priorPeriodReconciliation = priorReconciliationReceipt;
+        }
 
         let saved;
         if (existing?.id) {
             saved = await dataService.updateData('timesheets', existing.id, payload, req.user);
         } else {
             saved = await dataService.addData('timesheets', payload, req.user);
+        }
+
+        if (nextStatus === 'submitted' && reconciliationLockRefs.length > 0) {
+            const savedRow = saved && typeof saved === 'object' ? saved : { ...payload, id: existing?.id || saved };
+            const lockSummary = await schoolDependencyService.lockReconciliationSourceRefs({
+                refs: reconciliationLockRefs,
+                timesheetId: savedRow.id,
+                reqUser: req.user
+            });
+            const lockedSourceRefs = schoolDependencyService.dedupeSourceRefs([
+                ...(Array.isArray(savedRow.lockedSourceRefs) ? savedRow.lockedSourceRefs : []),
+                ...(Array.isArray(lockSummary?.lockedSourceRefs) ? lockSummary.lockedSourceRefs : [])
+            ]);
+            saved = await dataService.updateData('timesheets', savedRow.id, {
+                ...savedRow,
+                lockedSourceRefs
+            }, req.user);
         }
 
         if (nextStatus === 'submitted' && !reviewerEdit) {
@@ -2304,7 +2561,8 @@ exports.saveTimesheet = async (req, res) => {
                 code: String(error?.code || 'TIMESHEET_WARNING'),
                 message: error.message,
                 data: {
-                    conflicts: Array.isArray(error?.conflicts) ? error.conflicts : []
+                    conflicts: Array.isArray(error?.conflicts) ? error.conflicts : [],
+                    unresolved: Array.isArray(error?.unresolved) ? error.unresolved : []
                 }
             });
         }
@@ -2316,79 +2574,53 @@ exports.getPriorAdjustments = async (req, res) => {
     try {
         const { periodId } = req.params;
         const activeOrgId = getActiveOrgIdOrThrow(req.user);
-
         const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
         if (!period) throw new Error('Period not found.');
         assertPeriodOrgAccess(period, activeOrgId, req.user);
-
         const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.READ_ALL });
         const existing = await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user);
-
-        const prior = await priorPeriodAdjustmentService.findPriorSubmittedTimesheet({
+        const context = await resolvePriorReconciliationContext({
+            period,
             teacherId: teacherContext.targetTeacherId,
-            currentPeriod: period,
             activeOrgId,
             reqUser: req.user
         });
-
-        if (!prior) {
+        if (!context.prior) {
             return res.json({
                 status: 'success',
                 hasPriorPeriod: false,
                 needsReview: false,
                 adjustments: [],
+                unresolved: [],
+                reconciliationState: 'none',
                 alreadyApplied: false
             });
         }
-
+        const prior = context.prior;
         const alreadyApplied = Boolean(
-            existing?.priorPeriodAdjustmentsAppliedFrom &&
-            idsEqual(existing.priorPeriodAdjustmentsAppliedFrom, prior.priorPeriod.id)
+            existing?.priorPeriodReconciliation
+            && idsEqual(existing.priorPeriodReconciliation.sourcePeriodId, prior.priorPeriod.id)
+            && existing.priorPeriodReconciliation.state === 'resolved'
+            && priorPeriodAdjustmentService.isReconciliationReceiptCurrent(
+                existing.priorPeriodReconciliation,
+                context.result
+            )
         );
-
-        const snapshotEntries = priorPeriodAdjustmentService.resolveSnapshotEntries(prior.priorTimesheet);
-        const priorReviewSummary = {
-            entryCount: snapshotEntries.length,
-            totalSnapshotHours: Number(snapshotEntries.reduce((sum, entry) => sum + (Number(entry?.hours) || 0), 0).toFixed(2)),
-            submittedAt: String(prior.priorTimesheet?.submissionSnapshot?.submittedAt || prior.priorTimesheet?.audit?.lastUpdateDateTime || '')
-        };
-
-        let adjustments = [];
-        if (!alreadyApplied) {
-            adjustments = await priorPeriodAdjustmentService.detectAdjustments({
-                priorTimesheet: prior.priorTimesheet,
-                priorPeriod: prior.priorPeriod,
-                currentPeriod: period,
-                teacherId: teacherContext.targetTeacherId,
-                activeOrgId,
-                reqUser: req.user
-            });
-        }
-
-        const existingAdjIds = new Set(
-            (Array.isArray(existing?.entries) ? existing.entries : [])
-                .filter((entry) => entry?.isPriorPeriodAdjustment === true)
-                .map((entry) => String(entry?.sessionId || '').trim())
-                .filter(Boolean)
-        );
-        const pendingAdjustments = adjustments.filter(
-            (adj) => !existingAdjIds.has(String(adj.adjustmentSessionId || '').trim())
-        );
-
-        const needsReview = !alreadyApplied;
-
         return res.json({
             status: 'success',
             hasPriorPeriod: true,
-            needsReview,
+            needsReview: !alreadyApplied || context.reconciliationState !== 'resolved',
+            reconciliationState: context.reconciliationState,
             priorPeriod: {
                 id: String(prior.priorPeriod.id || ''),
                 name: String(prior.priorPeriod.name || ''),
                 startDate: String(prior.priorPeriod.startDate || ''),
                 endDate: String(prior.priorPeriod.endDate || '')
             },
-            priorReviewSummary,
-            adjustments: pendingAdjustments,
+            priorReviewSummary: context.priorReviewSummary,
+            adjustments: context.result?.adjustments || [],
+            unresolved: context.result?.unresolved || [],
+            reconciliationResults: context.result?.items || [],
             alreadyApplied
         });
     } catch (error) {
@@ -2429,68 +2661,54 @@ exports.applyPriorAdjustments = async (req, res) => {
             throw new Error('Cannot apply prior-period adjustments to a submitted timesheet.');
         }
 
-        const prior = await priorPeriodAdjustmentService.findPriorSubmittedTimesheet({
-            teacherId: teacherContext.targetTeacherId,
-            currentPeriod: period,
-            activeOrgId,
-            reqUser: req.user
-        });
-        if (!prior) throw new Error('No prior submitted timesheet found for adjustment.');
-
-        if (
-            existing?.priorPeriodAdjustmentsAppliedFrom &&
-            idsEqual(existing.priorPeriodAdjustmentsAppliedFrom, prior.priorPeriod.id)
-        ) {
-            const payloadOut = {
-                status: 'success',
-                message: 'Prior-period adjustments were already applied.',
-                entries: existing.entries || []
-            };
-            idempotencyGuardService.completeGuard(guardKey, payloadOut);
-            return res.json(payloadOut);
-        }
-
-        const adjustments = await priorPeriodAdjustmentService.detectAdjustments({
-            priorTimesheet: prior.priorTimesheet,
-            priorPeriod: prior.priorPeriod,
-            currentPeriod: period,
+        const context = await resolvePriorReconciliationContext({
+            period,
             teacherId: teacherContext.targetTeacherId,
             activeOrgId,
             reqUser: req.user
         });
-
-        const existingAdjIds = new Set(
-            (Array.isArray(existing?.entries) ? existing.entries : [])
-                .filter((entry) => entry?.isPriorPeriodAdjustment === true)
-                .map((entry) => String(entry?.sessionId || '').trim())
-                .filter(Boolean)
-        );
-        const pendingAdjustments = adjustments.filter(
-            (adj) => !existingAdjIds.has(String(adj.adjustmentSessionId || '').trim())
-        );
-
-        let mergedEntries = Array.isArray(existing?.entries) ? [...existing.entries] : [];
-        if (pendingAdjustments.length > 0) {
-            const adjustmentEntries = priorPeriodAdjustmentService.buildAdjustmentEntries({
-                adjustments: pendingAdjustments,
-                applyDate: period.startDate
-            });
-            mergedEntries = priorPeriodAdjustmentService.mergeAdjustmentEntries(mergedEntries, adjustmentEntries);
+        if (!context.prior) throw new Error('No prior submitted timesheet found for adjustment.');
+        if (context.reconciliationState === 'awaiting_prior_processing') {
+            const error = new Error('The previous timesheet must be payroll processed before reconciliation.');
+            error.code = 'PRIOR_TIMESHEET_NOT_PROCESSED';
+            error.httpStatus = 409;
+            throw error;
         }
-
+        if (context.result?.unresolved?.length) {
+            const error = new Error('One or more prior-period sessions are still non-final. Finalize them before continuing.');
+            error.code = 'PRIOR_RECONCILIATION_UNRESOLVED';
+            error.httpStatus = 409;
+            error.unresolved = context.result.unresolved;
+            throw error;
+        }
+        const prior = context.prior;
+        const adjustmentEntries = priorPeriodAdjustmentService.buildAdjustmentEntries({
+            adjustments: context.result?.adjustments || [],
+            applyDate: period.startDate
+        });
+        const mergedEntries = priorPeriodAdjustmentService.mergeAdjustmentEntriesForSource(
+            Array.isArray(existing?.entries) ? existing.entries : [],
+            adjustmentEntries,
+            prior.priorPeriod.id
+        );
         const totalHours = mergedEntries.reduce((sum, entry) => {
             if (!entry || entry.isDeleted) return sum;
             return sum + (Number(entry.hours) || 0);
         }, 0);
 
         const payload = {
+            ...(existing || {}),
             orgId: existing?.orgId || period.orgId || activeOrgId,
             periodId: String(periodId),
             teacherId: String(teacherContext.targetTeacherId),
             status: 'draft',
             entries: mergedEntries,
             totalHours: Number(totalHours.toFixed(2)),
-            priorPeriodAdjustmentsAppliedFrom: String(prior.priorPeriod.id)
+            priorPeriodAdjustmentsAppliedFrom: String(prior.priorPeriod.id),
+            priorPeriodReconciliation: priorPeriodAdjustmentService.buildReconciliationReceipt({
+                priorPeriod: prior.priorPeriod,
+                result: context.result
+            })
         };
 
         let saved;
@@ -2500,20 +2718,27 @@ exports.applyPriorAdjustments = async (req, res) => {
             saved = await dataService.addData('timesheets', payload, req.user);
         }
 
-        const appliedCount = pendingAdjustments.length;
+        const appliedCount = adjustmentEntries.length;
         const payloadOut = {
             status: 'success',
             message: appliedCount > 0
                 ? `Applied ${appliedCount} prior-period adjustment(s).`
                 : 'Prior-period review completed. No adjustments were required.',
             entries: saved?.entries || mergedEntries,
+            reconciliationState: 'resolved',
+            priorReviewSummary: context.priorReviewSummary,
             actionStateId: req.actionStateId || null
         };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);
         return res.json(payloadOut);
     } catch (error) {
         if (guardKey) idempotencyGuardService.failGuard(guardKey);
-        return res.status(400).json({ status: 'error', message: error.message });
+        return res.status(error?.httpStatus || 400).json({
+            status: 'error',
+            code: String(error?.code || 'PRIOR_RECONCILIATION_FAILED'),
+            message: error.message,
+            unresolved: Array.isArray(error?.unresolved) ? error.unresolved : []
+        });
     }
 };
 

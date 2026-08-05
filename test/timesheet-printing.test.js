@@ -215,8 +215,19 @@ test('standalone print view renders safe single and batch documents with print C
   const viewPath = path.join(ROOT_DIR, 'packages/school/MVC/views/school/timesheet/timesheetPrint.ejs');
   const source = fs.readFileSync(viewPath, 'utf8');
   assert.doesNotThrow(() => ejs.compile(source, { filename: viewPath }));
+  const reconciliationDocument = sampleDocument('Person Two', { isDraft: false, status: 'processed', statusLabel: 'Processed' });
+  reconciliationDocument.days[0].entries[0] = {
+    ...reconciliationDocument.days[0].entries[0],
+    statusLabel: 'Scheduled',
+    isProvisional: true,
+    showReconciliationBadge: true
+  };
   const html = ejs.render(source, {
     title: 'Timesheet Print',
+    appBrand: {
+      appName: 'Example Website',
+      logoUrl: '/uploads/GLOBAL/logo/example-logo.png'
+    },
     printContext: {
       organizationName: 'Example School',
       printedByName: 'Printer User',
@@ -227,7 +238,7 @@ test('standalone print view renders safe single and batch documents with print C
         endDateLabel: 'July 31, 2026',
         deadlineLabel: '2026-07-30 23:59'
       },
-      documents: [sampleDocument('Person One'), sampleDocument('Person Two', { isDraft: false, status: 'processed', statusLabel: 'Processed' })]
+      documents: [sampleDocument('Person One'), reconciliationDocument]
     }
   }, { filename: viewPath });
 
@@ -243,11 +254,19 @@ test('standalone print view renders safe single and batch documents with print C
   assert.match(html, /Example School/);
   assert.match(html, /<h1 class="organization-name">Example School<\/h1>/);
   assert.match(html, /<div class="document-name">Timesheet<\/div>/);
+  assert.match(html, /class="print-logo" src="\/uploads\/GLOBAL\/logo\/example-logo\.png" alt="Example Website Logo"/);
+  assert.match(html, /\.print-logo \{[^}]*height: 58px;[^}]*max-width: 180px;/);
+  assert.match(html, /\.print-logo \{ height: 42px; max-width: 140px; \}/);
   assert.match(html, /Person One/);
   assert.match(html, /2026-JULY-02/);
   assert.match(html, /class="timesheet-table"/);
   assert.match(html, /One on One/);
   assert.match(html, />Optional<\/span>/);
+  assert.equal((html.match(/class="badge reconciliation-badge"/g) || []).length, 1);
+  assert.match(html, />Scheduled<\/span>/);
+  assert.match(html, />Reconciliation<\/span>/);
+  assert.doesNotMatch(html, /Provisional - Scheduled/);
+  assert.doesNotMatch(html, /Completed - Recheck/);
   assert.match(html, /Hours by Department/);
   assert.match(html, /Total Optional Hours/);
   assert.match(html, /body \{ font-size: 8px; line-height: 1\.15; \}/);
