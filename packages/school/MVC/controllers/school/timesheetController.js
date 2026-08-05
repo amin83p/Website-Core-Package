@@ -590,6 +590,13 @@ function buildPriorReconciliationSummary(priorTimesheet, result = {}) {
         provisionalHours: Number(provisionalEntries.reduce((sum, entry) => sum + (Number(entry?.hours) || 0), 0).toFixed(2)),
         unresolvedCount: Array.isArray(result?.unresolved) ? result.unresolved.length : 0,
         resolvedNoChangeCount,
+        makeupState: String(result?.makeupState || 'none'),
+        makeupChainCount: Number(result?.makeupSummary?.chainCount || 0),
+        openMakeupChainCount: Number(result?.makeupSummary?.openChainCount || 0),
+        openMakeupNodeCount: Number(result?.makeupSummary?.openNodeCount || 0),
+        makeupConflictCount: Number(result?.makeupSummary?.conflictCount || 0),
+        makeupCatchupCount: Number(result?.makeupSummary?.catchupCount || 0),
+        makeupCatchupHours: Number(result?.makeupSummary?.catchupHours || 0),
         submittedAt: String(priorTimesheet?.submissionSnapshot?.submittedAt || priorTimesheet?.audit?.lastUpdateDateTime || '')
     };
 }
@@ -620,17 +627,20 @@ async function resolvePriorReconciliationContext({ period, teacherId, activeOrgI
     });
     return {
         prior,
-        reconciliationState: result.unresolved.length ? 'unresolved' : 'resolved',
+        reconciliationState: result.makeupState === 'conflict'
+            ? 'conflict'
+            : (result.unresolved.length ? 'unresolved' : 'resolved'),
         result,
         priorReviewSummary: buildPriorReconciliationSummary(prior.priorTimesheet, result)
     };
 }
 
-function throwPriorReconciliationWarning(code, message, unresolved = []) {
+function throwPriorReconciliationWarning(code, message, unresolved = [], conflicts = []) {
     const warning = new Error(message);
     warning.status = 'warning';
     warning.code = code;
     warning.unresolved = Array.isArray(unresolved) ? unresolved : [];
+    warning.conflicts = Array.isArray(conflicts) ? conflicts : [];
     throw warning;
 }
 
@@ -1132,6 +1142,10 @@ exports.getTimesheetManagementRoster = async (req, res) => {
                 : (Array.isArray(timesheet?.entries) ? timesheet.entries : []);
             const reconciliationEntries = summaryEntries.filter((entry) => entry?.reconciliationRequired === true && entry?.isDeleted !== true);
             const provisionalEntries = reconciliationEntries.filter((entry) => entry?.isProvisional === true);
+            const makeupChains = Array.isArray(timesheet?.priorPeriodReconciliation?.makeupChains)
+                ? timesheet.priorPeriodReconciliation.makeupChains
+                : [];
+            const openMakeupChains = makeupChains.filter((chain) => chain?.state === 'open');
             return {
                 personId: personRow.personId,
                 name: personRow.name,
@@ -1147,6 +1161,11 @@ exports.getTimesheetManagementRoster = async (req, res) => {
                 provisionalHours: Number(provisionalEntries.reduce((sum, entry) => (
                     sum + (Number(entry?.hours ?? entry?.timesheetHours) || 0)
                 ), 0).toFixed(2)),
+                makeupState: String(timesheet?.priorPeriodReconciliation?.makeupState || 'none'),
+                makeupChainCount: makeupChains.length,
+                openMakeupChainCount: openMakeupChains.length,
+                openMakeupNodeCount: openMakeupChains.flatMap((chain) => Array.isArray(chain?.nodes) ? chain.nodes : [])
+                    .filter((node) => Array.isArray(node?.openReasons) && node.openReasons.length > 0).length,
                 revisionCount: countReviewReopenCycles(timesheet),
                 lastReopenNote: getLastReopenNote(timesheet),
                 openUrl: `/school/timesheets/editor/${encodeURIComponent(periodId)}?teacherId=${encodeURIComponent(personRow.personId)}`
@@ -1782,6 +1801,10 @@ exports.viewTimesheet = async (req, res) => {
                     timesheet.priorPeriodReconciliation
                     && idsEqual(timesheet.priorPeriodReconciliation.sourcePeriodId, prior.priorPeriod.id)
                     && timesheet.priorPeriodReconciliation.state === 'resolved'
+                    && (
+                        timesheet.priorPeriodReconciliation.makeupState !== 'open'
+                        || timesheet.priorPeriodReconciliation.makeupConfirmedAt
+                    )
                 );
                 priorReviewPending = !alreadyReviewed;
             }
@@ -2387,7 +2410,19 @@ exports.saveTimesheet = async (req, res) => {
                     && priorPeriodAdjustmentService.isReconciliationReceiptCurrent(
                         reviewedReceipt,
                         priorReconciliationContext.result
+                    )
+                    && priorPeriodAdjustmentService.isMakeupConfirmationCurrent(
+                        reviewedReceipt,
+                        priorReconciliationContext.result
                     );
+                if (priorReconciliationContext.result?.makeupState === 'conflict') {
+                    throwPriorReconciliationWarning(
+                        'MAKEUP_RECONCILIATION_GRAPH_INVALID',
+                        'The make-up session chain contains invalid or ambiguous relationships. Correct them before submitting this timesheet.',
+                        [],
+                        priorReconciliationContext.result.makeupConflicts
+                    );
+                }
                 if (priorReconciliationContext.result?.unresolved?.length) {
                     throwPriorReconciliationWarning(
                         'PRIOR_RECONCILIATION_UNRESOLVED',
@@ -2435,11 +2470,16 @@ exports.saveTimesheet = async (req, res) => {
                 entriesForSave = priorPeriodAdjustmentService.mergeAdjustmentEntriesForSource(
                     entriesForSave,
                     adjustmentEntries,
-                    priorPeriodId
+                    priorPeriodId,
+                    [
+                        ...(priorReconciliationContext.result?.makeupChains || []),
+                        ...(existing?.priorPeriodReconciliation?.makeupChains || [])
+                    ].map((chain) => chain?.rootSourcePeriodId)
                 );
                 priorReconciliationReceipt = priorPeriodAdjustmentService.buildReconciliationReceipt({
                     priorPeriod: priorReconciliationContext.prior.priorPeriod,
-                    result: priorReconciliationContext.result
+                    result: priorReconciliationContext.result,
+                    makeupConfirmedAt: reviewedReceipt?.makeupConfirmedAt || ''
                 });
                 reconciliationLockRefs = priorPeriodAdjustmentService.buildResolvedSourceRefs(
                     priorReconciliationContext.result
@@ -2562,7 +2602,8 @@ exports.saveTimesheet = async (req, res) => {
                 message: error.message,
                 data: {
                     conflicts: Array.isArray(error?.conflicts) ? error.conflicts : [],
-                    unresolved: Array.isArray(error?.unresolved) ? error.unresolved : []
+                    unresolved: Array.isArray(error?.unresolved) ? error.unresolved : [],
+                    makeupConflicts: Array.isArray(error?.conflicts) ? error.conflicts : []
                 }
             });
         }
@@ -2605,6 +2646,10 @@ exports.getPriorAdjustments = async (req, res) => {
                 existing.priorPeriodReconciliation,
                 context.result
             )
+            && priorPeriodAdjustmentService.isMakeupConfirmationCurrent(
+                existing.priorPeriodReconciliation,
+                context.result
+            )
         );
         return res.json({
             status: 'success',
@@ -2621,6 +2666,10 @@ exports.getPriorAdjustments = async (req, res) => {
             adjustments: context.result?.adjustments || [],
             unresolved: context.result?.unresolved || [],
             reconciliationResults: context.result?.items || [],
+            makeupState: context.result?.makeupState || 'none',
+            makeupSummary: context.result?.makeupSummary || {},
+            makeupChains: context.result?.makeupChains || [],
+            makeupConflicts: context.result?.makeupConflicts || [],
             alreadyApplied
         });
     } catch (error) {
@@ -2674,11 +2723,26 @@ exports.applyPriorAdjustments = async (req, res) => {
             error.httpStatus = 409;
             throw error;
         }
+        if (context.result?.makeupState === 'conflict') {
+            const error = new Error('The make-up session chain contains invalid or ambiguous relationships.');
+            error.code = 'MAKEUP_RECONCILIATION_GRAPH_INVALID';
+            error.httpStatus = 409;
+            error.makeupConflicts = context.result.makeupConflicts;
+            throw error;
+        }
         if (context.result?.unresolved?.length) {
             const error = new Error('One or more prior-period sessions are still non-final. Finalize them before continuing.');
             error.code = 'PRIOR_RECONCILIATION_UNRESOLVED';
             error.httpStatus = 409;
             error.unresolved = context.result.unresolved;
+            throw error;
+        }
+        const hasOpenMakeupChains = context.result?.makeupState === 'open';
+        if (hasOpenMakeupChains && req.body?.confirmOpenMakeupChains !== true) {
+            const error = new Error('Review the open make-up session chains and confirm that they should carry forward.');
+            error.code = 'MAKEUP_RECONCILIATION_CONFIRMATION_REQUIRED';
+            error.httpStatus = 409;
+            error.makeupChains = context.result.makeupChains;
             throw error;
         }
         const prior = context.prior;
@@ -2689,7 +2753,11 @@ exports.applyPriorAdjustments = async (req, res) => {
         const mergedEntries = priorPeriodAdjustmentService.mergeAdjustmentEntriesForSource(
             Array.isArray(existing?.entries) ? existing.entries : [],
             adjustmentEntries,
-            prior.priorPeriod.id
+            prior.priorPeriod.id,
+            [
+                ...(context.result?.makeupChains || []),
+                ...(existing?.priorPeriodReconciliation?.makeupChains || [])
+            ].map((chain) => chain?.rootSourcePeriodId)
         );
         const totalHours = mergedEntries.reduce((sum, entry) => {
             if (!entry || entry.isDeleted) return sum;
@@ -2707,7 +2775,8 @@ exports.applyPriorAdjustments = async (req, res) => {
             priorPeriodAdjustmentsAppliedFrom: String(prior.priorPeriod.id),
             priorPeriodReconciliation: priorPeriodAdjustmentService.buildReconciliationReceipt({
                 priorPeriod: prior.priorPeriod,
-                result: context.result
+                result: context.result,
+                confirmOpenMakeupChains: hasOpenMakeupChains
             })
         };
 
@@ -2727,6 +2796,9 @@ exports.applyPriorAdjustments = async (req, res) => {
             entries: saved?.entries || mergedEntries,
             reconciliationState: 'resolved',
             priorReviewSummary: context.priorReviewSummary,
+            makeupState: context.result?.makeupState || 'none',
+            makeupSummary: context.result?.makeupSummary || {},
+            makeupChains: context.result?.makeupChains || [],
             actionStateId: req.actionStateId || null
         };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);
@@ -2737,7 +2809,9 @@ exports.applyPriorAdjustments = async (req, res) => {
             status: 'error',
             code: String(error?.code || 'PRIOR_RECONCILIATION_FAILED'),
             message: error.message,
-            unresolved: Array.isArray(error?.unresolved) ? error.unresolved : []
+            unresolved: Array.isArray(error?.unresolved) ? error.unresolved : [],
+            makeupChains: Array.isArray(error?.makeupChains) ? error.makeupChains : [],
+            makeupConflicts: Array.isArray(error?.makeupConflicts) ? error.makeupConflicts : []
         });
     }
 };

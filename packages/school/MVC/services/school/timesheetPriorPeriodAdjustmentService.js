@@ -10,6 +10,7 @@ const dataService = require('./schoolDataService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const deadlineReconciliationService = require('./timesheetDeadlineReconciliationService');
+const makeupReconciliationService = require('./timesheetMakeupReconciliationService');
 const { buildReportReflectionLiveSessions } = require('./reportTimesheetReflectionService');
 const activityService = require('./activityService');
 const { sanitizeSnapshotEntry } = require('../../models/school/timesheetModel');
@@ -366,22 +367,57 @@ async function detectLegacyAdjustments({ snapshotEntries, priorPeriod, currentPe
 
 async function detectReconciliation({ priorTimesheet, priorPeriod, currentPeriod, teacherId, activeOrgId, reqUser }) {
     const snapshotEntries = resolveSnapshotEntries(priorTimesheet);
-    if (!snapshotEntries.length) {
-        return { adjustments: [], unresolved: [], items: [], reconciliationEntries: [], legacyEntryCount: 0 };
-    }
+    const carriedRootRefs = priorTimesheet?.priorPeriodReconciliation?.openMakeupRootRefs || [];
     const reconciliationEntries = deadlineReconciliationService.resolveReconciliationSnapshotEntries({
         submissionSnapshot: { entries: snapshotEntries }
     });
-    const reconciliationSessionIds = new Set(reconciliationEntries.map((entry) => normalizeId(entry?.sessionId)));
-    const legacyEntries = snapshotEntries.filter((entry) => !reconciliationSessionIds.has(normalizeId(entry?.sessionId)));
-    const classIndex = reconciliationEntries.length
-        ? await buildCurrentClassSessionIndex({ teacherId, activeOrgId, reqUser })
-        : new Map();
+    const reconciliationEntryKeys = new Set(reconciliationEntries.map((entry) => (
+        makeupReconciliationService.buildSessionKey(entry?.classId, entry?.sessionId)
+        || normalizeId(entry?.sessionId)
+    )));
+    const legacyEntries = snapshotEntries.filter((entry) => {
+        const key = makeupReconciliationService.buildSessionKey(entry?.classId, entry?.sessionId)
+            || normalizeId(entry?.sessionId);
+        return !reconciliationEntryKeys.has(key);
+    });
+    const [statusMeta, classes, allPeriods, allTimesheets] = await Promise.all([
+        sessionStatusPolicyService.getClientStatusMeta(activeOrgId || '', { includeInactive: true }),
+        dataService.fetchData('classes', {}, reqUser),
+        dataService.fetchData('timesheetPeriods', { orgId__eq: activeOrgId }, reqUser),
+        dataService.fetchData('timesheets', {}, reqUser)
+    ]);
+    const scopedClasses = (Array.isArray(classes) ? classes : [])
+        .filter((row) => !activeOrgId || idsEqual(row?.orgId, activeOrgId));
+    const sessionRows = await Promise.all(scopedClasses.map(async (classRow) => ([
+        normalizeId(classRow?.id),
+        await dataService.getClassSessions(classRow.id, reqUser)
+    ])));
+    const sessionsByClassId = new Map(sessionRows);
+    const sessionGraph = makeupReconciliationService.buildSessionGraph({
+        classes: scopedClasses,
+        sessionsByClassId,
+        statusMeta,
+        teacherId
+    });
+    const baselineKeys = new Set();
+    const baselineHoursByKey = new Map();
+    const identityConflicts = [];
     const items = reconciliationEntries.map((rawEntry) => {
         const snapshotEntry = sanitizeSnapshotEntry(rawEntry) || rawEntry;
+        const resolved = makeupReconciliationService.resolveGraphNode(sessionGraph, {
+            classId: snapshotEntry?.classId,
+            sessionId: snapshotEntry?.sessionId
+        });
+        if (resolved.conflict?.code === 'ambiguous_legacy_session_identity') {
+            identityConflicts.push(resolved.conflict);
+        }
+        if (resolved.node) {
+            baselineKeys.add(resolved.node.key);
+            baselineHoursByKey.set(resolved.node.key, roundHours(snapshotEntry?.hours));
+        }
         return buildReconciliationAdjustment({
             snapshotEntry,
-            live: classIndex.get(normalizeId(snapshotEntry?.sessionId)),
+            live: resolved.node,
             priorPeriod,
             currentPeriod
         });
@@ -407,6 +443,55 @@ async function detectReconciliation({ priorTimesheet, priorPeriod, currentPeriod
                 adjustmentSessionId: buildAdjustmentSessionId(priorPeriod?.id, item.sourceSessionId)
             };
         });
+    const rootRefs = reconciliationEntries.map((rawEntry) => {
+        const snapshotEntry = sanitizeSnapshotEntry(rawEntry) || rawEntry;
+        const resolved = makeupReconciliationService.resolveGraphNode(sessionGraph, {
+            classId: snapshotEntry?.classId,
+            sessionId: snapshotEntry?.sessionId
+        });
+        if (!resolved.node?.isFinalStatus || !resolved.node?.makeUpRequired) return null;
+        return {
+            classId: resolved.node.classId,
+            sessionId: resolved.node.sessionId,
+            sourcePeriodId: normalizeId(priorPeriod?.id)
+        };
+    }).filter(Boolean);
+    const scopedPeriodIds = new Set((Array.isArray(allPeriods) ? allPeriods : [])
+        .map((period) => normalizeId(period?.id))
+        .filter(Boolean));
+    const scopedTimesheets = (Array.isArray(allTimesheets) ? allTimesheets : []).filter((row) => (
+        (!activeOrgId || idsEqual(row?.orgId, activeOrgId))
+        || (!normalizeId(row?.orgId) && scopedPeriodIds.has(normalizeId(row?.periodId)))
+    ));
+    const paymentCoverage = makeupReconciliationService.buildPaymentCoverage({
+        timesheets: scopedTimesheets
+            .filter((row) => !idsEqual(row?.periodId, currentPeriod?.id)),
+        periods: allPeriods,
+        teacherId
+    });
+    const makeupResult = makeupReconciliationService.analyzeMakeupChains({
+        graph: sessionGraph,
+        rootRefs,
+        carriedRootRefs,
+        currentPeriod,
+        coverage: paymentCoverage,
+        baselineKeys,
+        baselineHoursByKey,
+        teacherId,
+        sourcePeriodId: normalizeId(priorPeriod?.id)
+    });
+    if (identityConflicts.length) {
+        makeupResult.makeupState = 'conflict';
+        makeupResult.conflicts.push(...identityConflicts);
+        makeupResult.summary.conflictCount = makeupResult.conflicts.length;
+    }
+    const periodNameById = new Map((Array.isArray(allPeriods) ? allPeriods : [])
+        .map((period) => [normalizeId(period?.id), String(period?.name || '')]));
+    const makeupAdjustments = (Array.isArray(makeupResult.adjustments) ? makeupResult.adjustments : [])
+        .map((row) => ({
+            ...row,
+            sourcePeriodName: periodNameById.get(normalizeId(row?.sourcePeriodId)) || String(priorPeriod?.name || '')
+        }));
     const legacyAdjustments = await detectLegacyAdjustments({
         snapshotEntries: legacyEntries,
         priorPeriod,
@@ -416,11 +501,16 @@ async function detectReconciliation({ priorTimesheet, priorPeriod, currentPeriod
         reqUser
     });
     return {
-        adjustments: [...reconciliationAdjustments, ...legacyAdjustments],
+        adjustments: [...reconciliationAdjustments, ...makeupAdjustments, ...legacyAdjustments],
         unresolved,
         items,
         reconciliationEntries,
-        legacyEntryCount: legacyEntries.length
+        legacyEntryCount: legacyEntries.length,
+        makeupState: makeupResult.makeupState,
+        makeupChains: makeupResult.chains,
+        makeupConflicts: makeupResult.conflicts,
+        openMakeupRootRefs: makeupResult.openMakeupRootRefs,
+        makeupSummary: makeupResult.summary
     };
 }
 
@@ -429,17 +519,30 @@ async function detectAdjustments(options) {
     return result.adjustments;
 }
 
-function buildReconciliationReceipt({ priorPeriod, result, state = '' }) {
+function buildReconciliationReceipt({
+    priorPeriod,
+    result,
+    state = '',
+    confirmOpenMakeupChains = false,
+    makeupConfirmedAt = ''
+}) {
     const unresolved = Array.isArray(result?.unresolved) ? result.unresolved : [];
     const now = new Date().toISOString();
-    return {
+    const receipt = {
         sourcePeriodId: normalizeId(priorPeriod?.id),
         state: state || (unresolved.length ? 'unresolved' : 'resolved'),
         reviewedAt: now,
         lastCheckedAt: now,
         fingerprint: buildReconciliationFingerprint(result),
-        items: (Array.isArray(result?.items) ? result.items : []).map((item) => ({ ...item }))
+        items: (Array.isArray(result?.items) ? result.items : []).map((item) => ({ ...item })),
+        makeupState: String(result?.makeupState || 'none'),
+        makeupChains: (Array.isArray(result?.makeupChains) ? result.makeupChains : []).map((chain) => ({ ...chain })),
+        openMakeupRootRefs: (Array.isArray(result?.openMakeupRootRefs) ? result.openMakeupRootRefs : []).map((ref) => ({ ...ref }))
     };
+    if (receipt.makeupState === 'open' && (confirmOpenMakeupChains || makeupConfirmedAt)) {
+        receipt.makeupConfirmedAt = normalizeId(makeupConfirmedAt) || now;
+    }
+    return receipt;
 }
 
 function buildReconciliationFingerprint(result = {}) {
@@ -472,8 +575,43 @@ function buildReconciliationFingerprint(result = {}) {
                 currentHours: roundHours(item?.currentHours),
                 adjustmentHours: roundHours(item?.adjustmentHours ?? item?.deltaHours),
                 reason: normalizeId(item?.reconciliationReason)
+            })),
+        ...(Array.isArray(result?.makeupChains) ? result.makeupChains : []).flatMap((chain) => (
+            (Array.isArray(chain?.nodes) ? chain.nodes : []).map((node) => ({
+                kind: 'makeup_chain',
+                rootClassId: normalizeId(chain?.rootClassId),
+                rootSessionId: normalizeId(chain?.rootSessionId),
+                rootSourcePeriodId: normalizeId(chain?.rootSourcePeriodId),
+                chainState: normalizeId(chain?.state),
+                key: normalizeId(node?.key),
+                parentKey: normalizeId(node?.parentKey),
+                date: normalizeId(node?.date),
+                status: normalizeId(node?.status),
+                hours: roundHours(node?.hours),
+                isFinalStatus: node?.isFinalStatus === true,
+                makeUpRequired: node?.makeUpRequired === true,
+                deliveryPersonIds: (Array.isArray(node?.deliveryPersonIds) ? node.deliveryPersonIds : []).map(normalizeId).sort(),
+                periodDisposition: normalizeId(node?.periodDisposition),
+                paymentDisposition: normalizeId(node?.paymentDisposition),
+                baselineHours: roundHours(node?.baselineHours),
+                finalHours: roundHours(node?.finalHours),
+                hasFinalHours: node?.hasFinalHours === true,
+                adjustmentHours: roundHours(node?.adjustmentHours),
+                isProvisional: node?.isProvisional === true,
+                allowedDurationHours: roundHours(node?.allowedDurationHours),
+                allocatedDurationHours: roundHours(node?.allocatedDurationHours),
+                remainingDurationHours: roundHours(node?.remainingDurationHours),
+                openReasons: (Array.isArray(node?.openReasons) ? node.openReasons : []).map(normalizeId).sort()
             }))
-    ].sort((left, right) => `${left.kind}:${left.sourceSessionId}`.localeCompare(`${right.kind}:${right.sourceSessionId}`));
+        )),
+        ...(Array.isArray(result?.makeupConflicts) ? result.makeupConflicts : []).map((conflict) => ({
+            kind: 'makeup_conflict',
+            code: normalizeId(conflict?.code),
+            classId: normalizeId(conflict?.classId),
+            sessionId: normalizeId(conflict?.sessionId),
+            message: normalizeId(conflict?.message)
+        }))
+    ].sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
     return crypto.createHash('sha256').update(JSON.stringify(rows)).digest('hex');
 }
 
@@ -481,6 +619,12 @@ function isReconciliationReceiptCurrent(receipt = {}, result = {}) {
     const fingerprint = normalizeId(receipt?.fingerprint);
     if (!fingerprint) return false;
     return fingerprint === buildReconciliationFingerprint(result);
+}
+
+function isMakeupConfirmationCurrent(receipt = {}, result = {}) {
+    if (String(result?.makeupState || 'none') !== 'open') return true;
+    return Boolean(normalizeId(receipt?.makeupConfirmedAt))
+        && isReconciliationReceiptCurrent(receipt, result);
 }
 
 function buildAdjustmentEntries({ adjustments, applyDate }) {
@@ -502,6 +646,7 @@ function buildAdjustmentEntries({ adjustments, applyDate }) {
             adjustmentMeta: {
                 sourcePeriodId: adj.sourcePeriodId,
                 sourceSessionId: adj.sourceSessionId,
+                sourceClassId: adj.sourceClassId || adj.classId || '',
                 sourceSessionDate: adj.sourceSessionDate,
                 sourceType: adj.sourceType || 'class_session',
                 baselineStatus: adj.baselineStatus || '',
@@ -510,7 +655,14 @@ function buildAdjustmentEntries({ adjustments, applyDate }) {
                 reconciliationReason: adj.reconciliationReason || adj.resolutionReason || '',
                 snapshotHours: adj.snapshotHours ?? adj.baselineHours,
                 currentHours: adj.currentHours,
-                deltaHours: adjustmentHours
+                deltaHours: adjustmentHours,
+                paymentDisposition: adj.paymentDisposition || '',
+                makeupRootClassId: adj.makeupRootClassId || '',
+                makeupRootSessionId: adj.makeupRootSessionId || '',
+                makeupRootSourcePeriodId: adj.makeupRootSourcePeriodId || '',
+                makeupDepth: Number(adj.makeupDepth || 0),
+                assignedPersonId: adj.assignedPersonId || '',
+                claimKey: adj.claimKey || ''
             }
         };
     });
@@ -524,20 +676,35 @@ function mergeAdjustmentEntries(existingEntries, adjustmentEntries) {
     return [...kept, ...(Array.isArray(adjustmentEntries) ? adjustmentEntries : [])];
 }
 
-function mergeAdjustmentEntriesForSource(existingEntries, adjustmentEntries, sourcePeriodId) {
+function mergeAdjustmentEntriesForSource(existingEntries, adjustmentEntries, sourcePeriodId, makeupSourcePeriodIds = []) {
     const sourceId = normalizeId(sourcePeriodId);
     const prefix = `adj-${sourceId.replace(/[^A-Za-z0-9_-]/g, '_')}-`;
+    const adjustmentIds = new Set((Array.isArray(adjustmentEntries) ? adjustmentEntries : [])
+        .map((row) => normalizeId(row?.sessionId))
+        .filter(Boolean));
+    const makeupSourceIds = new Set((Array.isArray(makeupSourcePeriodIds) ? makeupSourcePeriodIds : [])
+        .map(normalizeId)
+        .filter(Boolean));
     const kept = (Array.isArray(existingEntries) ? existingEntries : []).filter((row) => {
         if (row?.isPriorPeriodAdjustment !== true) return true;
+        if (adjustmentIds.has(normalizeId(row?.sessionId))) return false;
         const rowSource = normalizeId(row?.adjustmentMeta?.sourcePeriodId);
         if (rowSource && idsEqual(rowSource, sourceId)) return false;
+        const reconciliationReason = normalizeId(row?.adjustmentMeta?.reconciliationReason);
+        if (
+            rowSource
+            && makeupSourceIds.has(rowSource)
+            && ['makeup_closed_period_catchup', 'reassigned_closed_period_catchup'].includes(reconciliationReason)
+        ) {
+            return false;
+        }
         return !normalizeId(row?.sessionId).startsWith(prefix);
     });
     return [...kept, ...(Array.isArray(adjustmentEntries) ? adjustmentEntries : [])];
 }
 
 function buildResolvedSourceRefs(result = {}) {
-    return (Array.isArray(result?.items) ? result.items : [])
+    const reconciliationRefs = (Array.isArray(result?.items) ? result.items : [])
         .filter((item) => item?.state === 'resolved' && item?.classId && item?.sourceSessionId)
         .filter((item) => !['removed_or_reassigned', 'moved_outside_review_periods'].includes(String(item?.resolutionReason || '')))
         .map((item) => ({
@@ -545,6 +712,17 @@ function buildResolvedSourceRefs(result = {}) {
             classId: String(item.classId),
             sessionId: String(item.sourceSessionId)
         }));
+    const catchupRefs = (Array.isArray(result?.makeupChains) ? result.makeupChains : [])
+        .flatMap((chain) => Array.isArray(chain?.nodes) ? chain.nodes : [])
+        .filter((node) => node?.paymentDisposition === 'catch_up' && node?.classId && node?.sessionId)
+        .map((node) => ({
+            type: 'classSession',
+            classId: String(node.classId),
+            sessionId: String(node.sessionId)
+        }));
+    const unique = new Map();
+    [...reconciliationRefs, ...catchupRefs].forEach((ref) => unique.set(`${ref.classId}::${ref.sessionId}`, ref));
+    return [...unique.values()];
 }
 
 module.exports = {
@@ -559,6 +737,7 @@ module.exports = {
     detectReconciliation,
     findPriorSubmittedTimesheet,
     isPriorTimesheetPayrollFinal,
+    isMakeupConfirmationCurrent,
     isReconciliationReceiptCurrent,
     mergeAdjustmentEntries,
     mergeAdjustmentEntriesForSource,

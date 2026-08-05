@@ -374,6 +374,13 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
   const departmentTotals = buildDepartmentTotals(entries);
   const reconciliationEntries = entries.filter((entry) => entry.reconciliationRequired === true);
   const provisionalEntries = reconciliationEntries.filter((entry) => entry.isProvisional === true);
+  const makeupChains = Array.isArray(timesheet?.priorPeriodReconciliation?.makeupChains)
+    ? timesheet.priorPeriodReconciliation.makeupChains
+    : [];
+  const openMakeupChains = makeupChains.filter((chain) => chain?.state === 'open');
+  const openMakeupNodes = openMakeupChains
+    .flatMap((chain) => Array.isArray(chain?.nodes) ? chain.nodes : [])
+    .filter((node) => Array.isArray(node?.openReasons) && node.openReasons.length > 0);
   return {
     person: {
       id: personId,
@@ -393,6 +400,10 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
     reconciliationEntryCount: reconciliationEntries.length,
     provisionalEntryCount: provisionalEntries.length,
     provisionalHours: roundHours(provisionalEntries.reduce((sum, entry) => sum + entry.payableHours, 0)),
+    makeupState: cleanText(timesheet?.priorPeriodReconciliation?.makeupState || 'none'),
+    makeupChainCount: makeupChains.length,
+    openMakeupChainCount: openMakeupChains.length,
+    openMakeupNodeCount: openMakeupNodes.length,
     payableTotalHours: roundHours(entries.reduce((sum, entry) => sum + entry.payableHours, 0))
   };
 }

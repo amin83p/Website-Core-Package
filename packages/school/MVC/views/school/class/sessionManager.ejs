@@ -1221,7 +1221,11 @@
             ? (currentSessionStatusMeta.isFinal === true && currentSessionStatusMeta.makeUpRequired !== true && currentSessionStatusMeta.excludeFromAttendance !== true)
             : currentSessionStatus === 'completed';
         const isMakeupRequiredInactive = currentSessionStatusMeta && currentSessionStatusMeta.makeUpRequired === true;
-        const canCreateMakeupSession = !isReadOnly && currentSessionStatusMeta && currentSessionStatusMeta.makeUpRequired === true;
+        const canCreateMakeupSession = Boolean(
+            (typeof canCreateMakeupWhileLocked !== 'undefined' ? canCreateMakeupWhileLocked : !isReadOnly)
+            && currentSessionStatusMeta
+            && currentSessionStatusMeta.makeUpRequired === true
+        );
         const makeupAllocationSummary = (typeof makeupSummary !== 'undefined' && makeupSummary && typeof makeupSummary === 'object')
             ? makeupSummary
             : { sessions: [], sessionCount: 0, originalDurationHours: 0, allowedDurationPercent: Number(currentSessionStatusMeta?.makeupDurationPercent || 100), allowedDurationHours: 0, allocatedDurationHours: 0, remainingDurationHours: 0, excessDurationHours: 0, isOverAllocated: false };

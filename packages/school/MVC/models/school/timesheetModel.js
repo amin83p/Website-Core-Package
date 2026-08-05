@@ -365,6 +365,7 @@ function sanitizeAdjustmentMeta(input) {
     return {
         sourcePeriodId: cleanString(input.sourcePeriodId, { max: 64, allowEmpty: true }),
         sourceSessionId: cleanString(input.sourceSessionId, { max: 80, allowEmpty: true }),
+        sourceClassId: cleanString(input.sourceClassId, { max: 64, allowEmpty: true }),
         sourceSessionDate: cleanDate(input.sourceSessionDate, { allowEmpty: true }),
         sourceType: cleanString(input.sourceType, { max: 40, allowEmpty: true }).toLowerCase() || 'class_session',
         baselineStatus: cleanString(input.baselineStatus, { max: 40, allowEmpty: true }).toLowerCase(),
@@ -373,7 +374,93 @@ function sanitizeAdjustmentMeta(input) {
         reconciliationReason: cleanString(input.reconciliationReason, { max: 80, allowEmpty: true }).toLowerCase(),
         snapshotHours: cleanHours(input.snapshotHours ?? 0, { min: -24, max: 24 }),
         currentHours: cleanHours(input.currentHours ?? 0, { min: -24, max: 24 }),
-        deltaHours: cleanHours(input.deltaHours ?? 0, { min: -24, max: 24 })
+        deltaHours: cleanHours(input.deltaHours ?? 0, { min: -24, max: 24 }),
+        paymentDisposition: cleanString(input.paymentDisposition, { max: 60, allowEmpty: true }).toLowerCase(),
+        makeupRootClassId: cleanString(input.makeupRootClassId, { max: 64, allowEmpty: true }),
+        makeupRootSessionId: cleanString(input.makeupRootSessionId, { max: 80, allowEmpty: true }),
+        makeupRootSourcePeriodId: cleanString(input.makeupRootSourcePeriodId, { max: 64, allowEmpty: true }),
+        makeupDepth: cleanNonNegativeInteger(input.makeupDepth, 0),
+        assignedPersonId: cleanString(input.assignedPersonId, { max: 80, allowEmpty: true }),
+        claimKey: cleanString(input.claimKey, { max: 128, allowEmpty: true }).toLowerCase()
+    };
+}
+
+function sanitizeMakeupRootRef(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const classId = cleanString(input.classId || input.rootClassId, { max: 64, allowEmpty: false });
+    const sessionId = cleanString(input.sessionId || input.rootSessionId, { max: 80, allowEmpty: false });
+    if (!classId || !sessionId) return null;
+    return {
+        classId,
+        sessionId,
+        sourcePeriodId: cleanString(input.sourcePeriodId || input.rootSourcePeriodId, { max: 64, allowEmpty: true })
+    };
+}
+
+function sanitizeMakeupChainNode(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const classId = cleanString(input.classId, { max: 64, allowEmpty: false });
+    const sessionId = cleanString(input.sessionId, { max: 80, allowEmpty: false });
+    if (!classId || !sessionId) return null;
+    return {
+        key: cleanString(input.key || `${classId}::${sessionId}`, { max: 180, allowEmpty: true }),
+        classId,
+        className: cleanString(input.className, { max: 200, allowEmpty: true }),
+        sessionId,
+        parentKey: cleanString(input.parentKey, { max: 180, allowEmpty: true }),
+        depth: cleanNonNegativeInteger(input.depth, 0),
+        date: cleanDate(input.date, { allowEmpty: true }),
+        startTime: cleanTime(input.startTime, { allowEmpty: true }),
+        endTime: cleanTime(input.endTime, { allowEmpty: true }),
+        durationHours: cleanHours(input.durationHours ?? 0, { min: 0, max: 24 }),
+        status: cleanString(input.status, { max: 40, allowEmpty: true }).toLowerCase(),
+        statusLabel: cleanString(input.statusLabel, { max: 120, allowEmpty: true }),
+        hours: cleanHours(input.hours ?? 0, { min: 0, max: 24 }),
+        baselineHours: cleanHours(input.baselineHours ?? 0, { min: 0, max: 24 }),
+        finalHours: cleanHours(input.finalHours ?? 0, { min: 0, max: 24 }),
+        hasFinalHours: input.hasFinalHours === true,
+        adjustmentHours: cleanHours(input.adjustmentHours ?? 0, { min: -24, max: 24 }),
+        isProvisional: input.isProvisional === true,
+        isFinalStatus: input.isFinalStatus === true,
+        makeUpRequired: input.makeUpRequired === true,
+        isMakeupSession: input.isMakeupSession === true,
+        deliveryPersonIds: (Array.isArray(input.deliveryPersonIds) ? input.deliveryPersonIds : [])
+            .map((value) => cleanString(value, { max: 80, allowEmpty: true }))
+            .filter(Boolean)
+            .slice(0, 12),
+        teacherName: cleanString(input.teacherName, { max: 180, allowEmpty: true }),
+        assignedToTeacher: input.assignedToTeacher === true,
+        periodDisposition: cleanString(input.periodDisposition, { max: 60, allowEmpty: true }).toLowerCase(),
+        paymentDisposition: cleanString(input.paymentDisposition, { max: 60, allowEmpty: true }).toLowerCase(),
+        allowedDurationHours: cleanHours(input.allowedDurationHours ?? 0, { min: 0, max: 24 }),
+        allocatedDurationHours: cleanHours(input.allocatedDurationHours ?? 0, { min: 0, max: 24 }),
+        remainingDurationHours: cleanHours(input.remainingDurationHours ?? 0, { min: 0, max: 24 }),
+        isFullyAllocated: input.isFullyAllocated === true,
+        isOverAllocated: input.isOverAllocated === true,
+        openReasons: (Array.isArray(input.openReasons) ? input.openReasons : [])
+            .map((value) => cleanString(value, { max: 80, allowEmpty: true }).toLowerCase())
+            .filter(Boolean)
+            .slice(0, 12),
+        manageUrl: cleanString(input.manageUrl, { max: 500, allowEmpty: true }),
+        targetPersonId: cleanString(input.targetPersonId, { max: 80, allowEmpty: true })
+    };
+}
+
+function sanitizeMakeupChain(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const rootClassId = cleanString(input.rootClassId, { max: 64, allowEmpty: false });
+    const rootSessionId = cleanString(input.rootSessionId, { max: 80, allowEmpty: false });
+    if (!rootClassId || !rootSessionId) return null;
+    const stateToken = cleanString(input.state, { max: 30, allowEmpty: true }).toLowerCase();
+    return {
+        rootClassId,
+        rootSessionId,
+        rootSourcePeriodId: cleanString(input.rootSourcePeriodId, { max: 64, allowEmpty: true }),
+        state: ['open', 'complete', 'conflict'].includes(stateToken) ? stateToken : 'open',
+        nodes: (Array.isArray(input.nodes) ? input.nodes : [])
+            .map(sanitizeMakeupChainNode)
+            .filter(Boolean)
+            .slice(0, 500)
     };
 }
 
@@ -416,12 +503,26 @@ function sanitizePriorPeriodReconciliation(input) {
             .filter(Boolean)
             .slice(0, 3000)
     };
+    const makeupStateToken = cleanString(input.makeupState, { max: 30, allowEmpty: true }).toLowerCase();
+    result.makeupState = ['none', 'open', 'complete', 'conflict'].includes(makeupStateToken)
+        ? makeupStateToken
+        : 'none';
+    result.makeupChains = (Array.isArray(input.makeupChains) ? input.makeupChains : [])
+        .map(sanitizeMakeupChain)
+        .filter(Boolean)
+        .slice(0, 100);
+    result.openMakeupRootRefs = (Array.isArray(input.openMakeupRootRefs) ? input.openMakeupRootRefs : [])
+        .map(sanitizeMakeupRootRef)
+        .filter(Boolean)
+        .slice(0, 100);
     const reviewedAt = cleanString(input.reviewedAt, { max: 40, allowEmpty: true });
     const lastCheckedAt = cleanString(input.lastCheckedAt, { max: 40, allowEmpty: true });
     const fingerprint = cleanString(input.fingerprint, { max: 128, allowEmpty: true }).toLowerCase();
+    const makeupConfirmedAt = cleanString(input.makeupConfirmedAt, { max: 40, allowEmpty: true });
     if (reviewedAt) result.reviewedAt = reviewedAt;
     if (lastCheckedAt) result.lastCheckedAt = lastCheckedAt;
     if (fingerprint) result.fingerprint = fingerprint;
+    if (makeupConfirmedAt) result.makeupConfirmedAt = makeupConfirmedAt;
     return result;
 }
 

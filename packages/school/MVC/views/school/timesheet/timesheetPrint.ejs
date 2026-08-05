@@ -168,6 +168,12 @@
               <strong><%= document.reconciliationEntryCount %></strong> window session(s) will be checked in the next timesheet.
             </div>
           <% } %>
+          <% if (document.openMakeupChainCount > 0) { %>
+            <div class="reconciliation-summary">
+              Open make-up reconciliation: <strong><%= document.openMakeupChainCount %></strong> confirmed chain(s),
+              <strong><%= document.openMakeupNodeCount %></strong> open session or scheduling obligation(s). These will be checked in a later timesheet.
+            </div>
+          <% } %>
         </div>
         <img class="print-logo" src="<%= printLogoUrl %>" alt="<%= printLogoAlt %>" onerror="this.style.display='none'">
       </div>

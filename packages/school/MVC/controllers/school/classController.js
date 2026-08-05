@@ -3933,6 +3933,10 @@ async function manageSession(req, res) {
             canOverride
             || (canEditSession && sessionDeliveryTeamService.isPersonSessionMainTeacher(session, viewerPersonId))
         );
+        const canCreateMakeupWhileLocked = Boolean(
+            canEditSession
+            && (!isSessionLocked || canOverride || String(session?.lockReason || '') === 'timesheet_approved')
+        );
 
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
@@ -3955,6 +3959,7 @@ async function manageSession(req, res) {
             isReadOnly,
             canEditSessionMetadata: canOverride,
             canOverrideMakeupDuration,
+            canCreateMakeupWhileLocked,
             makeupSummary,
             makeupOriginalSessionReference,
             canViewSchoolSettings,
@@ -4230,6 +4235,14 @@ async function createMakeupSession(req, res) {
 
             const originalSession = sessions[originalIndex];
             await assertCanCreateMakeupSession(req, classData, originalSession);
+            const originalIsLocked = originalSession?.locked === true || String(originalSession?.locked) === 'true';
+            if (
+                originalIsLocked
+                && String(originalSession?.lockReason || '') !== 'timesheet_approved'
+                && !canOverrideMakeupDuration
+            ) {
+                throw new Error('This session is locked and cannot be used to create a make-up session.');
+            }
 
             const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
                 includeInactive: true

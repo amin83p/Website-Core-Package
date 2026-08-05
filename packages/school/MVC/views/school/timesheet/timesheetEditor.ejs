@@ -846,6 +846,7 @@
     <% } %>
 
     <div id="provisionalSessionsSummary" class="ts-reconciliation-note mb-4 d-none" role="status" aria-live="polite"></div>
+    <div id="openMakeupChainSummary" class="alert alert-warning border mb-4 d-none" role="status" aria-live="polite"></div>
 
     <div id="incompleteSessionsPanel" class="card border-warning shadow-sm mb-4 d-none">
         <button type="button" class="card-header bg-warning-subtle border-warning d-flex align-items-center justify-content-between py-3 w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#incompleteSessionsCollapse" aria-expanded="false" aria-controls="incompleteSessionsCollapse" id="incompleteSessionsToggle">
@@ -1209,6 +1210,16 @@
             <tbody id="priorAdjustmentTableBody"></tbody>
           </table>
         </div>
+        <section class="mt-4 d-none" id="priorMakeupChainSection">
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <h6 class="fw-bold mb-0"><i class="bi bi-diagram-3 text-warning me-2"></i>Make-up Reconciliation Chains</h6>
+            <span class="badge text-bg-light border" id="priorMakeupChainCount"></span>
+          </div>
+          <div id="priorMakeupChainList" class="d-grid gap-2"></div>
+          <div class="alert alert-warning small mt-3 mb-0 d-none" id="priorMakeupCarryConfirmation">
+            Open make-up obligations will carry into later timesheets. Confirming this review does not let you choose or change payable hours.
+          </div>
+        </section>
       </div>
       <div class="modal-footer bg-light border-0">
         <button type="button" class="btn btn-outline-secondary" id="btnPriorAdjustmentLater"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Timesheet</button>
@@ -1228,6 +1239,7 @@
     const HOLIDAYS = <%- JSON.stringify(holidays || []) %>;
     const TIMESHEET_ENTRIES = <%- JSON.stringify(timesheet.entries || []) %>;
     const SNAPSHOT_ENTRIES = <%- JSON.stringify((timesheet.submissionSnapshot && timesheet.submissionSnapshot.entries) || []) %>;
+    const PRIOR_RECONCILIATION_RECEIPT = <%- JSON.stringify(timesheet.priorPeriodReconciliation || null) %>;
     const USE_FROZEN_SNAPSHOT = <%= (typeof useFrozenSnapshot !== 'undefined' && useFrozenSnapshot) ? 'true' : 'false' %>;
     const MANUAL_ACTIVITIES = <%- JSON.stringify(manualActivities || []) %>;
     const INCOMPLETE_SESSIONS = <%- JSON.stringify(incompleteSessions || []) %>;
@@ -1249,6 +1261,7 @@
     const PAYROLL_DEFAULT_ROLE = "<%= typeof payrollDefaultRole !== 'undefined' ? payrollDefaultRole : 'teacher' %>";
     const PAYROLL_WARNINGS = <%- JSON.stringify(typeof payrollWarnings !== 'undefined' ? payrollWarnings : []) %>;
     let actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+    let priorReviewHasOpenMakeupChains = false;
 
     const liveSessionById = new Map();
     const liveDepartmentByClassId = new Map();
@@ -2655,6 +2668,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 provisionalSummary.innerHTML = '';
             }
         }
+        const openMakeupSummary = document.getElementById('openMakeupChainSummary');
+        if (openMakeupSummary) {
+            const receiptChains = Array.isArray(PRIOR_RECONCILIATION_RECEIPT?.makeupChains)
+                ? PRIOR_RECONCILIATION_RECEIPT.makeupChains
+                : [];
+            const openChains = receiptChains.filter((chain) => chain?.state === 'open');
+            const openNodes = openChains.flatMap((chain) => Array.isArray(chain?.nodes) ? chain.nodes : [])
+                .filter((node) => Array.isArray(node?.openReasons) && node.openReasons.length > 0);
+            if (openChains.length > 0) {
+                openMakeupSummary.classList.remove('d-none');
+                openMakeupSummary.innerHTML = `<div class="d-flex gap-3 align-items-start">
+                    <i class="bi bi-diagram-3 fs-4" aria-hidden="true"></i>
+                    <div><div class="fw-bold">Open make-up reconciliation</div>
+                    <div class="small">${openChains.length} confirmed chain(s) with ${openNodes.length} open session or scheduling obligation(s) will be checked again in a later timesheet. Payable hours remain based on each session's configured status formula.</div></div>
+                </div>`;
+            } else {
+                openMakeupSummary.classList.add('d-none');
+                openMakeupSummary.innerHTML = '';
+            }
+        }
         renderDepartmentTotals();
 
         const btnSubmit = document.getElementById('btnSubmit');
@@ -3552,7 +3585,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (result.status === 'warning' && [
                 'PRIOR_RECONCILIATION_UNRESOLVED',
                 'PRIOR_RECONCILIATION_REVIEW_REQUIRED',
-                'PRIOR_TIMESHEET_NOT_PROCESSED'
+                'PRIOR_TIMESHEET_NOT_PROCESSED',
+                'MAKEUP_RECONCILIATION_GRAPH_INVALID'
             ].includes(result.code)) {
                 const unresolved = Array.isArray(result?.data?.unresolved) ? result.data.unresolved : [];
                 const sessionLinks = unresolved
@@ -3564,8 +3598,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     icon: 'warning',
                     message: `${result.message || 'Prior-period reconciliation must be completed before submission.'}${sessionLinks ? `<ul class="text-start mt-2 mb-0">${sessionLinks}</ul>` : ''}`
                 });
-                if (result.code === 'PRIOR_RECONCILIATION_REVIEW_REQUIRED') {
-                    await loadPriorAdjustmentsReview();
+                if (['PRIOR_RECONCILIATION_REVIEW_REQUIRED', 'MAKEUP_RECONCILIATION_GRAPH_INVALID'].includes(result.code)) {
+                    await loadPriorAdjustmentsReview({ force: true });
                 }
                 return;
             }
@@ -3946,7 +3980,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const applyRes = await fetch(`/school/timesheets/editor/${PERIOD_ID}/apply-prior-adjustments${buildMutationQuery()}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
-            body: JSON.stringify({ actionStateId })
+            body: JSON.stringify({
+                actionStateId,
+                confirmOpenMakeupChains: priorReviewHasOpenMakeupChains
+            })
         });
         const applyResult = await applyRes.json();
         if (applyResult.status !== 'success') throw new Error(applyResult.message || 'Failed to complete prior-period review.');
@@ -3957,8 +3994,104 @@ document.addEventListener('DOMContentLoaded', () => {
         return applyResult;
     }
 
-    async function loadPriorAdjustmentsReview() {
-        if (!SHOW_PRIOR_ADJUSTMENT_REVIEW || IS_READONLY) return;
+    function renderPriorMakeupChains(result = {}) {
+        const chains = Array.isArray(result.makeupChains) ? result.makeupChains : [];
+        const conflicts = Array.isArray(result.makeupConflicts) ? result.makeupConflicts : [];
+        const section = document.getElementById('priorMakeupChainSection');
+        const list = document.getElementById('priorMakeupChainList');
+        const count = document.getElementById('priorMakeupChainCount');
+        const confirmation = document.getElementById('priorMakeupCarryConfirmation');
+        priorReviewHasOpenMakeupChains = result.makeupState === 'open'
+            || chains.some((chain) => chain?.state === 'open');
+        if (!section || !list || (!chains.length && !conflicts.length)) {
+            section?.classList.add('d-none');
+            if (list) list.innerHTML = '';
+            return;
+        }
+        section.classList.remove('d-none');
+        if (count) count.textContent = `${chains.length} chain${chains.length === 1 ? '' : 's'}`;
+        confirmation?.classList.toggle('d-none', !priorReviewHasOpenMakeupChains);
+
+        const paymentLabels = {
+            reconciled_baseline: 'Parent reconciliation',
+            baseline_reversal: 'Prior baseline reversal',
+            already_paid: 'Already covered',
+            pending_payroll: 'Pending payroll processing',
+            pending_finalization: 'Awaiting final status',
+            catch_up: 'Catch-up adjustment',
+            resolved_zero: 'Resolved at 0.00 hrs',
+            current_period: 'Current timesheet row',
+            future_period: 'Future timesheet',
+            assigned_elsewhere: 'Assigned to another delivery team',
+            pending_schedule: 'Schedule pending'
+        };
+        const reasonLabels = {
+            status_not_final: 'Status not final',
+            invalid_allowance: 'Invalid make-up allowance',
+            makeup_not_fully_scheduled: 'Remaining make-up time must be scheduled',
+            pending_finalization: 'Awaiting final status',
+            future_period: 'Scheduled for a future period',
+            pending_payroll: 'Waiting for payroll processing'
+        };
+        const chainCards = chains.map((chain, chainIndex) => {
+            const nodes = Array.isArray(chain?.nodes) ? chain.nodes : [];
+            const root = nodes[0] || {};
+            const state = String(chain?.state || 'open');
+            const stateClass = state === 'complete' ? 'text-bg-success' : (state === 'conflict' ? 'text-bg-danger' : 'text-bg-warning');
+            const nodeRows = nodes.map((node) => {
+                const depth = Math.max(0, Number(node?.depth || 0));
+                const reasons = (Array.isArray(node?.openReasons) ? node.openReasons : [])
+                    .map((reason) => reasonLabels[reason] || String(reason || '').replaceAll('_', ' '));
+                const allocation = node?.makeUpRequired === true
+                    ? `<div class="small text-muted mt-1">Make-up allocation: ${Number(node.allocatedDurationHours || 0).toFixed(2)} / ${Number(node.allowedDurationHours || 0).toFixed(2)} hrs; ${Number(node.remainingDurationHours || 0).toFixed(2)} hrs remaining.</div>`
+                    : '';
+                const responsible = node?.assignedToTeacher === true
+                    ? (node.teacherName || 'Current timesheet owner')
+                    : (node.teacherName || 'Another delivery team');
+                const scheduleLink = node?.makeUpRequired === true && Number(node.remainingDurationHours || 0) > 0 && node.manageUrl
+                    ? `<a class="btn btn-sm btn-outline-warning" href="${escapeHtml(node.manageUrl)}" target="_blank" rel="noopener"><i class="bi bi-calendar-plus me-1"></i>Schedule remaining make-up</a>`
+                    : '';
+                return `
+                    <div class="border rounded p-2 bg-white" style="margin-left:${Math.min(depth, 8) * 1.25}rem">
+                      <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                        <div>
+                          <div class="fw-semibold">${depth ? '<i class="bi bi-arrow-return-right me-1 text-muted"></i>' : ''}${escapeHtml(node.className || 'Session')} - ${escapeHtml(node.date || '-')}</div>
+                          <div class="small text-muted">${escapeHtml(node.statusLabel || node.status || 'Unknown')} &middot; ${node.isFinalStatus === true ? 'Final' : (node.isProvisional === true ? 'Provisional reconciliation' : 'Not final')} &middot; ${escapeHtml(responsible)}</div>
+                        </div>
+                        <div class="text-end">
+                          <span class="badge ${node.isFinalStatus === true ? 'text-bg-success' : 'text-bg-warning'}">${escapeHtml(node.statusLabel || node.status || 'Unknown')}</span>
+                          ${node.isProvisional === true ? '<span class="badge text-bg-info ms-1">Provisional</span>' : ''}
+                          ${node.makeUpRequired === true ? '<span class="badge text-bg-light border text-warning-emphasis ms-1">Make-up required</span>' : ''}
+                          <div class="small fw-semibold mt-1">Formula: ${Number(node.hours || 0).toFixed(2)} hrs &middot; ${escapeHtml(paymentLabels[node.paymentDisposition] || node.paymentDisposition || '-')}</div>
+                        </div>
+                      </div>
+                      <div class="small mt-2">Baseline: <strong>${Number(node.baselineHours || 0).toFixed(2)} hrs</strong> &middot; Final: <strong>${node.hasFinalHours === true ? `${Number(node.finalHours || 0).toFixed(2)} hrs` : 'Pending'}</strong> &middot; Difference: <strong>${Number(node.adjustmentHours || 0) > 0 ? '+' : ''}${Number(node.adjustmentHours || 0).toFixed(2)} hrs</strong></div>
+                      ${allocation}
+                      ${reasons.length ? `<div class="small text-warning-emphasis mt-1">${reasons.map(escapeHtml).join(' &middot; ')}</div>` : ''}
+                      <div class="d-flex flex-wrap gap-2 mt-2">
+                        ${node.manageUrl ? `<a class="btn btn-sm btn-outline-primary" href="${escapeHtml(node.manageUrl)}" target="_blank" rel="noopener">Open session</a>` : ''}
+                        ${scheduleLink}
+                      </div>
+                    </div>`;
+            }).join('');
+            return `
+                <details class="border rounded bg-light" ${state === 'open' || state === 'conflict' || chainIndex === 0 ? 'open' : ''}>
+                  <summary class="p-3 fw-semibold d-flex align-items-center justify-content-between gap-2">
+                    <span>${escapeHtml(root.className || 'Make-up chain')} - root ${escapeHtml(chain.rootSessionId || root.sessionId || '')}</span>
+                    <span class="badge ${stateClass}">${escapeHtml(state)}</span>
+                  </summary>
+                  <div class="px-3 pb-3 d-grid gap-2">${nodeRows || '<div class="text-muted small">No chain sessions were found.</div>'}</div>
+                </details>`;
+        });
+        const conflictRows = conflicts.length
+            ? `<div class="alert alert-danger mb-0"><strong>Chain validation failed.</strong><ul class="mb-0 mt-1">${conflicts.map((row) => `<li>${escapeHtml(row.message || row.code || 'Invalid make-up relationship')}</li>`).join('')}</ul></div>`
+            : '';
+        list.innerHTML = `${conflictRows}${chainCards.join('')}`;
+    }
+
+    async function loadPriorAdjustmentsReview(options = {}) {
+        const force = options?.force === true;
+        if ((!SHOW_PRIOR_ADJUSTMENT_REVIEW && !force) || IS_READONLY) return;
 
         const loadingToken = showTimesheetWaitingModal({
             title: 'Loading Review',
@@ -3985,14 +4118,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const hasAdjustments = adjustments.length > 0;
             const hasUnresolved = unresolved.length > 0;
             const awaitingPriorProcessing = result.reconciliationState === 'awaiting_prior_processing';
+            const hasMakeupConflict = result.makeupState === 'conflict'
+                || (Array.isArray(result.makeupConflicts) && result.makeupConflicts.length > 0);
             const summary = result.priorReviewSummary || {};
+            renderPriorMakeupChains(result);
 
             const intro = document.getElementById('priorAdjustmentIntro');
             if (intro) {
                 if (awaitingPriorProcessing) {
                     intro.textContent = `The prior timesheet for "${priorName}" must be payroll processed before its deadline-window sessions can be reconciled. Current submission remains blocked until then.`;
+                } else if (hasMakeupConflict) {
+                    intro.textContent = 'The make-up reconciliation chain contains invalid or ambiguous relationships. Open the affected sessions below and correct the chain before continuing.';
                 } else if (hasUnresolved) {
                     intro.textContent = `${unresolved.length} prior-period session(s) are still non-final. Finalize them using the links below, then reopen this review.`;
+                } else if (priorReviewHasOpenMakeupChains) {
+                    intro.textContent = `The payable differences for "${priorName}" are ready. Review the open make-up chains below and confirm that their unfinished obligations should carry forward.`;
                 } else if (hasAdjustments) {
                     intro.textContent = `Finalized differences were detected for "${priorName}". Review the signed adjustments below before continuing.`;
                 } else {
@@ -4007,6 +4147,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div><strong>Prior period:</strong> ${priorName} (${priorRange})</div>
                     <div class="small text-muted mt-1">Submitted entries: ${Number(summary.entryCount || 0)} | Snapshot hours: ${Number(summary.totalSnapshotHours || 0).toFixed(2)}</div>
                     <div class="small mt-1">Deadline-window sessions: <strong>${Number(summary.reconciliationCount || 0)}</strong> (${Number(summary.reconciliationHours || 0).toFixed(2)} hrs) | Provisional: <strong>${Number(summary.provisionalCount || 0)}</strong> (${Number(summary.provisionalHours || 0).toFixed(2)} hrs) | Unresolved: <strong>${Number(summary.unresolvedCount || 0)}</strong> | No-change resolutions: <strong>${Number(summary.resolvedNoChangeCount || 0)}</strong></div>
+                    ${Number(summary.makeupChainCount || 0) > 0 ? `<div class="small mt-1 text-warning-emphasis">Make-up chains: <strong>${Number(summary.makeupChainCount || 0)}</strong> | Open: <strong>${Number(summary.openMakeupChainCount || 0)}</strong> | Catch-up: <strong>${Number(summary.makeupCatchupCount || 0)}</strong> (${Number(summary.makeupCatchupHours || 0).toFixed(2)} hrs)</div>` : ''}
                 `;
             }
 
@@ -4054,15 +4195,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (tbodyPrior) tbodyPrior.innerHTML = '';
             }
 
-            if (awaitingPriorProcessing || hasUnresolved) {
+            if (awaitingPriorProcessing || hasUnresolved || hasMakeupConflict) {
                 if (applyBtn) applyBtn.classList.add('d-none');
                 if (continueBtn) continueBtn.classList.add('d-none');
             } else if (hasAdjustments) {
                 if (applyBtn) applyBtn.classList.remove('d-none');
                 if (continueBtn) continueBtn.classList.add('d-none');
+                applyBtn.innerHTML = priorReviewHasOpenMakeupChains
+                    ? '<i class="bi bi-check2-circle me-1"></i>Apply &amp; Confirm Carry-forward'
+                    : 'Apply Adjustments';
             } else {
                 if (applyBtn) applyBtn.classList.add('d-none');
                 if (continueBtn) continueBtn.classList.remove('d-none');
+                continueBtn.innerHTML = priorReviewHasOpenMakeupChains
+                    ? '<i class="bi bi-check2-circle me-1"></i>Confirm Carry-forward'
+                    : 'Continue to Timesheet';
             }
 
             if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
