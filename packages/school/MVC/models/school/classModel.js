@@ -294,10 +294,14 @@ async function getClassById(id) {
   return list.find(c => String(c.id) === String(id));
 }
 
-function generateClassId() {
+function generateClassId(existingIds = new Set()) {
   const year = new Date().getFullYear();
-  const randomStr = Math.random().toString(36).substring(2, 7).toUpperCase();
-  return `CLS-${year}-${randomStr}`;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const randomStr = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const candidate = `CLS-${year}-${randomStr}`;
+    if (!existingIds.has(candidate)) return candidate;
+  }
+  throw new Error('Unable to generate a unique class id.');
 }
 
 function validateData(item) {
@@ -330,10 +334,11 @@ async function addClass(item, options = {}) {
   void options;
   return await queueWrite(async () => {
     const list = await getAllClasses();
+    const existingIds = new Set(list.map((row) => String(row?.id || '').trim()).filter(Boolean));
 
     item = sanitizeClassBasic(item);
     
-    item.id = generateClassId();
+    item.id = generateClassId(existingIds);
     
     const validity = validateData(item);
     if (!validity.isValid) throw new Error(validity.errors.join('\n'));

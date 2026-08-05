@@ -740,6 +740,14 @@ async function getTimesheetById(id) {
     return all.find((t) => String(t.id) === String(id)) || null;
 }
 
+function generateTimesheetId(existingIds = new Set()) {
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+        const candidate = `TS_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        if (!existingIds.has(candidate)) return candidate;
+    }
+    throw new Error('Unable to generate a unique timesheet id.');
+}
+
 async function saveTimesheet(data) {
     return queueWrite(async () => {
         const all = await getAllTimesheets();
@@ -800,7 +808,7 @@ async function saveTimesheet(data) {
         }
 
         const newTimesheet = {
-            id: `TS_${Date.now()}`,
+            id: generateTimesheetId(new Set(all.map((row) => String(row?.id || '').trim()).filter(Boolean))),
             ...sanitized,
             audit: { createDateTime: new Date().toISOString() }
         };

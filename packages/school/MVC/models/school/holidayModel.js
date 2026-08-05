@@ -20,8 +20,12 @@ async function getAllHolidays() {
     }
 }
 
-function generateId() {
-    return 'HOL-' + Math.floor(10000 + Math.random() * 90000).toString();
+function generateId(existingIds = new Set()) {
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+        const candidate = 'HOL-' + Math.floor(10000 + Math.random() * 90000).toString();
+        if (!existingIds.has(candidate)) return candidate;
+    }
+    throw new Error('Unable to generate a unique holiday id.');
 }
 
 function cleanString(v, { max = 500, allowEmpty = true } = {}) {
@@ -101,9 +105,10 @@ async function addHoliday(holidayData) {
         const holidays = await getAllHolidays();
         const sanitized = sanitizeHolidayInput(holidayData);
         assertUniqueInOrg(holidays, sanitized);
+        const existingIds = new Set(holidays.map((row) => String(row?.id || '').trim()).filter(Boolean));
 
         newHoliday = {
-            id: generateId(),
+            id: generateId(existingIds),
             ...sanitized
         };
         holidays.push(newHoliday);
