@@ -469,10 +469,15 @@ async function detectReconciliation({ priorTimesheet, priorPeriod, currentPeriod
         periods: allPeriods,
         teacherId
     });
+    const prunedCarriedRootRefs = (Array.isArray(carriedRootRefs) ? carriedRootRefs : [])
+        .filter((ref) => {
+            const resolved = makeupReconciliationService.resolveGraphNode(sessionGraph, ref);
+            return Boolean(resolved?.node) && !resolved?.conflict;
+        });
     const makeupResult = makeupReconciliationService.analyzeMakeupChains({
         graph: sessionGraph,
         rootRefs,
-        carriedRootRefs,
+        carriedRootRefs: prunedCarriedRootRefs,
         currentPeriod,
         coverage: paymentCoverage,
         baselineKeys,

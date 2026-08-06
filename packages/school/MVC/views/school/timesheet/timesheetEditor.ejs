@@ -14,6 +14,7 @@
   const isEditorLocked = pageIsReadOnly;
   const isManuallyEdited = timesheet.entries && timesheet.entries.some(e => e.isManual || e.isDeleted);
   const submitBlockedByDeadline = isSubmissionDeadlinePassedFlag && !allowLateSubmissionFlag && !isReviewerEditing;
+  const canResetTimesheetFlag = typeof canResetTimesheet !== 'undefined' && canResetTimesheet === true;
 %>
 
 <%
@@ -939,6 +940,9 @@
     <% if (!isEditorLocked || adminCanApprove || adminCanReopen || financeCanProcess || financeCanUnprocess || canAllowLateSubmissionFlag) { %>
         <div class="d-flex justify-content-end gap-2 border-top pt-3 flex-wrap">
             <% if (!isEditorLocked) { %>
+                <% if (canResetTimesheetFlag) { %>
+                    <button class="btn btn-outline-danger fw-bold px-4" id="btnResetTimesheet" type="button"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset Timesheet</button>
+                <% } %>
                 <button class="btn btn-light border fw-bold px-4" id="btnSaveDraft"><%= isReviewerEditing ? 'Save Review Changes' : 'Save Draft' %></button>
                 <% if (!isReviewerEditing) { %>
                     <button
@@ -3632,6 +3636,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (document.getElementById('btnSaveDraft')) document.getElementById('btnSaveDraft').addEventListener('click', () => executeSave('draft'));
 
+    if (document.getElementById('btnResetTimesheet')) {
+        document.getElementById('btnResetTimesheet').addEventListener('click', async () => {
+            const ok = await confirmAction({
+                title: 'Reset Timesheet',
+                message: 'This will permanently remove all saved work on this draft timesheet, including manual entries, deleted sessions, comments, prior-period adjustments, and reconciliation progress. You will start again from the beginning and may need to complete prior-period reconciliation again. This cannot be undone.',
+                confirmText: 'Reset Timesheet',
+                cancelText: 'Cancel',
+                icon: 'warning',
+                confirmBtnClass: 'btn-danger'
+            });
+            if (!ok) return;
+
+            const btn = document.getElementById('btnResetTimesheet');
+            if (btn) btn.disabled = true;
+            const loadingToken = showTimesheetWaitingModal({
+                title: 'Resetting Timesheet',
+                note: 'Removing saved draft work so you can start again...',
+                operation: 'Reset timesheet'
+            });
+
+            try {
+                const res = await fetch(`/school/timesheets/editor/${PERIOD_ID}/reset${buildMutationQuery()}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                    body: JSON.stringify({ actionStateId })
+                });
+                const result = await res.json();
+                const guarded = typeof window.applyGuardedApiResult === 'function'
+                    ? await window.applyGuardedApiResult(result, { busyTitle: 'Reset In Progress', replayTitle: 'Reset Already Processed' })
+                    : { stop: false };
+                if (guarded.stop) return;
+                if (result.status !== 'success') {
+                    await messageBox({
+                        title: 'Reset Failed',
+                        icon: 'error',
+                        message: result.message || 'Unable to reset this timesheet.'
+                    });
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+                if (result.actionStateId) actionStateId = String(result.actionStateId);
+                refreshTimesheetAfterPriorReview();
+            } catch (error) {
+                await messageBox({
+                    title: 'Reset Failed',
+                    icon: 'error',
+                    message: error.message || 'Unable to reset this timesheet.'
+                });
+                if (btn) btn.disabled = false;
+            } finally {
+                hideTimesheetWaitingModal(loadingToken);
+            }
+        });
+    }
+
     async function openTimesheetPrintPreview() {
         const printButton = document.getElementById('btnPrintTimesheet');
         if (!printButton) return;
@@ -4096,10 +4155,15 @@ document.addEventListener('DOMContentLoaded', () => {
                   <div class="px-3 pb-3 d-grid gap-2">${nodeRows || '<div class="text-muted small">No chain sessions were found.</div>'}</div>
                 </details>`;
         });
-        const conflictRows = conflicts.length
-            ? `<div class="alert alert-danger mb-0"><strong>Chain validation failed.</strong><ul class="mb-0 mt-1">${conflicts.map((row) => `<li>${escapeHtml(row.message || row.code || 'Invalid make-up relationship')}</li>`).join('')}</ul></div>`
+        const blockingConflicts = conflicts.filter((row) => String(row?.code || '') !== 'orphaned_makeup_parent');
+        const warningConflicts = conflicts.filter((row) => String(row?.code || '') === 'orphaned_makeup_parent');
+        const conflictRows = blockingConflicts.length
+            ? `<div class="alert alert-danger mb-0"><strong>Chain validation failed.</strong><ul class="mb-0 mt-1">${blockingConflicts.map((row) => `<li>${escapeHtml(row.message || row.code || 'Invalid make-up relationship')}</li>`).join('')}</ul></div>`
             : '';
-        list.innerHTML = `${conflictRows}${chainCards.join('')}`;
+        const warningRows = warningConflicts.length
+            ? `<div class="alert alert-warning mb-0"><strong>Orphaned make-up link detected.</strong><ul class="mb-0 mt-1">${warningConflicts.map((row) => `<li>${escapeHtml(row.message || row.code || 'Parent session missing')}</li>`).join('')}</ul><div class="small mt-2">Open the make-up session from Session Manager and delete it if it is still Scheduled, or fix its parent link.</div></div>`
+            : '';
+        list.innerHTML = `${conflictRows}${warningRows}${chainCards.join('')}`;
     }
 
     async function loadPriorAdjustmentsReview(options = {}) {

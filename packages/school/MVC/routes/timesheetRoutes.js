@@ -90,6 +90,11 @@ router.post('/editor/:periodId/apply-prior-adjustments',
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
   ctrl.applyPriorAdjustments);
 
+router.post('/editor/:periodId/reset',
+  requireAccessAny([SECTIONS.SCHOOL_TIMESHEETS, SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT], OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.resetTimesheet);
+
 router.post('/editor/:periodId/save',
   requireAccessAny([SECTIONS.SCHOOL_TIMESHEETS, SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT], OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, {

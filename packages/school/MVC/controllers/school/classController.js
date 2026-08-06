@@ -3075,8 +3075,17 @@ async function editClass(req, res) {
     }
 
     await schoolDataService.updateData('classes', classId, updates, req.user);
-    
-    await schoolDataService.saveClassSessions(classId, sessions, req.user);
+
+    const sessionStatusMeta = await getSessionStatusMetaForOrg(existing?.orgId || activeOrgId);
+    makeupSessionAllocationService.assertIncomingSessionsHonorMakeupRemovalRules({
+        existingSessions: existingSessions,
+        incomingSessions: sessions,
+        classId,
+        statusDefinitions: sessionStatusMeta
+    });
+    const cleanedSessions = makeupSessionAllocationService.cleanupMakeupHistoryForRemovedSessions(existingSessions, sessions);
+
+    await schoolDataService.saveClassSessions(classId, cleanedSessions, req.user);
     await indexService.rebuildIndexesForClass(classId);
 
     const payloadOut = { status: 'success', message: 'Class updated.' };
@@ -3085,6 +3094,16 @@ async function editClass(req, res) {
     res.redirect('/school/classes');
   } catch (error) {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    if (error?.name === 'MakeupAllocationError' || String(error?.code || '').startsWith('MAKEUP_')) {
+      const payload = {
+        status: 'error',
+        code: String(error?.code || 'MAKEUP_DELETE_FAILED'),
+        message: error.message,
+        data: error?.data || undefined
+      };
+      if (isAjax(req)) return res.status(Number(error?.statusCode) || 409).json(payload);
+      return res.status(Number(error?.statusCode) || 409).render('error', { title: 'Error', message: error.message, user: req.user });
+    }
     console.log(error);
     if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
     res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -3989,6 +4008,7 @@ async function manageSession(req, res) {
             canEditSessionMetadata: canOverride,
             canOverrideMakeupDuration,
             canCreateMakeupWhileLocked,
+            canDeleteMakeupSessions: Boolean(canEditSession && !isReadOnly),
             makeupSummary,
             makeupOriginalSessionReference,
             canViewSchoolSettings,
@@ -4177,6 +4197,35 @@ async function deleteSessionStudentCase(req, res) {
     }
 }
 
+async function deleteSessionDependencies(classId, sessionId, reqUser, orgId) {
+    const [cases, instances, assignments] = await Promise.all([
+        schoolDataService.fetchData('sessionStudentCases', { classId__eq: classId, sessionId__eq: sessionId, page: 1, limit: 10000 }, reqUser),
+        schoolDataService.fetchData('reportInstances', { classId__eq: classId, sessionId__eq: sessionId, page: 1, limit: 10000 }, reqUser),
+        schoolDataService.fetchData('reportAssignments', { classId__eq: classId, sessionId__eq: sessionId, page: 1, limit: 10000 }, reqUser)
+    ]);
+    for (const row of [...(cases || []), ...(instances || [])]) {
+        const entityType = (cases || []).includes(row) ? 'sessionStudentCases' : 'reportInstances';
+        // eslint-disable-next-line no-await-in-loop
+        await schoolDataService.deleteData(entityType, row.id, reqUser, { skipDeletionGuard: true });
+    }
+    for (const row of (assignments || [])) {
+        // eslint-disable-next-line no-await-in-loop
+        await schoolDataService.deleteData('reportAssignments', row.id, reqUser, { skipDeletionGuard: true });
+    }
+    await schoolDeletionGuardService.assertCanDelete({
+        entityKey: 'session',
+        id: sessionId,
+        orgId,
+        reqUser,
+        context: { classId }
+    });
+    return {
+        sessionStudentCases: (cases || []).length,
+        reportInstances: (instances || []).length,
+        reportAssignments: (assignments || []).length
+    };
+}
+
 async function deleteClassSession(req, res) {
   try {
     const classId = toPublicId(req.params.id);
@@ -4195,29 +4244,107 @@ async function deleteClassSession(req, res) {
       throw new schoolDeletionGuardService.DeleteBlockedError({ ...preview, blockers: protectedBlockers, canDelete: false });
     }
 
-    const [cases, instances, assignments] = await Promise.all([
-      schoolDataService.fetchData('sessionStudentCases', { classId__eq: classId, sessionId__eq: sessionId, page: 1, limit: 10000 }, req.user),
-      schoolDataService.fetchData('reportInstances', { classId__eq: classId, sessionId__eq: sessionId, page: 1, limit: 10000 }, req.user),
-      schoolDataService.fetchData('reportAssignments', { classId__eq: classId, sessionId__eq: sessionId, page: 1, limit: 10000 }, req.user)
-    ]);
-    for (const row of [...(cases || []), ...(instances || [])]) {
-      const entityType = (cases || []).includes(row) ? 'sessionStudentCases' : 'reportInstances';
-      // eslint-disable-next-line no-await-in-loop
-      await schoolDataService.deleteData(entityType, row.id, req.user, { skipDeletionGuard: true });
+    const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
+    const survivingSessions = sessions.filter((row) => !idsEqual(row?.sessionId || row?.id, sessionId));
+    makeupSessionAllocationService.assertSessionRemovalAllowed({
+      sessions: survivingSessions,
+      allSessions: sessions,
+      classId,
+      sessionToRemove: target,
+      statusDefinitions: sessionStatusMeta
+    });
+
+    const deletedCounts = await deleteSessionDependencies(classId, sessionId, req.user, classData.orgId);
+    let sessionsToSave = survivingSessions;
+    if (target?.makeup?.isMakeup === true) {
+        ({ sessions: sessionsToSave } = makeupSessionAllocationService.removeMakeupSessionFromLedger({
+            sessions,
+            classId,
+            originalSessionId: target?.makeup?.originalSessionId,
+            makeupSessionId: sessionId
+        }));
     }
-    for (const row of (assignments || [])) {
-      // eslint-disable-next-line no-await-in-loop
-      await schoolDataService.deleteData('reportAssignments', row.id, req.user, { skipDeletionGuard: true });
-    }
-    const remaining = sessions.filter((row) => !idsEqual(row?.sessionId || row?.id, sessionId));
-    await schoolDataService.saveClassSessions(classId, remaining, req.user);
+    await schoolDataService.saveClassSessions(classId, sessionsToSave, req.user);
+    await indexService.rebuildIndexesForClass(classId);
     return res.json({
       status: 'success', operation: 'physical-delete', entityType: 'classSession', id: sessionId,
-      deletedCounts: { classSessions: 1, sessionStudentCases: cases.length, reportInstances: instances.length, reportAssignments: assignments.length }
+      deletedCounts: { classSessions: 1, ...deletedCounts }
     });
   } catch (error) {
+    if (error?.name === 'MakeupAllocationError' || error?.code?.startsWith?.('MAKEUP_')) {
+      return res.status(Number(error?.statusCode) || 409).json({
+        status: 'error',
+        code: String(error?.code || 'MAKEUP_DELETE_FAILED'),
+        message: error.message,
+        data: error?.data || undefined
+      });
+    }
     return schoolDeletionGuardService.handleDeleteError(req, res, error);
   }
+}
+
+async function deleteLinkedMakeupSession(req, res) {
+    try {
+        const classId = toPublicId(req.params.id);
+        const originalSessionId = toPublicId(req.params.sessionId);
+        const makeupSessionId = toPublicId(req.params.makeupSessionId);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+
+        return await makeupSessionAllocationService.withMakeupAllocationLock(classId, originalSessionId, async () => {
+            const sessions = await schoolDataService.getClassSessions(classId, req.user);
+            const { session: originalSession } = findSessionInList(sessions, originalSessionId);
+            if (!originalSession) throw new Error('Original session not found.');
+            assertSessionScopeForRequest(req, classData, originalSession);
+
+            const makeupSession = sessions.find((row) => idsEqual(row?.sessionId || row?.id, makeupSessionId));
+            if (!makeupSession) throw new Error('Make-up session not found.');
+
+            const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
+            const survivingSessions = sessions.filter((row) => !idsEqual(row?.sessionId || row?.id, makeupSessionId));
+            makeupSessionAllocationService.assertSessionRemovalAllowed({
+                sessions: survivingSessions,
+                allSessions: sessions,
+                classId,
+                sessionToRemove: makeupSession,
+                statusDefinitions: sessionStatusMeta
+            });
+
+            await deleteSessionDependencies(classId, makeupSessionId, req.user, classData.orgId);
+            const { sessions: sessionsToSave } = makeupSessionAllocationService.removeMakeupSessionFromLedger({
+                sessions,
+                classId,
+                originalSessionId,
+                makeupSessionId
+            });
+            await schoolDataService.saveClassSessions(classId, sessionsToSave, req.user);
+            await indexService.rebuildIndexesForClass(classId);
+
+            const updatedSummary = makeupSessionAllocationService.buildMakeupAllocationSummary({
+                classId,
+                originalSession: sessionsToSave.find((row) => idsEqual(row?.sessionId || row?.id, originalSessionId)) || originalSession,
+                sessions: sessionsToSave,
+                statusDefinitions: sessionStatusMeta
+            });
+
+            return res.json({
+                status: 'success',
+                message: 'Make-up session deleted.',
+                data: {
+                    classId,
+                    originalSessionId,
+                    makeupSessionId,
+                    makeupSummary: updatedSummary
+                }
+            });
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: String(error?.code || ''),
+            message: error.message,
+            data: error?.data || undefined
+        });
+    }
 }
 
 async function uploadSessionFile(req, res) {
@@ -5109,7 +5236,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,

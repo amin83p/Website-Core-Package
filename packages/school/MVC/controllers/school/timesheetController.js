@@ -27,6 +27,7 @@ const timesheetSessionStudentLabelService = require('../../services/school/times
 const timesheetEffectiveEntryService = require('../../services/school/timesheetEffectiveEntryService');
 const timesheetPrintService = require('../../services/school/timesheetPrintService');
 const deadlineReconciliationService = require('../../services/school/timesheetDeadlineReconciliationService');
+const schoolRepositories = require('../../repositories/school');
 const {
     resolveOrgTodayFromRequest,
     resolveOrgYearFromRequest,
@@ -1767,7 +1768,7 @@ exports.viewTimesheet = async (req, res) => {
         const useFrozenSnapshot = ['submitted', 'processed'].includes(String(timesheet.status || '').toLowerCase())
             && Array.isArray(timesheet?.submissionSnapshot?.entries)
             && timesheet.submissionSnapshot.entries.length > 0;
-        const [canManagerUpdate, canFinanceConfigure, canOwnTimesheetExport, canManagementExport] = await Promise.all([
+        const [canManagerUpdate, canFinanceConfigure, canOwnTimesheetExport, canManagementExport, canTimesheetsAdminUpdate] = await Promise.all([
             hasTimesheetManagementAuthority(req.user, OPERATIONS.UPDATE),
             hasTimesheetManagementAuthority(req.user, OPERATIONS.CONFIGURE),
             accessUiService.canAccessTarget(req, {
@@ -1777,7 +1778,8 @@ exports.viewTimesheet = async (req, res) => {
             accessUiService.canAccessTarget(req, {
                 sectionId: SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT,
                 operationId: OPERATIONS.EXPORT
-            })
+            }),
+            isTimesheetSectionAdmin(req.user, OPERATIONS.UPDATE)
         ]);
         const status = String(timesheet.status || 'draft').toLowerCase();
         const managerApproved = isManagerApproved(timesheet);
@@ -1883,10 +1885,102 @@ exports.viewTimesheet = async (req, res) => {
             canAllowLateSubmission,
             reviewHistory: getReviewHistory(timesheet),
             canPrintTimesheet,
-            timesheetPrintMode
+            timesheetPrintMode,
+            canResetTimesheet: !isReadOnly && status === 'draft' && timesheet.id && (
+                !viewingOtherPerson || canManagerUpdate || canTimesheetsAdminUpdate
+            )
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    }
+};
+
+exports.resetTimesheet = async (req, res) => {
+    let guardKey = '';
+    try {
+        const { periodId } = req.params;
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+
+        const teacherContext = await resolveTargetTeacherContext(req, {
+            requireTeacher: true,
+            operationId: OPERATIONS.UPDATE,
+            managementOperationId: OPERATIONS.UPDATE
+        });
+        const isAuthor = Boolean(
+            teacherContext.currentTeacherId
+            && idsEqual(teacherContext.targetTeacherId, teacherContext.currentTeacherId)
+        );
+        const canManageReset = await hasTimesheetManagementAuthority(req.user, OPERATIONS.UPDATE);
+        const canSectionAdminReset = await isTimesheetSectionAdmin(req.user, OPERATIONS.UPDATE);
+        if (!isAuthor && !canManageReset && !canSectionAdminReset) {
+            throw new Error('Only the timesheet author or an authorized timesheet administrator can reset draft timesheets.');
+        }
+
+        guardKey = idempotencyGuardService.createGuardKey([
+            'timesheet_reset',
+            String(activeOrgId || '').trim(),
+            String(periodId || '').trim(),
+            String(teacherContext?.targetTeacherId || '').trim()
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({
+            key: guardKey,
+            runningTtlMs: 120000,
+            replayTtlMs: 15000
+        });
+        if (sendGuardedResponse(req, res, guardResult, 'Timesheet reset is already in progress. Please wait.')) return;
+
+        const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
+        if (!period) throw new Error('Period not found.');
+        assertPeriodOrgAccess(period, activeOrgId, req.user);
+
+        if (period.status === 'processed') {
+            throw new Error('<b>Security Error</b><br>This period has been processed by payroll and is locked.');
+        }
+
+        const existing = normalizeTimesheetLifecycle(
+            await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user)
+        );
+        if (!existing?.id) {
+            const payloadOut = { status: 'success', message: 'No saved timesheet to reset.' };
+            idempotencyGuardService.completeGuard(guardKey, payloadOut);
+            return res.json(payloadOut);
+        }
+
+        const status = String(existing.status || 'draft').toLowerCase();
+        if (status !== 'draft') {
+            throw new Error('Only draft timesheets can be reset. Submitted timesheets must be sent back for revision first.');
+        }
+
+        const preserveLateSubmission = existing.allowLateSubmission === true;
+        const orgId = existing.orgId || period.orgId || activeOrgId;
+        const teacherId = String(teacherContext.targetTeacherId);
+
+        await schoolRepositories.timesheets.maintenancePurgeById(existing.id, {
+            scope: { canViewAll: true }
+        });
+
+        if (preserveLateSubmission) {
+            await dataService.addData('timesheets', {
+                orgId,
+                periodId: String(periodId),
+                teacherId,
+                status: 'draft',
+                entries: [],
+                totalHours: 0,
+                allowLateSubmission: true
+            }, req.user);
+        }
+
+        const payloadOut = {
+            status: 'success',
+            message: 'Timesheet reset. You can start again from the beginning.',
+            actionStateId: req.actionStateId || null
+        };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        return res.json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        return res.status(400).json({ status: 'error', message: error.message });
     }
 };
 

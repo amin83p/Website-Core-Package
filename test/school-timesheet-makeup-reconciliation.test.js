@@ -382,3 +382,22 @@ test('timesheet-locked make-up-required parents keep the dedicated scheduling ac
   assert.match(view, /typeof canCreateMakeupWhileLocked !== 'undefined'/);
   assert.match(view, /const canCreateMakeupSession = Boolean/);
 });
+
+test('orphaned make-up with missing parent warns but does not block reconciliation', () => {
+  const sessions = [
+    { sessionId: 'ROOT', date: '2026-05-14', durationHours: 2, status: 'missed', delivery: delivery() },
+    {
+      sessionId: 'ORPHAN',
+      date: '2026-06-04',
+      durationHours: 2,
+      status: 'scheduled',
+      delivery: delivery(),
+      makeup: makeup('MISSING_PARENT')
+    }
+  ];
+  const graph = buildGraph(sessions);
+  assert.ok(graph.conflicts.some((row) => row.code === 'orphaned_makeup_parent'));
+  const result = analyze(sessions);
+  assert.notEqual(result.makeupState, 'conflict');
+  assert.ok(result.conflicts.some((row) => row.code === 'orphaned_makeup_parent'));
+});

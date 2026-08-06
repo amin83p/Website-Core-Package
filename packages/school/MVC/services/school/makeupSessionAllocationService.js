@@ -241,16 +241,217 @@ async function withMakeupAllocationLock(classId, originalSessionId, task) {
   }
 }
 
+function findDirectChildMakeupSessions(sessions = [], classId = '', parentSessionId = '') {
+  const safeClassId = toPublicId(classId);
+  const safeParentSessionId = toPublicId(parentSessionId);
+  if (!safeClassId || !safeParentSessionId) return [];
+  return (Array.isArray(sessions) ? sessions : []).filter((session) => (
+    session?.makeup?.isMakeup === true
+    && idsEqual(session?.makeup?.originalClassId, safeClassId)
+    && idsEqual(session?.makeup?.originalSessionId, safeParentSessionId)
+  ));
+}
+
+function buildChildMakeupSessionRows(children = [], { classId = '', statusDefinitions = [] } = {}) {
+  return (Array.isArray(children) ? children : []).map((session) => buildSessionReference(session, {
+    classId: toPublicId(session?.makeup?.originalClassId || classId),
+    statusDefinitions
+  }));
+}
+
+function assertMakeupSessionDeletable(session = {}, statusDefinitions = []) {
+  const status = sessionStatusPolicyService.normalizeSessionStatus(session?.status, session?.notes);
+  if (status !== 'scheduled') {
+    const definition = resolveStatusDefinition(statusDefinitions, session);
+    throw new MakeupAllocationError(
+      `Only Scheduled make-up sessions can be deleted. Resolve the session status to Scheduled first (${definition?.label || status || 'current status'}).`,
+      {
+        code: 'MAKEUP_DELETE_STATUS_NOT_SCHEDULED',
+        statusCode: 409,
+        data: {
+          sessionId: toPublicId(session?.sessionId || session?.id),
+          status
+        }
+      }
+    );
+  }
+}
+
+function assertNoUnresolvedChildMakeups(sessions = [], classId = '', makeupSessionId = '', statusDefinitions = []) {
+  const children = findDirectChildMakeupSessions(sessions, classId, makeupSessionId);
+  if (!children.length) return;
+  throw new MakeupAllocationError(
+    'Remove or resolve child make-up sessions before deleting this make-up session.',
+    {
+      code: 'MAKEUP_CHILD_SESSIONS_EXIST',
+      statusCode: 409,
+      data: {
+        parentSessionId: toPublicId(makeupSessionId),
+        childSessions: buildChildMakeupSessionRows(children, { classId, statusDefinitions })
+      }
+    }
+  );
+}
+
+function assertSessionRemovalAllowed({
+  sessions = [],
+  allSessions = sessions,
+  classId = '',
+  sessionToRemove = null,
+  statusDefinitions = []
+} = {}) {
+  const safeClassId = toPublicId(classId);
+  const sessionId = toPublicId(sessionToRemove?.sessionId || sessionToRemove?.id);
+  if (!sessionId) return;
+
+  const childMakeups = findDirectChildMakeupSessions(allSessions, safeClassId, sessionId);
+  if (childMakeups.length) {
+    throw new MakeupAllocationError(
+      'Remove linked make-up sessions from Session Manager before deleting this session.',
+      {
+        code: 'MAKEUP_CHILD_SESSIONS_EXIST',
+        statusCode: 409,
+        data: {
+          parentSessionId: sessionId,
+          childSessions: buildChildMakeupSessionRows(childMakeups, { classId: safeClassId, statusDefinitions })
+        }
+      }
+    );
+  }
+
+  if (sessionToRemove?.makeup?.isMakeup === true) {
+    assertMakeupSessionDeletable(sessionToRemove, statusDefinitions);
+    assertNoUnresolvedChildMakeups(allSessions, safeClassId, sessionId, statusDefinitions);
+  }
+}
+
+function removeMakeupSessionFromLedger({
+  sessions = [],
+  classId = '',
+  originalSessionId = '',
+  makeupSessionId = ''
+} = {}) {
+  const safeClassId = toPublicId(classId);
+  const safeOriginalSessionId = toPublicId(originalSessionId);
+  const safeMakeupSessionId = toPublicId(makeupSessionId);
+  if (!safeClassId || !safeOriginalSessionId || !safeMakeupSessionId) {
+    throw new MakeupAllocationError('Make-up session removal requires class, original, and make-up session ids.', {
+      code: 'MAKEUP_DELETE_INVALID',
+      statusCode: 400
+    });
+  }
+
+  const nextSessions = [...(Array.isArray(sessions) ? sessions : [])];
+  const makeupIndex = nextSessions.findIndex((row) => idsEqual(row?.sessionId || row?.id, safeMakeupSessionId));
+  if (makeupIndex < 0) {
+    throw new MakeupAllocationError('Make-up session not found.', { code: 'MAKEUP_DELETE_NOT_FOUND', statusCode: 404 });
+  }
+  const makeupSession = nextSessions[makeupIndex];
+  if (
+    makeupSession?.makeup?.isMakeup !== true
+    || !idsEqual(makeupSession?.makeup?.originalClassId, safeClassId)
+    || !idsEqual(makeupSession?.makeup?.originalSessionId, safeOriginalSessionId)
+  ) {
+    throw new MakeupAllocationError('The selected session is not a linked make-up for this original session.', {
+      code: 'MAKEUP_DELETE_NOT_LINKED',
+      statusCode: 409
+    });
+  }
+
+  nextSessions.splice(makeupIndex, 1);
+  const originalIndex = nextSessions.findIndex((row) => idsEqual(row?.sessionId || row?.id, safeOriginalSessionId));
+  if (originalIndex >= 0) {
+    const originalSession = nextSessions[originalIndex];
+    if (Array.isArray(originalSession.makeupHistory)) {
+      originalSession.makeupHistory = originalSession.makeupHistory.filter((row) => {
+        const linkedId = toPublicId(row?.makeupSessionId || row?.sessionId || '');
+        return !linkedId || !idsEqual(linkedId, safeMakeupSessionId);
+      });
+    }
+    originalSession.audit = {
+      ...(originalSession.audit || {}),
+      lastUpdateDateTime: new Date().toISOString()
+    };
+    nextSessions[originalIndex] = originalSession;
+  }
+
+  return {
+    sessions: nextSessions,
+    removedIds: [safeMakeupSessionId]
+  };
+}
+
+function cleanupMakeupHistoryForRemovedSessions(existingSessions = [], incomingSessions = []) {
+  const incomingIds = new Set(
+    (Array.isArray(incomingSessions) ? incomingSessions : [])
+      .map((row) => toPublicId(row?.sessionId || row?.id))
+      .filter(Boolean)
+  );
+  const removedIds = new Set(
+    (Array.isArray(existingSessions) ? existingSessions : [])
+      .map((row) => toPublicId(row?.sessionId || row?.id))
+      .filter((id) => id && !incomingIds.has(id))
+  );
+  if (!removedIds.size) return incomingSessions;
+
+  return (Array.isArray(incomingSessions) ? incomingSessions : []).map((session) => {
+    if (!Array.isArray(session?.makeupHistory) || !session.makeupHistory.length) return session;
+    const filteredHistory = session.makeupHistory.filter((row) => {
+      const linkedId = toPublicId(row?.makeupSessionId || row?.sessionId || '');
+      return !linkedId || !removedIds.has(linkedId);
+    });
+    if (filteredHistory.length === session.makeupHistory.length) return session;
+    return {
+      ...session,
+      makeupHistory: filteredHistory
+    };
+  });
+}
+
+function assertIncomingSessionsHonorMakeupRemovalRules({
+  existingSessions = [],
+  incomingSessions = [],
+  classId = '',
+  statusDefinitions = []
+} = {}) {
+  const incomingIds = new Set(
+    (Array.isArray(incomingSessions) ? incomingSessions : [])
+      .map((row) => toPublicId(row?.sessionId || row?.id))
+      .filter(Boolean)
+  );
+  const removedSessions = (Array.isArray(existingSessions) ? existingSessions : []).filter((row) => {
+    const sessionId = toPublicId(row?.sessionId || row?.id);
+    return sessionId && !incomingIds.has(sessionId);
+  });
+  removedSessions.forEach((row) => {
+    assertSessionRemovalAllowed({
+      sessions: incomingSessions,
+      allSessions: existingSessions,
+      classId,
+      sessionToRemove: row,
+      statusDefinitions
+    });
+  });
+}
+
 module.exports = {
   MakeupAllocationError,
   assertAllowedPercentCoversAllocated,
+  assertIncomingSessionsHonorMakeupRemovalRules,
   assertMakeupAllocationAvailable,
+  assertMakeupSessionDeletable,
+  assertNoUnresolvedChildMakeups,
+  assertSessionRemovalAllowed,
   buildAllocationLockKey,
+  buildChildMakeupSessionRows,
   buildMakeupAllocationSummary,
   buildSessionReference,
   calculateDurationMinutes,
+  cleanupMakeupHistoryForRemovedSessions,
+  findDirectChildMakeupSessions,
   isDirectMakeupForSession,
   minutesToHours,
+  removeMakeupSessionFromLedger,
   resolveAllowedDurationPercent,
   withMakeupAllocationLock
 };

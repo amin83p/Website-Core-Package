@@ -477,6 +477,13 @@ router.post('/:id/sessions/:sessionId/makeup',
     allowInactiveTokenFallback: true
   }),
   classCtrl.createMakeupSession);
+router.delete('/:id/sessions/:sessionId/makeup/:makeupSessionId',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, {
+    requireToken: false,
+    keepActive: true
+  }),
+  classCtrl.deleteLinkedMakeupSession);
 router.post('/:id/sessions/:sessionId/cases',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, {

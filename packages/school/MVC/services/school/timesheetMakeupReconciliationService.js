@@ -11,6 +11,11 @@ const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 const MAX_CHAIN_DEPTH = 25;
 const MAX_CHAIN_NODES = 500;
+const NON_BLOCKING_MAKEUP_CONFLICT_CODES = new Set(['orphaned_makeup_parent']);
+
+function isBlockingMakeupConflict(conflict = {}) {
+  return !NON_BLOCKING_MAKEUP_CONFLICT_CODES.has(String(conflict?.code || '').trim());
+}
 
 function normalizeId(value) {
   return String(value || '').trim();
@@ -132,6 +137,20 @@ function buildSessionGraph({ classes = [], sessionsByClassId = new Map(), status
       if (!sessionIdBuckets.has(sessionId)) sessionIdBuckets.set(sessionId, []);
       sessionIdBuckets.get(sessionId).push(node);
     });
+  });
+
+  nodes.forEach((node) => {
+    if (!node.parentKey) return;
+    if (!nodes.has(node.parentKey)) {
+      conflicts.push({
+        code: 'orphaned_makeup_parent',
+        classId: node.classId,
+        sessionId: node.sessionId,
+        message: `The parent session for make-up ${node.sessionId} was removed. Delete this make-up session from Session Manager if it is still Scheduled, or fix its parent link.`
+      });
+      node.parentKey = '';
+      node.isOrphanedMakeup = true;
+    }
   });
 
   nodes.forEach((node) => {
@@ -625,7 +644,8 @@ function analyzeMakeupChains({
     const node = graph.nodes.get(key);
     if (relevantNodeKeys.has(key) || node?.assignedToTeacher === true) conflicts.push(conflict);
   });
-  const makeupState = conflicts.length
+  const blockingConflicts = conflicts.filter(isBlockingMakeupConflict);
+  const makeupState = blockingConflicts.length
     ? 'conflict'
     : (chains.some((chain) => chain.state === 'open') ? 'open' : (chains.length ? 'complete' : 'none'));
   const nodes = chains.flatMap((chain) => chain.nodes);
@@ -651,6 +671,8 @@ function analyzeMakeupChains({
 module.exports = {
   MAX_CHAIN_DEPTH,
   MAX_CHAIN_NODES,
+  NON_BLOCKING_MAKEUP_CONFLICT_CODES,
+  isBlockingMakeupConflict,
   analyzeMakeupChains,
   buildCatchupAdjustmentId,
   buildPaymentCoverage,

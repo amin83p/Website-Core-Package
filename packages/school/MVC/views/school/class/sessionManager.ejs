@@ -1235,6 +1235,7 @@
             ? makeupOriginalSessionReference
             : null;
         const originalSessionReferenceId = String(originalSessionReference?.sessionId || session?.makeup?.originalSessionId || '').trim();
+        const canDeleteMakeupSessionsFlag = typeof canDeleteMakeupSessions !== 'undefined' && canDeleteMakeupSessions === true;
         const workDisabledAttr = (isReadOnly || isMakeupRequiredInactive) ? 'disabled' : '';
         const attendanceMatrixHref = '/school/attendances?classId=' + encodeURIComponent(classData.id) + '&range=allTime';
         const gradesMatrixHref = '/school/grades-matrix?classId=' + encodeURIComponent(classData.id) + '&range=allTime';
@@ -1647,7 +1648,7 @@
                 <div class="table-responsive mt-3 border rounded bg-white">
                     <table class="table table-sm table-hover align-middle mb-0">
                         <thead class="table-light">
-                            <tr><th>Session</th><th>Date / Time</th><th class="text-end">Duration</th><th>Teacher</th><th>Room</th><th>Status</th></tr>
+                            <tr><th>Session</th><th>Date / Time</th><th class="text-end">Duration</th><th>Teacher</th><th>Room</th><th>Status</th><% if (canDeleteMakeupSessionsFlag) { %><th class="text-end">Actions</th><% } %></tr>
                         </thead>
                         <tbody>
                             <% if (existingMakeupHistory.length) { %>
@@ -1659,10 +1660,19 @@
                                         <td><%= row.teacherName || row.teacherId || '-' %></td>
                                         <td><%= row.room || '-' %></td>
                                         <td><span class="badge bg-light text-dark border"><%= row.statusLabel || row.status || '-' %></span></td>
+                                        <% if (canDeleteMakeupSessionsFlag) { %>
+                                            <td class="text-end">
+                                                <% if (String(row.status || '').toLowerCase() === 'scheduled') { %>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger btn-delete-linked-makeup" data-makeup-session-id="<%= row.sessionId %>" title="Delete this scheduled make-up session"><i class="bi bi-trash"></i></button>
+                                                <% } else { %>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Resolve session status to Scheduled before deletion."><i class="bi bi-trash"></i></button>
+                                                <% } %>
+                                            </td>
+                                        <% } %>
                                     </tr>
                                 <% }); %>
                             <% } else { %>
-                                <tr><td colspan="6" class="text-center text-muted py-3">No make-up sessions have been created yet.</td></tr>
+                                <tr><td colspan="<%= canDeleteMakeupSessionsFlag ? 7 : 6 %>" class="text-center text-muted py-3">No make-up sessions have been created yet.</td></tr>
                             <% } %>
                         </tbody>
                     </table>
@@ -2675,6 +2685,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let sessionMakeupSummary = <%- jsonForScript(makeupAllocationSummary || {}) %>;
     const sessionMakeupHistory = Array.isArray(sessionMakeupSummary.sessions) ? sessionMakeupSummary.sessions : [];
     const sessionCanCreateMakeup = <%- jsonForScript(Boolean(canCreateMakeupSession)) %>;
+    const sessionCanDeleteMakeupSessions = <%- jsonForScript(typeof canDeleteMakeupSessions !== 'undefined' && canDeleteMakeupSessions === true) %>;
     const sessionCanOverrideMakeupDuration = <%- jsonForScript(Boolean(typeof canOverrideMakeupDuration !== 'undefined' && canOverrideMakeupDuration === true)) %>;
     const sessionInstructionalInactive = <%- jsonForScript(Boolean(isMakeupRequiredInactive)) %>;
     const sessionDefaultTeacherId = <%- jsonForScript(session.delivery?.deliveredBy || '') %>;
@@ -2925,6 +2936,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const overview = modal?.querySelector('#makeupSessionAllocationOverview');
         if (!overview) return;
         const rows = Array.isArray(sessionMakeupSummary?.sessions) ? sessionMakeupSummary.sessions : [];
+        const actionsHeader = sessionCanDeleteMakeupSessions ? '<th class="text-end">Actions</th>' : '';
         const rowHtml = rows.length
             ? rows.map((row) => {
                 const href = String(row?.manageUrl || '').trim();
@@ -2932,6 +2944,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const sessionLink = href
                     ? '<a href="' + attendanceAttachmentEscape(href) + '" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none"><i class="bi bi-box-arrow-up-right me-1"></i>' + sessionLabel + '</a>'
                     : sessionLabel;
+                const isScheduled = String(row?.status || '').trim().toLowerCase() === 'scheduled';
+                const deleteCell = sessionCanDeleteMakeupSessions
+                    ? '<td class="text-end">' + (isScheduled
+                        ? '<button type="button" class="btn btn-sm btn-outline-danger btn-delete-linked-makeup" data-makeup-session-id="' + attendanceAttachmentEscape(row?.sessionId || '') + '" title="Delete this scheduled make-up session"><i class="bi bi-trash"></i></button>'
+                        : '<button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Resolve session status to Scheduled before deletion."><i class="bi bi-trash"></i></button>')
+                    + '</td>'
+                    : '';
                 return '<tr>'
                     + '<td>' + sessionLink + '</td>'
                     + '<td><div>' + attendanceAttachmentEscape(row?.date || '-') + '</div><div class="small text-muted">' + attendanceAttachmentEscape(row?.startTime || '-') + ' &ndash; ' + attendanceAttachmentEscape(row?.endTime || '-') + '</div></td>'
@@ -2939,17 +2958,75 @@ document.addEventListener('DOMContentLoaded', () => {
                     + '<td>' + attendanceAttachmentEscape(row?.teacherName || row?.teacherId || '-') + '</td>'
                     + '<td>' + attendanceAttachmentEscape(row?.room || '-') + '</td>'
                     + '<td><span class="badge bg-light text-dark border">' + attendanceAttachmentEscape(row?.statusLabel || row?.status || '-') + '</span></td>'
+                    + deleteCell
                     + '</tr>';
             }).join('')
-            : '<tr><td colspan="6" class="text-center text-muted py-3">No make-up sessions have been created yet.</td></tr>';
+            : '<tr><td colspan="' + (sessionCanDeleteMakeupSessions ? 7 : 6) + '" class="text-center text-muted py-3">No make-up sessions have been created yet.</td></tr>';
         overview.innerHTML = '<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">'
             + '<div><h6 class="fw-bold mb-0">Created Make-up Sessions</h6><div class="small text-muted">Every directly linked session counts toward this original session\'s allowance, regardless of status.</div></div>'
             + '<span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle">' + rows.length + ' session(s)</span>'
             + '</div>'
             + '<div class="table-responsive border rounded"><table class="table table-sm table-hover align-middle mb-0">'
-            + '<thead class="table-light"><tr><th>Session</th><th>Date / Time</th><th class="text-end">Duration</th><th>Teacher</th><th>Room</th><th>Status</th></tr></thead>'
+            + '<thead class="table-light"><tr><th>Session</th><th>Date / Time</th><th class="text-end">Duration</th><th>Teacher</th><th>Room</th><th>Status</th>' + actionsHeader + '</tr></thead>'
             + '<tbody>' + rowHtml + '</tbody></table></div>';
     }
+
+    async function deleteLinkedMakeupSession(makeupSessionId) {
+        const safeMakeupSessionId = String(makeupSessionId || '').trim();
+        if (!safeMakeupSessionId) return;
+        const confirmed = await sessionConfirmBox({
+            title: 'Delete Make-up Session',
+            message: 'This will permanently delete the scheduled make-up session and remove it from this original session\'s allowance.',
+            confirmText: 'Delete Make-up Session',
+            cancelText: 'Cancel',
+            confirmClass: 'btn-danger'
+        });
+        if (confirmed !== 'Delete Make-up Session') return;
+
+        const loadingToken = typeof window.showLoading === 'function'
+            ? window.showLoading({ title: 'Deleting Make-up Session', note: 'Removing linked session...', operation: 'Delete make-up' })
+            : null;
+        try {
+            const res = await fetch('/school/classes/' + encodeURIComponent(sessionManagerClassId) + '/sessions/' + encodeURIComponent(sessionManagerSessionId) + '/makeup/' + encodeURIComponent(safeMakeupSessionId), {
+                method: 'DELETE',
+                headers: { 'X-AJAX-Request': 'true', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actionStateId })
+            });
+            const result = await res.json();
+            if (result.status !== 'success') {
+                const childSessions = Array.isArray(result?.data?.childSessions) ? result.data.childSessions : [];
+                const childDetail = childSessions.length
+                    ? '<ul class="mb-0 mt-2">' + childSessions.map((row) => '<li><strong>' + attendanceAttachmentEscape(row?.sessionId || '-') + '</strong> (' + attendanceAttachmentEscape(row?.statusLabel || row?.status || '-') + ')</li>').join('') + '</ul>'
+                    : '';
+                await sessionMessageBox({
+                    title: 'Delete Failed',
+                    icon: 'error',
+                    message: String(result?.message || 'Unable to delete this make-up session.') + childDetail,
+                    html: childDetail.length > 0
+                });
+                return;
+            }
+            if (result?.data?.makeupSummary) {
+                sessionMakeupSummary = result.data.makeupSummary;
+            }
+            window.location.reload();
+        } catch (error) {
+            await sessionMessageBox({
+                title: 'Delete Failed',
+                icon: 'error',
+                message: error?.message || 'Unable to delete this make-up session.'
+            });
+        } finally {
+            if (loadingToken && typeof window.hideLoading === 'function') window.hideLoading(loadingToken);
+        }
+    }
+
+    document.addEventListener('click', (event) => {
+        const deleteBtn = event.target.closest('.btn-delete-linked-makeup');
+        if (!deleteBtn || deleteBtn.disabled) return;
+        event.preventDefault();
+        deleteLinkedMakeupSession(deleteBtn.getAttribute('data-makeup-session-id'));
+    });
 
     function syncMakeupSessionDurationPreview({ updateEndTime = false } = {}) {
         const modal = document.getElementById('makeupSessionModal');
