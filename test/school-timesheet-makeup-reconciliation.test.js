@@ -401,3 +401,153 @@ test('orphaned make-up with missing parent warns but does not block reconciliati
   assert.notEqual(result.makeupState, 'conflict');
   assert.ok(result.conflicts.some((row) => row.code === 'orphaned_makeup_parent'));
 });
+
+test('completed make-up in current period builds cross-period netting summary for prior-period difference', () => {
+  const augustPeriod = {
+    id: 'TSP_AUG',
+    startDate: '2026-08-01',
+    submissionDeadline: '2026-08-29',
+    endDate: '2026-08-31'
+  };
+  const graph = buildGraph([
+    { sessionId: 'ROOT', date: '2026-07-30', durationHours: 1.5, status: 'completed', delivery: delivery() },
+    { sessionId: 'M1', date: '2026-08-08', durationHours: 1.5, status: 'completed', delivery: delivery(), makeup: makeup('ROOT') }
+  ]);
+  const result = makeupReconciliationService.analyzeMakeupChains({
+    graph,
+    rootRefs: [{ classId: 'CLS_1', sessionId: 'ROOT', sourcePeriodId: 'TSP_JUL' }],
+    currentPeriod: augustPeriod,
+    coverage: { isPaid: () => true, isPending: () => false },
+    baselineKeys: new Set(['CLS_1::ROOT']),
+    baselineHoursByKey: new Map([['CLS_1::ROOT', 3]]),
+    teacherId: 'P_1',
+    sourcePeriodId: 'TSP_JUL'
+  });
+
+  assert.equal(result.makeupState, 'complete');
+  const netting = result.chains[0]?.crossPeriodNetting;
+  assert.ok(netting);
+  assert.equal(netting.rootSessionId, 'ROOT');
+  assert.equal(netting.priorDifferenceHours, -1.5);
+  assert.equal(netting.finalizedMakeupHours, 1.5);
+  assert.equal(netting.netHours, 0);
+  assert.equal(netting.satisfied, true);
+  assert.equal(netting.requiresFinalization, false);
+  assert.equal(netting.currentPeriodMakeupSessions[0].sessionId, 'M1');
+});
+
+test('all make-up sessions in prior period omit cross-period netting from current review', () => {
+  const augustPeriod = {
+    id: 'TSP_AUG',
+    startDate: '2026-08-01',
+    submissionDeadline: '2026-08-29',
+    endDate: '2026-08-31'
+  };
+  const graph = buildGraph([
+    { sessionId: 'ROOT', date: '2026-07-28', durationHours: 1.5, status: 'missed', delivery: delivery() },
+    { sessionId: 'M1', date: '2026-07-30', durationHours: 1.5, status: 'completed', delivery: delivery(), makeup: makeup('ROOT') }
+  ]);
+  const result = makeupReconciliationService.analyzeMakeupChains({
+    graph,
+    rootRefs: [{ classId: 'CLS_1', sessionId: 'ROOT', sourcePeriodId: 'TSP_JUL' }],
+    currentPeriod: augustPeriod,
+    coverage: { isPaid: () => true, isPending: () => false },
+    baselineKeys: new Set(['CLS_1::ROOT']),
+    baselineHoursByKey: new Map([['CLS_1::ROOT', 3]]),
+    teacherId: 'P_1',
+    sourcePeriodId: 'TSP_JUL'
+  });
+  assert.ok(result.chains[0]);
+  assert.equal(result.chains[0].crossPeriodNetting, undefined);
+});
+
+test('current-period make-up pending finalization is informational and does not block apply', () => {
+  const augustPeriod = {
+    id: 'TSP_AUG',
+    startDate: '2026-08-01',
+    submissionDeadline: '2026-08-29',
+    endDate: '2026-08-31'
+  };
+  const graph = buildGraph([
+    { sessionId: 'ROOT', date: '2026-07-30', durationHours: 1.5, status: 'completed', delivery: delivery() },
+    { sessionId: 'M1', date: '2026-08-08', durationHours: 1.5, status: 'scheduled', delivery: delivery(), makeup: makeup('ROOT') }
+  ]);
+  const result = makeupReconciliationService.analyzeMakeupChains({
+    graph,
+    rootRefs: [{ classId: 'CLS_1', sessionId: 'ROOT', sourcePeriodId: 'TSP_JUL' }],
+    currentPeriod: augustPeriod,
+    coverage: { isPaid: () => true, isPending: () => false },
+    baselineKeys: new Set(['CLS_1::ROOT']),
+    baselineHoursByKey: new Map([['CLS_1::ROOT', 3]]),
+    teacherId: 'P_1',
+    sourcePeriodId: 'TSP_JUL'
+  });
+  const netting = result.chains[0]?.crossPeriodNetting;
+  assert.ok(netting);
+  assert.equal(netting.requiresFinalization, true);
+  assert.equal(priorAdjustmentService.countBlockingCrossPeriodNetting(result), 1);
+});
+
+test('partial finalized make-up leaves uncovered hours on first-day netting preview', () => {
+  const netting = makeupReconciliationService.buildCrossPeriodNettingSummary({
+    state: 'complete',
+    nodes: [
+      {
+        classId: 'CLS_1',
+        sessionId: 'ROOT',
+        className: 'Math',
+        date: '2026-07-30',
+        periodDisposition: 'closed_period',
+        adjustmentHours: -1.5,
+        isMakeupSession: false
+      },
+      {
+        classId: 'CLS_1',
+        sessionId: 'M1',
+        className: 'Math',
+        date: '2026-08-08',
+        periodDisposition: 'current_period',
+        isMakeupSession: true,
+        isFinalStatus: true,
+        finalHours: 1
+      }
+    ]
+  });
+  assert.ok(netting);
+  assert.equal(netting.uncoveredHours, 0.5);
+  assert.equal(netting.satisfied, false);
+  const preview = priorAdjustmentService.buildCrossPeriodNettingPreview({
+    makeupChains: [{ crossPeriodNetting: netting }]
+  }, { startDate: '2026-08-01' });
+  assert.ok(preview.some((row) => row.nettingKind === 'first_day_prior_difference' && row.adjustmentHours === -1.5));
+  assert.ok(preview.some((row) => row.nettingKind === 'current_period_makeup' && row.adjustmentHours === 1));
+});
+
+test('prior-period parent adjustment stays payable when cross-period netting is present', () => {
+  const adjustments = [{
+    sourceSessionId: 'ROOT',
+    sourceClassId: 'CLS_1',
+    classId: 'CLS_1',
+    className: 'Math',
+    adjustmentHours: -1.5,
+    deltaHours: -1.5
+  }];
+  assert.equal(adjustments[0].adjustmentHours, -1.5);
+  const entries = priorAdjustmentService.buildAdjustmentEntries({
+    adjustments,
+    applyDate: '2026-08-01'
+  });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].date, '2026-08-01');
+  assert.equal(entries[0].hours, -1.5);
+});
+
+test('timesheet editor exposes automatic cross-period netting review', () => {
+  const view = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
+  const routes = read('packages/school/MVC/routes/timesheetRoutes.js');
+  assert.match(view, /crossPeriodNettingPreview/);
+  assert.match(view, /blockingCrossPeriodNettingCount/);
+  assert.match(view, /renderCrossPeriodNettingTableRows/);
+  assert.doesNotMatch(view, /btnPriorAdjustmentResolve/);
+  assert.doesNotMatch(routes, /resolve-cross-period-makeup/);
+});

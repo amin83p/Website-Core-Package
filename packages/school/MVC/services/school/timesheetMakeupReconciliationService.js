@@ -12,6 +12,12 @@ const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const MAX_CHAIN_DEPTH = 25;
 const MAX_CHAIN_NODES = 500;
 const NON_BLOCKING_MAKEUP_CONFLICT_CODES = new Set(['orphaned_makeup_parent']);
+const CROSS_PERIOD_MAKEUP_DISPOSITIONS = new Set([
+  'current_period',
+  'future_period',
+  'current_before_deadline',
+  'current_reconciliation_window'
+]);
 
 function isBlockingMakeupConflict(conflict = {}) {
   return !NON_BLOCKING_MAKEUP_CONFLICT_CODES.has(String(conflict?.code || '').trim());
@@ -422,6 +428,75 @@ function buildNodeAudit(node, {
   };
 }
 
+function buildCrossPeriodNettingSummary(chain = {}) {
+  const nodes = Array.isArray(chain?.nodes) ? chain.nodes : [];
+  const root = nodes[0];
+  if (!root) return null;
+  const priorDifferenceHours = roundHours(root.adjustmentHours);
+  if (Math.abs(priorDifferenceHours) < 0.005) return null;
+  if (root.periodDisposition !== 'closed_period') return null;
+
+  const makeupChildren = nodes.filter((node, index) => (
+    index > 0 && node?.isMakeupSession === true
+  ));
+  if (!makeupChildren.length) return null;
+
+  const currentPeriodMakeup = makeupChildren.filter((node) => (
+    CROSS_PERIOD_MAKEUP_DISPOSITIONS.has(String(node?.periodDisposition || ''))
+  ));
+  const priorPeriodMakeup = makeupChildren.filter((node) => (
+    String(node?.periodDisposition || '') === 'closed_period'
+  ));
+  if (!currentPeriodMakeup.length) {
+    if (priorPeriodMakeup.length) return null;
+    return null;
+  }
+
+  const currentPeriodMakeupSessions = currentPeriodMakeup.map((node) => ({
+    classId: normalizeId(node.classId),
+    sessionId: normalizeId(node.sessionId),
+    date: normalizeId(node.date),
+    className: String(node.className || '').trim(),
+    finalHours: node.isFinalStatus === true ? roundHours(node.finalHours) : 0,
+    isFinalStatus: node.isFinalStatus === true,
+    manageUrl: String(node.manageUrl || '').trim()
+  }));
+  const finalizedMakeupHours = roundHours(
+    currentPeriodMakeupSessions
+      .filter((row) => row.isFinalStatus)
+      .reduce((sum, row) => sum + roundHours(row.finalHours), 0)
+  );
+  const hasCurrentMakeup = currentPeriodMakeupSessions.length > 0;
+  const allFinal = hasCurrentMakeup && currentPeriodMakeupSessions.every((row) => row.isFinalStatus);
+  const requiresFinalization = hasCurrentMakeup && !allFinal;
+  const uncoveredHours = roundHours(Math.max(0, Math.abs(priorDifferenceHours) - finalizedMakeupHours));
+  const netHours = roundHours(priorDifferenceHours + finalizedMakeupHours);
+  const satisfied = uncoveredHours < 0.005;
+  const rootDate = normalizeId(root.date);
+  const classLabel = String(root.className || 'Session').trim() || 'Session';
+  const label = satisfied
+    ? `Make-up on this timesheet offsets ${Math.abs(priorDifferenceHours).toFixed(2)} hr prior difference (net ${netHours.toFixed(2)}).`
+    : (requiresFinalization
+      ? `Prior-period difference of ${priorDifferenceHours.toFixed(2)} hr posts on the first day now. Finalizing the scheduled make-up session will offset those hours; until then, payable hours follow the prior timesheet.`
+      : `Prior difference of ${priorDifferenceHours.toFixed(2)} hr posts on the first day; ${uncoveredHours.toFixed(2)} hr remains uncovered.`);
+
+  return {
+    rootClassId: normalizeId(root.classId),
+    rootSessionId: normalizeId(root.sessionId),
+    rootSessionDate: rootDate,
+    className: classLabel,
+    priorDifferenceHours,
+    currentPeriodMakeupSessions,
+    finalizedMakeupHours,
+    uncoveredHours,
+    netHours,
+    satisfied,
+    requiresFinalization,
+    allMakeupInPriorPeriod: false,
+    label
+  };
+}
+
 function buildCatchupAdjustment({ node, audit, rootRef, sourcePeriodId, teacherId }) {
   const isMakeupCatchup = node.isMakeupSession || node.makeUpRequired;
   const reconciliationReason = isMakeupCatchup
@@ -644,21 +719,26 @@ function analyzeMakeupChains({
     const node = graph.nodes.get(key);
     if (relevantNodeKeys.has(key) || node?.assignedToTeacher === true) conflicts.push(conflict);
   });
+  const chainsWithNetting = chains.map((chain) => {
+    const crossPeriodNetting = buildCrossPeriodNettingSummary(chain);
+    return crossPeriodNetting ? { ...chain, crossPeriodNetting } : chain;
+  });
   const blockingConflicts = conflicts.filter(isBlockingMakeupConflict);
   const makeupState = blockingConflicts.length
     ? 'conflict'
-    : (chains.some((chain) => chain.state === 'open') ? 'open' : (chains.length ? 'complete' : 'none'));
-  const nodes = chains.flatMap((chain) => chain.nodes);
+    : (chainsWithNetting.some((chain) => chain.state === 'open') ? 'open' : (chainsWithNetting.length ? 'complete' : 'none'));
+  const nodes = chainsWithNetting.flatMap((chain) => chain.nodes);
   return {
     makeupState,
-    chains,
+    chains: chainsWithNetting,
     conflicts,
     adjustments: [...uniqueAdjustments.values()],
     openMakeupRootRefs,
     summary: {
-      chainCount: chains.length,
-      openChainCount: chains.filter((chain) => chain.state === 'open').length,
-      completeChainCount: chains.filter((chain) => chain.state === 'complete').length,
+      chainCount: chainsWithNetting.length,
+      openChainCount: chainsWithNetting.filter((chain) => chain.state === 'open').length,
+      completeChainCount: chainsWithNetting.filter((chain) => chain.state === 'complete').length,
+      crossPeriodNettingCount: chainsWithNetting.filter((chain) => chain.crossPeriodNetting).length,
       conflictCount: conflicts.length,
       nodeCount: nodes.length,
       openNodeCount: nodes.filter((node) => node.openReasons.length > 0).length,
@@ -674,6 +754,7 @@ module.exports = {
   NON_BLOCKING_MAKEUP_CONFLICT_CODES,
   isBlockingMakeupConflict,
   analyzeMakeupChains,
+  buildCrossPeriodNettingSummary,
   buildCatchupAdjustmentId,
   buildPaymentCoverage,
   buildSessionGraph,

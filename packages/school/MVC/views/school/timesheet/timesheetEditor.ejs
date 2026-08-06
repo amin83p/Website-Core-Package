@@ -4066,8 +4066,51 @@ document.addEventListener('DOMContentLoaded', () => {
         return applyResult;
     }
 
+    function isBlockingMakeupConflict(row = {}) {
+        return String(row?.code || '').trim() !== 'orphaned_makeup_parent';
+    }
+
+    function renderCrossPeriodNettingTableRows(preview = []) {
+        return (Array.isArray(preview) ? preview : []).flatMap((row) => {
+            if (row?.nettingKind === 'net_summary') {
+                const rowClass = row.requiresFinalization ? 'table-warning' : (row.satisfied ? 'table-success' : '');
+                return [`
+                <tr class="${rowClass}">
+                    <td colspan="3"><em>${escapeHtml(row.changeSummary || '')}</em></td>
+                    <td class="text-end text-muted">-</td>
+                    <td class="text-end text-muted">-</td>
+                    <td class="text-end fw-bold">${row.satisfied ? formatSignedHours(row.netHours || 0) : formatSignedHours(row.uncoveredHours || 0)}</td>
+                </tr>`];
+            }
+            if (row?.nettingKind === 'first_day_prior_difference') {
+                return [`
+                <tr class="table-info">
+                    <td>${escapeHtml(row.sourceSessionDate || P_START)}</td>
+                    <td>${escapeHtml(row.className || '-')} <span class="badge text-bg-info ms-1">First day</span></td>
+                    <td>${escapeHtml(row.changeSummary || '-')}</td>
+                    <td class="text-end text-muted">-</td>
+                    <td class="text-end text-muted">-</td>
+                    <td class="text-end fw-bold ${Number(row.adjustmentHours) < 0 ? 'text-danger' : 'text-success'}">${formatSignedHours(row.adjustmentHours)}</td>
+                </tr>`];
+            }
+            if (row?.nettingKind === 'current_period_makeup') {
+                return [`
+                <tr class="${row.isFinalStatus ? 'table-success' : 'table-warning'}">
+                    <td>${escapeHtml(row.sourceSessionDate || '-')}</td>
+                    <td>${escapeHtml(row.className || '-')} <span class="badge text-bg-success ms-1">Make-up</span></td>
+                    <td>${escapeHtml(row.changeSummary || '-')}</td>
+                    <td class="text-end text-muted">-</td>
+                    <td class="text-end">${row.isFinalStatus ? Number(row.currentHours || 0).toFixed(2) : 'Pending'}</td>
+                    <td class="text-end fw-bold ${row.isFinalStatus ? 'text-success' : 'text-muted'}">${row.isFinalStatus ? formatSignedHours(row.adjustmentHours) : '-'}</td>
+                </tr>`];
+            }
+            return [];
+        });
+    }
+
     function renderPriorMakeupChains(result = {}) {
-        const chains = Array.isArray(result.makeupChains) ? result.makeupChains : [];
+        const chains = (Array.isArray(result.makeupChains) ? result.makeupChains : [])
+            .filter((chain) => chain?.crossPeriodNetting || chain?.state === 'open' || chain?.state === 'conflict');
         const conflicts = Array.isArray(result.makeupConflicts) ? result.makeupConflicts : [];
         const section = document.getElementById('priorMakeupChainSection');
         const list = document.getElementById('priorMakeupChainList');
@@ -4110,6 +4153,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const root = nodes[0] || {};
             const state = String(chain?.state || 'open');
             const stateClass = state === 'complete' ? 'text-bg-success' : (state === 'conflict' ? 'text-bg-danger' : 'text-bg-warning');
+            const crossPeriodNetting = chain?.crossPeriodNetting || null;
             const nodeRows = nodes.map((node) => {
                 const depth = Math.max(0, Number(node?.depth || 0));
                 const reasons = (Array.isArray(node?.openReasons) ? node.openReasons : [])
@@ -4146,16 +4190,22 @@ document.addEventListener('DOMContentLoaded', () => {
                       </div>
                     </div>`;
             }).join('');
+            const nettingNote = crossPeriodNetting
+                ? `<div class="small ${crossPeriodNetting.requiresFinalization ? 'text-warning-emphasis' : (crossPeriodNetting.satisfied ? 'text-success' : 'text-info')} mt-2">${escapeHtml(crossPeriodNetting.label || 'Prior-period difference posts on the first day and offsets against make-up sessions on this timesheet.')}</div>`
+                : '';
             return `
                 <details class="border rounded bg-light" ${state === 'open' || state === 'conflict' || chainIndex === 0 ? 'open' : ''}>
                   <summary class="p-3 fw-semibold d-flex align-items-center justify-content-between gap-2">
                     <span>${escapeHtml(root.className || 'Make-up chain')} - root ${escapeHtml(chain.rootSessionId || root.sessionId || '')}</span>
                     <span class="badge ${stateClass}">${escapeHtml(state)}</span>
                   </summary>
-                  <div class="px-3 pb-3 d-grid gap-2">${nodeRows || '<div class="text-muted small">No chain sessions were found.</div>'}</div>
+                  <div class="px-3 pb-3 d-grid gap-2">
+                    ${nettingNote}
+                    ${nodeRows || '<div class="text-muted small">No chain sessions were found.</div>'}
+                  </div>
                 </details>`;
         });
-        const blockingConflicts = conflicts.filter((row) => String(row?.code || '') !== 'orphaned_makeup_parent');
+        const blockingConflicts = conflicts.filter(isBlockingMakeupConflict);
         const warningConflicts = conflicts.filter((row) => String(row?.code || '') === 'orphaned_makeup_parent');
         const conflictRows = blockingConflicts.length
             ? `<div class="alert alert-danger mb-0"><strong>Chain validation failed.</strong><ul class="mb-0 mt-1">${blockingConflicts.map((row) => `<li>${escapeHtml(row.message || row.code || 'Invalid make-up relationship')}</li>`).join('')}</ul></div>`
@@ -4195,8 +4245,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const hasAdjustments = adjustments.length > 0;
             const hasUnresolved = unresolved.length > 0;
             const awaitingPriorProcessing = result.reconciliationState === 'awaiting_prior_processing';
-            const hasMakeupConflict = result.makeupState === 'conflict'
-                || (Array.isArray(result.makeupConflicts) && result.makeupConflicts.length > 0);
+            const blockingMakeupConflicts = (Array.isArray(result.makeupConflicts) ? result.makeupConflicts : [])
+                .filter(isBlockingMakeupConflict);
+            const hasMakeupConflict = result.makeupState === 'conflict' || blockingMakeupConflicts.length > 0;
+            const blockingCrossPeriodNetting = Number(result.blockingCrossPeriodNettingCount || 0);
+            const crossPeriodNettingPreview = Array.isArray(result.crossPeriodNettingPreview) ? result.crossPeriodNettingPreview : [];
+            const nettingRootSessionIds = new Set(
+                (Array.isArray(result.makeupChains) ? result.makeupChains : [])
+                    .filter((chain) => chain?.crossPeriodNetting)
+                    .map((chain) => String(chain.crossPeriodNetting.rootSessionId || ''))
+                    .filter(Boolean)
+            );
             const summary = result.priorReviewSummary || {};
             renderPriorMakeupChains(result);
 
@@ -4208,6 +4267,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     intro.textContent = 'The make-up reconciliation chain contains invalid or ambiguous relationships. Open the affected sessions below and correct the chain before continuing.';
                 } else if (hasUnresolved) {
                     intro.textContent = `${unresolved.length} prior-period session(s) are still non-final. Finalize them using the links below, then reopen this review.`;
+                } else if (blockingCrossPeriodNetting > 0) {
+                    intro.textContent = `The prior-period difference posts on the first day of this timesheet (${P_START}). You can continue editing now. When the scheduled make-up session is finalized, its hours will offset that adjustment; until then, payable hours follow what was recorded on the prior timesheet.`;
+                } else if (crossPeriodNettingPreview.length > 0) {
+                    intro.textContent = `Prior-period differences post on the first day of this timesheet (${P_START}) and offset against finalized make-up sessions scheduled in this period. Review the rows below before continuing.`;
                 } else if (priorReviewHasOpenMakeupChains) {
                     intro.textContent = `The payable differences for "${priorName}" are ready. Review the open make-up chains below and confirm that their unfinished obligations should carry forward.`;
                 } else if (hasAdjustments) {
@@ -4232,15 +4295,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const tbodyPrior = document.getElementById('priorAdjustmentTableBody');
             const applyBtn = document.getElementById('btnPriorAdjustmentApply');
             const continueBtn = document.getElementById('btnPriorAdjustmentContinue');
+            const crossPeriodNettingRows = renderCrossPeriodNettingTableRows(crossPeriodNettingPreview);
 
-            const resolvedRows = adjustments.map((adj) => `
+            const resolvedRows = adjustments
+                .filter((adj) => (
+                    Math.abs(Number(adj.adjustmentHours ?? adj.deltaHours ?? 0)) >= 0.005
+                    && !nettingRootSessionIds.has(String(adj.sourceSessionId || ''))
+                ))
+                .map((adj) => `
                 <tr>
                     <td>${escapeHtml(adj.sourceSessionDate || '-')}</td>
                     <td>${escapeHtml(adj.className || '-')}</td>
                     <td>${escapeHtml(adj.changeSummary || adj.comment || '-')}</td>
                     <td class="text-end">${Number(adj.snapshotHours ?? adj.baselineHours ?? 0).toFixed(2)}</td>
                     <td class="text-end">${Number(adj.currentHours || 0).toFixed(2)}</td>
-                    <td class="text-end fw-bold ${Number(adj.deltaHours) < 0 ? 'text-danger' : 'text-success'}">${formatSignedHours(adj.deltaHours)}</td>
+                    <td class="text-end fw-bold ${Number(adj.deltaHours ?? adj.adjustmentHours) < 0 ? 'text-danger' : 'text-success'}">${formatSignedHours(adj.deltaHours ?? adj.adjustmentHours)}</td>
                 </tr>
             `);
             const unresolvedRows = unresolved.map((row) => `
@@ -4264,9 +4333,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr>
             `);
 
-            if (!awaitingPriorProcessing && (resolvedRows.length || unresolvedRows.length || noChangeRows.length)) {
+            if (!awaitingPriorProcessing && (resolvedRows.length || crossPeriodNettingRows.length || unresolvedRows.length || noChangeRows.length)) {
                 if (tableWrap) tableWrap.classList.remove('d-none');
-                if (tbodyPrior) tbodyPrior.innerHTML = [...unresolvedRows, ...resolvedRows, ...noChangeRows].join('');
+                if (tbodyPrior) tbodyPrior.innerHTML = [...unresolvedRows, ...crossPeriodNettingRows, ...resolvedRows, ...noChangeRows].join('');
             } else {
                 if (tableWrap) tableWrap.classList.add('d-none');
                 if (tbodyPrior) tbodyPrior.innerHTML = '';
@@ -4275,7 +4344,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (awaitingPriorProcessing || hasUnresolved || hasMakeupConflict) {
                 if (applyBtn) applyBtn.classList.add('d-none');
                 if (continueBtn) continueBtn.classList.add('d-none');
-            } else if (hasAdjustments) {
+            } else if (hasAdjustments || crossPeriodNettingRows.length) {
                 if (applyBtn) applyBtn.classList.remove('d-none');
                 if (continueBtn) continueBtn.classList.add('d-none');
                 applyBtn.innerHTML = priorReviewHasOpenMakeupChains

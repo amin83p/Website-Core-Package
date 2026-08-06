@@ -258,6 +258,65 @@ function buildReconciliationAdjustment({ snapshotEntry, live, priorPeriod, curre
     return base;
 }
 
+function listMakeupChains(result = {}) {
+    if (Array.isArray(result?.makeupChains)) return result.makeupChains;
+    if (Array.isArray(result?.chains)) return result.chains;
+    return [];
+}
+
+function countBlockingCrossPeriodNetting(result = {}) {
+    return listMakeupChains(result)
+        .filter((chain) => chain?.crossPeriodNetting?.requiresFinalization === true).length;
+}
+
+function listCrossPeriodNettingSummaries(result = {}) {
+    return listMakeupChains(result)
+        .map((chain) => chain?.crossPeriodNetting)
+        .filter(Boolean);
+}
+
+function buildCrossPeriodNettingPreview(result = {}, currentPeriod = {}) {
+    const applyDate = normalizeId(currentPeriod?.startDate);
+    return listCrossPeriodNettingSummaries(result).flatMap((netting) => {
+        const rows = [{
+            sourceSessionDate: applyDate,
+            className: netting.className,
+            changeSummary: `Prior-period difference for session ${netting.rootSessionId}${netting.rootSessionDate ? ` (${netting.rootSessionDate})` : ''} posts on the first day of this timesheet.`,
+            adjustmentHours: netting.priorDifferenceHours,
+            deltaHours: netting.priorDifferenceHours,
+            isCrossPeriodNetting: true,
+            nettingKind: 'first_day_prior_difference',
+            rootSessionId: netting.rootSessionId,
+            rootClassId: netting.rootClassId
+        }];
+        (Array.isArray(netting.currentPeriodMakeupSessions) ? netting.currentPeriodMakeupSessions : []).forEach((makeup) => {
+            rows.push({
+                sourceSessionDate: makeup.date,
+                className: netting.className,
+                changeSummary: `Make-up for prior session ${netting.rootSessionId}${netting.rootSessionDate ? ` (${netting.rootSessionDate})` : ''}.`,
+                adjustmentHours: makeup.isFinalStatus ? roundHours(makeup.finalHours) : 0,
+                deltaHours: makeup.isFinalStatus ? roundHours(makeup.finalHours) : 0,
+                currentHours: makeup.isFinalStatus ? roundHours(makeup.finalHours) : 0,
+                isCrossPeriodNetting: true,
+                nettingKind: 'current_period_makeup',
+                makeupSessionId: makeup.sessionId,
+                isFinalStatus: makeup.isFinalStatus === true,
+                manageUrl: makeup.manageUrl || ''
+            });
+        });
+        rows.push({
+            changeSummary: netting.label,
+            netHours: netting.netHours,
+            uncoveredHours: netting.uncoveredHours,
+            satisfied: netting.satisfied === true,
+            requiresFinalization: netting.requiresFinalization === true,
+            isCrossPeriodNetting: true,
+            nettingKind: 'net_summary'
+        });
+        return rows;
+    });
+}
+
 function buildReconciliationChangeSummary(item = {}) {
     const classLabel = String(item.className || 'Session').trim() || 'Session';
     if (item.resolutionReason === 'moved_into_current_period') {
@@ -581,8 +640,22 @@ function buildReconciliationFingerprint(result = {}) {
                 adjustmentHours: roundHours(item?.adjustmentHours ?? item?.deltaHours),
                 reason: normalizeId(item?.reconciliationReason)
             })),
-        ...(Array.isArray(result?.makeupChains) ? result.makeupChains : []).flatMap((chain) => (
-            (Array.isArray(chain?.nodes) ? chain.nodes : []).map((node) => ({
+        ...(Array.isArray(result?.makeupChains) ? result.makeupChains : []).flatMap((chain) => {
+            const netting = chain?.crossPeriodNetting;
+            const nettingRows = netting ? [{
+                kind: 'cross_period_netting',
+                rootClassId: normalizeId(netting.rootClassId),
+                rootSessionId: normalizeId(netting.rootSessionId),
+                priorDifferenceHours: roundHours(netting.priorDifferenceHours),
+                finalizedMakeupHours: roundHours(netting.finalizedMakeupHours),
+                uncoveredHours: roundHours(netting.uncoveredHours),
+                netHours: roundHours(netting.netHours),
+                satisfied: netting.satisfied === true,
+                requiresFinalization: netting.requiresFinalization === true
+            }] : [];
+            return [
+                ...nettingRows,
+                ...(Array.isArray(chain?.nodes) ? chain.nodes : []).map((node) => ({
                 kind: 'makeup_chain',
                 rootClassId: normalizeId(chain?.rootClassId),
                 rootSessionId: normalizeId(chain?.rootSessionId),
@@ -608,7 +681,8 @@ function buildReconciliationFingerprint(result = {}) {
                 remainingDurationHours: roundHours(node?.remainingDurationHours),
                 openReasons: (Array.isArray(node?.openReasons) ? node.openReasons : []).map(normalizeId).sort()
             }))
-        )),
+            ];
+        }),
         ...(Array.isArray(result?.makeupConflicts) ? result.makeupConflicts : []).map((conflict) => ({
             kind: 'makeup_conflict',
             code: normalizeId(conflict?.code),
@@ -733,17 +807,20 @@ function buildResolvedSourceRefs(result = {}) {
 module.exports = {
     buildAdjustmentSessionId,
     buildAdjustmentEntries,
+    buildCrossPeriodNettingPreview,
     buildCurrentClassSessionIndex,
     buildReconciliationAdjustment,
     buildReconciliationFingerprint,
     buildReconciliationReceipt,
     buildResolvedSourceRefs,
+    countBlockingCrossPeriodNetting,
     detectAdjustments,
     detectReconciliation,
     findPriorSubmittedTimesheet,
     isPriorTimesheetPayrollFinal,
     isMakeupConfirmationCurrent,
     isReconciliationReceiptCurrent,
+    listCrossPeriodNettingSummaries,
     mergeAdjustmentEntries,
     mergeAdjustmentEntriesForSource,
     resolveSnapshotEntries

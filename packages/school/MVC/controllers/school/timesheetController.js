@@ -599,11 +599,12 @@ function buildPriorReconciliationSummary(priorTimesheet, result = {}) {
         makeupConflictCount: Number(result?.makeupSummary?.conflictCount || 0),
         makeupCatchupCount: Number(result?.makeupSummary?.catchupCount || 0),
         makeupCatchupHours: Number(result?.makeupSummary?.catchupHours || 0),
+        blockingCrossPeriodNettingCount: priorPeriodAdjustmentService.countBlockingCrossPeriodNetting(result),
         submittedAt: String(priorTimesheet?.submissionSnapshot?.submittedAt || priorTimesheet?.audit?.lastUpdateDateTime || '')
     };
 }
 
-async function resolvePriorReconciliationContext({ period, teacherId, activeOrgId, reqUser }) {
+async function resolvePriorReconciliationContext({ period, teacherId, activeOrgId, reqUser, existingTimesheet = null }) {
     const prior = await priorPeriodAdjustmentService.findPriorSubmittedTimesheet({
         teacherId,
         currentPeriod: period,
@@ -619,7 +620,7 @@ async function resolvePriorReconciliationContext({ period, teacherId, activeOrgI
             priorReviewSummary: buildPriorReconciliationSummary(prior.priorTimesheet)
         };
     }
-    const result = await priorPeriodAdjustmentService.detectReconciliation({
+    const rawResult = await priorPeriodAdjustmentService.detectReconciliation({
         priorTimesheet: prior.priorTimesheet,
         priorPeriod: prior.priorPeriod,
         currentPeriod: period,
@@ -627,6 +628,7 @@ async function resolvePriorReconciliationContext({ period, teacherId, activeOrgI
         activeOrgId,
         reqUser
     });
+    const result = rawResult;
     return {
         prior,
         reconciliationState: result.makeupState === 'conflict'
@@ -2493,7 +2495,8 @@ exports.saveTimesheet = async (req, res) => {
                 period,
                 teacherId: teacherContext.targetTeacherId,
                 activeOrgId,
-                reqUser: req.user
+                reqUser: req.user,
+                existingTimesheet: existing
             });
             if (priorReconciliationContext.prior) {
                 const priorPeriodId = String(priorReconciliationContext.prior.priorPeriod?.id || '');
@@ -2724,7 +2727,8 @@ exports.getPriorAdjustments = async (req, res) => {
             period,
             teacherId: teacherContext.targetTeacherId,
             activeOrgId,
-            reqUser: req.user
+            reqUser: req.user,
+            existingTimesheet: existing
         });
         if (!context.prior) {
             return res.json({
@@ -2751,7 +2755,7 @@ exports.getPriorAdjustments = async (req, res) => {
                 context.result
             )
         );
-        return res.json({
+        const priorAdjustmentsPayload = {
             status: 'success',
             hasPriorPeriod: true,
             needsReview: !alreadyApplied || context.reconciliationState !== 'resolved',
@@ -2770,8 +2774,14 @@ exports.getPriorAdjustments = async (req, res) => {
             makeupSummary: context.result?.makeupSummary || {},
             makeupChains: context.result?.makeupChains || [],
             makeupConflicts: context.result?.makeupConflicts || [],
+            crossPeriodNettingPreview: priorPeriodAdjustmentService.buildCrossPeriodNettingPreview(
+                context.result,
+                period
+            ),
+            blockingCrossPeriodNettingCount: priorPeriodAdjustmentService.countBlockingCrossPeriodNetting(context.result),
             alreadyApplied
-        });
+        };
+        return res.json(priorAdjustmentsPayload);
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
     }
@@ -2814,7 +2824,8 @@ exports.applyPriorAdjustments = async (req, res) => {
             period,
             teacherId: teacherContext.targetTeacherId,
             activeOrgId,
-            reqUser: req.user
+            reqUser: req.user,
+            existingTimesheet: existing
         });
         if (!context.prior) throw new Error('No prior submitted timesheet found for adjustment.');
         if (context.reconciliationState === 'awaiting_prior_processing') {
@@ -2846,8 +2857,11 @@ exports.applyPriorAdjustments = async (req, res) => {
             throw error;
         }
         const prior = context.prior;
+        const payableAdjustments = (context.result?.adjustments || []).filter((adj) => (
+            Math.abs(Number(adj?.adjustmentHours ?? adj?.deltaHours ?? 0)) >= 0.005
+        ));
         const adjustmentEntries = priorPeriodAdjustmentService.buildAdjustmentEntries({
-            adjustments: context.result?.adjustments || [],
+            adjustments: payableAdjustments,
             applyDate: period.startDate
         });
         const mergedEntries = priorPeriodAdjustmentService.mergeAdjustmentEntriesForSource(

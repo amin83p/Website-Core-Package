@@ -385,6 +385,21 @@ function sanitizeAdjustmentMeta(input) {
     };
 }
 
+function sanitizeCrossPeriodMakeupResolution(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const rootClassId = cleanString(input.rootClassId, { max: 64, allowEmpty: false });
+    const rootSessionId = cleanString(input.rootSessionId, { max: 80, allowEmpty: false });
+    if (!rootClassId || !rootSessionId) return null;
+    return {
+        rootClassId,
+        rootSessionId,
+        makeupSessionId: cleanString(input.makeupSessionId, { max: 80, allowEmpty: true }),
+        differenceHours: cleanHours(input.differenceHours ?? 0, { min: -24, max: 24 }),
+        coveredHours: cleanHours(input.coveredHours ?? 0, { min: 0, max: 24 }),
+        resolvedAt: cleanString(input.resolvedAt, { max: 40, allowEmpty: true })
+    };
+}
+
 function sanitizeMakeupRootRef(input) {
     if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
     const classId = cleanString(input.classId || input.rootClassId, { max: 64, allowEmpty: false });
@@ -513,6 +528,10 @@ function sanitizePriorPeriodReconciliation(input) {
         .slice(0, 100);
     result.openMakeupRootRefs = (Array.isArray(input.openMakeupRootRefs) ? input.openMakeupRootRefs : [])
         .map(sanitizeMakeupRootRef)
+        .filter(Boolean)
+        .slice(0, 100);
+    result.crossPeriodMakeupResolutions = (Array.isArray(input.crossPeriodMakeupResolutions) ? input.crossPeriodMakeupResolutions : [])
+        .map(sanitizeCrossPeriodMakeupResolution)
         .filter(Boolean)
         .slice(0, 100);
     const reviewedAt = cleanString(input.reviewedAt, { max: 40, allowEmpty: true });
