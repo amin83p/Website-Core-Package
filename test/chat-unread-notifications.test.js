@@ -299,8 +299,57 @@ test('rendered chat client script is valid and includes badge, sound, and read-s
   assert.match(clientSource, /mark_conversation_read/);
   assert.match(clientSource, /unread_state/);
   assert.match(clientSource, /chat\.soundMuted\./);
-  assert.match(clientSource, /document\.visibilityState === 'visible' && document\.hasFocus\(\)/);
+  assert.match(clientSource, /function isTabVisible\(\)/);
+  assert.match(clientSource, /document\.visibilityState === 'visible'/);
+  assert.match(clientSource, /chatInitialUnreadSoundPlayed/);
+  assert.match(clientSource, /if \(!chatInitialUnreadSoundPlayed && loadedTotalUnread > 0/);
   assert.doesNotMatch(clientSource, /updateUnreadCount\(0,\s*true\)/);
   assert.match(rendered, /id="chatSoundToggle"/);
+  assert.match(rendered, /id="chatSendButton"[^>]*data-no-wait="true"/);
   assert.match(clientSource, /getElementById\('chatGlobalBadge'\)/);
+});
+
+test('mongo chat create reuses an existing direct conversation between the same users', async () => {
+  const originals = new Map();
+  const inserted = [];
+  const existingConversation = {
+    _id: 'mongo-conv-1',
+    id: 'CONV-EXISTING',
+    type: 'direct',
+    participants: [
+      { userId: 'USER-1', unreadCount: 2 },
+      { userId: 'USER-2', unreadCount: 0 }
+    ],
+    totalMessages: 4,
+    updatedAt: '2026-07-29T10:00:00.000Z'
+  };
+  const fakeCollection = {
+    find() {
+      return {
+        toArray: async () => [existingConversation]
+      };
+    },
+    async insertOne(doc) {
+      inserted.push(doc);
+      return { insertedId: 'mongo-conv-new' };
+    }
+  };
+
+  try {
+    stubModule('../MVC/infrastructure/mongo/mongoConnection', {
+      getMongoCollection: () => fakeCollection
+    }, originals);
+    delete require.cache[CHAT_REPOSITORY_PATH];
+    const repository = require(CHAT_REPOSITORY_PATH);
+
+    const created = await repository.create(
+      { userIds: ['USER-2', 'USER-1'] },
+      { backendMode: 'mongo' }
+    );
+
+    assert.equal(created.id, 'CONV-EXISTING');
+    assert.equal(inserted.length, 0);
+  } finally {
+    restoreModules(originals);
+  }
 });

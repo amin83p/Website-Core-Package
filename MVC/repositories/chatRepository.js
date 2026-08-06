@@ -1,5 +1,5 @@
 const chatModel = require('../models/chatModel');
-const { toPublicId } = require('../utils/idAdapter');
+const { toPublicId, idsEqual } = require('../utils/idAdapter');
 const { assertQueryableCrudRepository } = require('./contracts/crudRepositoryContract');
 const { runByRepositoryBackend } = require('./backend/repositoryBackendSelector');
 const { getMongoCollection } = require('../infrastructure/mongo/mongoConnection');
@@ -61,6 +61,47 @@ function normalizeChatDocument(row) {
   return normalized ? normalizeConversation(normalized) : null;
 }
 
+function isDirectConversationForUserIds(conversation, userIds = []) {
+  if (String(conversation?.type || 'direct') !== 'direct') return false;
+  const normalizedUserIds = (Array.isArray(userIds) ? userIds : [])
+    .map((id) => toPublicId(id))
+    .filter(Boolean);
+  const participants = Array.isArray(conversation?.participants) ? conversation.participants : [];
+  if (!normalizedUserIds.length || participants.length !== normalizedUserIds.length) return false;
+  return normalizedUserIds.every((userId) => (
+    participants.some((participant) => idsEqual(participant?.userId, userId))
+  ));
+}
+
+async function findDirectConversationByUserIds(userIds = [], options = {}) {
+  const normalizedUserIds = (Array.isArray(userIds) ? userIds : [])
+    .map((id) => toPublicId(id))
+    .filter(Boolean);
+  if (!normalizedUserIds.length) return null;
+
+  return runByRepositoryBackend(options, {
+    json: async () => {
+      const conversations = await chatModel.queryConversations({
+        query: {},
+        scope: { canViewAll: true }
+      });
+      return (Array.isArray(conversations) ? conversations : [])
+        .find((conversation) => isDirectConversationForUserIds(conversation, normalizedUserIds)) || null;
+    },
+    mongo: async () => {
+      const collection = getMongoCollection('chatConversations');
+      const candidates = await collection.find({
+        type: 'direct',
+        'participants.userId': { $all: normalizedUserIds }
+      }).toArray();
+      const match = candidates.find((conversation) => (
+        isDirectConversationForUserIds(conversation, normalizedUserIds)
+      ));
+      return match ? normalizeChatDocument(match) : null;
+    }
+  }, 'core.chat.findDirectConversationByUserIds');
+}
+
 const chatRepository = {
   async list(options = {}) {
     return runByRepositoryBackend(options, {
@@ -120,6 +161,9 @@ const chatRepository = {
       mongo: async () => {
         const userIds = Array.isArray(data?.userIds) ? data.userIds.map((id) => toPublicId(id)).filter(Boolean) : [];
         if (!userIds.length) throw new Error('Conversation participants are required.');
+        const existing = await findDirectConversationByUserIds(userIds, options);
+        if (existing) return existing;
+
         const collection = getMongoCollection('chatConversations');
         const now = new Date().toISOString();
         const payload = {

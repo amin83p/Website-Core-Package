@@ -361,7 +361,13 @@ exports.startChat = async (req, res) => {
         await chatContactScopeService.assertCanContact(req.user, targetUserId);
 
         const conv = await chatRepository.create({ userIds: [req.user.id, targetUserId] });
-        res.json({ status: 'success', conversationId: conv.id });
+        const updateAccess = await chatAccessService.canUseChatOperation(req.user, OPERATIONS.UPDATE, req.ip);
+        const enriched = (await enrichConversations([conv], req.user.id, req.user, updateAccess))[0];
+        res.json({
+            status: 'success',
+            conversationId: conv.id,
+            data: enriched
+        });
     } catch (err) {
         res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
     }

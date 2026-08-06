@@ -96,7 +96,7 @@
                                     placeholder="Message..." 
                                     style="resize:none; min-height: 38px; max-height: 160px; overflow-y: auto; line-height: 1.5;"></textarea>
                           
-                          <button type="submit" id="chatSendButton" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                          <button type="submit" id="chatSendButton" data-no-wait="true" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
                               <i class="bi bi-send-fill" style="font-size: 0.9rem; margin-left: 2px;"></i>
                           </button>
                       </form>
@@ -230,6 +230,7 @@ let totalUnreadCount = 0;
 const chatSoundStorageKey = `chat.soundMuted.${String(currentUser.id)}`;
 let chatSoundMuted = false;
 let chatAudioContext = null;
+let chatInitialUnreadSoundPlayed = false;
 
 function normalizeClientUnreadCount(value) {
     const parsed = Number(value);
@@ -309,8 +310,12 @@ function markConversationReadLocally(convId) {
     renderGlobalUnreadCount();
 }
 
+function isTabVisible() {
+    return document.visibilityState === 'visible';
+}
+
 function isAppActive() {
-    return document.visibilityState === 'visible' && document.hasFocus();
+    return isTabVisible() && document.hasFocus();
 }
 
 function isConversationActivelyViewed(convId) {
@@ -380,15 +385,17 @@ function ensureChatAudioContext() {
 
 async function unlockChatAudio() {
     const context = ensureChatAudioContext();
-    if (!context || context.state !== 'suspended') return;
+    if (!context || context.state !== 'suspended') return context;
     try {
         await context.resume();
     } catch (_) {}
+    return context;
 }
 
-function playChatDing() {
-    if (chatSoundMuted || !isAppActive()) return;
-    const context = ensureChatAudioContext();
+async function playChatDing() {
+    if (chatSoundMuted || !isTabVisible()) return;
+
+    const context = await unlockChatAudio();
     if (!context || context.state !== 'running') return;
 
     const start = context.currentTime;
@@ -425,8 +432,8 @@ function initChatSoundControls() {
         });
     }
 
-    document.addEventListener('pointerdown', unlockChatAudio, { once: true, capture: true });
-    document.addEventListener('keydown', unlockChatAudio, { once: true, capture: true });
+    document.addEventListener('pointerdown', unlockChatAudio, { capture: true });
+    document.addEventListener('keydown', unlockChatAudio, { capture: true });
 }
 
 function safeText(value) {
@@ -575,7 +582,7 @@ function initChatSystem() {
             : normalizeClientUnreadCount(totalUnreadCount) + 1;
         applyUnreadState(data.convId, eventConversationUnread, eventTotalUnread);
         latestIncomingMessageByConversation.set(String(data.convId), data.message.id);
-        playChatDing();
+        if (!isActiveConversation) playChatDing();
 
         if (isCurrentConversationOpen) {
             appendMessage(data.message);
@@ -1000,7 +1007,13 @@ async function refreshInbox() {
         const res = await resp.json();
         if(res.status === 'success') {
             listEl.innerHTML = '';
+            const previousTotalUnread = normalizeClientUnreadCount(totalUnreadCount);
             replaceUnreadState(res.data || [], res.totalUnread);
+            const loadedTotalUnread = normalizeClientUnreadCount(res.totalUnread);
+            if (!chatInitialUnreadSoundPlayed && loadedTotalUnread > 0 && previousTotalUnread === 0) {
+                chatInitialUnreadSoundPlayed = true;
+                playChatDing();
+            }
             
             if(!res.data || res.data.length === 0) {
                  listEl.innerHTML = '<div class="text-center text-muted mt-5 small">No messages yet.</div>';
@@ -1099,7 +1112,7 @@ async function fetchUsers(query) {
                 const packageText = packages.length ? `${packages.join(', ')} · ` : '';
                 const detailText = `${u.org || 'General'} · ${packageText}${roleLabels.join(', ')}`;
                 const html = `
-                <div class="chat-item d-flex align-items-center p-2" onclick='createNewChat(${safeInlineJson(u.id)})'>
+                <div class="chat-item d-flex align-items-center p-2" onclick='createNewChat(${safeInlineJson(u.id)}, ${safeInlineJson(u.name)}, ${safeInlineJson(u.avatar || '')})'>
                     <div class="me-2 flex-shrink-0">${avatarHtml}</div>
                     <div class="flex-grow-1 overflow-hidden">
                         <div class="fw-bold small text-dark text-truncate">${safeText(u.name)}</div>
@@ -1114,12 +1127,37 @@ async function fetchUsers(query) {
     } catch (e) { console.error(e); }
 }
 
-async function createNewChat(uid){
+async function createNewChat(uid, name = '', avatarUrl = '') {
     if (!chatAccess.canCreate) {
         safeShowAlert('Your access profile does not allow starting new chats.', 'warning');
         return;
     }
-    fetch('/chat/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetUserId:uid})}).then(r=>r.json()).then(res=>{if(res.status==='success'){showInbox();}else if(res.message){safeShowAlert(res.message, 'error');}});
+    try {
+        const resp = await fetch('/chat/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetUserId: uid })
+        });
+        const res = await resp.json();
+        if (res.status !== 'success') {
+            if (res.message) safeShowAlert(res.message, 'error');
+            return;
+        }
+
+        const conversation = res.data || {};
+        const display = conversation.display || {};
+        await openChat(
+            res.conversationId || conversation.id,
+            display.name || name || 'Chat',
+            display.targetUserId || uid,
+            display.avatar || avatarUrl || '',
+            conversation.canMessage !== false,
+            conversation.scopeReason || ''
+        );
+    } catch (e) {
+        console.error(e);
+        safeShowAlert('Unable to start chat right now.', 'error');
+    }
 }
 
 function handleSearch(v){if(document.getElementById('sidebarTitle').innerText==='New Chat')fetchUsers(v);}
