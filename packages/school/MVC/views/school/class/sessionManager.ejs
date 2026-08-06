@@ -3513,6 +3513,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return attendanceDetailsState[key];
     }
+    window.getAttendanceDetails = getAttendanceDetails;
 
     function conductEscapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (ch) => ({
@@ -7626,12 +7627,12 @@ function openDetailsModal(personId, name) {
         document.getElementById('modalLateMins').value = row.querySelector('.att-late').value;
         document.getElementById('modalLeaveMins').value = row.querySelector('.att-leave').value;
         document.getElementById('modalExcuseRef').value = row.querySelector('.att-excuse').value;
-        const details = getAttendanceDetails(personId);
+        const details = window.getAttendanceDetails(personId);
         const excuseAttachment = details.excuseAttachment || null;
         const excuseFileInput = document.getElementById('modalExcuseFile');
         if (excuseFileInput) excuseFileInput.value = '';
         const excusePreview = document.getElementById('modalExcuseAttachmentPreview');
-        if (excusePreview) excusePreview.innerHTML = renderAttendanceAttachmentLink(excuseAttachment, '<span class="text-muted">No file attached.</span>');
+        if (excusePreview) excusePreview.innerHTML = window.renderAttendanceAttachmentLink(excuseAttachment, '<span class="text-muted">No file attached.</span>');
 
         const comments = Array.isArray(details.comments) ? details.comments : [];
         const thread = document.getElementById('det_commentsThread');
@@ -7641,7 +7642,7 @@ function openDetailsModal(personId, name) {
             comments.forEach(c => {
                 let mentionHtml = '';
                 (c.mentions || []).forEach(m => mentionHtml += `<span class="mention-badge me-1">@${m.name}</span>`);
-                const attachmentHtml = c.attachment ? `<div class="small mt-1">${renderAttendanceAttachmentLink(c.attachment)}</div>` : '';
+                const attachmentHtml = c.attachment ? `<div class="small mt-1">${window.renderAttendanceAttachmentLink(c.attachment)}</div>` : '';
 
                 thread.innerHTML += `
                     <div class="comment-bubble">
