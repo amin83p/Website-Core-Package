@@ -35,6 +35,7 @@ const idempotencyGuardService = require('../../services/school/idempotencyGuardS
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
+const sessionDeletePreparationService = require('../../services/school/sessionDeletePreparationService');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
@@ -3738,6 +3739,7 @@ async function manageSession(req, res) {
             OPERATIONS.DELETE,
             { section: { id: SECTIONS.SCHOOL_SESSIONS } }
         );
+        const canDeleteSession = canDeleteStudentCases;
         
         const isReadOnly = !canEditSession || (isSessionLocked && !canOverride);
 
@@ -4013,6 +4015,7 @@ async function manageSession(req, res) {
             makeupOriginalSessionReference,
             canViewSchoolSettings,
             canDeleteStudentCases,
+            canDeleteSession,
             sessionCoTeachers,
             canManageCoTeachers,
             canToggleCoTeacherEdit,
@@ -4224,6 +4227,36 @@ async function deleteSessionDependencies(classId, sessionId, reqUser, orgId) {
         reportInstances: (instances || []).length,
         reportAssignments: (assignments || []).length
     };
+}
+
+async function previewClassSessionDelete(req, res) {
+    try {
+        const classId = toPublicId(req.params.id);
+        const sessionId = toPublicId(req.params.sessionId);
+        const isAdmin = await adminAuthorityService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_SESSIONS,
+            OPERATIONS.DELETE,
+            { section: { id: SECTIONS.SCHOOL_SESSIONS } }
+        );
+        if (!isAdmin) {
+            return res.status(403).json({ status: 'error', message: 'Only administrators can delete class sessions.' });
+        }
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const preview = await sessionDeletePreparationService.buildSessionDeletePreview({
+            classId,
+            sessionId,
+            reqUser: req.user,
+            orgId: classData?.orgId
+        });
+        return res.json({
+            status: 'success',
+            preview,
+            actionStateId: req.actionStateId || ''
+        });
+    } catch (error) {
+        return res.status(error.statusCode || 400).json({ status: 'error', message: error.message });
+    }
 }
 
 async function deleteClassSession(req, res) {
@@ -5236,7 +5269,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, manageSession, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,

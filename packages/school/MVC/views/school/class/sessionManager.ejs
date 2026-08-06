@@ -1381,6 +1381,11 @@
                     <i class="bi bi-<%= isSessionLocked ? 'unlock' : 'lock-fill' %> me-1"></i><%= isSessionLocked ? 'Unlock session' : 'Lock session' %>
                 </button>
             <% } %>
+            <% if (typeof canDeleteSession !== 'undefined' && canDeleteSession) { %>
+                <button type="button" class="btn btn-outline-danger btn-md fw-semibold shadow-sm" id="btnDeleteSession">
+                    <i class="bi bi-trash me-1"></i>Delete session
+                </button>
+            <% } %>
             <% if (!isReadOnly) { %>
                 <button type="button" class="btn btn-primary btn-md btn-filled btn-save-session shadow-md" id="btnSaveSession"><i class="bi bi-save me-1"></i>Save session</button>
             <% } %>
@@ -2681,6 +2686,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionInitialStatusCode = <%- jsonForScript(currentSessionStatus) %>;
     const sessionManagerClassId = <%- jsonForScript(classData.id) %>;
     const sessionManagerSessionId = <%- jsonForScript(session.sessionId) %>;
+    const sessionManagerSchoolDashboardHref = <%- jsonForScript(typeof schoolSectionDashboardHref !== 'undefined' ? schoolSectionDashboardHref : '/dashboard/section-nav/SCHOOL') %>;
     const sessionStatusMeta = <%- jsonForScript(availableStatusRows || []) %>;
     let sessionMakeupSummary = <%- jsonForScript(makeupAllocationSummary || {}) %>;
     const sessionMakeupHistory = Array.isArray(sessionMakeupSummary.sessions) ? sessionMakeupSummary.sessions : [];
@@ -2719,6 +2725,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : (Array.isArray(session?.delivery?.coTeachers) ? session.delivery.coTeachers : [])
     ) %>;
     const sessionCanToggleLock = <%- jsonForScript(Boolean(canToggleSessionLock)) %>;
+    const sessionCanDeleteSession = <%- jsonForScript(typeof canDeleteSession !== 'undefined' && canDeleteSession === true) %>;
     const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     const sessionStatusMap = new Map((sessionStatusMeta || []).map((row) => [normalizeStatusCode(row.code), row]));
     const resolveStatusMeta = (statusCode) => sessionStatusMap.get(normalizeStatusCode(statusCode)) || null;
@@ -2779,6 +2786,54 @@ document.addEventListener('DOMContentLoaded', () => {
         }[char]));
     }
 
+    function sessionStripHtmlMessage(value) {
+        return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    async function sessionShowDeleteError(title, message, { html = false } = {}) {
+        const raw = String(message || '').trim();
+        const hasHtml = html || /<[a-z][\s\S]*>/i.test(raw);
+        await sessionMessageBox({
+            title: title || 'Delete Failed',
+            icon: 'error',
+            message: hasHtml ? raw : sessionStripHtmlMessage(raw),
+            html: hasHtml,
+            okClass: 'btn-danger'
+        });
+    }
+
+    function buildSessionDeleteSuccessMessage(payload, preview) {
+        const label = attendanceAttachmentEscape(preview?.label || preview?.session?.sessionId || 'Session');
+        const counts = payload?.deletedCounts && typeof payload.deletedCounts === 'object' ? payload.deletedCounts : {};
+        const related = [];
+        if (Number(counts.reportInstances || 0) > 0) {
+            related.push(Number(counts.reportInstances) + ' report instance' + (Number(counts.reportInstances) === 1 ? '' : 's'));
+        }
+        if (Number(counts.reportAssignments || 0) > 0) {
+            related.push(Number(counts.reportAssignments) + ' report assignment' + (Number(counts.reportAssignments) === 1 ? '' : 's'));
+        }
+        if (Number(counts.sessionStudentCases || 0) > 0) {
+            related.push(Number(counts.sessionStudentCases) + ' student case' + (Number(counts.sessionStudentCases) === 1 ? '' : 's'));
+        }
+        let message = '<p class="mb-0"><strong>' + label + '</strong> was permanently deleted.</p>';
+        if (related.length) {
+            message += '<p class="mb-0 mt-2 text-muted small">Removed related records: ' + related.join(', ') + '.</p>';
+        }
+        return message;
+    }
+
+    function leaveSessionManagerAfterDelete() {
+        const dashboardHref = String(
+            document.getElementById('linkSessionDashboard')?.getAttribute('href')
+            || sessionManagerSchoolDashboardHref
+            || '/dashboard/section-nav/SCHOOL'
+        ).trim();
+        window.close();
+        setTimeout(() => {
+            window.location.href = dashboardHref || '/dashboard/section-nav/SCHOOL';
+        }, 200);
+    }
+
     async function sessionMessageBox({
         title = 'Notice',
         message = '',
@@ -2833,6 +2888,200 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = options || {};
         const html = payload.html === true || (payload.html !== false && /<[a-z][\s\S]*>/i.test(String(payload.message || '')));
         return sessionMessageBox({ ...payload, html });
+    }
+
+    function renderSessionDeletePreviewHtml(preview) {
+        const blockers = Array.isArray(preview?.blockers) ? preview.blockers : [];
+        const autoCascade = Array.isArray(preview?.autoCascade) ? preview.autoCascade : [];
+        const label = attendanceAttachmentEscape(preview?.label || preview?.session?.sessionId || 'this session');
+        const blockerHtml = blockers.length
+            ? '<div class="small fw-semibold text-uppercase text-muted mb-2">Resolve these first</div>'
+                + blockers.map((blocker, index) => {
+                    const samples = Array.isArray(blocker.samples) ? blocker.samples : [];
+                    const sampleHtml = samples.map((sample) => {
+                        const sampleLabel = attendanceAttachmentEscape(sample.label || sample.id || 'Record');
+                        if (sample.href) {
+                            return '<li class="list-group-item py-2"><a href="' + attendanceAttachmentEscape(sample.href) + '" target="_blank" rel="noopener noreferrer">' + sampleLabel + '</a></li>';
+                        }
+                        return '<li class="list-group-item py-2">' + sampleLabel + '</li>';
+                    }).join('');
+                    const extra = Number(blocker.count || 0) > samples.length
+                        ? '<li class="list-group-item py-2 text-muted">…and ' + (Number(blocker.count) - samples.length) + ' more</li>'
+                        : '';
+                    const hint = blocker.resolveHint
+                        ? '<div class="small text-muted mt-2"><i class="bi bi-lightbulb me-1"></i>' + attendanceAttachmentEscape(blocker.resolveHint) + '</div>'
+                        : '';
+                    return '<div class="border rounded p-3 mb-2 bg-light-subtle">'
+                        + '<div class="d-flex flex-wrap align-items-center gap-2 mb-1">'
+                        + '<span class="badge text-bg-warning">' + (index + 1) + '</span>'
+                        + '<strong>' + attendanceAttachmentEscape(blocker.label || blocker.message || blocker.code || 'Reference') + '</strong>'
+                        + '<span class="badge rounded-pill text-bg-secondary">' + Number(blocker.count || samples.length || 0) + ' reference' + (Number(blocker.count || samples.length || 0) === 1 ? '' : 's') + '</span>'
+                        + '</div>'
+                        + hint
+                        + ((samples.length || extra) ? '<ul class="list-group list-group-flush mt-2 mb-0">' + sampleHtml + extra + '</ul>' : '')
+                        + '</div>';
+                }).join('')
+            : '';
+        const cascadeHtml = autoCascade.length
+            ? '<div class="small fw-semibold text-uppercase text-muted mb-2 mt-3">Will be removed automatically</div>'
+                + '<ul class="list-group list-group-flush mb-0">'
+                + autoCascade.map((row) => {
+                    const detail = row.detail ? ' <span class="text-muted">(' + attendanceAttachmentEscape(row.detail) + ')</span>' : '';
+                    return '<li class="list-group-item px-0 py-2 d-flex justify-content-between gap-3">'
+                        + '<span>' + attendanceAttachmentEscape(row.label || row.code || 'Related data') + detail + '</span>'
+                        + '<span class="badge text-bg-secondary">' + Number(row.count || 0) + '</span>'
+                        + '</li>';
+                }).join('')
+                + '</ul>'
+            : '<p class="text-muted small mb-0">No separate linked records were found. Embedded attendance, gradebooks, and content on this session will be removed with it.</p>';
+        const intro = preview?.canDelete
+            ? '<p class="mb-2">You are about to permanently delete <strong>' + label + '</strong>.</p><p class="text-danger small mb-0">This cannot be undone.</p>'
+            : '<p class="mb-3">Cannot delete <strong>' + label + '</strong> yet.</p>';
+        return intro + blockerHtml + cascadeHtml;
+    }
+
+    function ensureSessionDeleteModal() {
+        let modal = document.getElementById('sessionDeleteModal');
+        if (modal) return modal;
+        modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'sessionDeleteModal';
+        modal.tabIndex = -1;
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML = [
+            '<div class="modal-dialog modal-lg modal-dialog-scrollable">',
+            '<div class="modal-content">',
+            '<div class="modal-header bg-danger text-white">',
+            '<h5 class="modal-title fw-bold"><i class="bi bi-trash me-2"></i>Delete Session</h5>',
+            '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>',
+            '</div>',
+            '<div class="modal-body" id="sessionDeleteModalBody"></div>',
+            '<div class="modal-footer bg-light">',
+            '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>',
+            '<button type="button" class="btn btn-danger d-none" id="sessionDeleteConfirmBtn"><i class="bi bi-trash me-1"></i>Delete session</button>',
+            '</div>',
+            '</div>',
+            '</div>'
+        ].join('');
+        document.body.appendChild(modal);
+        return modal;
+    }
+
+    async function openSessionDeleteModal() {
+        if (!sessionCanDeleteSession) return;
+        const modal = ensureSessionDeleteModal();
+        const bodyEl = modal.querySelector('#sessionDeleteModalBody');
+        const confirmBtn = modal.querySelector('#sessionDeleteConfirmBtn');
+        const confirmInputId = 'sessionDeleteConfirmInput';
+        if (bodyEl) {
+            bodyEl.innerHTML = '<div class="py-4 text-center text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Checking session dependencies...</div>';
+        }
+        if (confirmBtn) {
+            confirmBtn.classList.add('d-none');
+            confirmBtn.disabled = true;
+            confirmBtn.onclick = null;
+        }
+        const bsModal = window.bootstrap?.Modal ? new window.bootstrap.Modal(modal) : null;
+        if (bsModal) bsModal.show();
+
+        try {
+            const response = await fetch('/school/classes/' + encodeURIComponent(String(sessionManagerClassId)) + '/sessions/' + encodeURIComponent(String(sessionManagerSessionId)) + '/delete-preview', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-AJAX-Request': 'true'
+                }
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.status !== 'success') {
+                throw new Error(payload?.message || 'Could not load session delete preview.');
+            }
+            const preview = payload.preview || {};
+            const sessionDeleteActionStateId = String(payload.actionStateId || '').trim();
+            if (bodyEl) bodyEl.innerHTML = renderSessionDeletePreviewHtml(preview);
+            if (!preview.canDelete || !confirmBtn) return;
+
+            const confirmationText = String(preview.confirmationText || '').trim();
+            if (confirmationText && bodyEl) {
+                bodyEl.insertAdjacentHTML('beforeend',
+                    '<div class="mt-4">'
+                    + '<label class="form-label fw-semibold" for="' + confirmInputId + '">Type <code>' + attendanceAttachmentEscape(confirmationText) + '</code> to confirm</label>'
+                    + '<input type="text" class="form-control" id="' + confirmInputId + '" autocomplete="off" spellcheck="false">'
+                    + '</div>');
+            }
+
+            confirmBtn.classList.remove('d-none');
+            const confirmInput = modal.querySelector('#' + confirmInputId);
+            const syncConfirmState = () => {
+                const typed = String(confirmInput?.value || '').trim();
+                confirmBtn.disabled = confirmationText ? typed !== confirmationText : false;
+            };
+            if (confirmInput) {
+                confirmInput.addEventListener('input', syncConfirmState);
+                syncConfirmState();
+            } else {
+                confirmBtn.disabled = false;
+            }
+
+            confirmBtn.onclick = async () => {
+                if (confirmationText && String(confirmInput?.value || '').trim() !== confirmationText) return;
+                if (!sessionDeleteActionStateId) {
+                    await sessionShowDeleteError('Delete Failed', 'Delete session token is missing. Close this dialog and try again.');
+                    return;
+                }
+                confirmBtn.disabled = true;
+                let loadingToken = typeof window.showLoading === 'function'
+                    ? window.showLoading({ title: 'Deleting Session', note: 'Removing session and linked records...', operation: 'Delete session' })
+                    : null;
+                let deleteSucceeded = false;
+                try {
+                    const deleteResponse = await fetch('/school/classes/' + encodeURIComponent(String(sessionManagerClassId)) + '/sessions/' + encodeURIComponent(String(sessionManagerSessionId)), {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-AJAX-Request': 'true'
+                        },
+                        body: JSON.stringify({ actionStateId: sessionDeleteActionStateId })
+                    });
+                    const deletePayload = await deleteResponse.json().catch(() => ({}));
+                    if (!deleteResponse.ok || deletePayload.status !== 'success') {
+                        const childSessions = Array.isArray(deletePayload?.data?.childSessions) ? deletePayload.data.childSessions : [];
+                        const childDetail = childSessions.length
+                            ? '<ul class="mb-0 mt-2">' + childSessions.map((row) => '<li><strong>' + attendanceAttachmentEscape(row?.sessionId || '-') + '</strong> (' + attendanceAttachmentEscape(row?.statusLabel || row?.status || '-') + ')</li>').join('') + '</ul>'
+                            : '';
+                        await sessionShowDeleteError(
+                            'Delete Failed',
+                            String(deletePayload?.message || 'Unable to delete this session.') + childDetail,
+                            { html: childDetail.length > 0 }
+                        );
+                        return;
+                    }
+                    deleteSucceeded = true;
+                    if (bsModal) bsModal.hide();
+                    if (loadingToken && typeof window.hideLoading === 'function') {
+                        window.hideLoading(loadingToken);
+                        loadingToken = null;
+                    }
+                    await sessionMessageBox({
+                        title: 'Session Deleted',
+                        icon: 'success',
+                        message: buildSessionDeleteSuccessMessage(deletePayload, preview),
+                        html: true,
+                        okClass: 'btn-primary'
+                    });
+                    leaveSessionManagerAfterDelete();
+                } catch (error) {
+                    await sessionShowDeleteError('Delete Failed', error?.message || 'Unable to delete this session.');
+                } finally {
+                    if (loadingToken && typeof window.hideLoading === 'function') window.hideLoading(loadingToken);
+                    if (!deleteSucceeded) confirmBtn.disabled = false;
+                }
+            };
+        } catch (error) {
+            if (bsModal) bsModal.hide();
+            await sessionShowDeleteError('Delete Preview Failed', error?.message || 'Could not load session delete preview.');
+        }
     }
 
     function ensureMakeupSessionModal() {
@@ -3173,6 +3422,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sessionCanCreateMakeup) {
         document.getElementById('btnCreateMakeupSession')?.addEventListener('click', openMakeupSessionModal);
         document.getElementById('btnCreateMakeupSessionInline')?.addEventListener('click', openMakeupSessionModal);
+    }
+
+    if (sessionCanDeleteSession) {
+        document.getElementById('btnDeleteSession')?.addEventListener('click', openSessionDeleteModal);
     }
 
     document.getElementById('btnToggleSessionLock')?.addEventListener('click', async () => {

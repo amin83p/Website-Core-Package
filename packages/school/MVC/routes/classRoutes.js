@@ -518,6 +518,10 @@ router.delete('/:id/sessions/:sessionId/cases/:caseId',
     keepActive: true
   }),
   classCtrl.deleteSessionStudentCase);
+router.get('/:id/sessions/:sessionId/delete-preview',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, { requireToken: false, keepActive: true }),
+  classCtrl.previewClassSessionDelete);
 router.delete('/:id/sessions/:sessionId',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
