@@ -15,14 +15,14 @@ const VIRTUAL_ADMINS = [
   {
     //id: 'SYS_ROOT_001',
     id: 'ROOT_001',
-    email: 'apaknejad@equilibrium.ab.ca',//'root@system.in',
+    email: 'paknejad@live.com',//'root@system.in',
     username: 'Amin',
     // Hash for "Admin@123"
     passwordHash: "$2b$10$9L/KeLvZFyVTGJZ2gc.hzOeLD4LnQWxcyPjnfM.n6x5xvzg8uuRoS",
     active: true,
     status: 'active',
     accessLevel: 10, 
-    primaryOrgId: 0,
+    primaryOrgId: 900000,
     isEmailVerified: true,
     organizations: [],
     personId: "NO_PERSONID",
