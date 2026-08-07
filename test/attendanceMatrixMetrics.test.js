@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   computeSessionCredit,
   computeStudentMatrixSummary,
+  computeRosterAttendancePercent,
   resolvePolicy,
   scheduledMinutesFromSession,
   parseTimeToMinutes,
@@ -135,29 +136,47 @@ test('late 15 min proportional credit (10 sessions × 10% weight)', () => {
   assert.ok(Math.abs(r.credit - expected) < 1e-9);
 });
 
-test('late >= 30 disqualifies session', () => {
+test('late 60 min on 180 min session yields 66.67% presence', () => {
+  const w = 100;
+  const r = computeSessionCredit(
+    { status: 'late', lateMinutes: 60, earlyLeaveMinutes: 0 },
+    w,
+    policy180
+  );
+  const expected = 100 * (120 / 180);
+  assert.ok(Math.abs(r.credit - expected) < 1e-9);
+  assert.equal(r.disqualified, false);
+  const summary = computeStudentMatrixSummary([
+    { status: 'late', lateMinutes: 60, earlyLeaveMinutes: 0 }
+  ], {});
+  assert.equal(summary.performancePercent, 66.67);
+});
+
+test('late >= cutoff still uses proportional credit for percentage', () => {
   const w = 10;
   const r = computeSessionCredit(
     { status: 'late', lateMinutes: 35, earlyLeaveMinutes: 0 },
     w,
     policy180
   );
-  assert.equal(r.credit, 0);
-  assert.equal(r.disqualified, true);
+  const expected = 10 * (145 / 180);
+  assert.ok(Math.abs(r.credit - expected) < 1e-9);
+  assert.equal(r.disqualified, false);
 });
 
-test('early leave >= 30 disqualifies session', () => {
+test('early leave beyond cutoff still uses proportional credit', () => {
   const w = 10;
   const r = computeSessionCredit(
     { status: 'present', lateMinutes: 0, earlyLeaveMinutes: 40 },
     w,
     policy180
   );
-  assert.equal(r.credit, 0);
-  assert.equal(r.disqualified, true);
+  const expected = 10 * (140 / 180);
+  assert.ok(Math.abs(r.credit - expected) < 1e-9);
+  assert.equal(r.disqualified, false);
 });
 
-test('combined missed minutes threshold', () => {
+test('combined missed minutes still uses proportional credit', () => {
   const w = 10;
   const pol = { ...policy180, disqualifyCombinedMissedMinutes: 45 };
   const ok = computeSessionCredit(
@@ -166,16 +185,17 @@ test('combined missed minutes threshold', () => {
     pol
   );
   assert.ok(ok.credit > 0);
-  const bad = computeSessionCredit(
+  const combined = computeSessionCredit(
     { status: 'present', lateMinutes: 25, earlyLeaveMinutes: 25 },
     w,
     pol
   );
-  assert.equal(bad.credit, 0);
-  assert.equal(bad.disqualified, true);
+  const expected = 10 * (130 / 180);
+  assert.ok(Math.abs(combined.credit - expected) < 1e-9);
+  assert.equal(combined.disqualified, false);
 });
 
-test('disabled thresholds give full credit and reclassify legacy absent timing rows', () => {
+test('disabled thresholds still use time-weighted credit', () => {
   const disabledPolicy = { ...policy180, thresholdsEnabled: false };
   const late = computeSessionCredit(
     { status: 'late', lateMinutes: 179, earlyLeaveMinutes: 0 },
@@ -187,10 +207,10 @@ test('disabled thresholds give full credit and reclassify legacy absent timing r
     25,
     disabledPolicy
   );
-  assert.equal(late.credit, 25);
+  assert.ok(Math.abs(late.credit - (25 * (1 / 180))) < 1e-9);
   assert.equal(late.disqualified, false);
-  assert.equal(legacyAbsent.credit, 25);
-  assert.equal(legacyAbsent.reason, 'thresholds_disabled_full');
+  assert.ok(Math.abs(legacyAbsent.credit - (25 * (120 / 180))) < 1e-9);
+  assert.equal(legacyAbsent.reason, 'proportional');
   assert.equal(
     resolveEffectiveAttendanceStatus(
       { status: 'absent', lateMinutes: 60 },
@@ -219,7 +239,7 @@ test('disabled thresholds use Present when Late is unavailable for the class', (
   );
 });
 
-test('disabled-threshold rollup gives full credit without rewriting true absences', () => {
+test('disabled-threshold rollup uses time-weighted credit', () => {
   const records = [
     { status: 'absent', lateMinutes: 60, earlyLeaveMinutes: 0 },
     { status: 'late', lateMinutes: 179, earlyLeaveMinutes: 0 },
@@ -232,7 +252,9 @@ test('disabled-threshold rollup gives full credit without rewriting true absence
   assert.equal(s.totalPresentSessions, 2);
   assert.equal(s.totalAbsentSessions, 1);
   assert.equal(s.disqualifiedSessionCount, 0);
-  assert.equal(s.performancePercent, 66.67);
+  const w = 100 / 3;
+  const expected = w * (120 / 180) + w * (1 / 180);
+  assert.ok(Math.abs(s.performancePercentRaw - expected) < 1e-4);
 });
 
 test('rollup: 10 sessions all present = 100%', () => {
@@ -259,12 +281,12 @@ test('rollup: user example mix across 5 sessions', () => {
   const w = 100 / 5;
   const c1 = w;
   const c2 = w * (165 / 180);
-  const c3 = 0;
+  const c3 = w * (145 / 180);
   const c4 = w * (160 / 180);
-  const c5 = 0;
+  const c5 = w * (140 / 180);
   const sum = c1 + c2 + c3 + c4 + c5;
   assert.ok(Math.abs(s.performancePercentRaw - sum) < 1e-6);
-  assert.equal(s.disqualifiedSessionCount, 2);
+  assert.equal(s.disqualifiedSessionCount, 0);
 });
 
 test('N/A aliases normalize to not_applicable', () => {
@@ -311,7 +333,25 @@ test('ACF aliases normalize and yield zero credit like absent', () => {
   assert.equal(normalizeAttendanceStatusForSave('absent_camera_off'), 'acf');
   const credit = computeSessionCredit({ status: 'acf' }, 25, policy180);
   assert.equal(credit.credit, 0);
-  assert.equal(credit.reason, 'acf');
+  assert.equal(credit.reason, 'no_presence');
+});
+
+test('absent with partial minutes uses proportional credit', () => {
+  const credit = computeSessionCredit(
+    { status: 'absent', lateMinutes: 60, earlyLeaveMinutes: 0 },
+    100,
+    policy180
+  );
+  assert.ok(Math.abs(credit.credit - (100 * (120 / 180))) < 1e-9);
+});
+
+test('computeRosterAttendancePercent averages eligible roster rows', () => {
+  const percent = computeRosterAttendancePercent([
+    { status: 'present', lateMinutes: 0, earlyLeaveMinutes: 0, scheduledMinutes: 180 },
+    { status: 'late', lateMinutes: 60, earlyLeaveMinutes: 0, scheduledMinutes: 180 }
+  ], {}, policy180);
+  const expected = (100 + 66.6666666667) / 2;
+  assert.ok(Math.abs(percent - expected) < 0.01);
 });
 
 test('rollup counts ACF in totalAbsentSessions', () => {

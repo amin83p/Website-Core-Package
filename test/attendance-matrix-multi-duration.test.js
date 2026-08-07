@@ -103,7 +103,7 @@ test('normalizePolicyItemsForSave enforces unique durations and one default', ()
   );
 });
 
-test('matrix summary uses per-session duration policy cutoffs', () => {
+test('matrix summary uses per-session duration for time-weighted credit', () => {
   const catalog = {
     items: [
       {
@@ -122,16 +122,17 @@ test('matrix summary uses per-session duration policy cutoffs', () => {
       }
     ]
   };
-  // 15 late on 60-min session → disqualified by 10 cutoff
-  // 15 late on 180-min session → still proportional (under 30)
+  // 15 late on 60-min session → 45/60 proportional credit
+  // 15 late on 180-min session → 165/180 proportional credit
   const summary = computeStudentMatrixSummary([
     { status: 'late', lateMinutes: 15, earlyLeaveMinutes: 0, scheduledMinutes: 60 },
     { status: 'late', lateMinutes: 15, earlyLeaveMinutes: 0, scheduledMinutes: 180 }
   ], {}, catalog);
   assert.equal(summary.totalEligibleSessions, 2);
-  assert.equal(summary.disqualifiedSessionCount, 1);
-  // weight 50 each: first 0, second 50 * (165/180) = 45.833...
-  assert.ok(summary.performancePercent > 45 && summary.performancePercent < 46);
+  assert.equal(summary.disqualifiedSessionCount, 0);
+  const w = 50;
+  const expected = w * (45 / 60) + w * (165 / 180);
+  assert.ok(Math.abs(summary.performancePercentRaw - expected) < 1e-6);
 });
 
 test('pickOrgPolicyLayerForMinutes and resolvePolicyForScheduledMinutes helpers', () => {

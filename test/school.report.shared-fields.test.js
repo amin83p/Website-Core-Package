@@ -894,7 +894,7 @@ test('report template prefill catalog keys are all produced with correct represe
           assert.equal(snapshot.class_attendance_span_present, 2);
           assert.equal(snapshot.class_attendance_span_late, 1);
           assert.equal(snapshot.class_attendance_span_absent, 1);
-          assert.equal(snapshot.class_attendance_span_percent, 75);
+          assert.equal(snapshot.class_attendance_span_percent, 68.75);
           assert.equal(snapshot.student_attendance_span_total_sessions, 3);
           assert.equal(snapshot.student_attendance_span_percent, 58.33);
 

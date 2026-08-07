@@ -1,5 +1,6 @@
 const schoolDataService = require('./schoolDataService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
+const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const { buildAttendanceMatrixPayload } = require('../../controllers/school/attendanceController');
@@ -211,23 +212,23 @@ function buildStudentSessionRows(matrixRow = {}, sessions = []) {
     .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
 }
 
-function scoreStudentAttendanceRecord(record = {}) {
-  const status = attendanceMatrixMetricsService.normalizeStatus(record?.status);
-  const lateMinutes = Math.max(0, Number(record?.lateMinutes) || 0);
-  if (attendanceMatrixMetricsService.isAbsentLikeStatus(status)) return 0;
-  if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) return 35;
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE || lateMinutes > 0) return 72;
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) return 100;
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) return 85;
-  return 55;
-}
-
-function computeStudentAttendanceHealth(matrixRow = {}) {
+function computeStudentAttendanceHealth(matrixRow = {}, classData = {}, orgPolicyLayer = {}) {
   const records = (Array.isArray(matrixRow?.records) ? matrixRow.records : [])
-    .filter((record) => record?.expectedForSession === true);
+    .filter((record) => record?.expectedForSession === true)
+    .map((record) => ({
+      status: record?.status,
+      lateMinutes: record?.lateMinutes,
+      earlyLeaveMinutes: record?.earlyLeaveMinutes,
+      scheduledMinutes: record?.scheduledMinutes
+    }));
   if (!records.length) return 100;
-  const total = records.reduce((sum, record) => sum + scoreStudentAttendanceRecord(record), 0);
-  return Math.round(total / records.length);
+  const summary = attendanceMatrixMetricsService.computeStudentMatrixSummary(
+    records,
+    classData,
+    orgPolicyLayer
+  );
+  if (summary.performancePercent == null) return 100;
+  return Math.round(summary.performancePercent);
 }
 
 function countStudentAttendanceBuckets(matrixRow = {}) {
@@ -415,7 +416,9 @@ function buildStudentDetailRowFromClass({
   gradesPayload = {},
   sessionsById = new Map(),
   caseRows = [],
-  sessionIdSet = new Set()
+  sessionIdSet = new Set(),
+  classData = {},
+  orgPolicyLayer = {}
 } = {}) {
   const studentId = toPublicId(matrixRow?.studentRecordId);
   const personId = toPublicId(matrixRow?.personId);
@@ -425,7 +428,7 @@ function buildStudentDetailRowFromClass({
     personId,
     name: String(matrixRow?.name || '').trim() || studentId,
     sessionCount: countExpectedSessionsFromMatrixRow(matrixRow),
-    attendanceHealth: computeStudentAttendanceHealth(matrixRow),
+    attendanceHealth: computeStudentAttendanceHealth(matrixRow, classData, orgPolicyLayer),
     presentCount: attendanceBuckets.presentCount,
     lateCount: attendanceBuckets.lateCount,
     absenceCount: attendanceBuckets.absenceCount,
@@ -617,6 +620,10 @@ async function buildWeeklyReportsStudentBoard({
       const classCaseRows = (Array.isArray(caseRows) ? caseRows : [])
         .filter((row) => idsEqual(row?.classId, classId));
 
+      const orgPolicyCatalog = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(
+        classRow?.orgId || activeOrgId
+      );
+
       (Array.isArray(attendancePayload?.matrix) ? attendancePayload.matrix : []).forEach((matrixRow) => {
         const detailRow = buildStudentDetailRowFromClass({
           matrixRow,
@@ -624,7 +631,9 @@ async function buildWeeklyReportsStudentBoard({
           gradesPayload,
           sessionsById,
           caseRows: classCaseRows,
-          sessionIdSet
+          sessionIdSet,
+          classData: classRow,
+          orgPolicyLayer: orgPolicyCatalog
         });
         mergeStudentDetailIntoMap(studentMap, classId, detailRow);
       });

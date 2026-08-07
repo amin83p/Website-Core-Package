@@ -1,17 +1,19 @@
 /**
  * Time-based attendance credit for the Attendance Matrix date window.
- * Each session contributes up to (100 / N)% where N = sessions in the window.
+ * Each session contributes up to (100 / N)% where N = eligible sessions in the window.
  *
  * Per-session length: from session startTime/endTime, else durationHours, else policy scheduledMinutes.
  *
- * Rules (Option A + optional combined cap):
- * - absent / acf (Absent Camera Off) → 0 credit
+ * Attendance percentage (always time-weighted, regardless of status label):
  * - excused → full session weight
- * - N/A / not_applicable -> excluded from the denominator
- * - present / late → proportional credit = weight × attendedMinutes / scheduledMinutes
- *   attendedMinutes = max(0, scheduled - late - early)
- * - Hard zero if late >= disqualifyLateMinutes OR early >= disqualifyEarlyMinutes
- * - Optional: late + early >= disqualifyCombinedMissedMinutes → 0
+ * - N/A / not_applicable → excluded from the denominator
+ * - unmarked → excluded from the denominator
+ * - present / late / absent / acf → credit = weight × presenceRatio
+ *   presenceRatio = max(0, scheduled - late - early) / scheduled
+ *   absent / acf with no late/early minutes → presenceRatio = 0
+ *
+ * Threshold cutoffs (when enabled) may change stored status on roster save only;
+ * they do not zero out or override percentage credit.
  */
 
 const ATTENDANCE_STATUS = Object.freeze({
@@ -441,17 +443,39 @@ function resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, scheduledMi
   return resolvePolicy(classData, pickOrgPolicyLayerForMinutes(orgPolicyLayer, scheduledMinutes));
 }
 
+function scheduledMinutesForRecord(record, policy) {
+  const recSched = Number(record?.scheduledMinutes);
+  return Number.isFinite(recSched) && recSched > 0 ? recSched : policy.scheduledMinutes;
+}
+
+/**
+ * Fraction of scheduled session time the student was present (0..1).
+ * @param {{ status?: string, attendance?: string, lateMinutes?: number, earlyLeaveMinutes?: number, scheduledMinutes?: number }} record
+ * @param {ReturnType<typeof resolvePolicy>} policy
+ */
+function computePresenceRatio(record, policy) {
+  const sched = scheduledMinutesForRecord(record, policy);
+  if (!Number.isFinite(sched) || sched <= 0) return 0;
+
+  const late = Math.max(0, Number(record?.lateMinutes) || 0);
+  const early = Math.max(0, Number(record?.earlyLeaveMinutes) || 0);
+  const rawStatus = record?.status !== undefined ? record.status : record?.attendance;
+  const st = normalizeStatus(rawStatus);
+
+  if (isAbsentLikeStatus(st) && late <= 0 && early <= 0) {
+    return 0;
+  }
+
+  const attended = Math.max(0, sched - late - early);
+  return attended / sched;
+}
+
 /**
  * @param {{ status: string, lateMinutes?: number, earlyLeaveMinutes?: number, scheduledMinutes?: number }} record
  * @param {number} sessionWeight — max credit for this session (e.g. 100/N)
  * @param {ReturnType<typeof resolvePolicy>} policy
  */
 function computeSessionCredit(record, sessionWeight, policy) {
-  const recSched = Number(record?.scheduledMinutes);
-  const sched =
-    Number.isFinite(recSched) && recSched > 0 ? recSched : policy.scheduledMinutes;
-  const late = Math.max(0, Number(record?.lateMinutes) || 0);
-  const early = Math.max(0, Number(record?.earlyLeaveMinutes) || 0);
   const st = resolveEffectiveAttendanceStatus(record, policy);
 
   if (st === ATTENDANCE_STATUS.NOT_APPLICABLE) {
@@ -460,41 +484,47 @@ function computeSessionCredit(record, sessionWeight, policy) {
   if (st === '') {
     return { credit: 0, disqualified: false, exempt: false, reason: 'no_record' };
   }
-  if (st === ATTENDANCE_STATUS.ABSENT) {
-    return { credit: 0, disqualified: false, reason: 'absent' };
-  }
-  if (st === ATTENDANCE_STATUS.ACF) {
-    return { credit: 0, disqualified: false, reason: 'acf' };
-  }
   if (st === ATTENDANCE_STATUS.EXCUSED) {
     return { credit: sessionWeight, disqualified: false, reason: 'excused_full' };
   }
-  if (st !== ATTENDANCE_STATUS.PRESENT && st !== ATTENDANCE_STATUS.LATE) {
-    return { credit: 0, disqualified: false, reason: 'unknown_status' };
-  }
 
-  if (!policyThresholdsAreEnabled(policy)) {
-    return {
-      credit: sessionWeight,
-      disqualified: false,
-      reason: 'thresholds_disabled_full'
-    };
-  }
+  const presenceRatio = computePresenceRatio({ ...record, status: st }, policy);
+  const credit = sessionWeight * presenceRatio;
+  const reason = presenceRatio >= 1 ? 'full_presence' : (presenceRatio > 0 ? 'proportional' : 'no_presence');
+  return { credit, disqualified: false, reason };
+}
 
-  if (late >= policy.disqualifyLateMinutes) {
-    return { credit: 0, disqualified: true, reason: 'late_cutoff' };
-  }
-  if (early >= policy.disqualifyEarlyLeaveMinutes) {
-    return { credit: 0, disqualified: true, reason: 'early_leave_cutoff' };
-  }
-  const comb = policy.disqualifyCombinedMissedMinutes;
-  if (comb != null && late + early >= comb) {
-    return { credit: 0, disqualified: true, reason: 'combined_cutoff' };
-  }
+/**
+ * Time-weighted attendance percent for a roster slice (one session or class span).
+ * Each eligible student row receives equal weight within the slice.
+ * @param {Array<{ status?: string, attendance?: string, lateMinutes?: number, earlyLeaveMinutes?: number, scheduledMinutes?: number }>} records
+ * @param {object} classData
+ * @param {object|Array} orgPolicyLayer
+ * @returns {number|null}
+ */
+function computeRosterAttendancePercent(records, classData = {}, orgPolicyLayer = {}) {
+  const allRecords = Array.isArray(records) ? records : [];
+  const enabledStatuses = resolveEnabledAttendanceStatuses(classData);
+  const prepared = allRecords.map((rec) => {
+    const policy = resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, rec?.scheduledMinutes);
+    const effectiveStatus = resolveEffectiveAttendanceStatus(rec, policy, enabledStatuses);
+    return { rec, policy, effectiveStatus };
+  });
+  const eligible = prepared.filter((row) => isEligibleAttendanceStatus(row.effectiveStatus));
+  const n = eligible.length;
+  if (!n) return null;
 
-  const attended = Math.max(0, sched - late - early);
-  const credit = sessionWeight * (attended / sched);
-  return { credit, disqualified: false, reason: 'proportional' };
+  const rowWeight = 100 / n;
+  let sumCredit = 0;
+  for (const row of eligible) {
+    const { credit } = computeSessionCredit(
+      { ...row.rec, status: row.effectiveStatus },
+      rowWeight,
+      row.policy
+    );
+    sumCredit += credit;
+  }
+  return Math.round(sumCredit * 100) / 100;
 }
 
 /**
@@ -583,7 +613,9 @@ module.exports = {
   resolvePolicyForScheduledMinutes,
   parseTimeToMinutes,
   scheduledMinutesFromSession,
+  computePresenceRatio,
   computeSessionCredit,
+  computeRosterAttendancePercent,
   computeStudentMatrixSummary,
   applyAttendanceMatrixRosterRules,
   parseNonNegIntRoster

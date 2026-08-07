@@ -939,13 +939,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const na = Number(s.totalNotApplicableSessions) || 0;
                 const pct = s.performancePercent;
                 const pctStr = pct == null ? '—' : `${pct}%`;
-                const dq = Number(s.disqualifiedSessionCount) || 0;
                 const rollupTitle = [
                   `Present (marked): ${p}`,
                   `Absent: ${a}`,
                   na ? `N/A: ${na}` : null,
-                  `Efficiency: ${pctStr}`,
-                  dq ? `Disqualified sessions (late/leave cutoffs): ${dq}` : null
+                  `Efficiency: ${pctStr}`
                 ].filter(Boolean).join(' · ');
 
                 let rowHtml = `
