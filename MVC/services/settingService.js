@@ -20,6 +20,19 @@ const settingService = {
    */
   refresh: async () => {
     _cache = await systemSettingsRepository.getSettings();
+    try {
+      const { clearAllRequestCaches, rebuildAuthContextCache } = require('./cache/authContextCacheService');
+      clearAllRequestCaches();
+      rebuildAuthContextCache();
+    } catch (_) {
+      // ignore cache refresh errors
+    }
+    try {
+      const { clearSchoolCountCache } = require('../../packages/school/MVC/services/school/schoolPaginationUtils');
+      clearSchoolCountCache();
+    } catch (_) {
+      // ignore school cache refresh errors
+    }
     startupLogger.info('SETTINGS', 'CACHE', 'System settings cache refreshed.');
   },
 

@@ -153,11 +153,15 @@ const domainOpsService = {
   },
 
   async getWebsitePolicy() {
-    return await websitePolicyRepository.getPolicy();
+    const websitePolicyCacheService = require('../cache/websitePolicyCacheService');
+    return websitePolicyCacheService.getWebsitePolicy();
   },
 
   async updateWebsitePolicy(updates, requestingUser) {
-    return await websitePolicyRepository.updatePolicy(updates, requestingUser);
+    const websitePolicyCacheService = require('../cache/websitePolicyCacheService');
+    const updated = await websitePolicyRepository.updatePolicy(updates, requestingUser);
+    websitePolicyCacheService.invalidateWebsitePolicyCache();
+    return updated;
   },
 
   async getSymbolByLabel(label, requestingUser) {

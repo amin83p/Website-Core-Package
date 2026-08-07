@@ -200,10 +200,10 @@ async function buildStudentAcademicOverview({ reqUser, activeOrgId, studentId } 
     termRegistrationViewService.buildRegistrationSummaries(reqUser, activeOrgId, {
       filters: { studentId: normalizedStudentId }
     }),
-    dataService.fetchData('programs', {}, reqUser),
-    dataService.fetchData('terms', {}, reqUser),
-    dataService.fetchData('classes', {}, reqUser),
-    dataService.fetchData('subjects', {}, reqUser),
+    dataService.fetchAllData('programs', {}, reqUser),
+    dataService.fetchAllData('terms', {}, reqUser),
+    dataService.fetchAllData('classes', {}, reqUser),
+    dataService.fetchAllData('subjects', {}, reqUser),
     programWithdrawalService.getStudentWithdrawalStatus(normalizedStudentId, activeOrgId, reqUser)
   ]);
 

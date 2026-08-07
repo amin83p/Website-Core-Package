@@ -51,7 +51,7 @@ async function resolveClassStudentIds({
   const activeStudentIds = snapshot?.studentIds instanceof Set ? [...snapshot.studentIds] : [];
   if (!activeStudentIds.length) return [];
 
-  const allStudents = await schoolDataService.fetchData('students', {}, reqUser);
+  const allStudents = await schoolDataService.fetchAllData('students', {}, reqUser);
   const studentToPersonMap = new Map(
     (Array.isArray(allStudents) ? allStudents : [])
       .map((student) => [String(student?.id || '').trim(), String(student?.personId || '').trim()])
@@ -390,7 +390,7 @@ async function assertNoAssignmentScheduleConflicts({
 
   if (!candidateTargets.length) return;
 
-  const allClasses = await schoolDataService.fetchData('classes', {}, reqUser);
+  const allClasses = await schoolDataService.fetchAllData('classes', {}, reqUser);
   const orgClasses = (Array.isArray(allClasses) ? allClasses : []).filter((row) => String(row?.orgId || '').trim() === String(classData?.orgId || '').trim());
   const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || '', { includeInactive: true });
 

@@ -54,7 +54,7 @@ async function hasLinkedTeacherRole(reqUser = {}) {
   const activeOrgId = normalizeId(reqUser?.activeOrgId);
   if (!personId) return false;
 
-  const teachers = await schoolDataService.fetchData('teachers', {}, reqUser);
+  const teachers = await schoolDataService.fetchAllData('teachers', {}, reqUser);
   return (Array.isArray(teachers) ? teachers : []).some((row) => (
     idsEqual(row?.personId, personId)
     && rowBelongsToActiveOrg(row, activeOrgId)
@@ -219,13 +219,13 @@ async function listSessions(req, query = {}) {
   const activeOrgId = String(req?.user?.activeOrgId || '').trim();
   const statusMeta = await sessionStatusPolicyService.getClientStatusMeta(activeOrgId || '', { includeInactive: true });
 
-  let classes = await schoolDataService.fetchData('classes', {}, req.user, accessContext);
+  let classes = await schoolDataService.fetchAllData('classes', {}, req.user, accessContext);
   if (filters.classId) {
     classes = classes.filter((row) => idsEqual(row?.id, filters.classId));
   }
 
   const personById = await schoolPersonAccessService.buildPersonByIdMap({ reqUser: req.user });
-  const allTeachers = await schoolDataService.fetchData('teachers', {}, req.user, accessContext).catch(() => []);
+  const allTeachers = await schoolDataService.fetchAllData('teachers', {}, req.user, accessContext).catch(() => []);
   const teacherPersonMap = teacherIdentityService.buildTeacherPersonMap(allTeachers);
   let rows = [];
 

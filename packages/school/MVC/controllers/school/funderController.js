@@ -192,14 +192,14 @@ async function getFunderOrThrow(req, id) {
 }
 
 async function getActiveOrgAccounts(req, orgId) {
-  const accounts = await schoolDataService.fetchData('schoolAccounts', {}, req.user, routeAccess(req));
+  const accounts = await schoolDataService.fetchAllData('schoolAccounts', {}, req.user, routeAccess(req));
   return (accounts || []).filter((account) => idsEqual(account?.orgId, orgId));
 }
 
 exports.listFunders = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
-    const rows = await schoolDataService.fetchData('funders', {}, req.user, routeAccess(req));
+    const rows = await schoolDataService.fetchAllData('funders', {}, req.user, routeAccess(req));
     const scoped = (rows || []).filter((row) => idsEqual(row?.orgId, orgId));
     const people = await schoolPersonAccessService.buildPersonByIdMap({ reqUser: req.user, personIds: scoped.map((row) => row.personId) });
     const accounts = await getActiveOrgAccounts(req, orgId);

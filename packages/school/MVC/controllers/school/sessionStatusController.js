@@ -109,8 +109,8 @@ exports.listSessionStatuses = async (req, res) => {
 
     await ensureOrgDefaults(activeOrgId, req.user?.id || 'SYSTEM');
 
-    const rows = await schoolDataService.fetchData('sessionStatuses', query, req.user);
-    const dataRows = (rows || [])
+    const paged = await schoolDataService.fetchDataPaged('sessionStatuses', query, req.user);
+    const dataRows = (paged.rows || [])
       .filter((row) => idsEqual(row?.orgId, activeOrgId))
       .sort((a, b) => {
         const orderA = Number(a?.sortOrder || 0);
@@ -120,7 +120,8 @@ exports.listSessionStatuses = async (req, res) => {
       });
 
     const searchableFields = await inferSearchableFields(dataRows, { exclude: ['audit'] });
-    const { data, pagination } = paginate(dataRows, query.page, query.limit);
+    const data = dataRows;
+    const pagination = paged.pagination;
 
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
 

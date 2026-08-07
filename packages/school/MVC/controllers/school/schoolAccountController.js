@@ -98,7 +98,7 @@ exports.listAccounts = async (req, res) => {
     delete accountQuery.page;
     delete accountQuery.limit;
     const [allAccounts, ownersByAccount] = await Promise.all([
-      dataService.fetchData('schoolAccounts', accountQuery, req.user, routeAccess(req)),
+      dataService.fetchAllData('schoolAccounts', accountQuery, req.user, routeAccess(req)),
       schoolAccountDomainService.buildAccountOwnerMap(req.user, routeAccess(req))
     ]);
     const enriched = schoolAccountDomainService
@@ -146,7 +146,7 @@ exports.listArchivedAccounts = async (req, res) => {
     // Fetch full archived set, then paginate once in this controller.
     delete archivedQuery.page;
     delete archivedQuery.limit;
-    const all = await dataService.fetchData('schoolAccounts', archivedQuery, req.user, routeAccess(req));
+    const all = await dataService.fetchAllData('schoolAccounts', archivedQuery, req.user, routeAccess(req));
     const searchableFields = await inferSearchableFields(all, { exclude: ['audit'] });
     const ownerByAccount = await schoolAccountDomainService.buildAccountOwnerMap(req.user);
     const idToName = new Map(all.map((a) => [toPublicId(a.id), `${a.code} - ${a.name}`]));
@@ -200,7 +200,7 @@ async function renderAccountFormView(req, res, viewName, titleOverride) {
       owners: ownerConflicts
     };
 
-    const accounts = await dataService.fetchData('schoolAccounts', {}, req.user, routeAccess(req));
+    const accounts = await dataService.fetchAllData('schoolAccounts', {}, req.user, routeAccess(req));
     const parentAccounts = accounts
       .filter((a) => !isEdit || !idsEqual(a.id, account.id))
       .sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));

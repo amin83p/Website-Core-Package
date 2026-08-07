@@ -416,9 +416,9 @@ async function buildScheduleViewerAccess(reqUser = {}) {
     if (personId) {
         try {
             const [students, teachers, staffRows] = await Promise.all([
-                schoolDataService.fetchData('students', {}, reqUser),
-                schoolDataService.fetchData('teachers', {}, reqUser),
-                schoolDataService.fetchData('staff', {}, reqUser),
+                schoolDataService.fetchAllData('students', { orgId__eq: activeOrgId }, reqUser),
+                schoolDataService.fetchAllData('teachers', { orgId__eq: activeOrgId }, reqUser),
+                schoolDataService.fetchAllData('staff', { orgId__eq: activeOrgId }, reqUser),
             ]);
 
             let persons = [];
@@ -475,9 +475,9 @@ async function buildScheduleRoleOptionsForPerson({ personId, activeOrgId, reqUse
 
     try {
         const [students, teachers, staffRows] = await Promise.all([
-            schoolDataService.fetchData('students', {}, reqUser),
-            schoolDataService.fetchData('teachers', {}, reqUser),
-            schoolDataService.fetchData('staff', {}, reqUser),
+            schoolDataService.fetchAllData('students', {}, reqUser),
+            schoolDataService.fetchAllData('teachers', {}, reqUser),
+            schoolDataService.fetchAllData('staff', {}, reqUser),
         ]);
 
         [
@@ -528,9 +528,9 @@ function getPersonSearchText(person, roleOptions = []) {
 
 async function buildSchoolSchedulePersonPickerRows({ activeOrgId, reqUser }) {
     const [students, teachers, staffRows, persons] = await Promise.all([
-        schoolDataService.fetchData('students', {}, reqUser),
-        schoolDataService.fetchData('teachers', {}, reqUser),
-        schoolDataService.fetchData('staff', {}, reqUser),
+        schoolDataService.fetchAllData('students', {}, reqUser),
+        schoolDataService.fetchAllData('teachers', {}, reqUser),
+        schoolDataService.fetchAllData('staff', {}, reqUser),
         listSchoolPersonRecords(reqUser, { query: { limit: 1000 } }),
     ]);
 
@@ -1019,11 +1019,11 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
     const [studentIndex, teacherIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents] = await Promise.all([
         schoolDataService.getStudentIndex(),
         schoolDataService.getTeacherIndex(),
-        schoolDataService.fetchData('classes', {}, reqUser, accessContext),
+        schoolDataService.fetchAllData('classes', {}, reqUser, accessContext),
         schoolRepositories.reportAssignments.list({ query: {}, scope: { canViewAll: true } }),
         schoolRepositories.reportTemplates.list({ query: {}, scope: { canViewAll: true } }),
-        schoolDataService.fetchData('teachers', {}, reqUser, accessContext),
-        schoolDataService.fetchData('students', {}, reqUser, accessContext)
+        schoolDataService.fetchAllData('teachers', {}, reqUser, accessContext),
+        schoolDataService.fetchAllData('students', {}, reqUser, accessContext)
     ]);
     const teacherPersonMap = buildTeacherPersonMap(allTeachers);
     const normalizedPersonId = resolveLinkedPersonId(personId, teacherPersonMap);
@@ -1546,7 +1546,7 @@ async function listActiveTeacherSchedulePersons(req, res) {
     try {
         const activeOrgId = getActiveScheduleOrgId(req.user);
         const [teachers, persons] = await Promise.all([
-            schoolDataService.fetchData('teachers', {}, req.user),
+            schoolDataService.fetchAllData('teachers', {}, req.user),
             listSchoolPersonRecords(req.user, { query: { limit: 1000 } }),
         ]);
 

@@ -46,7 +46,7 @@ async function loadFormLookups(req) {
   const orgId = getActiveOrgIdOrThrow(req.user);
   const [categories, departments] = await Promise.all([
     activityService.listActivityCategories({ orgId, reqUser: req.user, includeInactive: false }),
-    schoolDataService.fetchData('departments', {}, req.user)
+    schoolDataService.fetchAllData('departments', {}, req.user)
   ]);
   return {
     categories,

@@ -3,6 +3,7 @@ const dataService = require('./dataService');
 const effectiveAccessResolverService = require('./security/effectiveAccessResolverService');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 const { idsEqual, toPublicId } = require('../utils/idAdapter');
+const { invalidateAuthContextForSession } = require('./cache/authContextCacheService');
 
 /**
  * =============================================================================
@@ -212,7 +213,20 @@ async function validateOrgSwitch(user, currentSessionId, targetOrgId) {
 }
 
 async function terminateSession(sessionId) {
-    return await dataService.deleteData('sessions', sessionId, SYSTEM_CONTEXT);
+    const normalizedSessionId = String(sessionId || '').trim();
+    let session = null;
+    if (normalizedSessionId) {
+      try {
+        session = await dataService.getDataById('sessions', normalizedSessionId, SYSTEM_CONTEXT);
+      } catch (_) {
+        session = null;
+      }
+    }
+    const result = await dataService.deleteData('sessions', normalizedSessionId, SYSTEM_CONTEXT);
+    if (session?.userId) {
+      invalidateAuthContextForSession(session.userId, normalizedSessionId);
+    }
+    return result;
 }
 
 module.exports = {

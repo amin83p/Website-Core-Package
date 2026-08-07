@@ -53,9 +53,9 @@ async function buildReportReflectionLiveSessions({
   if (!personId || !normalizeId(periodStartDate) || !normalizeId(periodEndDate)) return [];
 
   const [assignments, templates, classes] = await Promise.all([
-    schoolDataService.fetchData('reportAssignments', {}, reqUser),
-    schoolDataService.fetchData('reportTemplates', {}, reqUser),
-    schoolDataService.fetchData('classes', {}, reqUser)
+    schoolDataService.fetchAllData('reportAssignments', {}, reqUser),
+    schoolDataService.fetchAllData('reportTemplates', {}, reqUser),
+    schoolDataService.fetchAllData('classes', {}, reqUser)
   ]);
 
   const templateMap = new Map(

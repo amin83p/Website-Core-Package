@@ -81,7 +81,7 @@ async function findExistingPersonAccount({ entityType, orgId, personId, excludeI
       personId__eq: targetPersonId
     }, requestingUser);
   } catch (_) {
-    rows = await dataService.fetchData(entityType, {}, requestingUser);
+    rows = await dataService.fetchAllData(entityType, {}, requestingUser);
   }
 
   return (Array.isArray(rows) ? rows : []).find((row) => {
@@ -130,7 +130,7 @@ async function enrichPersonPickerRowsWithAccountState(rows = [], { entityType, o
   try {
     accounts = await dataService.fetchData(entityType, { orgId__eq: targetOrgId }, requestingUser);
   } catch (_) {
-    accounts = await dataService.fetchData(entityType, {}, requestingUser);
+    accounts = await dataService.fetchAllData(entityType, {}, requestingUser);
   }
 
   const accountByPersonId = new Map();

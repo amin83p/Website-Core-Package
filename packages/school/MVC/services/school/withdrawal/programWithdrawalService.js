@@ -589,8 +589,8 @@ async function getStudentWithdrawalStatus(studentId, orgId, reqUser) {
     getActiveProgramRegistrationsForStudent(studentId, orgId),
     termWithdrawalService.getActiveTermRegistrationsForStudent(studentId, orgId),
     (require('./classWithdrawalService')).getActiveClassEnrollmentsForStudent(studentId, orgId, reqUser),
-    schoolDataService.fetchData('programs', {}, reqUser),
-    schoolDataService.fetchData('terms', {}, reqUser)
+    schoolDataService.fetchAllData('programs', {}, reqUser),
+    schoolDataService.fetchAllData('terms', {}, reqUser)
   ]);
   const programs = asDataRows(programsResult).filter((row) => idsEqual(row?.orgId || '', orgId));
   const terms = asDataRows(termsResult).filter((row) => idsEqual(row?.orgId || '', orgId));

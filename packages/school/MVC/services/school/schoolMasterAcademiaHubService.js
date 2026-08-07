@@ -300,7 +300,7 @@ async function getPeoplePanelRows(type, queryInput, req) {
     dataService.fetchData(moduleConfig.entityType, fetchQuery, req.user, { scopeId: access.scopeId }),
     moduleConfig.type === 'students'
       ? Promise.resolve([])
-      : dataService.fetchData('departments', {}, req.user)
+      : dataService.fetchAllData('departments', {}, req.user)
   ]);
   const personById = await schoolPersonAccessService.buildPersonByIdMap({
     reqUser: req.user,
@@ -1138,7 +1138,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       query: {},
       scope: { activeOrgId: getHubActiveOrgId(req.user) }
     });
-    const students = await dataService.fetchData('students', {}, req.user);
+    const students = await dataService.fetchAllData('students', {}, req.user);
     const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(
       students,
       getHubActiveOrgId(req.user)
@@ -1273,7 +1273,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     const [activities, categories, departments] = await Promise.all([
       activityService.listActivities({ orgId, reqUser: req.user, query: fetchQuery }),
       activityService.listActivityCategories({ orgId, reqUser: req.user, includeInactive: true }),
-      dataService.fetchData('departments', {}, req.user, { scopeId: access.scopeId })
+      dataService.fetchAllData('departments', {}, req.user, { scopeId: access.scopeId })
     ]);
     const normalizedRows = sortActivityRows(normalizeActivityRows(activities)
       .filter((row) => activityMatchesFilters(row, queryInput || {}, query.q || '')));
@@ -1500,8 +1500,8 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
         status,
         q: searchTerm
       }),
-      dataService.fetchData('reportTemplates', {}, req.user),
-      dataService.fetchData('classes', {}, req.user)
+      dataService.fetchAllData('reportTemplates', {}, req.user),
+      dataService.fetchAllData('classes', {}, req.user)
     ]);
     const rows = normalizeReportInstanceRows(instanceRows);
     const classMap = new Map(

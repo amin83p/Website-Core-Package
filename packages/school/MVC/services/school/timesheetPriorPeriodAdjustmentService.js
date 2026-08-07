@@ -77,7 +77,7 @@ function buildChangeSummary({ snapshotEntry, snapshotHours, currentHours, curren
 async function buildCurrentClassSessionIndex({ teacherId, activeOrgId, reqUser }) {
     const statusMeta = await sessionStatusPolicyService.getClientStatusMeta(activeOrgId || '', { includeInactive: true });
     const statusMap = sessionStatusPolicyService.getStatusMetaMap(statusMeta);
-    const classes = await dataService.fetchData('classes', {}, reqUser);
+    const classes = await dataService.fetchAllData('classes', {}, reqUser);
     const index = new Map();
 
     for (const classRow of Array.isArray(classes) ? classes : []) {
@@ -181,7 +181,7 @@ async function findPriorSubmittedTimesheet({ teacherId, currentPeriod, activeOrg
 
     const [allPeriods, allTimesheets] = await Promise.all([
         dataService.fetchData('timesheetPeriods', { orgId__eq: activeOrgId }, reqUser),
-        dataService.fetchData('timesheets', {}, reqUser)
+        dataService.fetchAllData('timesheets', {}, reqUser)
     ]);
     const teacherTimesheets = (Array.isArray(allTimesheets) ? allTimesheets : [])
         .filter((row) => idsEqual(row?.teacherId, teacherId));
@@ -441,9 +441,9 @@ async function detectReconciliation({ priorTimesheet, priorPeriod, currentPeriod
     });
     const [statusMeta, classes, allPeriods, allTimesheets] = await Promise.all([
         sessionStatusPolicyService.getClientStatusMeta(activeOrgId || '', { includeInactive: true }),
-        dataService.fetchData('classes', {}, reqUser),
+        dataService.fetchAllData('classes', {}, reqUser),
         dataService.fetchData('timesheetPeriods', { orgId__eq: activeOrgId }, reqUser),
-        dataService.fetchData('timesheets', {}, reqUser)
+        dataService.fetchAllData('timesheets', {}, reqUser)
     ]);
     const scopedClasses = (Array.isArray(classes) ? classes : [])
         .filter((row) => !activeOrgId || idsEqual(row?.orgId, activeOrgId));

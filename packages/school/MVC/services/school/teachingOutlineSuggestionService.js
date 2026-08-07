@@ -230,9 +230,9 @@ async function loadSessionOutlineContext(reqUser, { classId, sessionId, roster =
   await teachingOutlineCatalogService.ensureOrgTeachingOutlineDefaults(orgId, reqUser?.id || 'SYSTEM');
 
   const [levels, templates, items, sessions] = await Promise.all([
-    schoolDataService.fetchData('teachingOutlineLevels', {}, reqUser),
-    schoolDataService.fetchData('teachingOutlineSectionTemplates', {}, reqUser),
-    schoolDataService.fetchData('teachingOutlineItems', {}, reqUser),
+    schoolDataService.fetchAllData('teachingOutlineLevels', {}, reqUser),
+    schoolDataService.fetchAllData('teachingOutlineSectionTemplates', {}, reqUser),
+    schoolDataService.fetchAllData('teachingOutlineItems', {}, reqUser),
     schoolDataService.getClassSessions(classId, reqUser)
   ]);
 

@@ -109,8 +109,8 @@ function buildStudentProgramKey(studentId, programId) {
 async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, registrationId = '', filters = {} } = {}) {
   const [registrations, students, programs, allTransactions, allEntries, termRegistrations, classEnrollmentPeriods] = await Promise.all([
     schoolRepositories.studentProgramRegistrations.list({ query: {}, scope: { canViewAll: true } }),
-    dataService.fetchData('students', {}, reqUser),
-    dataService.fetchData('programs', {}, reqUser),
+    dataService.fetchAllData('students', {}, reqUser),
+    dataService.fetchAllData('programs', {}, reqUser),
     schoolRepositories.globalTransactions.list({ query: {}, scope: { canViewAll: true } }),
     schoolRepositories.academicLedger.list({ query: {}, scope: { canViewAll: true } }),
     schoolRepositories.studentTermRegistrations.list({ query: {}, scope: { canViewAll: true } }),
@@ -367,8 +367,8 @@ async function buildStudentRegistrationPreview(program, student, reqUser, reques
     return preview;
   }
 
-  const transactionDefinitions = await dataService.fetchData('transactionDefinitions', {}, reqUser);
-  const allAccounts = await dataService.fetchData('schoolAccounts', {}, reqUser);
+  const transactionDefinitions = await dataService.fetchAllData('transactionDefinitions', {}, reqUser);
+  const allAccounts = await dataService.fetchAllData('schoolAccounts', {}, reqUser);
   const txResult = programTransactionService.buildProgramTransactionsForStudent({
     program,
     student,

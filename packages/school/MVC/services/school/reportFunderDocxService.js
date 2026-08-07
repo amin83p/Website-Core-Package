@@ -143,7 +143,7 @@ function resolveStudentFunderForReportPeriod({
 async function loadActiveFunderOptions(reqUser, orgId) {
   const orgToken = toPublicId(orgId);
   if (!orgToken) return [];
-  const rows = await schoolDataService.fetchData('funders', {}, reqUser);
+  const rows = await schoolDataService.fetchAllData('funders', {}, reqUser);
   const scoped = (Array.isArray(rows) ? rows : []).filter((row) => {
     if (!idsEqual(row?.orgId, orgToken)) return false;
     return String(row?.status || '').trim().toLowerCase() === 'active';

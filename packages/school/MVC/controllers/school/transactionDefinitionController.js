@@ -105,9 +105,10 @@ exports.listTransactionDefinitions = async (req, res) => {
     if (query.q === searchDefaultKeyword) query.q = '';
     const canCreateTransactionDefinitions = await canCreateOrgScopedItem(req.user, { scopeLabel: 'transaction templates' });
 
-    const all = await dataService.fetchData('transactionTemplates', query, req.user);
-    const searchableFields = await inferSearchableFields(all, { exclude: ['audit', 'metadata'] });
-    const { data, pagination } = paginate(all, query);
+    const paged = await dataService.fetchDataPaged('transactionTemplates', query, req.user);
+    const searchableFields = await inferSearchableFields(paged.rows, { exclude: ['audit', 'metadata'] });
+    const data = paged.rows;
+    const pagination = paged.pagination;
 
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
 

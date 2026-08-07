@@ -49,9 +49,9 @@ exports.listDashboard = async (req, res) => {
 
     await ensureDefaults(req);
     const [levels, items, templates] = await Promise.all([
-      schoolDataService.fetchData('teachingOutlineLevels', {}, req.user),
-      schoolDataService.fetchData('teachingOutlineItems', {}, req.user),
-      schoolDataService.fetchData('teachingOutlineSectionTemplates', {}, req.user)
+      schoolDataService.fetchAllData('teachingOutlineLevels', {}, req.user),
+      schoolDataService.fetchAllData('teachingOutlineItems', {}, req.user),
+      schoolDataService.fetchAllData('teachingOutlineSectionTemplates', {}, req.user)
     ]);
     const orgLevels = teachingOutlineCatalogService.listActiveLevels(
       (levels || []).filter((row) => idsEqual(row.orgId, orgId))
@@ -131,8 +131,8 @@ exports.listLevels = async (req, res) => {
 
     await ensureDefaults(req);
 
-    const levels = await schoolDataService.fetchData('teachingOutlineLevels', query, req.user);
-    const dataRows = (levels || [])
+    const paged = await schoolDataService.fetchDataPaged('teachingOutlineLevels', query, req.user);
+    const dataRows = (paged.rows || [])
       .filter((row) => idsEqual(row.orgId, orgId))
       .sort((a, b) => {
         const orderA = Number(a?.sortOrder || 0);
@@ -142,7 +142,8 @@ exports.listLevels = async (req, res) => {
       });
 
     const searchableFields = await inferSearchableFields(dataRows, { exclude: ['audit'] });
-    const { data, pagination } = paginate(dataRows, query.page, query.limit);
+    const data = dataRows;
+    const pagination = paged.pagination;
 
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
 
@@ -230,7 +231,7 @@ exports.showSectionTemplateEditor = async (req, res) => {
     const skillId = String(req.params.skillId || '').trim().toLowerCase();
     if (!teachingOutlineCatalogService.CLB_SKILLS.includes(skillId)) throw new Error('Invalid skill.');
     await ensureDefaults(req);
-    const templates = await schoolDataService.fetchData('teachingOutlineSectionTemplates', {}, req.user);
+    const templates = await schoolDataService.fetchAllData('teachingOutlineSectionTemplates', {}, req.user);
     const template = (templates || []).find((row) => idsEqual(row.orgId, orgId) && row.skillId === skillId);
     return res.render('school/teachingOutline/sectionTemplateEditor', {
       title: `Section Template — ${skillId}`,
@@ -249,7 +250,7 @@ exports.saveSectionTemplate = async (req, res) => {
     const orgId = getActiveOrgIdOrThrow(req.user);
     const skillId = String(req.params.skillId || '').trim().toLowerCase();
     const sections = parseJsonBody(req.body.sectionsJson, []);
-    const templates = await schoolDataService.fetchData('teachingOutlineSectionTemplates', {}, req.user);
+    const templates = await schoolDataService.fetchAllData('teachingOutlineSectionTemplates', {}, req.user);
     const existing = (templates || []).find((row) => idsEqual(row.orgId, orgId) && row.skillId === skillId);
     const payload = {
       orgId,
@@ -277,9 +278,9 @@ exports.showOutlineEditor = async (req, res) => {
     const levelId = String(req.params.levelId || '').trim();
     await ensureDefaults(req);
     const [levels, items, templates] = await Promise.all([
-      schoolDataService.fetchData('teachingOutlineLevels', {}, req.user),
-      schoolDataService.fetchData('teachingOutlineItems', {}, req.user),
-      schoolDataService.fetchData('teachingOutlineSectionTemplates', {}, req.user)
+      schoolDataService.fetchAllData('teachingOutlineLevels', {}, req.user),
+      schoolDataService.fetchAllData('teachingOutlineItems', {}, req.user),
+      schoolDataService.fetchAllData('teachingOutlineSectionTemplates', {}, req.user)
     ]);
     const level = (levels || []).find((row) => String(row.id) === levelId && idsEqual(row.orgId, orgId));
     if (!level) throw new Error('Level not found.');
@@ -371,7 +372,7 @@ exports.importSeed = async (req, res) => {
     const skillId = String(req.body.skillId || req.params.skillId || '').trim().toLowerCase();
     const levelCode = String(req.body.levelCode || '').trim();
     await ensureDefaults(req);
-    const levels = await schoolDataService.fetchData('teachingOutlineLevels', {}, req.user);
+    const levels = await schoolDataService.fetchAllData('teachingOutlineLevels', {}, req.user);
     const level = (levels || []).find((row) => idsEqual(row.orgId, orgId) && row.code === levelCode);
     if (!level) throw new Error('Level not found.');
     const seed = teachingOutlineCatalogService.WRITING_ITEMS_BY_LEVEL?.[levelCode]
@@ -396,7 +397,7 @@ exports.importOutlineData = async (req, res) => {
     if (exportSkill && exportSkill !== skillId) {
       throw new Error('Import file skill does not match this outline.');
     }
-    const levels = await schoolDataService.fetchData('teachingOutlineLevels', {}, req.user);
+    const levels = await schoolDataService.fetchAllData('teachingOutlineLevels', {}, req.user);
     const level = (levels || []).find((row) => String(row.id) === levelId && idsEqual(row.orgId, orgId));
     if (!level) throw new Error('Level not found.');
     if (exportLevel && exportLevel !== level.code) {
@@ -425,9 +426,9 @@ exports.studentCoverage = async (req, res) => {
     const enrollmentPeriodId = String(req.query.enrollmentPeriodId || '').trim();
     await ensureDefaults(req);
     const [levels, items, templates, sessions, periods] = await Promise.all([
-      schoolDataService.fetchData('teachingOutlineLevels', {}, req.user),
-      schoolDataService.fetchData('teachingOutlineItems', {}, req.user),
-      schoolDataService.fetchData('teachingOutlineSectionTemplates', {}, req.user),
+      schoolDataService.fetchAllData('teachingOutlineLevels', {}, req.user),
+      schoolDataService.fetchAllData('teachingOutlineItems', {}, req.user),
+      schoolDataService.fetchAllData('teachingOutlineSectionTemplates', {}, req.user),
       schoolDataService.getClassSessions(classId, req.user),
       schoolDataService.fetchData('classEnrollmentPeriods', { classId }, req.user)
     ]);

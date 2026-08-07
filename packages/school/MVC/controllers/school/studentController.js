@@ -557,7 +557,7 @@ exports.listStudents = async (req, res) => {
         delete fetchQuery.page;
         delete fetchQuery.limit;
 
-        const allStudents = await dataService.fetchData('students', fetchQuery, req.user, dataService.buildRouteAccessContext(req));
+        const allStudents = await dataService.fetchAllData('students', fetchQuery, req.user, dataService.buildRouteAccessContext(req));
         const personById = await schoolPersonAccessService.buildPersonByIdMap({
             reqUser: req.user,
             personIds: (Array.isArray(allStudents) ? allStudents : []).map((student) => student.personId)
@@ -908,7 +908,7 @@ exports.saveStudent = async (req, res) => {
         };
 
         const accessibleAccounts = !id
-            ? await dataService.fetchData('schoolAccounts', {}, req.user, routeAccess(req))
+            ? await dataService.fetchAllData('schoolAccounts', {}, req.user, routeAccess(req))
             : [];
 
         if (!payload.personId) throw new Error("A valid Person must be selected.");

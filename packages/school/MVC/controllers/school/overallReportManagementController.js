@@ -76,7 +76,7 @@ async function listManagementSessions(req, res) {
 async function showNewWorkspace(req, res) {
   try {
     const templates = scoped(
-      await schoolDataService.fetchData('overallReportTemplates', {}, req.user),
+      await schoolDataService.fetchAllData('overallReportTemplates', {}, req.user),
       req.user
     )
       .filter((row) => String(row.status || '').toLowerCase() === 'active')
@@ -100,7 +100,7 @@ async function showEditWorkspace(req, res) {
   try {
     const session = await overallReportManagementService.getManagementSession(req.params.id, req.user);
     const templates = scoped(
-      await schoolDataService.fetchData('overallReportTemplates', {}, req.user),
+      await schoolDataService.fetchAllData('overallReportTemplates', {}, req.user),
       req.user
     )
       .filter((row) => (

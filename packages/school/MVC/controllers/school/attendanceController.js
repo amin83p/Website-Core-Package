@@ -258,7 +258,7 @@ async function resolveAttendanceEnrollmentWindow({ classData, session, studentPe
 
     const [periodRows, students] = await Promise.all([
         schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, reqUser),
-        schoolDataService.fetchData('students', {}, reqUser)
+        schoolDataService.fetchAllData('students', {}, reqUser)
     ]);
     const studentToPersonMap = new Map(
         (Array.isArray(students) ? students : [])
@@ -363,7 +363,7 @@ async function listActiveAttendanceClasses(req, res) {
     try {
         const activeOrgId = String(req.user?.activeOrgId || '').trim();
         const routeAccessContext = buildAttendanceRouteAccessContext(req);
-        const classes = await schoolDataService.fetchData('classes', {}, req.user, routeAccessContext);
+        const classes = await schoolDataService.fetchAllData('classes', {}, req.user, routeAccessContext);
         const items = (Array.isArray(classes) ? classes : [])
             .filter((row) => classBelongsToActiveOrg(row, activeOrgId))
             .filter(isActiveAttendanceClass)
@@ -421,7 +421,7 @@ async function buildAttendanceMatrixPayload(req) {
                 requireSchoolRole: false,
                 query: { limit: 1000 }
             }).then((payload) => payload.allRows || payload.rows || []),
-            schoolDataService.fetchData('students', {}, req.user),
+            schoolDataService.fetchAllData('students', {}, req.user),
             schoolIdentityLookupService.listTaggableUsers({
                 reqUser: req.user,
                 query: { limit: 1000 }

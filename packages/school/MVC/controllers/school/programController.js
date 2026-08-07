@@ -168,7 +168,7 @@ async function resolveProgramDepartmentFromBody(body, reqUser, activeOrgId) {
 async function assertProgramTermsAccessibleOrThrow(terms, orgId, reqUser) {
   const selectedTerms = Array.isArray(terms) ? terms : [];
   if (!selectedTerms.length) return;
-  const accessibleTerms = await dataService.fetchData('terms', {}, reqUser);
+  const accessibleTerms = await dataService.fetchAllData('terms', {}, reqUser);
   const termMap = new Map(accessibleTerms.map((term) => [String(term.id || ''), term]));
   selectedTerms.forEach((termRef) => {
     const termId = String(termRef?.termId || '').trim();
@@ -184,7 +184,7 @@ async function assertProgramTermsAccessibleOrThrow(terms, orgId, reqUser) {
 async function assertProgramSubjectsAccessibleOrThrow(subjects, orgId, reqUser) {
   const selectedSubjects = Array.isArray(subjects) ? subjects : [];
   if (!selectedSubjects.length) return;
-  const accessibleSubjects = await dataService.fetchData('subjects', {}, reqUser);
+  const accessibleSubjects = await dataService.fetchAllData('subjects', {}, reqUser);
   const subjectMap = new Map(accessibleSubjects.map((subject) => [String(subject.id || ''), subject]));
   selectedSubjects.forEach((subjectRef) => {
     const subjectId = String(subjectRef?.subjectId || '').trim();
@@ -317,13 +317,13 @@ exports.listPrograms = async (req, res) => {
     if (query.q === searchDefaultKeyword) query.q = '';
     const canCreatePrograms = await canCreateOrgScopedItem(req.user, { scopeLabel: 'programs' });
 
-    const programs = await dataService.fetchData('programs', query, req.user);
+    const paged = await dataService.fetchDataPaged('programs', query, req.user);
     const personById = await schoolPersonAccessService.buildPersonByIdMap({
       reqUser: req.user,
-      personIds: (Array.isArray(programs) ? programs : []).map((program) => program.programAdministratorPersonId)
+      personIds: (Array.isArray(paged.rows) ? paged.rows : []).map((program) => program.programAdministratorPersonId)
     });
 
-    const enrichedPrograms = programs.map((program) => {
+    const enrichedPrograms = paged.rows.map((program) => {
       const admin = personById.get(toPublicId(program.programAdministratorPersonId));
       const adminName = admin ? schoolPersonAccessService.formatPersonName(admin, '') : 'N/A';
       return {
@@ -336,7 +336,8 @@ exports.listPrograms = async (req, res) => {
     const searchableFields = await inferSearchableFields(enrichedPrograms, {
       exclude: ['audit', 'feeGroups', 'subjects']
     });
-    const { data, pagination } = paginate(enrichedPrograms, query);
+    const data = enrichedPrograms;
+    const pagination = paged.pagination;
 
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
 
@@ -405,9 +406,9 @@ async function renderProgramFormView(req, res, viewName) {
     }
 
     const transactionDefinitions = await getAccessibleTransactionDefinitionsForOrg(program.orgId || activeOrgId, req.user);
-    const subjectCatalog = await dataService.fetchData('subjects', {}, req.user);
-    const termCatalog = await dataService.fetchData('terms', {}, req.user);
-    const departments = await dataService.fetchData('departments', {}, req.user);
+    const subjectCatalog = await dataService.fetchAllData('subjects', {}, req.user);
+    const termCatalog = await dataService.fetchAllData('terms', {}, req.user);
+    const departments = await dataService.fetchAllData('departments', {}, req.user);
     const programOrgId = toPublicId(program.orgId || activeOrgId);
     const eligibleAdministrators = await resolveEligibleProgramAdministrators(req.user, programOrgId, {});
     const selectableDefinitions = transactionDefinitions

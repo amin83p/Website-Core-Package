@@ -51,7 +51,7 @@ async function getActiveClassesForTermRegistration(termRegistrationId, studentId
 
   if (!activeClassEnrollments.length) return [];
 
-  const classesResult = await schoolDataService.fetchData('classes', {}, reqUser);
+  const classesResult = await schoolDataService.fetchAllData('classes', {}, reqUser);
   const classes = classesResult?.data || classesResult || [];
   const classMap = new Map((Array.isArray(classes) ? classes : []).map((row) => [String(row?.id || '').trim(), row]));
 

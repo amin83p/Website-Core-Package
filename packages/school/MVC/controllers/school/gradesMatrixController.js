@@ -285,7 +285,7 @@ async function buildGradesMatrixPayload(req, query) {
   });
   filteredSessions.sort((a, b) => new Date(`${a.date}T${a.startTime || '00:00'}`) - new Date(`${b.date}T${b.startTime || '00:00'}`));
 
-  const students = await schoolDataService.fetchData('students', {}, req.user);
+  const students = await schoolDataService.fetchAllData('students', {}, req.user);
 
   const studentToPersonMap = new Map(
     (Array.isArray(students) ? students : [])

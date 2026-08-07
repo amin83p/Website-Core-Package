@@ -158,7 +158,7 @@ async function buildSessionReportViewerContext({
 } = {}) {
   const cleanClassId = String(classId || '').trim();
   const currentUserPersonId = String(reqUser?.personId || '').trim();
-  const students = await schoolDataService.fetchData('students', {}, reqUser);
+  const students = await schoolDataService.fetchAllData('students', {}, reqUser);
   const ownedStudentIds = new Set(
     (Array.isArray(students) ? students : [])
       .filter((row) => idsEqual(row?.personId, currentUserPersonId))

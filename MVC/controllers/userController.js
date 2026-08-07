@@ -6,6 +6,7 @@ const organizationRepository = require('../repositories/organizationRepository')
 const securityService = require('../services/security');
 const bcrypt = require('bcrypt');
 const adminAuthorityService = require('../services/adminAuthorityService');
+const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
 
 const { buildDataServiceQuery } = require('../utils/generalTools');
 const {
@@ -530,6 +531,7 @@ async function editUser(req, res) {
 
     updateStage = 'persist_update';
     const results = await dataService.updateData('users', req.params.id, updates, req.user);
+    invalidateAuthContextForUser(req.params.id);
 
     updateStage = 'send_response';
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'User updated successfully.', data: results });

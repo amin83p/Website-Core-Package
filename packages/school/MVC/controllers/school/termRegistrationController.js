@@ -92,7 +92,7 @@ function reindexDraftPreviewRows(rowsInput, startIndex = 0) {
 
 async function buildPostableAccountMap(reqUser, activeOrgId) {
   const allowedOrgIds = new Set([toPublicId(activeOrgId), 'SYSTEM']);
-  const rows = await dataService.fetchData('schoolAccounts', {}, reqUser);
+  const rows = await dataService.fetchAllData('schoolAccounts', {}, reqUser);
   const map = new Map();
   (Array.isArray(rows) ? rows : []).forEach((account) => {
     const accountId = toPublicId(account?.id);
@@ -474,7 +474,7 @@ function isBatchEligibleTermStatus(status) {
 async function buildBatchProgramCatalog(reqUser, activeOrgId) {
   const [registrationOptions, terms] = await Promise.all([
     buildActiveProgramRegistrationOptions(reqUser, activeOrgId),
-    dataService.fetchData('terms', {}, reqUser)
+    dataService.fetchAllData('terms', {}, reqUser)
   ]);
   const termMap = new Map((Array.isArray(terms) ? terms : []).map((row) => [toPublicId(row?.id), row]));
   const grouped = new Map();
@@ -548,7 +548,7 @@ async function buildBatchProgramCatalog(reqUser, activeOrgId) {
 async function buildBatchStudentRows(reqUser, activeOrgId, { programId, termId, query = '' } = {}) {
   const [registrationOptions, students] = await Promise.all([
     buildActiveProgramRegistrationOptions(reqUser, activeOrgId),
-    dataService.fetchData('students', {}, reqUser)
+    dataService.fetchAllData('students', {}, reqUser)
   ]);
   const studentMap = new Map((Array.isArray(students) ? students : []).map((row) => [toPublicId(row?.id), row]));
   const normalizedProgramId = toPublicId(programId);

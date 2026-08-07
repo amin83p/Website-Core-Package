@@ -58,9 +58,9 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
   );
   const statusMap = sessionStatusPolicyService.getStatusMetaMap(statusMeta);
   const [classes, existing, departments] = await Promise.all([
-    schoolDataService.fetchData('classes', {}, reqUser),
+    schoolDataService.fetchAllData('classes', {}, reqUser),
     schoolDataService.getTimesheetByPeriodAndTeacher(period.id, personId, reqUser),
-    schoolDataService.fetchData('departments', {}, reqUser)
+    schoolDataService.fetchAllData('departments', {}, reqUser)
   ]);
 
   const classRows = (Array.isArray(classes) ? classes : [])

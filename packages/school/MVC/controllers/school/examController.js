@@ -651,9 +651,9 @@ async function saveAllocationExemptStudentIds(allocation, exemptStudentIdSet, re
 async function showHome(req, res) {
   try {
     const [templates, revisions, questions] = await Promise.all([
-      schoolDataService.fetchData('examTemplates', {}, req.user),
-      schoolDataService.fetchData('examRevisions', {}, req.user),
-      schoolDataService.fetchData('examQuestions', {}, req.user)
+      schoolDataService.fetchAllData('examTemplates', {}, req.user),
+      schoolDataService.fetchAllData('examRevisions', {}, req.user),
+      schoolDataService.fetchAllData('examQuestions', {}, req.user)
     ]);
     const summary = {
       templateCount: templates.length,
@@ -717,8 +717,8 @@ async function showHome(req, res) {
 async function listTemplates(req, res) {
   try {
     const q = String(req.query.q || '').trim().toLowerCase();
-    const templates = await schoolDataService.fetchData('examTemplates', {}, req.user);
-    const allocationRows = await schoolDataService.fetchData('examAllocations', {}, req.user);
+    const templates = await schoolDataService.fetchAllData('examTemplates', {}, req.user);
+    const allocationRows = await schoolDataService.fetchAllData('examAllocations', {}, req.user);
     const allocationCountByTemplateId = new Map();
     (allocationRows || []).forEach((row) => {
       const templateId = String(row?.templateId || '').trim();
@@ -826,8 +826,8 @@ async function showTemplateForm(req, res) {
     }
 
     const [departments, subjects] = await Promise.all([
-      schoolDataService.fetchData('departments', {}, req.user),
-      schoolDataService.fetchData('subjects', {}, req.user)
+      schoolDataService.fetchAllData('departments', {}, req.user),
+      schoolDataService.fetchAllData('subjects', {}, req.user)
     ]);
 
     const subjectMap = new Map((subjects || []).map((row) => [String(row.id || ''), row]));
@@ -911,8 +911,8 @@ async function viewTemplate(req, res) {
     const template = await getTemplateOrThrow(req.params.templateId, req.user);
     const [questionContext, subjects, allTemplates] = await Promise.all([
       resolveTemplateQuestionRevision(template, req.user, { requireEditable: false }),
-      schoolDataService.fetchData('subjects', {}, req.user),
-      schoolDataService.fetchData('examTemplates', {}, req.user)
+      schoolDataService.fetchAllData('subjects', {}, req.user),
+      schoolDataService.fetchAllData('examTemplates', {}, req.user)
     ]);
     const revisions = Array.isArray(questionContext?.revisions) ? questionContext.revisions : [];
     const selectedQuestionRevision = questionContext?.revision || null;
@@ -1261,7 +1261,7 @@ async function saveAllocation(req, res) {
     const viewerPersonId = normalizeId(req.user?.personId);
     if (!isAdminViewer) {
       if (!viewerPersonId) throw new Error('Your user account is not linked to a person.');
-      const teachers = await schoolDataService.fetchData('teachers', {}, req.user);
+      const teachers = await schoolDataService.fetchAllData('teachers', {}, req.user);
       const teacherPersonMap = buildTeacherPersonMap(teachers || []);
       if (!classHasPrimaryInstructorPerson(classRow, viewerPersonId, teacherPersonMap)) {
         throw new Error('You can only create allocations for classes where you are the Primary Instructor.');
@@ -1369,7 +1369,7 @@ async function showAllocationEditForm(req, res) {
     const [template, revision, classes] = await Promise.all([
       schoolDataService.getDataById('examTemplates', allocation.templateId, req.user),
       schoolDataService.getDataById('examRevisions', allocation.revisionId, req.user),
-      schoolDataService.fetchData('classes', {}, req.user)
+      schoolDataService.fetchAllData('classes', {}, req.user)
     ]);
     const selectedClass = (classes || []).find((row) => idsEqual(row.id, allocation.classId)) || null;
     const classSessions = Array.isArray(selectedClass?.sessions) ? selectedClass.sessions : [];
@@ -1708,10 +1708,10 @@ async function listAllocations(req, res) {
     const q = String(req.query.q || '').trim().toLowerCase();
 
     const [allocations, assignments, classes, revisions] = await Promise.all([
-      schoolDataService.fetchData('examAllocations', {}, req.user),
-      schoolDataService.fetchData('examAssignments', {}, req.user),
-      schoolDataService.fetchData('classes', {}, req.user),
-      schoolDataService.fetchData('examRevisions', {}, req.user)
+      schoolDataService.fetchAllData('examAllocations', {}, req.user),
+      schoolDataService.fetchAllData('examAssignments', {}, req.user),
+      schoolDataService.fetchAllData('classes', {}, req.user),
+      schoolDataService.fetchAllData('examRevisions', {}, req.user)
     ]);
 
     const classNameById = new Map((classes || []).map((row) => [String(row.id), String(row.title || row.id || '').trim()]));
@@ -1800,7 +1800,7 @@ async function viewAllocation(req, res) {
       schoolDataService.getDataById('examRevisions', allocation.revisionId, req.user),
       schoolDataService.getDataById('classes', allocation.classId, req.user),
       schoolDataService.fetchData('examAssignments', { allocationId__eq: allocation.id }, req.user),
-      schoolDataService.fetchData('students', {}, req.user),
+      schoolDataService.fetchAllData('students', {}, req.user),
       listSchoolPersonRecords(req.user, { query: { limit: 5000 } })
     ]);
     const counts = buildAssignmentCounts(assignments || []);
@@ -1979,11 +1979,11 @@ async function listTeacherAssignments(req, res) {
     const statusFilter = String(req.query.status || '').trim().toLowerCase();
 
     const [allocations, assignments, classes, revisions, teachers] = await Promise.all([
-      schoolDataService.fetchData('examAllocations', {}, req.user),
-      schoolDataService.fetchData('examAssignments', {}, req.user),
-      schoolDataService.fetchData('classes', {}, req.user),
-      schoolDataService.fetchData('examRevisions', {}, req.user),
-      schoolDataService.fetchData('teachers', {}, req.user)
+      schoolDataService.fetchAllData('examAllocations', {}, req.user),
+      schoolDataService.fetchAllData('examAssignments', {}, req.user),
+      schoolDataService.fetchAllData('classes', {}, req.user),
+      schoolDataService.fetchAllData('examRevisions', {}, req.user),
+      schoolDataService.fetchAllData('teachers', {}, req.user)
     ]);
 
     const { viewer, effectivePersonId, selectedTeacherId } = resolveTeacherReviewPersonScope(req, teachers);
@@ -2101,10 +2101,10 @@ async function viewTeacherAssignment(req, res) {
       schoolDataService.getDataById('examRevisions', allocation.revisionId, req.user),
       schoolDataService.getDataById('classes', allocation.classId, req.user),
       schoolDataService.fetchData('examAssignments', { allocationId__eq: allocation.id }, req.user),
-      schoolDataService.fetchData('teachers', {}, req.user),
-      schoolDataService.fetchData('students', {}, req.user),
+      schoolDataService.fetchAllData('teachers', {}, req.user),
+      schoolDataService.fetchAllData('students', {}, req.user),
       listSchoolPersonRecords(req.user, { query: { limit: 5000 } }),
-      schoolDataService.fetchData('examAttempts', {}, req.user)
+      schoolDataService.fetchAllData('examAttempts', {}, req.user)
     ]);
 
     const teacherPersonMap = buildTeacherPersonMap(teachers || []);
@@ -2185,8 +2185,8 @@ async function viewTeacherAttemptReview(req, res) {
       schoolDataService.getDataById('examTemplates', assignment.templateId, req.user),
       schoolDataService.getDataById('examRevisions', assignment.revisionId, req.user),
       schoolDataService.getDataById('classes', assignment.classId, req.user),
-      schoolDataService.fetchData('teachers', {}, req.user),
-      schoolDataService.fetchData('students', {}, req.user),
+      schoolDataService.fetchAllData('teachers', {}, req.user),
+      schoolDataService.fetchAllData('students', {}, req.user),
       listSchoolPersonRecords(req.user, { query: { limit: 5000 } }),
       schoolDataService.fetchData('examAttempts', { assignmentId__eq: assignment.id }, req.user),
       schoolDataService.getExamRevisionBundle(assignment.revisionId, req.user)
@@ -2317,7 +2317,7 @@ async function deleteTeacherReviewAttempt(req, res) {
     if (!attempt || !idsEqual(attempt.assignmentId, assignment.id)) throw new Error('Attempt not found for assignment.');
 
     const classRow = await schoolDataService.getDataById('classes', assignment.classId, req.user);
-    const teachers = await schoolDataService.fetchData('teachers', {}, req.user);
+    const teachers = await schoolDataService.fetchAllData('teachers', {}, req.user);
     const teacherPersonMap = buildTeacherPersonMap(teachers || []);
     const normalizedViewerPersonId = normalizeId(viewer.personId);
     if (normalizedViewerPersonId) {
@@ -2364,7 +2364,7 @@ async function gradeTeacherAttemptAnswer(req, res) {
     if (!answer || !idsEqual(answer.attemptId, attempt.id)) throw new Error('Answer not found for attempt.');
 
     const classRow = await schoolDataService.getDataById('classes', assignment.classId, req.user);
-    const teachers = await schoolDataService.fetchData('teachers', {}, req.user);
+    const teachers = await schoolDataService.fetchAllData('teachers', {}, req.user);
     const teacherPersonMap = buildTeacherPersonMap(teachers || []);
     const normalizedViewerPersonId = normalizeId(viewer.personId);
     if (normalizedViewerPersonId) {
@@ -2420,7 +2420,7 @@ async function listTemplateSubjectsByDepartment(req, res) {
       });
     }
 
-    const allSubjects = await schoolDataService.fetchData('subjects', {}, req.user);
+    const allSubjects = await schoolDataService.fetchAllData('subjects', {}, req.user);
     const filtered = (allSubjects || [])
       .filter((row) => idsEqual(
         row?.academicUnit?.departmentId
@@ -2528,8 +2528,8 @@ async function listPublishedAllocationTemplates(req, res) {
   try {
     const q = String(req.query.q || '').trim().toLowerCase();
     const [templates, revisions] = await Promise.all([
-      schoolDataService.fetchData('examTemplates', {}, req.user),
-      schoolDataService.fetchData('examRevisions', {}, req.user)
+      schoolDataService.fetchAllData('examTemplates', {}, req.user),
+      schoolDataService.fetchAllData('examRevisions', {}, req.user)
     ]);
 
     const publishedRevisionByTemplateId = new Map();
@@ -2579,8 +2579,8 @@ async function listEligibleAllocationClasses(req, res) {
   try {
     const q = String(req.query.q || '').trim().toLowerCase();
     const [classes, teachers] = await Promise.all([
-      schoolDataService.fetchData('classes', {}, req.user),
-      schoolDataService.fetchData('teachers', {}, req.user)
+      schoolDataService.fetchAllData('classes', {}, req.user),
+      schoolDataService.fetchAllData('teachers', {}, req.user)
     ]);
     const isAdminViewer = isExamAdminViewer(req.user);
     const viewerPersonId = normalizeId(req.user?.personId);
@@ -2633,7 +2633,7 @@ async function listClassScheduledSessions(req, res) {
     const viewerPersonId = normalizeId(req.user?.personId);
     if (!isAdminViewer) {
       if (!viewerPersonId) throw new Error('Your user account is not linked to a person.');
-      const teachers = await schoolDataService.fetchData('teachers', {}, req.user);
+      const teachers = await schoolDataService.fetchAllData('teachers', {}, req.user);
       const teacherPersonMap = buildTeacherPersonMap(teachers || []);
       if (!classHasPrimaryInstructorPerson(classRow, viewerPersonId, teacherPersonMap)) {
         throw new Error('You can only access sessions for classes where you are the Primary Instructor.');
@@ -2686,7 +2686,7 @@ async function listAllocationClassStudents(req, res) {
 
     const q = String(req.query.q || '').trim().toLowerCase();
     const [students, persons, assignments] = await Promise.all([
-      schoolDataService.fetchData('students', {}, req.user),
+      schoolDataService.fetchAllData('students', {}, req.user),
       listSchoolPersonRecords(req.user, { query: { limit: 5000 } }),
       schoolDataService.fetchData('examAssignments', { allocationId__eq: allocation.id }, req.user)
     ]);
@@ -2761,15 +2761,15 @@ async function listTakeAssignments(req, res) {
       ? resolveTakeExamDateFilters({ datePreset: 'all' })
       : resolveTakeExamDateFilters(req.query);
     const [assignments, allocations, templates, revisions, classes, attempts, students, persons, teachers] = await Promise.all([
-      schoolDataService.fetchData('examAssignments', {}, req.user),
-      schoolDataService.fetchData('examAllocations', {}, req.user),
-      schoolDataService.fetchData('examTemplates', {}, req.user),
-      schoolDataService.fetchData('examRevisions', {}, req.user),
-      schoolDataService.fetchData('classes', {}, req.user),
-      schoolDataService.fetchData('examAttempts', {}, req.user),
-      schoolDataService.fetchData('students', {}, req.user),
+      schoolDataService.fetchAllData('examAssignments', {}, req.user),
+      schoolDataService.fetchAllData('examAllocations', {}, req.user),
+      schoolDataService.fetchAllData('examTemplates', {}, req.user),
+      schoolDataService.fetchAllData('examRevisions', {}, req.user),
+      schoolDataService.fetchAllData('classes', {}, req.user),
+      schoolDataService.fetchAllData('examAttempts', {}, req.user),
+      schoolDataService.fetchAllData('students', {}, req.user),
       listSchoolPersonRecords(req.user, { query: { limit: 5000 } }),
-      schoolDataService.fetchData('teachers', {}, req.user)
+      schoolDataService.fetchAllData('teachers', {}, req.user)
     ]);
 
     const assignmentRows = (Array.isArray(assignments) ? assignments : [])
@@ -2943,7 +2943,7 @@ async function updateTakeAssignmentStatus(req, res) {
     const classRow = await schoolDataService.getDataById('classes', assignment.classId, req.user);
     const isAdminViewer = isExamAdminViewer(req.user);
     if (!isAdminViewer) {
-      const teachers = await schoolDataService.fetchData('teachers', {}, req.user);
+      const teachers = await schoolDataService.fetchAllData('teachers', {}, req.user);
       const teacherPersonMap = buildTeacherPersonMap(teachers || []);
       const viewerPersonId = normalizeId(req.user?.personId);
       if (!classHasInstructorPerson(classRow, viewerPersonId, teacherPersonMap)) {
@@ -3001,7 +3001,7 @@ async function listEligibleTakeStudentPersons(req, res) {
     if (!isExamAdminViewer(req.user)) throw new Error('Only admins can access this picker.');
     const q = String(req.query?.q || '').trim().toLowerCase();
     const [students, persons] = await Promise.all([
-      schoolDataService.fetchData('students', {}, req.user),
+      schoolDataService.fetchAllData('students', {}, req.user),
       listSchoolPersonRecords(req.user, { query: { limit: 5000 } })
     ]);
     const studentCountByPersonId = new Map();
@@ -3133,7 +3133,7 @@ async function viewTakeAssignment(req, res) {
 
     if (!isAdminViewer) {
       const currentUserPersonId = normalizeId(req.user?.personId);
-      const students = await schoolDataService.fetchData('students', {}, req.user);
+      const students = await schoolDataService.fetchAllData('students', {}, req.user);
       const ownedStudentIds = new Set((Array.isArray(students) ? students : [])
         .filter((row) => idsEqual(row?.personId, currentUserPersonId))
         .map((row) => String(row?.id || '').trim())
@@ -3151,7 +3151,7 @@ async function viewTakeAssignment(req, res) {
       schoolDataService.getDataById('examTemplates', assignment.templateId, req.user),
       schoolDataService.getDataById('examRevisions', assignment.revisionId, req.user),
       schoolDataService.getDataById('classes', assignment.classId, req.user),
-      schoolDataService.fetchData('students', {}, req.user),
+      schoolDataService.fetchAllData('students', {}, req.user),
       listSchoolPersonRecords(req.user, { query: { limit: 5000 } }),
       schoolDataService.fetchData('examAttempts', { assignmentId__eq: assignment.id }, req.user),
       schoolDataService.getExamRevisionBundle(assignment.revisionId, req.user)
@@ -3239,7 +3239,7 @@ async function startTakeAssignment(req, res) {
     const isAdminViewer = isExamAdminViewer(req.user);
     if (!isAdminViewer) {
       const currentUserPersonId = normalizeId(req.user?.personId);
-      const students = await schoolDataService.fetchData('students', {}, req.user);
+      const students = await schoolDataService.fetchAllData('students', {}, req.user);
       const ownedStudentIds = new Set((Array.isArray(students) ? students : [])
         .filter((row) => idsEqual(row?.personId, currentUserPersonId))
         .map((row) => String(row?.id || '').trim())
@@ -3285,7 +3285,7 @@ async function saveTakeAssignmentAnswer(req, res) {
     const isAdminViewer = isExamAdminViewer(req.user);
     if (!isAdminViewer) {
       const currentUserPersonId = normalizeId(req.user?.personId);
-      const students = await schoolDataService.fetchData('students', {}, req.user);
+      const students = await schoolDataService.fetchAllData('students', {}, req.user);
       const ownedStudentIds = new Set((Array.isArray(students) ? students : [])
         .filter((row) => idsEqual(row?.personId, currentUserPersonId))
         .map((row) => String(row?.id || '').trim())
@@ -3332,7 +3332,7 @@ async function submitTakeAssignment(req, res) {
     const isAdminViewer = isExamAdminViewer(req.user);
     if (!isAdminViewer) {
       const currentUserPersonId = normalizeId(req.user?.personId);
-      const students = await schoolDataService.fetchData('students', {}, req.user);
+      const students = await schoolDataService.fetchAllData('students', {}, req.user);
       const ownedStudentIds = new Set((Array.isArray(students) ? students : [])
         .filter((row) => idsEqual(row?.personId, currentUserPersonId))
         .map((row) => String(row?.id || '').trim())

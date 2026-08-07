@@ -499,7 +499,7 @@ async function generateSampleSchoolPeople({
 
   const orgMeta = await resolveOrgMeta(reqUser, orgId);
   const accessibleAccounts = createLinkedAccounts ? await loadAccessibleAccountsWithSystem(reqUser, orgId) : [];
-  const departments = await dataService.fetchData('departments', {}, reqUser);
+  const departments = await dataService.fetchAllData('departments', {}, reqUser);
   const warnings = [];
   const errors = [];
 

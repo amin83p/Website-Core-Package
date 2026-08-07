@@ -78,7 +78,7 @@ async function listHolidays(req, res) {
         if (Object.prototype.hasOwnProperty.call(dataQuery, 'year')) delete dataQuery.year;
 
         // Fetch using the Data Service
-        const allHolidays = await schoolDataService.fetchData('holidays', dataQuery, req.user);
+        const allHolidays = await schoolDataService.fetchAllData('holidays', dataQuery, req.user);
         
         const searchableFields = await inferSearchableFields(allHolidays, { exclude: ['audit', 'attachments'] });
         

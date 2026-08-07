@@ -8,7 +8,7 @@ async function resolvePostingPoliciesOrThrow(rowsInput, activeOrgId, reqUser) {
   const rows = normalizePostingPolicyRows(rowsInput);
   if (!rows.length) return rows;
 
-  const definitions = await schoolDataService.fetchData('transactionDefinitions', {}, reqUser);
+  const definitions = await schoolDataService.fetchAllData('transactionDefinitions', {}, reqUser);
   const definitionMap = new Map(definitions.map((definition) => [String(definition.id || ''), definition]));
   const allowedOrgIds = new Set([String(activeOrgId || '').trim(), 'SYSTEM']);
 

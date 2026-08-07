@@ -128,12 +128,12 @@ exports.listLedger = async (req, res) => {
 
     if (shouldFetch) {
       [entries, students, programs, terms, classes, subjects] = await Promise.all([
-        dataService.fetchData('academicLedger', {}, req.user),
-        dataService.fetchData('students', {}, req.user),
-        dataService.fetchData('programs', {}, req.user),
-        dataService.fetchData('terms', {}, req.user),
-        dataService.fetchData('classes', {}, req.user),
-        dataService.fetchData('subjects', {}, req.user)
+        dataService.fetchAllData('academicLedger', {}, req.user),
+        dataService.fetchAllData('students', {}, req.user),
+        dataService.fetchAllData('programs', {}, req.user),
+        dataService.fetchAllData('terms', {}, req.user),
+        dataService.fetchAllData('classes', {}, req.user),
+        dataService.fetchAllData('subjects', {}, req.user)
       ]);
       const personById = await schoolPersonAccessService.buildPersonByIdMap({
         reqUser: req.user,
@@ -334,7 +334,7 @@ exports.showStudentStatement = async (req, res) => {
       ...(programId ? { programId } : {})
     }, req.user)).sort((a, b) => String(a.postedAt || '').localeCompare(String(b.postedAt || '')) || Number(a.sequenceNo || 0) - Number(b.sequenceNo || 0));
 
-    const programs = await dataService.fetchData('programs', {}, req.user);
+    const programs = await dataService.fetchAllData('programs', {}, req.user);
     const snapshots = (await dataService.fetchData('academicSnapshots', { studentId: student.id }, req.user))
       .filter((row) => !programId || String(row.programId || '') === programId);
     const person = student.personId

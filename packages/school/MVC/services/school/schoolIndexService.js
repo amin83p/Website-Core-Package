@@ -71,7 +71,7 @@ async function rebuildIndexesForClass(classId) {
         });
 
         if (unresolvedStudentIds.size) {
-            const allStudents = await schoolDataService.fetchData('students', {}, null);
+            const allStudents = await schoolDataService.fetchAllData('students', {}, null);
             (Array.isArray(allStudents) ? allStudents : []).forEach((student) => {
                 const studentId = String(student?.id || '').trim();
                 if (!studentId || !unresolvedStudentIds.has(studentId)) return;

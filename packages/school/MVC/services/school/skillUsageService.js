@@ -27,9 +27,9 @@ async function findSkillUsage(skillCode, orgId, reqUser) {
   const usages = [];
   const seen = new Set();
   const [allClasses, templates, items] = await Promise.all([
-    schoolDataService.fetchData('classes', {}, reqUser),
-    schoolDataService.fetchData('teachingOutlineSectionTemplates', {}, reqUser),
-    schoolDataService.fetchData('teachingOutlineItems', {}, reqUser)
+    schoolDataService.fetchAllData('classes', {}, reqUser),
+    schoolDataService.fetchAllData('teachingOutlineSectionTemplates', {}, reqUser),
+    schoolDataService.fetchAllData('teachingOutlineItems', {}, reqUser)
   ]);
   const classes = (Array.isArray(allClasses) ? allClasses : []).filter((row) => idsEqual(row?.orgId, org));
 

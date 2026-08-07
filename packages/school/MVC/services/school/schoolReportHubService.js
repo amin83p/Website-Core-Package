@@ -301,7 +301,7 @@ async function getPeoplePanelRows(type, queryInput, req) {
     dataService.fetchData(moduleConfig.entityType, fetchQuery, req.user, { scopeId: access.scopeId }),
     moduleConfig.type === 'students'
       ? Promise.resolve([])
-      : dataService.fetchData('departments', {}, req.user)
+      : dataService.fetchAllData('departments', {}, req.user)
   ]);
   const personById = await schoolPersonAccessService.buildPersonByIdMap({
     reqUser: req.user,

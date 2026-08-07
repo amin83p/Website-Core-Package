@@ -1339,7 +1339,7 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
   const [classData, allSessionsRaw, students, persons] = await Promise.all([
     classId ? schoolDataService.getDataById('classes', classId, reqUser) : Promise.resolve(null),
     classId ? schoolDataService.getClassSessions(classId, reqUser) : Promise.resolve([]),
-    schoolDataService.fetchData('students', {}, reqUser),
+    schoolDataService.fetchAllData('students', {}, reqUser),
     schoolIdentityLookupService.listSchoolPersonRecords({
       reqUser,
       requireSchoolRole: false,
@@ -1534,7 +1534,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
   const [classData, sessions, students, persons, organizations, examAssignmentsForClass] = await Promise.all([
     schoolDataService.getDataById('classes', assignment.classId, reqUser),
     schoolDataService.getClassSessions(assignment.classId, reqUser),
-    schoolDataService.fetchData('students', {}, reqUser),
+    schoolDataService.fetchAllData('students', {}, reqUser),
     schoolIdentityLookupService.listSchoolPersonRecords({
       reqUser,
       requireSchoolRole: false,

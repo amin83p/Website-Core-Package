@@ -570,7 +570,7 @@ function selectSubjectFeeRuleForProposal(subject, feeCategory, effectiveDate) {
 }
 
 async function buildClassFeeProposal({ curriculumSubjects, reqUser, effectiveDate }) {
-    const subjectCatalog = await schoolDataService.fetchData('subjects', {}, reqUser);
+    const subjectCatalog = await schoolDataService.fetchAllData('subjects', {}, reqUser);
     const subjectMap = new Map(subjectCatalog.map((subject) => [String(subject.id || ''), subject]));
     const effectiveWeightMap = new Map(buildEffectiveSubjectWeights(curriculumSubjects).map((item) => [item.subjectId, item.weight]));
     const categories = getFeeCategories({ includeAll: true });
@@ -663,7 +663,7 @@ function normalizeAddedRows(rowsInput) {
 
 async function buildPostableAccountMap(reqUser, activeOrgId) {
     const allowedOrgIds = new Set([toPublicId(activeOrgId), 'SYSTEM']);
-    const rows = await schoolDataService.fetchData('schoolAccounts', {}, reqUser);
+    const rows = await schoolDataService.fetchAllData('schoolAccounts', {}, reqUser);
     const map = new Map();
     (Array.isArray(rows) ? rows : []).forEach((account) => {
         const accountId = toPublicId(account?.id);
@@ -939,7 +939,7 @@ async function buildClassEnrollmentTransactionDraft({
     }
 
     const allowedOrgIds = new Set([toPublicId(classData?.orgId || ''), 'SYSTEM']);
-    const allAccounts = await schoolDataService.fetchData('schoolAccounts', {}, reqUser);
+    const allAccounts = await schoolDataService.fetchAllData('schoolAccounts', {}, reqUser);
     const postingAccounts = (Array.isArray(allAccounts) ? allAccounts : []).filter((account) => {
         if (!allowedOrgIds.has(toPublicId(account?.orgId))) return false;
         if (!Boolean(account?.allowPost)) return false;
@@ -1285,7 +1285,7 @@ async function assertSessionRosterEnrollmentWindows({ classData, session, incomi
 
     const [periodRows, students] = await Promise.all([
         schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, reqUser),
-        schoolDataService.fetchData('students', {}, reqUser)
+        schoolDataService.fetchAllData('students', {}, reqUser)
     ]);
     const studentToPersonMap = new Map(
         (Array.isArray(students) ? students : [])
@@ -1342,7 +1342,7 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
             requireSchoolRole: false,
             query: { limit: 2000 }
         }).then((payload) => payload.allRows || payload.rows || []),
-        schoolDataService.fetchData('students', {}, reqUser)
+        schoolDataService.fetchAllData('students', {}, reqUser)
     ]);
 
     const workingSession = {
@@ -1619,7 +1619,7 @@ function rowReferencesAnySession(row = {}, refs = []) {
 
 async function listImpactRows(entityType, repositoryName, reqUser) {
     try {
-        const rows = await schoolDataService.fetchData(entityType, {}, reqUser);
+        const rows = await schoolDataService.fetchAllData(entityType, {}, reqUser);
         if (Array.isArray(rows)) return rows;
     } catch (_) { /* fallback below */ }
     try {
@@ -1888,7 +1888,7 @@ async function resolveTermBasedSessionWindowOrThrow(classData = {}, reqUser) {
     }
 
     const activeOrgId = toPublicId(classData?.orgId || getActiveOrgIdOrThrow(reqUser));
-    const terms = await schoolDataService.fetchData('terms', {}, reqUser);
+    const terms = await schoolDataService.fetchAllData('terms', {}, reqUser);
     const termMap = new Map((Array.isArray(terms) ? terms : []).map((term) => [toPublicId(term?.id), term]));
     const windows = termIds.map((termId) => {
         const term = termMap.get(termId);
@@ -2518,8 +2518,8 @@ async function resolveAllowedProgramTermsOrThrow(rows, activeOrgId, reqUser, opt
     const allowProgramOnlyRows = registrationMode === 'rolling';
 
     const [programs, terms] = await Promise.all([
-        schoolDataService.fetchData('programs', {}, reqUser),
-        schoolDataService.fetchData('terms', {}, reqUser)
+        schoolDataService.fetchAllData('programs', {}, reqUser),
+        schoolDataService.fetchAllData('terms', {}, reqUser)
     ]);
 
     const programMap = new Map(programs.map((program) => [toPublicId(program.id), program]));
@@ -2617,7 +2617,8 @@ async function listClasses(req, res) {
     if(query.q===searchDefaultKeyword) query={};
     const canCreateClasses = await canCreateOrgScopedItem(req.user, { scopeLabel: 'classes' });
 
-    const classes = await schoolDataService.fetchData('classes', query, req.user, buildRouteAccessContext(req));
+    const paged = await schoolDataService.fetchDataPaged('classes', query, req.user, buildRouteAccessContext(req));
+    const classes = paged.rows;
     const orgs = await dataService.fetchData('organizations', {}, req.user);
     const classIds = (Array.isArray(classes) ? classes : []).map((row) => toPublicId(row?.id)).filter(Boolean);
     const periodMetricsMap = await buildClassEnrollmentPeriodMetrics(req.user, classIds, resolveOrgTodayFromRequest(req));
@@ -2640,7 +2641,8 @@ async function listClasses(req, res) {
         };
     });
 
-    const { data, pagination } = paginate(enriched, req.query.page, req.query.limit);
+    const data = enriched;
+    const pagination = paged.pagination;
 
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
 
@@ -2669,7 +2671,7 @@ async function showAddForm(req, res) {
   try {
     await assertCreateOrgContextOrThrow(req.user);
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
+    const subjects = await schoolDataService.fetchAllData('subjects', {}, req.user);
     const sessionStatusMeta = await getSessionStatusMetaForOrg(activeOrgId);
     const skillCatalog = await loadClassFormSkillCatalog(activeOrgId, req.user);
     const subjectFeeCatalog = subjects.map((subject) => ({
@@ -2701,7 +2703,7 @@ async function showAddWizardForm(req, res) {
   try {
     await assertCreateOrgContextOrThrow(req.user);
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
+    const subjects = await schoolDataService.fetchAllData('subjects', {}, req.user);
     const sessionStatusMeta = await getSessionStatusMetaForOrg(activeOrgId);
     const skillCatalog = await loadClassFormSkillCatalog(activeOrgId, req.user);
     const subjectFeeCatalog = subjects.map((subject) => ({
@@ -2735,7 +2737,7 @@ async function showEditForm(req, res) {
     const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user, resolveOrgTodayFromRequest(req));
     const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
-    const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
+    const subjects = await schoolDataService.fetchAllData('subjects', {}, req.user);
     const skillCatalog = await loadClassFormSkillCatalog(classData?.orgId || getActiveOrgIdOrThrow(req.user), req.user, classData?.skillIds);
     const subjectFeeCatalog = subjects.map((subject) => ({
       id: String(subject.id || ''),
@@ -2800,7 +2802,7 @@ async function showEditWizardForm(req, res) {
     const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user, resolveOrgTodayFromRequest(req));
     const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
-    const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
+    const subjects = await schoolDataService.fetchAllData('subjects', {}, req.user);
     const skillCatalog = await loadClassFormSkillCatalog(classData?.orgId || getActiveOrgIdOrThrow(req.user), req.user, classData?.skillIds);
     const subjectFeeCatalog = subjects.map((subject) => ({
       id: String(subject.id || ''),
@@ -3434,7 +3436,7 @@ async function manageSession1(req, res) {
                 requireSchoolRole: false,
                 query: { limit: 2000 }
             }).then((payload) => payload.allRows || payload.rows || []),
-            schoolDataService.fetchData('students', {}, req.user)
+            schoolDataService.fetchAllData('students', {}, req.user)
         ]);
         
         if (!session.roster) session.roster = [];
@@ -3502,7 +3504,7 @@ async function manageSession1(req, res) {
         session.roster = enrichedRoster;
 
         // 3. Fetch Curriculum Content
-        const allSubjects = await schoolDataService.fetchData('subjects', {}, req.user);
+        const allSubjects = await schoolDataService.fetchAllData('subjects', {}, req.user);
         const classSubjects = (classData.curriculum?.subjects || []).map(subMap => {
             const fullSubject = allSubjects.find((s) => idsEqual(s.id, subMap.subjectId));
             return {
@@ -3753,12 +3755,12 @@ async function manageSession(req, res) {
 
         // 3. Fetch Curriculum Content + Session Content/Exam Stream
         const [allSubjects, examAllocations, examTemplates, examQuestions, examAssignments, studentsForExamStart] = await Promise.all([
-            schoolDataService.fetchData('subjects', {}, req.user),
+            schoolDataService.fetchAllData('subjects', {}, req.user),
             schoolDataService.fetchData('examAllocations', { classId__eq: classId }, req.user),
-            schoolDataService.fetchData('examTemplates', {}, req.user),
-            schoolDataService.fetchData('examQuestions', {}, req.user),
+            schoolDataService.fetchAllData('examTemplates', {}, req.user),
+            schoolDataService.fetchAllData('examQuestions', {}, req.user),
             schoolDataService.fetchData('examAssignments', { classId__eq: classId }, req.user),
-            schoolDataService.fetchData('students', {}, req.user)
+            schoolDataService.fetchAllData('students', {}, req.user)
         ]);
         const currentUserPersonId = String(req.user?.personId || '').trim();
         const ownedStudentIdsForExamStart = new Set((Array.isArray(studentsForExamStart) ? studentsForExamStart : [])
@@ -4767,9 +4769,9 @@ async function saveSession(req, res) {
                 const orgId = classData?.orgId || getActiveOrgIdOrThrow(req.user);
                 await teachingOutlineCatalogService.ensureOrgTeachingOutlineDefaults(orgId, req.user?.id || 'SYSTEM');
                 const [allOutlineItems, allOutlineLevels, allOutlineTemplates] = await Promise.all([
-                    schoolDataService.fetchData('teachingOutlineItems', {}, req.user),
-                    schoolDataService.fetchData('teachingOutlineLevels', {}, req.user),
-                    schoolDataService.fetchData('teachingOutlineSectionTemplates', {}, req.user)
+                    schoolDataService.fetchAllData('teachingOutlineItems', {}, req.user),
+                    schoolDataService.fetchAllData('teachingOutlineLevels', {}, req.user),
+                    schoolDataService.fetchAllData('teachingOutlineSectionTemplates', {}, req.user)
                 ]);
                 outlineCatalogItems = (allOutlineItems || []).filter((row) => idsEqual(row?.orgId, orgId));
                 outlineLevels = (allOutlineLevels || []).filter((row) => idsEqual(row?.orgId, orgId));

@@ -107,7 +107,7 @@ function sanitizeCurrency(value) {
 
 async function buildPostableAccountMap(reqUser, activeOrgId) {
   const allowedOrgIds = new Set([toPublicId(activeOrgId), 'SYSTEM']);
-  const rows = await dataService.fetchData('schoolAccounts', {}, reqUser);
+  const rows = await dataService.fetchAllData('schoolAccounts', {}, reqUser);
   const map = new Map();
   (Array.isArray(rows) ? rows : []).forEach((account) => {
     const accountId = toPublicId(account?.id);
@@ -351,7 +351,7 @@ async function buildBatchPreview(studentIds, programId, reqUser, requestBody = {
 async function renderBatchRegistrationPage(req, res, viewName, pageTitle) {
   try {
     const activeOrgId = await assertCreateOrgContextOrThrow(req.user, { scopeLabel: 'program registrations' });
-    const programs = (await dataService.fetchData('programs', {}, req.user))
+    const programs = (await dataService.fetchAllData('programs', {}, req.user))
       .filter((program) => idsEqual(program.orgId || '', activeOrgId));
     const canManageRegistrations = await canCreateOrgScopedItem(req.user, { scopeLabel: 'program registrations' });
 

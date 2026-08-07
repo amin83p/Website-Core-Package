@@ -43,7 +43,7 @@ function nextClassSessionId(classId, sessions = []) {
 async function resolveNextTimesheetPeriodId({ orgId, currentPeriod = {}, reqUser } = {}) {
   const endDate = normalizeDate(currentPeriod?.endDate);
   if (!endDate) return '';
-  const rows = await schoolDataService.fetchData('timesheetPeriods', {}, reqUser);
+  const rows = await schoolDataService.fetchAllData('timesheetPeriods', {}, reqUser);
   const candidates = (Array.isArray(rows) ? rows : [])
     .filter((row) => idsEqual(row?.orgId, orgId))
     .filter((row) => normalizeDate(row?.startDate) > endDate)
@@ -430,7 +430,7 @@ async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = 
   let revertedClassSessions = 0;
   let revertedActivityEntries = 0;
   const entryRestorations = [];
-  const classes = await schoolDataService.fetchData('classes', {}, reqUser);
+  const classes = await schoolDataService.fetchAllData('classes', {}, reqUser);
   for (const classRow of Array.isArray(classes) ? classes : []) {
     const classId = normalizeId(classRow?.id);
     if (!classId) continue;
@@ -453,7 +453,7 @@ async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = 
     }
   }
 
-  const activities = await schoolDataService.fetchData('activities', {}, reqUser);
+  const activities = await schoolDataService.fetchAllData('activities', {}, reqUser);
   for (const activity of Array.isArray(activities) ? activities : []) {
     const activityId = normalizeId(activity?.id);
     if (!activityId) continue;

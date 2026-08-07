@@ -69,11 +69,11 @@ async function getOwnerByTypeAndId(ownerType, ownerId, reqUser) {
 async function resolveOwnerForPerson({ reqUser, activeOrgId, personId, personRole }) {
   const role = String(personRole || '').trim().toLowerCase();
   if (role === 'teacher') {
-    const teachers = await dataService.fetchData('teachers', {}, reqUser);
+    const teachers = await dataService.fetchAllData('teachers', {}, reqUser);
     return teachers.find((t) => idsEqual(t.personId || '', personId || '') && idsEqual(t.orgId || '', activeOrgId || '')) || null;
   }
   if (role === 'staff') {
-    const staff = await dataService.fetchData('staff', {}, reqUser);
+    const staff = await dataService.fetchAllData('staff', {}, reqUser);
     return staff.find((s) => idsEqual(s.personId || '', personId || '') && idsEqual(s.orgId || '', activeOrgId || '')) || null;
   }
   return null;
@@ -87,8 +87,8 @@ async function getEligiblePayRatePersons(req) {
     query: { limit: 1000 }
   });
   const persons = personPayload.allRows || personPayload.rows || [];
-  const teachers = await dataService.fetchData('teachers', {}, req.user);
-  const staff = await dataService.fetchData('staff', {}, req.user);
+  const teachers = await dataService.fetchAllData('teachers', {}, req.user);
+  const staff = await dataService.fetchAllData('staff', {}, req.user);
 
   const personById = new Map((persons || []).map((p) => [String(p.id || p.personId), p]));
   const results = [];
@@ -133,15 +133,15 @@ exports.listPayRates = async (req, res) => {
     const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
     if (query.q === searchDefaultKeyword) query = {};
 
-    const teachers = await dataService.fetchData('teachers', {}, req.user);
-    const staff = await dataService.fetchData('staff', {}, req.user);
+    const teachers = await dataService.fetchAllData('teachers', {}, req.user);
+    const staff = await dataService.fetchAllData('staff', {}, req.user);
     const personPayload = await schoolIdentityLookupService.listSchoolPersons({
       reqUser: req.user,
       requireSchoolRole: false,
       query: { limit: 1000 }
     });
     const persons = personPayload.allRows || personPayload.rows || [];
-    const departments = await dataService.fetchData('departments', {}, req.user);
+    const departments = await dataService.fetchAllData('departments', {}, req.user);
 
     const personById = new Map((persons || []).map((p) => [String(p.id || p.personId), p]));
     const deptById = new Map((departments || []).map((d) => [String(d.id), `${d.code || d.id} - ${d.name || ''}`.trim()]));
@@ -200,7 +200,7 @@ exports.listPayRates = async (req, res) => {
 exports.showCreateForm = async (req, res) => {
   try {
     getActiveOrgIdOrThrow(req.user);
-    const departments = await dataService.fetchData('departments', {}, req.user);
+    const departments = await dataService.fetchAllData('departments', {}, req.user);
     res.render('school/payRate/payRateForm', {
       title: 'Manage Pay Rate Profile',
       rate: {},
@@ -227,7 +227,7 @@ exports.showEditForm = async (req, res) => {
     assertOwnerOrgAccess(owner, activeOrgId, req.user);
 
     const person = await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: owner.personId });
-    const departments = await dataService.fetchData('departments', {}, req.user);
+    const departments = await dataService.fetchAllData('departments', {}, req.user);
 
     const view = {
       ownerType,

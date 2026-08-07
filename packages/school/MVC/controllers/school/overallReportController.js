@@ -66,7 +66,7 @@ function sendForbidden(req, res, message) {
 async function listTemplates(req, res) {
   try {
     const query = String(req.query.q || '').trim().toLowerCase();
-    const rows = scoped(await schoolDataService.fetchData('overallReportTemplates', {}, req.user), req.user)
+    const rows = scoped(await schoolDataService.fetchAllData('overallReportTemplates', {}, req.user), req.user)
       .filter((row) => !query || [row.id, row.title, row.status, row.description]
         .some((value) => String(value || '').toLowerCase().includes(query)))
       .sort((a, b) => String(b.audit?.lastUpdateDateTime || '').localeCompare(String(a.audit?.lastUpdateDateTime || '')));
@@ -93,7 +93,7 @@ async function listTemplates(req, res) {
 
 async function loadTemplateFormData(req, template = null) {
   const orgId = activeOrgId(req.user);
-  const sourceTemplates = scoped(await schoolDataService.fetchData('reportTemplates', {}, req.user), req.user)
+  const sourceTemplates = scoped(await schoolDataService.fetchAllData('reportTemplates', {}, req.user), req.user)
     .filter((row) => String(row.status || '').toLowerCase() !== 'archived')
     .map((row) => {
       const keyOptions = overallReportService.getSourceTemplateKeyOptions(row);
@@ -213,7 +213,7 @@ async function deleteTemplate(req, res) {
 
 async function sourceTemplates(req, res) {
   try {
-    const templates = scoped(await schoolDataService.fetchData('reportTemplates', {}, req.user), req.user)
+    const templates = scoped(await schoolDataService.fetchAllData('reportTemplates', {}, req.user), req.user)
       .filter((row) => String(row.status || '').toLowerCase() !== 'archived')
       .map((row) => {
         const keyOptions = overallReportService.getSourceTemplateKeyOptions(row);
@@ -268,7 +268,7 @@ async function ensureSourceTemplateDocx(req, res) {
 async function listOverallReports(req, res) {
   try {
     const query = String(req.query.q || '').trim().toLowerCase();
-    const rows = scoped(await schoolDataService.fetchData('overallReportInstances', {}, req.user), req.user)
+    const rows = scoped(await schoolDataService.fetchAllData('overallReportInstances', {}, req.user), req.user)
       .filter((row) => !query || [row.id, row.title, row.status, row.overallTemplateId]
         .some((value) => String(value || '').toLowerCase().includes(query)))
       .sort((a, b) => String(b.audit?.lastUpdateDateTime || '').localeCompare(String(a.audit?.lastUpdateDateTime || '')));
@@ -304,7 +304,7 @@ async function showCreateOverallReport(req, res) {
       if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) {
         throw new Error('Overall report template not found.');
       }
-      const reportTemplates = scoped(await schoolDataService.fetchData('reportTemplates', {}, req.user), req.user);
+      const reportTemplates = scoped(await schoolDataService.fetchAllData('reportTemplates', {}, req.user), req.user);
       const byId = new Map(reportTemplates.map((row) => [String(row.id), row]));
       sourceSlots = (template.sourceSlots || []).map((slot) => {
         const sourceTemplate = byId.get(String(slot.templateId)) || {};
@@ -344,7 +344,7 @@ async function getTemplateApi(req, res) {
     if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) {
       throw new Error('Overall report template not found.');
     }
-    const reportTemplates = scoped(await schoolDataService.fetchData('reportTemplates', {}, req.user), req.user);
+    const reportTemplates = scoped(await schoolDataService.fetchAllData('reportTemplates', {}, req.user), req.user);
     const byId = new Map(reportTemplates.map((row) => [String(row.id), row]));
     const sourceSlots = (template.sourceSlots || []).map((slot) => {
       const sourceTemplate = byId.get(String(slot.templateId)) || {};
@@ -457,7 +457,7 @@ async function showOverallReportEditor(req, res) {
     if (workspaceEntries.length) {
       const workspace = overallReportService.ensureWorkspaceShape(instance);
       const template = instance.templateSnapshot || {};
-      const reportTemplates = scoped(await schoolDataService.fetchData('reportTemplates', {}, req.user), req.user);
+      const reportTemplates = scoped(await schoolDataService.fetchAllData('reportTemplates', {}, req.user), req.user);
       const byId = new Map(reportTemplates.map((row) => [String(row.id), row]));
       const sourceSlots = (template.sourceSlots || []).map((slot) => {
         const sourceTemplate = byId.get(String(slot.templateId)) || {};

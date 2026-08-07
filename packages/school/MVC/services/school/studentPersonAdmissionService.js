@@ -364,7 +364,7 @@ async function admitNewPersonAndStudentFromRecord(record, context = {}) {
   const createdStudentId = toPublicId(savedStudent?.id);
   if (!createdStudentId) throw new Error('Student was saved but no student id was returned.');
 
-  const accessibleAccounts = await schoolDataService.fetchData('schoolAccounts', {}, reqUser);
+  const accessibleAccounts = await schoolDataService.fetchAllData('schoolAccounts', {}, reqUser);
   const person = await schoolPersonAccessService.getPersonById({ reqUser, personId });
   const studentAccount = await createStudentSubAccount({
     student: savedStudent,

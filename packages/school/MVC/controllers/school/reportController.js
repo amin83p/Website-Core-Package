@@ -345,9 +345,9 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
 async function showHome(req, res) {
   try {
     const [allTemplates, allAssignments, allInstances] = await Promise.all([
-      schoolDataService.fetchData('reportTemplates', {}, req.user),
-      schoolDataService.fetchData('reportAssignments', {}, req.user),
-      schoolDataService.fetchData('reportInstances', {}, req.user)
+      schoolDataService.fetchAllData('reportTemplates', {}, req.user),
+      schoolDataService.fetchAllData('reportAssignments', {}, req.user),
+      schoolDataService.fetchAllData('reportInstances', {}, req.user)
     ]);
     const summary = reportViewService.buildHomeSummary(allTemplates, allAssignments, allInstances, req.user);
     const dashboardSections = [
@@ -440,7 +440,7 @@ async function showHome(req, res) {
 async function listTemplates(req, res) {
   try {
     const q = String(req.query.q || '').trim().toLowerCase();
-    const templateRows = await schoolDataService.fetchData('reportTemplates', {}, req.user);
+    const templateRows = await schoolDataService.fetchAllData('reportTemplates', {}, req.user);
     const allTemplates = (Array.isArray(templateRows) ? templateRows : [])
       .map(reportScopePolicy.withResolvedAllowedReportScopes);
 
@@ -557,7 +557,7 @@ async function showTemplateCopyForm(req, res) {
     if (sourceTemplate?.orgId && !idsEqual(sourceTemplate.orgId, activeOrgId)) {
       throw new Error('Activate the source template organization before copying this report template.');
     }
-    const allTemplates = await schoolDataService.fetchData('reportTemplates', {}, req.user);
+    const allTemplates = await schoolDataService.fetchAllData('reportTemplates', {}, req.user);
     const template = buildCopiedTemplateDraft(sourceTemplate, allTemplates, activeOrgId);
     const activeFunders = await reportFunderDocxService.loadActiveFunderOptions(req.user, activeOrgId);
     const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);

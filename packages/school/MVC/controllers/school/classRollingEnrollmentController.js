@@ -459,7 +459,7 @@ function selectSubjectFeeRuleForProposal(subject, feeCategory, effectiveDate) {
 }
 
 async function buildClassFeeProposal({ curriculumSubjects, reqUser, effectiveDate }) {
-    const subjectCatalog = await schoolDataService.fetchData('subjects', {}, reqUser);
+    const subjectCatalog = await schoolDataService.fetchAllData('subjects', {}, reqUser);
     const subjectMap = new Map(subjectCatalog.map((subject) => [String(subject.id || ''), subject]));
     const effectiveWeightMap = new Map(buildEffectiveSubjectWeights(curriculumSubjects).map((item) => [item.subjectId, item.weight]));
     const categories = getFeeCategories({ includeAll: true });
@@ -552,7 +552,7 @@ function normalizeAddedRows(rowsInput) {
 
 async function buildPostableAccountMap(reqUser, activeOrgId) {
     const allowedOrgIds = new Set([toPublicId(activeOrgId), 'SYSTEM']);
-    const rows = await schoolDataService.fetchData('schoolAccounts', {}, reqUser);
+    const rows = await schoolDataService.fetchAllData('schoolAccounts', {}, reqUser);
     const map = new Map();
     (Array.isArray(rows) ? rows : []).forEach((account) => {
         const accountId = toPublicId(account?.id);
@@ -831,7 +831,7 @@ async function buildClassEnrollmentTransactionDraft({
     }
 
     const allowedOrgIds = new Set([toPublicId(classData?.orgId || ''), 'SYSTEM']);
-    const allAccounts = await schoolDataService.fetchData('schoolAccounts', {}, reqUser);
+    const allAccounts = await schoolDataService.fetchAllData('schoolAccounts', {}, reqUser);
     const postingAccounts = (Array.isArray(allAccounts) ? allAccounts : []).filter((account) => {
         if (!allowedOrgIds.has(toPublicId(account?.orgId))) return false;
         if (!Boolean(account?.allowPost)) return false;
@@ -1161,7 +1161,7 @@ const ROLLING_ENROLLMENT_SEARCHABLE_FIELDS = Object.freeze([
 async function loadActiveFunderOptions(reqUser, orgId) {
   const orgToken = toPublicId(orgId);
   if (!orgToken) return [];
-  const rows = await schoolDataService.fetchData('funders', {}, reqUser);
+  const rows = await schoolDataService.fetchAllData('funders', {}, reqUser);
   const scoped = (Array.isArray(rows) ? rows : []).filter((row) => {
     if (!idsEqual(row?.orgId, orgToken)) return false;
     return String(row?.status || '').trim().toLowerCase() === 'active';
@@ -1245,7 +1245,7 @@ async function resolveEnrollmentFunderBillingContext({
 async function attachStudentLabelsToEnrollmentPeriodRows(periodRows, user, students = null) {
   const effectiveStudents = Array.isArray(students)
     ? students
-    : await schoolDataService.fetchData('students', {}, user);
+    : await schoolDataService.fetchAllData('students', {}, user);
   const personById = await schoolPersonAccessService.buildPersonByIdMap({
     reqUser: user,
     personIds: (Array.isArray(effectiveStudents) ? effectiveStudents : []).map((student) => student.personId)
@@ -1312,7 +1312,7 @@ async function enrichCycleRolloverPreviewStudentLabels(preview, user) {
     : [];
   if (!studentRows.length) return preview;
 
-  const students = await schoolDataService.fetchData('students', {}, user);
+  const students = await schoolDataService.fetchAllData('students', {}, user);
   const personById = await schoolPersonAccessService.buildPersonByIdMap({
     reqUser: user,
     personIds: (Array.isArray(students) ? students : []).map((student) => student.personId)
@@ -1348,7 +1348,7 @@ async function showRollingEnrollmentPage(req, res) {
 
     const [periods, students, funderOptions] = await Promise.all([
       schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user),
-      schoolDataService.fetchData('students', {}, req.user),
+      schoolDataService.fetchAllData('students', {}, req.user),
       loadActiveFunderOptions(req.user, classData.orgId)
     ]);
 
@@ -1439,7 +1439,7 @@ async function listClassEnrollmentPeriods(req, res) {
       });
 
     const [students, funderOptions] = await Promise.all([
-      schoolDataService.fetchData('students', {}, req.user),
+      schoolDataService.fetchAllData('students', {}, req.user),
       loadActiveFunderOptions(req.user, classData.orgId)
     ]);
     rows = await attachStudentLabelsToEnrollmentPeriodRows(rows, req.user, students);
@@ -1860,7 +1860,7 @@ async function buildRollingEnrollmentPrerequisitePreview(req, classData, student
     ? rebuiltSnap
     : { results: { passedSubjects: [], failedSubjects: [], activeClasses: [] } };
 
-  const subjectsResult = await schoolDataService.fetchData('subjects', {}, req.user);
+  const subjectsResult = await schoolDataService.fetchAllData('subjects', {}, req.user);
   const subjectCatalogMap = new Map(
     (Array.isArray(subjectsResult) ? subjectsResult : [])
       .filter((s) => idsEqual(s?.orgId, classData?.orgId))
@@ -2372,7 +2372,7 @@ async function buildStudentWindowsForGapConflictReview({
 
   const [periodRows, allStudents] = await Promise.all([
     schoolDataService.getClassEnrollmentPeriodsByClassId(classId, reqUser),
-    schoolDataService.fetchData('students', {}, reqUser)
+    schoolDataService.fetchAllData('students', {}, reqUser)
   ]);
   const studentRows = Array.isArray(allStudents) ? allStudents : [];
   const personById = await schoolPersonAccessService.buildPersonByIdMap({
@@ -4284,7 +4284,7 @@ async function showEnrollmentOutcomesPage(req, res) {
         const matrixPayload = await gradesMatrixController.buildGradesMatrixPayload(req, { classId, startDate: '', endDate: '' });
         const finalByPerson = new Map((matrixPayload.matrix || []).map((row) => [String(row.personId), row.finalPercent]));
         const periods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user);
-        const students = await schoolDataService.fetchData('students', {}, req.user);
+        const students = await schoolDataService.fetchAllData('students', {}, req.user);
         const studentToPerson = new Map((Array.isArray(students) ? students : []).map((s) => [String(s.id), String(s.personId || '')]));
         const personById = await schoolPersonAccessService.buildPersonByIdMap({
             reqUser: req.user,

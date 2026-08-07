@@ -903,7 +903,7 @@ async function loadTimesheetEligiblePeople(activeOrgId, reqUser) {
         }),
         dataService.fetchData('teachers', { orgId__eq: activeOrgId }, reqUser),
         dataService.fetchData('staff', { orgId__eq: activeOrgId }, reqUser),
-        dataService.fetchData('departments', {}, reqUser)
+        dataService.fetchAllData('departments', {}, reqUser)
     ]);
     const persons = personPayload.allRows || personPayload.rows || [];
 
@@ -1127,11 +1127,10 @@ exports.getTimesheetManagementRoster = async (req, res) => {
 
         const [eligiblePeople, allTimesheets] = await Promise.all([
             loadTimesheetEligiblePeople(activeOrgId, req.user),
-            dataService.fetchData('timesheets', {}, req.user, dataService.buildRouteAccessContext(req))
+            dataService.fetchAllData('timesheets', { periodId__eq: periodId, orgId__eq: activeOrgId }, req.user, dataService.buildRouteAccessContext(req))
         ]);
         const timesheetByPersonId = new Map(
             (Array.isArray(allTimesheets) ? allTimesheets : [])
-                .filter((row) => idsEqual(row?.orgId, activeOrgId) && idsEqual(row?.periodId, periodId))
                 .map((row) => normalizeTimesheetLifecycle(row))
                 .map((row) => [String(row?.teacherId || '').trim(), row])
                 .filter(([id]) => Boolean(id))
@@ -1210,7 +1209,7 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
 
         const [period, departments] = await Promise.all([
             dataService.getDataById('timesheetPeriods', periodId, req.user),
-            dataService.fetchData('departments', {}, req.user)
+            dataService.fetchAllData('departments', {}, req.user)
         ]);
         if (!period) throw new Error('Timesheet period not found.');
         assertPeriodOrgAccess(period, activeOrgId, req.user);
@@ -1419,7 +1418,7 @@ exports.printManagedTimesheets = async (req, res) => {
         const [period, eligiblePeople, allTimesheets] = await Promise.all([
             dataService.getDataById('timesheetPeriods', periodId, req.user),
             loadTimesheetEligiblePeople(activeOrgId, req.user),
-            dataService.fetchData('timesheets', {}, req.user, dataService.buildRouteAccessContext(req))
+            dataService.fetchAllData('timesheets', { periodId__eq: periodId, orgId__eq: activeOrgId }, req.user, dataService.buildRouteAccessContext(req))
         ]);
         if (!period) throw new Error('Timesheet period not found.');
         assertPeriodOrgAccess(period, activeOrgId, req.user);
@@ -1481,7 +1480,15 @@ exports.listMyTimesheets = async (req, res) => {
 
         const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: false, operationId: OPERATIONS.READ_ALL });
 
-        const allTimesheets = await dataService.fetchData('timesheets', {}, req.user, dataService.buildRouteAccessContext(req));
+        const timesheetQuery = teacherContext.targetTeacherId
+            ? { teacherId__eq: teacherContext.targetTeacherId }
+            : { limit: 0 };
+        const allTimesheets = await dataService.fetchData(
+            'timesheets',
+            timesheetQuery,
+            req.user,
+            { ...dataService.buildRouteAccessContext(req), unbounded: !teacherContext.targetTeacherId }
+        );
         const targetTimesheets = teacherContext.targetTeacherId
             ? allTimesheets.filter((t) => idsEqual(t.teacherId, teacherContext.targetTeacherId)).map(normalizeTimesheetLifecycle)
             : [];
@@ -1572,7 +1579,15 @@ exports.viewTimesheet = async (req, res) => {
         const sessionStatusMeta = await sessionStatusPolicyService.getClientStatusMeta(period.orgId || activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(sessionStatusMeta);
 
-        const allTimesheets = await dataService.fetchData('timesheets', {}, req.user, dataService.buildRouteAccessContext(req));
+        const timesheetQuery = teacherContext.targetTeacherId
+            ? { teacherId__eq: teacherContext.targetTeacherId }
+            : { limit: 0 };
+        const allTimesheets = await dataService.fetchData(
+            'timesheets',
+            timesheetQuery,
+            req.user,
+            { ...dataService.buildRouteAccessContext(req), unbounded: !teacherContext.targetTeacherId }
+        );
         let timesheet = allTimesheets.find(
             (t) => idsEqual(t.periodId, periodId) && idsEqual(t.teacherId, teacherContext.targetTeacherId)
         );
@@ -1590,8 +1605,8 @@ exports.viewTimesheet = async (req, res) => {
         timesheet = normalizeTimesheetLifecycle(timesheet);
 
         const [classes, departments] = await Promise.all([
-            dataService.fetchData('classes', {}, req.user),
-            dataService.fetchData('departments', {}, req.user)
+            dataService.fetchAllData('classes', {}, req.user),
+            dataService.fetchAllData('departments', {}, req.user)
         ]);
         const scopedClasses = (Array.isArray(classes) ? classes : []).filter((row) => idsEqual(row?.orgId, activeOrgId));
         const liveSessionBuilders = [];
@@ -1773,7 +1788,7 @@ exports.viewTimesheet = async (req, res) => {
         const stampedLiveSessions = mergedLiveSessions.map((row) => withPayrollStamp(row, payrollContext, period));
 
         const [allHolidays] = await Promise.all([
-            dataService.fetchData('holidays', {}, req.user)
+            dataService.fetchAllData('holidays', {}, req.user)
         ]);
         const holidays = allHolidays.filter((h) => h.date >= period.startDate && h.date <= period.endDate);
         const eligibleManualActivities = await activityService.listManualEntryActivitiesForPerson({
@@ -2065,8 +2080,8 @@ exports.saveTimesheet = async (req, res) => {
         const sessionStatusMeta = await sessionStatusPolicyService.getClientStatusMeta(period.orgId || activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(sessionStatusMeta);
         const [classes, departments] = await Promise.all([
-            dataService.fetchData('classes', {}, req.user),
-            dataService.fetchData('departments', {}, req.user)
+            dataService.fetchAllData('classes', {}, req.user),
+            dataService.fetchAllData('departments', {}, req.user)
         ]);
         const scopedClasses = (Array.isArray(classes) ? classes : []).filter((row) => idsEqual(row?.orgId, activeOrgId));
         const liveSessionBuilders = [];
@@ -2954,7 +2969,7 @@ exports.listManualEntryClasses = async (req, res) => {
         if (query.q === searchDefaultKeyword) query.q = '';
         const searchTerm = String(query.q || '').trim().toLowerCase();
 
-        const classes = await dataService.fetchData('classes', {}, req.user);
+        const classes = await dataService.fetchAllData('classes', {}, req.user);
         let results = (Array.isArray(classes) ? classes : [])
             .filter((row) => idsEqual(row?.orgId, activeOrgId))
             .filter((row) => isActiveClassForManualEntry(row))

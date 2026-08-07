@@ -566,6 +566,26 @@ function createSchoolRepository(config) {
     return scopedRows;
   }
 
+  async function runMongoCount(options = {}) {
+    const collection = getMongoCollection(collectionName);
+    const query = options?.query || {};
+    const scopeFilter = mongoScopeInMemory
+      ? {}
+      : buildSchoolScopeFilter(options?.scope || {}, { orgField, allowSystemFallback, assignmentScopeKind });
+    const queryFilter = buildMongoFilterFromQuery(query, {
+      defaultSearchFields,
+      dateFields
+    });
+    const filter = combineMongoFilters(scopeFilter, queryFilter);
+
+    if (mongoScopeInMemory) {
+      const rows = await runMongoList(options);
+      return Array.isArray(rows) ? rows.length : 0;
+    }
+
+    return collection.countDocuments(filter);
+  }
+
   return {
     async list(options = {}) {
       return runByRepositoryBackend(options, {
@@ -600,11 +620,19 @@ function createSchoolRepository(config) {
 
     async count(options = {}) {
       const query = stripPaginationFromQuery(options?.query || {});
-      const rows = await this.list({
-        ...options,
-        query
-      });
-      return Array.isArray(rows) ? rows.length : 0;
+      return runByRepositoryBackend(options, {
+        json: async () => {
+          const rows = await this.list({
+            ...options,
+            query
+          });
+          return Array.isArray(rows) ? rows.length : 0;
+        },
+        mongo: async () => runMongoCount({
+          ...options,
+          query
+        })
+      }, `school.${entityName || 'entity'}.count`);
     },
 
     async exists(options = {}) {

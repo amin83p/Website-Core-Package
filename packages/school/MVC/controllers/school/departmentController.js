@@ -121,7 +121,7 @@ async function renderDepartmentFormView(req, res, viewName, titleOverride) {
             assertDepartmentOrgAccess(department, activeOrgId, req.user);
         }
 
-        const transactionDefinitions = await dataService.fetchData('transactionTemplates', {}, req.user);
+        const transactionDefinitions = await dataService.fetchAllData('transactionTemplates', {}, req.user);
         const definitionScopeOrgId = toPublicId(department.orgId || activeOrgId);
 
         res.render(viewName, {

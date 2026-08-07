@@ -11,7 +11,7 @@ async function attachSessionProgressToEnrollmentPeriodRows(periodRows, classData
   const orgId = toPublicId(classData?.orgId || user?.activeOrgId || '');
   const [sessions, effectiveStudents, statusMap] = await Promise.all([
     schoolDataService.getClassSessions(classData.id, user),
-    Array.isArray(students) ? students : schoolDataService.fetchData('students', {}, user),
+    Array.isArray(students) ? students : schoolDataService.fetchAllData('students', {}, user),
     sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true })
   ]);
   const studentToPersonMap = new Map(

@@ -4,6 +4,7 @@ const { buildDataServiceQuery } = require('../utils/generalTools');
 const { SEARCH_DEFAULT_KEYWORD } = require('../../config/constants');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
 const {isSuperAdmin, isAdmin}= require('../services/adminChekersService');
+const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
 // NOTE: Categories must come from the server layer (model/service), not the view.
 const ACCESS_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'name', 'description', 'orgId', 'active', 'fullAdmin'],
@@ -244,6 +245,14 @@ async function editAccess(req, res) {
         const updates = await buildAccessFromBody(req.body, req.user, existing, req);
     
         const result = await dataService.updateData('accesses', req.params.id, updates, req.user);
+        const linkedUsers = await dataService.fetchData('users', {
+          q: req.params.id,
+          type: 'exact_match',
+          searchFields: 'systemAccessProfileId'
+        }, req.user);
+        (Array.isArray(linkedUsers) ? linkedUsers : []).forEach((row) => {
+          if (row?.id) invalidateAuthContextForUser(row.id);
+        });
         
         if (req.headers['x-ajax-request']) {
           return res.json({ status: 'success', result, message: 'Access Definition updated.' });

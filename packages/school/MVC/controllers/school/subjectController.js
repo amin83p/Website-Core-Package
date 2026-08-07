@@ -69,18 +69,19 @@ async function listSubjects(req, res) {
     if(query.q === searchDefaultKeyword) query.q='';
     const canCreateSubjects = await canCreateOrgScopedItem(req.user, { scopeLabel: 'subjects' });
     // Note: You must add 'subjects' case to dataService.js
-    const subjects = await dataService.fetchData('subjects', query, req.user);
+    const paged = await dataService.fetchDataPaged('subjects', query, req.user);
     const orgs = await dataService1.fetchData('organizations', {}, req.user);
     
-    const searchableFields = await inferSearchableFields(subjects, { exclude: ['audit', 'attachments'] });
+    const searchableFields = await inferSearchableFields(paged.rows, { exclude: ['audit', 'attachments'] });
 
     // Join Org Name for display
-    const enriched = subjects.map(s => {
+    const enriched = paged.rows.map(s => {
         const org = orgs.find(o => idsEqual(o.id, s.orgId));
         return { ...s, orgName: org ? org.identity.displayName : `Unknown Org (#${s.orgId})` };
     });
 
-    const { data, pagination } = paginate(enriched, req.query.page, req.query.limit);
+    const data = enriched;
+    const pagination = paged.pagination;
 
     if (isAjax(req)) {
       return res.json({ status: 'success', results:data, pagination });

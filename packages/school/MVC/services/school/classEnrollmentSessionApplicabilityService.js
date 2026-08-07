@@ -453,7 +453,7 @@ async function recomputeSessionCappedEnrollmentCompletionsForClass({
       : schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, reqUser),
     Array.isArray(students)
       ? students
-      : schoolDataService.fetchData('students', {}, reqUser)
+      : schoolDataService.fetchAllData('students', {}, reqUser)
   ]);
   const studentToPersonMap = normalizeStudentToPersonMap(effectiveStudents);
   const sessionStatusPolicyService = getSessionStatusPolicyService();

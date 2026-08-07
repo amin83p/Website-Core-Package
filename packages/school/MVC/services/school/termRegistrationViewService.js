@@ -122,11 +122,11 @@ async function buildTermRegistrationPreview({
     transactionDefinitions,
     allAccounts
   ] = await Promise.all([
-    dataService.fetchData('classes', {}, reqUser),
-    dataService.fetchData('subjects', {}, reqUser),
-    dataService.fetchData('departments', {}, reqUser),
-    dataService.fetchData('transactionDefinitions', {}, reqUser),
-    dataService.fetchData('schoolAccounts', {}, reqUser)
+    dataService.fetchAllData('classes', {}, reqUser),
+    dataService.fetchAllData('subjects', {}, reqUser),
+    dataService.fetchAllData('departments', {}, reqUser),
+    dataService.fetchAllData('transactionDefinitions', {}, reqUser),
+    dataService.fetchAllData('schoolAccounts', {}, reqUser)
   ]);
 
   const preview = {
@@ -357,9 +357,9 @@ async function buildTermRegistrationPreview({
 async function buildRegistrationSummaries(reqUser, activeOrgId, { limit = null, registrationId = '', filters = {} } = {}) {
   const [registrations, students, programs, terms, allTransactions, allEntries] = await Promise.all([
     schoolRepositories.studentTermRegistrations.list({ query: {}, scope: { canViewAll: true } }),
-    dataService.fetchData('students', {}, reqUser),
-    dataService.fetchData('programs', {}, reqUser),
-    dataService.fetchData('terms', {}, reqUser),
+    dataService.fetchAllData('students', {}, reqUser),
+    dataService.fetchAllData('programs', {}, reqUser),
+    dataService.fetchAllData('terms', {}, reqUser),
     schoolRepositories.globalTransactions.list({ query: {}, scope: { canViewAll: true } }),
     schoolRepositories.academicLedger.list({ query: {}, scope: { canViewAll: true } })
   ]);
@@ -564,9 +564,9 @@ async function buildRegistrationDetail(reqUser, activeOrgId, registrationId) {
 
 async function buildActiveProgramRegistrationOptions(reqUser, activeOrgId) {
   const [students, programs, terms, programRegistrations, termRegistrations] = await Promise.all([
-    dataService.fetchData('students', {}, reqUser),
-    dataService.fetchData('programs', {}, reqUser),
-    dataService.fetchData('terms', {}, reqUser),
+    dataService.fetchAllData('students', {}, reqUser),
+    dataService.fetchAllData('programs', {}, reqUser),
+    dataService.fetchAllData('terms', {}, reqUser),
     schoolRepositories.studentProgramRegistrations.list({ query: {}, scope: { canViewAll: true } }),
     schoolRepositories.studentTermRegistrations.list({ query: {}, scope: { canViewAll: true } })
   ]);
@@ -627,7 +627,7 @@ async function buildActiveProgramRegistrationOptions(reqUser, activeOrgId) {
 }
 
 async function buildClassCatalogOptions(reqUser, activeOrgId) {
-  const classes = await dataService.fetchData('classes', {}, reqUser);
+  const classes = await dataService.fetchAllData('classes', {}, reqUser);
   const enrollmentCountsResult = await classEnrollmentReadService.buildClassEnrollmentCountMap({
     classes,
     reqUser,

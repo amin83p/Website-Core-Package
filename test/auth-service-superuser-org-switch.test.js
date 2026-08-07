@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const authService = require('../MVC/services/authService');
 const dataService = require('../MVC/services/dataService');
+const { clearAuthContextCache } = require('../MVC/services/cache/authContextCacheService');
 
 function withDataServiceStubs(stubs, fn) {
   const originals = new Map();
@@ -17,6 +18,7 @@ function withDataServiceStubs(stubs, fn) {
       originals.forEach((value, key) => {
         dataService[key] = value;
       });
+      clearAuthContextCache();
     });
 }
 

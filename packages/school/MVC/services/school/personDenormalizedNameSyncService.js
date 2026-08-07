@@ -47,9 +47,9 @@ async function buildPersonAliasIds({ personId, activeOrgId, reqUser } = {}) {
   const orgId = String(activeOrgId || '').trim();
 
   const [teachers, staff, students] = await Promise.all([
-    schoolDataService.fetchData('teachers', {}, reqUser || SYSTEM_READ_USER).catch(() => []),
-    schoolDataService.fetchData('staff', {}, reqUser || SYSTEM_READ_USER).catch(() => []),
-    schoolDataService.fetchData('students', {}, reqUser || SYSTEM_READ_USER).catch(() => [])
+    schoolDataService.fetchAllData('teachers', {}, reqUser || SYSTEM_READ_USER).catch(() => []),
+    schoolDataService.fetchAllData('staff', {}, reqUser || SYSTEM_READ_USER).catch(() => []),
+    schoolDataService.fetchAllData('students', {}, reqUser || SYSTEM_READ_USER).catch(() => [])
   ]);
 
   [teachers, staff, students].forEach((rows) => {

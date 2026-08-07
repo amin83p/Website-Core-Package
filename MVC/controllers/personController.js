@@ -12,6 +12,7 @@ const {
 } = require('../utils/organizationDisplay');
 
 const { DEFAULTS } = require('../../config/constants');
+const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
 const HIGH_ACCESS_MIN = Number(DEFAULTS?.HIGH_ACCESS_MIN || 8);
 const HIGH_ACCESS_MAX = Number(DEFAULTS?.HIGH_ACCESS_MAX || 10);
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
@@ -300,6 +301,14 @@ async function editPerson(req, res) {
     updates.organizations = await canonicalizeOrganizationMemberships(updates.organizations);
     
     await dataService.updateData('persons', req.params.id, updates, req.user);
+    const linkedUsers = await dataService.fetchData('users', {
+      q: req.params.id,
+      type: 'exact_match',
+      searchFields: 'personId'
+    }, req.user);
+    (Array.isArray(linkedUsers) ? linkedUsers : []).forEach((row) => {
+      if (row?.id) invalidateAuthContextForUser(row.id);
+    });
 
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Person updated successfully.' });
     res.redirect('/persons');

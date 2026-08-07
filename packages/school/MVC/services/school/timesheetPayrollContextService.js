@@ -98,7 +98,7 @@ async function resolvePayrollPersonContext({ orgId, personId, reqUser } = {}) {
   const [teachers, staff, accounts] = await Promise.all([
     schoolDataService.fetchData('teachers', { orgId__eq: activeOrgId, personId__eq: targetPersonId }, reqUser),
     schoolDataService.fetchData('staff', { orgId__eq: activeOrgId, personId__eq: targetPersonId }, reqUser),
-    schoolDataService.fetchData('schoolAccounts', {}, reqUser)
+    schoolDataService.fetchAllData('schoolAccounts', {}, reqUser)
   ]);
 
   const teacherRow = (Array.isArray(teachers) ? teachers : []).find((row) => !isInactiveSchoolRecord(row)) || null;

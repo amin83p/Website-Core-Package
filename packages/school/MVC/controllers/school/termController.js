@@ -58,9 +58,10 @@ async function listTerms(req, res) {
     const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
     if (query.q === searchDefaultKeyword) query = {};
     const canCreateTerms = await canCreateOrgScopedItem(req.user, { scopeLabel: 'terms' });
-    const allTerms = await dataService.fetchData('terms', query, req.user);
-    const searchableFields = await inferSearchableFields(allTerms, { exclude: ['audit'] });
-    const { data, pagination } = paginate(allTerms, req.query.page, req.query.limit);
+    const paged = await dataService.fetchDataPaged('terms', query, req.user);
+    const searchableFields = await inferSearchableFields(paged.rows, { exclude: ['audit'] });
+    const data = paged.rows;
+    const pagination = paged.pagination;
 
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
 

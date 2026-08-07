@@ -739,6 +739,32 @@ async function startServer() {
     app.locals.dataBackend = dataBackendRuntimeService.getPublicBackendStatus();
 
     await settingService.init();
+    try {
+      const {
+        resolveRequestCacheTtlMs,
+        resolveRequestCacheMaxEntries
+      } = require('./MVC/services/cache/requestCacheConfig');
+      startupLogger.info(
+        'REQUEST_CACHE',
+        'ENABLED',
+        `Request cache enabled: ttl=${Math.round(resolveRequestCacheTtlMs() / 1000)}s maxEntries=${resolveRequestCacheMaxEntries()}`
+      );
+    } catch (_) {
+      // ignore
+    }
+    try {
+      const {
+        resolveDefaultPageSize,
+        MAX_PAGE_SIZE
+      } = require('./packages/school/MVC/services/school/schoolPaginationUtils');
+      startupLogger.info(
+        'SCHOOL_LIST',
+        'DEFAULTS',
+        `School list defaults: pageSize=${resolveDefaultPageSize()} maxPageSize=${MAX_PAGE_SIZE}`
+      );
+    } catch (_) {
+      // ignore
+    }
     refreshBuildVersionLocals();
     try {
       const packageLoaderHooks = packageRegistryInstallerService.createLoaderHooks({

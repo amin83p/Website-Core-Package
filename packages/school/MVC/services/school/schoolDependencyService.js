@@ -169,7 +169,7 @@ function timesheetReferencesSource(timesheet = {}, sourceType, sourceRef = {}) {
 }
 
 async function listTimesheets(reqUser, orgId) {
-  const rows = await schoolDataService.fetchData('timesheets', {}, reqUser);
+  const rows = await schoolDataService.fetchAllData('timesheets', {}, reqUser);
   return (Array.isArray(rows) ? rows : []).filter((row) => !orgId || idsEqual(row?.orgId, orgId));
 }
 
@@ -199,7 +199,7 @@ function buildBlockedMessage(label, blockers = []) {
 async function buildTimesheetBlockers({ orgId, sourceType, sourceRef, minStatus = GUARD_MIN_STATUS, reqUser }) {
   const matches = await findTimesheetsReferencingSource({ orgId, sourceType, sourceRef, minStatus, reqUser });
   if (!matches.length) return [];
-  const periods = await schoolDataService.fetchData('timesheetPeriods', {}, reqUser);
+  const periods = await schoolDataService.fetchAllData('timesheetPeriods', {}, reqUser);
   const periodMap = new Map((Array.isArray(periods) ? periods : []).map((row) => [normalizeId(row?.id), row]));
   return matches.map((row) => {
     const period = periodMap.get(normalizeId(row?.periodId)) || {};
@@ -517,7 +517,7 @@ function dedupeSourceRefs(refs = []) {
 async function unlockClassSessionsForTimesheet({ timesheetId, reqUser }) {
   const token = normalizeId(timesheetId);
   if (!token) return;
-  const classes = await schoolDataService.fetchData('classes', {}, reqUser);
+  const classes = await schoolDataService.fetchAllData('classes', {}, reqUser);
   for (const classRow of Array.isArray(classes) ? classes : []) {
     const classId = normalizeId(classRow?.id);
     if (!classId) continue;
@@ -544,7 +544,7 @@ async function unlockClassSessionsForTimesheet({ timesheetId, reqUser }) {
 async function unlockActivitySourcesForTimesheet({ timesheetId, reqUser }) {
   const token = normalizeId(timesheetId);
   if (!token) return;
-  const activities = await schoolDataService.fetchData('activities', {}, reqUser);
+  const activities = await schoolDataService.fetchAllData('activities', {}, reqUser);
   for (const activity of Array.isArray(activities) ? activities : []) {
     const activityId = normalizeId(activity?.id);
     if (!activityId) continue;
@@ -809,7 +809,7 @@ function forceUnlockAllActivityTimesheetLocks({
 async function unlockReportAssignmentsForTimesheet({ timesheetId, reqUser }) {
   const token = normalizeId(timesheetId);
   if (!token) return;
-  const assignments = await schoolDataService.fetchData('reportAssignments', {}, reqUser);
+  const assignments = await schoolDataService.fetchAllData('reportAssignments', {}, reqUser);
   for (const assignment of Array.isArray(assignments) ? assignments : []) {
     if (normalizeId(assignment?.lockedTimesheetId) !== token) continue;
     const id = normalizeId(assignment?.id);
@@ -990,7 +990,7 @@ async function assertClassSessionsNotReferencedByApprovedTimesheets({ classId, o
 async function assertSessionStatusNotReferenced({ statusCode, orgId, label, reqUser }) {
   const normalizedCode = String(statusCode || '').trim().toLowerCase();
   if (!normalizedCode) return;
-  const classes = await schoolDataService.fetchData('classes', {}, reqUser);
+  const classes = await schoolDataService.fetchAllData('classes', {}, reqUser);
   const scoped = (Array.isArray(classes) ? classes : []).filter((row) => !orgId || idsEqual(row?.orgId, orgId));
   for (const classRow of scoped) {
     const classId = normalizeId(classRow?.id);

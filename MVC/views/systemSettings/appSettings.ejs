@@ -624,6 +624,24 @@
             </div>
 
             <div class="mb-4">
+                <label class="form-label fw-bold">Request Cache TTL</label>
+                <div class="input-group">
+                    <input type="number" name="requestCacheTtlSeconds" class="form-control" value="<%= settings.app.requestCacheTtlSeconds || 60 %>" min="5" max="600">
+                    <span class="input-group-text text-muted">seconds</span>
+                </div>
+                <div class="form-text">How long authenticated user context and website policy stay cached in memory. Lower values apply permission changes faster.</div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold">Request Cache Max Entries</label>
+                <div class="input-group">
+                    <input type="number" name="requestCacheMaxEntries" class="form-control" value="<%= settings.app.requestCacheMaxEntries || 500 %>" min="50" max="5000">
+                    <span class="input-group-text text-muted">sessions</span>
+                </div>
+                <div class="form-text">Maximum number of cached auth sessions kept in memory before least-recently-used eviction.</div>
+            </div>
+
+            <div class="mb-4">
                 <label class="form-label fw-bold">Default Search Keyword</label>
                 <input type="text" name="searchDefaultKeyword" class="form-control" value="<%= settings.app.searchDefaultKeyword %>">
                 <div class="form-text">Used as a fallback wildcard when no search term is provided (e.g. 'aaa' or '%').</div>

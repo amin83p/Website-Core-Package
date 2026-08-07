@@ -118,6 +118,8 @@ const DEFAULTS = {
   app: {                        // NEW SECTION
     defaultPageSize: 30,
     searchDefaultKeyword: 'aaa',
+    requestCacheTtlSeconds: 60,
+    requestCacheMaxEntries: 500,
     buildVersionOverride: '',
     defaultTimezone: 'UTC',
     uploadsPath: 'uploads', // Store as string, resolve at runtime

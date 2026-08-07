@@ -237,7 +237,7 @@ async function scanClassCycleLinkField(rule, targetId, orgId, reqUser) {
 }
 
 async function scanProgramsEmbeddingArray({ arrayField, idField, targetId, orgId, reqUser, rule }) {
-  const programs = scopeByOrg(await schoolDataService.fetchData('programs', {}, reqUser), orgId);
+  const programs = scopeByOrg(await schoolDataService.fetchAllData('programs', {}, reqUser), orgId);
   const matches = programs.filter((program) => {
     const items = Array.isArray(program?.[arrayField]) ? program[arrayField] : [];
     return items.some((item) => idsEqual(item?.[idField], targetId));
@@ -256,7 +256,7 @@ async function scanProgramsEmbeddingArray({ arrayField, idField, targetId, orgId
 }
 
 async function scanProgramsEmbeddingSubjectWithPrereqs(targetId, orgId, reqUser, rule) {
-  const programs = scopeByOrg(await schoolDataService.fetchData('programs', {}, reqUser), orgId);
+  const programs = scopeByOrg(await schoolDataService.fetchAllData('programs', {}, reqUser), orgId);
   const matches = programs.filter((program) => {
     const subjects = Array.isArray(program?.subjects) ? program.subjects : [];
     const inSubjects = subjects.some((item) => idsEqual(item?.subjectId, targetId));
@@ -277,7 +277,7 @@ async function scanProgramsEmbeddingSubjectWithPrereqs(targetId, orgId, reqUser,
 }
 
 async function scanClassesEmbeddingSubject(targetId, orgId, reqUser, rule) {
-  const classes = scopeByOrg(await schoolDataService.fetchData('classes', {}, reqUser), orgId);
+  const classes = scopeByOrg(await schoolDataService.fetchAllData('classes', {}, reqUser), orgId);
   const matches = classes.filter((cls) => {
     const subjects = Array.isArray(cls?.curriculum?.subjects) ? cls.curriculum.subjects : [];
     return subjects.some((item) => idsEqual(item?.subjectId, targetId));
@@ -338,7 +338,7 @@ async function scanTimesheetSourceBlocker({ sourceType, sourceRef, orgId, reqUse
 }
 
 async function scanTimesheetPeriodAnyTimesheets(periodId, orgId, reqUser, rule) {
-  const timesheets = scopeByOrg(await schoolDataService.fetchData('timesheets', {}, reqUser), orgId);
+  const timesheets = scopeByOrg(await schoolDataService.fetchAllData('timesheets', {}, reqUser), orgId);
   const matches = timesheets.filter((row) => idsEqual(row?.periodId, periodId));
   if (!matches.length) return null;
   return buildBlocker({
@@ -408,7 +408,7 @@ async function scanClassAllSessionTimesheetRefs(classId, orgId, reqUser, rule) {
 async function scanReportAssignmentsByTeacherId(teacherId, orgId, reqUser, rule) {
   const normalizedTeacherId = toPublicId(teacherId);
   if (!normalizedTeacherId) return null;
-  const assignments = scopeByOrg(await schoolDataService.fetchData('reportAssignments', {}, reqUser), orgId);
+  const assignments = scopeByOrg(await schoolDataService.fetchAllData('reportAssignments', {}, reqUser), orgId);
   const matches = assignments.filter((row) =>
     (Array.isArray(row?.teacherIds) ? row.teacherIds : []).some((candidateId) => idsEqual(candidateId, normalizedTeacherId))
   );
@@ -449,10 +449,10 @@ async function scanAccountOwnerConflicts(accountId, orgId, reqUser, rule) {
 
   const owners = [];
   const [students, teachers, staffRows, funders] = await Promise.all([
-    schoolDataService.fetchData('students', {}, reqUser),
-    schoolDataService.fetchData('teachers', {}, reqUser),
-    schoolDataService.fetchData('staff', {}, reqUser),
-    schoolDataService.fetchData('funders', {}, reqUser)
+    schoolDataService.fetchAllData('students', {}, reqUser),
+    schoolDataService.fetchAllData('teachers', {}, reqUser),
+    schoolDataService.fetchAllData('staff', {}, reqUser),
+    schoolDataService.fetchAllData('funders', {}, reqUser)
   ]);
 
   (Array.isArray(students) ? students : []).forEach((student) => {
@@ -513,7 +513,7 @@ async function scanAccountOwnerConflicts(accountId, orgId, reqUser, rule) {
 async function scanJournalLinesReferencingAccount(accountId, orgId, reqUser, rule) {
   const targetAccountId = toPublicId(accountId);
   if (!targetAccountId) return null;
-  const journals = scopeByOrg(await schoolDataService.fetchData('transactionJournals', {}, reqUser), orgId);
+  const journals = scopeByOrg(await schoolDataService.fetchAllData('transactionJournals', {}, reqUser), orgId);
   const matches = (Array.isArray(journals) ? journals : []).filter((journal) =>
     (Array.isArray(journal?.lines) ? journal.lines : []).some((line) => idsEqual(line?.accountId, targetAccountId))
   );
@@ -534,9 +534,9 @@ async function scanPostingPoliciesReferencingTransactionDefinition(transactionDe
 
   const matches = [];
   const [programs, departments, classes] = await Promise.all([
-    scopeByOrg(await schoolDataService.fetchData('programs', {}, reqUser), orgId),
-    scopeByOrg(await schoolDataService.fetchData('departments', {}, reqUser), orgId),
-    scopeByOrg(await schoolDataService.fetchData('classes', {}, reqUser), orgId)
+    scopeByOrg(await schoolDataService.fetchAllData('programs', {}, reqUser), orgId),
+    scopeByOrg(await schoolDataService.fetchAllData('departments', {}, reqUser), orgId),
+    scopeByOrg(await schoolDataService.fetchAllData('classes', {}, reqUser), orgId)
   ]);
 
   (programs || []).forEach((program) => {
@@ -647,7 +647,7 @@ async function scanExamAllocationDeletePolicy(ctx = {}) {
 }
 
 async function scanReportAssignmentsBySession(sessionId, classId, orgId, reqUser, rule) {
-  const assignments = scopeByOrg(await schoolDataService.fetchData('reportAssignments', {}, reqUser), orgId);
+  const assignments = scopeByOrg(await schoolDataService.fetchAllData('reportAssignments', {}, reqUser), orgId);
   const matches = assignments.filter((row) => {
     if (classId && !idsEqual(row?.classId, classId)) return false;
     if (idsEqual(row?.sessionId, sessionId)) return true;
@@ -666,7 +666,7 @@ async function scanReportAssignmentsBySession(sessionId, classId, orgId, reqUser
 }
 
 async function scanLeaveRequestsBySession(classId, sessionId, orgId, reqUser, rule) {
-  const rows = scopeByOrg(await schoolDataService.fetchData('leaveRequests', {}, reqUser), orgId);
+  const rows = scopeByOrg(await schoolDataService.fetchAllData('leaveRequests', {}, reqUser), orgId);
   const matches = rows.filter((row) => {
     const subs = Array.isArray(row?.sessionSubstitutions) ? row.sessionSubstitutions : [];
     return subs.some((sub) => idsEqual(sub?.classId, classId) && idsEqual(sub?.sessionId, sessionId));
@@ -685,7 +685,7 @@ async function scanLeaveRequestsBySession(classId, sessionId, orgId, reqUser, ru
 async function scanSessionStatusUsage(statusCode, orgId, reqUser, rule) {
   const normalizedCode = String(statusCode || '').trim().toLowerCase();
   if (!normalizedCode) return null;
-  const classes = scopeByOrg(await schoolDataService.fetchData('classes', {}, reqUser), orgId);
+  const classes = scopeByOrg(await schoolDataService.fetchAllData('classes', {}, reqUser), orgId);
   const matches = [];
   for (const classRow of classes) {
     const classId = toPublicId(classRow?.id);
@@ -1176,7 +1176,7 @@ const ENTITY_DEFINITIONS = Object.freeze({
           section: 'classes'
         });
         if (usageBlocker) return usageBlocker;
-        const classes = scopeByOrg(await schoolDataService.fetchData('classes', {}, ctx.reqUser), ctx.orgId);
+        const classes = scopeByOrg(await schoolDataService.fetchAllData('classes', {}, ctx.reqUser), ctx.orgId);
         for (const classRow of classes) {
           const classId = toPublicId(classRow?.id);
           if (!classId) continue;

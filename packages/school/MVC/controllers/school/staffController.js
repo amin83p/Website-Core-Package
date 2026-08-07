@@ -515,7 +515,7 @@ exports.listStaff = async (req, res) => {
       reqUser: req.user,
       personIds: (Array.isArray(allStaff) ? allStaff : []).map((staff) => staff.personId)
     });
-    const departments = await dataService.fetchData('departments', {}, req.user, routeAccess(req));
+    const departments = await dataService.fetchAllData('departments', {}, req.user, routeAccess(req));
 
     const deptById = new Map((departments || []).map((d) => [String(d.id), d.name || d.id]));
     const enriched = allStaff.map((staff) => {
@@ -581,7 +581,7 @@ exports.listArchivedStaff = async (req, res) => {
       reqUser: req.user,
       personIds: (Array.isArray(allStaff) ? allStaff : []).map((staff) => staff.personId)
     });
-    const departments = await dataService.fetchData('departments', {}, req.user, routeAccess(req));
+    const departments = await dataService.fetchAllData('departments', {}, req.user, routeAccess(req));
     const deptById = new Map((departments || []).map((d) => [String(d.id), d.name || d.id]));
 
     const enriched = allStaff.map((staff) => {
@@ -645,7 +645,7 @@ exports.showForm = async (req, res) => {
     }
 
     const [departments, organizations] = await Promise.all([
-      dataService.fetchData('departments', {}, req.user, routeAccess(req)),
+      dataService.fetchAllData('departments', {}, req.user, routeAccess(req)),
       dataServiceGlobal.fetchData('organizations', {}, req.user)
     ]);
     const organizationLookup = {};

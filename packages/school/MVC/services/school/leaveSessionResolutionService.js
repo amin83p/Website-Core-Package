@@ -82,7 +82,7 @@ function buildLeaveResolutionRepositoryScope(request = {}, reqUser = {}) {
 
 async function fetchOrgClassesForLeaveResolution(request, reqUser) {
   const orgId = resolveLeaveOrgId(request, reqUser);
-  let rows = await schoolDataService.fetchData('classes', {}, reqUser, LEAVE_RESOLUTION_ACCESS_CONTEXT);
+  let rows = await schoolDataService.fetchAllData('classes', {}, reqUser, LEAVE_RESOLUTION_ACCESS_CONTEXT);
   if (!Array.isArray(rows) || !rows.length) {
     rows = await schoolRepositories.classes.list({
       query: { page: 1, limit: 5000 },

@@ -455,7 +455,7 @@ function filterClassesForWeeklyReports(rows = [], { activeOrgId = '', classIds =
 
 async function resolveWeeklyReportsDepartmentOptions(reqUser = {}) {
   const activeOrgId = String(reqUser?.activeOrgId || '').trim();
-  const departments = await schoolDataService.fetchData('departments', {}, reqUser);
+  const departments = await schoolDataService.fetchAllData('departments', {}, reqUser);
   return (Array.isArray(departments) ? departments : [])
     .filter((row) => !String(row?.orgId || '').trim() || idsEqual(row?.orgId, activeOrgId))
     .map((row) => ({
@@ -467,7 +467,7 @@ async function resolveWeeklyReportsDepartmentOptions(reqUser = {}) {
 }
 
 async function resolveWeeklyReportsClasses({ reqUser, classIds = [], departmentId = '', activeOrgId = '' } = {}) {
-  const classes = await schoolDataService.fetchData('classes', {}, reqUser);
+  const classes = await schoolDataService.fetchAllData('classes', {}, reqUser);
   const normalizedClassIds = parseFilterIdList(classIds);
   const normalizedDepartmentId = toPublicId(departmentId) || '';
   return filterClassesForWeeklyReports(classes, {
@@ -596,7 +596,7 @@ async function buildWeeklyReportsStudentBoard({
           }
         ),
         schoolDataService.getClassSessions(classId, reqUser),
-        schoolDataService.fetchData('sessionStudentCases', {}, reqUser)
+        schoolDataService.fetchAllData('sessionStudentCases', {}, reqUser)
       ]);
 
       const statusMap = await sessionStatusPolicyService.getStatusMap(

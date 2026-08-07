@@ -441,7 +441,7 @@ async function resolveClassStudentIds({ classData, sessions = [], reqUser, refer
 
   const studentRows = Array.isArray(students) && students.length
     ? students
-    : await schoolDataService.fetchData('students', {}, reqUser);
+    : await schoolDataService.fetchAllData('students', {}, reqUser);
   const studentToPersonMap = new Map(
     (Array.isArray(studentRows) ? studentRows : [])
       .map((row) => [String(row?.id || '').trim(), String(row?.personId || '').trim()])
@@ -747,16 +747,16 @@ function mapReportInstanceParticipantFields({
 }
 
 async function listAllReportTemplates(reqUser) {
-  const rows = await schoolDataService.fetchData('reportTemplates', {}, reqUser);
+  const rows = await schoolDataService.fetchAllData('reportTemplates', {}, reqUser);
   return (Array.isArray(rows) ? rows : []).map(reportScopePolicy.withResolvedAllowedReportScopes);
 }
 
 async function listAllReportAssignments(reqUser) {
-  return await schoolDataService.fetchData('reportAssignments', {}, reqUser);
+  return await schoolDataService.fetchAllData('reportAssignments', {}, reqUser);
 }
 
 async function listAllReportInstances(reqUser) {
-  return await schoolDataService.fetchData('reportInstances', {}, reqUser);
+  return await schoolDataService.fetchAllData('reportInstances', {}, reqUser);
 }
 
 function buildHomeSummary(allTemplates, allAssignments, allInstances, reqUser) {
@@ -1018,7 +1018,7 @@ async function buildAssignmentListContext({
   const [allAssignments, allTemplates, classes, personMap] = await Promise.all([
     listAllReportAssignments(reqUser),
     listAllReportTemplates(reqUser),
-    schoolDataService.fetchData('classes', {}, reqUser),
+    schoolDataService.fetchAllData('classes', {}, reqUser),
     requestedTeacherPersonId ? buildPersonNameMap(reqUser) : Promise.resolve(new Map())
   ]);
 
@@ -1133,8 +1133,8 @@ async function buildAssignmentListContext({
 async function buildAssignmentFormContext({ assignment = null, requestedClassId = '', reqUser }) {
   const [allTemplates, classes, allStudents, personMap] = await Promise.all([
     listAllReportTemplates(reqUser),
-    schoolDataService.fetchData('classes', {}, reqUser),
-    schoolDataService.fetchData('students', {}, reqUser),
+    schoolDataService.fetchAllData('classes', {}, reqUser),
+    schoolDataService.fetchAllData('students', {}, reqUser),
     buildPersonNameMap(reqUser)
   ]);
 
@@ -1339,9 +1339,9 @@ async function buildInstanceListRows({
     listAllReportInstances(reqUser),
     listAllReportAssignments(reqUser),
     listAllReportTemplates(reqUser),
-    schoolDataService.fetchData('classes', {}, reqUser),
-    schoolDataService.fetchData('students', {}, reqUser),
-    schoolDataService.fetchData('teachers', {}, reqUser)
+    schoolDataService.fetchAllData('classes', {}, reqUser),
+    schoolDataService.fetchAllData('students', {}, reqUser),
+    schoolDataService.fetchAllData('teachers', {}, reqUser)
   ]);
   const participantTokens = [];
   filterRecordsByOrg(allInstances, reqUser).forEach((row) => {
@@ -1615,10 +1615,10 @@ async function buildPersonReportListContext({ reqUser, requestedScope = '', requ
     listAllReportInstances(reqUser),
     listAllReportAssignments(reqUser),
     listAllReportTemplates(reqUser),
-    schoolDataService.fetchData('classes', {}, reqUser),
-    schoolDataService.fetchData('teachers', {}, reqUser),
-    schoolDataService.fetchData('staff', {}, reqUser),
-    schoolDataService.fetchData('students', {}, reqUser)
+    schoolDataService.fetchAllData('classes', {}, reqUser),
+    schoolDataService.fetchAllData('teachers', {}, reqUser),
+    schoolDataService.fetchAllData('staff', {}, reqUser),
+    schoolDataService.fetchAllData('students', {}, reqUser)
   ]);
   const participantTokens = [];
   filterRecordsByOrg(allInstances, reqUser).forEach((row) => {

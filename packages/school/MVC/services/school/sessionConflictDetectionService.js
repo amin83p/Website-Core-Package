@@ -85,7 +85,7 @@ function resolveDeliveryPersonDisplayName(sessionRow = {}, personId = '') {
 }
 
 async function buildTeacherIdentityLookup({ activeOrgId = '', reqUser } = {}) {
-  const rows = await schoolDataService.fetchData('teachers', {}, reqUser).catch(() => []);
+  const rows = await schoolDataService.fetchAllData('teachers', {}, reqUser).catch(() => []);
   const teacherToPerson = new Map();
   const personToTeacherIds = new Map();
   (Array.isArray(rows) ? rows : []).forEach((row) => {
@@ -353,7 +353,7 @@ async function detectSessionConflicts({
   const parsedSessions = Array.isArray(sessions) ? sessions : [];
   const statusMap = await sessionStatusPolicyService.getStatusMap(activeOrgId, { includeInactive: true });
   const teacherIdentityLookup = await buildTeacherIdentityLookup({ activeOrgId, reqUser });
-  const allClasses = await schoolDataService.fetchData('classes', {}, reqUser);
+  const allClasses = await schoolDataService.fetchAllData('classes', {}, reqUser);
   const scopedClasses = (Array.isArray(allClasses) ? allClasses : []).filter((row) => {
     if (!activeOrgId) return true;
     return idsEqual(row?.orgId, activeOrgId);
@@ -472,7 +472,7 @@ async function detectSessionConflicts({
       ? [...activeRosterResult.studentIds]
       : [];
     if (activeStudentIds.length) {
-      const allStudents = await schoolDataService.fetchData('students', {}, reqUser);
+      const allStudents = await schoolDataService.fetchAllData('students', {}, reqUser);
       const studentRows = (Array.isArray(allStudents) ? allStudents : [])
         .filter((student) => activeStudentIds.some((id) => idsEqual(id, student?.id)));
       const studentDisplayNameMap = await buildStudentDisplayNameMap(studentRows, reqUser);
@@ -765,7 +765,7 @@ async function evaluateEnrollmentGapBatchConflicts({
     ? [...activeRosterResult.studentIds]
     : [];
 
-  const allStudents = await schoolDataService.fetchData('students', {}, reqUser);
+  const allStudents = await schoolDataService.fetchAllData('students', {}, reqUser);
   const studentRows = Array.isArray(allStudents) ? allStudents : [];
   const studentDisplayNameMap = await buildStudentDisplayNameMap(studentRows, reqUser);
   const studentPersonMap = new Map(

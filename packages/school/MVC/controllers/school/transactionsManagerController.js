@@ -201,7 +201,7 @@ function assertJournalOrgAccess(journal, activeOrgId, reqUser) {
 }
 
 async function getPostingAccountsByOrg(reqUser, orgId) {
-  const accounts = await dataService.fetchData('schoolAccounts', {}, reqUser);
+  const accounts = await dataService.fetchAllData('schoolAccounts', {}, reqUser);
   return (accounts || [])
     .filter((a) =>
       idsEqual(a.orgId || '', orgId || '') &&
@@ -405,7 +405,7 @@ exports.showStatement = async (req, res) => {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     const statementFilters = normalizeStatementFilters(req.query || {});
 
-    const allAccounts = await dataService.fetchData('schoolAccounts', {}, req.user);
+    const allAccounts = await dataService.fetchAllData('schoolAccounts', {}, req.user);
     // Important: Statements are used to view *any* account activity (including student sub-accounts),
     // not only accounts that allow posting. Filter to active accounts only.
     const selectableAccounts = (allAccounts || [])
@@ -421,7 +421,7 @@ exports.showStatement = async (req, res) => {
     const accountSet = new Set(selectedAccountIds);
     const hasSelectedAccounts = selectedAccountIds.length > 0;
 
-    const allTransactions = await dataService.fetchData('globalTransactions', {}, req.user);
+    const allTransactions = await dataService.fetchAllData('globalTransactions', {}, req.user);
     let scopedTransactions = (allTransactions || []).filter((tx) => idsEqual(tx.orgId || '', activeOrgId));
 
     // By default, hide reversal pairs (original + reversal) so rollbacks don't clutter statements.

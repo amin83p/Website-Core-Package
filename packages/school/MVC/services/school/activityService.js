@@ -358,8 +358,8 @@ function calculateDurationHours(startTime, endTime) {
 
 async function loadActivityLookups(reqUser) {
   const [categories, departments] = await Promise.all([
-    schoolDataService.fetchData('activityCategories', {}, reqUser),
-    schoolDataService.fetchData('departments', {}, reqUser)
+    schoolDataService.fetchAllData('activityCategories', {}, reqUser),
+    schoolDataService.fetchAllData('departments', {}, reqUser)
   ]);
   const categoryMap = new Map((Array.isArray(categories) ? categories : []).map((row) => [normalizeId(row.id), row]));
   const departmentMap = new Map((Array.isArray(departments) ? departments : []).map((row) => [normalizeId(row.id), row]));
@@ -385,7 +385,7 @@ function enrichActivity(activity = {}, lookups = {}) {
 }
 
 async function listActivityCategories({ orgId, reqUser, includeInactive = false } = {}) {
-  const rows = await schoolDataService.fetchData('activityCategories', {}, reqUser);
+  const rows = await schoolDataService.fetchAllData('activityCategories', {}, reqUser);
   return (Array.isArray(rows) ? rows : [])
     .filter((row) => belongsToOrg(row, orgId))
     .filter((row) => includeInactive || row.active !== false)
@@ -658,9 +658,9 @@ async function getEligiblePersons({ orgId, reqUser, q = '' } = {}) {
       requireSchoolRole: false,
       query: { limit: 1000 }
     }),
-    schoolDataService.fetchData('students', {}, reqUser),
-    schoolDataService.fetchData('teachers', {}, reqUser),
-    schoolDataService.fetchData('staff', {}, reqUser)
+    schoolDataService.fetchAllData('students', {}, reqUser),
+    schoolDataService.fetchAllData('teachers', {}, reqUser),
+    schoolDataService.fetchAllData('staff', {}, reqUser)
   ]);
   const persons = personPayload.allRows || personPayload.rows || [];
   const personMap = new Map((Array.isArray(persons) ? persons : []).map((person) => [normalizeId(person.id || person.personId), person]));

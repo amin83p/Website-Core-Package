@@ -44,9 +44,9 @@ function matchesAccountSearch(account, searchQuery) {
 
 async function buildAccountOwnerMap(reqUser, accessContext = {}) {
   const [students, teachers, staff] = await Promise.all([
-    schoolDataService.fetchData('students', {}, reqUser, accessContext),
-    schoolDataService.fetchData('teachers', {}, reqUser, accessContext),
-    schoolDataService.fetchData('staff', {}, reqUser, accessContext)
+    schoolDataService.fetchAllData('students', {}, reqUser, accessContext),
+    schoolDataService.fetchAllData('teachers', {}, reqUser, accessContext),
+    schoolDataService.fetchAllData('staff', {}, reqUser, accessContext)
   ]);
 
   const personMap = await schoolPersonAccessService.buildPersonByIdMap({
@@ -107,9 +107,9 @@ async function findAccountOwnerConflicts(accountId, reqUser, accessContext = {})
 
   const owners = [];
   const [students, teachers, staff] = await Promise.all([
-    schoolDataService.fetchData('students', {}, reqUser, accessContext),
-    schoolDataService.fetchData('teachers', {}, reqUser, accessContext),
-    schoolDataService.fetchData('staff', {}, reqUser, accessContext)
+    schoolDataService.fetchAllData('students', {}, reqUser, accessContext),
+    schoolDataService.fetchAllData('teachers', {}, reqUser, accessContext),
+    schoolDataService.fetchAllData('staff', {}, reqUser, accessContext)
   ]);
 
   (students || []).forEach((student) => {

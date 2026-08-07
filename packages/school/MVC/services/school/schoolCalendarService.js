@@ -309,7 +309,7 @@ function normalizeTimesheetDeadlineEvent(period) {
 }
 
 async function getHolidayEvents({ reqUser, orgId, startDate, endDate } = {}) {
-  const holidays = await schoolDataService.fetchData('holidays', {}, reqUser);
+  const holidays = await schoolDataService.fetchAllData('holidays', {}, reqUser);
   return (Array.isArray(holidays) ? holidays : [])
     .filter((row) => rowBelongsToOrg(row, orgId))
     .map(normalizeHolidayEvent)

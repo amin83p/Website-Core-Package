@@ -594,6 +594,8 @@ exports.updateAppSettings = async (req, res) => {
       app: {
         defaultPageSize: parseInt(req.body.defaultPageSize, 10),
         searchDefaultKeyword: req.body.searchDefaultKeyword,
+        requestCacheTtlSeconds: parseInt(req.body.requestCacheTtlSeconds, 10),
+        requestCacheMaxEntries: parseInt(req.body.requestCacheMaxEntries, 10),
         buildVersionOverride: cleanFormText(req.body.buildVersionOverride, 120),
         defaultTimezone: timezoneParse.timeZone,
         // Save raw string exactly as typed (e.g., "uploads" or "/app/uploads")

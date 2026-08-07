@@ -233,7 +233,7 @@ async function getManagementSession(id, reqUser) {
 
 async function listManagementSessions(reqUser) {
   const orgId = activeOrgId(reqUser);
-  return (await schoolDataService.fetchData('overallReportManagementSessions', {}, reqUser))
+  return (await schoolDataService.fetchAllData('overallReportManagementSessions', {}, reqUser))
     .filter((row) => idsEqual(row.orgId, orgId))
     .sort((a, b) => String(b.audit?.lastUpdateDateTime || '').localeCompare(String(a.audit?.lastUpdateDateTime || '')));
 }

@@ -15,6 +15,28 @@ const examBuilderService = require('./examBuilderService');
 const { isVoidPolicy } = require('./schoolDeletionPolicyRegistry');
 const { buildVoidPatch, isVoidRecord } = require('../../models/school/voidRecordMetadata');
 const studentSystemIdMigrationLockService = require('./studentSystemIdMigrationLockService');
+const {
+  applyDefaultFetchLimit,
+  stripPaginationFromQuery,
+  normalizePaginationQuery,
+  buildPaginationMeta,
+  buildCountCacheKey,
+  getCachedCountValue,
+  setCachedCountValue,
+  clearSchoolCountCache,
+  buildUnboundedQuery
+} = require('./schoolPaginationUtils');
+
+function applyVoidFilter(entityType, rawQuery, accessContext = {}) {
+  const hasStatusFilter = Object.keys(rawQuery).some((key) => key === 'status' || key.startsWith('status__'));
+  return isVoidPolicy(entityType) && accessContext?.includeVoided !== true && !hasStatusFilter
+    ? { ...rawQuery, status__ne: 'void' }
+    : rawQuery;
+}
+
+function clearSchoolCountCacheOnWrite() {
+  clearSchoolCountCache();
+}
 
 function getDeletionGuardDeps() {
   const schoolDeletionGuardService = require('./schoolDeletionGuardService');
@@ -194,15 +216,83 @@ const schoolDataService = {
     if (!config) throw new Error(`Unknown school entity type: ${entityType}`);
 
     const rawQuery = (query && typeof query === 'object') ? query : {};
-    const hasStatusFilter = Object.keys(rawQuery).some((key) => key === 'status' || key.startsWith('status__'));
-    const scopedQuery = isVoidPolicy(entityType) && accessContext?.includeVoided !== true && !hasStatusFilter
-      ? { ...rawQuery, status__ne: 'void' }
-      : rawQuery;
+    const scopedQuery = applyVoidFilter(entityType, applyDefaultFetchLimit(rawQuery, accessContext), accessContext);
     return await config.repository.list({
       query: normalizeQueryOptions(scopedQuery),
       scope: await buildEntityScopeForRequest(entityType, requestingUser, accessContext)
     });
   },
+
+  countData: async (entityType, query, requestingUser, accessContext = {}) => {
+    const config = resolveEntityConfig(entityType);
+    if (!config) throw new Error(`Unknown school entity type: ${entityType}`);
+
+    const rawQuery = (query && typeof query === 'object') ? query : {};
+    const scopedQuery = applyVoidFilter(entityType, rawQuery, accessContext);
+    const normalizedQuery = normalizeQueryOptions(stripPaginationFromQuery(scopedQuery));
+    const scope = await buildEntityScopeForRequest(entityType, requestingUser, accessContext);
+    const countCacheKey = buildCountCacheKey(entityType, normalizedQuery, scope);
+    const cachedValue = getCachedCountValue(countCacheKey);
+    if (cachedValue !== null) return cachedValue;
+
+    let totalRows = 0;
+    if (typeof config.repository.count === 'function') {
+      totalRows = Number(await config.repository.count({
+        query: normalizedQuery,
+        scope
+      }) || 0);
+    } else {
+      const rows = await config.repository.list({
+        query: normalizedQuery,
+        scope
+      });
+      totalRows = Array.isArray(rows) ? rows.length : 0;
+    }
+
+    setCachedCountValue(countCacheKey, totalRows);
+    return totalRows;
+  },
+
+  fetchDataPaged: async (entityType, query, requestingUser, accessContext = {}) => {
+    const config = resolveEntityConfig(entityType);
+    if (!config) throw new Error(`Unknown school entity type: ${entityType}`);
+
+    const rawQuery = (query && typeof query === 'object') ? query : {};
+    const scopedQuery = applyVoidFilter(entityType, rawQuery, accessContext);
+    const normalizedQuery = normalizeQueryOptions(scopedQuery);
+    const paginationInput = normalizePaginationQuery(normalizedQuery);
+    const pageQuery = {
+      ...stripPaginationFromQuery(normalizedQuery),
+      page: paginationInput.page,
+      limit: paginationInput.limit
+    };
+    const scope = await buildEntityScopeForRequest(entityType, requestingUser, accessContext);
+
+    const [totalRows, rows] = await Promise.all([
+      schoolDataService.countData(entityType, scopedQuery, requestingUser, accessContext),
+      config.repository.list({
+        query: pageQuery,
+        scope
+      })
+    ]);
+
+    return {
+      rows: Array.isArray(rows) ? rows : [],
+      totalRows,
+      pagination: buildPaginationMeta(totalRows, paginationInput.page, paginationInput.limit)
+    };
+  },
+
+  fetchAllData: async (entityType, query, requestingUser, accessContext = {}) => {
+    return schoolDataService.fetchData(
+      entityType,
+      buildUnboundedQuery(query),
+      requestingUser,
+      { ...accessContext, unbounded: true }
+    );
+  },
+
+  clearSchoolCountCache,
 
   addData: async (entityType, data, requestingUser, options = {}) => {
     const config = resolveEntityConfig(entityType);
@@ -218,6 +308,7 @@ const schoolDataService = {
       entityType: String(entityType || ''),
       size: Array.isArray(result) ? result.length : 1
     });
+    clearSchoolCountCacheOnWrite();
     return result;
   },
 
@@ -242,6 +333,7 @@ const schoolDataService = {
       entityType: String(entityType || ''),
       id: toPublicId(id)
     });
+    clearSchoolCountCacheOnWrite();
     return result;
   },
 
@@ -327,6 +419,7 @@ const schoolDataService = {
         entityType: normalizedType,
         id: toPublicId(id)
       });
+      clearSchoolCountCacheOnWrite();
       return archived;
     }
 
@@ -345,6 +438,7 @@ const schoolDataService = {
       entityType: String(entityType || ''),
       id: toPublicId(id)
     });
+    clearSchoolCountCacheOnWrite();
     return result;
   },
 
@@ -365,6 +459,7 @@ const schoolDataService = {
       voidedAt: '', voidedBy: '', voidReason: '', statusBeforeVoid: ''
     }, { ...options, requestingUser });
     recordTransactionOperation(options, { type: 'restore', entityType: normalizedType, id: toPublicId(id) });
+    clearSchoolCountCacheOnWrite();
     return result;
   },
 
@@ -397,6 +492,7 @@ const schoolDataService = {
         id: toPublicId(id),
         size: 1
       });
+      clearSchoolCountCacheOnWrite();
       return result;
     }
 
@@ -458,21 +554,21 @@ const schoolDataService = {
   /* ----------------------------------------------------------------
     BACKWARD-COMPATIBLE ACCESS HELPERS
   ---------------------------------------------------------------- */
-  getAccessibleSubjects: async (requestingUser) => schoolDataService.fetchData('subjects', {}, requestingUser),
-  getAccessibleAcademicLedger: async (requestingUser) => schoolDataService.fetchData('academicLedger', {}, requestingUser),
-  getAccessibleAcademicSnapshots: async (requestingUser) => schoolDataService.fetchData('academicSnapshots', {}, requestingUser),
-  getAccessibleReportTemplates: async (requestingUser) => schoolDataService.fetchData('reportTemplates', {}, requestingUser),
-  getAccessibleReportAssignments: async (requestingUser) => schoolDataService.fetchData('reportAssignments', {}, requestingUser),
-  getAccessibleReportInstances: async (requestingUser) => schoolDataService.fetchData('reportInstances', {}, requestingUser),
-  getAccessibleOverallReportTemplates: async (requestingUser) => schoolDataService.fetchData('overallReportTemplates', {}, requestingUser),
-  getAccessibleOverallReportInstances: async (requestingUser) => schoolDataService.fetchData('overallReportInstances', {}, requestingUser),
-  getAccessibleExamTemplates: async (requestingUser) => schoolDataService.fetchData('examTemplates', {}, requestingUser),
-  getAccessibleExamRevisions: async (requestingUser) => schoolDataService.fetchData('examRevisions', {}, requestingUser),
-  getAccessibleExamQuestions: async (requestingUser) => schoolDataService.fetchData('examQuestions', {}, requestingUser),
-  getAccessibleExamAllocations: async (requestingUser) => schoolDataService.fetchData('examAllocations', {}, requestingUser),
-  getAccessibleExamAssignments: async (requestingUser) => schoolDataService.fetchData('examAssignments', {}, requestingUser),
-  getAccessibleExamAttempts: async (requestingUser) => schoolDataService.fetchData('examAttempts', {}, requestingUser),
-  getAccessibleExamAnswers: async (requestingUser) => schoolDataService.fetchData('examAnswers', {}, requestingUser),
+  getAccessibleSubjects: async (requestingUser) => schoolDataService.fetchAllData('subjects', {}, requestingUser),
+  getAccessibleAcademicLedger: async (requestingUser) => schoolDataService.fetchAllData('academicLedger', {}, requestingUser),
+  getAccessibleAcademicSnapshots: async (requestingUser) => schoolDataService.fetchAllData('academicSnapshots', {}, requestingUser),
+  getAccessibleReportTemplates: async (requestingUser) => schoolDataService.fetchAllData('reportTemplates', {}, requestingUser),
+  getAccessibleReportAssignments: async (requestingUser) => schoolDataService.fetchAllData('reportAssignments', {}, requestingUser),
+  getAccessibleReportInstances: async (requestingUser) => schoolDataService.fetchAllData('reportInstances', {}, requestingUser),
+  getAccessibleOverallReportTemplates: async (requestingUser) => schoolDataService.fetchAllData('overallReportTemplates', {}, requestingUser),
+  getAccessibleOverallReportInstances: async (requestingUser) => schoolDataService.fetchAllData('overallReportInstances', {}, requestingUser),
+  getAccessibleExamTemplates: async (requestingUser) => schoolDataService.fetchAllData('examTemplates', {}, requestingUser),
+  getAccessibleExamRevisions: async (requestingUser) => schoolDataService.fetchAllData('examRevisions', {}, requestingUser),
+  getAccessibleExamQuestions: async (requestingUser) => schoolDataService.fetchAllData('examQuestions', {}, requestingUser),
+  getAccessibleExamAllocations: async (requestingUser) => schoolDataService.fetchAllData('examAllocations', {}, requestingUser),
+  getAccessibleExamAssignments: async (requestingUser) => schoolDataService.fetchAllData('examAssignments', {}, requestingUser),
+  getAccessibleExamAttempts: async (requestingUser) => schoolDataService.fetchAllData('examAttempts', {}, requestingUser),
+  getAccessibleExamAnswers: async (requestingUser) => schoolDataService.fetchAllData('examAnswers', {}, requestingUser),
   createExamTemplate: async (input, requestingUser, options = {}) =>
     examBuilderService.createTemplate(input, requestingUser, options),
   cloneExamTemplateAsRevision: async (sourceTemplateId, input, requestingUser, options = {}) =>
@@ -501,23 +597,23 @@ const schoolDataService = {
     examBuilderService.gradeAttemptAnswer(answerId, gradingInput, requestingUser, options),
   getExamRevisionBundle: async (revisionId, requestingUser, options = {}) =>
     examBuilderService.getRevisionBundle(revisionId, requestingUser, options),
-  getAccessibleClasses: async (requestingUser) => schoolDataService.fetchData('classes', {}, requestingUser),
-  getAccessibleHolidays: async (requestingUser) => schoolDataService.fetchData('holidays', {}, requestingUser),
-  getAccessibleTerms: async (requestingUser) => schoolDataService.fetchData('terms', {}, requestingUser),
-  getAccessibleDepartments: async (requestingUser) => schoolDataService.fetchData('departments', {}, requestingUser),
-  getAccessibleActivityCategories: async (requestingUser) => schoolDataService.fetchData('activityCategories', {}, requestingUser),
-  getAccessibleActivities: async (requestingUser) => schoolDataService.fetchData('activities', {}, requestingUser),
-  getAccessibleTeachers: async (requestingUser) => schoolDataService.fetchData('teachers', {}, requestingUser),
-  getAccessibleStaff: async (requestingUser) => schoolDataService.fetchData('staff', {}, requestingUser),
-  getAccessiblePayRates: async (requestingUser) => schoolDataService.fetchData('payRates', {}, requestingUser),
-  getAccessibleSessionStatuses: async (requestingUser) => schoolDataService.fetchData('sessionStatuses', {}, requestingUser),
-  getAccessibleTimesheetPeriods: async (requestingUser) => schoolDataService.fetchData('timesheetPeriods', {}, requestingUser),
-  getAccessibleTimesheets: async (requestingUser) => schoolDataService.fetchData('timesheets', {}, requestingUser),
-  getAccessibleStudentProgramRegistrations: async (requestingUser) => schoolDataService.fetchData('studentProgramRegistrations', {}, requestingUser),
+  getAccessibleClasses: async (requestingUser) => schoolDataService.fetchAllData('classes', {}, requestingUser),
+  getAccessibleHolidays: async (requestingUser) => schoolDataService.fetchAllData('holidays', {}, requestingUser),
+  getAccessibleTerms: async (requestingUser) => schoolDataService.fetchAllData('terms', {}, requestingUser),
+  getAccessibleDepartments: async (requestingUser) => schoolDataService.fetchAllData('departments', {}, requestingUser),
+  getAccessibleActivityCategories: async (requestingUser) => schoolDataService.fetchAllData('activityCategories', {}, requestingUser),
+  getAccessibleActivities: async (requestingUser) => schoolDataService.fetchAllData('activities', {}, requestingUser),
+  getAccessibleTeachers: async (requestingUser) => schoolDataService.fetchAllData('teachers', {}, requestingUser),
+  getAccessibleStaff: async (requestingUser) => schoolDataService.fetchAllData('staff', {}, requestingUser),
+  getAccessiblePayRates: async (requestingUser) => schoolDataService.fetchAllData('payRates', {}, requestingUser),
+  getAccessibleSessionStatuses: async (requestingUser) => schoolDataService.fetchAllData('sessionStatuses', {}, requestingUser),
+  getAccessibleTimesheetPeriods: async (requestingUser) => schoolDataService.fetchAllData('timesheetPeriods', {}, requestingUser),
+  getAccessibleTimesheets: async (requestingUser) => schoolDataService.fetchAllData('timesheets', {}, requestingUser),
+  getAccessibleStudentProgramRegistrations: async (requestingUser) => schoolDataService.fetchAllData('studentProgramRegistrations', {}, requestingUser),
   getAccessibleStudentProgramPriorSubjects: async (requestingUser) =>
-    schoolDataService.fetchData('studentProgramPriorSubjects', {}, requestingUser),
-  getAccessibleStudentTermRegistrations: async (requestingUser) => schoolDataService.fetchData('studentTermRegistrations', {}, requestingUser),
-  getAccessibleClassEnrollmentPeriods: async (requestingUser) => schoolDataService.fetchData('classEnrollmentPeriods', {}, requestingUser),
+    schoolDataService.fetchAllData('studentProgramPriorSubjects', {}, requestingUser),
+  getAccessibleStudentTermRegistrations: async (requestingUser) => schoolDataService.fetchAllData('studentTermRegistrations', {}, requestingUser),
+  getAccessibleClassEnrollmentPeriods: async (requestingUser) => schoolDataService.fetchAllData('classEnrollmentPeriods', {}, requestingUser),
   getClassEnrollmentPeriodsByOrg: async (orgId, requestingUser, options = {}) => schoolRepositories.classEnrollmentPeriods.findByOrgId(orgId, options),
   getClassEnrollmentPeriodsByClassId: async (classId, requestingUser, options = {}) => schoolRepositories.classEnrollmentPeriods.findByClassId(classId, options),
   getClassEnrollmentPeriodsByStudentId: async (studentId, requestingUser, options = {}) => schoolRepositories.classEnrollmentPeriods.findByStudentId(studentId, options),
@@ -552,13 +648,13 @@ const schoolDataService = {
     classCycleService.carryForwardEligibleStudents(input, requestingUser, options),
   splitClassEnrollmentPeriodsForCycleBoundary: async (input, requestingUser, options = {}) =>
     classCycleService.splitPeriodsCrossingCycleBoundary(input, requestingUser, options),
-  getAccessibleStudents: async (requestingUser) => schoolDataService.fetchData('students', {}, requestingUser),
-  getAccessiblePrograms: async (requestingUser) => schoolDataService.fetchData('programs', {}, requestingUser),
-  getAccessibleTransactionDefinitions: async (requestingUser) => schoolDataService.fetchData('transactionDefinitions', {}, requestingUser),
-  getAccessibleFeeDefinitions: async (requestingUser) => schoolDataService.fetchData('feeDefinitions', {}, requestingUser),
-  getAccessibleSchoolAccounts: async (requestingUser) => schoolDataService.fetchData('schoolAccounts', {}, requestingUser),
-  getAccessibleGlobalTransactions: async (requestingUser) => schoolDataService.fetchData('globalTransactions', {}, requestingUser),
-  getAccessibleTransactionJournals: async (requestingUser) => schoolDataService.fetchData('transactionJournals', {}, requestingUser),
+  getAccessibleStudents: async (requestingUser) => schoolDataService.fetchAllData('students', {}, requestingUser),
+  getAccessiblePrograms: async (requestingUser) => schoolDataService.fetchAllData('programs', {}, requestingUser),
+  getAccessibleTransactionDefinitions: async (requestingUser) => schoolDataService.fetchAllData('transactionDefinitions', {}, requestingUser),
+  getAccessibleFeeDefinitions: async (requestingUser) => schoolDataService.fetchAllData('feeDefinitions', {}, requestingUser),
+  getAccessibleSchoolAccounts: async (requestingUser) => schoolDataService.fetchAllData('schoolAccounts', {}, requestingUser),
+  getAccessibleGlobalTransactions: async (requestingUser) => schoolDataService.fetchAllData('globalTransactions', {}, requestingUser),
+  getAccessibleTransactionJournals: async (requestingUser) => schoolDataService.fetchAllData('transactionJournals', {}, requestingUser),
   buildRouteAccessContext(req) {
     return { scopeId: req?.accessScope || '' };
   },

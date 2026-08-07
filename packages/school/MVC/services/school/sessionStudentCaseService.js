@@ -100,7 +100,7 @@ async function resolveEffectiveSessionRosterPersonIds({ classData, session, reqU
     ? classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES
     : ['active'];
 
-  const students = await schoolDataService.fetchData('students', {}, reqUser);
+  const students = await schoolDataService.fetchAllData('students', {}, reqUser);
   const studentRows = Array.isArray(students) ? students : [];
   const studentToPersonMap = new Map();
   const knownPersonIds = new Set();

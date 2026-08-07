@@ -359,7 +359,7 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
   });
   const holidayRows = Array.isArray(holidays)
     ? holidays
-    : await schoolDataService.fetchData('holidays', {}, reqUser);
+    : await schoolDataService.fetchAllData('holidays', {}, reqUser);
   const holidayMap = new Map((Array.isArray(holidayRows) ? holidayRows : [])
     .filter((row) => cleanText(row?.date) >= cleanText(period.startDate) && cleanText(row?.date) <= cleanText(period.endDate))
     .map((row) => [cleanText(row?.date), row]));
@@ -459,7 +459,7 @@ async function buildTimesheetPrintContext({
 }) {
   const documents = [];
   const [holidays, organizationName] = await Promise.all([
-    schoolDataService.fetchData('holidays', {}, reqUser),
+    schoolDataService.fetchAllData('holidays', {}, reqUser),
     resolveOrganizationName(reqUser, activeOrgId)
   ]);
   for (const person of (Array.isArray(people) ? people : [])) {

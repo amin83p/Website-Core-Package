@@ -1156,7 +1156,7 @@ const registrationIntegrityService = {
 
     if ((includeClassEnrollmentRollback || includeRosterRollback) && !enrollmentRows.length && registrationId) {
       try {
-        const classesResult = await schoolDataService.fetchData('classes', {}, reqUser);
+        const classesResult = await schoolDataService.fetchAllData('classes', {}, reqUser);
         const classes = classesResult?.data || classesResult || [];
         const discovery = await classEnrollmentReadService.discoverClassEnrollmentRowsByRegistrationId({
           registrationId,

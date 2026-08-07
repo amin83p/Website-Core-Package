@@ -128,7 +128,7 @@ async function listClassSessionScheduleEvents({ activeOrgId, personId, activeRol
   const roles = normalizeActiveRoles(activeRoles);
   if (!roles.length) return [];
 
-  const scopedClasses = (await schoolDataService.fetchData('classes', {}, reqUser) || [])
+  const scopedClasses = (await schoolDataService.fetchAllData('classes', {}, reqUser) || [])
     .filter((row) => idsEqual(row?.orgId, activeOrgId));
   const statusMap = await sessionStatusPolicyService.getStatusMap(activeOrgId, { includeInactive: true });
   const events = [];

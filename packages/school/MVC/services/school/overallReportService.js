@@ -1063,8 +1063,8 @@ async function loadOverallCreateCandidates({
       .filter(Boolean)
   );
   const [allInstances, reportTemplates] = await Promise.all([
-    schoolDataService.fetchData('reportInstances', {}, reqUser),
-    schoolDataService.fetchData('reportTemplates', {}, reqUser)
+    schoolDataService.fetchAllData('reportInstances', {}, reqUser),
+    schoolDataService.fetchAllData('reportTemplates', {}, reqUser)
   ]);
   const orgId = toPublicId(reqUser?.activeOrgId || reqUser?.organizationId || reqUser?.orgId || template.orgId);
   const sourceTemplateMap = new Map(

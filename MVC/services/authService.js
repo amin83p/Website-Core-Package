@@ -16,6 +16,17 @@ const {
   getTodayDateKeyInTimezone
 } = require('../utils/timezoneUtils');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
+const {
+  getCachedAuthContext,
+  setCachedAuthContext,
+  invalidateAuthContextForUser
+} = require('./cache/authContextCacheService');
+const { cloneCacheValue } = require('./cache/cacheClone');
+
+function extractSessionIdFromToken(token) {
+  const parts = String(token || '').split('.');
+  return parts.length === 3 ? String(parts[2] || '').trim() : '';
+}
 
 async function resolveUserById(userId) {
     const fromDataService = await dataService.getDataById('users', userId, SYSTEM_CONTEXT);
@@ -170,6 +181,16 @@ async function login(username, password, deviceInfo) {
 ============================================================ */
 async function getUserFromToken(token) {
   const decoded = jwt.verify(token, SECRET_KEY);
+  const sessionId = extractSessionIdFromToken(token);
+  const cached = getCachedAuthContext(decoded.id, sessionId);
+  if (cached) return cached;
+
+  const userContext = await hydrateUserContextFromToken(token, decoded);
+  setCachedAuthContext(decoded.id, sessionId, userContext);
+  return cloneCacheValue(userContext);
+}
+
+async function hydrateUserContextFromToken(token, decoded) {
   const user = await resolveUserById(decoded.id);
   
   if (!user) throw new Error('Token user no longer exists');
@@ -461,6 +482,7 @@ async function switchOrganization(userId, targetOrgId, currentSessionId) {
   // 2. Logic
   if ((targetOrgId === 'SYSTEM' || !targetOrgId) && isSystemUser) {
       await dataService.updateData('users', user.id, { primaryOrgId: 'SYSTEM', activeProfileMode: 'SYSTEM' }, SYSTEM_CONTEXT);
+      invalidateAuthContextForUser(user.id);
       return { success: true, message: 'Switched to System Mode.' };
   }
 
@@ -511,6 +533,7 @@ async function switchOrganization(userId, targetOrgId, currentSessionId) {
         activeProfileMode: profileMode,//'LOCAL',
         audit: { lastUpdateUser: user.id, lastUpdateDateTime: new Date().toISOString() }
       }, SYSTEM_CONTEXT);
+      invalidateAuthContextForUser(user.id);
       return { success: true, message: 'Context switched.' };
   }
   return { success: false, message: 'Switch failed.' };
@@ -549,6 +572,7 @@ async function switchProfileMode(userId, mode, currentSessionId) {
         activeProfileMode: mode,
         audit: { lastUpdateUser: user.id, lastUpdateDateTime: new Date().toISOString() }
     }, SYSTEM_CONTEXT);
+    invalidateAuthContextForUser(user.id);
     return { success: true, message: `Switched to ${mode === 'SYSTEM' ? 'System Admin' : 'Local Member'} View.` };
 }
 
