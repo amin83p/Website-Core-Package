@@ -2664,10 +2664,39 @@
 </div>
 <%- include('partials/modal_GenericPicker') %>
 <script src="/scripts/outlineSessionPlanUtils.js"></script>
+<script src="/scripts/schoolAutosave.js"></script>
 
 <script>
 let detailsModalInstance = null;
+let detailsModalAllowClose = false;
+let detailsModalSnapshot = null;
 let currentMentions = [];
+
+function captureDetailsModalFormSnapshot() {
+    return {
+        late: String(document.getElementById('modalLateMins')?.value || '').trim(),
+        leave: String(document.getElementById('modalLeaveMins')?.value || '').trim(),
+        excuse: String(document.getElementById('modalExcuseRef')?.value || '').trim(),
+        excuseFileSelected: Boolean(document.getElementById('modalExcuseFile')?.files?.length),
+        commentDraft: String(document.getElementById('inp_newComment')?.value || '').trim(),
+        commentFileSelected: Boolean(document.getElementById('inp_newCommentFile')?.files?.length),
+        mentionCount: Array.isArray(currentMentions) ? currentMentions.length : 0
+    };
+}
+
+function isDetailsModalDirty() {
+    if (!detailsModalSnapshot) return false;
+    const current = captureDetailsModalFormSnapshot();
+    return (
+        current.late !== detailsModalSnapshot.late ||
+        current.leave !== detailsModalSnapshot.leave ||
+        current.excuse !== detailsModalSnapshot.excuse ||
+        current.excuseFileSelected !== detailsModalSnapshot.excuseFileSelected ||
+        current.commentDraft !== detailsModalSnapshot.commentDraft ||
+        current.commentFileSelected !== detailsModalSnapshot.commentFileSelected ||
+        current.mentionCount !== detailsModalSnapshot.mentionCount
+    );
+}
 
 function formatSchoolInstant(value) {
     if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatSchoolInstant === 'function') {
@@ -2686,6 +2715,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionInitialStatusCode = <%- jsonForScript(currentSessionStatus) %>;
     const sessionManagerClassId = <%- jsonForScript(classData.id) %>;
     const sessionManagerSessionId = <%- jsonForScript(session.sessionId) %>;
+    const sessionManagerOrgId = <%- jsonForScript(classData?.orgId || user?.activeOrgId || '') %>;
+    const sessionAutosavePolicy = <%- jsonForScript(typeof autosavePolicyResolved !== 'undefined' ? autosavePolicyResolved : { defaultMinutes: 5, sections: {} }) %>;
     const sessionManagerSchoolDashboardHref = <%- jsonForScript(typeof schoolSectionDashboardHref !== 'undefined' ? schoolSectionDashboardHref : '/dashboard/section-nav/SCHOOL') %>;
     const sessionStatusMeta = <%- jsonForScript(availableStatusRows || []) %>;
     let sessionMakeupSummary = <%- jsonForScript(makeupAllocationSummary || {}) %>;
@@ -4824,6 +4855,36 @@ document.addEventListener('DOMContentLoaded', () => {
         detailsModalInstance = new bootstrap.Modal(document.getElementById('attendanceDetailsModal'));
     }
 
+    const attendanceDetailsModalEl = document.getElementById('attendanceDetailsModal');
+    if (attendanceDetailsModalEl) {
+        attendanceDetailsModalEl.addEventListener('hide.bs.modal', (event) => {
+            if (detailsModalAllowClose) {
+                detailsModalAllowClose = false;
+                detailsModalSnapshot = null;
+                return;
+            }
+
+            const dirty = isDetailsModalDirty();
+            if (!dirty) return;
+
+            event.preventDefault();
+            void (async () => {
+                const discard = await sessionConfirmBox({
+                    title: 'Unsaved attendance details',
+                    icon: 'warning',
+                    html: true,
+                    message: '<p class="mb-0">You have unsaved late/early minutes, excuse details, or a note draft. Close without applying them?</p>',
+                    cancelText: 'Keep editing',
+                    confirmText: 'Discard changes',
+                    confirmClass: 'btn-danger'
+                });
+                if (!discard) return;
+                detailsModalAllowClose = true;
+                if (detailsModalInstance) detailsModalInstance.hide();
+            })();
+        });
+    }
+
     const SIDEBAR_KEY = 'sessionManagerSidebarCollapsed';
     const sidebarEl = document.getElementById('sessionManagerSidebar');
     const btnToggleSidebar = document.getElementById('btnToggleSessionSidebar');
@@ -5538,6 +5599,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            detailsModalAllowClose = true;
             if (detailsModalInstance) detailsModalInstance.hide();
         });
     }
@@ -7393,227 +7455,337 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.roster-row').forEach((row) => applyAttendanceRulesToRow(row));
     }
 
-    const btnSaveSession = document.getElementById('btnSaveSession');
-    if (btnSaveSession) {
-        btnSaveSession.addEventListener('click', async () => {
-            const btn = document.getElementById('btnSaveSession');
-            const originalHtml = btn.innerHTML;
+    let sessionAutosaveBaseline = '';
 
+    function buildSessionSaveRosterRows() {
+        const roster = [];
+        const conductRowsByPersonId = new Map();
+        document.querySelectorAll('#conductTable .conduct-row, #optionalConductTable .conduct-row').forEach((row) => {
+            const personId = row.getAttribute('data-personid');
+            if (!personId || conductRowsByPersonId.has(personId)) return;
+            conductRowsByPersonId.set(personId, row);
+        });
+        document.querySelectorAll('#conductTable .conduct-row').forEach((row) => {
+            const personId = row.getAttribute('data-personid');
+            if (personId) conductRowsByPersonId.set(personId, row);
+        });
+        const readConductRating = (conductRow, selector) => {
+            if (!conductRow) return undefined;
+            const input = conductRow.querySelector(selector);
+            if (!input) return undefined;
+            const cell = input.closest('.conduct-rating-cell');
+            if (cell) return readConductPercentFromCell(cell, null);
+            return normalizeConductPercent(input.value, null);
+        };
+        document.querySelectorAll('.roster-row').forEach((row) => {
+            const personId = row.getAttribute('data-personid');
+            const attendance = row.querySelector('.att-radio:checked')?.value || '';
+            const lateMinutes = row.querySelector('.att-late').value || null;
+            const earlyLeaveMinutes = row.querySelector('.att-leave').value || null;
+            const excuseRef = row.querySelector('.att-excuse').value || '';
+            const excuseAttachment = getAttendanceDetails(personId).excuseAttachment || null;
+            const conductRow = conductRowsByPersonId.get(personId);
+            const classEffortPercent = readConductRating(conductRow, '.conduct-class-effort');
+            const classParticipationPercent = readConductRating(conductRow, '.conduct-class-participation');
+            const respectsTeachersPercent = readConductRating(conductRow, '.conduct-respects-teachers');
+            const respectsStudentsPercent = readConductRating(conductRow, '.conduct-respects-students');
+            const rosterRow = {
+                personId,
+                attendance,
+                lateMinutes,
+                earlyLeaveMinutes,
+                excuseRef,
+                excuseAttachment,
+                notes: ''
+            };
+            if (classEffortPercent !== undefined) rosterRow.classEffortPercent = classEffortPercent;
+            if (classParticipationPercent !== undefined) rosterRow.classParticipationPercent = classParticipationPercent;
+            if (respectsTeachersPercent !== undefined) rosterRow.respectsTeachersPercent = respectsTeachersPercent;
+            if (respectsStudentsPercent !== undefined) rosterRow.respectsStudentsPercent = respectsStudentsPercent;
+            roster.push(rosterRow);
+        });
+        return roster;
+    }
+
+    function buildSessionSavePayload() {
+        const status = getSelectedSessionStatus();
+        const notes = document.getElementById('sessionNotes')?.value || '';
+        const room = document.getElementById('sessionRoom')?.value || '';
+        const selectedStatusRequiresMakeup = isSessionStatusMakeupRequired(status);
+        const shouldSendInstructionalPayload = !sessionInstructionalInactive && !selectedStatusRequiresMakeup;
+        const payload = {
+            status,
+            notes,
+            room,
+            actionStateId
+        };
+        if (sessionCanEditMetadata) {
+            payload.date = document.getElementById('sessionDate')?.value || '';
+            payload.startTime = document.getElementById('sessionStartTime')?.value || '';
+            payload.endTime = document.getElementById('sessionEndTime')?.value || '';
+            payload.teacherId = document.getElementById('sessionTeacherId')?.value || '';
+            payload.teacherName = document.getElementById('sessionTeacherName')?.value || '';
+        }
+        if (sessionCanManageCoTeachers || sessionCanToggleCoTeacherEdit || sessionCanEditMetadata) {
+            payload.coTeachers = JSON.stringify(Array.isArray(sessionCoTeachersState) ? sessionCoTeachersState : []);
+        }
+        if (shouldSendInstructionalPayload) {
+            payload.roster = JSON.stringify(buildSessionSaveRosterRows());
+            payload.contentItems = JSON.stringify(Array.isArray(manualSessionContentState) ? manualSessionContentState : []);
+            payload.contentOrder = JSON.stringify(Array.isArray(sessionContentOrderState) ? sessionContentOrderState : []);
+            payload.skillsCovered = JSON.stringify(Array.isArray(skillsCoveredState) ? skillsCoveredState : []);
+        }
+        return payload;
+    }
+
+    function captureSessionFormSnapshot() {
+        try {
+            return JSON.stringify(buildSessionSavePayload());
+        } catch (_error) {
+            return '';
+        }
+    }
+
+    function isSessionFormDirty() {
+        return captureSessionFormSnapshot() !== sessionAutosaveBaseline;
+    }
+
+    function resetSessionAutosaveBaseline() {
+        sessionAutosaveBaseline = captureSessionFormSnapshot();
+    }
+
+    const submitSessionSave = async (savePayload) => {
+        const payloadWithCsrf = {
+            ...(savePayload || {}),
+            _csrf: csrfToken || undefined
+        };
+        const response = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/save`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-AJAX-Request': 'true',
+                ...(csrfToken ? { 'csrf-token': csrfToken } : {})
+            },
+            body: JSON.stringify(payloadWithCsrf)
+        });
+        const parsed = await response.json().catch(() => ({ status: 'error', message: 'Unable to read save response.' }));
+        return { response, result: parsed };
+    };
+
+    const applySaveGuard = async (saveResult) => {
+        if (typeof window.applyGuardedApiResult === 'function') {
+            return window.applyGuardedApiResult(saveResult, { busyTitle: 'Save Session In Progress', replayTitle: 'Session Already Saved' });
+        }
+        return { stop: false };
+    };
+
+    async function runSessionSave(options = {}) {
+        const {
+            reloadOnSuccess = false,
+            skipLateCheck = false,
+            showSuccessModal = true,
+            trigger = 'manual'
+        } = options;
+        const isAutosave = trigger === 'autosave';
+        const btn = document.getElementById('btnSaveSession');
+        const originalHtml = btn ? btn.innerHTML : '';
+
+        if (!skipLateCheck) {
             const lateMissingRows = getLateMissingMinuteRows();
             if (lateMissingRows.length) {
+                if (isAutosave) {
+                    return { ok: false, skipped: true, reason: 'late-minutes-required', message: 'Late minutes are required before autosave.' };
+                }
                 await showLateMinutesRequiredWarning(lateMissingRows, { openFirst: true });
-                return;
+                return { ok: false, skipped: true, reason: 'late-minutes-required' };
             }
+        }
 
-            const status = getSelectedSessionStatus();
-            const notes = document.getElementById('sessionNotes').value;
-            const room = document.getElementById('sessionRoom').value;
-            const selectedStatusRequiresMakeup = isSessionStatusMakeupRequired(status);
-            const shouldSendInstructionalPayload = !sessionInstructionalInactive && !selectedStatusRequiresMakeup;
+        const payload = buildSessionSavePayload();
+        const status = payload.status;
 
-            const roster = [];
-            const conductRowsByPersonId = new Map();
-            document.querySelectorAll('#conductTable .conduct-row, #optionalConductTable .conduct-row').forEach((row) => {
-                const personId = row.getAttribute('data-personid');
-                if (!personId || conductRowsByPersonId.has(personId)) return;
-                // Prefer Step 1 table when both exist for the same student.
-                conductRowsByPersonId.set(personId, row);
-            });
-            // Re-apply Step 1 rows so they win over optional rows for the same person.
-            document.querySelectorAll('#conductTable .conduct-row').forEach((row) => {
-                const personId = row.getAttribute('data-personid');
-                if (personId) conductRowsByPersonId.set(personId, row);
-            });
-            const readConductRating = (conductRow, selector) => {
-                if (!conductRow) return undefined;
-                const input = conductRow.querySelector(selector);
-                if (!input) return undefined;
-                const cell = input.closest('.conduct-rating-cell');
-                if (cell) return readConductPercentFromCell(cell, null);
-                return normalizeConductPercent(input.value, null);
-            };
-            document.querySelectorAll('.roster-row').forEach(row => {
-                const personId = row.getAttribute('data-personid');
-                const attendance = row.querySelector('.att-radio:checked')?.value || '';
-                const lateMinutes = row.querySelector('.att-late').value || null;
-                const earlyLeaveMinutes = row.querySelector('.att-leave').value || null;
-                const excuseRef = row.querySelector('.att-excuse').value || '';
-                const excuseAttachment = getAttendanceDetails(personId).excuseAttachment || null;
-                const conductRow = conductRowsByPersonId.get(personId);
-                const classEffortPercent = readConductRating(conductRow, '.conduct-class-effort');
-                const classParticipationPercent = readConductRating(conductRow, '.conduct-class-participation');
-                const respectsTeachersPercent = readConductRating(conductRow, '.conduct-respects-teachers');
-                const respectsStudentsPercent = readConductRating(conductRow, '.conduct-respects-students');
-
-                const rosterRow = {
-                    personId,
-                    attendance,
-                    lateMinutes,
-                    earlyLeaveMinutes,
-                    excuseRef,
-                    excuseAttachment,
-                    notes: ''
-                };
-                if (classEffortPercent !== undefined) rosterRow.classEffortPercent = classEffortPercent;
-                if (classParticipationPercent !== undefined) rosterRow.classParticipationPercent = classParticipationPercent;
-                if (respectsTeachersPercent !== undefined) rosterRow.respectsTeachersPercent = respectsTeachersPercent;
-                if (respectsStudentsPercent !== undefined) rosterRow.respectsStudentsPercent = respectsStudentsPercent;
-                roster.push(rosterRow);
-            });
-
-            const payload = {
-                status,
-                notes,
-                room,
-                actionStateId
-            };
-            if (sessionCanEditMetadata) {
-                payload.date = document.getElementById('sessionDate')?.value || '';
-                payload.startTime = document.getElementById('sessionStartTime')?.value || '';
-                payload.endTime = document.getElementById('sessionEndTime')?.value || '';
-                payload.teacherId = document.getElementById('sessionTeacherId')?.value || '';
-                payload.teacherName = document.getElementById('sessionTeacherName')?.value || '';
-            }
-            if (sessionCanManageCoTeachers || sessionCanToggleCoTeacherEdit || sessionCanEditMetadata) {
-                payload.coTeachers = JSON.stringify(Array.isArray(sessionCoTeachersState) ? sessionCoTeachersState : []);
-            }
-            if (shouldSendInstructionalPayload) {
-                payload.roster = JSON.stringify(roster);
-                payload.contentItems = JSON.stringify(Array.isArray(manualSessionContentState) ? manualSessionContentState : []);
-                payload.contentOrder = JSON.stringify(Array.isArray(sessionContentOrderState) ? sessionContentOrderState : []);
-                payload.skillsCovered = JSON.stringify(Array.isArray(skillsCoveredState) ? skillsCoveredState : []);
-            }
-
+        if (btn && !isAutosave) {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+        }
 
-            try {
-                const transitioningToCompletion = !isSessionCompletionStatus(sessionInitialStatusCode)
-                    && isSessionCompletionStatus(status);
-                if (transitioningToCompletion) {
-                    await refreshSessionReportInstances();
-                    const clientPending = getUnsubmittedSessionReports();
-                    if (clientPending.length) {
-                        await showPendingReportsBlockModal(clientPending);
-                        return;
+        try {
+            const transitioningToCompletion = !isSessionCompletionStatus(sessionInitialStatusCode)
+                && isSessionCompletionStatus(status);
+            if (transitioningToCompletion) {
+                await refreshSessionReportInstances();
+                const clientPending = getUnsubmittedSessionReports();
+                if (clientPending.length) {
+                    if (isAutosave) {
+                        return { ok: false, skipped: true, reason: 'pending-reports', message: 'Completion blocked by pending reports.' };
                     }
+                    await showPendingReportsBlockModal(clientPending);
+                    return { ok: false, skipped: true, reason: 'pending-reports' };
                 }
+            }
 
-                const submitSessionSave = async (savePayload) => {
-                    const payloadWithCsrf = {
-                        ...(savePayload || {}),
-                        _csrf: csrfToken || undefined
-                    };
-                    const response = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/save`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-AJAX-Request': 'true',
-                            ...(csrfToken ? { 'csrf-token': csrfToken } : {})
-                        },
-                        body: JSON.stringify(payloadWithCsrf)
-                    });
-                    const parsed = await response.json().catch(() => ({ status: 'error', message: 'Unable to read save response.' }));
-                    return { response, result: parsed };
-                };
-                const applySaveGuard = async (saveResult) => {
-                    if (typeof window.applyGuardedApiResult === 'function') {
-                        return window.applyGuardedApiResult(saveResult, { busyTitle: 'Save Session In Progress', replayTitle: 'Session Already Saved' });
-                    }
-                    return { stop: false };
-                };
+            let { result } = await submitSessionSave(payload);
+            let guarded = await applySaveGuard(result);
+            if (guarded.stop) {
+                return { ok: false, skipped: true, reason: 'guard-stop' };
+            }
 
-                let { result } = await submitSessionSave(payload);
-                let guarded = await applySaveGuard(result);
-                if (guarded.stop) return;
-
-                if (result.code === 'PENDING_REPORTS_BLOCK_COMPLETION') {
-                    const pendingRows = Array.isArray(result?.data?.pendingReports) ? result.data.pendingReports : [];
-                    await showPendingReportsBlockModal(pendingRows.length ? pendingRows : getUnsubmittedSessionReports());
-                    return;
+            if (result.code === 'PENDING_REPORTS_BLOCK_COMPLETION') {
+                if (isAutosave) {
+                    return { ok: false, skipped: true, reason: 'pending-reports', message: result.message || 'Completion blocked by pending reports.' };
                 }
+                const pendingRows = Array.isArray(result?.data?.pendingReports) ? result.data.pendingReports : [];
+                await showPendingReportsBlockModal(pendingRows.length ? pendingRows : getUnsubmittedSessionReports());
+                return { ok: false, skipped: true, reason: 'pending-reports' };
+            }
 
-                if (result.status === 'warning' && result.code === 'MAKEUP_SESSIONS_EXIST') {
-                    const makeupRows = Array.isArray(result?.data?.makeupSessions) ? result.data.makeupSessions : [];
-                    const detailHtml = makeupRows.length
-                        ? '<div class="mt-3"><strong>Linked make-up sessions:</strong><ul class="mt-2 mb-0 text-start">'
-                            + makeupRows.map((row) => {
-                                const sessionId = attendanceAttachmentEscape(row?.sessionId || '-');
-                                const date = attendanceAttachmentEscape(row?.date || '-');
-                                const startTime = attendanceAttachmentEscape(row?.startTime || '--:--');
-                                const endTime = attendanceAttachmentEscape(row?.endTime || '--:--');
-                                const teacher = attendanceAttachmentEscape(row?.teacherName || row?.teacherId || '-');
-                                const roomValue = attendanceAttachmentEscape(row?.room || '-');
-                                const state = attendanceAttachmentEscape(row?.status || '-');
-                                return `<li><strong>${sessionId}</strong> | ${date} ${startTime}-${endTime} | Teacher: ${teacher} | Room: ${roomValue} | Status: ${state}</li>`;
-                            }).join('')
-                            + '</ul></div>'
-                        : '';
-                    const warningMessage = attendanceAttachmentEscape(result.message || 'Make-up sessions already exist for this original session.');
-                    const confirmed = await sessionConfirmBox({
-                        title: 'Make-up Sessions Already Scheduled',
-                        icon: 'warning',
-                        html: true,
-                        message: `${warningMessage}${detailHtml}<div class="mt-3">Changing to a status that does not need make-up will remove all listed make-up sessions. Continue?</div>`,
-                        confirmText: 'Remove Make-up Sessions and Continue',
-                        confirmClass: 'btn-warning'
-                    });
-                    if (!confirmed) return;
-
-                    ({ result } = await submitSessionSave({ ...payload, forceRemoveMakeups: true }));
-                    guarded = await applySaveGuard(result);
-                    if (guarded.stop) return;
+            if (result.status === 'warning' && result.code === 'MAKEUP_SESSIONS_EXIST') {
+                if (isAutosave) {
+                    return { ok: false, skipped: true, reason: 'makeup-confirmation-required', message: 'Make-up session confirmation required.' };
                 }
-
-                if (result.status === 'warning' && result.code === 'SESSION_METADATA_CONFLICTS') {
-                    const conflictRows = Array.isArray(result?.data?.conflicts) ? result.data.conflicts : [];
-                    const detailHtml = conflictRows.length
-                        ? '<div class="mt-3"><strong>Detected conflicts:</strong><ul class="mt-2 mb-0 text-start">'
-                            + conflictRows.map((row) => {
-                                const date = attendanceAttachmentEscape(row?.date || '-');
-                                const teacher = attendanceAttachmentEscape(row?.teacherName || '-');
-                                const conflictClass = attendanceAttachmentEscape(row?.conflictClass || 'schedule conflict');
-                                const existTime = attendanceAttachmentEscape(row?.existTime || '');
-                                return `<li>${date} | ${teacher} | ${conflictClass}${existTime ? ` (${existTime})` : ''}</li>`;
-                            }).join('')
-                            + '</ul></div>'
-                        : '';
-                    const warningMessage = attendanceAttachmentEscape(result.message || 'Schedule conflicts were detected for the updated session.');
-                    const confirmed = await sessionConfirmBox({
-                        title: 'Session Schedule Conflicts',
-                        icon: 'warning',
-                        html: true,
-                        message: `${warningMessage}${detailHtml}<div class="mt-3">Save anyway with these conflicts?</div>`,
-                        confirmText: 'Save Anyway',
-                        confirmClass: 'btn-warning'
-                    });
-                    if (!confirmed) return;
-
-                    ({ result } = await submitSessionSave({ ...payload, force: true }));
-                    guarded = await applySaveGuard(result);
-                    if (guarded.stop) return;
-                }
-
-                await sessionMessageBox({
-                    title: result.status === 'success' ? 'Saved' : 'Error',
-                    icon: result.status === 'success' ? 'success' : 'error',
-                    message: result.message,
-                    okClass: result.status === 'success' ? 'btn-success' : 'btn-danger'
+                const makeupRows = Array.isArray(result?.data?.makeupSessions) ? result.data.makeupSessions : [];
+                const detailHtml = makeupRows.length
+                    ? '<div class="mt-3"><strong>Linked make-up sessions:</strong><ul class="mt-2 mb-0 text-start">'
+                        + makeupRows.map((row) => {
+                            const sessionId = attendanceAttachmentEscape(row?.sessionId || '-');
+                            const date = attendanceAttachmentEscape(row?.date || '-');
+                            const startTime = attendanceAttachmentEscape(row?.startTime || '--:--');
+                            const endTime = attendanceAttachmentEscape(row?.endTime || '--:--');
+                            const teacher = attendanceAttachmentEscape(row?.teacherName || row?.teacherId || '-');
+                            const roomValue = attendanceAttachmentEscape(row?.room || '-');
+                            const state = attendanceAttachmentEscape(row?.status || '-');
+                            return `<li><strong>${sessionId}</strong> | ${date} ${startTime}-${endTime} | Teacher: ${teacher} | Room: ${roomValue} | Status: ${state}</li>`;
+                        }).join('')
+                        + '</ul></div>'
+                    : '';
+                const warningMessage = attendanceAttachmentEscape(result.message || 'Make-up sessions already exist for this original session.');
+                const confirmed = await sessionConfirmBox({
+                    title: 'Make-up Sessions Already Scheduled',
+                    icon: 'warning',
+                    html: true,
+                    message: `${warningMessage}${detailHtml}<div class="mt-3">Changing to a status that does not need make-up will remove all listed make-up sessions. Continue?</div>`,
+                    confirmText: 'Remove Make-up Sessions and Continue',
+                    confirmClass: 'btn-warning'
                 });
-                if (result.status === 'success') window.location.reload();
-            } catch (error) {
-                console.error(error);
-                await sessionMessageBox({
-                    title: 'Network Error',
-                    icon: 'error',
-                    message: 'A network error occurred while trying to save the session.',
-                    okText: 'Close',
-                    okClass: 'btn-secondary'
+                if (!confirmed) return { ok: false, skipped: true, reason: 'makeup-cancelled' };
+
+                ({ result } = await submitSessionSave({ ...payload, forceRemoveMakeups: true }));
+                guarded = await applySaveGuard(result);
+                if (guarded.stop) return { ok: false, skipped: true, reason: 'guard-stop' };
+            }
+
+            if (result.status === 'warning' && result.code === 'SESSION_METADATA_CONFLICTS') {
+                if (isAutosave) {
+                    return { ok: false, skipped: true, reason: 'metadata-conflicts', message: 'Schedule conflict confirmation required.' };
+                }
+                const conflictRows = Array.isArray(result?.data?.conflicts) ? result.data.conflicts : [];
+                const detailHtml = conflictRows.length
+                    ? '<div class="mt-3"><strong>Detected conflicts:</strong><ul class="mt-2 mb-0 text-start">'
+                        + conflictRows.map((row) => {
+                            const date = attendanceAttachmentEscape(row?.date || '-');
+                            const teacher = attendanceAttachmentEscape(row?.teacherName || '-');
+                            const conflictClass = attendanceAttachmentEscape(row?.conflictClass || 'schedule conflict');
+                            const existTime = attendanceAttachmentEscape(row?.existTime || '');
+                            return `<li>${date} | ${teacher} | ${conflictClass}${existTime ? ` (${existTime})` : ''}</li>`;
+                        }).join('')
+                        + '</ul></div>'
+                    : '';
+                const warningMessage = attendanceAttachmentEscape(result.message || 'Schedule conflicts were detected for the updated session.');
+                const confirmed = await sessionConfirmBox({
+                    title: 'Session Schedule Conflicts',
+                    icon: 'warning',
+                    html: true,
+                    message: `${warningMessage}${detailHtml}<div class="mt-3">Save anyway with these conflicts?</div>`,
+                    confirmText: 'Save Anyway',
+                    confirmClass: 'btn-warning'
                 });
-            } finally {
+                if (!confirmed) return { ok: false, skipped: true, reason: 'conflicts-cancelled' };
+
+                ({ result } = await submitSessionSave({ ...payload, force: true }));
+                guarded = await applySaveGuard(result);
+                if (guarded.stop) return { ok: false, skipped: true, reason: 'guard-stop' };
+            }
+
+            if (result.status === 'success') {
+                resetSessionAutosaveBaseline();
+                if (isAutosave) {
+                    return { ok: true, message: result.message };
+                }
+                if (showSuccessModal) {
+                    await sessionMessageBox({
+                        title: 'Saved',
+                        icon: 'success',
+                        message: result.message,
+                        okClass: 'btn-success'
+                    });
+                }
+                if (reloadOnSuccess) window.location.reload();
+                return { ok: true, message: result.message };
+            }
+
+            if (isAutosave) {
+                return { ok: false, message: result.message || 'Autosave failed.' };
+            }
+            await sessionMessageBox({
+                title: 'Error',
+                icon: 'error',
+                message: result.message,
+                okClass: 'btn-danger'
+            });
+            return { ok: false, message: result.message || 'Save failed.' };
+        } catch (error) {
+            console.error(error);
+            if (isAutosave) {
+                return { ok: false, message: 'A network error occurred during autosave.' };
+            }
+            await sessionMessageBox({
+                title: 'Network Error',
+                icon: 'error',
+                message: 'A network error occurred while trying to save the session.',
+                okText: 'Close',
+                okClass: 'btn-secondary'
+            });
+            return { ok: false, message: error?.message || 'Network error.' };
+        } finally {
+            if (btn && !isAutosave) {
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
             }
+        }
+    }
+
+    const btnSaveSession = document.getElementById('btnSaveSession');
+    if (btnSaveSession) {
+        btnSaveSession.addEventListener('click', async () => {
+            await runSessionSave({ reloadOnSuccess: true, showSuccessModal: true, trigger: 'manual' });
+        });
+    }
+
+    resetSessionAutosaveBaseline();
+
+    if (window.SchoolAutosave && typeof window.SchoolAutosave.init === 'function') {
+        window.SchoolAutosave.init({
+            sectionKey: 'manage-session',
+            sectionTitle: 'Manage Session',
+            orgId: sessionManagerOrgId,
+            policy: sessionAutosavePolicy,
+            readOnly: sessionConductReadOnly,
+            isDirty: () => isSessionFormDirty(),
+            canAutosave: () => {
+                if (sessionConductReadOnly) return false;
+                if (isDetailsModalDirty()) return false;
+                const status = getSelectedSessionStatus();
+                if (!isSessionCompletionStatus(sessionInitialStatusCode) && isSessionCompletionStatus(status)) {
+                    return false;
+                }
+                return true;
+            },
+            save: () => runSessionSave({
+                reloadOnSuccess: false,
+                skipLateCheck: false,
+                showSuccessModal: false,
+                trigger: 'autosave'
+            })
         });
     }
 });
@@ -7662,6 +7834,11 @@ function openDetailsModal(personId, name) {
     currentMentions = [];
     const area = document.getElementById('pendingMentionsArea');
     if(area) area.innerHTML = '';
+    const commentFileInput = document.getElementById('inp_newCommentFile');
+    if (commentFileInput) commentFileInput.value = '';
+
+    detailsModalSnapshot = captureDetailsModalFormSnapshot();
+    detailsModalAllowClose = false;
 
     if (detailsModalInstance) detailsModalInstance.show();
 }

@@ -52,6 +52,7 @@ const LABEL_FIELDS = Object.freeze({
   withdrawals: ['type', 'studentId'],
   attendanceMatrixPolicy: ['orgId'],
   conductRatingScalePolicy: ['orgId'],
+  autosavePolicy: ['orgId'],
   studentEnrollments: ['key'],
   teacherSchedules: ['key']
 });
@@ -105,6 +106,7 @@ const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
   { entityType: 'skills', label: 'Skills', group: 'operations', collectionName: 'schoolSkills', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false },
   { entityType: 'attendanceMatrixPolicy', label: 'Attendance Matrix Policies', group: 'operations', collectionName: 'schoolAttendanceMatrixPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'attendanceMatrix' },
   { entityType: 'conductRatingScalePolicy', label: 'Conduct Rating Scale Policies', group: 'operations', collectionName: 'schoolConductRatingScalePolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'conductRatingScale' },
+  { entityType: 'autosavePolicy', label: 'Autosave Policies', group: 'operations', collectionName: 'schoolAutosavePolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'autosave' },
   { entityType: 'leaveRequests', label: 'Leave Requests', group: 'operations', collectionName: 'schoolLeaveRequests', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'tasks', label: 'Tasks', group: 'operations', collectionName: 'schoolTasks', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'taskRoutingRules', label: 'Task Routing Rules', group: 'operations', collectionName: 'schoolTaskRoutingRules', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
@@ -161,6 +163,7 @@ function resolveListFields(entityType) {
     schoolAccounts: ['name', 'headCategory', 'partyId'],
     attendanceMatrixPolicy: ['scheduledMinutes'],
     conductRatingScalePolicy: ['levelCount'],
+    autosavePolicy: ['defaultMinutes'],
     studentEnrollments: ['key'],
     teacherSchedules: ['key']
   };

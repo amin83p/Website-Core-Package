@@ -14,6 +14,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     description: 'Configure late and early-leave cutoffs for each scheduled session duration.',
     icon: 'bi-clock-history',
     order: 20
+  }),
+  Object.freeze({
+    key: 'autosave',
+    title: 'Autosave',
+    description: 'Configure default autosave intervals and per-section defaults for school pages.',
+    icon: 'bi-arrow-repeat',
+    order: 30
   })
 ]);
 

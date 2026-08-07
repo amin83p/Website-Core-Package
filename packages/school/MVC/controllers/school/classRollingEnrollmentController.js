@@ -37,6 +37,7 @@ const classEnrollmentReadService = require('../../services/school/classEnrollmen
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
 const rollingEnrollmentFunderService = require('../../services/school/rollingEnrollmentFunderService');
+const rollingEnrollmentPeriodFilterService = require('../../services/school/rollingEnrollmentPeriodFilterService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
 const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
 const classEnrollmentDeleteService = require('../../services/school/classEnrollmentDeleteService');
@@ -1241,55 +1242,6 @@ async function resolveEnrollmentFunderBillingContext({
   };
 }
 
-function filterPeriodRowsBySearchQuery(rows, query) {
-  if (!Array.isArray(rows) || !rows.length) return rows;
-  const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
-  let q = String(query?.q || '').trim();
-  if (q === searchDefaultKeyword) q = '';
-  if (!q) return rows;
-
-  const rawType = String(query?.type || 'contains').trim().toLowerCase().replace(/\s+/g, '');
-  let matchMode = 'contains';
-  if (rawType === 'startswith' || rawType === 'starts_with') matchMode = 'starts_with';
-  else if (rawType === 'exactmatch' || rawType === 'exact_match' || rawType === 'exact') matchMode = 'exact';
-
-  const fieldRaw = String(query?.searchFields || query?.searchField || '').trim();
-  const field = fieldRaw && fieldRaw.toLowerCase() !== 'all' ? fieldRaw : '';
-
-  const norm = (v) => String(v ?? '').toLowerCase();
-  const needle = norm(q);
-
-  const cellText = (row, key) => {
-    switch (key) {
-      case 'studentLabel': return norm(row.studentLabel || row.studentId || '');
-      case 'studentId': return norm(toPublicId(row.studentId));
-      case 'startDate': return norm(row.startDate);
-      case 'endDate': return norm(row.endDate);
-      case 'status': return norm(row.status);
-      case 'funderLabel': return norm(row.funderLabel || row.funderType || row.funderId);
-      case 'funderType': return norm(row.funderType);
-      case 'funderId': return norm(row.funderId);
-      default: return '';
-    }
-  };
-
-  const allKeys = ROLLING_ENROLLMENT_SEARCHABLE_FIELDS;
-
-  const matches = (hay) => {
-    if (hay == null || hay === '') return false;
-    if (matchMode === 'exact') return hay === needle;
-    if (matchMode === 'starts_with') return hay.startsWith(needle);
-    return hay.includes(needle);
-  };
-
-  return rows.filter((row) => {
-    if (field && allKeys.includes(field)) {
-      return matches(cellText(row, field));
-    }
-    return allKeys.some((k) => matches(cellText(row, k)));
-  });
-}
-
 async function attachStudentLabelsToEnrollmentPeriodRows(periodRows, user, students = null) {
   const effectiveStudents = Array.isArray(students)
     ? students
@@ -1433,7 +1385,10 @@ async function showRollingEnrollmentPage(req, res) {
       });
     periodRows = attachFunderLabelsToPeriodRows(periodRows, funderOptions);
 
-    periodRows = filterPeriodRowsBySearchQuery(periodRows, req.query);
+    periodRows = rollingEnrollmentPeriodFilterService.filterEnrollmentPeriodRows(periodRows, req.query, {
+      orgToday: resolveOrgTodayFromRequest(req),
+      searchableFields: ROLLING_ENROLLMENT_SEARCHABLE_FIELDS
+    });
     periodRows = await attachSessionProgressToEnrollmentPeriodRows(periodRows, classData, req.user, students);
 
     res.render('school/class/rollingEnrollment', {
@@ -1452,6 +1407,10 @@ async function showRollingEnrollmentPage(req, res) {
       includeModal_Table: true,
       print: true,
       filters: req.query,
+      hasRollingFiltersApplied: rollingEnrollmentPeriodFilterService.hasRollingEnrollmentFiltersApplied(req.query),
+      enrollmentGroupOptions: rollingEnrollmentPeriodFilterService.ENROLLMENT_GROUP_OPTIONS,
+      periodStatusOptions: rollingEnrollmentPeriodFilterService.PERIOD_STATUS_OPTIONS,
+      targetTypeOptions: rollingEnrollmentPeriodFilterService.TARGET_TYPE_OPTIONS,
       orgToday: resolveOrgTodayFromRequest(req),
       user: req.user,
       actionStateId: req.actionStateId
@@ -1479,20 +1438,17 @@ async function listClassEnrollmentPeriods(req, res) {
         return (Number.isFinite(aSeq) ? aSeq : 0) - (Number.isFinite(bSeq) ? bSeq : 0);
       });
 
-    const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
-    const qRaw = String(req.query.q || '').trim();
-    const searchActive = qRaw && qRaw !== searchDefaultKeyword;
-
     const [students, funderOptions] = await Promise.all([
       schoolDataService.fetchData('students', {}, req.user),
       loadActiveFunderOptions(req.user, classData.orgId)
     ]);
     rows = await attachStudentLabelsToEnrollmentPeriodRows(rows, req.user, students);
-    if (searchActive) {
-      rows = filterPeriodRowsBySearchQuery(rows, req.query);
-    }
-    rows = await attachSessionProgressToEnrollmentPeriodRows(rows, classData, req.user, students);
     rows = attachFunderLabelsToPeriodRows(rows, funderOptions);
+    rows = rollingEnrollmentPeriodFilterService.filterEnrollmentPeriodRows(rows, req.query, {
+      orgToday: resolveOrgTodayFromRequest(req),
+      searchableFields: ROLLING_ENROLLMENT_SEARCHABLE_FIELDS
+    });
+    rows = await attachSessionProgressToEnrollmentPeriodRows(rows, classData, req.user, students);
 
     return res.json({
       status: 'success',

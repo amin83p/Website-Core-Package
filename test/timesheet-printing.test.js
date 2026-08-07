@@ -299,3 +299,27 @@ test('timesheet editor always exposes Print and blocks dirty drafts', () => {
   assert.doesNotMatch(editor, /btnPrintTimesheet[\s\S]{0,250}type="submit"/);
   assert.doesNotMatch(editor, /btnPrintTimesheet[\s\S]{0,500}Processing/);
 });
+
+test('timesheet management page exposes selection print and disables generic table print', () => {
+  const manage = read('packages/school/MVC/views/school/timesheet/timesheetManage.ejs');
+  const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
+  assert.match(controller, /showTimesheetManagement[\s\S]*?canPrintManagedTimesheets/);
+  assert.match(controller, /showTimesheetManagement[\s\S]*?print:\s*false/);
+  assert.match(manage, /timesheetSelectAllVisible/);
+  assert.match(manage, /timesheet-print-select/);
+  assert.match(manage, /btnPrintSelectedTimesheets/);
+  assert.match(manage, /btn btn-filled btn-edit btn-md me-2 mb-2/);
+  assert.match(manage, /optionalBtnsBeforePrint/);
+  assert.match(manage, /TIMESHEET_MANAGE_PRINT_ACTION = '\/school\/timesheets\/manage\/print'/);
+  assert.match(manage, /openSelectedTimesheetPrintPreview/);
+  assert.match(manage, /isPrintableRow/);
+  assert.match(manage, /submitted.*processed|processed.*submitted/);
+  assert.doesNotMatch(manage, /printTableBtn/);
+});
+
+test('managed print rejects non-printable timesheet statuses', () => {
+  const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
+  assert.match(controller, /exports\.printManagedTimesheets[\s\S]*?timesheetByPersonId/);
+  assert.match(controller, /Only submitted or processed timesheets can be printed/);
+  assert.match(controller, /normalizeTimesheetLifecycle\(row\)/);
+});

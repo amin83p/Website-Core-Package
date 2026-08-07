@@ -22,6 +22,19 @@
     teacherId: String(defaultInstructor?.personId || '').trim(),
     teacherName: String(defaultInstructor?.name || '').trim()
   });
+  const rollingFilters = (typeof filters !== 'undefined' && filters && typeof filters === 'object') ? filters : {};
+  const hasRollingFiltersAppliedFlag = typeof hasRollingFiltersApplied !== 'undefined' && hasRollingFiltersApplied === true;
+  const rollingEnrollmentGroupOptions = Array.isArray(typeof enrollmentGroupOptions !== 'undefined' ? enrollmentGroupOptions : null)
+    ? enrollmentGroupOptions
+    : [];
+  const rollingPeriodStatusOptions = Array.isArray(typeof periodStatusOptions !== 'undefined' ? periodStatusOptions : null)
+    ? periodStatusOptions
+    : [];
+  const rollingTargetTypeOptions = Array.isArray(typeof targetTypeOptions !== 'undefined' ? targetTypeOptions : null)
+    ? targetTypeOptions
+    : [];
+  const rollingFunderOptions = Array.isArray(funderOptions) ? funderOptions : [];
+  const rollingFilterAction = `/school/classes/${encodeURIComponent(String(c.id || ''))}/rolling-enrollment`;
 %>
 
 <style>
@@ -175,6 +188,70 @@
   optionalBtnsBeforePrint: rollingOptionalBtnsBeforePrint
 }) %>
 
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Enrollment Periods</div>
+    <button
+      id="rollingFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#rollingFilterCollapse"
+      aria-expanded="<%= hasRollingFiltersAppliedFlag ? 'true' : 'false' %>"
+      aria-controls="rollingFilterCollapse"
+      aria-label="<%= hasRollingFiltersAppliedFlag ? 'Close filters' : 'Open filters' %>">
+      <i id="rollingFilterToggleIcon" class="bi <%= hasRollingFiltersAppliedFlag ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasRollingFiltersAppliedFlag ? ' show' : '' %>" id="rollingFilterCollapse">
+    <form class="card-body p-3" method="get" action="<%= rollingFilterAction %>">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label" for="rollingEnrollmentGroupFilter">Enrollment group</label>
+          <select class="form-select size-md" id="rollingEnrollmentGroupFilter" name="enrollmentGroup">
+            <% rollingEnrollmentGroupOptions.forEach((option) => { %>
+              <option value="<%= option.value %>" <%= String(rollingFilters.enrollmentGroup || 'all') === option.value ? 'selected' : '' %>><%= option.label %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label" for="rollingPeriodStatusFilter">Period status</label>
+          <select class="form-select size-md" id="rollingPeriodStatusFilter" name="periodStatus">
+            <option value="" <%= !rollingFilters.periodStatus ? 'selected' : '' %>>All statuses</option>
+            <% rollingPeriodStatusOptions.forEach((value) => { %>
+              <option value="<%= value %>" <%= String(rollingFilters.periodStatus || '') === value ? 'selected' : '' %>><%= String(value).replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()) %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label" for="rollingFunderFilter">Funder</label>
+          <select class="form-select size-md" id="rollingFunderFilter" name="funderId">
+            <option value="" <%= !rollingFilters.funderId ? 'selected' : '' %>>All funders</option>
+            <option value="self" <%= String(rollingFilters.funderId || '') === 'self' ? 'selected' : '' %>>Self-funded</option>
+            <% rollingFunderOptions.forEach((option) => { %>
+              <option value="<%= option.id %>" <%= String(rollingFilters.funderId || '') === String(option.id) ? 'selected' : '' %>><%= option.label %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label" for="rollingTargetTypeFilter">Target type</label>
+          <select class="form-select size-md" id="rollingTargetTypeFilter" name="targetType">
+            <% rollingTargetTypeOptions.forEach((option) => { %>
+              <option value="<%= option.value %>" <%= String(rollingFilters.targetType || 'all') === option.value ? 'selected' : '' %>><%= option.label %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-12 d-flex justify-content-lg-end gap-2 pt-2">
+          <a href="<%= rollingFilterAction %>" class="btn btn-outline-secondary btn-md" id="rollingFilterResetLink">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <%- include('partials/tablePages-search', {
   placeholder: 'Search enrollment periods...',
   fields: []
@@ -197,15 +274,15 @@
     <table class="table-responsive size-md" id="first-table">
       <thead>
         <tr>
-          <th class="ps-4">Student / ID</th>
-          <th>Start Date</th>
-          <th>End Date</th>
-          <th class="text-center">Target</th>
-          <th class="text-center">Consumed</th>
-          <th class="text-center">Remaining</th>
-          <th>Completion</th>
-          <th class="text-center">Period Status</th>
-          <th>Funder</th>
+          <th class="ps-4 draggable" data-column="student">Student / ID <span class="sort-icon"></span></th>
+          <th class="draggable" data-column="startDate">Start Date <span class="sort-icon"></span></th>
+          <th class="draggable" data-column="endDate">End Date <span class="sort-icon"></span></th>
+          <th class="draggable text-center" data-column="target">Target <span class="sort-icon"></span></th>
+          <th class="draggable text-center" data-column="consumed">Consumed <span class="sort-icon"></span></th>
+          <th class="draggable text-center" data-column="remaining">Remaining <span class="sort-icon"></span></th>
+          <th class="draggable" data-column="completion">Completion <span class="sort-icon"></span></th>
+          <th class="draggable text-center" data-column="status">Period Status <span class="sort-icon"></span></th>
+          <th class="draggable" data-column="funder">Funder <span class="sort-icon"></span></th>
           <th class="text-end pe-4">Actions</th>
         </tr>
       </thead>
@@ -3451,10 +3528,63 @@
     };
   }
 
+  function resolvePeriodEndSortValue(row = {}, explicitTargetSessionCount = 0) {
+    if (explicitTargetSessionCount > 0) return '9999-12-31';
+    const endDate = String(row?.endDate || '').trim();
+    return endDate || '9999-12-31';
+  }
+
+  function reapplyActiveTableSort() {
+    const table = document.getElementById('first-table');
+    if (!table) return;
+    const activeHeader = table.querySelector('thead th.sort-asc, thead th.sort-desc');
+    if (!activeHeader) return;
+    const column = String(activeHeader.dataset.column || '').trim();
+    const order = activeHeader.classList.contains('sort-desc') ? 'desc' : 'asc';
+    const tbody = table.querySelector('tbody');
+    if (!tbody || !column) return;
+    const headerArray = Array.from(table.querySelectorAll('thead th'));
+    const idx = headerArray.findIndex((header) => header.dataset.column === column);
+    if (idx < 0) return;
+
+    const resolveComparableSortValue = (cell) => {
+      const explicitRaw = cell?.dataset?.sortValue;
+      const cellRaw = String(
+        explicitRaw == null || String(explicitRaw).trim() === ''
+          ? (cell?.textContent || '')
+          : explicitRaw
+      ).replace(/\s+/g, ' ').trim();
+      if (!cellRaw) return { type: 'string', value: '' };
+      const normalizedNumeric = cellRaw.replace(/,/g, '');
+      if (/^-?\d+(\.\d+)?$/.test(normalizedNumeric)) {
+        return { type: 'number', value: Number(normalizedNumeric) };
+      }
+      if (/^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(cellRaw)) {
+        const asTimestamp = Date.parse(cellRaw);
+        if (!Number.isNaN(asTimestamp)) return { type: 'number', value: asTimestamp };
+      }
+      return { type: 'string', value: cellRaw.toLowerCase() };
+    };
+
+    const compareSortValues = (left, right) => {
+      if (left.type === 'number' && right.type === 'number') return left.value - right.value;
+      return String(left.value).localeCompare(String(right.value), undefined, { sensitivity: 'base', numeric: true });
+    };
+
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.sort((leftRow, rightRow) => {
+      const leftVal = resolveComparableSortValue(leftRow.children[idx]);
+      const rightVal = resolveComparableSortValue(rightRow.children[idx]);
+      const comparison = compareSortValues(leftVal, rightVal);
+      return order === 'asc' ? comparison : -comparison;
+    });
+    tbody.innerHTML = '';
+    rows.forEach((row) => tbody.appendChild(row));
+  }
+
   function renderRows() {
     closeAllActionMenus();
     const rows = Array.isArray(periodRows) ? [...periodRows] : [];
-    rows.sort((a, b) => String(a?.startDate || '').localeCompare(String(b?.startDate || '')));
     periodCount.textContent = `${rows.length} row${rows.length === 1 ? '' : 's'}`;
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="' + String(periodTableColspan) + '" class="text-center py-4 text-muted">No enrollment periods found.</td></tr>';
@@ -3512,23 +3642,29 @@
         ? '<div class="small fw-semibold">' + htmlEscape(String(completion.date || '')) + '</div>'
           + (completion.sessionId ? '<div class="x-small text-muted font-monospace">' + htmlEscape(String(completion.sessionId)) + '</div>' : '')
         : '<span class="text-muted">-</span>';
+      const completionSortValue = String(completion?.date || '').trim();
+      const studentSortValue = `${String(studentDisplay.label || '').trim()} ${studentId}`.trim().toLowerCase();
+      const endSortValue = resolvePeriodEndSortValue(row, explicitTargetSessionCount);
+      const targetSortValue = displayTargetSessionCount !== null ? String(displayTargetSessionCount) : '';
+      const consumedSortValue = consumedSessionCount !== null ? String(consumedSessionCount) : '';
+      const remainingSortValue = remainingSessionCount !== null ? String(remainingSessionCount) : '';
       return `
         <tr>
-          <td class="ps-4">
+          <td class="ps-4" data-sort-value="${htmlEscape(studentSortValue)}">
             <div class="fw-semibold">${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(studentDisplay.label, studentDisplay.recordId, { className: 'text-decoration-none fw-semibold' }) : htmlEscape(studentDisplay.label))}</div>
             <div class="x-small text-muted font-monospace">${htmlEscape(studentId)}</div>
           </td>
-          <td>${htmlEscape(String(row?.startDate || '-'))}</td>
-          <td>${explicitTargetSessionCount ? '<span class="text-muted">Target-based</span>' : htmlEscape(String(row?.endDate || 'Open'))}</td>
-          <td class="text-center">${displayTargetSessionCount !== null ? htmlEscape(String(displayTargetSessionCount)) : '<span class="text-muted">-</span>'}</td>
-          <td class="text-center">${consumedSessionCount !== null ? htmlEscape(String(consumedSessionCount)) : '<span class="text-muted">-</span>'}</td>
-          <td class="text-center">${remainingSessionCount !== null ? htmlEscape(String(remainingSessionCount)) : '<span class="text-muted">-</span>'}</td>
-          <td>${completionHtml}</td>
-          <td class="text-center">
+          <td data-sort-value="${htmlEscape(String(row?.startDate || ''))}">${htmlEscape(String(row?.startDate || '-'))}</td>
+          <td data-sort-value="${htmlEscape(endSortValue)}">${explicitTargetSessionCount ? '<span class="text-muted">Target-based</span>' : htmlEscape(String(row?.endDate || 'Open'))}</td>
+          <td class="text-center" data-sort-value="${htmlEscape(targetSortValue)}">${displayTargetSessionCount !== null ? htmlEscape(String(displayTargetSessionCount)) : '<span class="text-muted">-</span>'}</td>
+          <td class="text-center" data-sort-value="${htmlEscape(consumedSortValue)}">${consumedSessionCount !== null ? htmlEscape(String(consumedSessionCount)) : '<span class="text-muted">-</span>'}</td>
+          <td class="text-center" data-sort-value="${htmlEscape(remainingSortValue)}">${remainingSessionCount !== null ? htmlEscape(String(remainingSessionCount)) : '<span class="text-muted">-</span>'}</td>
+          <td data-sort-value="${htmlEscape(completionSortValue)}">${completionHtml}</td>
+          <td class="text-center" data-sort-value="${htmlEscape(status)}">
             <span class="badge ${badgeClass}">${htmlEscape(formatPeriodStatusLabel(status))}</span>
             <div class="x-small text-muted mt-1">Finance: ${htmlEscape(financialStatus)}</div>
           </td>
-          <td>${htmlEscape(funderLabel)}</td>
+          <td data-sort-value="${htmlEscape(String(funderLabel || '').toLowerCase())}">${htmlEscape(funderLabel)}</td>
           <td class="text-end table-actions pe-4">
             <div class="rolling-row-actions-wrap">
               <button type="button" class="btn btn-secondary btn-sm rolling-row-actions-toggle" data-period-id="${htmlEscape(String(row?.id || ''))}">
@@ -3551,6 +3687,7 @@
     if (typeof window.reapplyCurrentTableSettings === 'function') {
       window.reapplyCurrentTableSettings(document.getElementById('first-table'));
     }
+    reapplyActiveTableSort();
   }
 
   function pickStudent() {
@@ -4257,6 +4394,17 @@
   qs('btnClearManualCredit')?.addEventListener('click', () => clearManualAccount('Credit'));
   qs('btnAddManualRow')?.addEventListener('click', addManualRow);
   bindKeyboardFlow();
+
+  const rollingFilterCollapse = document.getElementById('rollingFilterCollapse');
+  const rollingFilterToggleIcon = document.getElementById('rollingFilterToggleIcon');
+  rollingFilterCollapse?.addEventListener('show.bs.collapse', () => {
+    rollingFilterToggleIcon?.classList.remove('bi-chevron-down');
+    rollingFilterToggleIcon?.classList.add('bi-chevron-up');
+  });
+  rollingFilterCollapse?.addEventListener('hide.bs.collapse', () => {
+    rollingFilterToggleIcon?.classList.remove('bi-chevron-up');
+    rollingFilterToggleIcon?.classList.add('bi-chevron-down');
+  });
 
   resetChargeModalState();
   applyTargetSessionCountUi();

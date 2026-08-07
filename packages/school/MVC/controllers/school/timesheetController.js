@@ -1082,6 +1082,7 @@ exports.listEligibleTimesheetPersons = async (req, res) => {
 
 exports.showTimesheetManagement = async (req, res) => {
     try {
+        const canPrintManagedTimesheets = await hasTimesheetManagementAuthority(req.user, OPERATIONS.EXPORT);
         res.render('school/timesheet/timesheetManage', {
             title: 'Timesheet Management',
             tableName: 'Timesheet_Management',
@@ -1089,7 +1090,8 @@ exports.showTimesheetManagement = async (req, res) => {
             newLabel: null,
             includeModal: true,
             includeModal_Table: true,
-            print: true,
+            print: false,
+            canPrintManagedTimesheets,
             user: req.user,
             actionStateId: req.actionStateId
         });
@@ -1414,12 +1416,21 @@ exports.printManagedTimesheets = async (req, res) => {
         if (!periodId) throw new Error('Timesheet period is required.');
         if (!personIds.length) throw new Error('Select at least one timesheet to print.');
 
-        const [period, eligiblePeople] = await Promise.all([
+        const [period, eligiblePeople, allTimesheets] = await Promise.all([
             dataService.getDataById('timesheetPeriods', periodId, req.user),
-            loadTimesheetEligiblePeople(activeOrgId, req.user)
+            loadTimesheetEligiblePeople(activeOrgId, req.user),
+            dataService.fetchData('timesheets', {}, req.user, dataService.buildRouteAccessContext(req))
         ]);
         if (!period) throw new Error('Timesheet period not found.');
         assertPeriodOrgAccess(period, activeOrgId, req.user);
+
+        const timesheetByPersonId = new Map(
+            (Array.isArray(allTimesheets) ? allTimesheets : [])
+                .filter((row) => idsEqual(row?.orgId, activeOrgId) && idsEqual(row?.periodId, periodId))
+                .map((row) => normalizeTimesheetLifecycle(row))
+                .map((row) => [String(row?.teacherId || '').trim(), row])
+                .filter(([id]) => Boolean(id))
+        );
 
         const eligibleById = new Map((Array.isArray(eligiblePeople) ? eligiblePeople : [])
             .map((row) => [String(row?.personId || row?.id || '').trim(), row])
@@ -1427,6 +1438,11 @@ exports.printManagedTimesheets = async (req, res) => {
         const people = personIds.map((personId) => {
             const row = eligibleById.get(personId);
             if (!row) return null;
+            const timesheet = timesheetByPersonId.get(personId) || null;
+            const status = String(timesheet?.status || 'not_started').toLowerCase();
+            if (!['submitted', 'processed'].includes(status)) {
+                throw new Error('Only submitted or processed timesheets can be printed.');
+            }
             return { id: personId, name: String(row.name || row.displayName || personId) };
         });
         if (people.some((row) => !row)) {

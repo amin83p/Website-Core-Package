@@ -75,6 +75,7 @@ const sessionReportInstanceService = require('../../services/school/sessionRepor
 const schoolRecordAccessService = require('../../services/school/schoolRecordAccessService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
+const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
@@ -3948,6 +3949,9 @@ async function manageSession(req, res) {
         const conductRatingScaleResolved = await conductRatingScalePolicyModel.getPolicyForOrg(
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
         );
+        const autosavePolicyResolved = await autosavePolicyModel.getPolicyForOrg(
+            classData?.orgId || getActiveOrgIdOrThrow(req.user)
+        );
         const sessionStudentCases = await sessionStudentCaseService.listCasesForSession({
             classId,
             sessionId,
@@ -4023,6 +4027,7 @@ async function manageSession(req, res) {
             enabledAttendanceStatuses,
             canOpenAttendanceMatrix,
             conductRatingScaleResolved,
+            autosavePolicyResolved,
             sessionStudentCases,
             studentCaseDetailPresets: getPresetConfig(),
             gradebookSkills: sessionSkillPolicy.renderCatalog,

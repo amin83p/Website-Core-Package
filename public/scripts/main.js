@@ -3350,6 +3350,7 @@ function initScopedButtonWaitingState(options = {}) {
         if (button.classList.contains('view-btn')) return true;
         if (button.classList.contains('js-open-advanced-search')) return true;
         if (button.classList.contains('btn-copy-key')) return true;
+        if (button.classList.contains('school-autosave-side-control')) return true;
         if (button.hasAttribute('data-bs-toggle') || button.hasAttribute('data-bs-target')) return true;
         if (button.hasAttribute('data-bs-dismiss')) return true;
 

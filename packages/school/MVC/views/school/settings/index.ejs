@@ -2,6 +2,8 @@
   const canUpdateFlag = typeof canUpdate !== 'undefined' && canUpdate === true;
   const conductLevelsJson = JSON.stringify(conductPolicy?.levels || []).replace(/</g, '\\u003c');
   const attendanceItemsJson = JSON.stringify(attendanceItems || []).replace(/</g, '\\u003c');
+  const autosavePolicyJson = JSON.stringify(typeof autosavePolicy !== 'undefined' ? autosavePolicy : { defaultMinutes: 5, sections: {} }).replace(/</g, '\\u003c');
+  const autosaveSectionsJson = JSON.stringify(typeof autosaveSections !== 'undefined' ? autosaveSections : []).replace(/</g, '\\u003c');
   const attendanceThresholdsEnabledFlag = typeof attendanceThresholdsEnabled === 'undefined'
     ? true
     : attendanceThresholdsEnabled !== false;
@@ -333,6 +335,64 @@
           </form>
         </div>
       </section>
+
+      <section class="school-settings-panel card border-0 shadow-sm" id="autosave" role="tabpanel" aria-labelledby="settings-tab-autosave" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Autosave</h2>
+              <p class="small text-muted mb-0">Set default autosave intervals and per-page defaults for school workflows.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted">
+            Teachers can override autosave on each supported page. Those overrides are stored on their device only.
+            Organization defaults apply when a teacher has not changed settings on that page.
+          </p>
+          <div class="alert alert-danger d-none js-settings-error" id="autosaveSettingsError" role="alert"></div>
+          <form id="autosaveSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="row g-3 mb-4">
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" for="autosaveDefaultMinutes">Default interval (minutes)</label>
+                <input
+                  class="form-control"
+                  type="number"
+                  min="1"
+                  max="60"
+                  step="1"
+                  id="autosaveDefaultMinutes"
+                  name="defaultMinutes"
+                  value="<%= typeof autosavePolicy !== 'undefined' && autosavePolicy?.defaultMinutes != null ? autosavePolicy.defaultMinutes : 5 %>"
+                  <%= canUpdateFlag ? '' : 'disabled' %>
+                >
+                <div class="form-text">Used when a section does not have its own override.</div>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle school-settings-table">
+                <thead class="table-light">
+                  <tr>
+                    <th>Section</th>
+                    <th class="text-center">Enabled by default</th>
+                    <th style="min-width:10rem;">Minutes override</th>
+                  </tr>
+                </thead>
+                <tbody id="autosaveSettingsBody"></tbody>
+              </table>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit" id="btnSaveAutosaveSettings">
+                  <i class="bi bi-save me-1"></i>Save Autosave Settings
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
     </main>
   </div>
 </div>
@@ -342,9 +402,12 @@
   const canUpdate = <%= canUpdateFlag ? 'true' : 'false' %>;
   let conductLevels = <%- conductLevelsJson %>;
   let attendanceItems = <%- attendanceItemsJson %>;
+  let autosavePolicy = <%- autosavePolicyJson %>;
+  const autosaveSections = <%- autosaveSectionsJson %>;
   let attendanceThresholdsEnabled = <%= attendanceThresholdsEnabledFlag ? 'true' : 'false' %>;
   const conductBody = document.getElementById('conductSettingsBody');
   const attendanceBody = document.getElementById('attendanceSettingsBody');
+  const autosaveBody = document.getElementById('autosaveSettingsBody');
   const settingsWorkspace = document.getElementById('schoolSettingsWorkspace');
   const settingsSidebarToggle = document.getElementById('btnToggleSettingsSidebar');
   const settingsSidebarToggleIcon = document.getElementById('settingsSidebarToggleIcon');
@@ -683,7 +746,64 @@
     renderAttendanceItems();
   });
 
+  function renderAutosaveSections() {
+    if (!autosaveBody) return;
+    const disabled = canUpdate ? '' : 'disabled';
+    const sections = autosavePolicy?.sections && typeof autosavePolicy.sections === 'object'
+      ? autosavePolicy.sections
+      : {};
+    autosaveBody.innerHTML = (autosaveSections || []).map((section) => {
+      const row = sections[section.key] || {};
+      const enabled = row.enabledByDefault === true;
+      const minutes = row.defaultMinutes == null ? '' : String(row.defaultMinutes);
+      return `
+        <tr data-autosave-section="${escapeHtml(section.key)}">
+          <td>
+            <div class="fw-semibold">${escapeHtml(section.title || section.key)}</div>
+            <div class="small text-muted">${escapeHtml(section.description || '')}</div>
+          </td>
+          <td class="text-center">
+            <input class="form-check-input js-autosave-enabled" type="checkbox" ${enabled ? 'checked' : ''} ${disabled} aria-label="${escapeHtml(section.title || section.key)} enabled by default">
+          </td>
+          <td>
+            <input class="form-control form-control-sm js-autosave-minutes" type="number" min="1" max="60" step="1" value="${escapeHtml(minutes)}" placeholder="Use default" ${disabled} aria-label="${escapeHtml(section.title || section.key)} minutes override">
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function collectAutosaveSections() {
+    const sections = {};
+    autosaveBody?.querySelectorAll('tr[data-autosave-section]').forEach((row) => {
+      const key = String(row.dataset.autosaveSection || '').trim();
+      if (!key) return;
+      const minutesRaw = row.querySelector('.js-autosave-minutes')?.value;
+      sections[key] = {
+        enabledByDefault: row.querySelector('.js-autosave-enabled')?.checked === true,
+        defaultMinutes: minutesRaw === '' || minutesRaw == null ? null : Number(minutesRaw)
+      };
+    });
+    return sections;
+  }
+
+  document.getElementById('autosaveSettingsForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveAutosaveSettings');
+    if (!button) return;
+    const result = await postSettings('/school/settings/autosave', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      defaultMinutes: document.getElementById('autosaveDefaultMinutes')?.value || '5',
+      sections: JSON.stringify(collectAutosaveSections())
+    }, button, 'autosaveSettingsError');
+    if (!result) return;
+    autosavePolicy = result.policy && typeof result.policy === 'object' ? result.policy : autosavePolicy;
+    renderAutosaveSections();
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
   renderConductLevels();
   renderAttendanceItems();
+  renderAutosaveSections();
 })();
 </script>

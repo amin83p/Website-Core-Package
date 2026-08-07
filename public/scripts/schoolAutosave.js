@@ -1,0 +1,375 @@
+(function initSchoolAutosave(global) {
+  'use strict';
+
+  const STORAGE_PREFIX = 'schoolAutosave';
+  const MIN_MINUTES = 1;
+  const MAX_MINUTES = 60;
+
+  let activeController = null;
+
+  function clampMinutes(value, fallback) {
+    const n = Number(value);
+    const fb = Number(fallback);
+    const base = Number.isFinite(fb) ? fb : 5;
+    if (!Number.isFinite(n)) return Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, Math.round(base)));
+    return Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, Math.round(n)));
+  }
+
+  function storageKey(orgId, sectionKey) {
+    return `${STORAGE_PREFIX}:${String(orgId || '').trim()}:${String(sectionKey || '').trim()}`;
+  }
+
+  function readLocalOverride(orgId, sectionKey) {
+    try {
+      const raw = global.localStorage.getItem(storageKey(orgId, sectionKey));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return {
+        enabled: parsed.enabled === true,
+        minutes: parsed.minutes == null ? null : clampMinutes(parsed.minutes, 5)
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeLocalOverride(orgId, sectionKey, value) {
+    try {
+      global.localStorage.setItem(storageKey(orgId, sectionKey), JSON.stringify({
+        enabled: value?.enabled === true,
+        minutes: value?.minutes == null ? null : clampMinutes(value.minutes, 5)
+      }));
+    } catch (_) {
+      // Storage can be unavailable in privacy-restricted browsers.
+    }
+  }
+
+  function resolveSectionPolicy(policy, sectionKey) {
+    const sections = policy?.sections && typeof policy.sections === 'object' ? policy.sections : {};
+    const section = sections[sectionKey] || {};
+    const defaultMinutes = clampMinutes(policy?.defaultMinutes, 5);
+    const sectionMinutes = section.defaultMinutes == null
+      ? defaultMinutes
+      : clampMinutes(section.defaultMinutes, defaultMinutes);
+    return {
+      enabledByDefault: section.enabledByDefault === true,
+      defaultMinutes: sectionMinutes
+    };
+  }
+
+  function resolveEffectiveConfig(orgId, sectionKey, policy) {
+    const sectionPolicy = resolveSectionPolicy(policy, sectionKey);
+    const local = readLocalOverride(orgId, sectionKey);
+    if (local) {
+      return {
+        enabled: local.enabled === true,
+        minutes: local.minutes == null ? sectionPolicy.defaultMinutes : clampMinutes(local.minutes, sectionPolicy.defaultMinutes)
+      };
+    }
+    return {
+      enabled: sectionPolicy.enabledByDefault === true,
+      minutes: sectionPolicy.defaultMinutes
+    };
+  }
+
+  function formatTime(value) {
+    if (!value) return '';
+    try {
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function renderSideControlContent(button) {
+    if (!button) return;
+    button.innerHTML = `
+      <span class="school-autosave-side-control__rings" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </span>
+      <i class="bi bi-arrow-repeat school-autosave-side-control__icon" aria-hidden="true"></i>
+    `;
+  }
+
+  function ensureSideControl() {
+    const host = document.querySelector('.header-side-controls');
+    if (!host) return null;
+    let button = document.getElementById('schoolAutosaveSideControl');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.id = 'schoolAutosaveSideControl';
+      button.className = 'header-settings-toggle header-side-control-btn school-autosave-side-control';
+      button.setAttribute('data-no-wait', 'true');
+      button.setAttribute('aria-label', 'Manage autosave for this page');
+      button.title = 'Autosave';
+      renderSideControlContent(button);
+      host.appendChild(button);
+    } else {
+      button.setAttribute('data-no-wait', 'true');
+      if (!button.querySelector('.school-autosave-side-control__icon')) {
+        renderSideControlContent(button);
+      }
+    }
+    return button;
+  }
+
+  function ensureSettingsModal() {
+    let modal = document.getElementById('schoolAutosaveSettingsModal');
+    if (modal) {
+      const dialog = modal.querySelector('.modal-dialog');
+      if (dialog) {
+        dialog.classList.remove('modal-sm');
+        dialog.classList.add('modal-md');
+      }
+      return modal;
+    }
+
+    modal = document.createElement('div');
+    modal.id = 'schoolAutosaveSettingsModal';
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+          <div class="modal-header border-bottom-0 pb-0">
+            <h5 class="modal-title fw-bold" id="schoolAutosaveSettingsModalTitle">Autosave</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body py-3" id="schoolAutosaveSettingsModalBody"></div>
+          <div class="modal-footer border-top-0 pt-0" id="schoolAutosaveSettingsModalFooter">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" id="schoolAutosaveModalApply" data-no-wait="true">Apply</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function updateSideControlUi(controller) {
+    const button = controller.button;
+    if (!button) return;
+    if (!button.querySelector('.school-autosave-side-control__icon')) {
+      renderSideControlContent(button);
+    }
+    const active = controller.config.enabled && !controller.readOnly;
+    button.classList.toggle('school-autosave-side-control--active', active);
+    button.classList.toggle('school-autosave-side-control--saving', active && controller.status === 'saving');
+    button.classList.toggle('school-autosave-side-control--error', controller.status === 'error');
+    const statusLabel = controller.readOnly
+      ? 'Autosave unavailable (read-only)'
+      : (controller.config.enabled ? `Autosave active every ${controller.config.minutes} min` : 'Autosave inactive');
+    button.title = statusLabel;
+    button.setAttribute('aria-pressed', controller.config.enabled ? 'true' : 'false');
+    button.setAttribute('aria-label', statusLabel);
+  }
+
+  async function openManagementModal(controller) {
+    const sectionTitle = controller.sectionTitle || controller.sectionKey;
+    const statusText = controller.readOnly
+      ? 'Read-only page — autosave is disabled.'
+      : (controller.config.enabled
+        ? `Active on this page · every ${controller.config.minutes} minute(s)`
+        : 'Inactive on this page');
+    const lastSaved = controller.lastSavedAt
+      ? `Last autosave: ${formatTime(controller.lastSavedAt)}`
+      : (controller.status === 'saving' ? 'Saving…' : 'No autosave yet this visit');
+    const errorText = controller.lastError ? `<div class="small text-danger mt-2">${escapeHtml(controller.lastError)}</div>` : '';
+
+    const modal = ensureSettingsModal();
+    const bodyEl = document.getElementById('schoolAutosaveSettingsModalBody');
+    const applyBtn = document.getElementById('schoolAutosaveModalApply');
+    if (!modal || !bodyEl || !applyBtn) return;
+
+    bodyEl.innerHTML = `
+      <p class="mb-2"><strong>${escapeHtml(sectionTitle)}</strong></p>
+      <p class="mb-3 text-muted small mb-0">${escapeHtml(statusText)}</p>
+      <p class="small text-muted mb-3">${escapeHtml(lastSaved)}</p>
+      <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" role="switch" id="schoolAutosaveModalEnabled" ${controller.config.enabled ? 'checked' : ''} ${controller.readOnly ? 'disabled' : ''}>
+        <label class="form-check-label fw-semibold" for="schoolAutosaveModalEnabled">Enable autosave on this page</label>
+      </div>
+      <div class="mb-2">
+        <label class="form-label fw-semibold small" for="schoolAutosaveModalMinutes">Interval (minutes)</label>
+        <input class="form-control" type="number" min="${MIN_MINUTES}" max="${MAX_MINUTES}" step="1" id="schoolAutosaveModalMinutes" value="${escapeHtml(String(controller.config.minutes))}" ${controller.readOnly ? 'disabled' : ''}>
+      </div>
+      <p class="small text-muted mb-0">Changes apply only on this device. Organization defaults come from School Settings.</p>
+      ${errorText}
+    `;
+    applyBtn.disabled = controller.readOnly;
+
+    const instance = global.bootstrap?.Modal?.getOrCreateInstance(modal);
+    instance?.show();
+
+    const handleApply = () => {
+      const enabled = document.getElementById('schoolAutosaveModalEnabled')?.checked === true;
+      const minutes = clampMinutes(
+        document.getElementById('schoolAutosaveModalMinutes')?.value,
+        controller.config.minutes
+      );
+      controller.setConfig({ enabled, minutes }, { persist: true });
+      instance?.hide();
+    };
+
+    applyBtn.replaceWith(applyBtn.cloneNode(true));
+    const freshApplyBtn = document.getElementById('schoolAutosaveModalApply');
+    freshApplyBtn?.addEventListener('click', handleApply, { once: true });
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[ch]));
+  }
+
+  function createController(options) {
+    const sectionKey = String(options.sectionKey || '').trim();
+    const orgId = String(options.orgId || '').trim();
+    const policy = options.policy && typeof options.policy === 'object' ? options.policy : {};
+    const readOnly = options.readOnly === true;
+    const sectionTitle = String(options.sectionTitle || sectionKey).trim();
+    const isDirty = typeof options.isDirty === 'function' ? options.isDirty : () => false;
+    const save = typeof options.save === 'function' ? options.save : async () => ({ ok: false, skipped: true, reason: 'missing-save' });
+    const canAutosave = typeof options.canAutosave === 'function' ? options.canAutosave : () => true;
+    const onStatusChange = typeof options.onStatusChange === 'function' ? options.onStatusChange : null;
+
+    let config = resolveEffectiveConfig(orgId, sectionKey, policy);
+    if (readOnly) config = { ...config, enabled: false };
+
+    let timerId = null;
+    let status = 'idle';
+    let lastSavedAt = null;
+    let lastError = '';
+    const button = ensureSideControl();
+
+    function notifyStatus() {
+      updateSideControlUi(controller);
+      if (onStatusChange) onStatusChange({ status, config, lastSavedAt, lastError });
+    }
+
+    function clearTimer() {
+      if (timerId) {
+        global.clearInterval(timerId);
+        timerId = null;
+      }
+    }
+
+    function scheduleTimer() {
+      clearTimer();
+      if (!config.enabled || readOnly) return;
+      const intervalMs = Math.max(MIN_MINUTES, config.minutes) * 60 * 1000;
+      timerId = global.setInterval(() => {
+        void controller.tick();
+      }, intervalMs);
+    }
+
+    async function tick() {
+      if (!config.enabled || readOnly) return;
+      if (!isDirty()) {
+        status = 'idle';
+        notifyStatus();
+        return;
+      }
+      if (!canAutosave()) {
+        status = 'paused';
+        notifyStatus();
+        return;
+      }
+      status = 'saving';
+      lastError = '';
+      notifyStatus();
+      try {
+        const result = await save({ trigger: 'autosave' });
+        if (result?.ok) {
+          status = 'saved';
+          lastSavedAt = new Date();
+          lastError = '';
+        } else if (result?.skipped) {
+          status = 'paused';
+          lastError = result?.message || '';
+        } else {
+          status = 'error';
+          lastError = result?.message || 'Autosave failed.';
+        }
+      } catch (error) {
+        status = 'error';
+        lastError = error?.message || 'Autosave failed.';
+      }
+      notifyStatus();
+    }
+
+    const controller = {
+      sectionKey,
+      sectionTitle,
+      orgId,
+      policy,
+      readOnly,
+      config,
+      status,
+      lastSavedAt,
+      lastError,
+      button,
+      setConfig(next, { persist = false } = {}) {
+        config = {
+          enabled: next?.enabled === true,
+          minutes: clampMinutes(next?.minutes, config.minutes)
+        };
+        if (readOnly) config.enabled = false;
+        if (persist) {
+          writeLocalOverride(orgId, sectionKey, config);
+        }
+        status = 'idle';
+        scheduleTimer();
+        notifyStatus();
+      },
+      async tick() {
+        await tick();
+      },
+      destroy() {
+        clearTimer();
+        button?.removeEventListener('click', controller._onClick);
+        if (button && button.parentElement && activeController === controller) {
+          button.remove();
+        }
+        if (activeController === controller) activeController = null;
+      },
+      _onClick: null
+    };
+
+    controller._onClick = () => {
+      void openManagementModal(controller);
+    };
+    button?.addEventListener('click', controller._onClick);
+    scheduleTimer();
+    notifyStatus();
+    return controller;
+  }
+
+  function destroy() {
+    if (activeController) activeController.destroy();
+  }
+
+  function init(options = {}) {
+    destroy();
+    activeController = createController(options);
+    return activeController;
+  }
+
+  global.SchoolAutosave = {
+    STORAGE_PREFIX,
+    storageKey,
+    resolveEffectiveConfig,
+    init,
+    destroy
+  };
+})(window);

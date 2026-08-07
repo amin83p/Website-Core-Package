@@ -1,3 +1,8 @@
+<%
+  const timesheetManageOptionalBtnsBeforePrint = (typeof canPrintManagedTimesheets !== 'undefined' && canPrintManagedTimesheets)
+    ? ['<button type="button" id="btnPrintSelectedTimesheets" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Select submitted or processed timesheets to print">🖨 Print</button>']
+    : [];
+%>
 <%- include('partials/tablePages-start', {
   title,
   newUrl,
@@ -6,6 +11,7 @@
   tableName,
   btn_export: false,
   print,
+  optionalBtnsBeforePrint: timesheetManageOptionalBtnsBeforePrint,
   headerManageBtns: [
     '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACCOUNTING" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-calculator me-1"></i> Accounting Dashboard</a>'
@@ -87,6 +93,11 @@
     <table class="table table-hover align-middle mb-0" id="timesheetManageTable">
       <thead class="table-light">
         <tr>
+          <% if (typeof canPrintManagedTimesheets !== 'undefined' && canPrintManagedTimesheets) { %>
+            <th class="text-center" style="width: 2.5rem;">
+              <input type="checkbox" id="timesheetSelectAllVisible" class="form-check-input" title="Select all visible printable timesheets" aria-label="Select all visible printable timesheets">
+            </th>
+          <% } %>
           <th class="ps-4">Person</th>
           <th>Roles</th>
           <th>Department/Profile</th>
@@ -97,7 +108,7 @@
       </thead>
       <tbody id="timesheetRosterBody">
         <tr>
-          <td colspan="6" class="text-center py-5 text-muted">
+          <td colspan="<%= (typeof canPrintManagedTimesheets !== 'undefined' && canPrintManagedTimesheets) ? 7 : 6 %>" class="text-center py-5 text-muted">
             <i class="bi bi-calendar2-check fs-1 d-block mb-2"></i>
             Select a period and click <b>Load Timesheets</b>.
           </td>
@@ -133,12 +144,19 @@
 
 <script>
 (function () {
+  const CAN_PRINT_MANAGED_TIMESHEETS = <%= (typeof canPrintManagedTimesheets !== 'undefined' && canPrintManagedTimesheets) ? 'true' : 'false' %>;
+  const TIMESHEET_MANAGE_PRINT_ACTION = '/school/timesheets/manage/print';
+  const HAS_PRINT_SELECTION = CAN_PRINT_MANAGED_TIMESHEETS;
+  const TABLE_COLSPAN = HAS_PRINT_SELECTION ? 7 : 6;
+
   const periodSelect = document.getElementById('periodSelect');
   const periodDisplay = document.getElementById('periodDisplay');
   const btnPickPeriod = document.getElementById('btnPickPeriod');
   const btnClearPeriod = document.getElementById('btnClearPeriod');
   const btnLoad = document.getElementById('btnLoadRoster');
   const btnClear = document.getElementById('btnClearRoster');
+  const btnPrintSelected = document.getElementById('btnPrintSelectedTimesheets');
+  const selectAllVisible = document.getElementById('timesheetSelectAllVisible');
   const personSearch = document.getElementById('personSearch');
   const timesheetStatusFilter = document.getElementById('timesheetStatusFilter');
   const tbody = document.getElementById('timesheetRosterBody');
@@ -149,6 +167,7 @@
   const summaryContent = document.getElementById('departmentSummaryContent');
   let loadedRows = [];
   let loadedPeriod = null;
+  const selectedPersonIds = new Set();
 
   function escapeHtml(value) {
     return String(value || '')
@@ -187,9 +206,14 @@
     }).join('');
   }
 
-  function renderRows() {
+  function isPrintableRow(row) {
+    const status = String(row?.status || 'not_started').toLowerCase();
+    return status === 'submitted' || status === 'processed';
+  }
+
+  function getVisibleRows() {
     const term = String(personSearch?.value || '').trim().toLowerCase();
-    const rows = loadedRows.filter((row) => {
+    return loadedRows.filter((row) => {
       if (!term) return true;
       const haystack = [
         row.personId,
@@ -201,13 +225,60 @@
       ].join(' ').toLowerCase();
       return haystack.includes(term);
     });
+  }
+
+  function clearSelection() {
+    selectedPersonIds.clear();
+    updateSelectionUi();
+  }
+
+  function updateSelectionUi() {
+    if (btnPrintSelected) {
+      const count = selectedPersonIds.size;
+      btnPrintSelected.textContent = '🖨 Print';
+      btnPrintSelected.disabled = count === 0 || !loadedPeriod;
+      btnPrintSelected.title = count > 0
+        ? 'Print ' + count + ' selected timesheet' + (count === 1 ? '' : 's')
+        : 'Select submitted or processed timesheets to print';
+    }
+    if (!HAS_PRINT_SELECTION || !tbody) return;
+    const visiblePrintable = getVisibleRows().filter(isPrintableRow);
+    const visiblePrintableIds = visiblePrintable.map((row) => String(row.personId || '').trim()).filter(Boolean);
+    const selectedVisibleCount = visiblePrintableIds.filter((id) => selectedPersonIds.has(id)).length;
+    tbody.querySelectorAll('.timesheet-print-select').forEach((input) => {
+      const personId = String(input.dataset.personId || '').trim();
+      input.checked = selectedPersonIds.has(personId);
+    });
+    if (selectAllVisible) {
+      selectAllVisible.disabled = visiblePrintableIds.length === 0;
+      selectAllVisible.checked = visiblePrintableIds.length > 0 && selectedVisibleCount === visiblePrintableIds.length;
+      selectAllVisible.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < visiblePrintableIds.length;
+    }
+  }
+
+  function renderSelectionCell(row) {
+    if (!HAS_PRINT_SELECTION) return '';
+    const personId = String(row.personId || '').trim();
+    if (!isPrintableRow(row)) {
+      const status = String(row.status || 'not_started').toLowerCase();
+      const reason = status === 'draft'
+        ? 'Draft timesheets cannot be printed.'
+        : 'Only submitted or processed timesheets can be printed.';
+      return '<td class="text-center"><input type="checkbox" class="form-check-input" disabled title="' + escapeHtml(reason) + '" aria-label="Not printable"></td>';
+    }
+    return '<td class="text-center"><input type="checkbox" class="form-check-input timesheet-print-select" data-person-id="' + escapeHtml(personId) + '" aria-label="Select timesheet for ' + escapeHtml(row.name || personId) + '"></td>';
+  }
+
+  function renderRows() {
+    const rows = getVisibleRows();
 
     rosterCount.textContent = loadedPeriod
       ? `${rows.length} of ${loadedRows.length} eligible person(s) shown for ${loadedPeriod.name || loadedPeriod.id}.`
       : 'No period loaded yet.';
 
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">No matching teacher/staff timesheets found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="' + TABLE_COLSPAN + '" class="text-center py-5 text-muted">No matching teacher/staff timesheets found.</td></tr>';
+      updateSelectionUi();
       return;
     }
 
@@ -215,6 +286,7 @@
       const hours = Number(row.totalHours || 0).toFixed(2);
       return `
         <tr>
+          ${renderSelectionCell(row)}
           <td class="ps-4">
             <div class="fw-bold text-dark">${escapeHtml(row.name || row.personId)}</div>
             <div class="small text-muted font-monospace">${escapeHtml(row.personId)}</div>
@@ -243,6 +315,7 @@
         </tr>
       `;
     }).join('');
+    updateSelectionUi();
   }
 
   async function fetchJson(url) {
@@ -293,9 +366,10 @@
   function resetLoadedRoster(message) {
     loadedRows = [];
     loadedPeriod = null;
+    clearSelection();
     if (personSearch) personSearch.value = '';
     rosterCount.textContent = 'No period loaded yet.';
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">' + (message || 'Click <b>Load Timesheets</b> to load this period.') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="' + TABLE_COLSPAN + '" class="text-center py-5 text-muted">' + (message || 'Click <b>Load Timesheets</b> to load this period.') + '</td></tr>';
   }
 
   function setSelectedPeriod(period) {
@@ -320,7 +394,7 @@
     const original = btnLoad.innerHTML;
     btnLoad.disabled = true;
     btnLoad.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Loading...';
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading eligible timesheets...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="' + TABLE_COLSPAN + '" class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading eligible timesheets...</td></tr>';
 
     try {
       const rosterParams = new URLSearchParams({ periodId });
@@ -329,6 +403,7 @@
       const payload = await fetchJson('/school/timesheets/manage/api/roster?' + rosterParams.toString());
       loadedRows = Array.isArray(payload.rows) ? payload.rows : [];
       loadedPeriod = payload.period || null;
+      clearSelection();
       if (loadedPeriod) {
         periodMeta.innerHTML = '<b>' + escapeHtml(loadedPeriod.name || loadedPeriod.id) + '</b> | ' +
           escapeHtml(loadedPeriod.startDate || '') + ' to ' + escapeHtml(loadedPeriod.endDate || '') +
@@ -338,7 +413,7 @@
     } catch (error) {
       loadedRows = [];
       loadedPeriod = null;
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-danger">' + escapeHtml(error.message || String(error)) + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="' + TABLE_COLSPAN + '" class="text-center py-5 text-danger">' + escapeHtml(error.message || String(error)) + '</td></tr>';
       await showMessage({ title: 'Load Failed', icon: 'error', message: escapeHtml(error.message || String(error)) });
     } finally {
       btnLoad.disabled = false;
@@ -441,6 +516,71 @@
     }
   }
 
+  async function openSelectedTimesheetPrintPreview() {
+    if (!CAN_PRINT_MANAGED_TIMESHEETS) {
+      await showMessage({ title: 'Print Access Required', icon: 'warning', message: 'EXPORT access is required to print timesheets.' });
+      return;
+    }
+    const periodId = String(loadedPeriod?.id || periodSelect?.value || '').trim();
+    if (!periodId) {
+      await showMessage({ title: 'Timesheet Management', icon: 'warning', message: 'Please load a timesheet period first.' });
+      return;
+    }
+    const personIds = Array.from(selectedPersonIds).filter(Boolean);
+    if (!personIds.length) {
+      await showMessage({ title: 'Timesheet Management', icon: 'warning', message: 'Select at least one submitted or processed timesheet to print.' });
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'height=720,width=1100');
+    if (!printWindow) {
+      await showMessage({ title: 'Popup Blocked', icon: 'warning', message: 'Allow pop-ups for this site to open the timesheet print preview.' });
+      return;
+    }
+
+    try { printWindow.opener = null; } catch (_) { /* ignore */ }
+
+    printWindow.document.open();
+    printWindow.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Preparing Timesheets</title></head><body style="font:14px Segoe UI,Arial,sans-serif;padding:24px">Preparing timesheet print preview…</body></html>');
+    printWindow.document.close();
+
+    try {
+      const params = new URLSearchParams();
+      params.set('periodId', periodId);
+      personIds.forEach((personId) => params.append('personIds', personId));
+      const response = await fetch(TIMESHEET_MANAGE_PRINT_ACTION, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Accept': 'text/html',
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+        },
+        body: params.toString()
+      });
+      const html = await response.text();
+      if (!response.ok) {
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        const detail = String(parsed.querySelector('.alert-danger, .error-message, main')?.textContent || '').trim();
+        throw new Error(detail || 'The timesheet print preview could not be prepared.');
+      }
+
+      try {
+        printWindow.history.replaceState({}, '', location.pathname + '?print=1&view=timesheets');
+      } catch (_) { /* ignore */ }
+
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      window.setTimeout(() => {
+        try { printWindow.print(); } catch (_) { /* ignore */ }
+      }, 250);
+    } catch (error) {
+      try { printWindow.close(); } catch (_) { /* ignore */ }
+      await showMessage({ title: 'Print Error', icon: 'error', message: escapeHtml(error.message || String(error)) });
+    }
+  }
+
   btnLoad?.addEventListener('click', loadRoster);
   btnPickPeriod?.addEventListener('click', async () => {
     if (!window.GenericPicker || !window.GenericPickerPresets) {
@@ -479,6 +619,28 @@
     const btn = event.target.closest('[data-summary-person]');
     if (!btn) return;
     loadSummary(btn.getAttribute('data-summary-person'));
+  });
+  tbody?.addEventListener('change', (event) => {
+    const input = event.target.closest('.timesheet-print-select');
+    if (!input) return;
+    const personId = String(input.dataset.personId || '').trim();
+    if (!personId) return;
+    if (input.checked) selectedPersonIds.add(personId);
+    else selectedPersonIds.delete(personId);
+    updateSelectionUi();
+  });
+  selectAllVisible?.addEventListener('change', () => {
+    const visiblePrintable = getVisibleRows().filter(isPrintableRow);
+    visiblePrintable.forEach((row) => {
+      const personId = String(row.personId || '').trim();
+      if (!personId) return;
+      if (selectAllVisible.checked) selectedPersonIds.add(personId);
+      else selectedPersonIds.delete(personId);
+    });
+    updateSelectionUi();
+  });
+  btnPrintSelected?.addEventListener('click', () => {
+    void openSelectedTimesheetPrintPreview();
   });
 })();
 </script>

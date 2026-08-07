@@ -65,6 +65,10 @@ test('School Settings routes use standard access and action-state protection', (
     routes,
     /router\.post\('\/attendance-matrix'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
   );
+  assert.match(
+    routes,
+    /router\.post\('\/autosave'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
+  );
   assert.doesNotMatch(routes, /AdminMiddleware|adminAuthority|schoolAdminAccessService/);
 });
 
@@ -100,7 +104,7 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   const catalog = require('../packages/school/MVC/config/schoolSettingsCatalog');
   assert.deepEqual(
     catalog.listSchoolSettingsGroups().map((row) => row.key),
-    ['conduct-rating-scale', 'attendance-matrix']
+    ['conduct-rating-scale', 'attendance-matrix', 'autosave']
   );
   assert.match(view, /activeOrgName/);
   assert.match(view, /read-only access/);
@@ -112,6 +116,9 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   assert.match(view, /thresholdsEnabled/);
   assert.match(view, /\/school\/settings\/conduct-rating-scale/);
   assert.match(view, /\/school\/settings\/attendance-matrix/);
+  assert.match(view, /id="autosave"/);
+  assert.match(view, /\/school\/settings\/autosave/);
+  assert.match(view, /stored on their device only/);
   assert.match(view, /window\.showMessageModal/);
   assert.match(view, /window\.alert/);
   assert.match(view, /actionStateId/);
@@ -159,6 +166,13 @@ test('settings page renders in editable and read-only modes with valid client Ja
       isDefault: true
     }],
     attendanceThresholdsEnabled: false,
+    autosavePolicy: {
+      defaultMinutes: 5,
+      sections: {
+        'manage-session': { enabledByDefault: true, defaultMinutes: null }
+      }
+    },
+    autosaveSections: require('../packages/school/MVC/config/autosaveSectionCatalog').listAutosaveSections(),
     actionStateId: 'state-1',
     schoolSectionDashboardHref: '/dashboard/section-nav/SCHOOL'
   };

@@ -2,7 +2,9 @@
 
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
+const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const { listSchoolSettingsGroups } = require('../../config/schoolSettingsCatalog');
+const { listAutosaveSections } = require('../../config/autosaveSectionCatalog');
 const { userCanUpdateSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
 
 const CONDUCT_LEVEL_CODES = Object.freeze(
@@ -125,11 +127,13 @@ async function loadSettingsPageData(req) {
     conductPolicy,
     attendancePolicy,
     attendanceConfig,
+    autosavePolicy,
     canUpdate
   ] = await Promise.all([
     conductRatingScalePolicyModel.getPolicyForOrg(activeOrgId),
     attendanceMatrixPolicyModel.getPolicyForOrg(activeOrgId),
     attendanceMatrixPolicyModel.getPolicyCatalogForOrg(activeOrgId),
+    autosavePolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
   ]);
 
@@ -141,7 +145,9 @@ async function loadSettingsPageData(req) {
     conductPolicy,
     attendancePolicy,
     attendanceThresholdsEnabled: attendanceConfig.thresholdsEnabled,
-    attendanceItems: attendanceConfig.items.length ? attendanceConfig.items : defaultAttendanceItems()
+    attendanceItems: attendanceConfig.items.length ? attendanceConfig.items : defaultAttendanceItems(),
+    autosavePolicy,
+    autosaveSections: listAutosaveSections()
   };
 }
 
@@ -228,6 +234,27 @@ async function saveAttendanceMatrix(req, res) {
   }
 }
 
+async function saveAutosavePolicy(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const policy = await autosavePolicyModel.savePolicyForOrg(
+      activeOrgId,
+      req.body || {},
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'Autosave settings were updated.',
+      policy
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save autosave settings.'
+    });
+  }
+}
+
 function redirectLegacyConductSettings(_req, res) {
   return res.redirect('/school/settings#conduct-rating-scale');
 }
@@ -244,6 +271,7 @@ module.exports = {
   showSchoolSettings,
   saveConductRatingScale,
   saveAttendanceMatrix,
+  saveAutosavePolicy,
   redirectLegacyConductSettings,
   redirectLegacyAttendanceSettings
 };
