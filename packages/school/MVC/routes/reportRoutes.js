@@ -603,6 +603,11 @@ router.get('/instances/matrix/:assignmentId',
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
   ctrl.showReportMatrix);
 
+router.get('/instances/matrix/:assignmentId/api/data',
+  requireReportMatrixEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.getReportMatrixData);
+
 router.post('/instances/matrix/:assignmentId/save-row',
   requireReportMatrixEditorAccess,
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {

@@ -9,6 +9,7 @@ const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityServ
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getActiveOrgIdOrThrow, assertOrgAccess } = requireCoreModule('MVC/utils/orgContextUtils');
 const publicRegistrationService = requireCoreModule('MVC/services/person/publicRegistrationService');
+const authContextInvalidationService = requireCoreModule('MVC/services/cache/authContextInvalidationService');
 
 const PERSON_LOAD_OPTIONS = Object.freeze({
   enrichment: { includeSchoolRoles: false },
@@ -246,6 +247,7 @@ async function updateLinkedPersonProfile({ reqUser, personId, linkType, linkId =
   updates.avatarUrl = existing.avatarUrl || null;
 
   await coreDataService.updateData('persons', existing.id, updates, reqUser, PERSON_LOAD_OPTIONS);
+  await authContextInvalidationService.invalidateAuthContextForPersonId(existing.id);
 
   const refreshed = await loadPersonRecord(existing.id, reqUser);
   const profile = toProfileDto(refreshed);

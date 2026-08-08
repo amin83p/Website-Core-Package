@@ -2,10 +2,10 @@
 
 const settingService = require('../settingService');
 
-const DEFAULT_TTL_SECONDS = 60;
+const DEFAULT_TTL_SECONDS = 900;
 const DEFAULT_MAX_ENTRIES = 500;
 const MIN_TTL_SECONDS = 5;
-const MAX_TTL_SECONDS = 600;
+const MAX_TTL_SECONDS = 900;
 const MIN_MAX_ENTRIES = 50;
 const MAX_MAX_ENTRIES = 5000;
 
@@ -32,6 +32,7 @@ function resolveRequestCacheMaxEntries() {
 module.exports = {
   DEFAULT_TTL_SECONDS,
   DEFAULT_MAX_ENTRIES,
+  MAX_TTL_SECONDS,
   resolveRequestCacheTtlMs,
   resolveRequestCacheMaxEntries
 };

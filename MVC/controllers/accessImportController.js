@@ -1,6 +1,7 @@
 // MVC/controllers/accessImportController.js
 const createImportController = require('./importControllerFactory');
 const dataService = require('../services/dataService'); // ✅ Use Data Service
+const { invalidateAuthContextForAccessProfileId } = require('../services/cache/authContextInvalidationService');
 
 const accessImportController = createImportController({
   validateRecord: record => {
@@ -35,7 +36,9 @@ const accessImportController = createImportController({
 
     // ✅ Use dataService to add
     // We pass { id: userId } as the requestingUser object so dataService can log it if needed
-    await dataService.addData('accesses', accessItem, { id: userId });
+    const result = await dataService.addData('accesses', accessItem, { id: userId });
+    const profileId = result?.id || accessItem?.id;
+    if (profileId) await invalidateAuthContextForAccessProfileId(profileId);
   },
   
   downloadRouteBase: '/accesses/import/report'

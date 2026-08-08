@@ -25,4 +25,11 @@ router.get(
   ctrl.getGradesMatrixData
 );
 
+router.post(
+  '/api/rollups',
+  requireAccess(SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.READ_ALL, { keepActive: true }),
+  ctrl.postGradesRollups
+);
+
 module.exports = router;

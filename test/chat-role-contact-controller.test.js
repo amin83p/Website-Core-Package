@@ -210,5 +210,9 @@ test('Chat source keeps historical reads while applying role scope to writes and
   assert.equal(socketSource.includes('[OPERATIONS.UPDATE]'), true);
   assert.equal(modalSource.includes('chatReadOnlyNotice'), true);
   assert.equal(modalSource.includes('res.access'), true);
+  assert.equal(modalSource.includes('res.pagination'), true);
   assert.equal(modalSource.includes('currentConversationCanMessage'), true);
+  assert.equal(modalSource.includes('ensureChatSocket'), true);
+  assert.equal(modalSource.includes('loadOlderMessages'), true);
+  assert.equal(modalSource.includes('<script src="/socket.io/socket.io.js"></script>'), false);
 });

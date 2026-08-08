@@ -8,10 +8,12 @@ const {
   assertCreateOrgContextOrThrow: assertCreateOrgContextOrThrowShared,
   assertOrgAccess,
   normalizeOrgRoles,
-  getPrimaryOrgRole
+  getPrimaryOrgRole,
+  requireCoreModule
 } = require('../services/credit/creditCoreContracts');
 
 const creditDataService = require('../services/creditDataService');
+const authContextInvalidationService = requireCoreModule('MVC/services/cache/authContextInvalidationService');
 
 const { getDashboardSection } = dashboardController;
 
@@ -195,6 +197,7 @@ async function ensurePersonHasOrgRole(personId, orgId, role, reqUser) {
   }
 
   await dataServiceGlobal.updateData('persons', person.id, { ...person, organizations: list }, reqUser);
+  await authContextInvalidationService.invalidateAuthContextForPersonId(person.id);
 }
 
 exports.showDashboard = async (req, res) => {

@@ -13,6 +13,7 @@ const {
     markConversationRead,
     buildUnreadSummary
 } = require('../services/chatUnreadStateService');
+const { paginateChatMessages } = require('../services/chatMessagePaginationService');
 
 const CONV_FILE = path.join(__dirname, '../../data/conversations.json');
 const MSG_DIR = path.join(__dirname, '../../data/messages/');
@@ -31,12 +32,15 @@ async function getConversations(userId) {
     } catch (e) { return []; }
 }
 
-async function getMessages(convId) {
+async function getMessages(convId, options = {}) {
     try {
         const filePath = path.join(MSG_DIR, `${convId}.json`);
         const data = await fs.readFile(filePath, 'utf8').catch(() => '[]');
-        return JSON.parse(data).map((message) => normalizeMessage(message));
-    } catch (e) { return []; }
+        const messages = JSON.parse(data).map((message) => normalizeMessage(message));
+        return paginateChatMessages(messages, options);
+    } catch (e) {
+        return paginateChatMessages([], options);
+    }
 }
 
 async function createConversation(userIds) {

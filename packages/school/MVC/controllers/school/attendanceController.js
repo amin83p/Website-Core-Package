@@ -20,6 +20,8 @@ const accessService = requireCoreModule('MVC/services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const schoolRecordAccessService = require('../../services/school/schoolRecordAccessService');
+const matrixWindowService = require('../../services/school/matrixWindowService');
+const matrixRollupService = require('../../services/school/matrixRollupService');
 
 function buildAttendanceRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
@@ -391,8 +393,9 @@ async function listActiveAttendanceClasses(req, res) {
     }
 }
 
-async function buildAttendanceMatrixPayload(req) {
-        const { classId, startDate, endDate } = req.query;
+async function buildAttendanceMatrixPayload(req, options = {}) {
+        const query = req?.query && typeof req.query === 'object' ? req.query : {};
+        const { classId, startDate, endDate } = query;
         if (!classId) throw new Error('Class ID is required.');
 
         const routeAccessContext = buildAttendanceRouteAccessContext(req);
@@ -491,9 +494,14 @@ async function buildAttendanceMatrixPayload(req) {
         );
         const exportWindowStart = String(startDate || '').trim() || (sessionDates[0] || '');
         const exportWindowEnd = String(endDate || '').trim() || (sessionDates[sessionDates.length - 1] || '');
+        const personById = new Map(
+            (Array.isArray(persons) ? persons : [])
+                .map((row) => [String(row?.id || '').trim(), row])
+                .filter(([id]) => id)
+        );
 
         let studentList = Array.from(activePersonIds).map(uid => {
-            const person = persons.find(p => String(p.id) === uid);
+            const person = personById.get(String(uid || '').trim());
             const firstName = String(person?.name?.first || '').trim();
             const lastName = String(person?.name?.last || '').trim();
             const name = person
@@ -530,6 +538,25 @@ async function buildAttendanceMatrixPayload(req) {
         });
         studentList.sort((a, b) => a.name.localeCompare(b.name));
 
+        const parseIdFilterSet = (value) => {
+            if (value === undefined || value === null || value === '') return null;
+            return new Set(String(value).split(',').map((token) => token.trim()).filter(Boolean));
+        };
+        const sessionIdFilter = parseIdFilterSet(options.filterSessionIds);
+        const personIdFilter = parseIdFilterSet(options.filterPersonIds);
+        let matrixStudentList = studentList;
+        let matrixSessions = filteredSessions;
+        if (sessionIdFilter) {
+            matrixSessions = filteredSessions.filter((ses) =>
+                sessionIdFilter.has(String(ses?.sessionId || ses?.id || '').trim())
+            );
+        }
+        if (personIdFilter) {
+            matrixStudentList = studentList.filter((stu) =>
+                personIdFilter.has(String(stu?.personId || '').trim())
+            );
+        }
+
         const attendancePolicyOrgId = String(req.user?.activeOrgId || classData?.orgId || '').trim();
         const [orgPolicyLayer, orgPolicyCatalog] = await Promise.all([
             attendanceMatrixPolicyModel.getPolicyForOrg(attendancePolicyOrgId),
@@ -563,9 +590,21 @@ async function buildAttendanceMatrixPayload(req) {
             }
             return enrollmentWindowStateByKey.get(key);
         };
-        const matrix = studentList.map((stu) => {
-            const records = filteredSessions.map(ses => {
-                const rosterRecord = ses.roster?.find(r => String(r.personId) === stu.personId);
+
+        const windowParams = options.windowParams || matrixWindowService.parseMatrixWindowQuery(query);
+        const effectiveApplyWindow = options.applyWindow !== false && windowParams.applyWindow;
+        const buildPlan = matrixWindowService.planAttendanceMatrixBuild(
+            matrixStudentList.length,
+            matrixSessions.length,
+            { ...windowParams, applyWindow: effectiveApplyWindow }
+        );
+        const buildStudentList = matrixStudentList.slice(buildPlan.studentStart, buildPlan.studentEnd);
+        const buildSessions = matrixSessions.slice(buildPlan.sessionStart, buildPlan.sessionEnd);
+        const rosterMaps = matrixWindowService.buildRosterLookupMaps(buildSessions);
+
+        const matrix = buildStudentList.map((stu) => {
+            const records = buildSessions.map(ses => {
+                const rosterRecord = matrixWindowService.rosterRecordForSession(rosterMaps, ses, stu.personId);
                 const sessionLocked = ses.locked === true || String(ses.locked) === 'true';
                 const applicabilityState = getApplicabilityForSession(stu, ses);
                 const enrollmentWindow = getEnrollmentWindowForSession(stu, ses);
@@ -640,15 +679,20 @@ async function buildAttendanceMatrixPayload(req) {
             teacherName: resolveClassTeacherName(classData),
             startDate: String(startDate || '').trim(),
             endDate: String(endDate || '').trim(),
-            sessions: filteredSessions.map(s => ({ id: s.sessionId, date: s.date, status: s.status })),
+            sessions: buildSessions.map(s => ({ id: s.sessionId, date: s.date, status: s.status })),
             matrix,
             enabledAttendanceStatuses,
             enrollmentSource: registrationMode === 'rolling'
                 ? 'canonical_active_only_rolling'
                 : String(enrollmentSnapshot?.source || 'legacy'),
-            enrollmentUsedFallback: Boolean(enrollmentSnapshot?.usedFallback)
+            enrollmentUsedFallback: Boolean(enrollmentSnapshot?.usedFallback),
+            window: buildPlan.window
         };
-        return payload;
+
+        return matrixRollupService.recomputeAttendanceMatrixRollups(payload, {
+            classData,
+            orgPolicyCatalog
+        });
 }
 
 async function getAttendanceData(req, res) {
@@ -665,11 +709,19 @@ async function getAttendanceData(req, res) {
 
 async function exportAttendanceExcel(req, res) {
     try {
-        const payload = await buildAttendanceMatrixPayload(req);
-        const filteredPayload = attendanceExcelExportService.filterMatrixByPersonIds(
-            payload,
-            req.query?.personIds
+        const payload = await buildAttendanceMatrixPayload(req, {
+            applyWindow: false,
+            filterSessionIds: req.query?.sessionIds,
+            filterPersonIds: req.query?.personIds
+        });
+        const classData = await getAttendanceClassOrThrow(req, payload.classId);
+        const orgPolicyCatalog = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(
+            String(req.user?.activeOrgId || classData?.orgId || '').trim()
         );
+        const filteredPayload = matrixRollupService.recomputeAttendanceMatrixRollups(payload, {
+            classData,
+            orgPolicyCatalog
+        });
         const { buffer, filename } = await attendanceExcelExportService.buildAttendanceExcelWorkbook(filteredPayload);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -682,6 +734,24 @@ async function exportAttendanceExcel(req, res) {
             return res.status(400).json({ status: 'error', message: error.message });
         }
         return res.status(400).send(error.message || 'Unable to export attendance Excel.');
+    }
+}
+
+async function postAttendanceRollups(req, res) {
+    try {
+        const classId = String(req.body?.classId || '').trim();
+        if (!classId) throw new Error('Class ID is required.');
+        const classData = await getAttendanceClassOrThrow(req, classId);
+        const orgPolicyCatalog = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(
+            String(req.user?.activeOrgId || classData?.orgId || '').trim()
+        );
+        const rollups = matrixRollupService.summarizeAttendanceRollupsForStudents(
+            req.body?.students,
+            { classData, orgPolicyCatalog }
+        );
+        return res.json({ status: 'success', rollups });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
     }
 }
 
@@ -946,6 +1016,7 @@ module.exports = {
     listActiveAttendanceClasses,
     buildAttendanceMatrixPayload,
     getAttendanceData,
+    postAttendanceRollups,
     exportAttendanceExcel,
     uploadAttendanceFile,
     addAttendanceComment,

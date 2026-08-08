@@ -4,7 +4,7 @@ const { buildDataServiceQuery } = require('../utils/generalTools');
 const { SEARCH_DEFAULT_KEYWORD } = require('../../config/constants');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
 const {isSuperAdmin, isAdmin}= require('../services/adminChekersService');
-const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
+const { invalidateAuthContextForAccessProfileId } = require('../services/cache/authContextInvalidationService');
 // NOTE: Categories must come from the server layer (model/service), not the view.
 const ACCESS_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'name', 'description', 'orgId', 'active', 'fullAdmin'],
@@ -188,6 +188,7 @@ async function addAccess(req, res) {
     try {
         const item = await buildAccessFromBody(req.body, req.user, null, req);
         const result = await dataService.addData('accesses', item, req.user);
+        await invalidateAuthContextForAccessProfileId(result?.id || item?.id);
         
         if (req.headers['x-ajax-request']) {
           return res.json({ status: 'success', result, message: 'Access Definition saved.' });
@@ -245,14 +246,7 @@ async function editAccess(req, res) {
         const updates = await buildAccessFromBody(req.body, req.user, existing, req);
     
         const result = await dataService.updateData('accesses', req.params.id, updates, req.user);
-        const linkedUsers = await dataService.fetchData('users', {
-          q: req.params.id,
-          type: 'exact_match',
-          searchFields: 'systemAccessProfileId'
-        }, req.user);
-        (Array.isArray(linkedUsers) ? linkedUsers : []).forEach((row) => {
-          if (row?.id) invalidateAuthContextForUser(row.id);
-        });
+        await invalidateAuthContextForAccessProfileId(req.params.id);
         
         if (req.headers['x-ajax-request']) {
           return res.json({ status: 'success', result, message: 'Access Definition updated.' });
@@ -279,6 +273,7 @@ async function deleteAccess(req, res) {
         if (!existing) throw new Error('Access Definition not found');
     
         const results = await dataService.deleteData('accesses', req.params.id);
+        await invalidateAuthContextForAccessProfileId(req.params.id);
         if (req.headers['x-ajax-request']) {
           return res.json({ status: 'success', results, message: 'Access Definition Deleted successfully.' });
         }

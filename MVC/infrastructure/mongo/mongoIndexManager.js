@@ -489,6 +489,31 @@ const STARTUP_INDEX_GROUPS = Object.freeze({
         'idx_admin_totp_secrets_userId'
       ]
     }
+  },
+  schoolStudentsTimesheetsReports: {
+    label: 'School Students Timesheets Reports',
+    collections: {
+      schoolStudents: [
+        'idx_school_students_org_status_updated',
+        'idx_school_students_org_person'
+      ],
+      schoolTimesheets: [
+        'idx_school_timesheets_org_period_teacher',
+        'idx_school_timesheets_org_period_status'
+      ],
+      schoolReportTemplates: [
+        'idx_school_report_templates_org_status_updated'
+      ],
+      schoolReportAssignments: [
+        'idx_school_report_assignments_org_class_session',
+        'idx_school_report_assignments_org_template_status'
+      ],
+      schoolReportInstances: [
+        'idx_school_report_instances_org_class_session_student',
+        'idx_school_report_instances_org_assignment_student',
+        'idx_school_report_instances_org_assignment_teacher_target'
+      ]
+    }
   }
 });
 

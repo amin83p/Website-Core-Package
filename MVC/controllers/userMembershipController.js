@@ -7,6 +7,7 @@ const {
 } = require('../services/security/entitlementService');
 const { idsEqual, toPublicId } = require('../utils/idAdapter');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
+const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
 
 const MEMBERSHIP_PERIOD_SOURCE_TYPE_OPTIONS = getMembershipPeriodSourceTypeOptions();
 const MEMBERSHIP_LIST_QUERY_OPTIONS = Object.freeze({
@@ -225,6 +226,7 @@ async function addMembership(req, res) {
   try {
     const payload = await buildMembershipFromBody(req.body, req.user);
     await dataService.addData('userMemberships', payload, req.user);
+    invalidateAuthContextForUser(payload.userId);
     if (req.headers['x-ajax-request']) {
       return res.json({ status: 'success', message: 'Membership saved successfully.' });
     }
@@ -270,6 +272,7 @@ async function editMembership(req, res) {
     if (!existing) throw new Error('Membership record not found.');
     const payload = await buildMembershipFromBody(req.body, req.user, existing);
     await dataService.updateData('userMemberships', req.params.id, payload, req.user);
+    invalidateAuthContextForUser(payload.userId || existing.userId);
     if (req.headers['x-ajax-request']) {
       return res.json({ status: 'success', message: 'Membership updated successfully.' });
     }
@@ -284,7 +287,9 @@ async function editMembership(req, res) {
 
 async function deleteMembership(req, res) {
   try {
+    const existing = await dataService.getDataById('userMemberships', req.params.id, req.user);
     await dataService.deleteData('userMemberships', req.params.id, req.user);
+    if (existing?.userId) invalidateAuthContextForUser(existing.userId);
     if (req.headers['x-ajax-request']) {
       return res.json({ status: 'success', message: 'Membership deleted successfully.' });
     }

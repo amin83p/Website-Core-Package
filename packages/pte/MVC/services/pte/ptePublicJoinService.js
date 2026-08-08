@@ -7,6 +7,8 @@ const {
   SYSTEM_CONTEXT
 } = require('./pteCoreDependencies');
 const publicRegistrationService = require('../person/publicRegistrationService');
+const { requireCoreModule } = require('./pteCoreModuleResolver');
+const authContextInvalidationService = requireCoreModule('MVC/services/cache/authContextInvalidationService');
 
 function createPtePublicJoinService(overrides = {}) {
   const deps = {
@@ -165,6 +167,9 @@ function createPtePublicJoinService(overrides = {}) {
         lastUpdateDateTime: now
       }
     }, SYSTEM_CONTEXT);
+
+    await authContextInvalidationService.invalidateAuthContextForPersonId(person.id);
+    authContextInvalidationService.invalidateAuthContextForAllSessionsOfUser(linkedUser.id);
 
     const applicant = await deps.pteStudentDataService.createPublicApplicantFromJoin({
       orgId: pteJoinOrgId,

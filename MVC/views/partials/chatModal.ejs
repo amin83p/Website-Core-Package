@@ -115,8 +115,6 @@
   </div>
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
-
 <style>
     /* Compact Styling */
     .chat-item { cursor: pointer; border-bottom: 1px solid #f8f9fa; padding: 10px; }
@@ -211,6 +209,9 @@
 <script>
 // --- GLOBAL VARIABLES ---
 let socket;
+let socketHandlersBound = false;
+let socketReadyPromise = null;
+const CHAT_MESSAGE_PAGE_SIZE = 50;
 let currentConvId = null;
 let currentUser = { id: '<%= user.id %>' };
 const chatAccess = <%- JSON.stringify({
@@ -231,6 +232,9 @@ const chatSoundStorageKey = `chat.soundMuted.${String(currentUser.id)}`;
 let chatSoundMuted = false;
 let chatAudioContext = null;
 let chatInitialUnreadSoundPlayed = false;
+let hasMoreOlderMessages = false;
+let oldestLoadedMessageId = null;
+let loadingOlderMessages = false;
 
 function normalizeClientUnreadCount(value) {
     const parsed = Number(value);
@@ -444,11 +448,227 @@ function safeAttr(value) {
     return safeText(value);
 }
 
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) {
+            resolve();
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Failed to load ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
 function safeInlineJson(value) {
     return JSON.stringify(String(value == null ? '' : value))
         .replace(/&/g, '\\u0026')
         .replace(/</g, '\\u003c')
         .replace(/'/g, '\\u0027');
+}
+
+function bindChatSocketHandlers() {
+    if (!socket || socketHandlersBound) return;
+    socketHandlersBound = true;
+
+    socket.on('connect_error', (error) => {
+        console.warn('Chat connection rejected:', error && error.message ? error.message : error);
+    });
+
+    socket.on('chat_error', (payload) => {
+        const message = payload && payload.message ? payload.message : 'Chat action was not allowed.';
+        if (/read-only|role scope|contact scope|no longer share/i.test(message)) {
+            setConversationWriteState(false, message);
+            window.currentChatCanMessage = false;
+            window.currentChatScopeReason = message;
+        }
+        safeShowAlert(message, 'warning');
+    });
+
+    socket.on('connect', () => {
+        socket.emit('identify', currentUser.id);
+        refreshInbox();
+    });
+
+    socket.on('message_sent_ack', (data) => {
+        const tempRow = document.getElementById(`msg-row-${data.tempId}`);
+        if (tempRow) {
+            tempRow.id = `msg-row-${data.realMsg.id}`;
+            const statusContainer = tempRow.querySelector('.status-container');
+            if (statusContainer) {
+                statusContainer.id = `status-${data.realMsg.id}`;
+                statusContainer.innerHTML = '<i class="bi bi-check status-sent msg-status"></i>';
+            }
+        }
+    });
+
+    socket.on('new_message', (data) => {
+        if (String(data.message.senderId) === String(currentUser.id)) return;
+
+        const modalEl = document.getElementById('chatInterfaceModal');
+        const isModalOpen = modalEl.classList.contains('show');
+        const isCurrentConversationOpen = isModalOpen
+            && String(currentConvId || '') === String(data.convId || '');
+        const isActiveConversation = isConversationActivelyViewed(data.convId);
+
+        const eventConversationUnread = Number.isFinite(Number(data.unreadCount))
+            ? data.unreadCount
+            : normalizeClientUnreadCount(unreadByConversation.get(String(data.convId))) + 1;
+        const eventTotalUnread = Number.isFinite(Number(data.totalUnread))
+            ? data.totalUnread
+            : normalizeClientUnreadCount(totalUnreadCount) + 1;
+        applyUnreadState(data.convId, eventConversationUnread, eventTotalUnread);
+        latestIncomingMessageByConversation.set(String(data.convId), data.message.id);
+        if (!isActiveConversation) playChatDing();
+
+        if (isCurrentConversationOpen && !messageExistsInContainer(data.message.id)) {
+            appendMessage(data.message);
+        }
+
+        if (isActiveConversation) {
+            markConversationReadLocally(data.convId);
+            if (socket && socket.connected) {
+                socket.emit('mark_conversation_read', {
+                    convId: data.convId,
+                    messageId: data.message.id
+                });
+            }
+        } else {
+            if (socket && socket.connected) socket.emit('mark_delivered', { convId: data.convId, messageId: data.message.id });
+            if (isModalOpen && !isCurrentConversationOpen) refreshInbox();
+        }
+    });
+
+    socket.on('unread_state', (data) => {
+        applyUnreadState(data.convId, data.unreadCount, data.totalUnread);
+    });
+
+    socket.on('status_update', (data) => {
+        const statusContainer = document.getElementById(`status-${data.messageId}`);
+        if (statusContainer) {
+            if (data.status === 'delivered') statusContainer.innerHTML = '<i class="bi bi-check-all status-delivered msg-status"></i>';
+            else if (data.status === 'read') statusContainer.innerHTML = '<i class="bi bi-check-all status-read msg-status"></i>';
+        }
+    });
+
+    socket.on('on_conversation_deleted', (data) => {
+        refreshInbox();
+        if (currentConvId === data.convId) {
+            currentConvId = null;
+            document.getElementById('chatActiveView').classList.add('d-none');
+            document.getElementById('chatEmptyState').classList.remove('d-none');
+            safeShowAlert("The other user has deleted this conversation.", "warning");
+        }
+    });
+}
+
+async function ensureChatSocket() {
+    if (!chatAccess.canRead) return null;
+    if (socket && socket.connected) return socket;
+    if (socketReadyPromise) return socketReadyPromise;
+
+    socketReadyPromise = (async () => {
+        try {
+            if (typeof io === 'undefined') {
+                await loadScript('/socket.io/socket.io.js');
+            }
+            if (!socket) {
+                socket = io({ autoConnect: false });
+                bindChatSocketHandlers();
+            }
+            if (!socket.connected) {
+                socket.connect();
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        cleanup();
+                        reject(new Error('Chat connection timeout'));
+                    }, 15000);
+                    const onConnect = () => {
+                        cleanup();
+                        resolve();
+                    };
+                    const onError = (error) => {
+                        cleanup();
+                        reject(error || new Error('Chat connection failed'));
+                    };
+                    const cleanup = () => {
+                        clearTimeout(timeout);
+                        socket.off('connect', onConnect);
+                        socket.off('connect_error', onError);
+                    };
+                    socket.on('connect', onConnect);
+                    socket.on('connect_error', onError);
+                });
+            }
+            socket.emit('identify', currentUser.id);
+            return socket;
+        } catch (error) {
+            console.warn('Chat connection rejected:', error && error.message ? error.message : error);
+            socketReadyPromise = null;
+            return null;
+        }
+    })();
+
+    return socketReadyPromise;
+}
+
+function initChatFormHandler() {
+    const form = document.getElementById('chatForm');
+    if (!form || form.dataset.chatBound === '1') return;
+    form.dataset.chatBound = '1';
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!chatAccess.canUpdate || !currentConversationCanMessage) {
+            safeShowAlert(currentConversationScopeReason || 'This conversation is read-only.', 'warning');
+            return;
+        }
+        const input = document.getElementById('chatInput');
+        const text = input.value.trim();
+        if (!text && pendingAttachments.length === 0) return;
+
+        if (pendingAttachments.length > 0) {
+            await uploadPendingFiles();
+        }
+
+        if (text) {
+            const tempId = 'temp_' + Date.now();
+            appendMessage({
+                id: tempId, content: text, senderId: currentUser.id, type: 'text', status: 'sending'
+            }, true);
+            if (!socket || !socket.connected) {
+                await ensureChatSocket();
+            }
+            if (!socket || !socket.connected) {
+                safeShowAlert('Chat connection is not available yet. Please try again.', 'warning');
+                return;
+            }
+            socket.emit('send_message', {
+                tempId: tempId, convId: currentConvId, content: text, type: 'text', senderId: currentUser.id
+            });
+            input.value = '';
+            input.style.height = '38px';
+        }
+    });
+}
+
+function initMessageScrollLoader() {
+    const container = document.getElementById('chatMessageContainer');
+    if (!container || container.dataset.scrollBound === '1') return;
+    container.dataset.scrollBound = '1';
+    container.addEventListener('scroll', () => {
+        if (!currentConvId || !hasMoreOlderMessages || loadingOlderMessages) return;
+        if (container.scrollTop < 80) loadOlderMessages();
+    });
+}
+
+function initChatSystem() {
+    if (!chatAccess.canRead) return;
+    refreshInbox();
+    initMessageScrollLoader();
+    initChatFormHandler();
 }
 
 function buildAvatarHtml(name, avatarUrl, size = 40, bgClass = 'bg-secondary', textClass = 'text-white') {
@@ -493,185 +713,43 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.visibilityState === 'visible') markActiveConversationRead();
     });
 
-    // 3. Reset UI on Open
-    modalEl.addEventListener('show.bs.modal', () => {
-        showInbox(); 
+    // 3. Connect socket and refresh when modal opens
+    modalEl.addEventListener('show.bs.modal', async () => {
+        await ensureChatSocket();
+        showInbox();
 
-        // ✅ FIX #2: Refresh active chat if it exists
         const sidebar = document.getElementById('chatSidebar');
         if (sidebar && sidebar.classList.contains('d-none')) {
-            toggleSidebar(); // Ensure sidebar is visible initially if needed
+            toggleSidebar();
         }
 
-        // If we were in a chat, reload it silently to get new messages
-        if (currentConvId) {
-             // We use a small timeout to let the socket reconnect first
-             setTimeout(() => {
-                 // We re-use openChat but passing existing Name/Target stored in global vars
-                 // Note: You need to store Name/Target when opening a chat to use them here.
-                 // See updated openChat function below.
-                 if(typeof currentChatName !== 'undefined') {
-                     openChat(
-                         currentConvId,
-                         currentChatName,
-                         currentChatTarget,
-                         currentChatAvatar,
-                         window.currentChatCanMessage,
-                         window.currentChatScopeReason
-                     );
-                 }
-             }, 100);
+        if (currentConvId && typeof currentChatName !== 'undefined') {
+            setTimeout(() => {
+                openChat(
+                    currentConvId,
+                    currentChatName,
+                    currentChatTarget,
+                    currentChatAvatar,
+                    window.currentChatCanMessage,
+                    window.currentChatScopeReason
+                );
+            }, 100);
         }
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (socket && socket.connected) socket.disconnect();
+        socketReadyPromise = null;
     });
 });
-
-function initChatSystem() {
-    if (!chatAccess.canRead) return;
-    refreshInbox();
-    if(typeof io === 'undefined') return;
-    socket = io();
-
-    socket.on('connect_error', (error) => {
-        console.warn('Chat connection rejected:', error && error.message ? error.message : error);
-    });
-
-    socket.on('chat_error', (payload) => {
-        const message = payload && payload.message ? payload.message : 'Chat action was not allowed.';
-        if (/read-only|role scope|contact scope|no longer share/i.test(message)) {
-            setConversationWriteState(false, message);
-            window.currentChatCanMessage = false;
-            window.currentChatScopeReason = message;
-        }
-        safeShowAlert(message, 'warning');
-    });
-    
-    socket.on('connect', () => {
-        socket.emit('identify', currentUser.id);
-        refreshInbox();
-    });
-
-    // A. Sending Ack
-    socket.on('message_sent_ack', (data) => {
-        const tempRow = document.getElementById(`msg-row-${data.tempId}`);
-        if (tempRow) {
-            tempRow.id = `msg-row-${data.realMsg.id}`;
-            const statusContainer = tempRow.querySelector('.status-container');
-            if (statusContainer) {
-                statusContainer.id = `status-${data.realMsg.id}`;
-                statusContainer.innerHTML = '<i class="bi bi-check status-sent msg-status"></i>';
-            }
-        }
-    });
-
-    // B. New Message Received
-    socket.on('new_message', (data) => {
-        // Ignore self (handled locally)
-        if (String(data.message.senderId) === String(currentUser.id)) return;
-
-        const modalEl = document.getElementById('chatInterfaceModal');
-        const isModalOpen = modalEl.classList.contains('show');
-        const isCurrentConversationOpen = isModalOpen
-            && String(currentConvId || '') === String(data.convId || '');
-        const isActiveConversation = isConversationActivelyViewed(data.convId);
-
-        const eventConversationUnread = Number.isFinite(Number(data.unreadCount))
-            ? data.unreadCount
-            : normalizeClientUnreadCount(unreadByConversation.get(String(data.convId))) + 1;
-        const eventTotalUnread = Number.isFinite(Number(data.totalUnread))
-            ? data.totalUnread
-            : normalizeClientUnreadCount(totalUnreadCount) + 1;
-        applyUnreadState(data.convId, eventConversationUnread, eventTotalUnread);
-        latestIncomingMessageByConversation.set(String(data.convId), data.message.id);
-        if (!isActiveConversation) playChatDing();
-
-        if (isCurrentConversationOpen) {
-            appendMessage(data.message);
-            scrollToBottom();
-        }
-
-        if (isActiveConversation) {
-            markConversationReadLocally(data.convId);
-            if (socket && socket.connected) {
-                socket.emit('mark_conversation_read', {
-                    convId: data.convId,
-                    messageId: data.message.id
-                });
-            }
-        } else {
-            if (socket && socket.connected) socket.emit('mark_delivered', { convId: data.convId, messageId: data.message.id });
-            if (isModalOpen && !isCurrentConversationOpen) refreshInbox();
-        }
-    });
-
-    socket.on('unread_state', (data) => {
-        applyUnreadState(data.convId, data.unreadCount, data.totalUnread);
-    });
-
-    // C. Status Updates
-    socket.on('status_update', (data) => {
-        const statusContainer = document.getElementById(`status-${data.messageId}`);
-        if (statusContainer) {
-            if (data.status === 'delivered') statusContainer.innerHTML = '<i class="bi bi-check-all status-delivered msg-status"></i>';
-            else if (data.status === 'read') statusContainer.innerHTML = '<i class="bi bi-check-all status-read msg-status"></i>';
-        }
-    });
-
-    // D. Conversation Deleted (Real-time)
-    socket.on('on_conversation_deleted', (data) => {
-        refreshInbox(); // Remove from list
-        
-        // If I am currently looking at this deleted chat, kick me out
-        if (currentConvId === data.convId) {
-            currentConvId = null;
-            document.getElementById('chatActiveView').classList.add('d-none');
-            document.getElementById('chatEmptyState').classList.remove('d-none');
-            safeShowAlert("The other user has deleted this conversation.", "warning");
-        }
-    });
-
-    // E. Submit Handler
-    const form = document.getElementById('chatForm');
-    if(form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!chatAccess.canUpdate || !currentConversationCanMessage) {
-                safeShowAlert(currentConversationScopeReason || 'This conversation is read-only.', 'warning');
-                return;
-            }
-            const input = document.getElementById('chatInput');
-            const text = input.value.trim();
-            if(!text && pendingAttachments.length === 0) return;
-
-            if (pendingAttachments.length > 0) {
-                await uploadPendingFiles();
-            }
-
-            if (text) {
-                const tempId = 'temp_' + Date.now();
-                appendMessage({
-                    id: tempId, content: text, senderId: currentUser.id, type: 'text', status: 'sending'
-                }, true);
-                scrollToBottom();
-                if (!socket || !socket.connected) {
-                    safeShowAlert('Chat connection is not available yet. Please try again.', 'warning');
-                    return;
-                }
-                socket.emit('send_message', {
-                    tempId: tempId, convId: currentConvId, content: text, type: 'text', senderId: currentUser.id
-                });
-                input.value = '';
-                input.style.height = '38px';
-            }
-        });
-    }
-}
-
-// Uploads files and renders them LOCALLY immediately
 async function uploadPendingFiles() {
     if (!currentConvId) return;
     if (!chatAccess.canUpdate || !currentConversationCanMessage) {
         safeShowAlert(currentConversationScopeReason || 'This conversation is read-only.', 'warning');
         return;
+    }
+    if (!socket || !socket.connected) {
+        await ensureChatSocket();
     }
     if (!socket || !socket.connected) {
         safeShowAlert('Chat connection is not available yet. Please try again.', 'warning');
@@ -784,8 +862,12 @@ async function deleteCurrentChat() {
     }
 }
 
-function appendMessage(msg, isTemp = false) {
-    const container = document.getElementById('chatMessageContainer');
+function messageExistsInContainer(messageId) {
+    if (!messageId) return false;
+    return Boolean(document.getElementById(`msg-row-${messageId}`));
+}
+
+function buildMessageHtml(msg, isTemp = false) {
     const isMine = String(msg.senderId) === String(currentUser.id);
     const typeClass = isMine ? 'msg-sent' : 'msg-received';
     const alignClass = isMine ? 'align-self-end' : 'align-self-start';
@@ -795,7 +877,7 @@ function appendMessage(msg, isTemp = false) {
         if (isTemp) {
             statusIcon = '<i class="bi bi-clock status-sending msg-status" title="Sending..."></i>';
         } else {
-            switch(msg.status) {
+            switch (msg.status) {
                 case 'read': statusIcon = '<i class="bi bi-check-all status-read msg-status"></i>'; break;
                 case 'delivered': statusIcon = '<i class="bi bi-check-all status-delivered msg-status"></i>'; break;
                 default: statusIcon = '<i class="bi bi-check status-sent msg-status"></i>'; break;
@@ -804,14 +886,14 @@ function appendMessage(msg, isTemp = false) {
     }
 
     let contentHtml = msg.content;
-    if(msg.type === 'image') {
-        const safeUrl = encodeURI(msg.fileUrl).replace(/%25/g, '%'); 
+    if (msg.type === 'image') {
+        const safeUrl = encodeURI(msg.fileUrl).replace(/%25/g, '%');
         contentHtml = `<a href="${safeUrl}" target="_blank"><img src="${safeUrl}" class="img-fluid rounded mb-1" style="max-width: 200px; min-height: 50px; background: #f0f0f0;"></a>`;
     } else if (msg.type === 'file') {
         contentHtml = `<a href="${msg.fileUrl}" target="_blank" class="text-decoration-none d-flex align-items-center p-2 border rounded bg-white"><i class="bi bi-file-earmark-arrow-down fs-4 me-2 text-primary"></i><div><div class="small fw-bold text-dark">Attachment</div><div class="x-small text-muted">Download</div></div></a>`;
     }
 
-    const html = `
+    return `
     <div class="d-flex flex-column ${alignClass}" style="max-width: 85%;" id="msg-row-${msg.id || 'temp'}">
         <div class="msg-bubble ${typeClass}">
             ${contentHtml}
@@ -823,9 +905,82 @@ function appendMessage(msg, isTemp = false) {
             </div>
         </div>
     </div>`;
-    
-    container.insertAdjacentHTML('beforeend', html);
-    scrollToBottom();
+}
+
+function insertMessageHtml(html, position) {
+    const container = document.getElementById('chatMessageContainer');
+    if (!container) return;
+    const slot = document.getElementById('chatLoadOlderSlot');
+    if (position === 'afterbegin' && slot && slot.parentElement === container) {
+        slot.insertAdjacentHTML('afterend', html);
+        return;
+    }
+    container.insertAdjacentHTML(position, html);
+}
+
+function appendMessage(msg, isTemp = false, scrollAfter = true) {
+    if (messageExistsInContainer(msg.id) && !isTemp) return;
+    insertMessageHtml(buildMessageHtml(msg, isTemp), 'beforeend');
+    if (scrollAfter) scrollToBottom();
+}
+
+function prependMessages(messages) {
+    const container = document.getElementById('chatMessageContainer');
+    if (!container || !Array.isArray(messages) || messages.length === 0) return;
+    const previousHeight = container.scrollHeight;
+    const previousTop = container.scrollTop;
+    messages.forEach((message) => {
+        if (messageExistsInContainer(message.id)) return;
+        insertMessageHtml(buildMessageHtml(message, false), 'afterbegin');
+    });
+    container.scrollTop = previousTop + (container.scrollHeight - previousHeight);
+}
+
+function updateLoadOlderIndicator() {
+    const container = document.getElementById('chatMessageContainer');
+    if (!container) return;
+    let slot = document.getElementById('chatLoadOlderSlot');
+    if (!slot) {
+        slot = document.createElement('div');
+        slot.id = 'chatLoadOlderSlot';
+        slot.className = 'text-center small text-muted py-2';
+        container.insertAdjacentElement('afterbegin', slot);
+    }
+    if (loadingOlderMessages) {
+        slot.classList.remove('d-none');
+        slot.innerHTML = '<div class="spinner-border spinner-border-sm text-secondary"></div>';
+        return;
+    }
+    if (hasMoreOlderMessages) {
+        slot.classList.remove('d-none');
+        slot.innerHTML = '<span>Scroll up for older messages</span>';
+        return;
+    }
+    slot.classList.add('d-none');
+    slot.innerHTML = '';
+}
+
+async function loadOlderMessages() {
+    if (!currentConvId || !hasMoreOlderMessages || loadingOlderMessages || !oldestLoadedMessageId) return;
+    loadingOlderMessages = true;
+    updateLoadOlderIndicator();
+    try {
+        const url = `/chat/messages/${encodeURIComponent(currentConvId)}?limit=${CHAT_MESSAGE_PAGE_SIZE}&before=${encodeURIComponent(oldestLoadedMessageId)}`;
+        const resp = await fetch(url);
+        const res = await resp.json();
+        if (res.status === 'success' && Array.isArray(res.data) && res.data.length) {
+            prependMessages(res.data);
+            hasMoreOlderMessages = Boolean(res.pagination?.hasMore);
+            oldestLoadedMessageId = res.pagination?.oldestId || res.data[0]?.id || oldestLoadedMessageId;
+        } else {
+            hasMoreOlderMessages = false;
+        }
+    } catch (_) {
+        hasMoreOlderMessages = false;
+    } finally {
+        loadingOlderMessages = false;
+        updateLoadOlderIndicator();
+    }
 }
 
 function scrollToBottom() {
@@ -1194,6 +1349,9 @@ function setConversationWriteState(canMessage, reason = '') {
 
 async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage = true, scopeReason = '') {
     currentConvId = convId;
+    hasMoreOlderMessages = false;
+    oldestLoadedMessageId = null;
+    loadingOlderMessages = false;
     
     // Store these for the "Reopen" logic
     window.currentChatName = name; 
@@ -1215,21 +1373,12 @@ async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage =
         headerAvatar.innerText = name.charAt(0).toUpperCase();
     }
 
-    // 1. Refresh Inbox to clear badge for this item
-    // (Wait slightly so the server has processed the "mark read" request)
-    // Actually, calling refreshInbox() here might cause a visual jump.
-    // Better to just manually remove the badge class from the active item if you want instant feedback.
-    // But for now, we just rely on the next refresh or the socket event.
-    
     const container = document.getElementById('chatMessageContainer');
-    
-    // Only show loader if empty (to avoid flashing on refresh)
-    if(container.innerHTML.trim() === '') {
-        container.innerHTML = '<div class="text-center py-5"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
-    }
+    container.innerHTML = '<div class="text-center py-5"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
     
     try {
-        const resp = await fetch(`/chat/messages/${convId}`);
+        await ensureChatSocket();
+        const resp = await fetch(`/chat/messages/${encodeURIComponent(convId)}?limit=${CHAT_MESSAGE_PAGE_SIZE}`);
         const res = await resp.json();
         
         container.innerHTML = '';
@@ -1238,7 +1387,10 @@ async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage =
             setConversationWriteState(currentAccess.canMessage !== false, currentAccess.reason || '');
             window.currentChatCanMessage = currentAccess.canMessage !== false;
             window.currentChatScopeReason = currentAccess.reason || '';
-            res.data.forEach(msg => appendMessage(msg));
+            res.data.forEach(msg => appendMessage(msg, false, false));
+            hasMoreOlderMessages = Boolean(res.pagination?.hasMore);
+            oldestLoadedMessageId = res.pagination?.oldestId || res.data[0]?.id || null;
+            updateLoadOlderIndicator();
             const lastIncomingMessage = [...res.data].reverse().find((message) => (
                 String(message?.senderId) !== String(currentUser.id)
             ));
@@ -1259,7 +1411,6 @@ async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage =
             });
         }
         
-        // Refresh sidebar to update read counts (remove badge)
         refreshInbox();
         
     } catch(e) { 

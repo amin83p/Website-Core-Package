@@ -216,13 +216,15 @@ const chatRepository = {
   },
 
   async getMessages(convId, options = {}) {
+    const { paginateChatMessages } = require('../services/chatMessagePaginationService');
     return runByRepositoryBackend(options, {
-      json: async () => chatModel.getMessages(convId),
+      json: async () => chatModel.getMessages(convId, options),
       mongo: async () => {
         const row = await getMongoCollection('chatConversations').findOne(resolveMongoIdFilter(convId), { projection: { messages: 1 } });
-        return Array.isArray(row?.messages)
+        const messages = Array.isArray(row?.messages)
           ? row.messages.map((message) => normalizeMessage(message))
           : [];
+        return paginateChatMessages(messages, options);
       }
     }, 'core.chat.getMessages');
   },

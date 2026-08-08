@@ -14,6 +14,10 @@ const uploadMiddleware = require('../middleware/upload');
 const fileAssetStorage = require('../services/fileAssetStorageService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const { normalizeUnreadCount } = require('../services/chatUnreadStateService');
+const {
+    DEFAULT_CHAT_MESSAGE_PAGE_SIZE,
+    MAX_CHAT_MESSAGE_PAGE_SIZE
+} = require('../services/chatMessagePaginationService');
 
 /* ==========================================================================
    HELPERS
@@ -325,11 +329,19 @@ exports.getHistory = async (req, res) => {
         const convId = req.params.convId;
         const conversation = await loadConversationOrThrow(convId);
         await assertCanReadConversation(req, conversation);
-        if (chatAccessService.conversationHasParticipant(conversation, req.user.id)) {
+
+        const beforeCursor = req.query.before ? String(req.query.before) : '';
+        if (!beforeCursor && chatAccessService.conversationHasParticipant(conversation, req.user.id)) {
             await chatRepository.setLastRead(convId, req.user.id);
         }
-        const [messages, writeAccess] = await Promise.all([
-            chatRepository.getMessages(convId),
+
+        const paginationOptions = {
+            limit: req.query.limit,
+            before: beforeCursor || undefined
+        };
+
+        const [messagePage, writeAccess] = await Promise.all([
+            chatRepository.getMessages(convId, paginationOptions),
             chatAccessService.canAccessConversation({
                 user: req.user,
                 conversation,
@@ -338,9 +350,18 @@ exports.getHistory = async (req, res) => {
                 allowGlobalAdmin: false
             })
         ]);
+
         res.json({
             status: 'success',
-            data: messages,
+            data: messagePage.messages,
+            pagination: {
+                hasMore: Boolean(messagePage.hasMore),
+                oldestId: messagePage.oldestId || null,
+                limit: Math.min(
+                    Math.max(Number.parseInt(String(req.query.limit || ''), 10) || DEFAULT_CHAT_MESSAGE_PAGE_SIZE, 1),
+                    MAX_CHAT_MESSAGE_PAGE_SIZE
+                )
+            },
             access: {
                 canMessage: Boolean(writeAccess?.allowed),
                 reason: writeAccess?.allowed

@@ -7,6 +7,7 @@ const securityService = require('../services/security');
 const bcrypt = require('bcrypt');
 const adminAuthorityService = require('../services/adminAuthorityService');
 const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
+const { hardRevokeAuthContextForUser } = require('../services/cache/authContextInvalidationService');
 
 const { buildDataServiceQuery } = require('../utils/generalTools');
 const {
@@ -442,6 +443,7 @@ async function editUser(req, res) {
     if (adminAuthorityService.isSuperAdmin(current)) { // ✅ Reused helper
         if (req.body.primaryOrgId) {
              await dataService.updateData('users', req.params.id, { primaryOrgId: req.body.primaryOrgId }, req.user);
+             invalidateAuthContextForUser(req.params.id);
         }
         if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Admin Context Updated.' });
         return res.redirect('/users');
@@ -531,7 +533,12 @@ async function editUser(req, res) {
 
     updateStage = 'persist_update';
     const results = await dataService.updateData('users', req.params.id, updates, req.user);
-    invalidateAuthContextForUser(req.params.id);
+    const needsHardRevoke = !updates.active || updates.status === 'suspended' || updates.status === 'deleted';
+    if (needsHardRevoke) {
+      await hardRevokeAuthContextForUser(req.params.id);
+    } else {
+      invalidateAuthContextForUser(req.params.id);
+    }
 
     updateStage = 'send_response';
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'User updated successfully.', data: results });
@@ -560,6 +567,7 @@ async function editUser(req, res) {
 async function deleteUser(req, res) {
   try {
     const userId = req.params.id;
+    await hardRevokeAuthContextForUser(userId);
     const results = await dataService.deleteData('users', userId, req.user);
     if (req.headers['x-ajax-request']) return res.json({ status: 'success',results, message: 'User deleted.' });
     res.redirect('/users');

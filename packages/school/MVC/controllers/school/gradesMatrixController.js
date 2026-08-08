@@ -17,6 +17,8 @@ const schoolStudentProfileLinkService = require('../../services/school/schoolStu
 const {
   userCanOpenAttendanceMatrix
 } = require('../../services/school/attendanceMatrixAccessService');
+const matrixWindowService = require('../../services/school/matrixWindowService');
+const matrixRollupService = require('../../services/school/matrixRollupService');
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -214,49 +216,129 @@ function assignmentsCategoryAveragePercents(cells, columns) {
   return Math.round((sum / percents.length) * 100) / 100;
 }
 
-async function showGradesMatrixPage(req, res) {
-  try {
-    const q = req.query || {};
-    const initialClassId = String(q.classId || '').trim();
-    const initialStartDate = String(q.startDate || '').trim();
-    const initialEndDate = String(q.endDate || '').trim();
-    const initialRange = String(q.range || '').trim();
-    let initialClassName = String(q.className || '').trim();
-    if (initialClassId && !initialClassName) {
-      try {
-        const classRow = await schoolDataService.getDataById('classes', initialClassId, req.user);
-        if (classRow?.title) initialClassName = String(classRow.title).trim();
-      } catch (e) {
-        /* ignore */
-      }
-    }
-
-    const canOpenAttendanceMatrix = await userCanOpenAttendanceMatrix(req.user, req.ip);
-
-    res.render('school/grades/gradesMatrix', {
-      title: 'Grades Matrix',
-      includeModal: true,
-      user: req.user,
-      actionStateId: req.actionStateId,
-      tableName: 'Grades_Matrix',
-      initialClassId,
-      initialClassName,
-      initialStartDate,
-      initialEndDate,
-      initialRange,
-      canOpenAttendanceMatrix
-    });
-  } catch (error) {
-    res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+function buildGradesAttendanceRecord(stu, ses, ctx, rosterRecord) {
+  const {
+    classData,
+    orgPolicyCatalog,
+    attendancePolicy,
+    enabledAttendanceStatuses,
+    forceNotApplicableSessionKeys,
+    getApplicabilityForSession
+  } = ctx;
+  const applicabilityState = getApplicabilityForSession(stu, ses);
+  const forceNotApplicable = forceNotApplicableSessionKeys.has(String(ses?.sessionId || ses?.id || '').trim())
+    || forceNotApplicableSessionKeys.has(String(ses?.date || '').trim());
+  const expectedForSession = !forceNotApplicable && Boolean(applicabilityState.expected);
+  const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
+  let status = forceNotApplicable
+    ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+    : (rosterRecord
+      ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
+      : (expectedForSession ? '' : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
+  if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(status))) {
+    status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
   }
+  const scheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+    ses,
+    attendancePolicy.scheduledMinutes
+  );
+  const record = {
+    sessionId: ses.sessionId,
+    date: ses.date,
+    status,
+    lateMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.lateMinutes || 0),
+    earlyLeaveMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.earlyLeaveMinutes || 0),
+    scheduledMinutes
+  };
+  const recordPolicy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
+    classData,
+    orgPolicyCatalog,
+    scheduledMinutes
+  );
+  record.status = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus(
+    record,
+    recordPolicy,
+    enabledAttendanceStatuses
+  );
+  return record;
 }
 
-/**
- * Same payload as GET /school/grades-matrix/api/data (for server-side pages and tools).
- * @param {import('express').Request} req
- * @param {{ classId: string, startDate?: string, endDate?: string }} query
- */
-async function buildGradesMatrixPayload(req, query) {
+function buildGradesAttendanceRecords(stu, sessions, ctx, rosterMaps) {
+  return (Array.isArray(sessions) ? sessions : []).map((ses) => {
+    const rosterRecord = matrixWindowService.rosterRecordForSession(rosterMaps, ses, stu.personId);
+    return buildGradesAttendanceRecord(stu, ses, ctx, rosterRecord);
+  });
+}
+
+function buildGradesMatrixCell(stu, col, ctx, rosterMaps) {
+  const {
+    classData,
+    orgPolicyCatalog,
+    attendancePolicy,
+    enabledAttendanceStatuses,
+    forceNotApplicableSessionKeys,
+    sessionById,
+    getApplicabilityForSession
+  } = ctx;
+  const ses = sessionById.get(col.sessionId);
+  if (!ses) {
+    return { score: null, percent: null, absent: true, attendanceStatus: attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT, effective: false, includeInGradeCalculation: false };
+  }
+  const rosterRecord = matrixWindowService.rosterRecordForSession(rosterMaps, ses, stu.personId);
+  const applicabilityState = getApplicabilityForSession(stu, ses);
+  const forceNotApplicable = forceNotApplicableSessionKeys.has(String(ses?.sessionId || ses?.id || '').trim())
+    || forceNotApplicableSessionKeys.has(String(ses?.date || '').trim());
+  const expectedForSession = !forceNotApplicable && Boolean(applicabilityState.expected);
+  const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
+  let att = forceNotApplicable
+    ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+    : (rosterRecord
+      ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
+      : (expectedForSession ? '' : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
+  if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(att))) {
+    att = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+  }
+  const scheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+    ses,
+    attendancePolicy.scheduledMinutes
+  );
+  const cellPolicy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
+    classData,
+    orgPolicyCatalog,
+    scheduledMinutes
+  );
+  att = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus({
+    status: att,
+    lateMinutes: rosterRecord?.lateMinutes || 0,
+    earlyLeaveMinutes: rosterRecord?.earlyLeaveMinutes || 0
+  }, cellPolicy, enabledAttendanceStatuses);
+  const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
+    || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+
+  const payload = pickPayload(ses, col);
+  if (!payload) {
+    return { score: null, percent: null, absent, attendanceStatus: att, effective: false, includeInGradeCalculation: !!col.includeInGradeCalculation };
+  }
+
+  const total = Number(col.totalScore) > 0 ? Number(col.totalScore) : Number(payload.totalScore) || 0;
+  const raw = absent ? null : getScoreFromMap(payload.scores, stu.personId);
+  let percent = null;
+  if (!absent && raw != null && total > 0) {
+    percent = Math.round((raw / total) * 1000) / 10;
+  }
+  const effective = col.includeInGradeCalculation === true && !absent && raw != null && total > 0;
+
+  return {
+    score: absent ? null : raw,
+    percent,
+    absent,
+    attendanceStatus: att,
+    effective,
+    includeInGradeCalculation: col.includeInGradeCalculation
+  };
+}
+
+async function loadGradesMatrixSharedContext(req, query) {
   const classId = String(query?.classId || '').trim();
   const startDate = String(query?.startDate || '').trim();
   const endDate = String(query?.endDate || '').trim();
@@ -378,109 +460,111 @@ async function buildGradesMatrixPayload(req, query) {
       ses?.sessionId || ses?.id
     ) || { expected: false, reason: 'not_enrolled' };
   };
-  const matrix = studentList.map((stu) => {
-    const attendanceRecords = filteredSessions.map((ses) => {
-      const rosterRecord = ses.roster?.find((r) => idsEqual(r.personId, stu.personId));
-      const applicabilityState = getApplicabilityForSession(stu, ses);
-      const forceNotApplicable = forceNotApplicableSessionKeys.has(String(ses?.sessionId || ses?.id || '').trim())
-        || forceNotApplicableSessionKeys.has(String(ses?.date || '').trim());
-      const expectedForSession = !forceNotApplicable && Boolean(applicabilityState.expected);
-      const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
-      let status = forceNotApplicable
-        ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
-        : (rosterRecord
-          ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
-          : (expectedForSession ? '' : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
-      if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(status))) {
-        status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+
+  return {
+    classData,
+    filteredSessions,
+    studentList,
+    columns,
+    dateOrder,
+    sessionById,
+    evaluation,
+    isRollingClass,
+    enrollmentSnapshot,
+    orgPolicyCatalog,
+    attendancePolicy,
+    enabledAttendanceStatuses,
+    forceNotApplicableSessionKeys,
+    getApplicabilityForSession
+  };
+}
+
+async function showGradesMatrixPage(req, res) {
+  try {
+    const q = req.query || {};
+    const initialClassId = String(q.classId || '').trim();
+    const initialStartDate = String(q.startDate || '').trim();
+    const initialEndDate = String(q.endDate || '').trim();
+    const initialRange = String(q.range || '').trim();
+    let initialClassName = String(q.className || '').trim();
+    if (initialClassId && !initialClassName) {
+      try {
+        const classRow = await schoolDataService.getDataById('classes', initialClassId, req.user);
+        if (classRow?.title) initialClassName = String(classRow.title).trim();
+      } catch (e) {
+        /* ignore */
       }
-      const scheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
-        ses,
-        attendancePolicy.scheduledMinutes
-      );
-      const record = {
-        sessionId: ses.sessionId,
-        date: ses.date,
-        status,
-        lateMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.lateMinutes || 0),
-        earlyLeaveMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.earlyLeaveMinutes || 0),
-        scheduledMinutes
-      };
-      const recordPolicy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
-        classData,
-        orgPolicyCatalog,
-        scheduledMinutes
-      );
-      record.status = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus(
-        record,
-        recordPolicy,
-        enabledAttendanceStatuses
-      );
-      return record;
+    }
+
+    const canOpenAttendanceMatrix = await userCanOpenAttendanceMatrix(req.user, req.ip);
+
+    res.render('school/grades/gradesMatrix', {
+      title: 'Grades Matrix',
+      includeModal: true,
+      user: req.user,
+      actionStateId: req.actionStateId,
+      tableName: 'Grades_Matrix',
+      initialClassId,
+      initialClassName,
+      initialStartDate,
+      initialEndDate,
+      initialRange,
+      canOpenAttendanceMatrix
     });
+  } catch (error) {
+    res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+/**
+ * Same payload as GET /school/grades-matrix/api/data (for server-side pages and tools).
+ * @param {import('express').Request} req
+ * @param {{ classId: string, startDate?: string, endDate?: string }} query
+ */
+async function buildGradesMatrixPayload(req, query, options = {}) {
+  const ctx = await loadGradesMatrixSharedContext(req, query);
+  const {
+    classData,
+    filteredSessions,
+    studentList,
+    columns,
+    dateOrder,
+    sessionById,
+    evaluation,
+    enrollmentSnapshot,
+    orgPolicyCatalog
+  } = ctx;
+
+  const windowQuery = {
+    studentOffset: query?.studentOffset,
+    studentLimit: query?.studentLimit,
+    columnOffset: query?.columnOffset,
+    columnLimit: query?.columnLimit,
+    fullMatrix: query?.fullMatrix || query?.full
+  };
+  const windowParams = options.windowParams || matrixWindowService.parseMatrixWindowQuery(windowQuery);
+  const effectiveApplyWindow = options.applyWindow !== false && windowParams.applyWindow;
+  const buildPlan = matrixWindowService.planGradesMatrixBuild(
+    studentList.length,
+    columns.length,
+    { ...windowParams, applyWindow: effectiveApplyWindow }
+  );
+  const buildStudentList = studentList.slice(buildPlan.studentStart, buildPlan.studentEnd);
+  const buildColumns = columns.slice(buildPlan.columnStart, buildPlan.columnEnd);
+  const attendanceSessionIds = new Set(
+    buildColumns.map((col) => String(col?.sessionId || '').trim()).filter(Boolean)
+  );
+  const buildSessionsForAttendance = filteredSessions.filter((ses) =>
+    attendanceSessionIds.has(String(ses?.sessionId || '').trim())
+  );
+  const rosterMaps = matrixWindowService.buildRosterLookupMaps(buildSessionsForAttendance);
+
+  const matrix = buildStudentList.map((stu) => {
+    const attendanceRecords = buildGradesAttendanceRecords(stu, buildSessionsForAttendance, ctx, rosterMaps);
     const attSummary = attendanceMatrixMetricsService.computeStudentMatrixSummary(attendanceRecords, classData, orgPolicyCatalog);
     const attendancePct = attSummary.performancePercent;
-
-    const cells = columns.map((col) => {
-      const ses = sessionById.get(col.sessionId);
-      if (!ses) {
-        return { score: null, percent: null, absent: true, attendanceStatus: attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT, effective: false, includeInGradeCalculation: false };
-      }
-      const rosterRecord = ses.roster?.find((r) => idsEqual(r.personId, stu.personId));
-      const applicabilityState = getApplicabilityForSession(stu, ses);
-      const forceNotApplicable = forceNotApplicableSessionKeys.has(String(ses?.sessionId || ses?.id || '').trim())
-        || forceNotApplicableSessionKeys.has(String(ses?.date || '').trim());
-      const expectedForSession = !forceNotApplicable && Boolean(applicabilityState.expected);
-      const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
-      let att = forceNotApplicable
-        ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
-        : (rosterRecord
-          ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
-          : (expectedForSession ? '' : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE));
-      if (!forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(att))) {
-        att = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
-      }
-      const scheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
-        ses,
-        attendancePolicy.scheduledMinutes
-      );
-      const cellPolicy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
-        classData,
-        orgPolicyCatalog,
-        scheduledMinutes
-      );
-      att = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus({
-        status: att,
-        lateMinutes: rosterRecord?.lateMinutes || 0,
-        earlyLeaveMinutes: rosterRecord?.earlyLeaveMinutes || 0
-      }, cellPolicy, enabledAttendanceStatuses);
-      const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
-        || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
-
-      const payload = pickPayload(ses, col);
-      if (!payload) {
-        return { score: null, percent: null, absent, attendanceStatus: att, effective: false, includeInGradeCalculation: !!col.includeInGradeCalculation };
-      }
-
-      const total = Number(col.totalScore) > 0 ? Number(col.totalScore) : Number(payload.totalScore) || 0;
-      const raw = absent ? null : getScoreFromMap(payload.scores, stu.personId);
-      let percent = null;
-      if (!absent && raw != null && total > 0) {
-        percent = Math.round((raw / total) * 1000) / 10;
-      }
-      const effective = col.includeInGradeCalculation === true && !absent && raw != null && total > 0;
-
-      return {
-        score: absent ? null : raw,
-        percent,
-        absent,
-        attendanceStatus: att,
-        effective,
-        includeInGradeCalculation: col.includeInGradeCalculation
-      };
-    });
-
-    const assignmentsPct = assignmentsCategoryAveragePercents(cells, columns);
+    const cells = buildColumns.map((col) => buildGradesMatrixCell(stu, col, ctx, rosterMaps));
+    const assignmentsPct = assignmentsCategoryAveragePercents(cells, buildColumns);
     const { finalPercent, parts } = computeFinalPercent(
       evaluation,
       attendancePct,
@@ -492,16 +576,18 @@ async function buildGradesMatrixPayload(req, query) {
     return {
       personId: stu.personId,
       name: stu.name,
+      studentRecordId: stu.studentRecordId,
       attendancePct,
       attendanceSummary: attSummary,
       assignmentsPct,
       cells,
       finalPercent,
-      finalParts: parts
+      finalParts: parts,
+      _attendanceRecords: attendanceRecords
     };
   });
 
-  return {
+  const payload = {
     status: 'success',
     classId: classData.id,
     className: classData.title,
@@ -511,27 +597,91 @@ async function buildGradesMatrixPayload(req, query) {
     evaluation,
     sessions: filteredSessions.map((s) => ({ id: s.sessionId, date: s.date, startTime: s.startTime })),
     dateOrder,
-    columns,
+    columns: buildColumns,
     matrix,
     enrollmentSource: String(enrollmentSnapshot?.source || 'canonical'),
-    attendancePolicyNote: 'Attendance % uses the same session credit rules as the attendance matrix.'
+    attendancePolicyNote: 'Attendance % uses the same session credit rules as the attendance matrix.',
+    window: buildPlan.window
   };
+
+  return matrixRollupService.recomputeGradesMatrixRollups(payload, {
+    classData,
+    orgPolicyCatalog,
+    evaluation
+  });
 }
 
 async function getGradesMatrixData(req, res) {
   try {
     const { classId, startDate, endDate } = req.query;
-    const payload = await buildGradesMatrixPayload(req, { classId, startDate, endDate });
+    const payload = await buildGradesMatrixPayload(req, {
+      classId,
+      startDate,
+      endDate,
+      studentOffset: req.query.studentOffset,
+      studentLimit: req.query.studentLimit,
+      columnOffset: req.query.columnOffset,
+      columnLimit: req.query.columnLimit,
+      fullMatrix: req.query.fullMatrix || req.query.full
+    });
+    const clientPayload = {
+      ...payload,
+      matrix: (payload.matrix || []).map(({ _attendanceRecords, ...row }) => row)
+    };
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.set('Pragma', 'no-cache');
-    res.json(payload);
+    res.json(clientPayload);
   } catch (error) {
     res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function postGradesRollups(req, res) {
+  try {
+    const classId = String(req.body?.classId || '').trim();
+    if (!classId) throw new Error('Class ID is required.');
+    const startDate = String(req.body?.startDate || '').trim();
+    const endDate = String(req.body?.endDate || '').trim();
+    const columns = Array.isArray(req.body?.columns) ? req.body.columns : [];
+    const students = Array.isArray(req.body?.students) ? req.body.students : [];
+    const ctx = await loadGradesMatrixSharedContext(req, { classId, startDate, endDate });
+    const { classData, filteredSessions, studentList, orgPolicyCatalog, evaluation } = ctx;
+    const sessionIds = new Set(
+      columns.map((col) => String(col?.sessionId || '').trim()).filter(Boolean)
+    );
+    const sessionsForAttendance = filteredSessions.filter((ses) =>
+      sessionIds.has(String(ses?.sessionId || '').trim())
+    );
+    const rosterMaps = matrixWindowService.buildRosterLookupMaps(sessionsForAttendance);
+    const studentByPersonId = new Map(studentList.map((row) => [String(row.personId), row]));
+    const rollupRows = students.map((student) => {
+      const personId = String(student?.personId || '').trim();
+      const stu = studentByPersonId.get(personId) || { personId, name: `Person ${personId}` };
+      const attendanceRecords = buildGradesAttendanceRecords(stu, sessionsForAttendance, ctx, rosterMaps);
+      return {
+        personId,
+        cells: Array.isArray(student?.cells) ? student.cells : [],
+        _attendanceRecords: attendanceRecords
+      };
+    });
+    const rollups = matrixRollupService.summarizeGradesRollupsForRows(
+      rollupRows,
+      columns,
+      {
+        classData,
+        orgPolicyCatalog,
+        evaluation
+      }
+    );
+    return res.json({ status: 'success', rollups });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 }
 
 module.exports = {
   showGradesMatrixPage,
   getGradesMatrixData,
+  postGradesRollups,
   buildGradesMatrixPayload
 };

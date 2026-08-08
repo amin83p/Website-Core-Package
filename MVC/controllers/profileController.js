@@ -3,6 +3,7 @@ const dataService = require('../services/dataService');
 const bcrypt = require('bcryptjs');
 const adminTotpService = require('../services/adminTotpService');
 const adminAuthorityService = require('../services/adminAuthorityService');
+const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 const { buildDataServiceQuery } = require('../utils/generalTools');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
@@ -161,6 +162,7 @@ async function updateProfile(req, res) {
 
         // 6. Persist
         await dataService.updateData('users', userId, updates, req.user);
+        invalidateAuthContextForUser(userId);
 
         // 7. Response
         if (req.headers['x-ajax-request']) {

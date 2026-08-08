@@ -770,6 +770,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (endDate) params.set('endDate', endDate);
         const visibleIds = Array.from(getAttendanceVisiblePersonIds() || []).filter(Boolean);
         params.set('personIds', visibleIds.join(','));
+        const sessionIds = (window.currentMatrixData?.sessions || [])
+            .map((sessionRow) => String(sessionRow?.id || '').trim())
+            .filter(Boolean);
+        if (sessionIds.length) params.set('sessionIds', sessionIds.join(','));
         window.location.href = `/school/attendances/api/export.xlsx?${params.toString()}`;
     }
 
@@ -851,12 +855,167 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- 3. Render Engine ---
+    const MATRIX_STUDENT_WINDOW = 50;
+    const MATRIX_SESSION_WINDOW = 20;
+    const attMatrixWindowState = {
+        loadedStudents: 0,
+        loadedSessions: 0,
+        hasMoreStudents: false,
+        hasMoreSessions: false,
+        loading: false
+    };
+
+    function buildAttendanceSessionHeaderCell(classId, sessionRow) {
+        const d = new Date(sessionRow.date + 'T00:00:00');
+        const shortDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return `<th class="att-cell text-primary small fw-bold text-decoration-underline" style="cursor:pointer;" title="Click to open Session Manager" onclick="confirmOpenSession('${classId}', '${sessionRow.id}')">${shortDate}</th>`;
+    }
+
+    function buildAttendanceRecordCell(stu, rec) {
+        let icon = '<i class="bi bi-dash text-muted"></i>';
+        let tooltip = 'Not marked yet';
+        if (rec.status === 'present') { icon = '<i class="bi bi-check-circle-fill status-present"></i>'; tooltip = 'Present'; }
+        else if (rec.status === 'late') { icon = '<i class="bi bi-clock-fill status-late"></i>'; tooltip = 'Late'; }
+        else if (rec.status === 'excused') { icon = '<i class="bi bi-envelope-paper-fill status-excused"></i>'; tooltip = 'Excused'; }
+        else if (rec.status === 'absent') { icon = '<i class="bi bi-x-circle-fill status-absent"></i>'; tooltip = 'Absent'; }
+        else if (rec.status === 'acf') { icon = '<i class="bi bi-camera-video-off-fill status-acf"></i>'; tooltip = 'Absent Camera Off'; }
+        else if (rec.status === 'not_applicable') {
+            icon = '<i class="bi bi-dash-circle-fill status-na"></i>';
+            tooltip = rec.withinEnrollmentWindow === false
+                ? 'N/A - not enrolled for this session'
+                : (rec.applicability === 'approved_leave'
+                    ? 'N/A - approved leave'
+                    : (rec.applicability === 'makeup_required' ? 'N/A - make-up session required' : 'N/A'));
+        }
+        const hasComments = (rec.comments && rec.comments.length > 0);
+        const noteBadge = hasComments ? '<div class="position-absolute top-0 end-0 pe-1 pt-1"><i class="bi bi-chat-dots-fill text-primary" style="font-size: 0.65rem;"></i></div>' : '';
+        return `<td class="att-cell" title="${tooltip} (Click for Details)" onclick="openInteractiveModal('${stu.personId}', '${rec.sessionId}')">${icon}${noteBadge}</td>`;
+    }
+
+    function buildAttendanceStudentRowHtml(stu) {
+        const personId = String(stu?.personId || '').trim();
+        const s = stu.summary || {};
+        const p = Number(s.totalPresentSessions) || 0;
+        const a = Number(s.totalAbsentSessions) || 0;
+        const na = Number(s.totalNotApplicableSessions) || 0;
+        const pct = s.performancePercent;
+        const pctStr = pct == null ? '—' : `${pct}%`;
+        const rollupTitle = [
+            `Present (marked): ${p}`,
+            `Absent: ${a}`,
+            na ? `N/A: ${na}` : null,
+            `Efficiency: ${pctStr}`
+        ].filter(Boolean).join(' · ');
+        let rowHtml = `
+          <td class="matrix-sticky-rollup px-2 py-2 text-center small" title="${rollupTitle.replace(/"/g, '&quot;')}">
+            <div><span class="text-success fw-semibold">${p}</span><span class="text-muted"> / </span><span class="text-danger fw-semibold">${a}</span>${na ? `<span class="text-muted"> / </span><span class="text-secondary fw-semibold">${na}</span>` : ''}</div>
+            <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${pctStr}</div>
+          </td>
+          <td class="ps-3 matrix-sticky-name">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(stu.name, stu.studentRecordId, { className: 'text-decoration-none fw-bold' }) : stu.name}</td>`;
+        (stu.records || []).forEach((rec) => {
+            rowHtml += buildAttendanceRecordCell(stu, rec);
+        });
+        return `<tr class="matrix-student-row" data-person-id="${attEscapeHtml(personId)}">${rowHtml}</tr>`;
+    }
+
+    function updateAttendanceRollupDom(matrixRows) {
+        (matrixRows || []).forEach((stu) => {
+            const personId = String(stu?.personId || '').trim();
+            if (!personId) return;
+            const rowEl = document.querySelector(`tr.matrix-student-row[data-person-id="${CSS.escape(personId)}"]`);
+            if (!rowEl) return;
+            const rollupCell = rowEl.querySelector('.matrix-sticky-rollup');
+            if (!rollupCell) return;
+            const s = stu.summary || {};
+            const p = Number(s.totalPresentSessions) || 0;
+            const a = Number(s.totalAbsentSessions) || 0;
+            const na = Number(s.totalNotApplicableSessions) || 0;
+            const pct = s.performancePercent;
+            const pctStr = pct == null ? '—' : `${pct}%`;
+            const rollupTitle = [
+                `Present (marked): ${p}`,
+                `Absent: ${a}`,
+                na ? `N/A: ${na}` : null,
+                `Efficiency: ${pctStr}`
+            ].filter(Boolean).join(' · ');
+            rollupCell.title = rollupTitle;
+            rollupCell.innerHTML = `
+              <div><span class="text-success fw-semibold">${p}</span><span class="text-muted"> / </span><span class="text-danger fw-semibold">${a}</span>${na ? `<span class="text-muted"> / </span><span class="text-secondary fw-semibold">${na}</span>` : ''}</div>
+              <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${pctStr}</div>`;
+        });
+    }
+
+    async function refreshAttendanceDisplayRollups() {
+        const data = window.currentMatrixData;
+        if (!data?.classId || !Array.isArray(data.matrix)) return;
+        try {
+            const res = await fetch('/school/attendances/api/rollups', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify({
+                    classId: data.classId,
+                    students: data.matrix.map((row) => ({
+                        personId: row.personId,
+                        records: row.records || []
+                    }))
+                })
+            });
+            const result = await res.json();
+            if (result.status !== 'success') return;
+            const rollups = result.rollups || {};
+            data.matrix.forEach((row) => {
+                const key = String(row.personId || '');
+                if (rollups[key]) row.summary = rollups[key];
+            });
+            updateAttendanceRollupDom(data.matrix);
+        } catch (_) {}
+    }
+
+    function mergeAttendanceMatrixPayload(existing, chunk, mergeMode) {
+        if (!mergeMode) return chunk;
+        if (mergeMode === 'sessions') {
+            const mergedMatrix = (existing.matrix || []).map((row, index) => ({
+                ...row,
+                records: [...(row.records || []), ...((chunk.matrix?.[index]?.records) || [])]
+            }));
+            return {
+                ...existing,
+                sessions: [...(existing.sessions || []), ...(chunk.sessions || [])],
+                matrix: mergedMatrix,
+                window: chunk.window || existing.window
+            };
+        }
+        return {
+            ...existing,
+            matrix: [...(existing.matrix || []), ...(chunk.matrix || [])],
+            window: chunk.window || existing.window
+        };
+    }
+
+    function updateAttendanceWindowState(result, mergeMode) {
+        const windowMeta = result.window || {};
+        attMatrixWindowState.hasMoreStudents = Boolean(windowMeta.hasMoreStudents);
+        attMatrixWindowState.hasMoreSessions = Boolean(windowMeta.hasMoreSessions);
+        if (!mergeMode) {
+            attMatrixWindowState.loadedStudents = (result.matrix || []).length;
+            attMatrixWindowState.loadedSessions = (result.sessions || []).length;
+            return;
+        }
+        if (mergeMode === 'sessions') {
+            attMatrixWindowState.loadedSessions += (result.sessions || []).length;
+        } else if (mergeMode === 'students') {
+            attMatrixWindowState.loadedStudents += (result.matrix || []).length;
+        }
+    }
+
     async function loadAttendanceMatrixData(options = {}) {
         const classId = document.getElementById('filter_classId').value;
         const startDate = document.getElementById('filter_startDate').value;
         const endDate = document.getElementById('filter_endDate').value;
+        const mergeMode = options.merge === 'sessions' || options.merge === 'students' ? options.merge : null;
 
-        if (!classId) return; 
+        if (!classId) return;
+        if (attMatrixWindowState.loading) return;
 
         const btn = document.getElementById('btn_loadData');
         const originalHtml = btn.innerHTML;
@@ -873,31 +1032,80 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.disabled = true;
         }
 
+        attMatrixWindowState.loading = true;
         try {
-            const url = `/school/attendances/api/data?classId=${classId}&startDate=${startDate}&endDate=${endDate}`;
+            const params = new URLSearchParams({
+                classId,
+                startDate,
+                endDate,
+                studentOffset: String(mergeMode === 'students' ? attMatrixWindowState.loadedStudents : 0),
+                studentLimit: String(mergeMode === 'sessions'
+                    ? (attMatrixWindowState.loadedStudents || MATRIX_STUDENT_WINDOW)
+                    : MATRIX_STUDENT_WINDOW),
+                sessionOffset: String(mergeMode === 'sessions' ? attMatrixWindowState.loadedSessions : 0),
+                sessionLimit: String(mergeMode === 'students'
+                    ? (attMatrixWindowState.loadedSessions || MATRIX_SESSION_WINDOW)
+                    : MATRIX_SESSION_WINDOW)
+            });
+            const url = `/school/attendances/api/data?${params.toString()}`;
             const res = await fetch(url, { cache: 'no-store', headers: { 'X-AJAX-Request': 'true' } });
-            const result = await res.json();
+            const chunk = await res.json();
             const guarded = typeof window.applyGuardedApiResult === 'function'
-                ? await window.applyGuardedApiResult(result, { busyTitle: 'Load In Progress', replayTitle: 'Load Already Completed' })
+                ? await window.applyGuardedApiResult(chunk, { busyTitle: 'Load In Progress', replayTitle: 'Load Already Completed' })
                 : { stop: false };
             if (guarded.stop) return;
-            
-            if (result.status !== 'success') throw new Error(result.message);
-            
+
+            if (chunk.status !== 'success') throw new Error(chunk.message);
+
+            const result = mergeMode && window.currentMatrixData
+                ? mergeAttendanceMatrixPayload(window.currentMatrixData, chunk, mergeMode)
+                : chunk;
+            updateAttendanceWindowState(chunk, mergeMode);
+
             window.currentMatrixData = result;
-            resetAttendanceStudentVisibility(result.matrix);
+            if (!mergeMode) {
+                resetAttendanceStudentVisibility(result.matrix);
+            }
             document.getElementById('resultsContainer').classList.remove('d-none');
             setAttendancePrintEnabled(true);
-            
+
             document.getElementById('filter_className').value = result.className || 'Loaded Class';
             document.getElementById('lbl_displayClassName').innerText = result.className || 'Class Attendance';
 
             const headers = document.getElementById('matrixHeaders');
             const tbody = document.getElementById('matrixBody');
-            headers.innerHTML = ''; tbody.innerHTML = '';
+
+            if (mergeMode === 'sessions') {
+                (chunk.sessions || []).forEach((sessionRow) => {
+                    headers.insertAdjacentHTML('beforeend', buildAttendanceSessionHeaderCell(classId, sessionRow));
+                });
+                tbody.querySelectorAll('tr.matrix-student-row').forEach((rowEl, index) => {
+                    const studentRow = chunk.matrix?.[index];
+                    if (!studentRow) return;
+                    (studentRow.records || []).forEach((rec) => {
+                        rowEl.insertAdjacentHTML('beforeend', buildAttendanceRecordCell(studentRow, rec));
+                    });
+                });
+                bindAttendanceStudentVisibilityDropdown();
+                applyAttendanceStudentVisibility();
+                await refreshAttendanceDisplayRollups();
+                return;
+            }
+
+            if (mergeMode === 'students') {
+                (chunk.matrix || []).forEach((stu) => {
+                    tbody.insertAdjacentHTML('beforeend', buildAttendanceStudentRowHtml(stu));
+                });
+                bindAttendanceStudentVisibilityDropdown();
+                applyAttendanceStudentVisibility();
+                await refreshAttendanceDisplayRollups();
+                return;
+            }
+
+            headers.innerHTML = '';
+            tbody.innerHTML = '';
 
             const policyTitle = 'Attendance rollup';
-
             const studentHeaderHtml = buildAttendanceStudentFilterDropdownHtml(
                 result.matrix,
                 getAttendanceVisiblePersonIds()
@@ -909,19 +1117,15 @@ document.addEventListener('DOMContentLoaded', () => {
               </th>
               <th style="min-width: 220px;" class="ps-3 matrix-sticky-name">${studentHeaderHtml}</th>`;
             if (result.sessions.length === 0) {
-                headerHtml += `<th>Status</th>`;
-                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-5 text-muted">No active sessions found in this date range.</td></tr>`;
+                headerHtml += '<th>Status</th>';
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center py-5 text-muted">No active sessions found in this date range.</td></tr>';
                 headers.innerHTML = headerHtml;
                 bindAttendanceStudentVisibilityDropdown();
                 return;
             }
 
-            result.sessions.forEach(s => {
-                const d = new Date(s.date + 'T00:00:00');
-                const shortDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                
-                // UPDATED: Added clickable styling and onclick event to open Session Manager
-                headerHtml += `<th class="att-cell text-primary small fw-bold text-decoration-underline" style="cursor:pointer;" title="Click to open Session Manager" onclick="confirmOpenSession('${classId}', '${s.id}')">${shortDate}</th>`;
+            result.sessions.forEach((sessionRow) => {
+                headerHtml += buildAttendanceSessionHeaderCell(classId, sessionRow);
             });
             headers.innerHTML = headerHtml;
 
@@ -931,67 +1135,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            result.matrix.forEach(stu => {
-                const personId = String(stu?.personId || '').trim();
-                const s = stu.summary || {};
-                const p = Number(s.totalPresentSessions) || 0;
-                const a = Number(s.totalAbsentSessions) || 0;
-                const na = Number(s.totalNotApplicableSessions) || 0;
-                const pct = s.performancePercent;
-                const pctStr = pct == null ? '—' : `${pct}%`;
-                const rollupTitle = [
-                  `Present (marked): ${p}`,
-                  `Absent: ${a}`,
-                  na ? `N/A: ${na}` : null,
-                  `Efficiency: ${pctStr}`
-                ].filter(Boolean).join(' · ');
-
-                let rowHtml = `
-                  <td class="matrix-sticky-rollup px-2 py-2 text-center small" title="${rollupTitle.replace(/"/g, '&quot;')}">
-                    <div><span class="text-success fw-semibold">${p}</span><span class="text-muted"> / </span><span class="text-danger fw-semibold">${a}</span>${na ? `<span class="text-muted"> / </span><span class="text-secondary fw-semibold">${na}</span>` : ''}</div>
-                    <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${pctStr}</div>
-                  </td>
-                  <td class="ps-3 matrix-sticky-name">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(stu.name, stu.studentRecordId, { className: 'text-decoration-none fw-bold' }) : stu.name}</td>`;
-                
-                stu.records.forEach(rec => {
-                    let icon = '<i class="bi bi-dash text-muted"></i>';
-                    let tooltip = 'Not marked yet';
-
-                    if (rec.status === 'present') { icon = '<i class="bi bi-check-circle-fill status-present"></i>'; tooltip = 'Present'; }
-                    else if (rec.status === 'late') { icon = `<i class="bi bi-clock-fill status-late"></i>`; tooltip = `Late`; }
-                    else if (rec.status === 'excused') { icon = '<i class="bi bi-envelope-paper-fill status-excused"></i>'; tooltip = 'Excused'; }
-                    else if (rec.status === 'absent') { icon = '<i class="bi bi-x-circle-fill status-absent"></i>'; tooltip = 'Absent'; }
-                    else if (rec.status === 'acf') { icon = '<i class="bi bi-camera-video-off-fill status-acf"></i>'; tooltip = 'Absent Camera Off'; }
-                    else if (rec.status === 'not_applicable') {
-                        icon = '<i class="bi bi-dash-circle-fill status-na"></i>';
-                        tooltip = rec.withinEnrollmentWindow === false
-                            ? 'N/A - not enrolled for this session'
-                            : (rec.applicability === 'approved_leave'
-                            ? 'N/A - approved leave'
-                            : (rec.applicability === 'makeup_required' ? 'N/A - make-up session required' : 'N/A'));
-                    } else if (!rec.status) {
-                        icon = '<i class="bi bi-dash text-muted"></i>';
-                        tooltip = 'Not marked yet';
-                    }
-
-                    // UPDATED: Badge now strictly checks the comments array (ignores general teacherNotes)
-                    const hasComments = (rec.comments && rec.comments.length > 0);
-                    const noteBadge = hasComments ? `<div class="position-absolute top-0 end-0 pe-1 pt-1"><i class="bi bi-chat-dots-fill text-primary" style="font-size: 0.65rem;"></i></div>` : '';
-
-                    rowHtml += `
-                        <td class="att-cell" title="${tooltip} (Click for Details)" onclick="openInteractiveModal('${stu.personId}', '${rec.sessionId}')">
-                            ${icon}
-                            ${noteBadge}
-                        </td>
-                    `;
-                });
-                tbody.innerHTML += `<tr class="matrix-student-row" data-person-id="${attEscapeHtml(personId)}">${rowHtml}</tr>`;
+            result.matrix.forEach((stu) => {
+                tbody.insertAdjacentHTML('beforeend', buildAttendanceStudentRowHtml(stu));
             });
 
             bindAttendanceStudentVisibilityDropdown();
             applyAttendanceStudentVisibility();
 
-            // Auto-open logic
             const currentUrlParams = new URLSearchParams(window.location.search);
             const targetStudentId = currentUrlParams.get('studentId');
             const targetSessionId = currentUrlParams.get('sessionId');
@@ -1009,9 +1159,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error(error);
-            window.currentMatrixData = null;
-            window.attendanceVisiblePersonIds = null;
-            setAttendancePrintEnabled(false);
+            if (!mergeMode) {
+                window.currentMatrixData = null;
+                window.attendanceVisiblePersonIds = null;
+                setAttendancePrintEnabled(false);
+            }
             showAttendanceMatrixMessage({
                 title: 'Error',
                 icon: 'error',
@@ -1019,12 +1171,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 buttons: [{ text: 'Close', class: 'btn-secondary' }]
             });
         } finally {
+            attMatrixWindowState.loading = false;
             if (!skipButtonBusy) {
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
             }
         }
     }
+
+    document.querySelector('.matrix-wrapper')?.addEventListener('scroll', () => {
+        const wrapper = document.querySelector('.matrix-wrapper');
+        if (!wrapper || attMatrixWindowState.loading || !window.currentMatrixData) return;
+        const nearBottom = wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 100;
+        const nearRight = wrapper.scrollLeft + wrapper.clientWidth >= wrapper.scrollWidth - 100;
+        if (nearBottom && attMatrixWindowState.hasMoreStudents) {
+            loadAttendanceMatrixData({ merge: 'students', skipButtonBusy: true });
+        } else if (nearRight && attMatrixWindowState.hasMoreSessions) {
+            loadAttendanceMatrixData({ merge: 'sessions', skipButtonBusy: true });
+        }
+    });
 
     document.getElementById('btn_loadData').addEventListener('click', () => loadAttendanceMatrixData());
 

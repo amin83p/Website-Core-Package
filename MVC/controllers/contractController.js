@@ -1,5 +1,6 @@
 // MVC/controllers/contractController.js
 const dataService = require('../services/dataService');const { idsEqual } = require('../utils/idAdapter');
+const { invalidateAuthContextForOrgId } = require('../services/cache/authContextInvalidationService');
 
 // Helpers
 function parseData(input) {
@@ -106,6 +107,7 @@ async function addContract(req, res) {
     item.audit.createDateTime = new Date().toISOString();
 
     await dataService.addData('contracts', item, req.user);
+    await invalidateAuthContextForOrgId(item.orgId);
 
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Contract created.' });
     res.redirect('/contracts');
@@ -147,6 +149,7 @@ async function editContract(req, res) {
     updates.audit.createDateTime = existing.audit.createDateTime;
 
     await dataService.updateData('contracts', req.params.id, updates, req.user);
+    await invalidateAuthContextForOrgId(updates.orgId || existing.orgId);
 
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Contract updated.' });
     res.redirect('/contracts');
@@ -158,7 +161,9 @@ async function editContract(req, res) {
 
 async function deleteContract(req, res) {
   try {
+    const existing = await dataService.getDataById('contracts', req.params.id, req.user);
     await dataService.deleteData('contracts', req.params.id, req.user);
+    if (existing?.orgId) await invalidateAuthContextForOrgId(existing.orgId);
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Contract deleted.' });
     res.redirect('/contracts');
   } catch (error) {

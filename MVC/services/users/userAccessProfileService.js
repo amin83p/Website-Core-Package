@@ -1,4 +1,5 @@
 const dataService = require('../dataService');
+const { invalidateAuthContextForUser } = require('../cache/authContextCacheService');
 const securityService = require('../security');
 const adminChekersService = require('../adminChekersService');
 const { SYSTEM_CONTEXT } = require('../../../config/constants');
@@ -183,7 +184,9 @@ async function persistUserOrganizations(user, organizations, requestingUser, opt
     organizations,
     audit: buildAuditPatch(user?.audit || {}, requestingUser)
   };
-  return dataService.updateData('users', user.id, patch, requestingUser || SYSTEM_CONTEXT, options);
+  const result = await dataService.updateData('users', user.id, patch, requestingUser || SYSTEM_CONTEXT, options);
+  invalidateAuthContextForUser(user.id);
+  return result;
 }
 
 const userAccessProfileService = {

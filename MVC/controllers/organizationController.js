@@ -3,6 +3,10 @@
 const dataService = require('../services/dataService'); 
 const organizationNameSnapshotService = require('../services/organizationNameSnapshotService');
 const organizationPurgeService = require('../services/organizationPurgeService');
+const {
+  invalidateAuthContextForOrgId,
+  invalidateAuthContextForAllUsers
+} = require('../services/cache/authContextInvalidationService');
 const { buildDataServiceQuery, isAjax } = require('../utils/generalTools');
 const { idsEqual } = require('../utils/idAdapter');
 const {
@@ -256,6 +260,7 @@ async function addOrganization(req, res) {
     const org = buildOrganizationFromBody(req.body, reqUserId);
 
     const addResult = await dataService.addData('organizations', org, req.user);
+    invalidateAuthContextForAllUsers();
     //await organizationModel.addOrganization(org);
 
     if (req.headers['x-ajax-request']) {
@@ -320,6 +325,7 @@ async function editOrganization(req, res) {
     delete updates.audit.createUser;
     delete updates.audit.createDateTime;
     const updatedObj = await dataService.updateData('organizations', req.params.id, updates, req.user);
+    await invalidateAuthContextForOrgId(req.params.id);
 
     let syncSummary = null;
     let syncWarning = '';

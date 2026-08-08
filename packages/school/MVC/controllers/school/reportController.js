@@ -15,6 +15,7 @@ const reportAssignmentBulkRowService = require('../../services/school/reportAssi
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
+const matrixWindowService = require('../../services/school/matrixWindowService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const reportScopePolicy = require('../../services/school/reportScopePolicy');
 const sessionConductService = require('../../services/school/sessionConductService');
@@ -1464,6 +1465,21 @@ async function showReportMatrix(req, res) {
   }
 }
 
+async function getReportMatrixData(req, res) {
+  try {
+    const matrix = await reportMatrixService.buildMatrixContext({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: req.query.assignmentRowId || req.query.rowId || '',
+      teacherId: req.query.teacherId || '',
+      reqUser: req.user,
+      windowParams: matrixWindowService.parseMatrixWindowQuery(req.query)
+    });
+    return res.json({ status: 'success', ...matrix });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function saveReportMatrixRow(req, res) {
   let guardKey = '';
   try {
@@ -2230,6 +2246,7 @@ module.exports = {
   showInstanceEditor,
   showInstanceEditorV2,
   showReportMatrix,
+  getReportMatrixData,
   saveReportMatrixRow,
   saveReportMatrixRows,
   previewReportMatrixPrefill,

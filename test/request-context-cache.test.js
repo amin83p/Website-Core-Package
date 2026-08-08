@@ -9,6 +9,9 @@ const { createTtlLruCache } = require('../MVC/services/cache/ttlLruCache');
 const { cloneCacheValue } = require('../MVC/services/cache/cacheClone');
 const websitePolicyCacheService = require('../MVC/services/cache/websitePolicyCacheService');
 const authContextCacheService = require('../MVC/services/cache/authContextCacheService');
+const authContextInvalidationService = require('../MVC/services/cache/authContextInvalidationService');
+const requestCacheConfig = require('../MVC/services/cache/requestCacheConfig');
+const sessionService = require('../MVC/services/SessionService');
 const authService = require('../MVC/services/authService');
 const dataService = require('../MVC/services/dataService');
 const domainOpsService = require('../MVC/services/data/domainOpsService');
@@ -44,11 +47,14 @@ test('ttlLruCache deleteByPrefix removes user session keys', () => {
 });
 
 test('system settings defaults include request cache configuration', () => {
-  assert.equal(settingsModel.DEFAULTS.app.requestCacheTtlSeconds, 60);
+  assert.equal(settingsModel.DEFAULTS.app.requestCacheTtlSeconds, 900);
   assert.equal(settingsModel.DEFAULTS.app.requestCacheMaxEntries, 500);
+  assert.equal(requestCacheConfig.DEFAULT_TTL_SECONDS, 900);
+  assert.equal(requestCacheConfig.MAX_TTL_SECONDS, 900);
   const appSettingsView = read('MVC/views/systemSettings/appSettings.ejs');
   assert.match(appSettingsView, /requestCacheTtlSeconds/);
   assert.match(appSettingsView, /requestCacheMaxEntries/);
+  assert.match(appSettingsView, /max="900"/);
 });
 
 test('website policy cache avoids repeated repository reads within TTL', async () => {
@@ -264,4 +270,124 @@ test('cloneCacheValue returns independent object copies', () => {
   clone.siteWarnings.push('warn');
   assert.equal(source.allowedOrgs[0].name, 'One');
   assert.equal(source.siteWarnings.length, 0);
+});
+
+test('invalidateAuthContextForUser clears every session cache key for that user', () => {
+  authContextCacheService.clearAuthContextCache();
+  authContextCacheService.setCachedAuthContext('USR_MULTI', 'SES_A', { id: 'USR_MULTI', session: 'A' });
+  authContextCacheService.setCachedAuthContext('USR_MULTI', 'SES_B', { id: 'USR_MULTI', session: 'B' });
+  authContextCacheService.setCachedAuthContext('USR_OTHER', 'SES_C', { id: 'USR_OTHER' });
+
+  const removed = authContextCacheService.invalidateAuthContextForUser('USR_MULTI');
+  assert.equal(removed, 2);
+  assert.equal(authContextCacheService.getCachedAuthContext('USR_MULTI', 'SES_A'), null);
+  assert.equal(authContextCacheService.getCachedAuthContext('USR_MULTI', 'SES_B'), null);
+  assert.equal(authContextCacheService.getCachedAuthContext('USR_OTHER', 'SES_C')?.id, 'USR_OTHER');
+});
+
+test('invalidateAuthContextForAccessProfileId invalidates system and org-local profile users', async () => {
+  const profileId = 'APF_LOCAL_1';
+  const originals = {
+    fetchData: dataService.fetchData
+  };
+
+  dataService.fetchData = async (entityType, query = {}) => {
+    if (entityType === 'users' && query.searchFields === 'systemAccessProfileId') {
+      return [{ id: 'USR_SYS' }];
+    }
+    if (entityType === 'users' && !query.searchFields) {
+      return [
+        { id: 'USR_SYS' },
+        { id: 'USR_ORG', organizations: [{ orgId: 'ORG_1', accessProfileIds: [profileId] }] },
+        { id: 'USR_NONE', organizations: [{ orgId: 'ORG_2', accessProfileIds: ['OTHER'] }] }
+      ];
+    }
+    return [];
+  };
+
+  authContextCacheService.clearAuthContextCache();
+  authContextCacheService.setCachedAuthContext('USR_SYS', 'SES_1', { id: 'USR_SYS' });
+  authContextCacheService.setCachedAuthContext('USR_ORG', 'SES_2', { id: 'USR_ORG' });
+  authContextCacheService.setCachedAuthContext('USR_NONE', 'SES_3', { id: 'USR_NONE' });
+
+  try {
+    const result = await authContextInvalidationService.invalidateAuthContextForAccessProfileId(profileId);
+    assert.equal(result.userCount, 2);
+    assert.equal(authContextCacheService.getCachedAuthContext('USR_SYS', 'SES_1'), null);
+    assert.equal(authContextCacheService.getCachedAuthContext('USR_ORG', 'SES_2'), null);
+    assert.equal(authContextCacheService.getCachedAuthContext('USR_NONE', 'SES_3')?.id, 'USR_NONE');
+  } finally {
+    Object.assign(dataService, originals);
+    authContextCacheService.clearAuthContextCache();
+  }
+});
+
+test('invalidateAuthContextForOrgId invalidates members and primary-org users', async () => {
+  const orgId = 'ORG_TARGET';
+  const originals = { fetchData: dataService.fetchData };
+
+  dataService.fetchData = async (entityType) => {
+    if (entityType !== 'users') return [];
+    return [
+      { id: 'USR_MEMBER', organizations: [{ orgId: orgId }] },
+      { id: 'USR_PRIMARY', primaryOrgId: orgId, organizations: [] },
+      { id: 'USR_OUTSIDER', primaryOrgId: 'OTHER', organizations: [{ orgId: 'OTHER' }] }
+    ];
+  };
+
+  authContextCacheService.clearAuthContextCache();
+  authContextCacheService.setCachedAuthContext('USR_MEMBER', 'SES_M', { id: 'USR_MEMBER' });
+  authContextCacheService.setCachedAuthContext('USR_PRIMARY', 'SES_P', { id: 'USR_PRIMARY' });
+  authContextCacheService.setCachedAuthContext('USR_OUTSIDER', 'SES_O', { id: 'USR_OUTSIDER' });
+
+  try {
+    const result = await authContextInvalidationService.invalidateAuthContextForOrgId(orgId);
+    assert.equal(result.userCount, 2);
+    assert.equal(authContextCacheService.getCachedAuthContext('USR_MEMBER', 'SES_M'), null);
+    assert.equal(authContextCacheService.getCachedAuthContext('USR_PRIMARY', 'SES_P'), null);
+    assert.equal(authContextCacheService.getCachedAuthContext('USR_OUTSIDER', 'SES_O')?.id, 'USR_OUTSIDER');
+  } finally {
+    Object.assign(dataService, originals);
+    authContextCacheService.clearAuthContextCache();
+  }
+});
+
+test('terminateAllSessionsForUser removes session rows and auth cache entries', async () => {
+  const userId = 'USR_SESSIONS';
+  const originals = {
+    fetchData: dataService.fetchData,
+    getDataById: dataService.getDataById,
+    deleteData: dataService.deleteData
+  };
+  const deletedSessionIds = [];
+
+  dataService.fetchData = async (entityType, query = {}) => {
+    if (entityType === 'sessions' && query.searchFields === 'userId') {
+      return [{ id: 'SES_ONE', userId }, { id: 'SES_TWO', userId }];
+    }
+    return [];
+  };
+  dataService.getDataById = async (entityType, id) => {
+    if (entityType === 'sessions') return { id, userId };
+    return null;
+  };
+  dataService.deleteData = async (entityType, id) => {
+    if (entityType === 'sessions') deletedSessionIds.push(id);
+    return { id };
+  };
+
+  authContextCacheService.clearAuthContextCache();
+  authContextCacheService.setCachedAuthContext(userId, 'SES_ONE', { id: userId });
+  authContextCacheService.setCachedAuthContext(userId, 'SES_TWO', { id: userId });
+
+  try {
+    const result = await sessionService.terminateAllSessionsForUser(userId);
+    assert.equal(result.terminated, 2);
+    assert.deepEqual(deletedSessionIds.sort(), ['SES_ONE', 'SES_TWO']);
+    assert.equal(authContextCacheService.getCachedAuthContext(userId, 'SES_ONE'), null);
+    assert.equal(authContextCacheService.getCachedAuthContext(userId, 'SES_TWO'), null);
+  } finally {
+    Object.assign(dataService, originals);
+    authContextCacheService.clearAuthContextCache();
+  }
 });

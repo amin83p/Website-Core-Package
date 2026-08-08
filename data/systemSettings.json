@@ -59,10 +59,10 @@
     "brand": {
       "appName": "Amin Pakenjad",
       "appShortName": "Amin Pakenjad",
-      "tagline": "Learn, work, and thrive in new Education",
-      "logoUrl": "/uploads/GLOBAL/logo/PaknejadLogo/Logo1.png",
-      "iconSvgUrl": "/uploads/GLOBAL/logo/PaknejadLogo/Logo.svg",
-      "appleTouchIconUrl": "/uploads/GLOBAL/logo/PaknejadLogo/Logo1.png",
+      "tagline": "Equilibrium School",
+      "logoUrl": "/uploads/GLOBAL/logo/Logo1.png",
+      "iconSvgUrl": "/uploads/GLOBAL/logo/Logo.svg",
+      "appleTouchIconUrl": "/uploads/GLOBAL/logo/Logo1.png",
       "themeColor": "#ffffff",
       "ownerDisplayName": "Amin Paknejad",
       "footerAboutTitle": "About Amin Paknejad",
@@ -265,6 +265,6 @@
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-07-19T07:44:06.987Z"
+    "lastUpdateDateTime": "2026-08-07T02:16:41.634Z"
   }
 }

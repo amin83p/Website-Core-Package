@@ -118,7 +118,7 @@ const DEFAULTS = {
   app: {                        // NEW SECTION
     defaultPageSize: 30,
     searchDefaultKeyword: 'aaa',
-    requestCacheTtlSeconds: 60,
+    requestCacheTtlSeconds: 900,
     requestCacheMaxEntries: 500,
     buildVersionOverride: '',
     defaultTimezone: 'UTC',

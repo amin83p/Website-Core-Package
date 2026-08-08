@@ -28,6 +28,7 @@ test('attendance viewer uses shared Export button look and wires xlsx after load
   assert.match(viewer, /exportAttendanceExcel\(/);
   assert.match(viewer, /\/school\/attendances\/api\/export\.xlsx/);
   assert.match(viewer, /personIds/);
+  assert.match(viewer, /sessionIds/);
   assert.match(viewer, /getAttendanceVisiblePersonIds/);
   assert.match(viewer, /exportBtn\.disabled = !enabled/);
 });
@@ -343,6 +344,32 @@ test('filterMatrixByPersonIds keeps only requested students', () => {
   );
   assert.equal(
     attendanceExcelExportService.filterMatrixByPersonIds(payload, null).matrix.length,
+    3
+  );
+});
+
+test('filterMatrixBySessionIds keeps only requested sessions and aligned records', () => {
+  const payload = {
+    sessions: [{ id: 's1' }, { id: 's2' }, { id: 's3' }],
+    matrix: [
+      {
+        personId: 'p1',
+        records: [
+          { sessionId: 's1', status: 'present' },
+          { sessionId: 's2', status: 'absent' },
+          { sessionId: 's3', status: 'absent' }
+        ]
+      }
+    ]
+  };
+  const filtered = attendanceExcelExportService.filterMatrixBySessionIds(payload, 's1,s3');
+  assert.deepEqual(filtered.sessions.map((s) => s.id), ['s1', 's3']);
+  assert.deepEqual(
+    filtered.matrix[0].records.map((r) => r.sessionId),
+    ['s1', 's3']
+  );
+  assert.equal(
+    attendanceExcelExportService.filterMatrixBySessionIds(payload, null).sessions.length,
     3
   );
 });

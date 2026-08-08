@@ -10,6 +10,7 @@ const subscriptionGroupRepository = require('../repositories/subscriptionGroupRe
 const userMembershipRepository = require('../repositories/userMembershipRepository');
 const activityQuotaLedgerService = require('./activityQuotaLedgerService');
 const dataService = require('./dataService');
+const { clearAllRequestCaches } = require('./cache/authContextCacheService');
 const packagePersonDependencyGuardService = require('./packagePersonDependencyGuardService');
 const pathResolver = require('../utils/pathResolver');
 const { toPublicId, idsEqual } = require('../utils/idAdapter');
@@ -719,6 +720,9 @@ async function executeOrganizationPurge(orgId, requestingUser = null, { confirmN
   }
 
   const failed = stages.some((stage) => stage.status === 'error');
+  if (!failed) {
+    clearAllRequestCaches();
+  }
   return {
     status: failed ? 'partial' : 'success',
     orgId: targetOrgId,

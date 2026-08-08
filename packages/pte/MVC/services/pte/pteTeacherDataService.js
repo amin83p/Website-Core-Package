@@ -19,6 +19,8 @@ const {
 } = require('./pteCoreContracts');
 const { applyGenericFilter } = require('../../utils/queryEngine');
 const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./pteCoreModuleResolver');
+const authContextInvalidationService = requireCoreModule('MVC/services/cache/authContextInvalidationService');
 
 const PERSON_ROLE_TOKEN = 'PTE_Teacher';
 const PERSON_ORG_ROLE_TOKEN = 'pte_teacher';
@@ -433,10 +435,12 @@ async function ensurePersonHasPteRole(person, orgId, requestingUser, options = {
 
   if (!changed) return latest;
 
-  return dataService.updateData('persons', latest.id, {
+  const updated = await dataService.updateData('persons', latest.id, {
     ...latest,
     organizations
   }, requestingUser || SYSTEM_CONTEXT, options);
+  await authContextInvalidationService.invalidateAuthContextForPersonId(latest.id);
+  return updated;
 }
 
 async function ensurePersonFromPayload(input = {}, requestingUser, activeOrgId, options = {}) {

@@ -7,6 +7,7 @@ const reportViewService = require('./reportViewService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getPrefillValue } = require('./reportPrefillKeyUtils');
+const matrixWindowService = require('./matrixWindowService');
 
 const VISUAL_TYPES = new Set(['section', 'subheader', 'row_break']);
 const STUDENT_NAME_KEYS = new Set([
@@ -330,7 +331,13 @@ function buildProgress(rows = []) {
   };
 }
 
-async function buildMatrixContext({ assignmentId, assignmentRowId = '', teacherId = '', reqUser } = {}) {
+async function buildMatrixContext({
+  assignmentId,
+  assignmentRowId = '',
+  teacherId = '',
+  reqUser,
+  windowParams = null
+} = {}) {
   const resolved = await resolveMatrixBase({ assignmentId, assignmentRowId, teacherId, reqUser });
   const { assignment, assignmentRow, template, classData, teacherId: resolvedTeacherId, targetStudentIds } = resolved;
   await sessionConductService.assertAssignmentSessionConductReadyOrThrow({
@@ -345,14 +352,46 @@ async function buildMatrixContext({ assignmentId, assignmentRowId = '', teacherI
     page: 1,
     limit: 10000
   }, reqUser);
-  const rows = await Promise.all(targetStudentIds.map((studentId) => buildStudentMatrixRow({
+  const assignmentRowKey = assignment.assignmentRowId || assignmentRow?.rowId || '';
+  const sortedStudentIds = [...targetStudentIds]
+    .map((studentId) => clean(studentId))
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
+
+  const classificationRows = sortedStudentIds.map((studentId) => {
+    const instance = findMatchingInstance(instances, {
+      assignmentId: assignment.id,
+      assignmentRowId: assignmentRowKey,
+      teacherId: resolvedTeacherId,
+      studentId
+    });
+    return {
+      studentId,
+      answers: instance?.answers && typeof instance.answers === 'object' ? instance.answers : {},
+      status: clean(instance?.status),
+      instanceId: instance?.id,
+      isPending: !instance
+    };
+  });
+
+  const fieldGroups = classifyMatrixFields(template, classificationRows, assignment);
+  const progress = buildProgress(classificationRows);
+  const parsedWindow = windowParams || matrixWindowService.parseMatrixWindowQuery({});
+  const totalStudents = sortedStudentIds.length;
+  const studentStart = Math.min(parsedWindow.studentOffset, totalStudents);
+  const studentEnd = parsedWindow.applyWindow
+    ? Math.min(studentStart + parsedWindow.studentLimit, totalStudents)
+    : totalStudents;
+  const windowedStudentIds = sortedStudentIds.slice(studentStart, studentEnd);
+
+  const rows = await Promise.all(windowedStudentIds.map((studentId) => buildStudentMatrixRow({
     assignment,
     template,
     teacherId: resolvedTeacherId,
     studentId,
     instance: findMatchingInstance(instances, {
       assignmentId: assignment.id,
-      assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
+      assignmentRowId: assignmentRowKey,
       teacherId: resolvedTeacherId,
       studentId
     }),
@@ -360,8 +399,13 @@ async function buildMatrixContext({ assignmentId, assignmentRowId = '', teacherI
     treatSubmittedAsLocked
   })));
   rows.sort((a, b) => a.studentName.localeCompare(b.studentName) || a.studentId.localeCompare(b.studentId));
-  const fieldGroups = classifyMatrixFields(template, rows, assignment);
-  const teacherName = clean(rows[0]?.answers?.teacher_name || rows[0]?.answers?.instructor_name || resolvedTeacherId);
+
+  const teacherName = clean(
+    rows[0]?.answers?.teacher_name
+    || rows[0]?.answers?.instructor_name
+    || classificationRows.find((row) => row.answers?.teacher_name)?.answers?.teacher_name
+    || resolvedTeacherId
+  );
   const sharedFieldsGate = reportViewService.evaluateSharedFieldsEditability({
     assignment,
     template,
@@ -370,7 +414,7 @@ async function buildMatrixContext({ assignmentId, assignmentRowId = '', teacherI
     allowAdminOverride: isAdminEditor
   });
 
-  return {
+  const context = {
     assignmentId: toPublicId(assignment.id),
     assignmentRowId: clean(assignment.assignmentRowId || assignmentRow?.rowId),
     templateId: toPublicId(template.id),
@@ -389,8 +433,13 @@ async function buildMatrixContext({ assignmentId, assignmentRowId = '', teacherI
     sharedFieldsBlockingSiblingCount: sharedFieldsGate.blockingSiblingCount || 0,
     ...fieldGroups,
     rows,
-    progress: buildProgress(rows)
+    progress
   };
+
+  if (parsedWindow.applyWindow) {
+    return matrixWindowService.applyReportMatrixRowWindow(context, parsedWindow);
+  }
+  return matrixWindowService.applyReportMatrixRowWindow(context, { applyWindow: false });
 }
 
 function matrixPayloadToFormBody(template, rowAnswers = {}, sharedAnswers = {}, submitAction = 'save') {
@@ -499,7 +548,8 @@ async function saveMatrixRow({
         assignmentId: assignment.id,
         assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
         teacherId: resolvedTeacherId,
-        reqUser
+        reqUser,
+        windowParams: { applyWindow: false }
       })
     : null;
 
@@ -592,7 +642,8 @@ async function saveMatrixRows({
     assignmentId: assignment.id,
     assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
     teacherId: resolvedTeacherId,
-    reqUser
+    reqUser,
+    windowParams: { applyWindow: false }
   });
   const summary = {
     total: requestedRows.length,
@@ -662,7 +713,8 @@ async function lockMatrixRows({
     assignmentId: assignment.id,
     assignmentRowId: effectiveRowId,
     teacherId: resolvedTeacherId,
-    reqUser
+    reqUser,
+    windowParams: { applyWindow: false }
   });
   const summary = {
     total: requestedRows.length,
@@ -747,13 +799,25 @@ async function applyMatrixPrefill({ assignmentId, assignmentRowId = '', teacherI
     await schoolDataService.updateData('reportInstances', instance.id, { prefillSnapshot: nextPrefill, answers: nextAnswers, audit: { lastUpdateUser: reqUser?.id || '', lastUpdateDateTime: new Date().toISOString(), prefillRefreshedAt: new Date().toISOString() } }, reqUser);
     results.push({ studentId, status: 'success', appliedCount: changes.length });
   }
-  const matrix = await buildMatrixContext({ assignmentId, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, reqUser });
+  const matrix = await buildMatrixContext({
+    assignmentId,
+    assignmentRowId: source.assignmentRowId,
+    teacherId: source.resolvedTeacherId,
+    reqUser,
+    windowParams: { applyWindow: false }
+  });
   return { results, matrix, summary: { total: requested.length, succeeded: results.filter((r) => r.status === 'success').length, skipped: results.filter((r) => r.status === 'skipped').length, failed: results.filter((r) => r.status === 'error').length } };
 }
 
 async function buildMatrixExportPayload({ assignmentId, assignmentRowId = '', teacherId = '', reqUser } = {}) {
   const source = await resolveMatrixData({ assignmentId, assignmentRowId, teacherId, reqUser });
-  const matrix = await buildMatrixContext({ assignmentId, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, reqUser });
+  const matrix = await buildMatrixContext({
+    assignmentId,
+    assignmentRowId: source.assignmentRowId,
+    teacherId: source.resolvedTeacherId,
+    reqUser,
+    windowParams: { applyWindow: false }
+  });
   const rows = [];
   for (const row of matrix.rows) {
     const instance = findMatchingInstance(source.instances, { assignmentId: source.assignment.id, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, studentId: row.studentId });

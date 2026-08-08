@@ -501,6 +501,30 @@ function filterMatrixByPersonIds(payload = {}, personIds) {
   };
 }
 
+function parseSessionIdsFilter(sessionIds) {
+  if (sessionIds === undefined || sessionIds === null) return null;
+  return new Set(String(sessionIds).split(',').map((id) => clean(id)).filter(Boolean));
+}
+
+function filterMatrixBySessionIds(payload = {}, sessionIds) {
+  const filter = parseSessionIdsFilter(sessionIds);
+  if (!filter) return payload;
+  const sessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
+  const keepIndices = sessions
+    .map((sessionRow, index) => (filter.has(clean(sessionRow?.id)) ? index : -1))
+    .filter((index) => index >= 0);
+  const filteredSessions = keepIndices.map((index) => sessions[index]);
+  const matrix = Array.isArray(payload?.matrix) ? payload.matrix : [];
+  return {
+    ...payload,
+    sessions: filteredSessions,
+    matrix: matrix.map((row) => ({
+      ...row,
+      records: keepIndices.map((index) => (Array.isArray(row?.records) ? row.records[index] : undefined))
+    }))
+  };
+}
+
 function sanitizeFilenamePart(value) {
   return clean(value)
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
@@ -770,6 +794,7 @@ module.exports = {
   formatEnrollmentStartEnd,
   formatFunderType,
   filterMatrixByPersonIds,
+  filterMatrixBySessionIds,
   parsePersonIdsFilter,
   splitDisplayName,
   resolveAttendanceTitle,

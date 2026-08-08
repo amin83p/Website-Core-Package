@@ -7,6 +7,11 @@ const { resolveCanonicalOrganizationName } = requireCoreModule('MVC/utils/organi
 const { normalizeOrgRoleTokens } = require('../../utils/schoolRoleTokenUtils');
 
 const SYSTEM_CONTEXT = constants.SYSTEM_CONTEXT;
+const authContextInvalidationService = requireCoreModule('MVC/services/cache/authContextInvalidationService');
+
+async function invalidateLinkedUserAuthContext(personId) {
+  await authContextInvalidationService.invalidateAuthContextForPersonId(personId);
+}
 
 function normalizeId(value) {
   return toPublicId(value);
@@ -189,6 +194,7 @@ async function ensurePersonHasSchoolRole({ personId, orgId, role, reqUser, optio
 
   if (changed) {
     await dataService.updateData('persons', normalizeId(person.id || person.personId), { ...person, organizations: list }, SYSTEM_CONTEXT, options);
+    await invalidateLinkedUserAuthContext(normalizeId(person.id || person.personId));
   }
 
   return {
@@ -222,6 +228,7 @@ async function removePersonSchoolRole({ personId, orgId, role, reqUser, options 
 
   const beforeOrganizations = Array.isArray(person.organizations) ? JSON.parse(JSON.stringify(person.organizations)) : [];
   await dataService.updateData('persons', normalizeId(person.id || person.personId), { ...person, organizations: list }, SYSTEM_CONTEXT, options);
+  await invalidateLinkedUserAuthContext(normalizeId(person.id || person.personId));
 
   return {
     changed: true,
@@ -233,13 +240,15 @@ async function removePersonSchoolRole({ personId, orgId, role, reqUser, options 
 async function restorePersonOrganizations({ personId, organizations = [], reqUser, options = {} } = {}) {
   const person = await getPersonById({ reqUser, personId, requireSchoolRole: false });
   if (!person) return null;
-  return dataService.updateData(
+  const updated = await dataService.updateData(
     'persons',
     normalizeId(person.id || person.personId),
     { ...person, organizations: Array.isArray(organizations) ? organizations : [] },
     SYSTEM_CONTEXT,
     options
   );
+  await invalidateLinkedUserAuthContext(normalizeId(person.id || person.personId));
+  return updated;
 }
 
 module.exports = {

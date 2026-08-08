@@ -334,49 +334,219 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let gmLoadSeq = 0;
   let gmLoadAbort = null;
+  const GM_STUDENT_WINDOW = 50;
+  const GM_COLUMN_WINDOW = 40;
+  const gmMatrixWindowState = {
+    loadedStudents: 0,
+    loadedColumns: 0,
+    hasMoreStudents: false,
+    hasMoreColumns: false,
+    loading: false
+  };
 
-  document.getElementById('gm_btnLoad').addEventListener('click', async () => {
+  function buildGmColumnGroups(columns) {
+    const groups = [];
+    let i = 0;
+    while (i < columns.length) {
+      const d = columns[i].date;
+      let j = i;
+      while (j < columns.length && columns[j].date === d) j += 1;
+      groups.push({ date: d, start: i, len: j - i });
+      i = j;
+    }
+    return groups;
+  }
+
+  function mergeGradesMatrixPayload(existing, chunk, mergeMode) {
+    if (mergeMode === 'columns') {
+      return {
+        ...existing,
+        columns: [...(existing.columns || []), ...(chunk.columns || [])],
+        matrix: (existing.matrix || []).map((row, index) => ({
+          ...row,
+          cells: [...(row.cells || []), ...((chunk.matrix?.[index]?.cells) || [])]
+        })),
+        window: chunk.window || existing.window
+      };
+    }
+    if (mergeMode === 'students') {
+      return {
+        ...existing,
+        matrix: [...(existing.matrix || []), ...(chunk.matrix || [])],
+        window: chunk.window || existing.window
+      };
+    }
+    return chunk;
+  }
+
+  function updateGradesRollupDom(matrixRows) {
+    (matrixRows || []).forEach((row) => {
+      const personId = String(row?.personId || '').trim();
+      if (!personId) return;
+      const tr = document.querySelector(`#gm_tbody tr[data-person-id="${CSS.escape(personId)}"]`);
+      if (!tr) return;
+      const finalTd = tr.querySelector('.gm-sticky-final');
+      const attTd = tr.querySelector('.gm-sticky-att');
+      if (finalTd) {
+        finalTd.innerHTML = row.finalPercent != null
+          ? `<span class="fw-bold">${formatGmPercent(row.finalPercent)}</span>`
+          : '—';
+      }
+      if (attTd) {
+        const attStr = formatGmPercent(row.attendancePct);
+        attTd.innerHTML = attStr === '—'
+          ? '<span class="text-muted">—</span>'
+          : `<span class="fw-semibold text-primary">${attStr}</span>`;
+      }
+    });
+  }
+
+  async function refreshGradesDisplayRollups() {
+    const data = window.currentGradesMatrixData;
+    if (!data?.classId || !Array.isArray(data.matrix)) return;
+    try {
+      const res = await fetch('/school/grades-matrix/api/rollups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify({
+          classId: data.classId,
+          startDate: document.getElementById('gm_startDate').value,
+          endDate: document.getElementById('gm_endDate').value,
+          columns: data.columns || [],
+          students: data.matrix.map((row) => ({
+            personId: row.personId,
+            cells: row.cells || []
+          }))
+        })
+      });
+      const result = await res.json();
+      if (result.status !== 'success') return;
+      const rollups = result.rollups || {};
+      data.matrix.forEach((row) => {
+        const key = String(row.personId || '');
+        const rollup = rollups[key];
+        if (rollup) Object.assign(row, rollup);
+      });
+      updateGradesRollupDom(data.matrix);
+    } catch (_) {}
+  }
+
+  function appendGmColumns(columns) {
+    const thead = document.getElementById('gm_thead');
+    if (!thead || !thead.rows.length || !columns.length) return;
+    const trDate = thead.rows[0];
+    const trCols = thead.rows[1];
+    buildGmColumnGroups(columns).forEach((group) => {
+      const th = document.createElement('th');
+      th.colSpan = group.len;
+      th.className = `gm-date-group ${bandClass(columns[group.start].dateBand)}`;
+      th.textContent = group.date || '—';
+      trDate.appendChild(th);
+    });
+    columns.forEach((col) => {
+      const th = document.createElement('th');
+      th.className = `gm-col-head text-center ${bandClass(col.dateBand)}`;
+      th.innerHTML = `<div class="small text-muted">${col.kindLabel || ''}</div><div class="text-dark text-truncate" title="${col.label}">${col.label}</div>`;
+      trCols.appendChild(th);
+    });
+  }
+
+  function appendGmStudentRow(row, columns) {
+    const tbody = document.getElementById('gm_tbody');
+    const tr = document.createElement('tr');
+    tr.dataset.personId = String(row.personId || '');
+    const fp = row.finalPercent != null ? `<span class="fw-bold">${formatGmPercent(row.finalPercent)}</span>` : '—';
+    const attStr = formatGmPercent(row.attendancePct);
+    const attCell = attStr === '—'
+      ? '<span class="text-muted">—</span>'
+      : `<span class="fw-semibold text-primary">${attStr}</span>`;
+    let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-att small">${attCell}</td>`;
+    row.cells.forEach((cell, idx) => {
+      const col = columns[idx];
+      html += `<td class="text-center small ${bandClass(col.dateBand)}">${renderCellHtml(cell)}</td>`;
+    });
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  }
+
+  async function loadGradesMatrixData(options = {}) {
     const classId = document.getElementById('gm_classId').value;
     const startDate = document.getElementById('gm_startDate').value;
     const endDate = document.getElementById('gm_endDate').value;
+    const mergeMode = options.merge === 'columns' || options.merge === 'students' ? options.merge : null;
     if (!classId) return;
+    if (gmMatrixWindowState.loading) return;
 
-    if (gmLoadAbort) gmLoadAbort.abort();
-    gmLoadAbort = new AbortController();
+    if (!mergeMode) {
+      if (gmLoadAbort) gmLoadAbort.abort();
+      gmLoadAbort = new AbortController();
+    }
     const seq = (gmLoadSeq += 1);
     const requestedClassId = classId;
-
     const thead = document.getElementById('gm_thead');
     const tbody = document.getElementById('gm_tbody');
-    thead.innerHTML = '';
-    tbody.innerHTML = '';
-    document.getElementById('gm_results').classList.add('d-none');
+    if (!mergeMode) {
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+      document.getElementById('gm_results').classList.add('d-none');
+    }
 
     const btn = document.getElementById('gm_btnLoad');
     const orig = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    if (!mergeMode) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    }
+    gmMatrixWindowState.loading = true;
 
     try {
-      const url = `/school/grades-matrix/api/data?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+      const params = new URLSearchParams({
+        classId,
+        startDate,
+        endDate,
+        studentOffset: String(mergeMode === 'students' ? gmMatrixWindowState.loadedStudents : 0),
+        studentLimit: String(mergeMode === 'columns'
+          ? (gmMatrixWindowState.loadedStudents || GM_STUDENT_WINDOW)
+          : GM_STUDENT_WINDOW),
+        columnOffset: String(mergeMode === 'columns' ? gmMatrixWindowState.loadedColumns : 0),
+        columnLimit: String(mergeMode === 'students'
+          ? (gmMatrixWindowState.loadedColumns || GM_COLUMN_WINDOW)
+          : GM_COLUMN_WINDOW)
+      });
+      const url = `/school/grades-matrix/api/data?${params.toString()}`;
       const res = await fetch(url, {
         headers: { 'X-AJAX-Request': 'true' },
-        signal: gmLoadAbort.signal,
+        signal: mergeMode ? undefined : gmLoadAbort.signal,
         cache: 'no-store'
       });
-      const result = await res.json();
+      const chunk = await res.json();
       const guarded = typeof window.applyGuardedApiResult === 'function'
-        ? await window.applyGuardedApiResult(result, { busyTitle: 'Load In Progress', replayTitle: 'Load Already Completed' })
+        ? await window.applyGuardedApiResult(chunk, { busyTitle: 'Load In Progress', replayTitle: 'Load Already Completed' })
         : { stop: false };
       if (guarded.stop) return;
-      if (result.status !== 'success') throw new Error(result.message || 'Load failed');
-      if (seq !== gmLoadSeq) return;
-      if (String(result.classId || '') !== String(requestedClassId)) return;
+      if (chunk.status !== 'success') throw new Error(chunk.message || 'Load failed');
+      if (!mergeMode && seq !== gmLoadSeq) return;
+      if (!mergeMode && String(chunk.classId || '') !== String(requestedClassId)) return;
+
+      const result = mergeMode && window.currentGradesMatrixData
+        ? mergeGradesMatrixPayload(window.currentGradesMatrixData, chunk, mergeMode)
+        : chunk;
+      const windowMeta = chunk.window || {};
+      gmMatrixWindowState.hasMoreStudents = Boolean(windowMeta.hasMoreStudents);
+      gmMatrixWindowState.hasMoreColumns = Boolean(windowMeta.hasMoreColumns);
+      if (!mergeMode) {
+        gmMatrixWindowState.loadedStudents = (chunk.matrix || []).length;
+        gmMatrixWindowState.loadedColumns = (chunk.columns || []).length;
+      } else if (mergeMode === 'columns') {
+        gmMatrixWindowState.loadedColumns += (chunk.columns || []).length;
+      } else if (mergeMode === 'students') {
+        gmMatrixWindowState.loadedStudents += (chunk.matrix || []).length;
+      }
 
       window.currentGradesMatrixData = result;
       setGradesPrintEnabled(true);
 
-      const { evaluation, columns, matrix, className, dateOrder, registrationMode } = result;
+      const { evaluation, columns, matrix, className, registrationMode } = result;
       const isRollingClass = String(registrationMode || '').trim().toLowerCase() === 'rolling';
       document.getElementById('gm_classTitle').textContent = className || 'Class';
       document.getElementById('gm_passing').textContent = (evaluation && evaluation.passingScore != null) ? `${evaluation.passingScore}%` : '—';
@@ -398,10 +568,37 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       document.getElementById('gm_evalCard').classList.remove('d-none');
 
+      if (mergeMode === 'columns') {
+        appendGmColumns(chunk.columns || []);
+        tbody.querySelectorAll('tr').forEach((rowEl, index) => {
+          const studentRow = chunk.matrix?.[index];
+          if (!studentRow) return;
+          const cells = studentRow.cells || [];
+          cells.forEach((cell, cellIdx) => {
+            const col = chunk.columns?.[cellIdx];
+            const td = document.createElement('td');
+            td.className = `text-center small ${bandClass(col?.dateBand)}`;
+            td.innerHTML = renderCellHtml(cell);
+            rowEl.appendChild(td);
+          });
+        });
+        document.getElementById('gm_results').classList.remove('d-none');
+        await refreshGradesDisplayRollups();
+        return;
+      }
+
+      if (mergeMode === 'students') {
+        (chunk.matrix || []).forEach((row) => appendGmStudentRow(row, chunk.columns || []));
+        document.getElementById('gm_results').classList.remove('d-none');
+        await refreshGradesDisplayRollups();
+        return;
+      }
+
       if (!columns || !columns.length) {
         thead.innerHTML = '<tr><th class="gm-sticky-final">Final</th><th class="gm-sticky-name">Student</th><th class="gm-sticky-att" title="Attendance performance % for the selected period">Attend.</th><th>No graded items in this date range</th></tr>';
         matrix.forEach((row) => {
           const tr = document.createElement('tr');
+          tr.dataset.personId = String(row.personId || '');
           const fp = formatGmPercent(row.finalPercent);
           const att = formatGmPercent(row.attendancePct);
           tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-att small">${att}</td><td class="text-muted">—</td>`;
@@ -411,16 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      const groups = [];
-      let i = 0;
-      while (i < columns.length) {
-        const d = columns[i].date;
-        let j = i;
-        while (j < columns.length && columns[j].date === d) j += 1;
-        groups.push({ date: d, start: i, len: j - i });
-        i = j;
-      }
-
+      const groups = buildGmColumnGroups(columns);
       const trDate = document.createElement('tr');
       trDate.innerHTML = `<th class="gm-sticky-final gm-date-group" rowspan="2">Final</th>
         <th class="gm-sticky-name gm-date-group" rowspan="2">Student</th>
@@ -442,37 +630,42 @@ document.addEventListener('DOMContentLoaded', () => {
       thead.appendChild(trDate);
       thead.appendChild(trCols);
 
-      matrix.forEach((row) => {
-        const tr = document.createElement('tr');
-        const fp = row.finalPercent != null ? `<span class="fw-bold">${formatGmPercent(row.finalPercent)}</span>` : '—';
-        const attStr = formatGmPercent(row.attendancePct);
-        const attCell = attStr === '—'
-          ? '<span class="text-muted">—</span>'
-          : `<span class="fw-semibold text-primary">${attStr}</span>`;
-        let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-att small">${attCell}</td>`;
-        row.cells.forEach((cell, idx) => {
-          const col = columns[idx];
-          html += `<td class="text-center small ${bandClass(col.dateBand)}">${renderCellHtml(cell)}</td>`;
-        });
-        tr.innerHTML = html;
-        tbody.appendChild(tr);
-      });
+      matrix.forEach((row) => appendGmStudentRow(row, columns));
 
       document.getElementById('gm_results').classList.remove('d-none');
     } catch (e) {
       if (e && e.name === 'AbortError') return;
-      window.currentGradesMatrixData = null;
-      setGradesPrintEnabled(false);
+      if (!mergeMode) {
+        window.currentGradesMatrixData = null;
+        setGradesPrintEnabled(false);
+      }
       if (typeof showMessageModal === 'function') {
         showMessageModal({ title: 'Error', icon: 'error', message: e.message, buttons: [{ text: 'OK', class: 'btn-secondary' }] });
       } else {
         alert(e.message);
       }
     } finally {
-      btn.disabled = false;
-      btn.innerHTML = orig;
+      gmMatrixWindowState.loading = false;
+      if (!mergeMode) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+      }
+    }
+  }
+
+  document.querySelector('.gm-matrix')?.addEventListener('scroll', () => {
+    const wrapper = document.querySelector('.gm-matrix');
+    if (!wrapper || gmMatrixWindowState.loading || !window.currentGradesMatrixData) return;
+    const nearBottom = wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 100;
+    const nearRight = wrapper.scrollLeft + wrapper.clientWidth >= wrapper.scrollWidth - 100;
+    if (nearBottom && gmMatrixWindowState.hasMoreStudents) {
+      loadGradesMatrixData({ merge: 'students' });
+    } else if (nearRight && gmMatrixWindowState.hasMoreColumns) {
+      loadGradesMatrixData({ merge: 'columns' });
     }
   });
+
+  document.getElementById('gm_btnLoad')?.addEventListener('click', () => loadGradesMatrixData());
 
   // --- Grades Matrix Print ---
   function gmPrintEscapeHtml(value) {

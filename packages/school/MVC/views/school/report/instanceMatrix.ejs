@@ -270,6 +270,12 @@
     let matrixState = JSON.parse(dataEl?.textContent || '{}');
     const dirtyStudents = new Set();
     let sharedDirty = false;
+    const REPORT_MATRIX_STUDENT_WINDOW = 50;
+    const reportMatrixWindowState = {
+      loadedStudents: Array.isArray(matrixState.rows) ? matrixState.rows.length : 0,
+      hasMoreStudents: Boolean(matrixState.window?.hasMoreStudents),
+      loading: false
+    };
     window.CAN_EXPORT_REPORT_INSTANCE = <%- JSON.stringify(typeof canExportReportInstance !== 'undefined' && !!canExportReportInstance) %>;
     window.CAN_REOPEN_REPORT_INSTANCE = <%- JSON.stringify(typeof canReopenReportInstanceToDraft !== 'undefined' && !!canReopenReportInstanceToDraft) %>;
     window.MATRIX_HAS_SHARED_FIELDS = <%- JSON.stringify(hasSharedFieldsBlock) %>;
@@ -290,6 +296,139 @@
         buttonClass: icon === 'error' ? 'btn-danger' : 'btn-primary'
       });
     }
+
+    function reportMatrixEscapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function reportMatrixStatusBadgeClass(status) {
+      const token = String(status || '').toLowerCase();
+      if (token === 'submitted') return 'bg-success';
+      if (token === 'locked') return 'bg-dark';
+      if (token === 'draft') return 'bg-warning text-dark';
+      return 'bg-info-subtle text-info-emphasis border';
+    }
+
+    function reportMatrixStatusLabel(status) {
+      const token = String(status || '').toLowerCase();
+      if (token === 'submitted') return 'Submitted (awaiting review)';
+      return status || '-';
+    }
+
+    function readReportMatrixQueryParams() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        assignmentRowId: params.get('assignmentRowId') || params.get('rowId') || '',
+        teacherId: params.get('teacherId') || ''
+      };
+    }
+
+    function buildReportMatrixFieldHtml(field, row) {
+      const value = row.answers?.[field.id];
+      const disabled = row.locked || field.readOnly;
+      const valueStr = value === undefined || value === null ? '' : String(value);
+      const readonlyAttr = disabled ? 'readonly' : '';
+      const disabledAttr = disabled ? 'disabled' : '';
+      if (field.type === 'textarea') {
+        return `<textarea class="form-control form-control-sm js-matrix-row-field" rows="3" data-field-id="${reportMatrixEscapeHtml(field.id)}" placeholder="${reportMatrixEscapeHtml(field.placeholder || '')}" ${readonlyAttr}>${reportMatrixEscapeHtml(valueStr)}</textarea>`;
+      }
+      if (field.type === 'select') {
+        const options = Array.isArray(field.options) ? field.options : [];
+        const opts = options.map((opt) => {
+          const selected = String(opt.value) === valueStr ? ' selected' : '';
+          return `<option value="${reportMatrixEscapeHtml(opt.value)}"${selected}>${reportMatrixEscapeHtml(opt.label || opt.value)}</option>`;
+        }).join('');
+        return `<select class="form-select form-select-sm js-matrix-row-field" data-field-id="${reportMatrixEscapeHtml(field.id)}" ${disabledAttr}>${opts}</select>`;
+      }
+      if (field.type === 'checkbox') {
+        const checked = value === true || String(value).toLowerCase() === 'true' ? ' checked' : '';
+        return `<div class="form-check d-flex justify-content-center"><input type="checkbox" class="form-check-input js-matrix-row-field" data-field-id="${reportMatrixEscapeHtml(field.id)}"${checked}${disabled ? ' disabled' : ''}></div>`;
+      }
+      const inputType = field.type === 'number' || field.type === 'date' ? field.type : 'text';
+      return `<input type="${inputType}" class="form-control form-control-sm js-matrix-row-field" data-field-id="${reportMatrixEscapeHtml(field.id)}" value="${reportMatrixEscapeHtml(valueStr)}" placeholder="${reportMatrixEscapeHtml(field.placeholder || '')}" ${readonlyAttr}>`;
+    }
+
+    function buildReportMatrixRowHtml(row) {
+      const tableFields = Array.isArray(matrixState.tableFields) ? matrixState.tableFields : [];
+      const statusClass = reportMatrixStatusBadgeClass(row.status);
+      const statusLabel = reportMatrixStatusLabel(row.status);
+      const reopenBtn = row.instanceId && String(row.status || '').toLowerCase() === 'submitted' && window.CAN_REOPEN_REPORT_INSTANCE
+        ? `<button type="button" class="btn btn-sm btn-outline-warning js-matrix-reopen-instance" data-instance-id="${reportMatrixEscapeHtml(row.instanceId)}" data-student-name="${reportMatrixEscapeHtml(row.studentName)}" title="Reopen as draft for the teacher"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>`
+        : '';
+      const unlockBtn = row.instanceId && String(row.status || '').toLowerCase() === 'locked' && window.CAN_UNLOCK_REPORT_INSTANCE
+        ? `<button type="button" class="btn btn-sm btn-warning js-matrix-unlock-instance" data-instance-id="${reportMatrixEscapeHtml(row.instanceId)}" data-student-name="${reportMatrixEscapeHtml(row.studentName)}" title="Unlock returns the report to submitted"><i class="bi bi-unlock me-1"></i>Unlock</button>`
+        : '';
+      const openHref = row.editHref || '';
+      const openBtn = openHref
+        ? `<a href="${reportMatrixEscapeHtml(openHref)}" class="btn btn-sm btn-outline-secondary js-matrix-open" target="_blank" rel="noopener noreferrer" title="Open individual report"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>`
+        : '';
+      const cells = tableFields.map((field) => (
+        `<td data-matrix-cell="${reportMatrixEscapeHtml(field.id)}">${buildReportMatrixFieldHtml(field, row)}</td>`
+      )).join('');
+      return `<tr data-student-id="${reportMatrixEscapeHtml(row.studentId)}" data-instance-id="${reportMatrixEscapeHtml(row.instanceId || '')}" data-report-status="${reportMatrixEscapeHtml(row.status || '')}" class="${row.locked ? 'table-secondary' : ''}">
+        <td class="matrix-student-col ps-3">
+          <div class="fw-bold matrix-student-name">${reportMatrixEscapeHtml(row.studentName)}</div>
+          <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+            <span class="badge text-capitalize js-matrix-status ${statusClass}">${reportMatrixEscapeHtml(statusLabel)}</span>
+            ${openBtn}
+            ${reopenBtn}
+            ${unlockBtn}
+          </div>
+        </td>
+        ${cells}
+      </tr>`;
+    }
+
+    async function loadMoreReportMatrixRows() {
+      if (reportMatrixWindowState.loading || !reportMatrixWindowState.hasMoreStudents) return;
+      const assignmentId = String(matrixState.assignmentId || '').trim();
+      if (!assignmentId) return;
+      reportMatrixWindowState.loading = true;
+      try {
+        const qs = new URLSearchParams(readReportMatrixQueryParams());
+        qs.set('studentOffset', String(reportMatrixWindowState.loadedStudents));
+        qs.set('studentLimit', String(REPORT_MATRIX_STUDENT_WINDOW));
+        const url = `/school/reports/instances/matrix/${encodeURIComponent(assignmentId)}/api/data?${qs.toString()}`;
+        const res = await fetch(url, { headers: { 'X-AJAX-Request': 'true' }, cache: 'no-store' });
+        const payload = await res.json();
+        if (payload.status !== 'success') throw new Error(payload.message || 'Load failed');
+        const rows = Array.isArray(payload.rows) ? payload.rows : [];
+        const tbody = document.querySelector('#reportMatrixTable tbody');
+        if (tbody && rows.length) {
+          rows.forEach((row) => tbody.insertAdjacentHTML('beforeend', buildReportMatrixRowHtml(row)));
+        }
+        matrixState.rows = [...(matrixState.rows || []), ...rows];
+        matrixState.window = payload.window || matrixState.window;
+        if (dataEl) {
+          dataEl.textContent = JSON.stringify(matrixState).replace(/</g, '\\u003c');
+        }
+        const windowMeta = payload.window || {};
+        reportMatrixWindowState.hasMoreStudents = Boolean(windowMeta.hasMoreStudents);
+        reportMatrixWindowState.loadedStudents += rows.length;
+        initializeTooltips();
+      } catch (error) {
+        showReportMatrixMessage({
+          title: 'Load Error',
+          icon: 'error',
+          message: error?.message || 'Unable to load more students.'
+        });
+      } finally {
+        reportMatrixWindowState.loading = false;
+      }
+    }
+
+    document.querySelector('.report-matrix-page .matrix-table-wrap')?.addEventListener('scroll', () => {
+      const wrap = document.querySelector('.report-matrix-page .matrix-table-wrap');
+      if (!wrap || reportMatrixWindowState.loading) return;
+      const nearBottom = wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 120;
+      if (nearBottom && reportMatrixWindowState.hasMoreStudents) {
+        loadMoreReportMatrixRows();
+      }
+    });
 
     document.addEventListener('click', function (event) {
       const exportLink = event.target.closest('.js-export-report-instance');

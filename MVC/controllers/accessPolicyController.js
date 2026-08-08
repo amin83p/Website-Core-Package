@@ -1,5 +1,6 @@
 // MVC/controllers/accessPolicyController.js
 const dataService = require('../services/dataService');const { idsEqual } = require('../utils/idAdapter');
+const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
  
 const securityService = require('../services/security');
 
@@ -219,6 +220,7 @@ async function addPolicy(req, res) {
     
     const policy = buildPolicyFromBody(req.body, reqUserId);
     await dataService.addData('accessPolicies', policy, req.user);
+    invalidateAuthContextForUser(policy.userId);
     
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Policy created successfully.' });
     res.redirect('/accessPolicies');
@@ -275,6 +277,7 @@ async function editPolicy(req, res) {
 
     const updates = buildPolicyFromBody(req.body, reqUserId, existing);
     await dataService.updateData('accessPolicies', req.params.id, updates, req.user);
+    invalidateAuthContextForUser(existing.userId);
     
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Policy updated successfully.' });
     res.redirect('/accessPolicies');
@@ -288,7 +291,9 @@ async function editPolicy(req, res) {
 
 async function deletePolicy(req, res) {
   try {
+    const existing = await dataService.getDataById('accessPolicies', req.params.id, req.user);
     await dataService.deleteData('accessPolicies', req.params.id, req.user);
+    if (existing?.userId) invalidateAuthContextForUser(existing.userId);
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Policy deleted successfully.' });
     res.redirect('/accessPolicies');
   } catch (error) {

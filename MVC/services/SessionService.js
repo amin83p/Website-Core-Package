@@ -229,6 +229,25 @@ async function terminateSession(sessionId) {
     return result;
 }
 
+async function terminateAllSessionsForUser(userId) {
+    const normalizedUserId = toPublicId(userId);
+    if (!normalizedUserId) return { terminated: 0 };
+    const sessions = await dataService.fetchData('sessions', {
+        q: normalizedUserId,
+        type: 'exact_match',
+        searchFields: 'userId'
+    }, SYSTEM_CONTEXT);
+    const rows = Array.isArray(sessions) ? sessions : [];
+    let terminated = 0;
+    for (const session of rows) {
+        const sessionId = String(session?.id || '').trim();
+        if (!sessionId) continue;
+        await terminateSession(sessionId);
+        terminated += 1;
+    }
+    return { terminated };
+}
+
 module.exports = {
     resolvePolicyLimits,
     cleanupExpiredSessions,
@@ -236,5 +255,6 @@ module.exports = {
     touchSession,
     checkLoginEligibility,
     validateOrgSwitch,
-    terminateSession
+    terminateSession,
+    terminateAllSessionsForUser
 };

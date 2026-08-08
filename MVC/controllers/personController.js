@@ -13,6 +13,7 @@ const {
 
 const { DEFAULTS } = require('../../config/constants');
 const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
+const { invalidateAuthContextForPersonId } = require('../services/cache/authContextInvalidationService');
 const HIGH_ACCESS_MIN = Number(DEFAULTS?.HIGH_ACCESS_MIN || 8);
 const HIGH_ACCESS_MAX = Number(DEFAULTS?.HIGH_ACCESS_MAX || 10);
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
@@ -335,6 +336,7 @@ async function deletePerson(req, res) {
     //     throw new Error(`<b>Constraint Violation:</b><br>Cannot delete Person. A User account (<b>${userRef}</b>) is currently linked to this profile.<br><br>Please delete or unlink the User account first.`);
     // }
 
+    await invalidateAuthContextForPersonId(personId);
     const deleted_item = await dataService.deleteData('persons', personId, req.user);
     
     if (req.headers['x-ajax-request']) return res.json({ status: 'success' ,results:deleted_item, message:'Person deleted successfully.', result: deleted_item});
@@ -395,6 +397,7 @@ async function unlinkUserFromPerson(req, res) {
       return res.status(403).json({ status: 'error', message: 'Not allowed.' });
     }
     await dataService.unlinkPersonFromUser(userId, personId, req.user);
+    invalidateAuthContextForUser(userId);
     res.json({ status: 'success', message: 'User unlinked.' });
   } catch (error) {
     if (req.headers['x-ajax-request']) return res.status(500).json({ status: 'error', message: error.message }); 

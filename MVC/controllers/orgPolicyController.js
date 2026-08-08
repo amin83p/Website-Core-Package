@@ -1,5 +1,6 @@
 // MVC/controllers/orgPolicyController.js
 const dataService = require('../services/dataService');const { idsEqual } = require('../utils/idAdapter');
+const { invalidateAuthContextForOrgId } = require('../services/cache/authContextInvalidationService');
  
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 
@@ -308,6 +309,7 @@ async function addPolicy(req, res) {
     
     const policy = buildPolicyFromBody(req.body, reqUserId);
     await dataService.addData('orgPolicies', policy, req.user);
+    await invalidateAuthContextForOrgId(policy.orgId);
     
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Org Policy created successfully.' });
     res.redirect('/orgPolicies');
@@ -353,6 +355,7 @@ async function editPolicy(req, res) {
     const updates = buildPolicyFromBody(req.body, reqUserId, existing);
     
     await dataService.updateData('orgPolicies', req.params.id, updates, req.user);
+    await invalidateAuthContextForOrgId(existing.orgId);
     
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Policy updated successfully.' });
     res.redirect('/orgPolicies');
@@ -365,7 +368,9 @@ async function editPolicy(req, res) {
 
 async function deletePolicy(req, res) {
   try {
+    const existing = await dataService.getDataById('orgPolicies', req.params.id, req.user);
     await dataService.deleteData('orgPolicies', req.params.id, req.user);
+    if (existing?.orgId) await invalidateAuthContextForOrgId(existing.orgId);
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Policy deleted successfully.' });
     res.redirect('/orgPolicies');
   } catch (error) {
