@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
+const { resolveDataBackendConfig } = require('../../config/dataBackend');
 const { ensureMongoIndexes } = require('../../MVC/infrastructure/mongo/mongoIndexManager');
 
 function readJsonFileSafe(filePath) {
@@ -73,11 +74,43 @@ function resolveConnectionConfig(args = {}) {
   return { uri, dbName };
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+const TARGET_COLLECTIONS = new Set([
+  'users',
+  'persons',
+  'organizations',
+  'sections',
+  'symbols',
+  'operations',
+  'accesses',
+  'accessPolicies',
+  'tableSettings',
+  'scopes',
+  'sessions',
+  'logs',
+  'contracts',
+  'orgPolicies',
+  'contacts',
+  'news',
+  'newsletterSubscriptions',
+  'subscriptionGroups',
+  'tasks',
+  'userMemberships',
+  'helpArticles'
+]);
+
+async function runEnsureCoreListIndexes(options = {}) {
+  const args = options.args || parseArgs(process.argv.slice(2));
+  const env = options.env || process.env;
+  const backendConfig = resolveDataBackendConfig(env);
+  if (backendConfig.mode !== 'mongo' || !backendConfig.mongo?.ready) {
+    console.log('[core:ensure-list-indexes] skipped (DATA_BACKEND is not mongo or Mongo URI is missing).');
+    return { skipped: true, reason: 'mongo-not-configured' };
+  }
+
   const config = resolveConnectionConfig(args);
   if (!config.uri) {
-    throw new Error('Mongo URI is missing. Pass --uri or set MONGODB_URI (legacy MONGO_URI supported).');
+    console.log('[core:ensure-list-indexes] skipped (Mongo URI is missing).');
+    return { skipped: true, reason: 'missing-uri' };
   }
 
   const client = new MongoClient(config.uri, {
@@ -91,42 +124,32 @@ async function main() {
     const db = client.db(config.dbName);
     const result = await ensureMongoIndexes(db, { verbose: true });
     const rows = Array.isArray(result?.collections) ? result.collections : [];
-    const targets = new Set([
-      'users',
-      'persons',
-      'organizations',
-      'sections',
-      'symbols',
-      'operations',
-      'accesses',
-      'accessPolicies',
-      'tableSettings',
-      'scopes',
-      'sessions',
-      'logs',
-      'contracts',
-      'orgPolicies',
-      'contacts',
-      'news',
-      'newsletterSubscriptions',
-      'subscriptionGroups',
-      'tasks',
-      'userMemberships',
-      'helpArticles'
-    ]);
-    const targetRows = rows.filter((row) => targets.has(String(row?.collection || '')));
+    const targetRows = rows.filter((row) => TARGET_COLLECTIONS.has(String(row?.collection || '')));
 
     console.log('[core:ensure-list-indexes] target summary');
     targetRows.forEach((row) => {
       console.log(`  - ${row.collection}: ok=${row.ok ? 'yes' : 'no'} requested=${row.requested || 0} created=${row.created || 0}${row.error ? ` error=${row.error}` : ''}`);
     });
+
+    return { skipped: false, result, targetRows };
   } finally {
     await client.close();
   }
 }
 
-main().catch((error) => {
-  console.error(`[core:ensure-list-indexes][error] ${error.message}`);
-  process.exitCode = 1;
-});
+async function main() {
+  await runEnsureCoreListIndexes();
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(`[core:ensure-list-indexes][error] ${error.message}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  runEnsureCoreListIndexes,
+  TARGET_COLLECTIONS
+};
 
