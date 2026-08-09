@@ -7,6 +7,7 @@ const expressLayouts = require('express-ejs-layouts');
 const cookieParser = require('cookie-parser'); // ADD THIS
 const expressSession = require('express-session');
 const helmet = require('helmet');
+const compression = require('compression');
 const crypto = require('crypto');
 
 function loadLocalEnvFile() {
@@ -68,6 +69,8 @@ const { runWithRequestContext } = require('./MVC/utils/requestContextStore');
 const uploadPathUtils = require('./MVC/utils/uploadPathUtils');
 const { isRailwayProxyMode, getGatewayBaseUrl } = require('./MVC/utils/uploadModeUtils');
 const buildVersionResolver = require('./MVC/utils/buildVersionResolver');
+const { buildStaticAssetUrl } = require('./MVC/utils/staticAssetUrl');
+const staticAssetMiddleware = require('./MVC/middleware/staticAssetMiddleware');
 const { SESSION_SECRET } = require('./config/security');
 
 const PORT    = process.env.PORT || 3000;
@@ -116,7 +119,14 @@ function refreshBuildVersionLocals() {
 app.locals.refreshBuildVersion = refreshBuildVersionLocals;
 app.locals.buildVersion = { shortHash: '', source: '' };
 app.locals.buildVersionShort = '';
-//------middleware-----
+app.locals.staticAssetUrl = (assetPath) => buildStaticAssetUrl(assetPath, app.locals.buildVersionShort);
+function createAppStaticMiddleware(rootPath, cacheProfile = 'static') {
+  return staticAssetMiddleware.createStaticAssetMiddleware(rootPath, {
+    isProduction,
+    cacheProfile,
+    getBuildVersionShort: () => cleanBuildVersionToken(app.locals.buildVersionShort)
+  });
+}
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'MVC/views'))
 app.use(expressLayouts);
@@ -208,7 +218,15 @@ app.get('/site.webmanifest', (req, res) => {
   return res.json(appBrandingService.getManifest());
 });
 
-app.use(express.static(path.join(__dirname,'public')));
+app.use(compression({
+  threshold: 1024,
+  filter(req, res) {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
+
+app.use(createAppStaticMiddleware(path.join(__dirname, 'public')));
 const uploadsStaticContext = {
   root: '',
   middleware: null
@@ -217,7 +235,7 @@ app.use('/uploads', (req, res, next) => {
   const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
   if (!uploadsStaticContext.middleware || uploadsStaticContext.root !== uploadRoot) {
     uploadsStaticContext.root = uploadRoot;
-    uploadsStaticContext.middleware = express.static(uploadRoot);
+    uploadsStaticContext.middleware = createAppStaticMiddleware(uploadRoot, 'upload');
   }
 
   const requestedDiskPath = uploadPathUtils.fromUploadsUrlToDiskPath(req.originalUrl || req.url, uploadRoot);
@@ -302,6 +320,7 @@ app.use(async (req, res, next) => {
   res.locals.publicMenu = appBrandingService.getPublicMenu(req.user || null);
   res.locals.publicMenuEndpointOptions = appBrandingService.getPublicMenuEndpointOptions();
   res.locals.buildVersionShort = cleanBuildVersionToken(req.app?.locals?.buildVersionShort);
+  res.locals.staticAssetUrl = (assetPath) => buildStaticAssetUrl(assetPath, res.locals.buildVersionShort);
   res.locals.canUseAdminAuthenticator = Boolean(
     req.user && adminAuthorityService.hasAnyAdminPrivilege(req.user)
   );
@@ -740,6 +759,18 @@ async function startServer() {
 
     await settingService.init();
     try {
+      const domainOpsService = require('./MVC/services/data/domainOpsService');
+      const { ensureWriteHeavyRateLimitEnforcement } = require('./MVC/services/security/requestRateEnforcementBootstrap');
+      await ensureWriteHeavyRateLimitEnforcement({
+        getWebsitePolicy: () => domainOpsService.getWebsitePolicy(),
+        updateWebsitePolicy: (updates, user) => domainOpsService.updateWebsitePolicy(updates, user)
+      });
+    } catch (rateLimitBootstrapError) {
+      startupLogger.warn('REQUEST_RATE', 'PHASE2_ENFORCE', 'Unable to ensure write/heavy rate-limit enforcement.', {
+        error: rateLimitBootstrapError?.message || String(rateLimitBootstrapError)
+      });
+    }
+    try {
       const {
         resolveRequestCacheTtlMs,
         resolveRequestCacheMaxEntries
@@ -768,7 +799,8 @@ async function startServer() {
     refreshBuildVersionLocals();
     try {
       const packageLoaderHooks = packageRegistryInstallerService.createLoaderHooks({
-        backendMode: dataBackend.mode
+        backendMode: dataBackend.mode,
+        staticFactory: (rootPath) => createAppStaticMiddleware(rootPath)
       });
       const packageRootDir = getPackageStorageRootAbsolute();
       const packageLoadSummary = await packageLoaderService.loadEnabledPackages({
@@ -823,6 +855,7 @@ async function startServer() {
 
     server.listen(PORT, () => {
       startupLogger.success('APP', 'HTTP_SERVER', 'Server listening.', { url: `http://localhost:${PORT}` });
+      const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
       const appSettingsSnapshot = (() => {
         const appSettings = settingService.get().app || {};
         return {
@@ -832,7 +865,9 @@ async function startServer() {
           buildVersion: appSettings.buildVersionOverride || '',
           publicMenuItems: Array.isArray(appSettings.publicMenu?.items) ? appSettings.publicMenu.items.length : 0,
           uploadsPath: appSettings.uploadsPath || '',
-          dataBackend: appSettings.dataBackend || 'json'
+          dataBackend: runtimeBackend?.mode || dataBackend?.mode || 'json',
+          dataBackendRequested: runtimeBackend?.requested || runtimeBackend?.runtime?.requestedMode || '',
+          dataBackendRecovery: Boolean(runtimeBackend?.fallback?.active)
         };
       })();
       startupLogger.info('APP', 'SETTINGS_SNAPSHOT', 'Loaded settings summary.', appSettingsSnapshot);

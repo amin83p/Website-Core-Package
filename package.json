@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon app.js",
-    "start": "node app.js",
-    "prod": "cross-env NODE_ENV=production node app.js",
+    "start": "node scripts/core/ensure-core-list-indexes.js && node app.js",
+    "prod": "cross-env NODE_ENV=production node scripts/core/ensure-core-list-indexes.js && cross-env NODE_ENV=production node app.js",
     "test": "cross-env NODE_ENV=test mocha",
     "test:node": "node test/idAdapter.step5.test.js && node test/queryEngine.step12.test.js && node test/step4.integrity.repository.test.js && node test/dataService.fetchData.registry.test.js && node test/repositories.scope-query.parity.test.js && node test/school-ielts.step6.test.js && node test/idempotencyGuard.step7.test.js && node test/school.phase2.core-services.test.js && node test/school.class-controller.phase2.endpoints.test.js && node test/school.exam-builder.foundation.test.js && node test/school.exam-controller.phase2.endpoints.test.js && node test/school.exam.phase2.integration-allocation-flow.test.js && node test/school.phase10.integration-period-windows.test.js && node test/school.report.shared-fields.test.js",
     "test:pte:ai-assist": "node test/pte.question-type-registry.scoring-contracts.test.js && node test/pte.ai-assist.prompt-registry.test.js && node test/pte.ai-assist.autofill-private.test.js && node test/pte.question-bank-controller.endpoints.test.js && node test/pte.question-bank-data-service.publish-gating.test.js",
@@ -95,6 +95,7 @@
     "axios": "^1.13.4",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
+    "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "csv-parse": "^6.1.0",
     "docxtemplater": "^3.68.6",
