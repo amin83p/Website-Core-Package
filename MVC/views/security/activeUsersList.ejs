@@ -140,6 +140,8 @@
 
 <%- include('../partials/tablePages-end') %>
 
+<script src="/scripts/visibilityInterval.js"></script>
+
 <script>
   (function () {
     const tableBody = document.getElementById('activeUsersTableBody');
@@ -249,8 +251,12 @@
       });
     }
 
-    setInterval(() => {
-      refreshActiveUsers().catch(() => {});
-    }, 60000);
+    const pollActiveUsers = () => refreshActiveUsers().catch(() => {});
+    const pollIntervalMs = 60000;
+    if (typeof window.createVisibilityInterval === 'function') {
+      window.createVisibilityInterval(pollActiveUsers, pollIntervalMs).start();
+    } else {
+      setInterval(pollActiveUsers, pollIntervalMs);
+    }
   })();
 </script>

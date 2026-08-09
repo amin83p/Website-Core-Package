@@ -1393,6 +1393,7 @@
 <%- include('partials/modal', { user }) %>
 <%- include('partials/modal_GenericPicker') %>
 
+<script src="/scripts/visibilityInterval.js"></script>
 <script src="/scripts/scheduleCompletionDisplay.js"></script>
 <script>
 (function () {
@@ -1553,6 +1554,7 @@
   const taskState = {
     intervalSeconds: 60,
     timer: null,
+    visibilityPoller: null,
     loading: false
   };
 
@@ -1590,18 +1592,34 @@
   }
 
   function restartTaskTimer() {
+    if (taskState.visibilityPoller) {
+      taskState.visibilityPoller.stop();
+      taskState.visibilityPoller = null;
+    }
     if (taskState.timer) {
       window.clearInterval(taskState.timer);
       taskState.timer = null;
     }
 
+    const intervalMs = Math.max(10, taskState.intervalSeconds) * 1000;
+    if (typeof window.createVisibilityInterval === 'function') {
+      taskState.visibilityPoller = window.createVisibilityInterval(refreshTaskCount, intervalMs);
+      taskState.visibilityPoller.start();
+      return;
+    }
+
     refreshTaskCount();
-    taskState.timer = window.setInterval(refreshTaskCount, Math.max(10, taskState.intervalSeconds) * 1000);
+    taskState.timer = window.setInterval(refreshTaskCount, intervalMs);
   }
 
   function applyTaskInterval(value) {
     const parsed = Number(value);
     taskState.intervalSeconds = Number.isFinite(parsed) && parsed >= 10 ? parsed : 60;
+    const intervalMs = Math.max(10, taskState.intervalSeconds) * 1000;
+    if (taskState.visibilityPoller) {
+      taskState.visibilityPoller.setIntervalMs(intervalMs);
+      return;
+    }
     restartTaskTimer();
   }
 

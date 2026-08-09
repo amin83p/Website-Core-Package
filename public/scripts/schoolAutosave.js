@@ -246,7 +246,7 @@
     let config = resolveEffectiveConfig(orgId, sectionKey, policy);
     if (readOnly) config = { ...config, enabled: false };
 
-    let timerId = null;
+    let visibilityPoller = null;
     let status = 'idle';
     let lastSavedAt = null;
     let lastError = '';
@@ -258,9 +258,9 @@
     }
 
     function clearTimer() {
-      if (timerId) {
-        global.clearInterval(timerId);
-        timerId = null;
+      if (visibilityPoller) {
+        visibilityPoller.stop();
+        visibilityPoller = null;
       }
     }
 
@@ -268,9 +268,21 @@
       clearTimer();
       if (!config.enabled || readOnly) return;
       const intervalMs = Math.max(MIN_MINUTES, config.minutes) * 60 * 1000;
-      timerId = global.setInterval(() => {
+      if (typeof global.createVisibilityInterval === 'function') {
+        visibilityPoller = global.createVisibilityInterval(() => {
+          void controller.tick();
+        }, intervalMs);
+        visibilityPoller.start();
+        return;
+      }
+      visibilityPoller = {
+        stop() {},
+        setIntervalMs() {}
+      };
+      const legacyTimerId = global.setInterval(() => {
         void controller.tick();
       }, intervalMs);
+      visibilityPoller.stop = () => global.clearInterval(legacyTimerId);
     }
 
     async function tick() {
@@ -329,7 +341,12 @@
           writeLocalOverride(orgId, sectionKey, config);
         }
         status = 'idle';
-        scheduleTimer();
+        const intervalMs = Math.max(MIN_MINUTES, config.minutes) * 60 * 1000;
+        if (visibilityPoller && typeof visibilityPoller.setIntervalMs === 'function') {
+          visibilityPoller.setIntervalMs(intervalMs);
+        } else {
+          scheduleTimer();
+        }
         notifyStatus();
       },
       async tick() {
