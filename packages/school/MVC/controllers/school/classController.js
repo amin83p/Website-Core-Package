@@ -1,4 +1,4 @@
-﻿// MVC/controllers/school/classController.js
+// MVC/controllers/school/classController.js
 const fs = require('fs').promises;
 const path = require('path');
 const schoolDataService = require('../../services/school/schoolDataService');
@@ -4950,9 +4950,12 @@ async function saveSession(req, res) {
             reqUser: req.user,
             activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user)
         });
-        
-        const indexService = require('../../services/school/schoolIndexService');
-        await indexService.rebuildIndexesForClass(classId);
+
+        const isAutosaveRequest = String(req.body?.trigger || '').trim() === 'autosave';
+        if (!isAutosaveRequest) {
+            const indexService = require('../../services/school/schoolIndexService');
+            await indexService.rebuildIndexesForClass(classId);
+        }
 
         if (req.headers['x-ajax-request']) {
             const message = removedMakeupCount > 0
