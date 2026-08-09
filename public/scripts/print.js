@@ -34,13 +34,17 @@ function formatPrintedAtShort(dateObj) {
 }
 
 function resolveBrandLogoUrl() {
+    const logoRef = document.getElementById('printBrandLogoRef');
+    const refUrl = String(logoRef?.dataset?.url || logoRef?.getAttribute('data-url') || '').trim();
+    if (refUrl) return refUrl;
     try {
         const raw = getComputedStyle(document.documentElement).getPropertyValue('--app-brand-logo-url').trim();
         const match = raw.match(/url\(["']?([^"')]+)["']?\)/i);
-        return match ? String(match[1] || '').trim() : '';
-    } catch {
-        return '';
+        if (match) return String(match[1] || '').trim();
+    } catch (_) {
+        // ignore
     }
+    return '/uploads/GLOBAL/logo/Logo1.png';
 }
 
 function resolvePagePrintSummary() {
@@ -254,8 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('printSettingIncludeOrg').checked = isAdmin ? (stored.includeOrg !== false) : true;
         document.getElementById('printSettingHeaderNote').value = stored.headerNote || '';
         document.getElementById('printSettingIncludeHeaderNote').checked = isAdmin ? (stored.includeHeaderNote === true) : true;
-        document.getElementById('printSettingOrientation').value = isAdmin && stored.orientation === 'portrait' ? 'portrait' : 'landscape';
-        document.getElementById('printSettingDensity').value = isAdmin && stored.density === 'normal' ? 'normal' : 'compact';
+        document.getElementById('printSettingOrientation').value = stored.orientation === 'portrait' ? 'portrait' : 'landscape';
+        document.getElementById('printSettingDensity').value = stored.density === 'normal' ? 'normal' : 'compact';
     }
 
     printButton.addEventListener('click', () => {
@@ -270,14 +274,19 @@ document.addEventListener('DOMContentLoaded', () => {
             orgName: isAdmin ? String(document.getElementById('printSettingOrgName').value || '').trim() : (resolveActiveOrgName() || ''),
             includeHeaderNote: isAdmin ? Boolean(document.getElementById('printSettingIncludeHeaderNote').checked) : true,
             headerNote: String(document.getElementById('printSettingHeaderNote').value || ''),
-            orientation: isAdmin ? String(document.getElementById('printSettingOrientation').value || 'landscape') : 'landscape',
-            density: isAdmin ? String(document.getElementById('printSettingDensity').value || 'compact') : 'compact',
+            orientation: String(document.getElementById('printSettingOrientation').value || 'landscape'),
+            density: String(document.getElementById('printSettingDensity').value || 'compact'),
             requestingUserLabel: resolveRequestingUserLabel()
         };
 
         const persisted = isAdmin
           ? nextSettings
-          : { headerNote: nextSettings.headerNote, includeHeaderNote: true };
+          : {
+            headerNote: nextSettings.headerNote,
+            includeHeaderNote: nextSettings.includeHeaderNote,
+            orientation: nextSettings.orientation,
+            density: nextSettings.density
+          };
         savePrintSettings(persisted);
         modal.hide();
         void handlePrintTable('first-table', '.page-heading', nextSettings);

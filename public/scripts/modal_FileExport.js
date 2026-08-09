@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const detailedStatus = document.getElementById('exportDetailedStatus');
   const filterInput = document.getElementById('exportFilters');
   const progressBar = document.getElementById('exportProgressBar');
+  const exportFormatSelect = document.getElementById('exportFormat');
+  const exportFormatExcelOption = document.getElementById('exportFormatExcelOption');
 
   // Initialize Bootstrap Modal
   if (!exportModalEl) return; // Exit if modal isn't on page
@@ -22,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.closest('.open-export-modal')) {
       const triggerBtn = e.target.closest('.open-export-modal');
       const baseUrl = triggerBtn.dataset.baseUrl || window.location.pathname;
+      const excelExportUrl = String(triggerBtn.dataset.excelExportUrl || '').trim();
       
       // Capture Filters
       const currentParams = new URLSearchParams(window.location.search).toString();
@@ -29,6 +32,8 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Save Context
       exportForm.dataset.url = baseUrl;
+      exportForm.dataset.excelUrl = excelExportUrl;
+      setExcelExportOptionVisible(Boolean(excelExportUrl));
 
       // Reset UI State
       resetUI();
@@ -43,7 +48,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const formData = new FormData(exportForm);
     const source = formData.get('exportSource'); // 'page' or 'db'
-    const format = formData.get('exportFormat'); // 'csv' or 'json'
+    const format = formData.get('exportFormat'); // 'csv', 'json', or 'xlsx'
+
+    if (format === 'xlsx') {
+      handleExcelExport(formData);
+      return;
+    }
 
     if (source === 'page') {
       handlePageExport(format);
@@ -59,6 +69,32 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
+  // --- Logic: Server Excel export (filtered full dataset) ---
+  function handleExcelExport(formData) {
+    try {
+      const excelUrl = String(exportForm.dataset.excelUrl || '').trim();
+      if (!excelUrl) throw new Error('Excel export is not available on this page.');
+
+      updateStatus('Preparing Excel export...', 30);
+
+      const params = new URLSearchParams();
+      const currentParams = new URLSearchParams(window.location.search);
+      currentParams.forEach((value, key) => params.set(key, value));
+
+      const filterValue = formData.get('filters');
+      if (filterValue) {
+        const filterParams = new URLSearchParams(String(filterValue));
+        filterParams.forEach((value, key) => params.set(key, value));
+      }
+
+      const query = params.toString();
+      window.location.href = query ? `${excelUrl}?${query}` : excelUrl;
+      finishSuccess();
+    } catch (err) {
+      showError(err.message);
+    }
+  }
 
   // --- Logic: Export Visible Page Table ---
   function handlePageExport(format) {
@@ -250,8 +286,17 @@ document.addEventListener('DOMContentLoaded', () => {
     window.URL.revokeObjectURL(url);
   }
 
+  function setExcelExportOptionVisible(visible) {
+    if (!exportFormatExcelOption) return;
+    exportFormatExcelOption.hidden = !visible;
+    if (!visible && exportFormatSelect && exportFormatSelect.value === 'xlsx') {
+      exportFormatSelect.value = 'csv';
+    }
+  }
+
   function resetUI() {
     exportForm.reset();
+    setExcelExportOptionVisible(Boolean(String(exportForm.dataset.excelUrl || '').trim()));
     setupContent.style.display = 'block';
     progressContent.style.display = 'none';
     detailedStatus.innerHTML = '';

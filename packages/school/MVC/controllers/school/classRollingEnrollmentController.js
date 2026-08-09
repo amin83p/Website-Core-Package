@@ -38,6 +38,7 @@ const classEnrollmentSessionApplicabilityService = require('../../services/schoo
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
 const rollingEnrollmentFunderService = require('../../services/school/rollingEnrollmentFunderService');
 const rollingEnrollmentPeriodFilterService = require('../../services/school/rollingEnrollmentPeriodFilterService');
+const rollingEnrollmentExcelExportService = require('../../services/school/rollingEnrollmentExcelExportService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
 const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
 const classEnrollmentDeleteService = require('../../services/school/classEnrollmentDeleteService');
@@ -1422,43 +1423,86 @@ async function showRollingEnrollmentPage(req, res) {
 
 async function listClassEnrollmentPeriods(req, res) {
   try {
-    const classId = toPublicId(req.params.classId || req.query.classId || req.query.id || '');
-    if (!classId) throw new Error('classId is required.');
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
-    assertRollingWorkflowEnabledForClass(req, classData);
-    const periods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user);
-    let rows = (Array.isArray(periods) ? periods : [])
-      .slice()
-      .sort((a, b) => {
-        const aStart = String(a?.startDate || '');
-        const bStart = String(b?.startDate || '');
-        if (aStart !== bStart) return aStart.localeCompare(bStart);
-        const aSeq = Number.parseInt(String(a?.sequenceNo || ''), 10);
-        const bSeq = Number.parseInt(String(b?.sequenceNo || ''), 10);
-        return (Number.isFinite(aSeq) ? aSeq : 0) - (Number.isFinite(bSeq) ? bSeq : 0);
-      });
-
-    const [students, funderOptions] = await Promise.all([
-      schoolDataService.fetchAllData('students', {}, req.user),
-      loadActiveFunderOptions(req.user, classData.orgId)
-    ]);
-    rows = await attachStudentLabelsToEnrollmentPeriodRows(rows, req.user, students);
-    rows = attachFunderLabelsToPeriodRows(rows, funderOptions);
-    rows = rollingEnrollmentPeriodFilterService.filterEnrollmentPeriodRows(rows, req.query, {
-      orgToday: resolveOrgTodayFromRequest(req),
-      searchableFields: ROLLING_ENROLLMENT_SEARCHABLE_FIELDS
-    });
-    rows = await attachSessionProgressToEnrollmentPeriodRows(rows, classData, req.user, students);
-
+    const { classData, periodRows } = await buildRollingEnrollmentExportRows(req);
     return res.json({
       status: 'success',
       message: 'Class enrollment periods loaded.',
       classId: classData.id,
-      count: rows.length,
-      items: rows
+      count: periodRows.length,
+      items: periodRows
     });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+function resolveClassTeacherName(classData = {}) {
+  const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
+  const primary = instructors.find((row) => row && (row.primary === true || row.isPrimary === true))
+    || instructors[0]
+    || null;
+  return String(primary?.name || primary?.displayName || '').trim();
+}
+
+async function buildRollingEnrollmentExportRows(req) {
+  const classId = toPublicId(
+    req.params.id
+    || req.params.classId
+    || req.query.classId
+    || req.query.id
+    || ''
+  );
+  if (!classId) throw new Error('classId is required.');
+  const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+  assertRollingWorkflowEnabledForClass(req, classData);
+
+  const periods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user);
+  let periodRows = (Array.isArray(periods) ? periods : [])
+    .slice()
+    .sort((a, b) => {
+      const aStart = String(a?.startDate || '');
+      const bStart = String(b?.startDate || '');
+      if (aStart !== bStart) return aStart.localeCompare(bStart);
+      const aSeq = Number.parseInt(String(a?.sequenceNo || ''), 10);
+      const bSeq = Number.parseInt(String(b?.sequenceNo || ''), 10);
+      return (Number.isFinite(aSeq) ? aSeq : 0) - (Number.isFinite(bSeq) ? bSeq : 0);
+    });
+
+  const [students, funderOptions] = await Promise.all([
+    schoolDataService.fetchAllData('students', {}, req.user),
+    loadActiveFunderOptions(req.user, classData.orgId)
+  ]);
+  periodRows = await attachStudentLabelsToEnrollmentPeriodRows(periodRows, req.user, students);
+  periodRows = attachFunderLabelsToPeriodRows(periodRows, funderOptions);
+  periodRows = rollingEnrollmentPeriodFilterService.filterEnrollmentPeriodRows(periodRows, req.query, {
+    orgToday: resolveOrgTodayFromRequest(req),
+    searchableFields: ROLLING_ENROLLMENT_SEARCHABLE_FIELDS
+  });
+  periodRows = await attachSessionProgressToEnrollmentPeriodRows(periodRows, classData, req.user, students);
+
+  return { classData, periodRows, students };
+}
+
+async function exportRollingEnrollmentExcel(req, res) {
+  try {
+    const { classData, periodRows } = await buildRollingEnrollmentExportRows(req);
+    const { buffer, filename } = await rollingEnrollmentExcelExportService.buildRollingEnrollmentExcelWorkbook({
+      classData,
+      className: classData?.title || classData?.id,
+      teacherName: resolveClassTeacherName(classData),
+      periodRows
+    });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    return res.status(200).send(buffer);
+  } catch (error) {
+    const wantsJson = String(req.headers.accept || '').includes('application/json')
+      || String(req.headers['x-ajax-request'] || '') === 'true';
+    if (wantsJson) {
+      return res.status(400).json({ status: 'error', message: error.message });
+    }
+    return res.status(400).send(error.message || 'Unable to export rolling enrollment Excel.');
   }
 }
 
@@ -4412,6 +4456,8 @@ module.exports = {
   showCycleRolloverWizard,
   previewCycleRollover,
   listClassEnrollmentPeriods,
+  buildRollingEnrollmentExportRows,
+  exportRollingEnrollmentExcel,
   previewRollingEnrollmentEligibility,
   assertRollingProgramRegistrationShortcutContext,
   previewClassEnrollmentWithTransactions,

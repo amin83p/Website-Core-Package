@@ -37,9 +37,57 @@
   }
 
   function buildPageCss(orientation = 'landscape') {
-    return orientation === 'portrait'
-      ? '@page { size: letter portrait; margin: 10mm; }'
-      : '@page { size: letter landscape; margin: 10mm; }';
+    const mode = normalizeOrientation(orientation);
+    return `@page { margin: 10mm; size: ${mode}; }`;
+  }
+
+  function buildPreviewOrientationScript(options = {}) {
+    const initialOrientation = normalizeOrientation(options.orientation);
+    const sourcePath = String(options.sourcePath || '').trim();
+    return `<script>
+(function() {
+  var STORAGE_PREFIX = 'tablePrintSettings_v1:';
+  var sourcePath = ${JSON.stringify(sourcePath)};
+
+  function normalizeOrientation(value) {
+    return String(value || 'landscape').trim().toLowerCase() === 'portrait' ? 'portrait' : 'landscape';
+  }
+
+  function buildPageCss(orientation) {
+    var mode = normalizeOrientation(orientation);
+    return '@page { margin: 10mm; size: ' + mode + '; }';
+  }
+
+  function applyPrintOrientation(orientation) {
+    var mode = normalizeOrientation(orientation);
+    var styleEl = document.getElementById('print-page-orientation-css');
+    if (styleEl) styleEl.textContent = buildPageCss(mode);
+    document.body.dataset.printOrientation = mode;
+    document.querySelectorAll('[data-print-orientation]').forEach(function(btn) {
+      var active = btn.getAttribute('data-print-orientation') === mode;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    try {
+      if (window.opener && sourcePath) {
+        var key = STORAGE_PREFIX + sourcePath;
+        var stored = JSON.parse(window.opener.localStorage.getItem(key) || '{}') || {};
+        stored.orientation = mode;
+        window.opener.localStorage.setItem(key, JSON.stringify(stored));
+      }
+    } catch (_) {}
+  }
+
+  document.querySelectorAll('[data-print-orientation]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      applyPrintOrientation(btn.getAttribute('data-print-orientation'));
+    });
+  });
+
+  applyPrintOrientation(${JSON.stringify(initialOrientation)});
+  window.applyPrintOrientation = applyPrintOrientation;
+})();
+</script>`;
   }
 
   function normalizeOrientation(value) {
@@ -180,7 +228,7 @@
     const css = String(options.css || cachedPrintTableCss || FALLBACK_PRINT_TABLE_CSS).trim();
 
     const logoHtml = logoUrl
-      ? `<img class="print-logo" src="${escapeHtml(logoUrl)}" alt="Organization logo">`
+      ? `<img class="print-logo" src="${escapeHtml(logoUrl)}" alt="Organization logo" onerror="this.style.display='none'">`
       : '';
 
     const orgHtml = includeOrg && orgName
@@ -199,23 +247,31 @@
       ? `<div class="print-legend">${legendHtml}</div>`
       : '';
 
+    const landscapeActive = orientation === 'landscape';
+    const portraitActive = orientation === 'portrait';
+    const sourcePath = String(options.sourcePath || '').trim();
+
     return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
+  <style id="print-page-orientation-css"></style>
   <style>
-    ${buildPageCss(orientation)}
     ${css}
   </style>
 </head>
-<body class="print-density-${density}">
+<body class="print-density-${density}" data-print-orientation="${orientation}">
   <div class="print-sheet">
     <div class="screen-actions no-print">
+      <span class="screen-actions-label">Orientation:</span>
+      <button type="button" data-print-orientation="landscape" class="${landscapeActive ? 'is-active' : ''}" aria-pressed="${landscapeActive ? 'true' : 'false'}">Landscape</button>
+      <button type="button" data-print-orientation="portrait" class="${portraitActive ? 'is-active' : ''}" aria-pressed="${portraitActive ? 'true' : 'false'}">Portrait</button>
       <button type="button" onclick="window.print()">Print</button>
       <button type="button" onclick="window.close()">Close</button>
     </div>
+    <p class="screen-actions-hint no-print">Change orientation here, then click Print. Browser Scale (%) still applies in the print dialog.</p>
     <div class="identity-block">
       <div class="identity-copy">
         ${orgHtml}
@@ -233,8 +289,9 @@
       ${tableHtml}
     </div>
     ${legendBlock}
-    <div class="doc-footer">Generated from ${escapeHtml(String(options.sourcePath || '/'))}</div>
+    <div class="doc-footer">Generated from ${escapeHtml(sourcePath || '/')}</div>
   </div>
+  ${buildPreviewOrientationScript({ orientation, sourcePath })}
 </body>
 </html>`;
   }
@@ -269,6 +326,7 @@
     buildTableHtmlFromElement,
     buildFilterSummaryFromLocation,
     buildTablePrintDocument,
+    buildPreviewOrientationScript,
     ensurePrintTableCssLoaded,
     setPrintTableCss,
     FALLBACK_PRINT_TABLE_CSS

@@ -184,3 +184,18 @@ test('logRepository mongo countByUserId uses countDocuments instead of full scan
     restore();
   }
 });
+
+test('mongo date filter includes ISO string bounds for string timestamps', () => {
+  const { buildMongoFilterFromQuery } = require('../MVC/repositories/backend/mongoRepositoryUtils');
+  const filter = buildMongoFilterFromQuery({
+    startDate: '2026-08-01',
+    endDate: '2026-08-10'
+  }, {
+    dateFields: ['timestamp']
+  });
+
+  const serialized = JSON.stringify(filter);
+  assert.match(serialized, /2026-08-01T/);
+  assert.match(serialized, /T\d{2}:\d{2}:\d{2}\.\d{3}Z/);
+  assert.equal(serialized.includes('2026-08-01T06:00:00.000Z'), true);
+});

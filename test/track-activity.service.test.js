@@ -306,8 +306,8 @@ test('fetchTrackActivityHourlyTimeline builds 24 chunks with request and attempt
 
   try {
     const payload = await trackActivityService.fetchTrackActivityHourlyTimeline({
-      startAt: '2026-04-10T08:00',
-      endAt: '2026-04-10T23:00',
+      startAtMs: Date.parse('2026-04-10T08:00:00.000Z'),
+      endAtMs: Date.parse('2026-04-10T23:00:00.000Z'),
       userId: 'U1'
     }, { id: 'ROOT_001', isSystemAdmin: true, activeOrgId: 'ORG1' });
 
@@ -322,6 +322,94 @@ test('fetchTrackActivityHourlyTimeline builds 24 chunks with request and attempt
     assert.equal(day.chunks.length, 24);
     assert.equal(day.chunks[10].requestCount, 1);
     assert.equal(day.chunks[11].requestCount, 1);
+  } finally {
+    dataService.fetchData = originalFetchData;
+    dataService.getDataById = originalGetDataById;
+  }
+});
+
+test('fetchTrackActivityHourlyTimeline fetches logs per day so older days are not starved by limit', async () => {
+  const originalFetchData = dataService.fetchData;
+  const originalGetDataById = dataService.getDataById;
+  let logFetchCount = 0;
+
+  dataService.fetchData = async (entityType, query = {}) => {
+    const type = String(entityType || '');
+    if (type === 'sections') return [{ id: 'S1', name: 'PTE Practice Attempts' }];
+    if (type === 'operations') return [{ id: 'OP1', name: 'CREATE' }];
+    if (type === 'organizations') return [{ id: 'ORG1', identity: { displayName: 'Org One' }, timezone: 'UTC' }];
+    if (type === 'logs') {
+      logFetchCount += 1;
+      const startDate = String(query?.startDate || '').trim();
+      const endDate = String(query?.endDate || '').trim();
+      const rows = [];
+      if (startDate <= '2026-04-08' && endDate >= '2026-04-08') {
+        rows.push({
+          id: 'L-APR8',
+          timestamp: '2026-04-08T12:00:00.000Z',
+          sectionId: 'S1',
+          operationId: 'OP1',
+          userId: 'U1',
+          orgId: 'ORG1',
+          status: 'SUCCESS',
+          details: { method: 'GET', url: '/pte/practice/list' }
+        });
+      }
+      if (startDate <= '2026-04-09' && endDate >= '2026-04-09') {
+        rows.push({
+          id: 'L-APR9',
+          timestamp: '2026-04-09T12:00:00.000Z',
+          sectionId: 'S1',
+          operationId: 'OP1',
+          userId: 'U1',
+          orgId: 'ORG1',
+          status: 'SUCCESS',
+          details: { method: 'GET', url: '/pte/practice/list' }
+        });
+      }
+      if (startDate <= '2026-04-10' && endDate >= '2026-04-10') {
+        const limit = Number(query?.limit || 0);
+        for (let i = 0; i < 1600; i += 1) {
+          rows.push({
+            id: `L-APR10-${i}`,
+            timestamp: '2026-04-10T12:00:00.000Z',
+            sectionId: 'S1',
+            operationId: 'OP1',
+            userId: 'U1',
+            orgId: 'ORG1',
+            status: 'SUCCESS',
+            details: { method: 'GET', url: '/pte/practice/list' }
+          });
+        }
+        return Number.isFinite(limit) && limit > 0 ? rows.slice(0, limit) : rows;
+      }
+      return rows;
+    }
+    if (type === 'users') return [{ id: 'U1', username: 'amin', displayName: 'Amin', primaryOrgId: 'ORG1' }];
+    return [];
+  };
+
+  dataService.getDataById = async () => ({ id: 'ORG1', timezone: 'UTC' });
+
+  try {
+    const payload = await trackActivityService.fetchTrackActivityHourlyTimeline({
+      startAtMs: Date.parse('2026-04-08T00:00:00.000Z'),
+      endAtMs: Date.parse('2026-04-10T23:59:59.999Z'),
+      userId: 'U1',
+      maxRows: 1500
+    }, { id: 'ROOT_001', isSystemAdmin: true, activeOrgId: 'ORG1' });
+
+    assert.equal(logFetchCount, 3);
+    assert.equal(payload.dayTimelines.length, 3);
+    const apr8 = payload.dayTimelines.find((day) => day.dateKey === '2026-04-08');
+    const apr9 = payload.dayTimelines.find((day) => day.dateKey === '2026-04-09');
+    const apr10 = payload.dayTimelines.find((day) => day.dateKey === '2026-04-10');
+    assert.ok(apr8);
+    assert.ok(apr9);
+    assert.ok(apr10);
+    assert.equal(apr8.totalRequests, 1);
+    assert.equal(apr9.totalRequests, 1);
+    assert.ok(apr10.totalRequests >= 1400);
   } finally {
     dataService.fetchData = originalFetchData;
     dataService.getDataById = originalGetDataById;

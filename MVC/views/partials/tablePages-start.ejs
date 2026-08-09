@@ -32,11 +32,14 @@
         u.id ||
         ''
       ).trim();
+      const printBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
+      const printLogoUrl = printBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
     %>
     <span id="activeOrgIdRef" data-id="<%= activeOrgId %>" hidden></span>
     <span id="activeOrgNameRef" data-name="<%= activeOrgName %>" hidden></span>
     <span id="printAdminRef" data-is-admin="<%= isPrintAdmin ? 'true' : 'false' %>" hidden></span>
     <span id="requestingUserNameRef" data-name="<%= requestingUserName %>" hidden></span>
+    <span id="printBrandLogoRef" data-url="<%= printLogoUrl %>" hidden></span>
     <% if (typeof actionStateId !== 'undefined' && actionStateId !== null) { %>
       <span id="actionStateIdRef" data-id="<%= actionStateId %>" hidden></span>
     <% } %>
@@ -151,10 +154,15 @@
           : (typeof newUrl !== 'undefined' && newUrl != null ? String(newUrl).trim() : '');
         const exportPathNorm = exportPathRaw.replace(/^\/+/, '');
         const exportDataBaseAttr = exportPathNorm ? `/${exportPathNorm}` : '';
+        const exportExcelUrlRaw = (typeof exportExcelUrl !== 'undefined' && exportExcelUrl != null && String(exportExcelUrl).trim())
+          ? String(exportExcelUrl).trim()
+          : '';
+        const exportExcelUrlAttr = exportExcelUrlRaw ? exportExcelUrlRaw.replace(/^\/+/, '/') : '';
       %>
       <button type="button" 
         class="btn btn-filled btn-success btn-md open-export-modal me-2 mb-2" 
-        data-base-url="<%= exportDataBaseAttr %>"> <i class="bi bi-cloud-download me-1 mb-2"></i> Export
+        data-base-url="<%= exportDataBaseAttr %>"
+        <% if (exportExcelUrlAttr) { %>data-excel-export-url="<%= exportExcelUrlAttr %>"<% } %>> <i class="bi bi-cloud-download me-1 mb-2"></i> Export
       </button>
     <% } %>
 
@@ -209,19 +217,21 @@
         <div class="row g-2">
           <div class="col-6">
             <label class="form-label fw-bold">Orientation</label>
-            <select class="form-select" id="printSettingOrientation" <%= isPrintAdmin ? '' : 'disabled' %>>
+            <select class="form-select" id="printSettingOrientation">
               <option value="landscape">Landscape</option>
               <option value="portrait">Portrait</option>
             </select>
+            <div class="form-text small">You can also change orientation in the print preview before printing.</div>
           </div>
           <div class="col-6">
             <label class="form-label fw-bold">Density</label>
-            <select class="form-select" id="printSettingDensity" <%= isPrintAdmin ? '' : 'disabled' %>>
+            <select class="form-select" id="printSettingDensity">
               <option value="compact">Compact</option>
               <option value="normal">Normal</option>
             </select>
           </div>
         </div>
+        <div class="form-text small mt-2">Use the browser print dialog <strong>Scale (%)</strong> to fit wide tables. Disable Headers and footers for a cleaner page.</div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

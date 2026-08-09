@@ -177,20 +177,32 @@ function buildDateRangeClause(query = {}, dateFields = []) {
   if (!startDate && !endDate) return null;
   if (!Array.isArray(dateFields) || !dateFields.length) return null;
 
-  const range = {};
-  if (startDate) {
-    const parsedStart = parseDateRangeBoundary(startDate, 'start');
-    if (parsedStart) range.$gte = parsedStart;
-  }
-  if (endDate) {
-    const parsedEnd = parseDateRangeBoundary(endDate, 'end');
-    if (parsedEnd) range.$lte = parsedEnd;
-  }
-  if (!Object.keys(range).length) return null;
+  const parsedStart = startDate ? parseDateRangeBoundary(startDate, 'start') : null;
+  const parsedEnd = endDate ? parseDateRangeBoundary(endDate, 'end') : null;
+  if (!parsedStart && !parsedEnd) return null;
 
-  return {
-    $or: dateFields.map((field) => ({ [field]: range }))
-  };
+  const dateRange = {};
+  const isoRange = {};
+  if (parsedStart) {
+    dateRange.$gte = parsedStart;
+    isoRange.$gte = parsedStart.toISOString();
+  }
+  if (parsedEnd) {
+    dateRange.$lte = parsedEnd;
+    isoRange.$lte = parsedEnd.toISOString();
+  }
+
+  const fieldClauses = dateFields.map((field) => {
+    const perField = [];
+    if (Object.keys(dateRange).length) perField.push({ [field]: { ...dateRange } });
+    if (Object.keys(isoRange).length) perField.push({ [field]: { ...isoRange } });
+    if (!perField.length) return null;
+    return perField.length === 1 ? perField[0] : { $or: perField };
+  }).filter(Boolean);
+
+  if (!fieldClauses.length) return null;
+  if (fieldClauses.length === 1) return fieldClauses[0];
+  return { $or: fieldClauses };
 }
 
 function buildMongoFilterFromQuery(query = {}, options = {}) {

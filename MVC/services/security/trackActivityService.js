@@ -193,11 +193,13 @@ function getDateTimePartsInTimezone(ms, timeZone = DEFAULT_ORG_TIMEZONE) {
       hour12: false
     }).formatToParts(date);
     const get = (type) => parts.find((part) => part.type === type)?.value || '';
+    let hour = Number(get('hour') || 0);
+    if (hour === 24) hour = 0;
     return {
       year: Number(get('year') || 0),
       month: Number(get('month') || 0),
       day: Number(get('day') || 0),
-      hour: Number(get('hour') || 0),
+      hour,
       minute: Number(get('minute') || 0),
       second: Number(get('second') || 0)
     };
@@ -264,6 +266,20 @@ function toDateKeyInTimezone(ms, timeZone = DEFAULT_ORG_TIMEZONE) {
   return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
 }
 
+function shiftCalendarParts(parts = {}, deltaDays = 0) {
+  const year = Number(parts.year || 0);
+  const month = Number(parts.month || 0);
+  const day = Number(parts.day || 0);
+  if (!year || !month || !day) return { year: 0, month: 0, day: 0 };
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + Number(deltaDays || 0));
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate()
+  };
+}
+
 function getDayBoundsMs(referenceMs, timeZone = DEFAULT_ORG_TIMEZONE) {
   const parts = getDateTimePartsInTimezone(referenceMs, timeZone);
   if (!parts) {
@@ -282,11 +298,11 @@ function getDayBoundsMs(referenceMs, timeZone = DEFAULT_ORG_TIMEZONE) {
     second: 0
   }, timeZone);
 
-  const nextUtc = new Date(Date.UTC(parts.year, parts.month - 1, parts.day) + (24 * 60 * 60 * 1000));
+  const nextParts = shiftCalendarParts(parts, 1);
   const nextStartMs = toUtcMsFromTimezoneLocal({
-    year: nextUtc.getUTCFullYear(),
-    month: nextUtc.getUTCMonth() + 1,
-    day: nextUtc.getUTCDate(),
+    year: nextParts.year,
+    month: nextParts.month,
+    day: nextParts.day,
     hour: 0,
     minute: 0,
     second: 0
@@ -1528,27 +1544,121 @@ function getLocalTimeParts(ms) {
   };
 }
 
+function resolveTimelineDayKey(ms, timezone = DEFAULT_ORG_TIMEZONE) {
+  return toDateKeyInTimezone(ms, timezone);
+}
+
+function resolveTimelineTimeParts(ms, timezone = DEFAULT_ORG_TIMEZONE) {
+  const parts = getDateTimePartsInTimezone(ms, timezone);
+  if (!parts) return null;
+  return {
+    hour: parts.hour,
+    minute: parts.minute,
+    second: parts.second
+  };
+}
+
 function buildDayWindows(rangeStartMs, rangeEndMs, timezone = DEFAULT_ORG_TIMEZONE) {
   const windows = [];
-  const startDate = new Date(Number(rangeStartMs || 0));
-  const endDate = new Date(Number(rangeEndMs || 0));
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return windows;
-  startDate.setHours(0, 0, 0, 0);
-  endDate.setHours(0, 0, 0, 0);
+  const startMs = Number(rangeStartMs || 0);
+  const endMs = Number(rangeEndMs || 0);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return windows;
 
-  const cursor = new Date(startDate);
-  while (cursor <= endDate && windows.length < MAX_RANGE_DAYS) {
-    const dayStartMs = cursor.getTime();
-    const dayEndMs = dayStartMs + (24 * 60 * 60 * 1000) - 1;
+  let bounds = getDayBoundsMs(startMs, timezone);
+  if (!bounds?.dateKey || !Number.isFinite(bounds.dayStartMs)) return windows;
+
+  while (bounds.dayStartMs <= endMs && windows.length < MAX_RANGE_DAYS) {
     windows.push({
-      dateKey: formatLocalDateKey(dayStartMs),
-      dayStartMs,
-      dayEndMs
+      dateKey: bounds.dateKey,
+      dayStartMs: Math.max(bounds.dayStartMs, startMs),
+      dayEndMs: Math.min(bounds.dayEndMs, endMs)
     });
-    cursor.setDate(cursor.getDate() + 1);
+    const nextMs = bounds.dayEndMs + 1;
+    if (!Number.isFinite(nextMs)) break;
+    const previousStartMs = bounds.dayStartMs;
+    bounds = getDayBoundsMs(nextMs, timezone);
+    if (!bounds?.dateKey || !Number.isFinite(bounds.dayStartMs)) break;
+    if (bounds.dayStartMs <= previousStartMs) break;
   }
 
   return windows;
+}
+
+function buildHourlyTimelineLogQuery(
+  filters = {},
+  sectionIds = [],
+  operationIds = [],
+  orgIds = [],
+  dayStartMs = 0,
+  dayEndMs = 0,
+  timezone = DEFAULT_ORG_TIMEZONE
+) {
+  const dateTokens = buildDateTokensForQuery(dayStartMs, dayEndMs, timezone);
+  const logQuery = {
+    page: 1,
+    limit: filters.maxRows,
+    startDate: dateTokens.startDate,
+    endDate: dateTokens.endDate,
+    userId: filters.userId || undefined,
+    q: filters.q || undefined,
+    sort: '-timestamp'
+  };
+  if (sectionIds.length === 1) logQuery.sectionId = sectionIds[0];
+  else if (sectionIds.length > 1) logQuery.sectionId__in = sectionIds.join(',');
+  if (operationIds.length === 1) logQuery.operationId = operationIds[0];
+  else if (operationIds.length > 1) logQuery.operationId__in = operationIds.join(',');
+  if (orgIds.length === 1) logQuery.orgId__eq = orgIds[0];
+  else if (orgIds.length > 1) logQuery.orgId__in = orgIds.join(',');
+  if (filters.status) logQuery.status__contains = filters.status;
+  return logQuery;
+}
+
+async function fetchHourlyTimelineLogs({
+  dayWindows = [],
+  filters = {},
+  timezone = DEFAULT_ORG_TIMEZONE,
+  sectionIds = [],
+  operationIds = [],
+  orgIds = [],
+  requestUser = null
+} = {}) {
+  const windows = Array.isArray(dayWindows) ? dayWindows : [];
+  if (!windows.length) return [];
+
+  const batches = await Promise.all(windows.map(async (window) => {
+    const dayStartMs = Number(window?.dayStartMs || 0);
+    const dayEndMs = Number(window?.dayEndMs || 0);
+    if (!Number.isFinite(dayStartMs) || !Number.isFinite(dayEndMs)) return [];
+    const logQuery = buildHourlyTimelineLogQuery(
+      filters,
+      sectionIds,
+      operationIds,
+      orgIds,
+      dayStartMs,
+      dayEndMs,
+      timezone
+    );
+    const rows = await dataService.fetchData('logs', logQuery, requestUser);
+    const safeRows = Array.isArray(rows) ? rows : [];
+    return safeRows;
+  }));
+
+  const merged = [];
+  const seen = new Set();
+  batches.forEach((rows) => {
+    rows.forEach((log) => {
+      const id = cleanText(log?.id, 160);
+      const dedupeKey = id || [
+        resolveLogTimestamp(log),
+        cleanText(log?.userId, 120),
+        cleanText(log?.operationId, 120)
+      ].join('|');
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      merged.push(log);
+    });
+  });
+  return merged;
 }
 
 function toFiveMinuteLabel(hour, fiveMinuteIndex) {
@@ -1618,15 +1728,14 @@ async function fetchTrackActivityHourlyTimeline(rawQuery = {}, requestUser = nul
 
   let dayWindows = buildDayWindows(filters.startAtMs, filters.endAtMs, timezone);
   if (!dayWindows.length) {
-    const fallbackDate = new Date(Number(filters.endAtMs || Date.now()));
-    if (Number.isNaN(fallbackDate.getTime())) fallbackDate.setTime(Date.now());
-    fallbackDate.setHours(0, 0, 0, 0);
-    const fallbackStartMs = fallbackDate.getTime();
-    dayWindows = [{
-      dateKey: formatLocalDateKey(fallbackStartMs),
-      dayStartMs: fallbackStartMs,
-      dayEndMs: fallbackStartMs + (24 * 60 * 60 * 1000) - 1
-    }];
+    const fallbackBounds = getDayBoundsMs(filters.endAtMs, timezone);
+    if (fallbackBounds?.dateKey && Number.isFinite(fallbackBounds.dayStartMs)) {
+      dayWindows = [{
+        dateKey: fallbackBounds.dateKey,
+        dayStartMs: fallbackBounds.dayStartMs,
+        dayEndMs: fallbackBounds.dayEndMs
+      }];
+    }
   }
 
   const dateTokens = buildDateTokensForQuery(filters.startAtMs, filters.endAtMs, timezone);
@@ -1648,24 +1757,15 @@ async function fetchTrackActivityHourlyTimeline(rawQuery = {}, requestUser = nul
     dayHourCounters.set(key, buildEmptyMetricSlots(24));
   });
 
-  const logQuery = {
-    page: 1,
-    limit: filters.maxRows,
-    startDate: rangeStartDateKey,
-    endDate: rangeEndDateKey,
-    userId: filters.userId || undefined,
-    q: filters.q || undefined,
-    sort: '-timestamp'
-  };
-  if (sectionIds.length === 1) logQuery.sectionId = sectionIds[0];
-  else if (sectionIds.length > 1) logQuery.sectionId__in = sectionIds.join(',');
-  if (operationIds.length === 1) logQuery.operationId = operationIds[0];
-  else if (operationIds.length > 1) logQuery.operationId__in = operationIds.join(',');
-  if (orgIds.length === 1) logQuery.orgId__eq = orgIds[0];
-  else if (orgIds.length > 1) logQuery.orgId__in = orgIds.join(',');
-  if (filters.status) logQuery.status__contains = filters.status;
-
-  const logs = await dataService.fetchData('logs', logQuery, requestUser);
+  const logs = await fetchHourlyTimelineLogs({
+    dayWindows,
+    filters,
+    timezone,
+    sectionIds,
+    operationIds,
+    orgIds,
+    requestUser
+  });
   const sectionMap = buildLookupMap(lookups.sections);
   const operationMap = buildLookupMap(lookups.operations);
   const fiveMinuteCounters = new Map();
@@ -1687,11 +1787,11 @@ async function fetchTrackActivityHourlyTimeline(rawQuery = {}, requestUser = nul
     if (!Number.isFinite(occurredAtMs)) return;
     if (occurredAtMs < filters.startAtMs || occurredAtMs > filters.endAtMs) return;
 
-    const dayKey = formatLocalDateKey(occurredAtMs);
+    const dayKey = resolveTimelineDayKey(occurredAtMs, timezone);
     const daySlots = dayHourCounters.get(dayKey);
     if (!Array.isArray(daySlots)) return;
 
-    const hourParts = getLocalTimeParts(occurredAtMs);
+    const hourParts = resolveTimelineTimeParts(occurredAtMs, timezone);
     const hour = clamp(Number(hourParts?.hour || 0), 0, 23);
     const minute = clamp(Number(hourParts?.minute || 0), 0, 59);
     const second = clamp(Number(hourParts?.second || 0), 0, 59);

@@ -163,6 +163,10 @@ router.get('/:id/rolling-enrollment',
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, { keepActive: true }),
   rollingCtrl.showRollingEnrollmentPage);
 
+router.get('/:id/rolling-enrollment/export.xlsx',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL),
+  rollingCtrl.exportRollingEnrollmentExcel);
+
 router.get('/:id/cycle-rollover',
   requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, { keepActive: true }),

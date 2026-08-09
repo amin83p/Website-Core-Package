@@ -153,9 +153,32 @@ test('buildTablePrintDocument includes identity header, table content, and previ
   assert.match(html, /Requested by:/);
   assert.match(html, /print-logo/);
   assert.match(html, /class="screen-actions no-print"/);
+  assert.match(html, /data-print-orientation="landscape"/);
+  assert.match(html, /data-print-orientation="portrait"/);
+  assert.match(html, /id="print-page-orientation-css"/);
+  assert.match(html, /screen-actions-hint/);
   assert.match(html, /onclick="window\.print\(\)"/);
-  assert.match(html, /@page \{ size: letter landscape/);
+  assert.match(html, /applyPrintOrientation/);
+  assert.doesNotMatch(html, /letter/);
   assert.match(html, /print-density-compact/);
+});
+
+test('buildTablePrintDocument uses portrait orientation in preview toolbar', () => {
+  const html = builder.buildTablePrintDocument({
+    title: 'Portrait Report',
+    tableHtml: '<table class="print-table"><tbody><tr><td>Row</td></tr></tbody></table>',
+    orientation: 'portrait',
+    css: printTableCss
+  });
+
+  assert.match(html, /data-print-orientation="portrait"/);
+  assert.match(html, /applyPrintOrientation\("portrait"\)/);
+  assert.doesNotMatch(html, /letter/);
+});
+
+test('buildPageCss omits letter keyword', () => {
+  assert.equal(builder.buildPageCss('landscape'), '@page { margin: 10mm; size: landscape; }');
+  assert.equal(builder.buildPageCss('portrait'), '@page { margin: 10mm; size: portrait; }');
 });
 
 test('buildTableHtmlFromElement skips actions column and prefers data-print-value', () => {
@@ -232,9 +255,17 @@ test('layout and print.js load builder before print script', () => {
   assert.doesNotMatch(printJs, /printWindow\.close\(\)/);
 });
 
+test('tablePages-start includes print brand logo ref', () => {
+  const partial = read('MVC/views/partials/tablePages-start.ejs');
+  assert.match(partial, /id="printBrandLogoRef"/);
+  assert.match(partial, /printLogoUrl/);
+});
+
 test('print-table.css defines shared print tokens', () => {
   assert.match(printTableCss, /--ink:/);
   assert.match(printTableCss, /\.print-table th/);
   assert.match(printTableCss, /\.identity-block/);
   assert.match(printTableCss, /\.no-print/);
+  assert.match(printTableCss, /width: auto/);
+  assert.match(printTableCss, /data-print-orientation="portrait"/);
 });
