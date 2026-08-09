@@ -144,7 +144,7 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
       date: '2026-07-20',
       lateMinutes: 15
     }),
-    'Jul 20 Late 15m'
+    'Late 15m'
   );
   assert.equal(
     attendanceExcelExportService.buildLateExcusedCommentFragment({
@@ -152,7 +152,16 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
       date: '2026-07-20',
       excuseRef: 'doctor note'
     }),
-    'Jul 20 Excused doctor note'
+    'Excused'
+  );
+  assert.equal(
+    attendanceExcelExportService.formatTimingMinutesFragment({
+      status: 'present',
+      date: '2026-07-20',
+      lateMinutes: 12,
+      earlyLeaveMinutes: 8
+    }),
+    'Late 12m / Early 8m'
   );
 
   const lateNote = attendanceExcelExportService.buildCellNoteText({
@@ -170,9 +179,9 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
     receiverName: 'Foroozan Haidari',
     receiverEmail: 'foroozan@example.com'
   });
-  assert.match(lateNote, /Jul 20 Late 10m/);
-  assert.match(lateNote, /traffic/);
-  assert.match(lateNote, /From: Jane Admin <jane@school\.org>/);
+  assert.doesNotMatch(lateNote, /Late 10m/);
+  assert.match(lateNote, /Note: traffic/);
+  assert.doesNotMatch(lateNote, /From: Jane Admin/);
   assert.match(lateNote, /To: Bob Teacher <bob@school\.org>/);
   assert.match(lateNote, /Please follow up/);
 
@@ -184,7 +193,30 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
       rosterStudentNotes: 'traffic',
       comments: [{ authorName: 'Jane Admin', text: 'Please follow up' }]
     }),
-    'Jul 20 Late 10m\n\ntraffic'
+    'Note: traffic'
+  );
+
+  assert.equal(
+    attendanceExcelExportService.formatExportCellDisplay({
+      status: 'late',
+      lateMinutes: 15
+    }),
+    'L 15\''
+  );
+  assert.equal(
+    attendanceExcelExportService.formatExportCellDisplay({
+      status: 'present',
+      earlyLeaveMinutes: 60
+    }),
+    'P /60\''
+  );
+  assert.equal(
+    attendanceExcelExportService.formatExportCellDisplay({
+      status: 'late',
+      lateMinutes: 10,
+      earlyLeaveMinutes: 60
+    }),
+    'L 10\'/60\''
   );
 
   const threaded = attendanceExcelExportService.buildThreadedMessagesForRecord({
@@ -203,8 +235,10 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
     receiverEmail: 'foroozan@example.com'
   });
   assert.equal(threaded.length, 1);
-  assert.match(threaded[0].text, /Jul 20 Late 10m/);
-  assert.match(threaded[0].text, /From: Jane Admin <jane@school\.org>/);
+  assert.doesNotMatch(threaded[0].text, /traffic/);
+  assert.doesNotMatch(threaded[0].text, /From:/);
+  assert.match(threaded[0].text, /To: Bob Teacher <bob@school\.org>/);
+  assert.match(threaded[0].text, /Please follow up/);
   assert.equal(threaded[0].authorEmail, 'jane@school.org');
 
   const excusedNote = attendanceExcelExportService.buildCellNoteText({
@@ -219,9 +253,9 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
     receiverName: 'Foroozan Haidari',
     receiverEmail: 'foroozan@example.com'
   });
-  assert.match(excusedNote, /Jul 21 Excused/);
-  assert.match(excusedNote, /From: Jane Admin <jane@school\.org>/);
-  assert.match(excusedNote, /To: Foroozan Haidari <foroozan@example\.com>/);
+  assert.doesNotMatch(excusedNote, /Excused/);
+  assert.doesNotMatch(excusedNote, /From: Jane Admin/);
+  assert.doesNotMatch(excusedNote, /To: Foroozan/);
   assert.match(excusedNote, /family emergency/);
 
   assert.equal(
@@ -231,7 +265,15 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
       mentions: [{ name: 'B', email: 'b@x.com' }],
       text: 'hello'
     }),
-    'From: A <a@x.com>\nTo: B <b@x.com>\nhello'
+    'To: B <b@x.com>\nhello'
+  );
+  assert.equal(
+    attendanceExcelExportService.formatCommentAsCommunication({
+      authorName: 'A',
+      authorEmail: 'a@x.com',
+      text: 'Tsagay left at 2 pm and didn\'t mention the reason.'
+    }),
+    'Tsagay left at 2 pm and didn\'t mention the reason.'
   );
 
   assert.equal(
@@ -488,7 +530,7 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   assert.equal(sheet.getCell(9, 2).value, 1);
   assert.equal(sheet.getCell(9, 3).value, 'Haidari');
   assert.equal(sheet.getCell(9, 4).value, 'Foroozan');
-  assert.equal(sheet.getCell(9, 5).value, 'L');
+  assert.equal(sheet.getCell(9, 5).value, 'L 15\'');
   assert.equal(sheet.getCell(9, 6).value, 'E');
   assert.equal(sheet.getCell(9, 3).fill?.fgColor?.argb || null, null);
   assert.equal(sheet.getCell(9, 3).alignment?.vertical, 'middle');
@@ -501,15 +543,7 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   assert.equal(lateCell.fill?.fgColor?.argb, 'FFFFC000');
   assert.equal(excusedCell.fill?.fgColor?.argb, 'FF0DCAF0');
 
-  // Admin Discussion uses threaded Comments (+ legacy bridge), not a normal Note author
-  const lateNote = noteText(lateCell);
-  if (lateNote) {
-    assert.match(lateNote, /\[Threaded comment\]/);
-    assert.match(lateNote, /Please follow up/);
-  }
-  assert.match(noteText(excusedCell), /Jul 21 Excused appointment/);
-  assert.doesNotMatch(noteText(excusedCell), /Please follow up/);
-
+  // Late cell: roster/timing in Note (comments1); admin discussion in threaded Comments
   const zip = await JSZip.loadAsync(buffer);
   assert.ok(zip.file('xl/persons/person.xml'));
   assert.ok(zip.file('xl/threadedComments/threadedComment1.xml'));
@@ -519,22 +553,27 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   const threadedXml = await zip.file('xl/threadedComments/threadedComment1.xml').async('string');
   const commentsXml = await zip.file('xl/comments1.xml').async('string');
   const vmlXml = await zip.file('xl/drawings/vmlDrawing1.vml').async('string');
+  assert.doesNotMatch(commentsXml, /Late 15m/);
+  assert.match(commentsXml, /Note: bus delay/);
+  assert.doesNotMatch(commentsXml, /Please follow up/);
+  assert.match(noteText(excusedCell), /Excuse: appointment/);
+  assert.doesNotMatch(noteText(excusedCell), /Excused/);
+  assert.doesNotMatch(noteText(excusedCell), /Please follow up/);
   assert.match(personXml, /displayName="Jane Admin"/);
   assert.match(personXml, /userId="jane@school\.org"/);
   assert.match(threadedXml, /ref="E9"/);
-  assert.match(threadedXml, /From: Jane Admin &lt;jane@school\.org&gt;/);
+  assert.doesNotMatch(threadedXml, /From: Jane Admin/);
   assert.match(threadedXml, /To: Bob Teacher &lt;bob@school\.org&gt;/);
   assert.match(threadedXml, /Please follow up/);
-  assert.match(threadedXml, /Jul 20 Late 15m/);
-  assert.match(threadedXml, /bus delay/);
+  assert.doesNotMatch(threadedXml, /bus delay/);
+  assert.match(vmlXml, /width:220pt;height:150pt/);
 
-  // Legacy bridge Excel needs to show Comments in the UI
-  assert.match(commentsXml, /tc=\{/);
-  assert.match(commentsXml, /ref="E9"/);
-  assert.match(commentsXml, /xr:uid="\{/);
-  assert.match(commentsXml, /\[Threaded comment\]/);
-  assert.match(commentsXml, /Please follow up/);
-  // E9 => col 4 (0-based), row 8 (0-based)
+  // Plain status notes stay in comments1.xml; threaded admin text only in threadedComment1.xml
+  assert.doesNotMatch(commentsXml, /xmlns:xr=/);
+  assert.doesNotMatch(commentsXml, /tc=\{/);
+  assert.doesNotMatch(commentsXml, /\[Threaded comment\]/);
+  assert.doesNotMatch(commentsXml, /Please follow up/);
+  // E9 => col 4 (0-based), row 8 (0-based) — ExcelJS note VML
   assert.match(vmlXml, /<x:Row>8<\/x:Row><x:Column>4<\/x:Column>/);
 
   const contentTypes = await zip.file('[Content_Types].xml').async('string');

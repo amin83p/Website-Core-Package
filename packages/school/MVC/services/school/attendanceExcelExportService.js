@@ -167,6 +167,18 @@ function statusToExportCode(status) {
   return STATUS_EXPORT_META[normalized]?.code || '';
 }
 
+/** Mirrors attendance print matrix cell text (status letter + late/early minutes). */
+function formatExportCellDisplay(record = {}) {
+  const code = statusToExportCode(record.status);
+  if (!code) return '';
+  const late = Number(record.lateMinutes) || 0;
+  const early = Number(record.earlyLeaveMinutes) || 0;
+  if (late <= 0 && early <= 0) return code;
+  if (late > 0 && early > 0) return `${code} ${late}'/${early}'`;
+  if (late > 0) return `${code} ${late}'`;
+  return `${code} /${early}'`;
+}
+
 function statusFillArgb(status, { forLegend = false } = {}) {
   const normalized = normalizeAttendanceStatusForSave(status, '');
   if (!normalized) return '';
@@ -251,39 +263,32 @@ function formatPersonContact({ name, email } = {}) {
   return '';
 }
 
-function resolveCommentReceivers(comment = {}, fallbackReceiver = null) {
+function resolveMentionContacts(comment = {}) {
   const mentions = Array.isArray(comment?.mentions) ? comment.mentions : [];
-  const fromMentions = mentions
+  return mentions
     .map((mention) => formatPersonContact({
       name: mention?.name || mention?.displayName || mention?.authorName,
       email: mention?.email || mention?.authorEmail
     }))
     .filter(Boolean);
-  if (fromMentions.length) return fromMentions;
-  const fallback = formatPersonContact(fallbackReceiver || {});
-  return fallback ? [fallback] : [];
 }
 
-/** Format one admin comment as clear From/To communication. */
-function formatCommentAsCommunication(comment = {}, { fallbackReceiver = null } = {}) {
+/** Admin discussion text for Excel comments (author shown as thread title in Excel). */
+function formatCommentAsCommunication(comment = {}) {
   if (typeof comment === 'string') {
-    const text = clean(comment);
-    return text;
+    return clean(comment);
   }
 
   const text = clean(comment?.text || comment?.body);
-  const sender = formatPersonContact({
-    name: comment?.authorName || comment?.author,
-    email: comment?.authorEmail || comment?.email
-  });
-  const receivers = resolveCommentReceivers(comment, fallbackReceiver);
-  if (!text && !sender && !receivers.length) return '';
+  const mentionContacts = resolveMentionContacts(comment);
+  if (!text && !mentionContacts.length) return '';
 
   const lines = [];
-  if (sender) lines.push(`From: ${sender}`);
-  if (receivers.length) lines.push(`To: ${receivers.join('; ')}`);
+  if (mentionContacts.length) {
+    lines.push(`To: ${mentionContacts.join('; ')}`);
+  }
   if (text) lines.push(text);
-  return lines.join('\n');
+  return lines.join('\n').trim();
 }
 
 function collectRosterStatusNotes(record = {}) {
@@ -291,6 +296,19 @@ function collectRosterStatusNotes(record = {}) {
   const rosterNotes = clean(record.rosterStudentNotes || record.notes);
   if (rosterNotes) notes.push(rosterNotes);
   return notes;
+}
+
+function formatTimingMinutesLabel(record = {}) {
+  const late = Number(record.lateMinutes) || 0;
+  const early = Number(record.earlyLeaveMinutes) || 0;
+  if (late <= 0 && early <= 0) return '';
+  if (late > 0 && early > 0) return `Late ${late}m / Early ${early}m`;
+  if (late > 0) return `Late ${late}m`;
+  return `Early ${early}m`;
+}
+
+function formatTimingMinutesFragment(record = {}) {
+  return formatTimingMinutesLabel(record);
 }
 
 function collectAdminDiscussionMessages(record = {}, { fallbackReceiver = null } = {}) {
@@ -307,7 +325,7 @@ function collectAdminDiscussionMessages(record = {}, { fallbackReceiver = null }
           timestamp: ''
         };
       }
-      const formatted = formatCommentAsCommunication(comment, { fallbackReceiver });
+      const formatted = formatCommentAsCommunication(comment);
       if (!formatted) return null;
       return {
         authorName: clean(comment?.authorName || comment?.author) || 'Attendance',
@@ -330,30 +348,29 @@ function collectCellCommentNotes(record = {}, { fallbackReceiver = null } = {}) 
 
 function buildLateExcusedCommentFragment(record = {}) {
   const status = normalizeAttendanceStatusForSave(record.status, '');
-  const dateLabel = formatShortMonthDay(record.date);
-  if (!dateLabel) return '';
+  const timing = formatTimingMinutesLabel(record);
 
   if (status === ATTENDANCE_STATUS.LATE) {
-    const minutes = Number(record.lateMinutes) || 0;
-    return minutes > 0 ? `${dateLabel} Late ${minutes}m` : `${dateLabel} Late`;
+    return timing || 'Late';
   }
 
   if (status === ATTENDANCE_STATUS.EXCUSED) {
-    const parts = [`${dateLabel} Excused`];
-    const excuseRef = clean(record.excuseRef);
-    if (excuseRef) parts.push(excuseRef);
-    return parts.join(' ');
+    return 'Excused';
   }
 
-  return '';
+  return timing;
 }
 
-/** Status-only Excel Note text (Late/Excused + roster notes). Admin Discussion is excluded. */
+/** Status-only Excel Note text (excuse, roster notes). Timing is shown in the cell value. */
 function buildStatusNoteText(record = {}) {
   const fragments = [];
-  const lateOrExcused = buildLateExcusedCommentFragment(record);
-  if (lateOrExcused) fragments.push(lateOrExcused);
-  collectRosterStatusNotes(record).forEach((note) => fragments.push(note));
+  const excuseRef = clean(record.excuseRef);
+  if (excuseRef) fragments.push(`Excuse: ${excuseRef}`);
+
+  collectRosterStatusNotes(record).forEach((note) => {
+    fragments.push(note.startsWith('Note:') ? note : `Note: ${note}`);
+  });
+
   return fragments.join('\n\n');
 }
 
@@ -384,20 +401,7 @@ function buildThreadedMessagesForRecord(record = {}, { receiverName = '', receiv
     name: clean(receiverName),
     email: clean(receiverEmail)
   };
-  const statusNote = buildStatusNoteText(record);
-  const discussion = collectAdminDiscussionMessages(record, { fallbackReceiver });
-  if (!discussion.length) return [];
-
-  // Excel allows Comment OR Note on a cell, not both — fold status into the thread.
-  if (!statusNote) return discussion;
-  const [first, ...rest] = discussion;
-  return [
-    {
-      ...first,
-      text: `${statusNote}\n\n${first.text}`
-    },
-    ...rest
-  ];
+  return collectAdminDiscussionMessages(record, { fallbackReceiver });
 }
 
 function countStatusesFromRecords(records = []) {
@@ -714,26 +718,26 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
         || records[sessionIdx]
         || {};
       const cell = sheet.getCell(bodyRow, firstSessionCol + sessionIdx);
-      cell.value = statusToExportCode(record.status);
+      const displayValue = formatExportCellDisplay(record);
+      cell.value = displayValue;
       applyStatusCellStyle(cell, record.status);
       const noteOptions = {
         receiverName: [firstName, lastName].filter(Boolean).join(' ') || clean(student.name),
         receiverEmail: clean(student.email)
       };
-      const threadedMessages = buildThreadedMessagesForRecord(record, noteOptions);
-      if (threadedMessages.length) {
-        threadedCommentTargets.push({
-          ref: cell.address,
-          messages: threadedMessages
-        });
-        return;
-      }
       const noteText = buildStatusNoteText(record);
+      const threadedMessages = buildThreadedMessagesForRecord(record, noteOptions);
       if (noteText) {
         cell.note = {
           texts: [{ text: noteText }],
           author: resolveNoteAuthorLabel()
         };
+      }
+      if (threadedMessages.length) {
+        threadedCommentTargets.push({
+          ref: cell.address,
+          messages: threadedMessages
+        });
       }
     });
 
@@ -778,8 +782,11 @@ module.exports = {
   ROW_BAND_FILL_ARGB,
   buildLegendEntries,
   statusToExportCode,
+  formatExportCellDisplay,
   statusFillArgb,
   buildLateExcusedCommentFragment,
+  formatTimingMinutesFragment,
+  formatTimingMinutesLabel,
   formatPersonContact,
   formatCommentAsCommunication,
   buildStatusNoteText,

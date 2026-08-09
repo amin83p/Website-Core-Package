@@ -231,16 +231,46 @@ function countAuthors(commentsXml = '') {
   return (authorsBlock[1].match(/<author>/g) || []).length;
 }
 
-function mergeLegacyCommentsXml(commentsXml, threads = []) {
-  let xml = ensureCommentsRootNamespaces(commentsXml || emptyCommentsXml());
-  if (!/<authors>/.test(xml)) {
-    xml = xml.replace(/<commentList>/, '<authors></authors><commentList>');
-  }
-  if (!/<commentList>/.test(xml)) {
-    xml = xml.replace(/<\/comments>/, '<commentList></commentList></comments>');
-  }
+function stripLegacyCommentsForRef(commentsXml = '', ref = '') {
+  const token = escapeXml(String(ref || '').trim());
+  if (!token) return commentsXml;
+  const pattern = new RegExp(
+    `<comment\\s+ref="${token.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}"[\\s\\S]*?</comment>`,
+    'g'
+  );
+  return String(commentsXml || '').replace(pattern, '');
+}
 
-  let authorCount = countAuthors(xml);
+function stripThreadedLegacyCommentsForRef(commentsXml = '', ref = '') {
+  const token = escapeXml(String(ref || '').trim());
+  if (!token) return commentsXml;
+  const pattern = new RegExp(
+    `<comment\\s+ref="${token.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}"[^>]*xr:uid=[^>]*>[\\s\\S]*?</comment>`,
+    'g'
+  );
+  return String(commentsXml || '').replace(pattern, '');
+}
+
+function hasPlainLegacyCommentForRef(commentsXml = '', ref = '') {
+  const token = escapeXml(String(ref || '').trim());
+  if (!token) return false;
+  const pattern = new RegExp(
+    `<comment\\s+ref="${token.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}"[^>]*>[\\s\\S]*?</comment>`,
+    'g'
+  );
+  let match = pattern.exec(String(commentsXml || ''));
+  while (match) {
+    const block = match[0];
+    if (!/xr:uid=/.test(block) && !/tc=/.test(block)) return true;
+    match = pattern.exec(String(commentsXml || ''));
+  }
+  return false;
+}
+
+function mergeLegacyCommentsXml(commentsXml, threads = []) {
+  const originalXml = String(commentsXml || '');
+  let workingXml = originalXml;
+  let authorCount = countAuthors(workingXml);
   const authorSnippets = [];
   const commentSnippets = [];
 
@@ -248,7 +278,11 @@ function mergeLegacyCommentsXml(commentsXml, threads = []) {
     const rootId = thread.messages[0]?.id;
     const ref = thread.ref;
     if (!rootId || !ref) return;
-    if (xml.includes(`xr:uid="${rootId}"`) || xml.includes(`tc=${rootId}`)) return;
+    if (workingXml.includes(`xr:uid="${rootId}"`) || workingXml.includes(`tc=${rootId}`)) return;
+    workingXml = stripThreadedLegacyCommentsForRef(workingXml, ref);
+    if (hasPlainLegacyCommentForRef(workingXml, ref)) {
+      return;
+    }
 
     const authorId = authorCount;
     authorCount += 1;
@@ -261,7 +295,17 @@ function mergeLegacyCommentsXml(commentsXml, threads = []) {
     );
   });
 
-  if (!authorSnippets.length) return xml;
+  if (!authorSnippets.length) {
+    return originalXml;
+  }
+
+  let xml = ensureCommentsRootNamespaces(workingXml || emptyCommentsXml());
+  if (!/<authors>/.test(xml)) {
+    xml = xml.replace(/<commentList>/, '<authors></authors><commentList>');
+  }
+  if (!/<commentList>/.test(xml)) {
+    xml = xml.replace(/<\/comments>/, '<commentList></commentList></comments>');
+  }
   xml = xml.replace('</authors>', `${authorSnippets.join('')}</authors>`);
   xml = xml.replace('</commentList>', `${commentSnippets.join('')}</commentList>`);
   return xml;
@@ -292,15 +336,22 @@ function nextVmlShapeId(vmlXml = '') {
   return max + 1;
 }
 
+const NOTE_VML_WIDTH_PT = 220;
+const NOTE_VML_HEIGHT_PT = 150;
+const NOTE_ANCHOR_COL_SPAN = 5;
+const NOTE_ANCHOR_ROW_SPAN = 10;
+
 function buildVmlNoteShape({ shapeId, row0, col0 }) {
-  const anchor = `${col0}, 15, ${row0}, 10, ${col0 + 2}, 15, ${row0 + 4}, 9`;
+  const anchorEndCol = col0 + NOTE_ANCHOR_COL_SPAN;
+  const anchorEndRow = row0 + NOTE_ANCHOR_ROW_SPAN;
+  const anchor = `${col0}, 8, ${row0}, 8, ${anchorEndCol}, 8, ${anchorEndRow}, 16`;
   return `<v:shape id="_x0000_s${shapeId}" type="#_x0000_t202"`
-    + ` style="position:absolute; margin-left:105.3pt;margin-top:10.5pt;width:97.8pt;height:59.1pt;z-index:1;visibility:hidden"`
+    + ` style="position:absolute; margin-left:2pt;margin-top:2pt;width:${NOTE_VML_WIDTH_PT}pt;height:${NOTE_VML_HEIGHT_PT}pt;z-index:1;visibility:hidden"`
     + ` fillcolor="infoBackground [80]" strokecolor="none [81]" o:insetmode="auto">`
     + `<v:fill color2="infoBackground [80]"/>`
     + `<v:shadow color="none [81]" obscured="t"/>`
     + `<v:path o:connecttype="none"/>`
-    + `<v:textbox style="mso-direction-alt:auto" inset="1.3mm,1.3mm,2.5mm,2.5mm"><div style="text-align:left"/></v:textbox>`
+    + `<v:textbox style="mso-direction-alt:auto;mso-fit-shape-to-text:true" inset="2mm,2mm,2mm,2mm"><div style="text-align:left"/></v:textbox>`
     + `<x:ClientData ObjectType="Note">`
     + `<x:MoveWithCells/><x:SizeWithCells/>`
     + `<x:Anchor>${anchor}</x:Anchor>`
@@ -308,6 +359,37 @@ function buildVmlNoteShape({ shapeId, row0, col0 }) {
     + `<x:Row>${row0}</x:Row><x:Column>${col0}</x:Column>`
     + `</x:ClientData>`
     + `</v:shape>`;
+}
+
+function enlargeVmlNoteShapes(vmlXml = '') {
+  if (!vmlXml) return vmlXml;
+  let xml = vmlXml.replace(
+    /width:\s*[\d.]+pt;height:\s*[\d.]+pt/g,
+    `width:${NOTE_VML_WIDTH_PT}pt;height:${NOTE_VML_HEIGHT_PT}pt`
+  );
+  xml = xml.replace(
+    /(<x:ClientData ObjectType="Note">[\s\S]*?<x:Anchor>)([\d,\s]+)(<\/x:Anchor>)/g,
+    (match, prefix, anchor, suffix) => {
+      const parts = String(anchor).split(',').map((token) => Number(String(token).trim()));
+      if (parts.length !== 8 || parts.some((n) => !Number.isFinite(n))) return match;
+      const [c1, d1, r1, dn1, c2, d2, r2, dn2] = parts;
+      const newC2 = Math.max(c2, c1 + NOTE_ANCHOR_COL_SPAN);
+      const newR2 = Math.max(r2, r1 + NOTE_ANCHOR_ROW_SPAN);
+      return `${prefix}${c1}, ${d1}, ${r1}, ${dn1}, ${newC2}, ${d2}, ${newR2}, ${dn2}${suffix}`;
+    }
+  );
+  return xml.replace(
+    /inset="[^"]*"/g,
+    'inset="2mm,2mm,2mm,2mm"'
+  ).replace(
+    /<v:textbox style="([^"]*)"/g,
+    (match, style) => {
+      const next = style.includes('mso-fit-shape-to-text')
+        ? style
+        : `${style};mso-fit-shape-to-text:true`;
+      return `<v:textbox style="${next}"`;
+    }
+  );
 }
 
 function mergeLegacyVmlDrawing(vmlXml, threads = []) {
@@ -357,13 +439,7 @@ function ensureSheetLegacyDrawing(sheetXml, vmlRelId) {
  */
 async function injectThreadedComments(buffer, cellThreads = []) {
   const { persons, threads } = resolvePersonsAndThreads(cellThreads);
-  if (!threads.length) return Buffer.from(buffer);
-
   const zip = await JSZip.loadAsync(buffer);
-
-  zip.file('xl/persons/person.xml', buildPersonListXml(persons));
-  zip.file('xl/threadedComments/threadedComment1.xml', buildThreadedCommentsXml(threads));
-
   const commentsPath = 'xl/comments1.xml';
   const vmlPath = 'xl/drawings/vmlDrawing1.vml';
   const existingComments = zip.file(commentsPath)
@@ -372,8 +448,26 @@ async function injectThreadedComments(buffer, cellThreads = []) {
   const existingVml = zip.file(vmlPath)
     ? await zip.file(vmlPath).async('string')
     : '';
-  zip.file(commentsPath, mergeLegacyCommentsXml(existingComments, threads));
-  zip.file(vmlPath, mergeLegacyVmlDrawing(existingVml, threads));
+
+  if (!threads.length) {
+    if (existingVml) {
+      zip.file(vmlPath, enlargeVmlNoteShapes(existingVml));
+    }
+    const out = await zip.generateAsync({
+      type: 'nodebuffer',
+      compression: 'DEFLATE'
+    });
+    return Buffer.from(out);
+  }
+
+  zip.file('xl/persons/person.xml', buildPersonListXml(persons));
+  zip.file('xl/threadedComments/threadedComment1.xml', buildThreadedCommentsXml(threads));
+  const mergedCommentsXml = mergeLegacyCommentsXml(existingComments, threads);
+  const commentsChanged = mergedCommentsXml !== existingComments;
+  if (commentsChanged) {
+    zip.file(commentsPath, mergedCommentsXml);
+  }
+  zip.file(vmlPath, enlargeVmlNoteShapes(mergeLegacyVmlDrawing(existingVml, threads)));
 
   const contentTypesPath = '[Content_Types].xml';
   let contentTypesXml = await zip.file(contentTypesPath).async('string');
@@ -449,5 +543,8 @@ module.exports = {
   resolvePersonsAndThreads,
   buildPersonListXml,
   buildThreadedCommentsXml,
-  injectThreadedComments
+  injectThreadedComments,
+  enlargeVmlNoteShapes,
+  NOTE_VML_WIDTH_PT,
+  NOTE_VML_HEIGHT_PT
 };
