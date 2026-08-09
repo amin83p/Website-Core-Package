@@ -1,12 +1,17 @@
+'use strict';
+
 const logModel = require('../models/logModel');
 const { assertLogRepository } = require('./contracts/logRepositoryContract');
 const { idsEqual, toPublicId } = require('../utils/idAdapter');
 const { runByRepositoryBackend } = require('./backend/repositoryBackendSelector');
 const { getMongoCollection } = require('../infrastructure/mongo/mongoConnection');
-const { applyGenericFilter } = require('../utils/queryEngine');
 const { canonicalizeLogInput, normalizePersistedLogRecord } = require('../utils/logRecordUtils');
 const {
+  buildMongoFilterFromQuery,
+  buildMongoSortFromQuery,
+  resolveMongoPagination,
   normalizeMongoDocument,
+  combineMongoFilters,
   resolveMongoIdFilter,
   generateUniqueStringId
 } = require('./backend/mongoRepositoryUtils');
@@ -59,33 +64,39 @@ function formatBytes(bytes, decimals = 2) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`;
 }
 
-function injectSortQuery(query = {}, explicitSort = null) {
-  const next = { ...(query || {}) };
-  if (next.sort || !explicitSort || typeof explicitSort !== 'object' || Array.isArray(explicitSort)) return next;
-
-  const fields = Object.entries(explicitSort)
-    .filter(([field]) => String(field || '').trim())
-    .map(([field, order]) => (Number(order) < 0 ? `-${field}` : field));
-
-  if (fields.length) next.sort = fields.join(',');
-  return next;
+function buildMongoLogFilter(options = {}) {
+  const scopeFilter = buildCanViewAllFilter(options?.scope || {});
+  const query = stripPaginationFromQuery(options?.query || {});
+  const queryFilter = buildMongoFilterFromQuery(query, LOG_QUERY_FALLBACK);
+  return combineMongoFilters(scopeFilter, queryFilter);
 }
 
-async function listMongoLogs(options = {}, runtime = {}) {
-  const collection = getMongoCollection('logs');
-  const scopeFilter = buildCanViewAllFilter(options?.scope || {});
-  const queryInput = runtime?.includePagination === false
-    ? stripPaginationFromQuery(options?.query || {})
-    : (options?.query || {});
-  const query = injectSortQuery(queryInput, options?.sort || { timestamp: -1 });
+function resolveMongoLogSort(query = {}, explicitSort = null) {
+  return buildMongoSortFromQuery(query, explicitSort || { timestamp: -1 });
+}
 
-  const rows = await collection.find(scopeFilter).toArray();
-  const normalizedRows = rows
+async function listMongoLogs(options = {}) {
+  const collection = getMongoCollection('logs');
+  const query = options?.query || {};
+  const filter = buildMongoLogFilter(options);
+  const sort = resolveMongoLogSort(query, options?.sort || null);
+  const { skip, limit } = resolveMongoPagination(query, options?.pagination || null);
+
+  let cursor = collection.find(filter);
+  if (sort && Object.keys(sort).length) cursor = cursor.sort(sort);
+  if (skip > 0) cursor = cursor.skip(skip);
+  if (limit > 0) cursor = cursor.limit(limit);
+  const rows = await cursor.toArray();
+  return rows
     .map((row) => normalizeMongoDocument(row))
     .map((row) => normalizePersistedLogRecord(row))
     .filter(Boolean);
+}
 
-  return applyGenericFilter(normalizedRows, query, LOG_QUERY_FALLBACK);
+async function countMongoLogs(options = {}) {
+  const collection = getMongoCollection('logs');
+  const filter = buildMongoLogFilter(options);
+  return Number(await collection.countDocuments(filter));
 }
 
 const logRepository = {
@@ -101,7 +112,7 @@ const logRepository = {
           sort: options?.sort || null
         });
       },
-      mongo: async () => listMongoLogs(options, { includePagination: true })
+      mongo: async () => listMongoLogs(options)
     }, 'core.logs.list');
   },
 
@@ -117,13 +128,10 @@ const logRepository = {
         });
         return Array.isArray(rows) ? rows.length : 0;
       },
-      mongo: async () => {
-        const rows = await listMongoLogs({
-          ...options,
-          query
-        }, { includePagination: false });
-        return Array.isArray(rows) ? rows.length : 0;
-      }
+      mongo: async () => countMongoLogs({
+        ...options,
+        query
+      })
     }, 'core.logs.count');
   },
 
@@ -218,13 +226,10 @@ const logRepository = {
         const rows = await logModel.getReport({ userId: normalizedUserId });
         return Array.isArray(rows) ? rows.length : 0;
       },
-      mongo: async () => {
-        const rows = await listMongoLogs({
-          query: { userId__eq: normalizedUserId },
-          scope: { canViewAll: true }
-        }, { includePagination: false });
-        return Array.isArray(rows) ? rows.length : 0;
-      }
+      mongo: async () => countMongoLogs({
+        query: { userId__eq: normalizedUserId },
+        scope: { canViewAll: true }
+      })
     }, 'core.logs.countByUserId');
   },
 
