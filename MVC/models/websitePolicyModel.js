@@ -33,8 +33,8 @@ const defaults = {
         logCooldownMs: 60000,
         excludePaths: ['/health', '/favicon.ico'],
         phase2: {
-            enabled: false,
-            enforceGroups: ['auth', 'heavy']
+            enabled: true,
+            enforceGroups: ['auth', 'heavy', 'write']
         },
         phase3: {
             enabled: true

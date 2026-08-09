@@ -12,8 +12,8 @@ const DEFAULT_CONFIG = Object.freeze({
   logCooldownMs: 60 * 1000,
   excludePaths: ['/health', '/favicon.ico'],
   phase2: {
-    enabled: false,
-    enforceGroups: ['auth', 'heavy']
+    enabled: true,
+    enforceGroups: ['auth', 'heavy', 'write']
   },
   phase3: {
     enabled: true
@@ -89,7 +89,9 @@ function getConfig(req) {
     ...DEFAULT_CONFIG,
     ...policyConfig,
     phase2: {
-      enabled: Boolean(policyConfig.phase2 && policyConfig.phase2.enabled),
+      enabled: policyConfig.phase2?.enabled !== undefined
+        ? Boolean(policyConfig.phase2.enabled)
+        : DEFAULT_CONFIG.phase2.enabled,
       enforceGroups: Array.isArray(policyConfig.phase2?.enforceGroups) && policyConfig.phase2.enforceGroups.length > 0
         ? policyConfig.phase2.enforceGroups.map((g) => String(g || '').trim().toLowerCase()).filter(Boolean)
         : [...DEFAULT_CONFIG.phase2.enforceGroups]
@@ -660,3 +662,5 @@ function requestRatePhaseOne(req, res, next) {
 }
 
 module.exports = requestRatePhaseOne;
+module.exports.shouldEnforceForGroup = shouldEnforceForGroup;
+module.exports.DEFAULT_CONFIG = DEFAULT_CONFIG;

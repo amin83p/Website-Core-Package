@@ -131,10 +131,11 @@
       "/favicon.ico"
     ],
     "phase2": {
-      "enabled": false,
+      "enabled": true,
       "enforceGroups": [
         "auth",
-        "heavy"
+        "heavy",
+        "write"
       ]
     },
     "phase3": {

@@ -35,11 +35,11 @@ function parseKeyMode(value, fallback = 'user_or_ip') {
 }
 
 function parsePhase2Groups(value) {
-  const parsed = String(value || 'auth,heavy')
+  const parsed = String(value || 'auth,heavy,write')
     .split(',')
     .map((g) => g.trim().toLowerCase())
     .filter((g) => ['auth', 'picker', 'write', 'heavy', 'global'].includes(g));
-  return parsed.length > 0 ? parsed : ['auth', 'heavy'];
+  return parsed.length > 0 ? parsed : ['auth', 'heavy', 'write'];
 }
 
 function parseRouteOverrides(rawList) {
@@ -157,7 +157,7 @@ async function updatePolicy(req, res) {
                 .map((p) => p.trim())
                 .filter(Boolean),
             phase2: {
-                enabled: parseBool(body.req_phase2_enabled ?? 'false'),
+                enabled: parseBool(body.req_phase2_enabled ?? 'true'),
                 enforceGroups: parsePhase2Groups(body.req_phase2_groups)
             },
             phase3: {

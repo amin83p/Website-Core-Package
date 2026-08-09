@@ -12,8 +12,8 @@
     logCooldownMs: 60000,
     excludePaths: ['/health', '/favicon.ico'],
     phase2: {
-      enabled: false,
-      enforceGroups: ['auth', 'heavy']
+      enabled: true,
+      enforceGroups: ['auth', 'heavy', 'write']
     },
     phase3: {
       enabled: true
@@ -256,7 +256,7 @@
                 </div>
                 <div class="col-md-9">
                   <label class="form-label small fw-bold">Phase 2 Enforce Groups (CSV)</label>
-                  <input type="text" class="form-control" name="req_phase2_groups" value="<%= (reqCtrl.phase2?.enforceGroups || ['auth', 'heavy']).join(', ') %>" placeholder="auth, heavy">
+                  <input type="text" class="form-control" name="req_phase2_groups" value="<%= (reqCtrl.phase2?.enforceGroups || ['auth', 'heavy', 'write']).join(', ') %>" placeholder="auth, heavy, write">
                   <div class="form-text">When enabled, only listed groups are blocked while others stay monitor-only.</div>
                 </div>
               </div>
