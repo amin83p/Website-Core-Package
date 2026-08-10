@@ -415,3 +415,127 @@ test('fetchTrackActivityHourlyTimeline fetches logs per day so older days are no
     dataService.getDataById = originalGetDataById;
   }
 });
+
+test('fetchTrackActivityTimeline per-day fetch returns older-day logs under high volume', async () => {
+  const originalFetchData = dataService.fetchData;
+  const originalGetDataById = dataService.getDataById;
+  let logFetchCount = 0;
+
+  dataService.fetchData = async (entityType, query = {}) => {
+    const type = String(entityType || '');
+    if (type === 'sections') return [{ id: 'S1', name: 'Security' }];
+    if (type === 'operations') return [{ id: 'OP1', name: 'READ' }];
+    if (type === 'organizations') return [{ id: 'ORG1', identity: { displayName: 'Org One' }, timezone: 'UTC' }];
+    if (type === 'logs') {
+      logFetchCount += 1;
+      const startDate = String(query?.startDate || '').trim();
+      const endDate = String(query?.endDate || '').trim();
+      const rows = [];
+      if (startDate <= '2026-04-08' && endDate >= '2026-04-08') {
+        rows.push({
+          id: 'L-APR8',
+          timestamp: '2026-04-08T12:00:00.000Z',
+          sectionId: 'S1',
+          operationId: 'OP1',
+          userId: 'U1',
+          orgId: 'ORG1',
+          status: 'SUCCESS',
+          details: { method: 'GET', url: '/logs' }
+        });
+      }
+      if (startDate <= '2026-04-10' && endDate >= '2026-04-10') {
+        const limit = Number(query?.limit || 0);
+        for (let i = 0; i < 1600; i += 1) {
+          rows.push({
+            id: `L-APR10-${i}`,
+            timestamp: '2026-04-10T12:00:00.000Z',
+            sectionId: 'S1',
+            operationId: 'OP1',
+            userId: 'U1',
+            orgId: 'ORG1',
+            status: 'SUCCESS',
+            details: { method: 'GET', url: '/logs' }
+          });
+        }
+        return Number.isFinite(limit) && limit > 0 ? rows.slice(0, limit) : rows;
+      }
+      return rows;
+    }
+    if (type === 'actionStates') return [];
+    if (type === 'users') return [{ id: 'U1', username: 'amin', displayName: 'Amin', primaryOrgId: 'ORG1' }];
+    return [];
+  };
+
+  dataService.getDataById = async () => ({ id: 'ORG1', timezone: 'UTC' });
+
+  try {
+    const payload = await trackActivityService.fetchTrackActivityTimeline({
+      startAtMs: Date.parse('2026-04-08T00:00:00.000Z'),
+      endAtMs: Date.parse('2026-04-10T23:59:59.999Z'),
+      userId: 'U1',
+      maxRows: 1500
+    }, { id: 'ROOT_001', isSystemAdmin: true, activeOrgId: 'ORG1' });
+
+    assert.ok(logFetchCount >= 3);
+    assert.equal(payload.summary.totalEvents, 1501);
+  } finally {
+    dataService.fetchData = originalFetchData;
+    dataService.getDataById = originalGetDataById;
+  }
+});
+
+test('fetchTrackActivityDetails interval fetch narrows to bucket window', async () => {
+  const originalFetchData = dataService.fetchData;
+  const originalGetDataById = dataService.getDataById;
+  const queriedRanges = [];
+
+  dataService.fetchData = async (entityType, query = {}) => {
+    const type = String(entityType || '');
+    if (type === 'sections') return [{ id: 'S1', name: 'Security' }];
+    if (type === 'operations') return [{ id: 'OP1', name: 'READ' }];
+    if (type === 'organizations') return [{ id: 'ORG1', identity: { displayName: 'Org One' }, timezone: 'UTC' }];
+    if (type === 'logs') {
+      const startDate = String(query?.startDate || '').trim();
+      const endDate = String(query?.endDate || '').trim();
+      queriedRanges.push({ startDate, endDate });
+      if (startDate <= '2026-04-09' && endDate >= '2026-04-09') {
+        return [{
+          id: 'L-APR9',
+          timestamp: '2026-04-09T12:00:00.000Z',
+          sectionId: 'S1',
+          operationId: 'OP1',
+          userId: 'U1',
+          orgId: 'ORG1',
+          status: 'SUCCESS',
+          details: { method: 'GET', url: '/logs' }
+        }];
+      }
+      return [];
+    }
+    if (type === 'actionStates') return [];
+    if (type === 'users') return [{ id: 'U1', username: 'amin', displayName: 'Amin', primaryOrgId: 'ORG1' }];
+    return [];
+  };
+
+  dataService.getDataById = async () => ({ id: 'ORG1', timezone: 'UTC' });
+
+  try {
+    const payload = await trackActivityService.fetchTrackActivityDetails({
+      startAtMs: Date.parse('2026-04-08T00:00:00.000Z'),
+      endAtMs: Date.parse('2026-04-10T23:59:59.999Z'),
+      userId: 'U1',
+      kind: 'interval',
+      bucketStartAt: '2026-04-09T00:00:00.000Z',
+      bucketEndAt: '2026-04-09T23:59:59.999Z'
+    }, { id: 'ROOT_001', isSystemAdmin: true, activeOrgId: 'ORG1' });
+
+    assert.equal(payload.kind, 'interval');
+    assert.equal(payload.summary.total, 1);
+    assert.equal(queriedRanges.length, 1);
+    assert.ok(queriedRanges[0].startDate <= '2026-04-09');
+    assert.ok(queriedRanges[0].endDate >= '2026-04-09');
+  } finally {
+    dataService.fetchData = originalFetchData;
+    dataService.getDataById = originalGetDataById;
+  }
+});

@@ -153,11 +153,15 @@ function computeSummaryMetrics(enrichedRows = [], groupedRows = [], now = new Da
 async function computeAvgDailyActiveUsers(now = new Date(), lookbackDays = 7) {
   const safeDays = Math.max(1, parseSafeInt(lookbackDays, 7));
   const start = new Date(now.getTime() - (safeDays * 24 * 60 * 60 * 1000));
+  const startIso = start.toISOString();
   const collection = getMongoCollection('logs');
   const pipeline = [
     {
       $match: {
-        timestamp: { $gte: start.toISOString() },
+        $or: [
+          { timestamp: { $gte: start } },
+          { timestamp: { $gte: startIso } }
+        ],
         userId: { $exists: true, $nin: [null, ''] }
       }
     },

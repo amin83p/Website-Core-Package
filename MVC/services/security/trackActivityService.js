@@ -2,7 +2,7 @@ const settingService = require('../settingService');
 const dataService = require('../dataService');
 const adminAuthorityService = require('../adminAuthorityService');
 const { toPublicId } = require('../../utils/idAdapter');
-const { resolveOrganizationTimezoneFromRow } = require('../../utils/timezoneUtils');
+const { resolveOrganizationTimezoneFromRow, getDateTimePartsInTimezone, getDateKeyInTimezone, getDayBoundsMs, toUtcMsFromTimezoneLocal, formatMsToDateTimeLocalInput } = require('../../utils/timezoneUtils');
 
 const DEFAULT_LOOKBACK_DAYS = 7;
 const DEFAULT_MERGE_LIMIT = 1500;
@@ -177,142 +177,10 @@ function formatDateInTimezone(ms, timeZone = DEFAULT_ORG_TIMEZONE) {
   }
 }
 
-function getDateTimePartsInTimezone(ms, timeZone = DEFAULT_ORG_TIMEZONE) {
-  const date = new Date(Number(ms || 0));
-  if (Number.isNaN(date.getTime())) return null;
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: normalizeTimezoneToken(timeZone, resolveDefaultTimezone()),
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hourCycle: 'h23',
-      hour12: false
-    }).formatToParts(date);
-    const get = (type) => parts.find((part) => part.type === type)?.value || '';
-    let hour = Number(get('hour') || 0);
-    if (hour === 24) hour = 0;
-    return {
-      year: Number(get('year') || 0),
-      month: Number(get('month') || 0),
-      day: Number(get('day') || 0),
-      hour,
-      minute: Number(get('minute') || 0),
-      second: Number(get('second') || 0)
-    };
-  } catch (_) {
-    return {
-      year: date.getUTCFullYear(),
-      month: date.getUTCMonth() + 1,
-      day: date.getUTCDate(),
-      hour: date.getUTCHours(),
-      minute: date.getUTCMinutes(),
-      second: date.getUTCSeconds()
-    };
-  }
-}
-
-function toUtcMsFromTimezoneLocal(parts = {}, timeZone = DEFAULT_ORG_TIMEZONE) {
-  const year = Number(parts.year || 0);
-  const month = Number(parts.month || 0);
-  const day = Number(parts.day || 0);
-  const hour = Number(parts.hour || 0);
-  const minute = Number(parts.minute || 0);
-  const second = Number(parts.second || 0);
-  if (!year || !month || !day) return Number.NaN;
-
-  let guess = Date.UTC(year, month - 1, day, hour, minute, second);
-  for (let i = 0; i < 3; i += 1) {
-    const currentParts = getDateTimePartsInTimezone(guess, timeZone);
-    if (!currentParts) break;
-    const desiredUtc = Date.UTC(year, month - 1, day, hour, minute, second);
-    const currentUtc = Date.UTC(
-      currentParts.year,
-      currentParts.month - 1,
-      currentParts.day,
-      currentParts.hour,
-      currentParts.minute,
-      currentParts.second
-    );
-    const diff = desiredUtc - currentUtc;
-    if (!diff) break;
-    guess += diff;
-  }
-  return guess;
-}
-
-function formatMsToDateTimeLocalInput(ms, timeZone = DEFAULT_ORG_TIMEZONE) {
-  const parts = getDateTimePartsInTimezone(ms, timeZone);
-  if (!parts) return '';
-  return [
-    String(parts.year).padStart(4, '0'),
-    '-',
-    String(parts.month).padStart(2, '0'),
-    '-',
-    String(parts.day).padStart(2, '0'),
-    'T',
-    String(parts.hour).padStart(2, '0'),
-    ':',
-    String(parts.minute).padStart(2, '0')
-  ].join('');
-}
-
 function toDateKeyInTimezone(ms, timeZone = DEFAULT_ORG_TIMEZONE) {
-  const parts = getDateTimePartsInTimezone(ms, timeZone);
-  if (!parts) return '';
-  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
-}
-
-function shiftCalendarParts(parts = {}, deltaDays = 0) {
-  const year = Number(parts.year || 0);
-  const month = Number(parts.month || 0);
-  const day = Number(parts.day || 0);
-  if (!year || !month || !day) return { year: 0, month: 0, day: 0 };
-  const date = new Date(Date.UTC(year, month - 1, day));
-  date.setUTCDate(date.getUTCDate() + Number(deltaDays || 0));
-  return {
-    year: date.getUTCFullYear(),
-    month: date.getUTCMonth() + 1,
-    day: date.getUTCDate()
-  };
-}
-
-function getDayBoundsMs(referenceMs, timeZone = DEFAULT_ORG_TIMEZONE) {
-  const parts = getDateTimePartsInTimezone(referenceMs, timeZone);
-  if (!parts) {
-    return {
-      dateKey: '',
-      dayStartMs: Number.NaN,
-      dayEndMs: Number.NaN
-    };
-  }
-  const dayStartMs = toUtcMsFromTimezoneLocal({
-    year: parts.year,
-    month: parts.month,
-    day: parts.day,
-    hour: 0,
-    minute: 0,
-    second: 0
-  }, timeZone);
-
-  const nextParts = shiftCalendarParts(parts, 1);
-  const nextStartMs = toUtcMsFromTimezoneLocal({
-    year: nextParts.year,
-    month: nextParts.month,
-    day: nextParts.day,
-    hour: 0,
-    minute: 0,
-    second: 0
-  }, timeZone);
-
-  return {
-    dateKey: `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`,
-    dayStartMs,
-    dayEndMs: Number(nextStartMs) - 1
-  };
+  const date = new Date(Number(ms || 0));
+  if (Number.isNaN(date.getTime())) return '';
+  return getDateKeyInTimezone(date.toISOString(), timeZone);
 }
 
 function parseDateTimeInputToMs(value, timeZone = DEFAULT_ORG_TIMEZONE, { endOfDay = false } = {}) {
@@ -1392,6 +1260,109 @@ function buildDateTokensForQuery(startAtMs, endAtMs, timeZone = DEFAULT_ORG_TIME
   };
 }
 
+function mergeUniqueRows(batches = [], resolveKey) {
+  const merged = [];
+  const seen = new Set();
+  (Array.isArray(batches) ? batches : []).forEach((rows) => {
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      const key = resolveKey(row);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      merged.push(row);
+    });
+  });
+  return merged;
+}
+
+function resolveDayWindowsForRange(startMs, endMs, timezone = DEFAULT_ORG_TIMEZONE) {
+  let dayWindows = buildDayWindows(startMs, endMs, timezone);
+  if (!dayWindows.length) {
+    const fallbackBounds = getDayBoundsMs(endMs, timezone);
+    if (fallbackBounds?.dateKey && Number.isFinite(fallbackBounds.dayStartMs)) {
+      dayWindows = [{
+        dateKey: fallbackBounds.dateKey,
+        dayStartMs: fallbackBounds.dayStartMs,
+        dayEndMs: fallbackBounds.dayEndMs
+      }];
+    }
+  }
+  return dayWindows;
+}
+
+function buildCanonicalActionStateQuery(
+  filters = {},
+  orgIds = [],
+  dayStartMs = 0,
+  dayEndMs = 0,
+  timezone = DEFAULT_ORG_TIMEZONE
+) {
+  const dateTokens = buildDateTokensForQuery(dayStartMs, dayEndMs, timezone);
+  const actionQuery = {
+    page: 1,
+    limit: filters.maxRows,
+    startDate: dateTokens.startDate,
+    endDate: dateTokens.endDate,
+    userId: filters.userId || undefined,
+    q: filters.q || undefined,
+    sort: '-startedAt,-createdAt,-updatedAt'
+  };
+  if (orgIds.length) actionQuery.orgId__in = orgIds.join(',');
+  if (filters.status) actionQuery.status__contains = filters.status;
+  return actionQuery;
+}
+
+async function fetchCanonicalSourceRows({
+  dayWindows = [],
+  filters = {},
+  timezone = DEFAULT_ORG_TIMEZONE,
+  sectionIds = [],
+  operationIds = [],
+  orgIds = [],
+  requestUser = null
+} = {}) {
+  const windows = Array.isArray(dayWindows) ? dayWindows : [];
+  if (!windows.length) return { logs: [], actionStates: [] };
+
+  const logBatches = await Promise.all(windows.map(async (window) => {
+    const dayStartMs = Number(window?.dayStartMs || 0);
+    const dayEndMs = Number(window?.dayEndMs || 0);
+    if (!Number.isFinite(dayStartMs) || !Number.isFinite(dayEndMs)) return [];
+    const logQuery = buildHourlyTimelineLogQuery(
+      filters,
+      sectionIds,
+      operationIds,
+      orgIds,
+      dayStartMs,
+      dayEndMs,
+      timezone
+    );
+    const rows = await dataService.fetchData('logs', logQuery, requestUser);
+    return Array.isArray(rows) ? rows : [];
+  }));
+
+  const actionBatches = await Promise.all(windows.map(async (window) => {
+    const dayStartMs = Number(window?.dayStartMs || 0);
+    const dayEndMs = Number(window?.dayEndMs || 0);
+    if (!Number.isFinite(dayStartMs) || !Number.isFinite(dayEndMs)) return [];
+    const actionQuery = buildCanonicalActionStateQuery(filters, orgIds, dayStartMs, dayEndMs, timezone);
+    const rows = await dataService.fetchData('actionStates', actionQuery, requestUser);
+    return Array.isArray(rows) ? rows : [];
+  }));
+
+  const logs = mergeUniqueRows(logBatches, (log) => {
+    const id = cleanText(log?.id, 160);
+    return id || [
+      resolveLogTimestamp(log),
+      cleanText(log?.userId, 120),
+      cleanText(log?.operationId, 120)
+    ].join('|');
+  });
+
+  const actionStates = mergeUniqueRows(actionBatches, (row) => cleanText(row?.id, 160));
+
+  return { logs, actionStates };
+}
+
 async function loadCanonicalEvents(rawQuery = {}, requestUser = null, options = {}) {
   const lookups = options.lookups || await fetchLookups(requestUser);
   const timezone = options.timezone || await resolveTimelineTimezone(rawQuery, requestUser, lookups);
@@ -1401,40 +1372,22 @@ async function loadCanonicalEvents(rawQuery = {}, requestUser = null, options = 
   const operationIds = parseIdList(filters.operationIds || filters.operationId, 120, 200);
   const orgIds = parseIdList(filters.orgIds || filters.orgId, 120, 200);
 
-  const dateTokens = buildDateTokensForQuery(filters.startAtMs, filters.endAtMs, timezone);
-  const sharedQuery = {
-    userId: filters.userId || undefined,
-    startDate: dateTokens.startDate,
-    endDate: dateTokens.endDate,
-    page: 1,
-    limit: filters.maxRows
-  };
-  if (sectionIds.length === 1) sharedQuery.sectionId = sectionIds[0];
-  else if (sectionIds.length > 1) sharedQuery.sectionId__in = sectionIds.join(',');
-  if (operationIds.length === 1) sharedQuery.operationId = operationIds[0];
-  else if (operationIds.length > 1) sharedQuery.operationId__in = operationIds.join(',');
-
-  const logQuery = {
-    ...sharedQuery,
-    q: filters.q || undefined,
-    sort: '-timestamp'
-  };
-  if (orgIds.length === 1) logQuery.orgId__eq = orgIds[0];
-  else if (orgIds.length > 1) logQuery.orgId__in = orgIds.join(',');
-  if (filters.status) logQuery.status__contains = filters.status;
-
-  const actionQuery = {
-    ...sharedQuery,
-    q: filters.q || undefined,
-    sort: '-startedAt,-createdAt,-updatedAt'
-  };
-  if (orgIds.length) actionQuery.orgId__in = orgIds.join(',');
-  if (filters.status) actionQuery.status__contains = filters.status;
-
-  const [logs, actionStates] = await Promise.all([
-    dataService.fetchData('logs', logQuery, requestUser),
-    dataService.fetchData('actionStates', actionQuery, requestUser)
-  ]);
+  const fetchStartMs = Number.isFinite(Number(options.fetchStartAtMs))
+    ? Number(options.fetchStartAtMs)
+    : filters.startAtMs;
+  const fetchEndMs = Number.isFinite(Number(options.fetchEndAtMs))
+    ? Number(options.fetchEndAtMs)
+    : filters.endAtMs;
+  const dayWindows = resolveDayWindowsForRange(fetchStartMs, fetchEndMs, timezone);
+  const { logs, actionStates } = await fetchCanonicalSourceRows({
+    dayWindows,
+    filters,
+    timezone,
+    sectionIds,
+    operationIds,
+    orgIds,
+    requestUser
+  });
 
   const userIds = [];
   (Array.isArray(logs) ? logs : []).forEach((log) => {
@@ -1622,43 +1575,16 @@ async function fetchHourlyTimelineLogs({
   orgIds = [],
   requestUser = null
 } = {}) {
-  const windows = Array.isArray(dayWindows) ? dayWindows : [];
-  if (!windows.length) return [];
-
-  const batches = await Promise.all(windows.map(async (window) => {
-    const dayStartMs = Number(window?.dayStartMs || 0);
-    const dayEndMs = Number(window?.dayEndMs || 0);
-    if (!Number.isFinite(dayStartMs) || !Number.isFinite(dayEndMs)) return [];
-    const logQuery = buildHourlyTimelineLogQuery(
-      filters,
-      sectionIds,
-      operationIds,
-      orgIds,
-      dayStartMs,
-      dayEndMs,
-      timezone
-    );
-    const rows = await dataService.fetchData('logs', logQuery, requestUser);
-    const safeRows = Array.isArray(rows) ? rows : [];
-    return safeRows;
-  }));
-
-  const merged = [];
-  const seen = new Set();
-  batches.forEach((rows) => {
-    rows.forEach((log) => {
-      const id = cleanText(log?.id, 160);
-      const dedupeKey = id || [
-        resolveLogTimestamp(log),
-        cleanText(log?.userId, 120),
-        cleanText(log?.operationId, 120)
-      ].join('|');
-      if (seen.has(dedupeKey)) return;
-      seen.add(dedupeKey);
-      merged.push(log);
-    });
+  const { logs } = await fetchCanonicalSourceRows({
+    dayWindows,
+    filters,
+    timezone,
+    sectionIds,
+    operationIds,
+    orgIds,
+    requestUser
   });
-  return merged;
+  return logs;
 }
 
 function toFiveMinuteLabel(hour, fiveMinuteIndex) {
@@ -1726,17 +1652,7 @@ async function fetchTrackActivityHourlyTimeline(rawQuery = {}, requestUser = nul
   const focusHour = normalizeHourIndex(rawQuery?.focusHour);
   const focusFiveMinute = normalizeFiveMinuteIndex(rawQuery?.focusFiveMinute);
 
-  let dayWindows = buildDayWindows(filters.startAtMs, filters.endAtMs, timezone);
-  if (!dayWindows.length) {
-    const fallbackBounds = getDayBoundsMs(filters.endAtMs, timezone);
-    if (fallbackBounds?.dateKey && Number.isFinite(fallbackBounds.dayStartMs)) {
-      dayWindows = [{
-        dateKey: fallbackBounds.dateKey,
-        dayStartMs: fallbackBounds.dayStartMs,
-        dayEndMs: fallbackBounds.dayEndMs
-      }];
-    }
-  }
+  const dayWindows = resolveDayWindowsForRange(filters.startAtMs, filters.endAtMs, timezone);
 
   const dateTokens = buildDateTokensForQuery(filters.startAtMs, filters.endAtMs, timezone);
   const rangeStartDateKey = cleanText(dateTokens.startDate, 20)
@@ -2049,10 +1965,31 @@ function toMaskedEventDetails(event = {}, reveal = false) {
 async function fetchTrackActivityDetails(rawQuery = {}, requestUser = null) {
   const lookups = await fetchLookups(requestUser);
   const timezone = await resolveTimelineTimezone(rawQuery, requestUser, lookups);
-  const dataset = await loadCanonicalEvents(rawQuery, requestUser, { lookups, timezone });
+  const kind = cleanText(rawQuery.kind, 20).toLowerCase();
+  const loadOptions = { lookups, timezone };
+
+  if (kind !== 'event') {
+    const filters = parseTimelineFilters(rawQuery, timezone);
+    const intervalStartMs = parseDateTimeInputToMs(rawQuery.bucketStartAt, timezone);
+    const intervalEndMs = parseDateTimeInputToMs(rawQuery.bucketEndAt, timezone);
+
+    let startMs = Number.isNaN(intervalStartMs) ? filters.focusStartAtMs : intervalStartMs;
+    let endMs = Number.isNaN(intervalEndMs) ? filters.focusEndAtMs : intervalEndMs;
+    if (startMs > endMs) {
+      const tmp = startMs;
+      startMs = endMs;
+      endMs = tmp;
+    }
+
+    startMs = Math.max(filters.startAtMs, startMs);
+    endMs = Math.min(filters.endAtMs, endMs);
+    loadOptions.fetchStartAtMs = startMs;
+    loadOptions.fetchEndAtMs = endMs;
+  }
+
+  const dataset = await loadCanonicalEvents(rawQuery, requestUser, loadOptions);
   const { filters, events } = dataset;
 
-  const kind = cleanText(rawQuery.kind, 20).toLowerCase();
   const canReveal = hasAdminPower(requestUser);
   const reveal = canReveal && String(rawQuery.reveal || '').trim() === '1';
 

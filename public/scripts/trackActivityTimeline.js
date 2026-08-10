@@ -510,14 +510,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!token) continue;
       params.set(key, token);
     }
-    if (startInputEl && startInputEl.value) {
-      const startAtMs = new Date(startInputEl.value).getTime();
-      if (Number.isFinite(startAtMs)) params.set('startAtMs', String(startAtMs));
-    }
-    if (endInputEl && endInputEl.value) {
-      const endAtMs = new Date(endInputEl.value).getTime();
-      if (Number.isFinite(endAtMs)) params.set('endAtMs', String(endAtMs));
-    }
+    params.delete('startAtMs');
+    params.delete('endAtMs');
     params.set('zoomLevel', state.zoomLevel);
     if (state.zoomLevel !== 'hourly' && state.focusDay) {
       params.set('focusDay', state.focusDay);

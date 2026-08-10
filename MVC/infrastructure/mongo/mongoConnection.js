@@ -1,5 +1,6 @@
 const { getActiveDataBackendConfig } = require('../runtime/dataBackendRuntime');
 const { ensureMongoIndexes } = require('./mongoIndexManager');
+const { parseBoolean } = require('../../../config/dataBackend');
 const startupLogger = require('../../utils/startupLogger');
 
 let mongoDriver = null;
@@ -48,6 +49,44 @@ function resolveMongoConnectionConfig(options = {}) {
   return { uri, dbName };
 }
 
+function parseMongoUriHost(uri = '') {
+  const safeUri = String(uri || '').trim();
+  if (!safeUri) return '';
+  try {
+    const normalized = safeUri.startsWith('mongodb://') || safeUri.startsWith('mongodb+srv://')
+      ? safeUri
+      : `mongodb://${safeUri}`;
+    const parsed = new URL(normalized);
+    return String(parsed.hostname || '').trim().toLowerCase();
+  } catch (_) {
+    return '';
+  }
+}
+
+function shouldUseDirectConnection(uri = '') {
+  const envRaw = process.env.MONGO_DIRECT_CONNECTION;
+  if (envRaw !== undefined && envRaw !== '') {
+    return parseBoolean(envRaw, false);
+  }
+  const host = parseMongoUriHost(uri);
+  if (!host) return false;
+  // Railway TCP proxies are single-host endpoints and reject replica-set discovery.
+  if (host.endsWith('.proxy.rlwy.net') || host.endsWith('.rlwy.net')) return true;
+  return false;
+}
+
+function buildMongoClientOptions(options = {}, uri = '') {
+  const clientOptions = {
+    maxPoolSize: Number(options?.maxPoolSize || process.env.MONGO_MAX_POOL || 20),
+    minPoolSize: Number(options?.minPoolSize || process.env.MONGO_MIN_POOL || 0),
+    serverSelectionTimeoutMS: Number(options?.serverSelectionTimeoutMS || process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 5000)
+  };
+  if (shouldUseDirectConnection(uri)) {
+    clientOptions.directConnection = true;
+  }
+  return clientOptions;
+}
+
 async function connectMongo(options = {}) {
   if (mongoDb) return mongoDb;
   if (connectPromise) return connectPromise;
@@ -58,13 +97,10 @@ async function connectMongo(options = {}) {
   }
 
   const { MongoClient } = loadMongoDriver();
+  const clientOptions = buildMongoClientOptions(options, uri);
 
   connectPromise = (async () => {
-    const client = new MongoClient(uri, {
-      maxPoolSize: Number(options?.maxPoolSize || process.env.MONGO_MAX_POOL || 20),
-      minPoolSize: Number(options?.minPoolSize || process.env.MONGO_MIN_POOL || 0),
-      serverSelectionTimeoutMS: Number(options?.serverSelectionTimeoutMS || process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 5000)
-    });
+    const client = new MongoClient(uri, clientOptions);
 
     await client.connect();
     const db = client.db(dbName);
@@ -156,5 +192,7 @@ module.exports = {
   getMongoCollection,
   getMongoTransactionCapability,
   withMongoTransaction,
-  resolveMongoConnectionConfig
+  resolveMongoConnectionConfig,
+  buildMongoClientOptions,
+  shouldUseDirectConnection
 };

@@ -176,19 +176,29 @@ function getDateTimePartsInTimezone(ms = Date.now(), timeZone = FALLBACK_TIMEZON
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
+      hourCycle: 'h23',
       hour12: false
     }).formatToParts(date);
     const pick = (type) => parts.find((part) => part.type === type)?.value || '';
+    let hour = Number(pick('hour') || 0);
+    if (hour === 24) hour = 0;
     return {
-      year: pick('year'),
-      month: pick('month'),
-      day: pick('day'),
-      hour: pick('hour'),
-      minute: pick('minute'),
-      second: pick('second')
+      year: Number(pick('year') || 0),
+      month: Number(pick('month') || 0),
+      day: Number(pick('day') || 0),
+      hour,
+      minute: Number(pick('minute') || 0),
+      second: Number(pick('second') || 0)
     };
   } catch (_) {
-    return null;
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth() + 1,
+      day: date.getUTCDate(),
+      hour: date.getUTCHours(),
+      minute: date.getUTCMinutes(),
+      second: date.getUTCSeconds()
+    };
   }
 }
 
@@ -197,7 +207,7 @@ function getTodayDateKeyInTimezone(timeZone = FALLBACK_TIMEZONE, referenceMs = D
   if (!parts?.year || !parts?.month || !parts?.day) {
     return new Date(referenceMs).toISOString().slice(0, 10);
   }
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
 }
 
 function getDateKeyInTimezone(isoDateTime = '', timeZone = FALLBACK_TIMEZONE) {
@@ -207,7 +217,101 @@ function getDateKeyInTimezone(isoDateTime = '', timeZone = FALLBACK_TIMEZONE) {
   if (!parts?.year || !parts?.month || !parts?.day) {
     return new Date(ms).toISOString().slice(0, 10);
   }
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+}
+
+function shiftCalendarParts(parts = {}, deltaDays = 0) {
+  const year = Number(parts.year || 0);
+  const month = Number(parts.month || 0);
+  const day = Number(parts.day || 0);
+  if (!year || !month || !day) return { year: 0, month: 0, day: 0 };
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + Number(deltaDays || 0));
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate()
+  };
+}
+
+function toUtcMsFromTimezoneLocal(parts = {}, timeZone = FALLBACK_TIMEZONE) {
+  const year = Number(parts.year || 0);
+  const month = Number(parts.month || 0);
+  const day = Number(parts.day || 0);
+  const hour = Number(parts.hour || 0);
+  const minute = Number(parts.minute || 0);
+  const second = Number(parts.second || 0);
+  if (!year || !month || !day) return Number.NaN;
+
+  let guess = Date.UTC(year, month - 1, day, hour, minute, second);
+  for (let i = 0; i < 3; i += 1) {
+    const currentParts = getDateTimePartsInTimezone(guess, timeZone);
+    if (!currentParts) break;
+    const desiredUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+    const currentUtc = Date.UTC(
+      currentParts.year,
+      currentParts.month - 1,
+      currentParts.day,
+      currentParts.hour,
+      currentParts.minute,
+      currentParts.second
+    );
+    const diff = desiredUtc - currentUtc;
+    if (!diff) break;
+    guess += diff;
+  }
+  return guess;
+}
+
+function getDayBoundsMs(referenceMs, timeZone = FALLBACK_TIMEZONE) {
+  const parts = getDateTimePartsInTimezone(referenceMs, timeZone);
+  if (!parts) {
+    return {
+      dateKey: '',
+      dayStartMs: Number.NaN,
+      dayEndMs: Number.NaN
+    };
+  }
+  const dayStartMs = toUtcMsFromTimezoneLocal({
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+    hour: 0,
+    minute: 0,
+    second: 0
+  }, timeZone);
+
+  const nextParts = shiftCalendarParts(parts, 1);
+  const nextStartMs = toUtcMsFromTimezoneLocal({
+    year: nextParts.year,
+    month: nextParts.month,
+    day: nextParts.day,
+    hour: 0,
+    minute: 0,
+    second: 0
+  }, timeZone);
+
+  return {
+    dateKey: `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`,
+    dayStartMs,
+    dayEndMs: Number(nextStartMs) - 1
+  };
+}
+
+function formatMsToDateTimeLocalInput(ms, timeZone = FALLBACK_TIMEZONE) {
+  const parts = getDateTimePartsInTimezone(ms, timeZone);
+  if (!parts) return '';
+  return [
+    String(parts.year).padStart(4, '0'),
+    '-',
+    String(parts.month).padStart(2, '0'),
+    '-',
+    String(parts.day).padStart(2, '0'),
+    'T',
+    String(parts.hour).padStart(2, '0'),
+    ':',
+    String(parts.minute).padStart(2, '0')
+  ].join('');
 }
 
 function coerceInstantMs(value) {
@@ -381,6 +485,10 @@ module.exports = {
   getDateTimePartsInTimezone,
   getTodayDateKeyInTimezone,
   getDateKeyInTimezone,
+  shiftCalendarParts,
+  toUtcMsFromTimezoneLocal,
+  getDayBoundsMs,
+  formatMsToDateTimeLocalInput,
   formatInstantInTimezone,
   formatDateKeyInTimezone,
   buildOrgTimezoneContext,
