@@ -119,5 +119,51 @@
         "action": "login"
       }
     ]
+  },
+  {
+    "id": "1m116zHXvYOEFupVNcDWQAGiAA5Li7_7d3PEzOiYl6A",
+    "tokenHash": "1m116zHXvYOEFupVNcDWQAGiAA5Li7_7d3PEzOiYl6A",
+    "userId": "ROOT_001",
+    "deviceFingerprint": {
+      "ip": "::1",
+      "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+      "authProvider": "password"
+    },
+    "status": "active",
+    "createdAt": "2026-08-10T03:38:48.367Z",
+    "lastActivityAt": "2026-08-10T03:38:48.367Z",
+    "absoluteExpiry": "2026-08-11T03:38:48.367Z",
+    "idleTimeoutMinutes": 1440,
+    "currentOrgId": 900000,
+    "orgHistory": [
+      {
+        "orgId": 900000,
+        "enteredAt": "2026-08-10T03:38:48.367Z",
+        "action": "login"
+      }
+    ]
+  },
+  {
+    "id": "438Po3-r4UbC3_XTvPTUmZScJwTtYNTihnX5bTJy16U",
+    "tokenHash": "438Po3-r4UbC3_XTvPTUmZScJwTtYNTihnX5bTJy16U",
+    "userId": "ROOT_001",
+    "deviceFingerprint": {
+      "ip": "::1",
+      "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+      "authProvider": "password"
+    },
+    "status": "active",
+    "createdAt": "2026-08-10T03:47:08.201Z",
+    "lastActivityAt": "2026-08-10T03:48:59.768Z",
+    "absoluteExpiry": "2026-08-11T03:47:08.201Z",
+    "idleTimeoutMinutes": 1440,
+    "currentOrgId": 900000,
+    "orgHistory": [
+      {
+        "orgId": 900000,
+        "enteredAt": "2026-08-10T03:47:08.201Z",
+        "action": "login"
+      }
+    ]
   }
 ]

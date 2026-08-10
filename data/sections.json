@@ -295,7 +295,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "111975",
@@ -372,7 +378,13 @@
         "id": "446106"
       }
     ],
-    "trackState": false
+    "trackState": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "123317",
@@ -640,7 +652,13 @@
       "lastUpdateUser": "ROOT_001",
       "lastUpdateDateTime": "2026-03-31T19:57:58.784Z"
     },
-    "id": "139382"
+    "id": "139382",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "160519",
@@ -1205,7 +1223,13 @@
       "lastUpdateUser": "ROOT_001",
       "lastUpdateDateTime": "2026-03-28T03:58:08.642Z"
     },
-    "id": "225382"
+    "id": "225382",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "265881",
@@ -1378,7 +1402,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "296981",
@@ -1458,7 +1488,13 @@
       "lastUpdateUser": "ROOT_001",
       "lastUpdateDateTime": "2026-03-28T03:07:35.601Z"
     },
-    "id": "330563"
+    "id": "330563",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "332225",
@@ -1531,7 +1567,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "332226",
@@ -1604,7 +1646,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "332227",
@@ -1677,7 +1725,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "332228",
@@ -1750,7 +1804,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "332229",
@@ -1819,11 +1879,29 @@
         "sessionAttempts": 5,
         "sessionTime": 15,
         "active": true
+      },
+      {
+        "id": "OP1023",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "355444",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
       }
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "332230",
@@ -1892,11 +1970,29 @@
         "sessionAttempts": 5,
         "sessionTime": 15,
         "active": true
+      },
+      {
+        "id": "OP1023",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "355444",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
       }
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "332231",
@@ -1965,11 +2061,29 @@
         "sessionAttempts": 5,
         "sessionTime": 15,
         "active": true
+      },
+      {
+        "id": "OP1023",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "355444",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
       }
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "340738",
@@ -2156,7 +2270,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "359513",
@@ -2441,7 +2561,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445561",
@@ -2484,7 +2610,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445582",
@@ -2527,7 +2659,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445562",
@@ -2576,7 +2714,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445563",
@@ -2625,7 +2769,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445564",
@@ -2680,7 +2830,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445565",
@@ -2735,7 +2891,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445566",
@@ -2845,7 +3007,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445568",
@@ -2906,7 +3074,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445569",
@@ -2961,7 +3135,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445570",
@@ -3034,7 +3214,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_REPORTS",
@@ -3084,7 +3270,13 @@
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-04-09T04:30:43.028Z"
     },
-    "id": "445571"
+    "id": "445571",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_CLASS_ENROLLMENT_PERIODS",
@@ -3185,7 +3377,13 @@
     },
     "id": "445572",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_CLASS_CYCLES",
@@ -3286,7 +3484,13 @@
     },
     "id": "445573",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_EXAMS",
@@ -3323,7 +3527,13 @@
     },
     "id": "445574",
     "navigatorSection": true,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_EXAMS_TEMPLATE",
@@ -3396,7 +3606,13 @@
     },
     "id": "446001",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_EXAMS_ALLOCATION",
@@ -3469,7 +3685,13 @@
     },
     "id": "446002",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_EXAMS_TAKING",
@@ -3554,7 +3776,13 @@
     },
     "id": "446003",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_EXAMS_REVIEW",
@@ -3627,7 +3855,13 @@
     },
     "id": "446004",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_REPORTS_TEMPLATE",
@@ -3688,7 +3922,13 @@
     },
     "id": "446101",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_REPORTS_ASSIGNMENT",
@@ -3743,7 +3983,13 @@
     },
     "id": "446102",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_REPORTS_INSTANCES",
@@ -3798,7 +4044,13 @@
     },
     "id": "446103",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_REPORTS_OVERALL_TEMPLATE",
@@ -3814,12 +4066,42 @@
     "subsections": [],
     "related": [],
     "operations": [
-      { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
     ],
     "audit": {
       "createUser": "SYS_ROOT_001",
@@ -3829,7 +4111,13 @@
     },
     "id": "446104",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_REPORTS_OVERALL_INSTANCES",
@@ -3845,12 +4133,42 @@
     "subsections": [],
     "related": [],
     "operations": [
-      { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
     ],
     "audit": {
       "createUser": "SYS_ROOT_001",
@@ -3860,7 +4178,13 @@
     },
     "id": "446105",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_REPORTS_OVERALL_MANAGEMENT",
@@ -3876,12 +4200,42 @@
     "subsections": [],
     "related": [],
     "operations": [
-      { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-      { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
     ],
     "audit": {
       "createUser": "SYS_ROOT_001",
@@ -3891,7 +4245,13 @@
     },
     "id": "446107",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_SETTINGS",
@@ -3928,7 +4288,13 @@
     },
     "id": "446106",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "446201",
@@ -4419,7 +4785,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "554656",
@@ -5043,7 +5415,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "740780",
@@ -5284,23 +5662,17 @@
     },
     "category": "CREDIT_LOANS",
     "dashboardDisplay": true,
-    "description": "This the the dashboard of the Credit and Loans Management.",
+    "description": "Credit package root section.",
     "homeURL": "/credit",
     "inactiveMessage": "",
-    "mainDashboardDisplay": false,
+    "mainDashboardDisplay": true,
     "message": "",
-    "minimumAccessRequirement": 5,
+    "minimumAccessRequirement": 1,
     "name": "CREDIT_LOANS",
     "navigatorSection": true,
     "operations": [
       {
         "id": "OP1002",
-        "sessionAttempts": 5,
-        "sessionTime": 15,
-        "active": true
-      },
-      {
-        "id": "OP1003",
         "sessionAttempts": 5,
         "sessionTime": 15,
         "active": true
@@ -5318,7 +5690,13 @@
         "name": "CREDIT_INSTALLMENTS"
       }
     ],
-    "trackState": true
+    "trackState": false,
+    "packageId": "credit",
+    "packageName": "CREDIT",
+    "package": {
+      "packageId": "credit",
+      "packageName": "CREDIT"
+    }
   },
   {
     "id": "774672",
@@ -5359,6 +5737,12 @@
         "active": true
       },
       {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
         "id": "OP1005",
         "sessionAttempts": 5,
         "sessionTime": 15,
@@ -5367,7 +5751,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "credit",
+    "packageName": "CREDIT",
+    "package": {
+      "packageId": "credit",
+      "packageName": "CREDIT"
+    }
   },
   {
     "id": "774673",
@@ -5380,7 +5770,7 @@
     },
     "category": "CREDIT_LOANS",
     "dashboardDisplay": true,
-    "description": "Track and review credit and loan application requests.",
+    "description": "Track and review credit/loan application requests.",
     "homeURL": "/credit/requests",
     "inactiveMessage": "",
     "mainDashboardDisplay": false,
@@ -5404,7 +5794,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "credit",
+    "packageName": "CREDIT",
+    "package": {
+      "packageId": "credit",
+      "packageName": "CREDIT"
+    }
   },
   {
     "id": "774674",
@@ -5441,7 +5837,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "credit",
+    "packageName": "CREDIT",
+    "package": {
+      "packageId": "credit",
+      "packageName": "CREDIT"
+    }
   },
   {
     "id": "775100",
@@ -6506,7 +6908,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_GRADEBOOK",
@@ -6591,7 +6999,13 @@
     },
     "id": "778769",
     "navigatorSection": false,
-    "mainDashboardDisplay": false
+    "mainDashboardDisplay": false,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "804236",
@@ -9504,7 +9918,13 @@
     ],
     "related": [],
     "subsections": [],
-    "trackState": true
+    "trackState": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "445583",
@@ -9536,7 +9956,14 @@
     ],
     "subsections": [],
     "related": [],
-    "adoptExisting": true
+    "adoptExisting": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    },
+    "audit": {}
   },
   {
     "name": "PTE_TOOLS_AND_REPORTS",
@@ -9961,6 +10388,575 @@
     ],
     "subsections": [],
     "related": [],
-    "adoptExisting": true
+    "adoptExisting": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    },
+    "audit": {}
+  },
+  {
+    "id": "440026",
+    "name": "SCHOOL_SKILLS",
+    "category": "SCHOOL",
+    "description": "Manage the organization skill catalog used by class definitions, sessions, and teaching outlines.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/skills",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "442232",
+    "name": "SCHOOL_BOOKS",
+    "category": "SCHOOL",
+    "description": "Manage school textbooks and materials, including bibliographic details and table of contents.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/books",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "555012",
+    "name": "SCHOOL_ACTIVITIES",
+    "category": "SCHOOL",
+    "description": "Define school activities such as PD sessions, track attendee participation, and reflect payable attendance into schedules and timesheets.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/activities",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "363841",
+    "name": "SCHOOL_PRIOR_SUBJECT_CREDITS",
+    "category": "SCHOOL",
+    "description": "Manage student prior subject credits that can satisfy prerequisite and progression checks.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/programs/prior-subject-credits",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "391872",
+    "name": "SCHOOL_TEACHING_OUTLINES",
+    "category": "SCHOOL",
+    "description": "Manage CLB teaching content outlines, levels, and curriculum checklists.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/teaching-outlines",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "864647",
+    "name": "SCHOOL_FUNDERS",
+    "category": "SCHOOL",
+    "description": "Manage School Funder records, linked people, and financial accounts.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/funders",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "627028",
+    "name": "SCHOOL_LEAVE_REQUESTS",
+    "category": "SCHOOL",
+    "description": "Submit, review, and approve student, teacher, and staff leave requests with schedule blocking after approval.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/leave-requests",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "682784",
+    "name": "SCHOOL_TASKS",
+    "category": "SCHOOL",
+    "description": "Review school tasks and manage embedded follow-up assignments for package workflows.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/tasks",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "977269",
+    "name": "SCHOOL_MASTER_ACADEMIA_HUB",
+    "category": "SCHOOL",
+    "description": "Full-width Master Academia Hub for reviewing people, attendance, schedules, sessions, classes, tasks, and leave requests from one workspace.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/master-hub",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "463433",
+    "name": "SCHOOL_CALENDAR",
+    "category": "SCHOOL",
+    "description": "View school days off, professional development activities, and personal school schedules in a layered calendar.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/calendar",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   }
 ]

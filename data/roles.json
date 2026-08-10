@@ -497,5 +497,59 @@
       "lastUpdateUser": "SYSTEM",
       "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
     }
+  },
+  {
+    "id": "ROL1201",
+    "key": "credit_admin",
+    "label": "Credit Admin",
+    "description": "Credit package admin role.",
+    "domain": "credit",
+    "packageName": "CREDIT",
+    "aliases": [
+      "creditadmin",
+      "credit-admin",
+      "credit-admins",
+      "credit_admins"
+    ],
+    "active": true,
+    "system": true,
+    "packageId": "credit",
+    "package": {
+      "packageId": "credit",
+      "packageName": "CREDIT"
+    },
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-08-10T03:35:09.704Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-08-10T03:35:09.704Z"
+    }
+  },
+  {
+    "id": "ROL1202",
+    "key": "credit_user",
+    "label": "Credit User",
+    "description": "Credit package user role.",
+    "domain": "credit",
+    "packageName": "CREDIT",
+    "aliases": [
+      "credituser",
+      "credit-user",
+      "credit-users",
+      "credit_users"
+    ],
+    "active": true,
+    "system": true,
+    "packageId": "credit",
+    "package": {
+      "packageId": "credit",
+      "packageName": "CREDIT"
+    },
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-08-10T03:35:09.712Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-08-10T03:35:09.712Z"
+    }
   }
 ]

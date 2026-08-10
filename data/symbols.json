@@ -52,7 +52,13 @@
       "lastUpdateDateTime": "2026-04-07T06:09:52.661Z"
     },
     "orgId": "SYSTEM",
-    "id": "467570"
+    "id": "467570",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
+    }
   },
   {
     "id": "SYM_900000_001",
@@ -392,6 +398,12 @@
       "createDateTime": "2026-04-25T03:50:41.272Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -409,6 +421,12 @@
       "createDateTime": "2026-04-25T03:50:41.272Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -426,6 +444,12 @@
       "createDateTime": "2026-05-03T23:19:10.790Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -443,6 +467,12 @@
       "createDateTime": "2026-04-29T05:31:38.571Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -460,6 +490,12 @@
       "createDateTime": "2026-04-21T04:03:32.006Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -477,6 +513,12 @@
       "createDateTime": "2026-04-21T04:03:32.006Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -494,6 +536,12 @@
       "createDateTime": "2026-04-21T04:03:32.006Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -511,6 +559,12 @@
       "createDateTime": "2026-04-21T04:03:32.006Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -528,6 +582,12 @@
       "createDateTime": "2026-04-22T05:38:26.987Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -545,6 +605,12 @@
       "createDateTime": "2026-04-21T21:06:29.298Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -562,6 +628,12 @@
       "createDateTime": "2026-04-21T21:06:29.298Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -579,6 +651,12 @@
       "createDateTime": "2026-05-05T19:32:24.926Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -596,6 +674,12 @@
       "createDateTime": "2026-04-19T19:42:21.922Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -613,6 +697,12 @@
       "createDateTime": "2026-04-21T05:12:00.523Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -630,6 +720,12 @@
       "createDateTime": "2026-04-21T05:12:00.523Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -647,6 +743,12 @@
       "createDateTime": "2026-05-10T05:55:43.267Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -664,6 +766,12 @@
       "createDateTime": "2026-05-13T16:36:38.960Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -681,6 +789,12 @@
       "createDateTime": "2026-04-20T04:01:42.153Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -698,6 +812,12 @@
       "createDateTime": "2026-04-26T01:29:18.770Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -715,6 +835,12 @@
       "createDateTime": "2026-04-26T01:29:18.770Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -732,6 +858,12 @@
       "createDateTime": "2026-05-06T15:47:21.078Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -749,6 +881,12 @@
       "createDateTime": "2026-04-19T19:42:21.922Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -766,6 +904,12 @@
       "createDateTime": "2026-04-22T16:52:01.615Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -783,6 +927,12 @@
       "createDateTime": "2026-04-21T04:03:32.006Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-13T16:36:38.960Z"
+    },
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
     }
   },
   {
@@ -801,7 +951,13 @@
       "446000"
     ],
     "type": "class",
-    "value": "bi bi-mortarboard-fill"
+    "value": "bi bi-mortarboard-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_EXAMS_TEMPLATE",
@@ -818,7 +974,13 @@
       "lastUpdateDateTime": "2026-04-07T22:00:00.000Z"
     },
     "orgId": "SYSTEM",
-    "id": "SYM_SCHOOL_EXAMS_446001"
+    "id": "SYM_SCHOOL_EXAMS_446001",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_EXAMS_ALLOCATION",
@@ -835,7 +997,13 @@
       "lastUpdateDateTime": "2026-04-07T22:00:00.000Z"
     },
     "orgId": "SYSTEM",
-    "id": "SYM_SCHOOL_EXAMS_446002"
+    "id": "SYM_SCHOOL_EXAMS_446002",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_EXAMS_TAKING",
@@ -852,7 +1020,13 @@
       "lastUpdateDateTime": "2026-04-07T22:00:00.000Z"
     },
     "orgId": "SYSTEM",
-    "id": "SYM_SCHOOL_EXAMS_446003"
+    "id": "SYM_SCHOOL_EXAMS_446003",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_EXAMS_REVIEW",
@@ -869,7 +1043,13 @@
       "lastUpdateDateTime": "2026-04-07T22:00:00.000Z"
     },
     "orgId": "SYSTEM",
-    "id": "SYM_SCHOOL_EXAMS_446004"
+    "id": "SYM_SCHOOL_EXAMS_446004",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_001",
@@ -1469,7 +1649,13 @@
       "536458"
     ],
     "type": "class",
-    "value": "bi bi-book-half"
+    "value": "bi bi-book-half",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_034",
@@ -1486,7 +1672,13 @@
       "442039"
     ],
     "type": "class",
-    "value": "bi bi-easel-fill"
+    "value": "bi bi-easel-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_035",
@@ -1503,7 +1695,13 @@
       "938980"
     ],
     "type": "class",
-    "value": "bi bi-calendar3"
+    "value": "bi bi-calendar3",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_036",
@@ -1520,7 +1718,13 @@
       "290216"
     ],
     "type": "class",
-    "value": "bi bi-sun-fill"
+    "value": "bi bi-sun-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_037",
@@ -1537,7 +1741,13 @@
       "778768"
     ],
     "type": "class",
-    "value": "bi bi-clipboard-check-fill"
+    "value": "bi bi-clipboard-check-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "name": "SCHOOL_GRADEBOOK",
@@ -1554,7 +1764,13 @@
       "lastUpdateDateTime": "2026-03-30T12:00:00.000Z"
     },
     "orgId": "SYSTEM",
-    "id": "SYM_SYSTEM_037A"
+    "id": "SYM_SYSTEM_037A",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_038",
@@ -1571,7 +1787,13 @@
       "358609"
     ],
     "type": "class",
-    "value": "bi bi-door-open-fill"
+    "value": "bi bi-door-open-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_039",
@@ -1588,7 +1810,13 @@
       "688865"
     ],
     "type": "class",
-    "value": "bi bi-diagram-3-fill"
+    "value": "bi bi-diagram-3-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_040",
@@ -1605,7 +1833,13 @@
       "111874"
     ],
     "type": "class",
-    "value": "bi bi-arrow-left-right"
+    "value": "bi bi-arrow-left-right",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_041",
@@ -1622,7 +1856,13 @@
       "445562"
     ],
     "type": "class",
-    "value": "bi bi-calendar3-range-fill"
+    "value": "bi bi-calendar3-range-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_042",
@@ -1639,7 +1879,13 @@
       "445561"
     ],
     "type": "class",
-    "value": "bi bi-database-fill"
+    "value": "bi bi-database-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_200",
@@ -1656,7 +1902,13 @@
       "445582"
     ],
     "type": "class",
-    "value": "bi bi-database-gear"
+    "value": "bi bi-database-gear",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_043",
@@ -1673,7 +1925,13 @@
       "445563"
     ],
     "type": "class",
-    "value": "bi bi-journal-richtext"
+    "value": "bi bi-journal-richtext",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_044",
@@ -1690,7 +1948,13 @@
       "445564"
     ],
     "type": "class",
-    "value": "bi bi-person-plus-fill"
+    "value": "bi bi-person-plus-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_045",
@@ -1707,7 +1971,13 @@
       "445565"
     ],
     "type": "class",
-    "value": "bi bi-calendar-plus-fill"
+    "value": "bi bi-calendar-plus-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_046",
@@ -1724,7 +1994,13 @@
       "445567"
     ],
     "type": "class",
-    "value": "bi bi-calendar-week-fill"
+    "value": "bi bi-calendar-week-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_047",
@@ -1741,7 +2017,13 @@
       "445568"
     ],
     "type": "class",
-    "value": "bi bi-clock-history"
+    "value": "bi bi-clock-history",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_048",
@@ -1758,7 +2040,13 @@
       "445569"
     ],
     "type": "class",
-    "value": "bi bi-toggle-on"
+    "value": "bi bi-toggle-on",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_049",
@@ -1792,7 +2080,13 @@
       "332224"
     ],
     "type": "class",
-    "value": "bi bi-person-check-fill"
+    "value": "bi bi-person-check-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_051",
@@ -1810,7 +2104,13 @@
       "SYSTEM_ACCOUNTS"
     ],
     "type": "class",
-    "value": "bi bi-wallet2"
+    "value": "bi bi-wallet2",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_052",
@@ -1827,7 +2127,13 @@
       "332226"
     ],
     "type": "class",
-    "value": "bi bi-receipt-cutoff"
+    "value": "bi bi-receipt-cutoff",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_053",
@@ -1844,7 +2150,13 @@
       "332227"
     ],
     "type": "class",
-    "value": "bi bi-currency-dollar"
+    "value": "bi bi-currency-dollar",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_054",
@@ -1861,7 +2173,13 @@
       "332228"
     ],
     "type": "class",
-    "value": "bi bi-mortarboard-fill"
+    "value": "bi bi-mortarboard-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_124",
@@ -1878,7 +2196,13 @@
       "445571"
     ],
     "type": "class",
-    "value": "bi bi-file-earmark-richtext"
+    "value": "bi bi-file-earmark-richtext",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_125",
@@ -1895,7 +2219,13 @@
       "446101"
     ],
     "type": "class",
-    "value": "bi bi-journal-richtext"
+    "value": "bi bi-journal-richtext",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_126",
@@ -1912,7 +2242,13 @@
       "446102"
     ],
     "type": "class",
-    "value": "bi bi-list-check"
+    "value": "bi bi-list-check",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_127",
@@ -1929,7 +2265,13 @@
       "446103"
     ],
     "type": "class",
-    "value": "bi bi-file-earmark-text-fill"
+    "value": "bi bi-file-earmark-text-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_128",
@@ -1946,7 +2288,13 @@
       "445583"
     ],
     "type": "class",
-    "value": "bi bi-grid-1x2-fill"
+    "value": "bi bi-grid-1x2-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_055",
@@ -1963,7 +2311,13 @@
       "332229"
     ],
     "type": "class",
-    "value": "bi bi-people-fill"
+    "value": "bi bi-people-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_056",
@@ -1980,7 +2334,13 @@
       "332230"
     ],
     "type": "class",
-    "value": "bi bi-person-vcard-fill"
+    "value": "bi bi-person-vcard-fill",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_057",
@@ -1997,7 +2357,13 @@
       "332231"
     ],
     "type": "class",
-    "value": "bi bi-person-workspace"
+    "value": "bi bi-person-workspace",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_058",
@@ -2014,7 +2380,13 @@
       "445570"
     ],
     "type": "class",
-    "value": "bi bi-box-arrow-right"
+    "value": "bi bi-box-arrow-right",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_059",
@@ -2028,10 +2400,17 @@
     "orgId": "SYSTEM",
     "tags": [
       "CREDIT_LOANS",
+      "CREDIT",
       "774671"
     ],
     "type": "class",
-    "value": "bi bi-bank2"
+    "value": "bi bi-cash-coin",
+    "packageId": "credit",
+    "packageName": "CREDIT",
+    "package": {
+      "packageId": "credit",
+      "packageName": "CREDIT"
+    }
   },
   {
     "id": "SYM_CREDIT_001",
@@ -2044,10 +2423,18 @@
     "name": "CREDIT_CUSTOMERS",
     "orgId": "SYSTEM",
     "tags": [
-      "CREDIT_CUSTOMERS"
+      "CREDIT_CUSTOMERS",
+      "CREDIT_CUSTOMERS_SECTION",
+      "774672"
     ],
     "type": "class",
-    "value": "bi bi-person-vcard"
+    "value": "bi bi-person-vcard",
+    "packageId": "credit",
+    "packageName": "CREDIT",
+    "package": {
+      "packageId": "credit",
+      "packageName": "CREDIT"
+    }
   },
   {
     "id": "SYM_CREDIT_002",
@@ -2060,10 +2447,17 @@
     "name": "CREDIT_REQUESTS",
     "orgId": "SYSTEM",
     "tags": [
-      "CREDIT_REQUESTS"
+      "CREDIT_REQUESTS",
+      "774673"
     ],
     "type": "class",
-    "value": "bi bi-file-earmark-text"
+    "value": "bi bi-file-earmark-text",
+    "packageId": "credit",
+    "packageName": "CREDIT",
+    "package": {
+      "packageId": "credit",
+      "packageName": "CREDIT"
+    }
   },
   {
     "id": "SYM_CREDIT_003",
@@ -2076,10 +2470,17 @@
     "name": "CREDIT_INSTALLMENTS",
     "orgId": "SYSTEM",
     "tags": [
-      "CREDIT_INSTALLMENTS"
+      "CREDIT_INSTALLMENTS",
+      "774674"
     ],
     "type": "class",
-    "value": "bi bi-receipt-cutoff"
+    "value": "bi bi-receipt-cutoff",
+    "packageId": "credit",
+    "packageName": "CREDIT",
+    "package": {
+      "packageId": "credit",
+      "packageName": "CREDIT"
+    }
   },
   {
     "id": "SYM_SYSTEM_060",
@@ -2522,7 +2923,13 @@
       "445579"
     ],
     "orgId": "SYSTEM",
-    "adoptExisting": true
+    "adoptExisting": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_129",
@@ -2534,7 +2941,13 @@
       "446104"
     ],
     "orgId": "SYSTEM",
-    "adoptExisting": true
+    "adoptExisting": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_130",
@@ -2546,7 +2959,13 @@
       "446105"
     ],
     "orgId": "SYSTEM",
-    "adoptExisting": true
+    "adoptExisting": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_131",
@@ -2558,7 +2977,13 @@
       "446106"
     ],
     "orgId": "SYSTEM",
-    "adoptExisting": true
+    "adoptExisting": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   },
   {
     "id": "SYM_SYSTEM_132",
@@ -2570,6 +2995,131 @@
       "446107"
     ],
     "orgId": "SYSTEM",
-    "adoptExisting": true
+    "adoptExisting": true,
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "SYM_SYSTEM_201",
+    "name": "SCHOOL_PRIOR_SUBJECT_CREDITS",
+    "type": "class",
+    "value": "bi bi-mortarboard",
+    "tags": [
+      "SCHOOL_PRIOR_SUBJECT_CREDITS",
+      "445578"
+    ],
+    "orgId": "SYSTEM",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "SYM_SYSTEM_202",
+    "name": "SCHOOL_TEACHING_OUTLINES",
+    "type": "class",
+    "value": "bi bi-journal-check",
+    "tags": [
+      "SCHOOL_TEACHING_OUTLINES",
+      "445580"
+    ],
+    "orgId": "SYSTEM",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "SYM_SYSTEM_203",
+    "name": "SCHOOL_SKILLS",
+    "type": "class",
+    "value": "bi bi-stars",
+    "tags": [
+      "SCHOOL_SKILLS",
+      "445584"
+    ],
+    "orgId": "SYSTEM",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "SYM_SYSTEM_204",
+    "name": "SCHOOL_BOOKS",
+    "type": "class",
+    "value": "bi bi-journal-text",
+    "tags": [
+      "SCHOOL_BOOKS",
+      "445585"
+    ],
+    "orgId": "SYSTEM",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "SYM_SYSTEM_205",
+    "name": "SCHOOL_FUNDERS",
+    "type": "class",
+    "value": "bi bi-bank2",
+    "tags": [
+      "SCHOOL_FUNDERS",
+      "332232"
+    ],
+    "orgId": "SYSTEM",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "SYM_SYSTEM_206",
+    "name": "SCHOOL_LEAVE_REQUESTS",
+    "type": "class",
+    "value": "bi bi-calendar-x",
+    "tags": [
+      "SCHOOL_LEAVE_REQUESTS",
+      "445575"
+    ],
+    "orgId": "SYSTEM",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
+  },
+  {
+    "id": "SYM_SYSTEM_207",
+    "name": "SCHOOL_CALENDAR",
+    "type": "class",
+    "value": "bi bi-calendar4-week",
+    "tags": [
+      "SCHOOL_CALENDAR",
+      "445581"
+    ],
+    "orgId": "SYSTEM",
+    "packageId": "school",
+    "packageName": "SCHOOL",
+    "package": {
+      "packageId": "school",
+      "packageName": "SCHOOL"
+    }
   }
 ]

@@ -5421,5 +5421,139 @@
     "changeEvents": [],
     "finalData": null,
     "lastActiveAt": "2026-05-22T06:20:11.508Z"
+  },
+  {
+    "id": "ASI202608091786333147801",
+    "userId": "ROOT_001",
+    "sectionId": "340738",
+    "operationId": "OP1005",
+    "targetKey": "GLOBAL_SCOPE",
+    "status": "active",
+    "attemptCount": 4,
+    "volumeUsageKB": 380.185546875,
+    "startedAt": "2026-08-10T03:39:07.769Z",
+    "expiresAt": "2026-08-10T04:39:07.769Z",
+    "appliedLimits": {},
+    "initialContext": {
+      "method": "GET",
+      "url": "/systemSettings/data-backend",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+      "requestId": "bae3db3a-9cce-48f3-a670-1547934acd08",
+      "userId": "ROOT_001",
+      "username": "Amin",
+      "displayName": "Amin",
+      "orgId": "900000",
+      "orgName": "Amin Paknejad"
+    },
+    "history": [
+      {
+        "ts": "2026-08-10T03:39:07.769Z",
+        "status": "attempt_started",
+        "details": "New/Auto Session Started",
+        "context": {
+          "method": "GET",
+          "url": "/systemSettings/data-backend",
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+          "requestId": "bae3db3a-9cce-48f3-a670-1547934acd08",
+          "userId": "ROOT_001",
+          "username": "Amin",
+          "displayName": "Amin",
+          "orgId": "900000",
+          "orgName": "Amin Paknejad"
+        }
+      },
+      {
+        "ts": "2026-08-10T03:39:07.799Z",
+        "status": "step_completed",
+        "details": "Intermediate response sent",
+        "volumeKB": 190.091796875,
+        "context": {
+          "method": "GET",
+          "url": "/systemSettings/data-backend",
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+          "requestId": "bae3db3a-9cce-48f3-a670-1547934acd08",
+          "userId": "ROOT_001",
+          "username": "Amin",
+          "displayName": "Amin",
+          "orgId": "900000",
+          "orgName": "Amin Paknejad"
+        }
+      },
+      {
+        "ts": "2026-08-10T03:39:13.679Z",
+        "status": "attempt_started",
+        "details": "New/Auto Session Started",
+        "context": {
+          "method": "POST",
+          "url": "/systemSettings/data-backend/retry",
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+          "requestId": "2545a529-3b8b-4049-bbe2-3b6667c8be93",
+          "userId": "ROOT_001",
+          "username": "Amin",
+          "displayName": "Amin",
+          "orgId": "900000",
+          "orgName": "Amin Paknejad"
+        }
+      },
+      {
+        "ts": "2026-08-10T03:49:01.693Z",
+        "status": "attempt_started",
+        "details": "New/Auto Session Started",
+        "context": {
+          "method": "GET",
+          "url": "/systemSettings/data-backend",
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+          "requestId": "0b9962ee-6e27-409a-856e-c3d27164d66d",
+          "userId": "ROOT_001",
+          "username": "Amin",
+          "displayName": "Amin",
+          "orgId": "900000",
+          "orgName": "Amin Paknejad"
+        }
+      },
+      {
+        "ts": "2026-08-10T03:49:01.728Z",
+        "status": "step_completed",
+        "details": "Intermediate response sent",
+        "volumeKB": 190.09375,
+        "context": {
+          "method": "GET",
+          "url": "/systemSettings/data-backend",
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+          "requestId": "0b9962ee-6e27-409a-856e-c3d27164d66d",
+          "userId": "ROOT_001",
+          "username": "Amin",
+          "displayName": "Amin",
+          "orgId": "900000",
+          "orgName": "Amin Paknejad"
+        }
+      },
+      {
+        "ts": "2026-08-10T03:49:03.925Z",
+        "status": "attempt_started",
+        "details": "New/Auto Session Started",
+        "context": {
+          "method": "POST",
+          "url": "/systemSettings/data-backend/retry",
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+          "requestId": "9e4d73af-23be-4177-bae9-e643f4a134ae",
+          "userId": "ROOT_001",
+          "username": "Amin",
+          "displayName": "Amin",
+          "orgId": "900000",
+          "orgName": "Amin Paknejad"
+        }
+      }
+    ],
+    "changeEvents": [],
+    "finalData": null,
+    "lastActiveAt": "2026-08-10T03:49:03.925Z"
   }
 ]

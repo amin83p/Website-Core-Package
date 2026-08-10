@@ -6,12 +6,19 @@
     "keepActive": true,
     "system": false,
     "audit": {
-      "createUser": "ROOT_001",
-      "createDateTime": "2026-05-02T00:24:02.746Z",
-      "lastUpdateUser": "ROOT_001",
-      "lastUpdateDateTime": "2026-05-02T19:03:16.085Z"
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-08-10T03:45:43.215Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-08-10T03:45:43.215Z"
     },
-    "id": "935362"
+    "id": "935362",
+    "description": "",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "package": {
+      "packageId": "pte",
+      "packageName": "PTE"
+    }
   },
   {
     "id": "OP0101",
