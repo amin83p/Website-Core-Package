@@ -1,0 +1,58 @@
+<%- include('partials/tablePages-start', {
+  title,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_LIBRARY" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-book me-1"></i> School Library</a>',
+    '<a href="/school/library/patrons/new" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-person-plus me-1"></i> Register Patron</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search patrons...',
+  fields: [
+    { name: 'patronRole', label: 'Role', type: 'select', options: ['student', 'teacher', 'staff'] },
+    { name: 'status', label: 'Status', type: 'select', options: ['active', 'suspended', 'blocked'] }
+  ]
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4">Patron</th>
+        <th class="draggable">Role</th>
+        <th class="draggable">Status</th>
+        <th class="draggable">Active loans</th>
+        <th class="draggable">Card #</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr><td colspan="6" class="text-center py-5 text-muted">No patrons found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-semibold"><%= item.displayName %></div>
+            <div class="x-small text-muted font-monospace"><%= item.personId %></div>
+          </td>
+          <td><span class="badge bg-secondary"><%= item.patronRole %></span></td>
+          <td><span class="badge <%= item.status === 'active' ? 'bg-success' : 'bg-danger' %>"><%= item.status %></span></td>
+          <td><%= Number(item.activeLoanCount || 0) %></td>
+          <td><%= item.libraryCardNumber || '—' %></td>
+          <td class="text-end pe-4">
+            <a href="/school/library/patrons/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/tablePages-end') %>

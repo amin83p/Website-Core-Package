@@ -191,6 +191,12 @@
       apiEndpoint: '/school/subjects',
       placeholder: 'Search subjects...'
     },
+    book: {
+      title: 'Select Book',
+      icon: 'bi-journal-text',
+      apiEndpoint: '/school/library/books',
+      placeholder: 'Search books...'
+    },
     teacher: {
       title: 'Select Teacher',
       icon: 'bi-person-workspace',
@@ -247,6 +253,8 @@
     '/school/staff': 'staff',
     '/school/students': 'student',
     '/school/subjects': 'subject',
+    '/school/library/books': 'book',
+    '/school/books': 'book',
     '/school/teachers': 'teacher',
     '/help/manage/pages': 'helpPage'
     ,
@@ -281,6 +289,7 @@
       'staff',
       'student',
       'subject',
+      'book',
       'teacher',
       'user'
     ]);
@@ -408,6 +417,7 @@
     staff: (overrides) => byName('staff', overrides),
     student: (overrides) => byName('student', overrides),
     subject: (overrides) => byName('subject', overrides),
+    book: (overrides) => byName('book', overrides),
     term: (overrides) => byName('term', overrides),
     teacher: (overrides) => byName('teacher', overrides),
     transactionDefinition: (overrides) => byName('transactionDefinition', overrides),

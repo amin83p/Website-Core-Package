@@ -1,0 +1,55 @@
+<%
+  const item = policyItem || {};
+%>
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-sliders me-2"></i>Policy — <%= patronRole %></h1>
+    <a href="/school/library/policies" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back</a>
+  </div>
+  <div class="form-container wide" style="max-width: 800px;">
+    <form action="/school/library/policies/edit/<%= patronRole %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="patronRole" value="<%= patronRole %>">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4 row g-3">
+          <div class="col-md-4">
+            <label class="form-label fw-bold" for="maxConcurrentLoans">Max concurrent loans</label>
+            <input type="number" min="0" id="maxConcurrentLoans" name="maxConcurrentLoans" class="form-control size-md" value="<%= item.maxConcurrentLoans || 0 %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold" for="loanPeriodDays">Physical loan days</label>
+            <input type="number" min="1" id="loanPeriodDays" name="loanPeriodDays" class="form-control size-md" value="<%= item.loanPeriodDays || 14 %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold" for="digitalAccessDays">Digital access days</label>
+            <input type="number" min="1" id="digitalAccessDays" name="digitalAccessDays" class="form-control size-md" value="<%= item.digitalAccessDays || 30 %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold" for="maxRenewals">Max renewals</label>
+            <input type="number" min="0" id="maxRenewals" name="maxRenewals" class="form-control size-md" value="<%= item.maxRenewals || 0 %>">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="allowDigitalDownload" name="allowDigitalDownload" value="1" <%= item.allowDigitalDownload ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="allowDigitalDownload">Allow digital download</label>
+            </div>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="active" name="active" value="1" <%= item.active ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="active">Policy active</label>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-bold" for="notes">Notes</label>
+            <textarea id="notes" name="notes" class="form-control size-md" rows="3"><%= item.notes || '' %></textarea>
+          </div>
+        </div>
+        <div class="card-footer bg-white border-top d-flex gap-2">
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save Policy</button>
+          <a href="/school/library/policies" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>

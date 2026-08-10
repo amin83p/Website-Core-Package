@@ -53,6 +53,11 @@ router.use('/terms', require('./termRoutes'));
 router.use('/payRates', require('./payRateRoutes'));
 router.use('/session-statuses', require('./sessionStatusRoutes'));
 router.use('/skills', require('./skillRoutes'));
+router.use('/books', (req, res) => {
+  const suffix = String(req.originalUrl || '').split('/books')[1] || '';
+  return res.redirect(301, '/school/library/books' + suffix);
+});
+router.use('/library', require('./libraryMainRoute'));
 router.use('/teaching-outlines', require('./teachingOutlineRoutes'));
 router.use('/timesheetPeriods', require('./timesheetPeriodRoutes'));
 router.use('/timesheets', require('./timesheetRoutes'));

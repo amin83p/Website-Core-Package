@@ -1,0 +1,33 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-exclamation-triangle me-2"></i>Overdue Loans</h1>
+    <a href="/school/library/circulation" class="btn btn-outline-secondary btn-sm">Circulation desk</a>
+  </div>
+  <div class="table-scroll-wrapper">
+    <table class="table-responsive size-md">
+      <thead>
+        <tr>
+          <th class="ps-4">Loan</th>
+          <th>Book</th>
+          <th>Copy</th>
+          <th>Patron</th>
+          <th>Due</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!data || data.length === 0) { %>
+          <tr><td colspan="5" class="text-center py-5 text-muted">No overdue loans.</td></tr>
+        <% } %>
+        <% (data || []).forEach((item) => { %>
+          <tr>
+            <td class="ps-4 font-monospace"><%= item.id %></td>
+            <td><%= item.bookTitle || item.bookId %></td>
+            <td class="font-monospace"><%= item.copyCode || item.copyId %></td>
+            <td class="font-monospace"><%= item.patronPersonId || item.personId %></td>
+            <td><%= item.dueAt ? new Date(item.dueAt).toLocaleString() : '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

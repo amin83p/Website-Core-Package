@@ -64,6 +64,8 @@
     "school:skills:migrate-org-scope": "node scripts/school/migration/migrateSystemOrgSkills.js --db app --org 900000",
     "school:skills:migrate-org-scope:apply": "node scripts/school/migration/migrateSystemOrgSkills.js --db app --org 900000 --apply",
     "school:skills-section:seed": "node scripts/seed-school-skills-section.js --db app",
+    "school:books-section:seed": "node scripts/seed-school-books-section.js --db app",
+    "school:library-section:seed": "node scripts/seed-school-library-section.js --db app",
     "school:teaching-outline-templates:reconcile": "node scripts/seed-school-teaching-outline-defaults.js --db app --org 900000 --reconcile-sections",
     "school:class-skills:backfill": "node scripts/school/migration/backfillClassSkills.js --org 900000",
     "school:class-skills:backfill:apply": "node scripts/school/migration/backfillClassSkills.js --org 900000 --apply",

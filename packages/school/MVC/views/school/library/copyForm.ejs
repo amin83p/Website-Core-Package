@@ -1,0 +1,485 @@
+<%
+
+  const item = copyItem || {};
+
+  const isEdit = !!item.id;
+
+  const bookId = selectedBookId || item.bookId || '';
+
+  const bookTitle = selectedBookTitle || bookId;
+
+  const bookIsbn = selectedBookIsbn || '';
+
+  const locationPath = selectedLocationPath || item.location || '';
+
+%>
+
+<div class="sections-page">
+
+  <div class="d-flex align-items-center justify-content-between mb-4">
+
+    <h1 class="page-heading size-md m-0"><i class="bi bi-upc-scan me-2"></i><%= isEdit ? 'Edit Copy' : 'New Copy' %></h1>
+
+    <a href="/school/library/copies" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back</a>
+
+  </div>
+
+
+
+  <% if (includeModal) { %><%- include('partials/modal_GenericPicker', { user }) %><% } %>
+
+
+
+  <div class="form-container wide" style="max-width: 1400px;">
+
+    <form id="copyForm" action="<%= isEdit ? '/school/library/copies/edit/' + item.id : '/school/library/copies/new' %>" method="POST">
+
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+
+      <input type="hidden" name="bookId" id="hid_bookId" value="<%= bookId %>">
+
+      <div class="card border-0 shadow-sm">
+
+        <div class="card-header bg-white border-bottom">
+
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-upc-scan me-2"></i>Library copy details</h6>
+
+          <div class="small text-muted mt-1">Link a catalog book to a physical barcode or digital lendable unit.</div>
+
+        </div>
+
+        <div class="card-body p-4">
+
+          <div class="row g-3">
+
+            <div class="col-md-6">
+
+              <label class="form-label fw-bold">Catalog book *</label>
+
+              <% if (isEdit) { %>
+
+                <div class="form-control size-md bg-light">
+
+                  <div class="fw-semibold"><%= bookTitle %></div>
+
+                  <% if (bookIsbn) { %><div class="x-small text-muted font-monospace"><%= bookIsbn %></div><% } %>
+
+                  <div class="x-small text-muted font-monospace"><%= bookId %></div>
+
+                </div>
+
+              <% } else { %>
+
+                <div class="d-flex gap-2 flex-wrap align-items-start">
+
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickBook">
+
+                    <i class="bi bi-journal-text me-1"></i> Select book
+
+                  </button>
+
+                  <div id="pickedBookLabel" class="small text-muted pt-1">
+
+                    <% if (bookId) { %>
+
+                      Selected: <span class="fw-semibold text-dark"><%= bookTitle %></span>
+
+                      <% if (bookIsbn) { %><span class="font-monospace"> · <%= bookIsbn %></span><% } %>
+
+                    <% } else { %>
+
+                      No book selected.
+
+                    <% } %>
+
+                  </div>
+
+                </div>
+
+              <% } %>
+
+            </div>
+
+            <div class="col-md-3">
+
+              <label class="form-label fw-bold" for="copyType">Type *</label>
+
+              <select id="copyType" name="copyType" class="form-select size-md" required>
+
+                <% (copyTypes || []).forEach((type) => { %>
+
+                  <option value="<%= type %>" <%= item.copyType === type ? 'selected' : '' %>><%= type %></option>
+
+                <% }) %>
+
+              </select>
+
+            </div>
+
+            <div class="col-md-3">
+
+              <label class="form-label fw-bold" for="status">Status</label>
+
+              <select id="status" name="status" class="form-select size-md">
+
+                <% (copyStatuses || []).forEach((status) => { %>
+
+                  <option value="<%= status %>" <%= item.status === status ? 'selected' : '' %>><%= status %></option>
+
+                <% }) %>
+
+              </select>
+
+            </div>
+
+            <div class="col-md-6">
+
+              <label class="form-label fw-bold" for="copyCode">Copy code / barcode *</label>
+
+              <input id="copyCode" name="copyCode" class="form-control size-md font-monospace" value="<%= item.copyCode || '' %>" required>
+
+            </div>
+
+            <div class="col-md-6" id="locationFieldWrap">
+
+              <label class="form-label fw-bold">Shelf location</label>
+
+              <input type="hidden" name="locationId" id="hid_locationId" value="<%= item.locationId || '' %>">
+
+              <div class="d-flex gap-2 flex-wrap align-items-start">
+
+                <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickLocation">
+
+                  <i class="bi bi-geo-alt me-1"></i> Select location
+
+                </button>
+
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnClearLocation" title="Clear location">
+
+                  <i class="bi bi-x-lg"></i>
+
+                </button>
+
+                <div id="pickedLocationLabel" class="small text-muted pt-1">
+
+                  <% if (locationPath) { %>
+
+                    <span class="fw-semibold text-dark"><%= locationPath %></span>
+
+                  <% } else { %>
+
+                    No spot selected.
+
+                  <% } %>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <div class="col-12">
+
+              <label class="form-label fw-bold" for="notes">Notes</label>
+
+              <textarea id="notes" name="notes" class="form-control size-md" rows="3"><%= item.notes || '' %></textarea>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="card-footer bg-white border-top d-flex gap-2">
+
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save Copy</button>
+
+          <a href="/school/library/copies" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+
+        </div>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</div>
+
+
+
+<div class="modal fade" id="locationSpotModal" tabindex="-1" aria-labelledby="locationSpotModalLabel" aria-hidden="true">
+
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+
+    <div class="modal-content">
+
+      <div class="modal-header">
+
+        <h5 class="modal-title" id="locationSpotModalLabel"><i class="bi bi-geo-alt me-2"></i>Select spot location</h5>
+
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+      </div>
+
+      <div class="modal-body">
+
+        <input type="search" id="locationSpotSearch" class="form-control size-md mb-3" placeholder="Search spots by path, name, or code...">
+
+        <div id="locationSpotList" class="list-group list-group-flush border rounded">
+
+          <div class="list-group-item text-muted small">Loading spots...</div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+<script>
+
+(function () {
+
+  const copyTypeSelect = document.getElementById('copyType');
+
+  const locationFieldWrap = document.getElementById('locationFieldWrap');
+
+  const pickLocationBtn = document.getElementById('btnPickLocation');
+
+  const clearLocationBtn = document.getElementById('btnClearLocation');
+
+  const hiddenLocationId = document.getElementById('hid_locationId');
+
+  const pickedLocationLabel = document.getElementById('pickedLocationLabel');
+
+  const locationModalEl = document.getElementById('locationSpotModal');
+
+  const locationSpotSearch = document.getElementById('locationSpotSearch');
+
+  const locationSpotList = document.getElementById('locationSpotList');
+
+  let assignableSpots = [];
+
+  let locationModal = null;
+
+
+
+  function toggleLocationField() {
+
+    const isPhysical = String(copyTypeSelect?.value || '').toLowerCase() === 'physical';
+
+    if (locationFieldWrap) locationFieldWrap.style.display = isPhysical ? '' : 'none';
+
+    if (!isPhysical && hiddenLocationId) hiddenLocationId.value = '';
+
+  }
+
+
+
+  async function loadAssignableSpots() {
+
+    const response = await fetch('/school/library/locations/api/assignable-spots', {
+
+      headers: { 'Accept': 'application/json' }
+
+    });
+
+    const payload = await response.json();
+
+    assignableSpots = Array.isArray(payload?.results) ? payload.results : [];
+
+    renderSpotList(locationSpotSearch?.value || '');
+
+  }
+
+
+
+  function renderSpotList(filterText) {
+
+    if (!locationSpotList) return;
+
+    const needle = String(filterText || '').trim().toLowerCase();
+
+    const rows = assignableSpots.filter((row) => {
+
+      if (!needle) return true;
+
+      const hay = [row.path, row.name, row.code, row.id].join(' ').toLowerCase();
+
+      return hay.includes(needle);
+
+    });
+
+    if (!rows.length) {
+
+      locationSpotList.innerHTML = '<div class="list-group-item text-muted small">No matching spots found.</div>';
+
+      return;
+
+    }
+
+    locationSpotList.innerHTML = rows.map((row) => {
+
+      const label = row.path || row.name || row.id;
+
+      const code = row.code ? '<span class="font-monospace text-muted ms-1">' + row.code + '</span>' : '';
+
+      return '<button type="button" class="list-group-item list-group-item-action location-spot-option" data-id="' + row.id + '" data-path="' + label.replace(/"/g, '&quot;') + '">' + label + code + '</button>';
+
+    }).join('');
+
+  }
+
+
+
+  pickLocationBtn?.addEventListener('click', async () => {
+
+    if (!locationModal && locationModalEl && window.bootstrap) {
+
+      locationModal = new bootstrap.Modal(locationModalEl);
+
+    }
+
+    if (!assignableSpots.length) await loadAssignableSpots();
+
+    else renderSpotList(locationSpotSearch?.value || '');
+
+    locationModal?.show();
+
+  });
+
+
+
+  locationSpotSearch?.addEventListener('input', () => renderSpotList(locationSpotSearch.value));
+
+
+
+  locationSpotList?.addEventListener('click', (event) => {
+
+    const btn = event.target.closest('.location-spot-option');
+
+    if (!btn) return;
+
+    const id = String(btn.dataset.id || '').trim();
+
+    const path = String(btn.dataset.path || '').trim();
+
+    if (hiddenLocationId) hiddenLocationId.value = id;
+
+    if (pickedLocationLabel) pickedLocationLabel.innerHTML = path ? '<span class="fw-semibold text-dark">' + path + '</span>' : 'No spot selected.';
+
+    locationModal?.hide();
+
+  });
+
+
+
+  clearLocationBtn?.addEventListener('click', () => {
+
+    if (hiddenLocationId) hiddenLocationId.value = '';
+
+    if (pickedLocationLabel) pickedLocationLabel.textContent = 'No spot selected.';
+
+  });
+
+
+
+  copyTypeSelect?.addEventListener('change', toggleLocationField);
+
+  toggleLocationField();
+
+})();
+
+</script>
+
+
+
+<% if (!isEdit) { %>
+
+<script>
+
+(function () {
+
+  const pickBtn = document.getElementById('btnPickBook');
+
+  const hiddenBookId = document.getElementById('hid_bookId');
+
+  const pickedBookLabel = document.getElementById('pickedBookLabel');
+
+  const copyForm = document.getElementById('copyForm');
+
+
+
+  pickBtn?.addEventListener('click', () => {
+
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+
+      alert('Book picker is not available on this page.');
+
+      return;
+
+    }
+
+    const context = typeof GenericPickerContexts?.activeOrganizationScope === 'function'
+
+      ? GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+
+      : null;
+
+    GenericPicker.open(GenericPickerPresets.book({
+
+      title: 'Select Catalog Book',
+
+      icon: 'bi-journal-text',
+
+      placeholder: 'Search books in active organization...',
+
+      context,
+
+      onSelect: (item) => {
+
+        const id = String(item?.id || '').trim();
+
+        if (!id) return;
+
+        hiddenBookId.value = id;
+
+        const label = item.label || item.title || item.name || id;
+
+        const isbn = item.isbn ? ' · ' + item.isbn : '';
+
+        pickedBookLabel.innerHTML = 'Selected: <span class="fw-semibold text-dark">' + label + '</span><span class="font-monospace">' + isbn + '</span>';
+
+      }
+
+    }));
+
+  });
+
+
+
+  copyForm?.addEventListener('submit', (event) => {
+
+    if (!String(hiddenBookId?.value || '').trim()) {
+
+      event.preventDefault();
+
+      alert('Please select a catalog book.');
+
+    }
+
+  });
+
+})();
+
+</script>
+
+<% } %>
+
+

@@ -1,0 +1,83 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-geo-alt me-2"></i>Library Locations</h1>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="/dashboard/section-nav/SCHOOL_LIBRARY" class="btn btn-outline-secondary btn-sm"><i class="bi bi-book me-1"></i> Library Hub</a>
+      <% if (canCreate) { %>
+        <a href="/school/library/locations/new" class="btn btn-primary btn-sm"><i class="bi bi-building-add me-1"></i> Add building</a>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom">
+      <h6 class="fw-bold m-0 text-primary"><i class="bi bi-diagram-3 me-2"></i>Location hierarchy</h6>
+      <div class="small text-muted mt-1">Building → Floor → Room → Shelf → Spot. Only spots can be assigned to physical copies.</div>
+    </div>
+    <div class="card-body p-4">
+      <% if (!tree || tree.length === 0) { %>
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-geo-alt fs-3 d-block mb-2"></i>
+          No locations yet. Add a building to start the hierarchy.
+        </div>
+      <% } else { %>
+        <% function typeBadgeClass(type) {
+          const t = String(type || '').toLowerCase();
+          if (t === 'building') return 'bg-primary';
+          if (t === 'floor') return 'bg-info text-dark';
+          if (t === 'room') return 'bg-secondary';
+          if (t === 'shelf') return 'bg-dark';
+          if (t === 'spot') return 'bg-success';
+          return 'bg-light text-dark';
+        } %>
+
+        <% function renderNodes(nodes, depth) { %>
+          <ul class="list-unstyled location-tree-list <%= depth > 0 ? 'ms-4 border-start ps-3' : '' %>">
+            <% (nodes || []).forEach((node) => {
+              const isActive = node.active !== false;
+              const childType = (function () {
+                const map = { building: 'floor', floor: 'room', room: 'shelf', shelf: 'spot' };
+                return map[String(node.locationType || '').toLowerCase()] || '';
+              })();
+            %>
+              <li class="mb-2">
+                <div class="d-flex align-items-start gap-2 flex-wrap location-tree-row <%= !isActive ? 'opacity-75' : '' %>">
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                      <span class="badge <%= typeBadgeClass(node.locationType) %>"><%= node.locationType %></span>
+                      <% if (!isActive) { %><span class="badge bg-warning text-dark">inactive</span><% } %>
+                      <span class="fw-semibold"><%= node.name %></span>
+                      <% if (node.code) { %><span class="small text-muted font-monospace"><%= node.code %></span><% } %>
+                    </div>
+                    <% if (node.notes) { %><div class="small text-muted mt-1"><%= node.notes %></div><% } %>
+                  </div>
+                  <div class="d-flex gap-1 flex-wrap">
+                    <a href="/school/library/locations/edit/<%= node.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square"></i></a>
+                    <% if (canCreate && childType) { %>
+                      <a href="/school/library/locations/new?parentId=<%= node.id %>" class="btn btn-outline-secondary btn-sm" title="Add <%= childType %>"><i class="bi bi-plus-lg"></i></a>
+                    <% } %>
+                    <% if (isActive) { %>
+                      <form method="POST" action="/school/library/locations/deactivate/<%= node.id %>" class="d-inline">
+                        <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+                        <button type="submit" class="btn btn-outline-warning btn-sm" title="Deactivate"><i class="bi bi-slash-circle"></i></button>
+                      </form>
+                    <% } %>
+                    <form method="POST" action="/school/library/locations/delete/<%= node.id %>" class="d-inline" onsubmit="return confirm('Delete this location? This cannot be undone.');">
+                      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+                      <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete"><i class="bi bi-trash"></i></button>
+                    </form>
+                  </div>
+                </div>
+                <% if ((node.children || []).length) { %>
+                  <% renderNodes(node.children, depth + 1); %>
+                <% } %>
+              </li>
+            <% }) %>
+          </ul>
+        <% } %>
+
+        <% renderNodes(tree, 0); %>
+      <% } %>
+    </div>
+  </div>
+</div>

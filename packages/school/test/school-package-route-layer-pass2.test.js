@@ -29,6 +29,8 @@ test('school package main route should mount expected school route branches', ()
     '/terms',
     '/payRates',
     '/session-statuses',
+    '/skills',
+    '/books',
     '/timesheetPeriods',
     '/timesheets',
     '/classes',

@@ -1,0 +1,164 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-arrow-left-right me-2"></i>Circulation Desk</h1>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="/school/library/circulation/loans" class="btn btn-outline-primary btn-sm">Active loans</a>
+      <a href="/school/library/circulation/overdue" class="btn btn-outline-warning btn-sm">Overdue</a>
+      <a href="/dashboard/section-nav/SCHOOL_LIBRARY" class="btn btn-outline-secondary btn-sm">Library hub</a>
+    </div>
+  </div>
+
+  <% if (includeModal) { %><%- include('partials/modal_GenericPicker', { user }) %><% } %>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom fw-bold text-primary"><i class="bi bi-box-arrow-right me-2"></i>Checkout</div>
+        <div class="card-body">
+          <input type="hidden" id="checkout_personId">
+          <input type="hidden" id="checkout_roleRecordId">
+          <input type="hidden" id="checkout_patronRole" value="student">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Patron</label>
+            <div class="d-flex gap-2 flex-wrap mb-2">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="deskPickStudent">Student</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="deskPickTeacher">Teacher</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="deskPickStaff">Staff</button>
+            </div>
+            <div id="checkoutPatronLabel" class="small text-muted">No patron selected.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="checkoutBookId">Filter by book (optional)</label>
+            <input type="text" id="checkoutBookId" class="form-control size-md font-monospace" placeholder="Book id">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="checkoutCopyId">Available copy *</label>
+            <select id="checkoutCopyId" class="form-select size-md">
+              <option value="">Load copies after selecting patron...</option>
+            </select>
+            <button type="button" class="btn btn-link btn-sm p-0 mt-1" id="btnRefreshCopies">Refresh copy list</button>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="checkoutNotes">Notes</label>
+            <textarea id="checkoutNotes" class="form-control size-md" rows="2"></textarea>
+          </div>
+          <button type="button" class="btn btn-filled btn-primary btn-md" id="btnCheckout">Complete checkout</button>
+          <div id="checkoutStatus" class="small mt-2"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom fw-bold text-primary"><i class="bi bi-box-arrow-in-left me-2"></i>Return / Renew</div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="loanActionId">Loan id *</label>
+            <input type="text" id="loanActionId" class="form-control size-md font-monospace" placeholder="LL-...">
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-filled btn-success btn-md" id="btnReturn">Return</button>
+            <button type="button" class="btn btn-filled btn-secondary btn-md" id="btnRenew">Renew</button>
+          </div>
+          <div id="loanActionStatus" class="small mt-2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const checkoutPatronLabel = document.getElementById('checkoutPatronLabel');
+  const checkoutCopySelect = document.getElementById('checkoutCopyId');
+  const checkoutStatus = document.getElementById('checkoutStatus');
+  const loanActionStatus = document.getElementById('loanActionStatus');
+
+  function bindDeskPicker(btnId, presetName, role) {
+    const btn = document.getElementById(btnId);
+    if (!btn || !window.GenericPicker || !window.GenericPickerPresets) return;
+    btn.addEventListener('click', () => {
+      GenericPicker.open(GenericPickerPresets[presetName]({
+        onSelect: (row) => {
+          document.getElementById('checkout_personId').value = row.personId || row.id || '';
+          document.getElementById('checkout_roleRecordId').value = row.id || '';
+          document.getElementById('checkout_patronRole').value = role;
+          const label = row.label || row.name || row.localId || row.personId || row.id;
+          checkoutPatronLabel.textContent = 'Selected: ' + label;
+          loadAvailableCopies();
+        }
+      }));
+    });
+  }
+
+  async function loadAvailableCopies() {
+    const bookId = document.getElementById('checkoutBookId').value.trim();
+    const params = new URLSearchParams();
+    if (bookId) params.set('bookId', bookId);
+    checkoutCopySelect.innerHTML = '<option value="">Loading...</option>';
+    try {
+      const res = await fetch('/school/library/copies/api/available?' + params.toString(), { headers: { 'X-AJAX-Request': 'true' } });
+      const data = await res.json();
+      const rows = data.results || [];
+      checkoutCopySelect.innerHTML = rows.length
+        ? rows.map((row) => '<option value="' + row.id + '">' + row.copyCode + ' — ' + (row.bookTitle || row.bookId) + ' (' + row.copyType + ')</option>').join('')
+        : '<option value="">No available copies</option>';
+    } catch (error) {
+      checkoutCopySelect.innerHTML = '<option value="">Failed to load copies</option>';
+    }
+  }
+
+  bindDeskPicker('deskPickStudent', 'student', 'student');
+  bindDeskPicker('deskPickTeacher', 'teacher', 'teacher');
+  bindDeskPicker('deskPickStaff', 'staff', 'staff');
+  document.getElementById('btnRefreshCopies')?.addEventListener('click', loadAvailableCopies);
+  document.getElementById('checkoutBookId')?.addEventListener('change', loadAvailableCopies);
+
+  document.getElementById('btnCheckout')?.addEventListener('click', async () => {
+    checkoutStatus.textContent = 'Processing checkout...';
+    try {
+      const res = await fetch('/school/library/circulation/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify({
+          personId: document.getElementById('checkout_personId').value,
+          roleRecordId: document.getElementById('checkout_roleRecordId').value,
+          patronRole: document.getElementById('checkout_patronRole').value,
+          copyId: checkoutCopySelect.value,
+          notes: document.getElementById('checkoutNotes').value
+        })
+      });
+      const data = await res.json();
+      if (data.status !== 'success') throw new Error(data.message || 'Checkout failed.');
+      checkoutStatus.textContent = 'Checkout complete. Loan ' + (data.loan?.id || '');
+      document.getElementById('loanActionId').value = data.loan?.id || '';
+      loadAvailableCopies();
+    } catch (error) {
+      checkoutStatus.textContent = error.message || 'Checkout failed.';
+    }
+  });
+
+  async function postLoanAction(path) {
+    loanActionStatus.textContent = 'Processing...';
+    const loanId = document.getElementById('loanActionId').value.trim();
+    if (!loanId) {
+      loanActionStatus.textContent = 'Loan id is required.';
+      return;
+    }
+    try {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify({ loanId })
+      });
+      const data = await res.json();
+      if (data.status !== 'success') throw new Error(data.message || 'Action failed.');
+      loanActionStatus.textContent = data.message || 'Done.';
+    } catch (error) {
+      loanActionStatus.textContent = error.message || 'Action failed.';
+    }
+  }
+
+  document.getElementById('btnReturn')?.addEventListener('click', () => postLoanAction('/school/library/circulation/api/return'));
+  document.getElementById('btnRenew')?.addEventListener('click', () => postLoanAction('/school/library/circulation/api/renew'));
+})();
+</script>

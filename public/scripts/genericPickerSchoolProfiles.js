@@ -4,6 +4,25 @@
 
   const utils = core.utils || {};
 
+  core.registerProfile(['book', 'books'], {
+    icon: 'bi-journal-text',
+    getTitle(item) {
+      const title = String(item?.title || '').trim();
+      const edition = String(item?.edition || '').trim();
+      if (title && edition) return `${title} (${edition})`;
+      return title || String(item?.id || '').trim() || 'Book';
+    },
+    getSummary(item) {
+      const authors = Array.isArray(item?.authors) ? item.authors.join(', ') : '';
+      const isbn = String(item?.isbn || '').trim();
+      const bits = [];
+      if (authors) bits.push(authors);
+      if (isbn) bits.push(`ISBN: ${isbn}`);
+      if (item?.publicationYear) bits.push(String(item.publicationYear));
+      return bits.join(' | ') || 'Book record';
+    }
+  });
+
   core.registerProfile(['teacher', 'teachers'], {
     icon: 'bi-person-workspace',
     getSummary(item) {

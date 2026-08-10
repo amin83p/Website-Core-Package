@@ -86,6 +86,18 @@ function buildSubjectWorkspaceCategory(context = {}) {
   return joinUploadParts(base, 'attachments');
 }
 
+function buildBookCoverCategory(context = {}) {
+  return resolveUploadFolder('school.bookCover', {
+    bookId: sanitizeFolderToken(context.bookId || context.itemId, 'book_unsaved')
+  });
+}
+
+function buildBookPdfCategory(context = {}) {
+  return resolveUploadFolder('school.bookPdf', {
+    bookId: sanitizeFolderToken(context.bookId || context.itemId, 'book_unsaved')
+  });
+}
+
 module.exports = {
   sanitizeFolderToken,
   joinUploadParts,
@@ -95,5 +107,7 @@ module.exports = {
   buildReportTemplatesCategory,
   buildExamMediaCategory,
   buildClassWorkspaceCategory,
-  buildSubjectWorkspaceCategory
+  buildSubjectWorkspaceCategory,
+  buildBookCoverCategory,
+  buildBookPdfCategory
 };

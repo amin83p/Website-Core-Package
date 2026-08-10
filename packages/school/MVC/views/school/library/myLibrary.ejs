@@ -1,0 +1,72 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-journal-richtext me-2"></i>My Library</h1>
+    <a href="/dashboard/section-nav/SCHOOL_LIBRARY" class="btn btn-outline-secondary btn-sm">Library hub</a>
+  </div>
+
+  <div class="alert alert-light border">
+    <div class="fw-semibold">Your active loans</div>
+    <div class="small text-muted">Digital books can be opened while your loan is active and access has not expired.</div>
+  </div>
+
+  <div class="table-scroll-wrapper">
+    <table class="table-responsive size-md">
+      <thead>
+        <tr>
+          <th class="ps-4">Book</th>
+          <th>Copy</th>
+          <th>Type</th>
+          <th>Due</th>
+          <th>Status</th>
+          <th class="text-end pe-4">Digital</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!loans || loans.length === 0) { %>
+          <tr><td colspan="6" class="text-center py-5 text-muted">You have no active library loans.</td></tr>
+        <% } %>
+        <% (loans || []).forEach((loan) => { %>
+          <tr>
+            <td class="ps-4">
+              <div class="fw-semibold"><%= loan.bookTitle || loan.bookId %></div>
+              <div class="x-small text-muted font-monospace"><%= loan.id %></div>
+            </td>
+            <td class="font-monospace"><%= loan.copyCode || loan.copyId %></td>
+            <td><%= loan.copyType %></td>
+            <td><%= loan.dueAt ? new Date(loan.dueAt).toLocaleString() : '—' %></td>
+            <td><span class="badge <%= loan.status === 'overdue' ? 'bg-danger' : 'bg-success' %>"><%= loan.status %></span></td>
+            <td class="text-end pe-4">
+              <% if (loan.copyType === 'digital' && loan.hasDigitalAccess) { %>
+                <button type="button" class="btn btn-outline-primary btn-sm btn-open-digital" data-loan-id="<%= loan.id %>">
+                  <i class="bi bi-file-earmark-pdf me-1"></i>Open PDF
+                </button>
+              <% } else if (loan.copyType === 'digital') { %>
+                <span class="small text-muted">Expired</span>
+              <% } else { %>
+                <span class="small text-muted">Physical</span>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.btn-open-digital').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const loanId = btn.getAttribute('data-loan-id');
+    try {
+      const res = await fetch('/school/library/my/api/digital/' + encodeURIComponent(loanId), {
+        headers: { 'X-AJAX-Request': 'true' }
+      });
+      const data = await res.json();
+      if (data.status !== 'success' || !data.url) throw new Error(data.message || 'Access denied.');
+      window.open(data.url, '_blank', 'noopener');
+    } catch (error) {
+      alert(error.message || 'Unable to open digital book.');
+    }
+  });
+});
+</script>

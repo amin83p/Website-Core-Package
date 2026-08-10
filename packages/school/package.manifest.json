@@ -129,6 +129,9 @@
           "id": "139382"
         },
         {
+          "id": "446110"
+        },
+        {
           "id": "445571"
         },
         {
@@ -225,9 +228,6 @@
         },
         {
           "id": "290216"
-        },
-        {
-          "id": "445580"
         },
         {
           "id": "445561"
@@ -836,6 +836,182 @@
       "mainDashboardDisplay": false,
       "navigatorSection": false,
       "homeURL": "/school/skills",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "445585",
+      "name": "SCHOOL_BOOKS",
+      "category": "SCHOOL",
+      "description": "Manage school textbooks and materials, including bibliographic details and table of contents.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/library/books",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446110",
+      "name": "SCHOOL_LIBRARY",
+      "category": "SCHOOL",
+      "description": "School library hub for catalog, copies, patrons, circulation, and lending policies.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "/dashboard/section-nav/SCHOOL_LIBRARY",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        { "id": "445585" },
+        { "id": "446111" },
+        { "id": "446112" },
+        { "id": "446113" },
+        { "id": "446114" },
+        { "id": "446115" }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446111",
+      "name": "SCHOOL_LIBRARY_COPIES",
+      "category": "SCHOOL",
+      "description": "Manage physical and digital library copies linked to catalog books.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/library/copies",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446112",
+      "name": "SCHOOL_LIBRARY_PATRONS",
+      "category": "SCHOOL",
+      "description": "Register and manage library patrons from school people.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/library/patrons",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446113",
+      "name": "SCHOOL_LIBRARY_CIRCULATION",
+      "category": "SCHOOL",
+      "description": "Checkout, return, renew, and track overdue library loans.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/library/circulation",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446114",
+      "name": "SCHOOL_LIBRARY_POLICIES",
+      "category": "SCHOOL",
+      "description": "Configure lending limits and digital access rules by patron role.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/library/policies",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446115",
+      "name": "SCHOOL_LIBRARY_LOCATIONS",
+      "category": "SCHOOL",
+      "description": "Manage library location hierarchy from buildings down to assignable shelf spots.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/library/locations",
       "inactiveMessage": "",
       "message": "",
       "operations": [
@@ -3679,6 +3855,90 @@
       "tags": [
         "SCHOOL_SKILLS",
         "445584"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_BOOKS_001",
+      "name": "SCHOOL_BOOKS",
+      "type": "class",
+      "value": "bi bi-journal-text",
+      "tags": [
+        "SCHOOL_BOOKS",
+        "445585"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_LIBRARY_001",
+      "name": "SCHOOL_LIBRARY",
+      "type": "class",
+      "value": "bi bi-book",
+      "tags": [
+        "SCHOOL_LIBRARY",
+        "446110"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_LIBRARY_COPIES_001",
+      "name": "SCHOOL_LIBRARY_COPIES",
+      "type": "class",
+      "value": "bi bi-upc-scan",
+      "tags": [
+        "SCHOOL_LIBRARY_COPIES",
+        "446111"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_LIBRARY_PATRONS_001",
+      "name": "SCHOOL_LIBRARY_PATRONS",
+      "type": "class",
+      "value": "bi bi-person-vcard",
+      "tags": [
+        "SCHOOL_LIBRARY_PATRONS",
+        "446112"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_LIBRARY_CIRCULATION_001",
+      "name": "SCHOOL_LIBRARY_CIRCULATION",
+      "type": "class",
+      "value": "bi bi-arrow-left-right",
+      "tags": [
+        "SCHOOL_LIBRARY_CIRCULATION",
+        "446113"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_LIBRARY_POLICIES_001",
+      "name": "SCHOOL_LIBRARY_POLICIES",
+      "type": "class",
+      "value": "bi bi-sliders",
+      "tags": [
+        "SCHOOL_LIBRARY_POLICIES",
+        "446114"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_LIBRARY_LOCATIONS_001",
+      "name": "SCHOOL_LIBRARY_LOCATIONS",
+      "type": "class",
+      "value": "bi bi-geo-alt",
+      "tags": [
+        "SCHOOL_LIBRARY_LOCATIONS",
+        "446115"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -7890,6 +8150,28 @@
       "defaultTemplate": "school/subjects/{subjectId}",
       "placeholders": [
         "subjectId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "school.bookCover",
+      "packageName": "SCHOOL",
+      "group": "School Uploads",
+      "label": "School Book Cover Photos",
+      "defaultTemplate": "school/books/{bookId}/cover",
+      "placeholders": [
+        "bookId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "school.bookPdf",
+      "packageName": "SCHOOL",
+      "group": "School Uploads",
+      "label": "School Book Digital PDFs",
+      "defaultTemplate": "school/books/{bookId}/pdf",
+      "placeholders": [
+        "bookId"
       ],
       "applyDefault": true
     }

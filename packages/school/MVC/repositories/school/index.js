@@ -12,6 +12,12 @@ const activityModel = require('../../models/school/activityModel');
 const payRateModel = require('../../models/school/payRateModel');
 const sessionStatusModel = require('../../models/school/sessionStatusModel');
 const skillModel = require('../../models/school/skillModel');
+const bookModel = require('../../models/school/bookModel');
+const libraryCopyModel = require('../../models/school/libraryCopyModel');
+const libraryPatronModel = require('../../models/school/libraryPatronModel');
+const libraryPolicyModel = require('../../models/school/libraryPolicyModel');
+const libraryLoanModel = require('../../models/school/libraryLoanModel');
+const libraryLocationModel = require('../../models/school/libraryLocationModel');
 const teachingOutlineLevelModel = require('../../models/school/teachingOutlineLevelModel');
 const teachingOutlineSectionTemplateModel = require('../../models/school/teachingOutlineSectionTemplateModel');
 const teachingOutlineItemModel = require('../../models/school/teachingOutlineItemModel');
@@ -1182,6 +1188,72 @@ const schoolRepositories = {
     update: skillModel.updateSkill,
     remove: skillModel.deleteSkill,
     defaultSearchFields: ['id', 'orgId', 'code', 'label', 'kind'],
+    allowSystemFallback: false
+  }),
+  books: createSchoolRepository({
+    entityName: 'books',
+    collectionName: 'schoolBooks',
+    getAll: bookModel.getAllBooks,
+    getById: bookModel.getBookById,
+    create: bookModel.addBook,
+    update: bookModel.updateBook,
+    remove: bookModel.deleteBook,
+    defaultSearchFields: ['id', 'orgId', 'title', 'subtitle', 'authors', 'publisher', 'isbn', 'subjectArea'],
+    allowSystemFallback: false
+  }),
+  libraryCopies: createSchoolRepository({
+    entityName: 'libraryCopies',
+    collectionName: 'schoolLibraryCopies',
+    getAll: libraryCopyModel.getAllLibraryCopies,
+    getById: libraryCopyModel.getLibraryCopyById,
+    create: libraryCopyModel.addLibraryCopy,
+    update: libraryCopyModel.updateLibraryCopy,
+    remove: libraryCopyModel.deleteLibraryCopy,
+    defaultSearchFields: ['id', 'orgId', 'bookId', 'copyCode', 'copyType', 'status', 'location'],
+    allowSystemFallback: false
+  }),
+  libraryPatrons: createSchoolRepository({
+    entityName: 'libraryPatrons',
+    collectionName: 'schoolLibraryPatrons',
+    getAll: libraryPatronModel.getAllLibraryPatrons,
+    getById: libraryPatronModel.getLibraryPatronById,
+    create: libraryPatronModel.addLibraryPatron,
+    update: libraryPatronModel.updateLibraryPatron,
+    remove: libraryPatronModel.deleteLibraryPatron,
+    defaultSearchFields: ['id', 'orgId', 'personId', 'patronRole', 'libraryCardNumber', 'status'],
+    allowSystemFallback: false
+  }),
+  libraryPolicies: createSchoolRepository({
+    entityName: 'libraryPolicies',
+    collectionName: 'schoolLibraryPolicies',
+    getAll: libraryPolicyModel.getAllLibraryPolicies,
+    getById: libraryPolicyModel.getLibraryPolicyById,
+    create: libraryPolicyModel.addLibraryPolicy,
+    update: libraryPolicyModel.updateLibraryPolicy,
+    remove: libraryPolicyModel.deleteLibraryPolicy,
+    defaultSearchFields: ['id', 'orgId', 'patronRole'],
+    allowSystemFallback: false
+  }),
+  libraryLoans: createSchoolRepository({
+    entityName: 'libraryLoans',
+    collectionName: 'schoolLibraryLoans',
+    getAll: libraryLoanModel.getAllLibraryLoans,
+    getById: libraryLoanModel.getLibraryLoanById,
+    create: libraryLoanModel.addLibraryLoan,
+    update: libraryLoanModel.updateLibraryLoan,
+    remove: libraryLoanModel.deleteLibraryLoan,
+    defaultSearchFields: ['id', 'orgId', 'patronId', 'personId', 'copyId', 'bookId', 'status', 'copyType'],
+    allowSystemFallback: false
+  }),
+  libraryLocations: createSchoolRepository({
+    entityName: 'libraryLocations',
+    collectionName: 'schoolLibraryLocations',
+    getAll: libraryLocationModel.getAllLibraryLocations,
+    getById: libraryLocationModel.getLibraryLocationById,
+    create: libraryLocationModel.addLibraryLocation,
+    update: libraryLocationModel.updateLibraryLocation,
+    remove: libraryLocationModel.deleteLibraryLocation,
+    defaultSearchFields: ['id', 'orgId', 'parentId', 'locationType', 'name', 'code'],
     allowSystemFallback: false
   }),
   teachingOutlineLevels: createSchoolRepository({
@@ -2625,6 +2697,12 @@ assertQueryableCrudRepository('schoolRepositories.teachers', schoolRepositories.
 assertQueryableCrudRepository('schoolRepositories.staff', schoolRepositories.staff);
 assertQueryableCrudRepository('schoolRepositories.payRates', schoolRepositories.payRates);
 assertQueryableCrudRepository('schoolRepositories.sessionStatuses', schoolRepositories.sessionStatuses);
+assertQueryableCrudRepository('schoolRepositories.books', schoolRepositories.books);
+assertQueryableCrudRepository('schoolRepositories.libraryCopies', schoolRepositories.libraryCopies);
+assertQueryableCrudRepository('schoolRepositories.libraryPatrons', schoolRepositories.libraryPatrons);
+assertQueryableCrudRepository('schoolRepositories.libraryPolicies', schoolRepositories.libraryPolicies);
+assertQueryableCrudRepository('schoolRepositories.libraryLoans', schoolRepositories.libraryLoans);
+assertQueryableCrudRepository('schoolRepositories.libraryLocations', schoolRepositories.libraryLocations);
 assertQueryableCrudRepository('schoolRepositories.timesheetPeriods', schoolRepositories.timesheetPeriods);
 assertQueryableCrudRepository('schoolRepositories.timesheets', schoolRepositories.timesheets);
 assertQueryableCrudRepository('schoolRepositories.studentProgramRegistrations', schoolRepositories.studentProgramRegistrations);

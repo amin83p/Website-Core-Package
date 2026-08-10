@@ -1,0 +1,28 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-sliders me-2"></i>Library Policies</h1>
+    <a href="/dashboard/section-nav/SCHOOL_LIBRARY" class="btn btn-outline-secondary btn-sm"><i class="bi bi-book me-1"></i> Library Hub</a>
+  </div>
+  <div class="row g-3">
+    <% (policies || []).forEach((policy) => { %>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <h5 class="fw-bold m-0 text-capitalize"><%= policy.patronRole %></h5>
+              <span class="badge <%= policy.active ? 'bg-success' : 'bg-secondary' %>"><%= policy.active ? 'Active' : 'Inactive' %></span>
+            </div>
+            <ul class="list-unstyled small mb-3">
+              <li>Max concurrent loans: <strong><%= policy.maxConcurrentLoans %></strong></li>
+              <li>Physical loan period: <strong><%= policy.loanPeriodDays %> days</strong></li>
+              <li>Digital access: <strong><%= policy.digitalAccessDays %> days</strong></li>
+              <li>Max renewals: <strong><%= policy.maxRenewals %></strong></li>
+              <li>Digital download: <strong><%= policy.allowDigitalDownload ? 'Allowed' : 'Blocked' %></strong></li>
+            </ul>
+            <a href="/school/library/policies/edit/<%= policy.patronRole %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-1"></i>Edit policy</a>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</div>

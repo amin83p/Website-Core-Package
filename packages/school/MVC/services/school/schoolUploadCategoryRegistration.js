@@ -60,6 +60,18 @@ function registerSchoolUploadCategoryResolvers() {
       subjectId: req.params?.id || req.params?.subjectId || req.body?.subjectId
     })
   ));
+
+  uploadCategoryResolverService.registerUploadCategoryResolver('school-books', ({ req = {} } = {}) => (
+    schoolUploadPathUtils.buildBookCoverCategory({
+      bookId: req.params?.id || req.body?.bookId || req.body?.id
+    })
+  ));
+
+  uploadCategoryResolverService.registerUploadCategoryResolver('school-books-pdf', ({ req = {} } = {}) => (
+    schoolUploadPathUtils.buildBookPdfCategory({
+      bookId: req.params?.id || req.body?.bookId || req.body?.id
+    })
+  ));
 }
 
 module.exports = {

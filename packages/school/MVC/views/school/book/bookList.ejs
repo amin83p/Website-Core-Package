@@ -1,0 +1,121 @@
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_LIBRARY" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-book me-1"></i> School Library</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search books by title, author, ISBN, or publisher...'
+}) %>
+
+<% if (typeof canCreateBooks !== 'undefined' && canCreateBooks === false) { %>
+  <div class="alert alert-warning border d-flex gap-3 align-items-start">
+    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+    <div>
+      <div class="fw-semibold">Organization required</div>
+      <div class="small">You are in <strong>SYSTEM / GLOBAL MODE</strong>. Switch to a real organization to add or manage books for that organization.</div>
+    </div>
+  </div>
+<% } %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="cover">Cover</th>
+        <th class="draggable" data-column="title">Title</th>
+        <th class="draggable" data-column="authors">Authors</th>
+        <th class="draggable" data-column="publisher">Publisher</th>
+        <th class="draggable" data-column="editionYear">Edition / Year</th>
+        <th class="draggable" data-column="isbn">ISBN</th>
+        <th class="draggable" data-column="totalPages">Pages</th>
+        <th class="draggable" data-column="tocCount">TOC</th>
+        <th class="draggable" data-column="digitalPdf">PDF</th>
+        <th class="draggable" data-column="active">Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr><td colspan="11" class="text-center py-5 text-muted">No books found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => {
+        const authorsText = Array.isArray(item.authors) ? item.authors.join(', ') : '';
+        const editionYear = [item.edition, item.publicationYear].filter(Boolean).join(' / ');
+        const tocCount = Array.isArray(item.tableOfContents) ? item.tableOfContents.length : 0;
+        const coverUrl = item.coverPhoto && item.coverPhoto.url ? item.coverPhoto.url : '';
+        const hasPdf = item.digitalPdf && (item.digitalPdf.url || item.digitalPdf.path);
+        const pdfPageOne = item.pdfBookPageOne ? Number(item.pdfBookPageOne) : '';
+      %>
+        <tr>
+          <td class="ps-4" data-sort-value="<%= coverUrl ? '1' : '0' %>">
+            <% if (coverUrl) { %>
+              <img src="<%= coverUrl %>" alt="" class="rounded border" style="width: 48px; height: 64px; object-fit: cover;">
+            <% } else { %>
+              <div class="border rounded bg-light text-muted d-flex align-items-center justify-content-center" style="width: 48px; height: 64px;">
+                <i class="bi bi-book"></i>
+              </div>
+            <% } %>
+          </td>
+          <td data-sort-value="<%= item.title || '' %>">
+            <div class="fw-semibold text-dark"><%= item.title || '' %></div>
+            <% if (item.subtitle) { %>
+              <div class="small text-muted"><%= item.subtitle %></div>
+            <% } %>
+            <div class="x-small text-muted font-monospace"><%= item.id %></div>
+          </td>
+          <td><%= authorsText %></td>
+          <td><%= item.publisher || '' %></td>
+          <td data-sort-value="<%= editionYear %>"><%= editionYear || '—' %></td>
+          <td class="font-monospace"><%= item.isbn || '—' %></td>
+          <td data-sort-value="<%= Number(item.totalPages || 0) %>"><%= item.totalPages ? Number(item.totalPages) : '—' %></td>
+          <td data-sort-value="<%= tocCount %>">
+            <span class="badge bg-light text-dark border"><%= tocCount %> <%= tocCount === 1 ? 'entry' : 'entries' %></span>
+          </td>
+          <td data-sort-value="<%= hasPdf ? '1' : '0' %>">
+            <% if (hasPdf) { %>
+              <span class="badge bg-primary">PDF</span>
+              <% if (pdfPageOne) { %>
+                <div class="x-small text-muted">Page 1 → PDF <%= pdfPageOne %></div>
+              <% } %>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          </td>
+          <td><span class="badge <%= item.active ? 'bg-success' : 'bg-danger' %>"><%= item.active ? 'Active' : 'Inactive' %></span></td>
+          <td class="table-actions text-end pe-4">
+            <% if (typeof canCreateBooks === 'undefined' || canCreateBooks !== false) { %>
+            <div class="row-actions-wrap">
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= item.id %>" title="Book actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/library/books/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <a href="/school/library/books/new?copyFrom=<%= encodeURIComponent(item.id) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-copy me-2"></i>Copy to new book</a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>"><i class="bi bi-trash me-2"></i>Delete</button>
+              </div>
+            </div>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/pagination', {
+  pagination,
+  filters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('partials/tablePages-end') %>

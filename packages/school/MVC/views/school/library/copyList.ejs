@@ -1,0 +1,95 @@
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_LIBRARY" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-book me-1"></i> School Library</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search copies by code, book title, or status...',
+  fields: [
+    { name: 'copyType', label: 'Type', type: 'select', options: ['physical', 'digital'] },
+    { name: 'status', label: 'Status', type: 'select', options: ['available', 'loaned', 'lost', 'damaged', 'retired'] }
+  ]
+}) %>
+
+<% if (duplicateNoticeId && duplicateNoticeCopy) { %>
+  <div class="alert alert-success border d-flex gap-3 align-items-start">
+    <i class="bi bi-check-circle-fill fs-5"></i>
+    <div>
+      <div class="fw-semibold">A similar copy was created (<span class="font-monospace"><%= duplicateNoticeCopy.copyCode %></span>).</div>
+      <div class="small mt-1">To change the barcode or other details for this copy, open the new copy and edit it.</div>
+      <a href="/school/library/copies/edit/<%= duplicateNoticeCopy.id %>" class="btn btn-outline-primary btn-sm mt-2">
+        <i class="bi bi-pencil-square me-1"></i>Open new copy
+      </a>
+    </div>
+  </div>
+<% } %>
+
+<% if (filterBookId) { %>
+  <div class="alert alert-info border">Filtered to catalog book <span class="font-monospace"><%= filterBookId %></span></div>
+<% } %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="copyCode">Copy</th>
+        <th class="draggable" data-column="bookTitle">Book</th>
+        <th class="draggable" data-column="copyType">Type</th>
+        <th class="draggable" data-column="status">Status</th>
+        <th class="draggable" data-column="location">Location</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr><td colspan="6" class="text-center py-5 text-muted">No copies found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold font-monospace"><%= item.copyCode %></div>
+            <div class="x-small text-muted"><%= item.id %></div>
+          </td>
+          <td>
+            <div class="fw-semibold"><%= item.bookTitle || item.bookId %></div>
+            <% if (item.bookIsbn) { %><div class="x-small text-muted"><%= item.bookIsbn %></div><% } %>
+          </td>
+          <td><span class="badge <%= item.copyType === 'digital' ? 'bg-info text-dark' : 'bg-secondary' %>"><%= item.copyType %></span></td>
+          <td><span class="badge <%= item.status === 'available' ? 'bg-success' : (item.status === 'loaned' ? 'bg-warning text-dark' : 'bg-secondary') %>"><%= item.status %></span></td>
+          <td><%= item.locationPath || item.location || '—' %></td>
+          <td class="table-actions text-end pe-4">
+            <% if (typeof canCreate === 'undefined' || canCreate !== false) { %>
+            <div class="row-actions-wrap">
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= item.id %>" title="Copy actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/library/copies/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <form method="POST" action="/school/library/copies/duplicate/<%= item.id %>" class="d-inline">
+                  <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+                  <button type="submit" class="btn btn-outline-secondary btn-sm w-100 text-start"><i class="bi bi-copy me-2"></i>Make a Copy</button>
+                </form>
+                <% if (item.status !== 'loaned') { %>
+                  <a href="/school/library/copies/delete/<%= item.id %>" class="btn btn-outline-danger btn-sm" data-confirm-delete="true"><i class="bi bi-trash me-2"></i>Delete</a>
+                <% } %>
+              </div>
+            </div>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/tablePages-end') %>

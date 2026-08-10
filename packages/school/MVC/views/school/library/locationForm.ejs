@@ -1,0 +1,72 @@
+<%
+  const item = locationItem || {};
+  const isEdit = !!item.id;
+  const parentRow = parent || null;
+%>
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-geo-alt me-2"></i><%= title %></h1>
+    <a href="/school/library/locations" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back</a>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form action="<%= isEdit ? '/school/library/locations/edit/' + item.id : '/school/library/locations/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <% if (!isEdit) { %>
+        <input type="hidden" name="locationType" value="<%= locationType %>">
+        <% if (parentRow) { %><input type="hidden" name="parentId" value="<%= parentRow.id %>"><% } %>
+      <% } %>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-geo-alt me-2"></i><%= locationType %> details</h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Type</label>
+              <div class="form-control size-md bg-light"><%= locationType %></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Parent</label>
+              <div class="form-control size-md bg-light">
+                <% if (parentRow) { %>
+                  <%= parentRow.name %><span class="text-muted"> (<%= parentRow.locationType %>)</span>
+                <% } else { %>
+                  <span class="text-muted">Root — no parent</span>
+                <% } %>
+              </div>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label fw-bold" for="name">Name *</label>
+              <input id="name" name="name" class="form-control size-md" value="<%= item.name || '' %>" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="code">Code</label>
+              <input id="code" name="code" class="form-control size-md font-monospace" value="<%= item.code || '' %>" placeholder="Optional signage code">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="sortOrder">Sort order</label>
+              <input id="sortOrder" name="sortOrder" type="number" min="0" class="form-control size-md" value="<%= item.sortOrder != null ? item.sortOrder : 100 %>">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="active">Active</label>
+              <select id="active" name="active" class="form-select size-md">
+                <option value="1" <%= item.active !== false ? 'selected' : '' %>>Yes</option>
+                <option value="0" <%= item.active === false ? 'selected' : '' %>>No</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold" for="notes">Notes</label>
+              <textarea id="notes" name="notes" class="form-control size-md" rows="3"><%= item.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer bg-white border-top d-flex gap-2">
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save</button>
+          <a href="/school/library/locations" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>

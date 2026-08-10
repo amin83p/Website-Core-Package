@@ -50,6 +50,22 @@ test('school manifest links master academia hub under SCHOOL root', () => {
   assert.equal(subsectionIds(school).includes(MASTER_HUB_ID), true, 'SCHOOL should list Master Academia Hub');
 });
 
+test('school manifest links library hub under SCHOOL root and moves books under library', () => {
+  const manifest = readManifest();
+  const school = findSection(manifest, 'SCHOOL');
+  const library = findSection(manifest, 'SCHOOL_LIBRARY');
+  const academia = findSection(manifest, 'SCHOOL_ACADEMIA');
+  const books = findSection(manifest, 'SCHOOL_BOOKS');
+
+  assert.ok(library, 'SCHOOL_LIBRARY section should be declared');
+  assert.equal(subsectionIds(school).includes('446110'), true, 'SCHOOL should list School Library hub');
+  assert.equal(subsectionIds(library).includes('445585'), true, 'SCHOOL_LIBRARY should list School Books');
+  assert.equal(subsectionIds(library).includes('446111'), true, 'SCHOOL_LIBRARY should list copies');
+  assert.equal(subsectionIds(library).includes('446115'), true, 'SCHOOL_LIBRARY should list locations');
+  assert.equal(academia && subsectionIds(academia).includes('445585'), false, 'SCHOOL_ACADEMIA should not list books');
+  assert.equal(String(books?.homeURL || ''), '/school/library/books');
+});
+
 test('school manifest avoids duplicate subsection parents', () => {
   const manifest = readManifest();
   const parentByChild = new Map();

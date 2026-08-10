@@ -5,6 +5,7 @@ const path = require('path');
 const { MongoClient } = require('mongodb');
 const { resolveDataBackendConfig } = require('../../config/dataBackend');
 const { ensureMongoIndexes } = require('../../MVC/infrastructure/mongo/mongoIndexManager');
+const { buildMongoClientOptions } = require('../../MVC/infrastructure/mongo/mongoConnection');
 
 function readJsonFileSafe(filePath) {
   try {
@@ -114,9 +115,7 @@ async function runEnsureCoreListIndexes(options = {}) {
   }
 
   const client = new MongoClient(config.uri, {
-    maxPoolSize: 10,
-    minPoolSize: 0,
-    serverSelectionTimeoutMS: 15000
+    ...buildMongoClientOptions({ maxPoolSize: 10, serverSelectionTimeoutMS: 15000 }, config.uri)
   });
 
   try {

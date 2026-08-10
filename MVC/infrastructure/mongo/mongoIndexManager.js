@@ -248,6 +248,40 @@ const INDEX_DEFINITIONS = Object.freeze({
     { key: { orgId: 1, code: 1 }, options: { name: 'idx_school_skills_org_code', unique: true } },
     { key: { orgId: 1, active: 1, sortOrder: 1 }, options: { name: 'idx_school_skills_org_active_order' } }
   ],
+  schoolBooks: [
+    { key: { id: 1 }, options: { name: 'idx_school_books_id', unique: true } },
+    { key: { orgId: 1, isbn: 1 }, options: { name: 'idx_school_books_org_isbn', unique: true, sparse: true } },
+    { key: { orgId: 1, active: 1, sortOrder: 1 }, options: { name: 'idx_school_books_org_active_order' } }
+  ],
+  schoolLibraryCopies: [
+    { key: { id: 1 }, options: { name: 'idx_school_library_copies_id', unique: true } },
+    { key: { orgId: 1, bookId: 1 }, options: { name: 'idx_school_library_copies_org_book' } },
+    { key: { orgId: 1, copyCode: 1 }, options: { name: 'idx_school_library_copies_org_code', unique: true } },
+    { key: { orgId: 1, status: 1, copyType: 1 }, options: { name: 'idx_school_library_copies_org_status_type' } },
+    { key: { orgId: 1, locationId: 1 }, options: { name: 'idx_school_library_copies_org_location', sparse: true } }
+  ],
+  schoolLibraryPatrons: [
+    { key: { id: 1 }, options: { name: 'idx_school_library_patrons_id', unique: true } },
+    { key: { orgId: 1, personId: 1 }, options: { name: 'idx_school_library_patrons_org_person', unique: true } },
+    { key: { orgId: 1, status: 1, patronRole: 1 }, options: { name: 'idx_school_library_patrons_org_status_role' } }
+  ],
+  schoolLibraryPolicies: [
+    { key: { id: 1 }, options: { name: 'idx_school_library_policies_id', unique: true } },
+    { key: { orgId: 1, patronRole: 1 }, options: { name: 'idx_school_library_policies_org_role', unique: true } }
+  ],
+  schoolLibraryLoans: [
+    { key: { id: 1 }, options: { name: 'idx_school_library_loans_id', unique: true } },
+    { key: { orgId: 1, patronId: 1, status: 1 }, options: { name: 'idx_school_library_loans_org_patron_status' } },
+    { key: { orgId: 1, personId: 1, status: 1 }, options: { name: 'idx_school_library_loans_org_person_status' } },
+    { key: { orgId: 1, copyId: 1, status: 1 }, options: { name: 'idx_school_library_loans_org_copy_status' } },
+    { key: { orgId: 1, dueAt: 1, status: 1 }, options: { name: 'idx_school_library_loans_org_due_status' } }
+  ],
+  schoolLibraryLocations: [
+    { key: { id: 1 }, options: { name: 'idx_school_library_locations_id', unique: true } },
+    { key: { orgId: 1, parentId: 1, sortOrder: 1 }, options: { name: 'idx_school_library_locations_org_parent_order' } },
+    { key: { orgId: 1, locationType: 1, active: 1 }, options: { name: 'idx_school_library_locations_org_type_active' } },
+    { key: { orgId: 1, code: 1 }, options: { name: 'idx_school_library_locations_org_code', unique: true, sparse: true } }
+  ],
   schoolClassEnrollmentPeriods: [
     { key: { id: 1 }, options: { name: 'idx_school_class_enrollment_periods_id' } },
     { key: { orgId: 1, status: 1 }, options: { name: 'idx_school_class_enrollment_periods_org_status' } },

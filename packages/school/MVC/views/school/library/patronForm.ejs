@@ -1,0 +1,93 @@
+<%
+  const item = patronItem || {};
+  const isEdit = !!item.id;
+%>
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-person-vcard me-2"></i><%= isEdit ? 'Edit Patron' : 'Register Patron' %></h1>
+    <a href="/school/library/patrons" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back</a>
+  </div>
+  <% if (includeModal) { %><%- include('partials/modal_GenericPicker', { user }) %><% } %>
+  <div class="form-container wide" style="max-width: 900px;">
+    <form id="patronForm" action="<%= isEdit ? '/school/library/patrons/edit/' + item.id : '/school/library/patrons/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="personId" id="hid_personId" value="<%= item.personId || '' %>">
+      <input type="hidden" name="roleRecordId" id="hid_roleRecordId" value="<%= item.roleRecordId || '' %>">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <% if (!isEdit) { %>
+          <div class="mb-3">
+            <label class="form-label fw-bold">School person *</label>
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickStudent"><i class="bi bi-person-vcard me-1"></i> Student</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickTeacher"><i class="bi bi-person-workspace me-1"></i> Teacher</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickStaff"><i class="bi bi-person-badge me-1"></i> Staff</button>
+            </div>
+            <div id="pickedPersonLabel" class="small text-muted mt-2"><%= item.personId ? 'Selected: ' + item.personId : 'No person selected.' %></div>
+          </div>
+          <% } %>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="patronRole">Role</label>
+              <select id="patronRole" name="patronRole" class="form-select size-md" <%= isEdit ? 'disabled' : '' %>>
+                <% (patronRoles || []).forEach((role) => { %>
+                  <option value="<%= role %>" <%= item.patronRole === role ? 'selected' : '' %>><%= role %></option>
+                <% }) %>
+              </select>
+              <% if (isEdit) { %><input type="hidden" name="patronRole" value="<%= item.patronRole %>"><% } %>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="status">Status</label>
+              <select id="status" name="status" class="form-select size-md">
+                <% (patronStatuses || []).forEach((status) => { %>
+                  <option value="<%= status %>" <%= item.status === status ? 'selected' : '' %>><%= status %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="libraryCardNumber">Library card #</label>
+              <input id="libraryCardNumber" name="libraryCardNumber" class="form-control size-md" value="<%= item.libraryCardNumber || '' %>">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="maxConcurrentLoans">Max loans override</label>
+              <input id="maxConcurrentLoans" name="maxConcurrentLoans" type="number" min="0" class="form-control size-md" value="<%= item.maxConcurrentLoans != null ? item.maxConcurrentLoans : '' %>" placeholder="Policy default">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold" for="notes">Notes</label>
+              <textarea id="notes" name="notes" class="form-control size-md" rows="3"><%= item.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer bg-white border-top d-flex gap-2">
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save Patron</button>
+          <a href="/school/library/patrons" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  function bindPicker(btnId, presetName, role) {
+    const btn = document.getElementById(btnId);
+    if (!btn || !window.GenericPicker || !window.GenericPickerPresets) return;
+    btn.addEventListener('click', () => {
+      GenericPicker.open(GenericPickerPresets[presetName]({
+        onSelect: (row) => {
+          const personId = row.personId || row.id || '';
+          const recordId = row.id || '';
+          document.getElementById('hid_personId').value = personId;
+          document.getElementById('hid_roleRecordId').value = recordId;
+          document.getElementById('patronRole').value = role;
+          const label = row.label || row.name || row.localId || personId;
+          document.getElementById('pickedPersonLabel').textContent = 'Selected: ' + label;
+        }
+      }));
+    });
+  }
+  bindPicker('btnPickStudent', 'student', 'student');
+  bindPicker('btnPickTeacher', 'teacher', 'teacher');
+  bindPicker('btnPickStaff', 'staff', 'staff');
+})();
+</script>

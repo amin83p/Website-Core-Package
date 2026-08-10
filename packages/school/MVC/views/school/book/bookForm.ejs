@@ -1,0 +1,1523 @@
+<%
+
+  const item = bookItem || {};
+
+  const isEdit = !!item.id;
+
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+
+  const initialCopyFromId = String(typeof copyFromId !== 'undefined' && copyFromId ? copyFromId : '').trim();
+
+  const authorsText = Array.isArray(item.authors) ? item.authors.join(', ') : '';
+
+  const initTableOfContents = JSON.stringify(item.tableOfContents || []);
+
+  const initCoverPhoto = JSON.stringify(item.coverPhoto || null);
+
+  const coverPhotoUrl = item.coverPhoto && item.coverPhoto.url ? item.coverPhoto.url : '';
+
+  const initDigitalPdf = JSON.stringify(item.digitalPdf || null);
+
+  const digitalPdfUrl = item.digitalPdf && item.digitalPdf.url ? item.digitalPdf.url : '';
+
+  const digitalPdfName = item.digitalPdf && (item.digitalPdf.originalName || item.digitalPdf.fileName) ? (item.digitalPdf.originalName || item.digitalPdf.fileName) : '';
+
+  const pdfBookPageOne = item.pdfBookPageOne ? Number(item.pdfBookPageOne) : '';
+
+%>
+
+
+
+<style>
+
+  .toc-label-cell { position: relative; }
+
+  .toc-label-indent { padding-left: calc(0.25rem + var(--toc-indent, 0px)); }
+
+  .toc-level-badge { font-size: 0.72rem; font-weight: 600; color: #5c6b7a; min-width: 2.25rem; }
+
+  .toc-row-actions .btn { padding: 0.15rem 0.35rem; }
+
+</style>
+
+
+
+<div class="sections-page">
+
+  <div class="d-flex align-items-center justify-content-between mb-4">
+
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+
+      <h1 class="page-heading size-md m-0">
+
+        <%= isEdit ? 'Edit Book' : 'New Book' %>
+
+      </h1>
+
+      <% if (isEdit) { %>
+
+        <span class="badge bg-primary border font-monospace">ID: <%= item.id %></span>
+
+      <% } %>
+
+    </div>
+
+    <div class="d-flex gap-2">
+
+      <button type="button" class="btn btn-outline-primary btn-sm" id="btnCopyFromBook">
+
+        <i class="bi bi-copy me-1"></i> Copy From Book
+
+      </button>
+
+      <a href="/school/library/books" class="btn btn-outline-secondary btn-sm">
+
+        <i class="bi bi-arrow-left me-1"></i> Back to List
+
+      </a>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="form-container wide" style="max-width: 1400px;">
+
+    <form id="bookForm" action="<%= isEdit ? '/school/library/books/edit/' + item.id : '/school/library/books/new' %>" method="POST">
+
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+
+      <input type="hidden" name="tableOfContents" id="hid_tableOfContents" value='<%- initTableOfContents %>'>
+
+      <input type="hidden" name="coverPhoto" id="hid_coverPhoto" value='<%- initCoverPhoto %>'>
+
+      <input type="hidden" name="removeCoverPhoto" id="hid_removeCoverPhoto" value="false">
+
+      <input type="hidden" name="digitalPdf" id="hid_digitalPdf" value='<%- initDigitalPdf %>'>
+
+      <input type="hidden" name="removeDigitalPdf" id="hid_removeDigitalPdf" value="false">
+
+
+
+      <ul class="nav nav-tabs mb-4" id="bookTabs" role="tablist">
+
+        <li class="nav-item">
+
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button" role="tab">
+
+            <i class="bi bi-card-checklist me-1"></i> General Info
+
+          </button>
+
+        </li>
+
+        <li class="nav-item">
+
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-media" type="button" role="tab">
+
+            <i class="bi bi-file-earmark-image me-1"></i> Cover & PDF
+
+          </button>
+
+        </li>
+
+        <li class="nav-item">
+
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-toc" type="button" role="tab">
+
+            <i class="bi bi-list-nested me-1"></i> Table of Contents
+
+          </button>
+
+        </li>
+
+      </ul>
+
+
+
+      <div class="tab-content">
+
+        <div class="tab-pane fade show active" id="tab-general" role="tabpanel">
+
+          <div class="card border-0 shadow-sm mb-3">
+
+            <div class="card-body p-4">
+
+              <h6 class="fw-bold text-primary mb-3"><i class="bi bi-journal-text me-2"></i>Book details</h6>
+
+              <div class="row g-3">
+
+                <div class="col-md-8">
+
+                  <label class="form-label fw-bold" for="bookTitle">Title *</label>
+
+                  <input id="bookTitle" type="text" name="title" class="form-control size-md" value="<%= item.title || '' %>" placeholder="Book title" required>
+
+                </div>
+
+                <div class="col-md-4">
+
+                  <label class="form-label fw-bold" for="bookSortOrder">Sort Order</label>
+
+                  <input id="bookSortOrder" type="number" name="sortOrder" class="form-control size-md" value="<%= Number(item.sortOrder || 0) %>" min="0" max="9999">
+
+                </div>
+
+                <div class="col-md-12">
+
+                  <label class="form-label fw-bold" for="bookSubtitle">Subtitle</label>
+
+                  <input id="bookSubtitle" type="text" name="subtitle" class="form-control size-md" value="<%= item.subtitle || '' %>" placeholder="Optional subtitle">
+
+                </div>
+
+                <div class="col-md-6">
+
+                  <label class="form-label fw-bold" for="bookAuthors">Authors</label>
+
+                  <input id="bookAuthors" type="text" name="authors" class="form-control size-md" value="<%= authorsText %>" placeholder="Comma-separated author names">
+
+                  <div class="form-text small">Separate multiple authors with commas.</div>
+
+                </div>
+
+                <div class="col-md-6">
+
+                  <label class="form-label fw-bold" for="bookPublisher">Publisher</label>
+
+                  <input id="bookPublisher" type="text" name="publisher" class="form-control size-md" value="<%= item.publisher || '' %>" placeholder="Publisher name">
+
+                </div>
+
+                <div class="col-md-3">
+
+                  <label class="form-label fw-bold" for="bookEdition">Edition</label>
+
+                  <input id="bookEdition" type="text" name="edition" class="form-control size-md" value="<%= item.edition || '' %>" placeholder="e.g. 3rd">
+
+                </div>
+
+                <div class="col-md-3">
+
+                  <label class="form-label fw-bold" for="bookPublicationYear">Publication Year</label>
+
+                  <input id="bookPublicationYear" type="number" name="publicationYear" class="form-control size-md" value="<%= item.publicationYear || '' %>" min="1000" max="2100" placeholder="Year">
+
+                </div>
+
+                <div class="col-md-3">
+
+                  <label class="form-label fw-bold" for="bookIsbn">ISBN</label>
+
+                  <input id="bookIsbn" type="text" name="isbn" class="form-control size-md font-monospace" value="<%= item.isbn || '' %>" placeholder="ISBN-10 or ISBN-13">
+
+                </div>
+
+                <div class="col-md-3">
+
+                  <label class="form-label fw-bold" for="bookTotalPages">Total Pages</label>
+
+                  <input id="bookTotalPages" type="number" name="totalPages" class="form-control size-md" value="<%= item.totalPages || '' %>" min="1" step="1" placeholder="Page count">
+
+                </div>
+
+                <div class="col-md-4">
+
+                  <label class="form-label fw-bold" for="bookLanguage">Language</label>
+
+                  <input id="bookLanguage" type="text" name="language" class="form-control size-md" value="<%= item.language || '' %>" placeholder="e.g. English">
+
+                </div>
+
+                <div class="col-md-8">
+
+                  <label class="form-label fw-bold" for="bookSubjectArea">Subject Area</label>
+
+                  <input id="bookSubjectArea" type="text" name="subjectArea" class="form-control size-md" value="<%= item.subjectArea || '' %>" placeholder="e.g. ESL LINC 3">
+
+                </div>
+
+                <div class="col-12">
+
+                  <label class="form-label fw-bold" for="bookDescription">Description / Notes</label>
+
+                  <textarea id="bookDescription" name="description" class="form-control size-md" rows="3" placeholder="Optional notes about this book"><%= item.description || '' %></textarea>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+
+          <div class="card border-0 shadow-sm mb-3">
+
+            <div class="card-body p-4">
+
+              <div class="d-flex justify-content-between gap-3 align-items-start">
+
+                <div>
+
+                  <h6 class="fw-bold text-primary m-0"><i class="bi bi-toggle-on me-2"></i>Availability</h6>
+
+                  <div class="small text-muted mt-1">Inactive books stay in the catalog but are hidden from future session pickers.</div>
+
+                </div>
+
+                <div class="form-check form-switch">
+
+                  <input class="form-check-input" type="checkbox" role="switch" id="bookActive" name="active" value="true" <%= item.active === false ? '' : 'checked' %>>
+
+                  <label class="form-check-label fw-semibold" for="bookActive">Active</label>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="tab-pane fade" id="tab-media" role="tabpanel">
+
+          <div class="card border-0 shadow-sm mb-3">
+
+            <div class="card-body p-4">
+
+              <h6 class="fw-bold text-primary mb-1"><i class="bi bi-image me-2"></i>Cover photo</h6>
+
+              <div class="small text-muted mb-3">Upload a cover image to recognize this book quickly in lists and session pickers.</div>
+
+              <div class="d-flex flex-wrap align-items-start gap-4">
+
+                <div id="coverPhotoPreviewWrap" class="border rounded bg-light-subtle d-flex align-items-center justify-content-center<%= coverPhotoUrl ? '' : ' d-none' %>" style="width: 140px; height: 180px;">
+
+                  <img id="coverPhotoPreview" src="<%= coverPhotoUrl %>" alt="Book cover preview" class="img-fluid rounded" style="max-width: 140px; max-height: 180px; object-fit: contain;">
+
+                </div>
+
+                <div id="coverPhotoPlaceholder" class="border rounded bg-light text-muted d-flex align-items-center justify-content-center<%= coverPhotoUrl ? ' d-none' : '' %>" style="width: 140px; height: 180px;">
+
+                  <div class="text-center small px-2"><i class="bi bi-book fs-3 d-block mb-2"></i>No cover photo</div>
+
+                </div>
+
+                <div class="flex-grow-1">
+
+                  <label class="form-label fw-bold" for="coverPhotoInput">Upload cover image</label>
+
+                  <input type="file" id="coverPhotoInput" class="form-control size-md" accept="image/*">
+
+                  <div class="form-text small">JPG, PNG, GIF, or WebP. One image per book.</div>
+
+                  <div class="d-flex gap-2 mt-3">
+
+                    <button type="button" class="btn btn-outline-danger btn-sm d-none" id="btnRemoveCoverPhoto">
+
+                      <i class="bi bi-trash me-1"></i> Remove photo
+
+                    </button>
+
+                  </div>
+
+                  <div id="coverPhotoUploadStatus" class="small text-muted mt-2"></div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+
+          <div class="card border-0 shadow-sm mb-3">
+
+            <div class="card-body p-4">
+
+              <h6 class="fw-bold text-primary mb-1"><i class="bi bi-file-earmark-pdf me-2"></i>Digital copy (PDF)</h6>
+
+              <div class="small text-muted mb-3">Upload the book PDF and map printed page 1 to the correct PDF page for session navigation.</div>
+
+              <div class="row g-3 align-items-start">
+
+                <div class="col-md-7">
+
+                  <label class="form-label fw-bold" for="digitalPdfInput">Upload PDF</label>
+
+                  <input type="file" id="digitalPdfInput" class="form-control size-md" accept="application/pdf,.pdf">
+
+                  <div class="form-text small">One PDF per book. Replace the file by uploading again.</div>
+
+                  <div id="digitalPdfFileWrap" class="mt-3<%= digitalPdfUrl ? '' : ' d-none' %>">
+
+                    <div class="border rounded p-3 bg-light-subtle">
+
+                      <div class="fw-semibold" id="digitalPdfFileName"><%= digitalPdfName || 'Attached PDF' %></div>
+
+                      <% if (digitalPdfUrl) { %>
+
+                        <a href="<%= digitalPdfUrl %>" target="_blank" rel="noopener" class="small" id="digitalPdfOpenLink">Open current PDF</a>
+
+                      <% } else { %>
+
+                        <a href="#" target="_blank" rel="noopener" class="small d-none" id="digitalPdfOpenLink">Open current PDF</a>
+
+                      <% } %>
+
+                    </div>
+
+                  </div>
+
+                  <div class="d-flex gap-2 mt-3">
+
+                    <button type="button" class="btn btn-outline-danger btn-sm<%= digitalPdfUrl ? '' : ' d-none' %>" id="btnRemoveDigitalPdf">
+
+                      <i class="bi bi-trash me-1"></i> Remove PDF
+
+                    </button>
+
+                  </div>
+
+                  <div id="digitalPdfUploadStatus" class="small text-muted mt-2"></div>
+
+                </div>
+
+                <div class="col-md-5">
+
+                  <label class="form-label fw-bold" for="pdfBookPageOne">PDF page for book page 1 *</label>
+
+                  <input type="number" id="pdfBookPageOne" name="pdfBookPageOne" class="form-control size-md" min="1" step="1" value="<%= pdfBookPageOne %>" placeholder="e.g. 15">
+
+                  <div class="form-text small">If the book starts on PDF page 15 because of front matter, enter <strong>15</strong>. Book page 10 will open PDF page 24.</div>
+
+                  <div class="small text-muted mt-2" id="pdfPageMappingHint"></div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="tab-pane fade" id="tab-toc" role="tabpanel">
+
+          <div class="card border-0 shadow-sm mb-3">
+
+            <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3">
+
+              <div>
+
+                <h6 class="fw-bold m-0 text-primary"><i class="bi bi-list-nested me-2"></i>Table of contents</h6>
+
+                <div class="small text-muted mt-1">Use heading levels (H1–H6) for chapters, sections, and subsections.</div>
+
+              </div>
+
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddTocRow">
+
+                <i class="bi bi-plus-lg me-1"></i> Add top-level entry
+
+              </button>
+
+            </div>
+
+            <div class="card-body p-0">
+
+              <div class="table-responsive">
+
+                <table class="table table-sm align-middle mb-0" id="tocTable">
+
+                  <thead class="table-light">
+
+                    <tr>
+
+                      <th class="ps-4" style="width: 110px;">Level</th>
+
+                      <th>Heading *</th>
+
+                      <th style="width: 120px;">Start page *</th>
+
+                      <th style="width: 120px;">End page</th>
+
+                      <th class="text-end pe-4" style="width: 110px;"></th>
+
+                    </tr>
+
+                  </thead>
+
+                  <tbody id="tocTableBody"></tbody>
+
+                </table>
+
+              </div>
+
+              <div id="tocEmptyState" class="text-center py-4 text-muted small">No table of contents entries yet. Click <strong>Add top-level entry</strong> to begin.</div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="button-row mt-4 pt-3 border-top">
+
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><%= isEdit ? 'Save Changes' : 'Create Book' %></button>
+
+        <a href="/school/library/books" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</div>
+
+
+
+<script>
+
+document.addEventListener('DOMContentLoaded', () => {
+
+  const MAX_TOC_LEVEL = 6;
+
+  const TOC_LEVEL_INDENT_PX = 18;
+
+  const form = document.getElementById('bookForm');
+
+  const tbody = document.getElementById('tocTableBody');
+
+  const emptyState = document.getElementById('tocEmptyState');
+
+  const hiddenToc = document.getElementById('hid_tableOfContents');
+
+  const addBtn = document.getElementById('btnAddTocRow');
+
+  const coverInput = document.getElementById('coverPhotoInput');
+
+  const hiddenCover = document.getElementById('hid_coverPhoto');
+
+  const hiddenRemoveCover = document.getElementById('hid_removeCoverPhoto');
+
+  const coverPreview = document.getElementById('coverPhotoPreview');
+
+  const coverPreviewWrap = document.getElementById('coverPhotoPreviewWrap');
+
+  const coverPlaceholder = document.getElementById('coverPhotoPlaceholder');
+
+  const btnRemoveCover = document.getElementById('btnRemoveCoverPhoto');
+
+  const coverUploadStatus = document.getElementById('coverPhotoUploadStatus');
+
+  const bookIdForUpload = '<%= isEdit ? item.id : "book_unsaved" %>';
+
+  const currentBookId = '<%= isEdit ? item.id : "" %>';
+
+  const initialCopyFromId = '<%= initialCopyFromId %>';
+
+  const pdfInput = document.getElementById('digitalPdfInput');
+
+  const hiddenPdf = document.getElementById('hid_digitalPdf');
+
+  const hiddenRemovePdf = document.getElementById('hid_removeDigitalPdf');
+
+  const pdfBookPageOneInput = document.getElementById('pdfBookPageOne');
+
+  const pdfFileWrap = document.getElementById('digitalPdfFileWrap');
+
+  const pdfFileName = document.getElementById('digitalPdfFileName');
+
+  const pdfOpenLink = document.getElementById('digitalPdfOpenLink');
+
+  const btnRemovePdf = document.getElementById('btnRemoveDigitalPdf');
+
+  const pdfUploadStatus = document.getElementById('digitalPdfUploadStatus');
+
+  const pdfPageMappingHint = document.getElementById('pdfPageMappingHint');
+
+  const bookTabs = document.getElementById('bookTabs');
+
+
+
+  function showTab(targetSelector) {
+
+    const button = bookTabs?.querySelector(`button[data-bs-target="${targetSelector}"]`);
+
+    if (button && typeof bootstrap !== 'undefined') {
+
+      bootstrap.Tab.getOrCreateInstance(button).show();
+
+    }
+
+  }
+
+
+
+  function escapeHtml(value) {
+
+    return String(value || '')
+
+      .replace(/&/g, '&amp;')
+
+      .replace(/</g, '&lt;')
+
+      .replace(/>/g, '&gt;')
+
+      .replace(/"/g, '&quot;');
+
+  }
+
+
+
+  function buildLevelOptions(selectedLevel) {
+
+    const selected = Number(selectedLevel || 1);
+
+    return Array.from({ length: MAX_TOC_LEVEL }, (_, index) => {
+
+      const level = index + 1;
+
+      return '<option value="' + level + '"' + (level === selected ? ' selected' : '') + '>H' + level + '</option>';
+
+    }).join('');
+
+  }
+
+
+
+  function syncTocRowIndent(tr) {
+
+    const level = Number(tr.querySelector('.js-toc-level')?.value || 1);
+
+    const safeLevel = Number.isFinite(level) && level >= 1 ? Math.min(MAX_TOC_LEVEL, level) : 1;
+
+    const labelCell = tr.querySelector('.toc-label-cell');
+
+    if (labelCell) {
+
+      labelCell.style.setProperty('--toc-indent', String((safeLevel - 1) * TOC_LEVEL_INDENT_PX) + 'px');
+
+    }
+
+    const badge = tr.querySelector('.toc-level-badge');
+
+    if (badge) badge.textContent = 'H' + safeLevel;
+
+  }
+
+
+
+  function syncEmptyState() {
+
+    const hasRows = tbody.querySelectorAll('tr[data-toc-row]').length > 0;
+
+    emptyState.classList.toggle('d-none', hasRows);
+
+  }
+
+
+
+  function clearTocRows() {
+
+    tbody.querySelectorAll('tr[data-toc-row]').forEach((row) => row.remove());
+
+    syncEmptyState();
+
+  }
+
+
+
+  function createTocRow(initial = {}, insertAfter = null) {
+
+    const level = Number(initial.level || 1);
+
+    const tr = document.createElement('tr');
+
+    tr.setAttribute('data-toc-row', '1');
+
+    tr.innerHTML = [
+
+      '<td class="ps-4">',
+
+        '<select class="form-select form-select-sm js-toc-level" aria-label="Heading level">',
+
+          buildLevelOptions(level),
+
+        '</select>',
+
+      '</td>',
+
+      '<td class="toc-label-cell toc-label-indent">',
+
+        '<input type="hidden" class="js-toc-id" value="' + escapeHtml(initial.id || '') + '">',
+
+        '<input type="hidden" class="js-toc-sort-order" value="' + escapeHtml(initial.sortOrder || '') + '">',
+
+        '<div class="d-flex align-items-center gap-2">',
+
+          '<span class="toc-level-badge">H' + escapeHtml(level) + '</span>',
+
+          '<input type="text" class="form-control form-control-sm js-toc-label flex-grow-1" value="' + escapeHtml(initial.label || '') + '" placeholder="Chapter, section, or subsection title" required>',
+
+        '</div>',
+
+      '</td>',
+
+      '<td>',
+
+        '<input type="number" min="1" step="1" class="form-control form-control-sm js-toc-start" value="' + escapeHtml(initial.startPage || '') + '" placeholder="Start" required>',
+
+      '</td>',
+
+      '<td>',
+
+        '<input type="number" min="1" step="1" class="form-control form-control-sm js-toc-end" value="' + escapeHtml(initial.endPage || '') + '" placeholder="End">',
+
+      '</td>',
+
+      '<td class="text-end pe-4 toc-row-actions">',
+
+        '<div class="d-flex justify-content-end gap-1">',
+
+          '<button type="button" class="btn btn-outline-primary btn-sm js-add-toc-child" title="Add child heading"><i class="bi bi-node-plus"></i></button>',
+
+          '<button type="button" class="btn btn-outline-danger btn-sm js-remove-toc-row" title="Remove entry"><i class="bi bi-trash"></i></button>',
+
+        '</div>',
+
+      '</td>'
+
+    ].join('');
+
+
+
+    tr.querySelector('.js-remove-toc-row').addEventListener('click', () => {
+
+      tr.remove();
+
+      syncEmptyState();
+
+    });
+
+
+
+    tr.querySelector('.js-add-toc-child').addEventListener('click', () => {
+
+      const currentLevel = Number(tr.querySelector('.js-toc-level').value || 1);
+
+      const childLevel = Math.min(MAX_TOC_LEVEL, currentLevel + 1);
+
+      createTocRow({ level: childLevel }, tr);
+
+    });
+
+
+
+    tr.querySelector('.js-toc-level').addEventListener('change', () => syncTocRowIndent(tr));
+
+
+
+    if (insertAfter && insertAfter.parentNode === tbody) {
+
+      insertAfter.insertAdjacentElement('afterend', tr);
+
+    } else {
+
+      tbody.appendChild(tr);
+
+    }
+
+
+
+    syncTocRowIndent(tr);
+
+    syncEmptyState();
+
+    tr.querySelector('.js-toc-label')?.focus();
+
+    return tr;
+
+  }
+
+
+
+  function serializeToc() {
+
+    const rows = [];
+
+    tbody.querySelectorAll('tr[data-toc-row]').forEach((tr, index) => {
+
+      const label = tr.querySelector('.js-toc-label').value.trim();
+
+      const startPage = tr.querySelector('.js-toc-start').value.trim();
+
+      const endPage = tr.querySelector('.js-toc-end').value.trim();
+
+      const level = Number(tr.querySelector('.js-toc-level').value || 1);
+
+      if (!label && !startPage && !endPage) return;
+
+      rows.push({
+
+        id: tr.querySelector('.js-toc-id').value.trim(),
+
+        label,
+
+        startPage,
+
+        endPage: endPage || '',
+
+        level,
+
+        sortOrder: index + 1
+
+      });
+
+    });
+
+    return rows;
+
+  }
+
+
+
+  function validateTocClient(rows) {
+
+    const totalPagesInput = document.getElementById('bookTotalPages');
+
+    const totalPages = Number(totalPagesInput?.value || 0);
+
+    let previousLevel = 0;
+
+    for (let i = 0; i < rows.length; i += 1) {
+
+      const row = rows[i];
+
+      const level = Number(row.level || 1);
+
+      if (!Number.isFinite(level) || level < 1 || level > MAX_TOC_LEVEL) {
+
+        throw new Error('TOC row ' + (i + 1) + ': heading level must be between 1 and ' + MAX_TOC_LEVEL + '.');
+
+      }
+
+      if (level > 1 && previousLevel < 1) {
+
+        throw new Error('TOC row ' + (i + 1) + ': nested headings must follow a top-level entry.');
+
+      }
+
+      if (level > previousLevel + 1) {
+
+        throw new Error('TOC row ' + (i + 1) + ': cannot skip more than one heading level.');
+
+      }
+
+      previousLevel = level;
+
+      if (!row.label) {
+
+        throw new Error('Each table of contents row requires a heading.');
+
+      }
+
+      const startPage = Number(row.startPage);
+
+      if (!Number.isFinite(startPage) || startPage < 1) {
+
+        throw new Error('Each table of contents row requires a valid start page.');
+
+      }
+
+      if (row.endPage) {
+
+        const endPage = Number(row.endPage);
+
+        if (!Number.isFinite(endPage) || endPage < startPage) {
+
+          throw new Error('TOC row ' + (i + 1) + ': end page must be greater than or equal to start page.');
+
+        }
+
+        if (totalPages > 0 && endPage > totalPages) {
+
+          throw new Error('TOC row ' + (i + 1) + ': end page exceeds total pages.');
+
+        }
+
+      }
+
+      if (totalPages > 0 && startPage > totalPages) {
+
+        throw new Error('TOC row ' + (i + 1) + ': start page exceeds total pages.');
+
+      }
+
+    }
+
+  }
+
+
+
+  function applyBookTemplate(template) {
+
+    if (!template || typeof template !== 'object') return '';
+
+    const setVal = (id, value) => {
+
+      const el = document.getElementById(id);
+
+      if (el) el.value = value ?? '';
+
+    };
+
+    setVal('bookTitle', template.title || '');
+
+    setVal('bookSubtitle', template.subtitle || '');
+
+    setVal('bookAuthors', Array.isArray(template.authors) ? template.authors.join(', ') : '');
+
+    setVal('bookPublisher', template.publisher || '');
+
+    setVal('bookEdition', template.edition || '');
+
+    setVal('bookPublicationYear', template.publicationYear ?? '');
+
+    setVal('bookIsbn', '');
+
+    setVal('bookTotalPages', template.totalPages ?? '');
+
+    setVal('bookLanguage', template.language || '');
+
+    setVal('bookSubjectArea', template.subjectArea || '');
+
+    setVal('bookDescription', template.description || '');
+
+    setVal('bookSortOrder', Number(template.sortOrder || 0));
+
+    const activeEl = document.getElementById('bookActive');
+
+    if (activeEl) activeEl.checked = template.active !== false;
+
+
+
+    clearTocRows();
+
+    const tocRows = Array.isArray(template.tableOfContents) ? template.tableOfContents : [];
+
+    if (tocRows.length) {
+
+      tocRows.forEach((row) => createTocRow(row));
+
+    } else {
+
+      syncEmptyState();
+
+    }
+
+    hiddenToc.value = JSON.stringify(serializeToc());
+
+    showTab('#tab-general');
+
+    return String(template.sourceTitle || template.sourceId || '').trim();
+
+  }
+
+
+
+  async function loadBookTemplate(sourceBookId, options = {}) {
+
+    const silent = Boolean(options.silent);
+
+    const sourceId = String(sourceBookId || '').trim();
+
+    if (!sourceId) return;
+
+    if (currentBookId && sourceId === String(currentBookId)) {
+
+      const msg = 'Select a different book to copy from.';
+
+      if (!silent) {
+
+        if (typeof showMessageModal === 'function') {
+
+          await showMessageModal({ title: 'Copy From Book', icon: 'warning', message: msg, buttons: [{ text: 'Close', class: 'btn-warning' }] });
+
+        } else alert(msg);
+
+      }
+
+      return;
+
+    }
+
+    const response = await fetch('/school/library/books/api/template/' + encodeURIComponent(sourceId), {
+
+      headers: { 'X-AJAX-Request': 'true' }
+
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result?.status === 'error') {
+
+      throw new Error(result?.message || 'Failed to load book template.');
+
+    }
+
+    const label = applyBookTemplate(result.template || {});
+
+    if (!silent) {
+
+      const message = label
+
+        ? 'Book fields were copied from "' + label + '". ISBN, cover photo, and PDF were not copied — update those for the new edition.'
+
+        : 'Book fields were copied. ISBN, cover photo, and PDF were not copied — update those for the new edition.';
+
+      if (typeof showMessageModal === 'function') {
+
+        await showMessageModal({ title: 'Template Applied', icon: 'success', message, buttons: [{ text: 'OK', class: 'btn-success' }] });
+
+      } else alert(message);
+
+    }
+
+  }
+
+
+
+  let initialRows = [];
+
+  try {
+
+    initialRows = JSON.parse(hiddenToc.value || '[]');
+
+    if (!Array.isArray(initialRows)) initialRows = [];
+
+  } catch (_) {
+
+    initialRows = [];
+
+  }
+
+
+
+  if (initialRows.length) {
+
+    initialRows.forEach((row) => createTocRow(row));
+
+  } else {
+
+    syncEmptyState();
+
+  }
+
+
+
+  function syncCoverPreview(url) {
+
+    const hasPhoto = Boolean(String(url || '').trim());
+
+    if (coverPreview) coverPreview.src = hasPhoto ? url : '';
+
+    coverPreviewWrap?.classList.toggle('d-none', !hasPhoto);
+
+    coverPlaceholder?.classList.toggle('d-none', hasPhoto);
+
+    btnRemoveCover?.classList.toggle('d-none', !hasPhoto);
+
+  }
+
+
+
+  function setCoverPhotoState(coverPhoto, removed = false) {
+
+    hiddenRemoveCover.value = removed ? 'true' : 'false';
+
+    if (removed) {
+
+      hiddenCover.value = '';
+
+      syncCoverPreview('');
+
+      return;
+
+    }
+
+    hiddenCover.value = coverPhoto ? JSON.stringify(coverPhoto) : '';
+
+    syncCoverPreview(coverPhoto?.url || '');
+
+  }
+
+
+
+  try {
+
+    const initialCover = JSON.parse(hiddenCover.value || 'null');
+
+    if (initialCover && initialCover.url) {
+
+      setCoverPhotoState(initialCover, false);
+
+    }
+
+  } catch (_) {
+
+    setCoverPhotoState(null, false);
+
+  }
+
+
+
+  coverInput?.addEventListener('change', async () => {
+
+    const file = coverInput.files && coverInput.files[0];
+
+    if (!file) return;
+
+    if (!String(file.type || '').toLowerCase().startsWith('image/')) {
+
+      coverUploadStatus.textContent = 'Please choose an image file.';
+
+      coverInput.value = '';
+
+      return;
+
+    }
+
+    coverUploadStatus.textContent = 'Uploading cover photo...';
+
+    try {
+
+      const fd = new FormData();
+
+      fd.append('coverPhoto', file);
+
+      fd.append('bookId', bookIdForUpload);
+
+      const response = await fetch('/school/library/books/api/upload-cover', {
+
+        method: 'POST',
+
+        headers: { 'X-AJAX-Request': 'true' },
+
+        body: fd
+
+      });
+
+      const result = await response.json();
+
+      if (result.status !== 'success' || !result.coverPhoto) {
+
+        throw new Error(result.message || 'Cover photo upload failed.');
+
+      }
+
+      setCoverPhotoState(result.coverPhoto, false);
+
+      coverUploadStatus.textContent = 'Cover photo uploaded.';
+
+      coverInput.value = '';
+
+    } catch (error) {
+
+      coverUploadStatus.textContent = error.message || 'Cover photo upload failed.';
+
+      coverInput.value = '';
+
+    }
+
+  });
+
+
+
+  btnRemoveCover?.addEventListener('click', () => {
+
+    setCoverPhotoState(null, true);
+
+    coverInput.value = '';
+
+    coverUploadStatus.textContent = 'Cover photo will be removed when you save.';
+
+  });
+
+
+
+  function syncPdfUi(hasPdf, digitalPdf) {
+
+    pdfFileWrap?.classList.toggle('d-none', !hasPdf);
+
+    btnRemovePdf?.classList.toggle('d-none', !hasPdf);
+
+    if (hasPdf && digitalPdf) {
+
+      const label = digitalPdf.originalName || digitalPdf.fileName || 'Attached PDF';
+
+      if (pdfFileName) pdfFileName.textContent = label;
+
+      if (pdfOpenLink) {
+
+        pdfOpenLink.href = digitalPdf.url || '#';
+
+        pdfOpenLink.classList.toggle('d-none', !digitalPdf.url);
+
+      }
+
+    }
+
+    updatePdfMappingHint();
+
+  }
+
+
+
+  function setDigitalPdfState(digitalPdf, removed = false) {
+
+    hiddenRemovePdf.value = removed ? 'true' : 'false';
+
+    if (removed) {
+
+      hiddenPdf.value = '';
+
+      syncPdfUi(false, null);
+
+      if (pdfBookPageOneInput) pdfBookPageOneInput.value = '';
+
+      return;
+
+    }
+
+    hiddenPdf.value = digitalPdf ? JSON.stringify(digitalPdf) : '';
+
+    syncPdfUi(Boolean(digitalPdf), digitalPdf);
+
+  }
+
+
+
+  function updatePdfMappingHint() {
+
+    if (!pdfPageMappingHint || !pdfBookPageOneInput) return;
+
+    const hasPdf = Boolean(String(hiddenPdf.value || '').trim());
+
+    const pageOne = Number(pdfBookPageOneInput.value || 0);
+
+    if (!hasPdf) {
+
+      pdfPageMappingHint.textContent = '';
+
+      return;
+
+    }
+
+    if (!Number.isFinite(pageOne) || pageOne < 1) {
+
+      pdfPageMappingHint.textContent = 'Enter the PDF page number where book page 1 begins.';
+
+      return;
+
+    }
+
+    pdfPageMappingHint.textContent = 'Example: book page 10 opens PDF page ' + (10 + pageOne - 1) + '.';
+
+  }
+
+
+
+  try {
+
+    const initialPdf = JSON.parse(hiddenPdf.value || 'null');
+
+    if (initialPdf && (initialPdf.url || initialPdf.path)) {
+
+      setDigitalPdfState(initialPdf, false);
+
+    }
+
+  } catch (_) {
+
+    setDigitalPdfState(null, false);
+
+  }
+
+
+
+  pdfBookPageOneInput?.addEventListener('input', updatePdfMappingHint);
+
+
+
+  pdfInput?.addEventListener('change', async () => {
+
+    const file = pdfInput.files && pdfInput.files[0];
+
+    if (!file) return;
+
+    const name = String(file.name || '').toLowerCase();
+
+    const type = String(file.type || '').toLowerCase();
+
+    if (type !== 'application/pdf' && !name.endsWith('.pdf')) {
+
+      pdfUploadStatus.textContent = 'Please choose a PDF file.';
+
+      pdfInput.value = '';
+
+      return;
+
+    }
+
+    pdfUploadStatus.textContent = 'Uploading PDF...';
+
+    try {
+
+      const fd = new FormData();
+
+      fd.append('digitalPdf', file);
+
+      fd.append('bookId', bookIdForUpload);
+
+      const response = await fetch('/school/library/books/api/upload-pdf', {
+
+        method: 'POST',
+
+        headers: { 'X-AJAX-Request': 'true' },
+
+        body: fd
+
+      });
+
+      const result = await response.json();
+
+      if (result.status !== 'success' || !result.digitalPdf) {
+
+        throw new Error(result.message || 'PDF upload failed.');
+
+      }
+
+      setDigitalPdfState(result.digitalPdf, false);
+
+      if (pdfBookPageOneInput && !pdfBookPageOneInput.value) pdfBookPageOneInput.value = '1';
+
+      pdfUploadStatus.textContent = 'PDF uploaded. Confirm the page mapping below.';
+
+      pdfInput.value = '';
+
+    } catch (error) {
+
+      pdfUploadStatus.textContent = error.message || 'PDF upload failed.';
+
+      pdfInput.value = '';
+
+    }
+
+  });
+
+
+
+  btnRemovePdf?.addEventListener('click', () => {
+
+    setDigitalPdfState(null, true);
+
+    pdfInput.value = '';
+
+    pdfUploadStatus.textContent = 'PDF will be removed when you save.';
+
+  });
+
+
+
+  addBtn?.addEventListener('click', () => createTocRow({ level: 1 }));
+
+
+
+  document.getElementById('btnCopyFromBook')?.addEventListener('click', () => {
+
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+
+      alert('Book picker is not available.');
+
+      return;
+
+    }
+
+    const context = typeof GenericPickerContexts?.activeOrganizationScope === 'function'
+
+      ? GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+
+      : null;
+
+    GenericPicker.open(GenericPickerPresets.book({
+
+      title: 'Copy From Book',
+
+      icon: 'bi-copy',
+
+      placeholder: 'Search books to copy...',
+
+      context,
+
+      onSelect: async (item) => {
+
+        try {
+
+          await loadBookTemplate(item?.id);
+
+        } catch (error) {
+
+          const msg = error.message || 'Failed to copy book data.';
+
+          if (typeof showMessageModal === 'function') {
+
+            await showMessageModal({ title: 'Copy Failed', icon: 'error', message: msg, buttons: [{ text: 'Close', class: 'btn-danger' }] });
+
+          } else alert(msg);
+
+        }
+
+      }
+
+    }));
+
+  });
+
+
+
+  if (initialCopyFromId) {
+
+    loadBookTemplate(initialCopyFromId).catch((error) => {
+
+      console.warn('Book copy prefill failed:', error.message);
+
+    });
+
+  }
+
+
+
+  form?.addEventListener('submit', async (event) => {
+
+    event.preventDefault();
+
+    const button = form.querySelector('button[type="submit"]');
+
+    const original = button.innerHTML;
+
+    try {
+
+      const titleValue = String(document.getElementById('bookTitle')?.value || '').trim();
+
+      if (!titleValue) {
+
+        showTab('#tab-general');
+
+        throw new Error('Book title is required.');
+
+      }
+
+
+
+      const tocRows = serializeToc();
+
+      validateTocClient(tocRows);
+
+      hiddenToc.value = JSON.stringify(tocRows);
+
+      const hasPdf = Boolean(String(hiddenPdf?.value || '').trim()) && hiddenRemovePdf?.value !== 'true';
+
+      if (hasPdf) {
+
+        const pageOne = Number(pdfBookPageOneInput?.value || 0);
+
+        if (!Number.isFinite(pageOne) || pageOne < 1) {
+
+          showTab('#tab-media');
+
+          throw new Error('Enter the PDF page number where book page 1 begins.');
+
+        }
+
+      }
+
+      button.disabled = true;
+
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+      const response = await fetch(form.action, {
+
+        method: 'POST',
+
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+
+        body: new URLSearchParams(new FormData(form)).toString()
+
+      });
+
+      const result = await response.json();
+
+      if (result.status !== 'success') throw new Error(result.message || 'Save failed.');
+
+      window.location.href = result.redirectTo || '/school/library/books';
+
+    } catch (error) {
+
+      button.disabled = false;
+
+      button.innerHTML = original;
+
+      if (String(error.message || '').toLowerCase().includes('toc')) {
+
+        showTab('#tab-toc');
+
+      }
+
+      if (typeof showMessageModal === 'function') {
+
+        await showMessageModal({
+
+          title: 'Unable to save book',
+
+          icon: 'error',
+
+          message: error.message || 'Save failed.',
+
+          buttons: [{ text: 'Close', class: 'btn-danger' }]
+
+        });
+
+      } else {
+
+        alert(error.message || 'Save failed.');
+
+      }
+
+    }
+
+  });
+
+});
+
+</script>
+
+
