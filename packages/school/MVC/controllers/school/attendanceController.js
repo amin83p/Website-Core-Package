@@ -645,6 +645,12 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
                     hasApprovedLeave,
                     lateMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.lateMinutes || 0),
                     earlyLeaveMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.earlyLeaveMinutes || 0),
+                    lateExcused: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+                        ? false
+                        : Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRecord).lateExcused),
+                    earlyLeaveExcused: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+                        ? false
+                        : Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRecord).earlyLeaveExcused),
                     excuseRef: rosterRecord?.excuseRef || '',
                     excuseAttachment: rosterRecord?.excuseAttachment || null,
                     teacherNotes: (rosterRecord?.notes) || ses.notes || '',
@@ -949,6 +955,8 @@ async function updateAttendanceRosterCell(req, res) {
         if (req.body?.earlyLeaveMinutes !== undefined) {
             rosterRecord.earlyLeaveMinutes = parseNonNegInt(req.body.earlyLeaveMinutes);
         }
+        rosterRecord.lateExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.lateExcused);
+        rosterRecord.earlyLeaveExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.earlyLeaveExcused);
         if (req.body?.excuseRef !== undefined) {
             rosterRecord.excuseRef = String(req.body.excuseRef || '').trim();
         }
@@ -1002,6 +1010,8 @@ async function updateAttendanceRosterCell(req, res) {
                 attendance: rosterRecord.attendance,
                 lateMinutes: rosterRecord.lateMinutes || 0,
                 earlyLeaveMinutes: rosterRecord.earlyLeaveMinutes || 0,
+                lateExcused: Boolean(rosterRecord.lateExcused),
+                earlyLeaveExcused: Boolean(rosterRecord.earlyLeaveExcused),
                 excuseRef: rosterRecord.excuseRef || '',
                 excuseAttachment: rosterRecord.excuseAttachment || null,
                 notes: rosterRecord.notes || ''

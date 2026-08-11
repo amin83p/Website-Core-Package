@@ -130,6 +130,10 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_attendance_percent', label: 'Student Attendance Percent', description: 'Computed attendance percentage.' }),
     Object.freeze({ key: 'student_late_minutes', label: 'Student Late Minutes', description: 'Accumulated late minutes for this student.' }),
     Object.freeze({ key: 'student_early_leave_minutes', label: 'Student Early Leave Minutes', description: 'Accumulated early-leave minutes for this student.' }),
+    Object.freeze({ key: 'student_late_excused_sessions', label: 'Student Late Excused Sessions', description: 'Sessions where late-arrival minutes were marked excused.' }),
+    Object.freeze({ key: 'student_late_excused_minutes', label: 'Student Late Excused Minutes', description: 'Late-arrival minutes marked excused.' }),
+    Object.freeze({ key: 'student_early_leave_excused_sessions', label: 'Student Early Leave Excused Sessions', description: 'Sessions where early-leave minutes were marked excused.' }),
+    Object.freeze({ key: 'student_early_leave_excused_minutes', label: 'Student Early Leave Excused Minutes', description: 'Early-leave minutes marked excused.' }),
     Object.freeze({ key: 'student_attendance_span_total_sessions', label: 'Student Attendance Span Total Sessions', description: 'Total sessions for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_present', label: 'Student Attendance Span Present', description: 'Present count for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_late', label: 'Student Attendance Span Late', description: 'Late count for this student within report period.' }),
@@ -140,12 +144,20 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_attendance_span_percent', label: 'Student Attendance Span Percent', description: 'Attendance percentage for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_late_minutes', label: 'Student Attendance Span Late Minutes', description: 'Late minutes for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_early_leave_minutes', label: 'Student Attendance Span Early Leave Minutes', description: 'Early-leave minutes for this student within report period.' }),
+    Object.freeze({ key: 'student_attendance_span_late_excused_sessions', label: 'Student Attendance Span Late Excused Sessions', description: 'Report-period sessions where late-arrival minutes were marked excused.' }),
+    Object.freeze({ key: 'student_attendance_span_late_excused_minutes', label: 'Student Attendance Span Late Excused Minutes', description: 'Report-period late-arrival minutes marked excused.' }),
+    Object.freeze({ key: 'student_attendance_span_early_leave_excused_sessions', label: 'Student Attendance Span Early Leave Excused Sessions', description: 'Report-period sessions where early-leave minutes were marked excused.' }),
+    Object.freeze({ key: 'student_attendance_span_early_leave_excused_minutes', label: 'Student Attendance Span Early Leave Excused Minutes', description: 'Report-period early-leave minutes marked excused.' }),
     Object.freeze({ key: 'student_punctuality_span_attended_sessions', label: 'Student Punctuality Span Attended Sessions', description: 'Attended sessions used for punctuality within report period.' }),
     Object.freeze({ key: 'student_punctuality_span_on_time_sessions', label: 'Student Punctuality Span On-Time Sessions', description: 'Attended sessions with no late arrival and no left-early minutes within report period.' }),
     Object.freeze({ key: 'student_punctuality_span_late_sessions', label: 'Student Punctuality Span Late Sessions', description: 'Attended sessions with late-arrival minutes within report period.' }),
     Object.freeze({ key: 'student_punctuality_span_left_early_sessions', label: 'Student Punctuality Span Left-Early Sessions', description: 'Attended sessions with left-early minutes within report period.' }),
     Object.freeze({ key: 'student_punctuality_span_late_minutes', label: 'Student Punctuality Span Late Minutes', description: 'Total late-arrival minutes across attended sessions within report period.' }),
     Object.freeze({ key: 'student_punctuality_span_left_early_minutes', label: 'Student Punctuality Span Left-Early Minutes', description: 'Total left-early minutes across attended sessions within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_late_excused_sessions', label: 'Student Punctuality Span Late Excused Sessions', description: 'Attended sessions with excused late-arrival minutes within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_late_excused_minutes', label: 'Student Punctuality Span Late Excused Minutes', description: 'Excused late-arrival minutes within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_left_early_excused_sessions', label: 'Student Punctuality Span Left-Early Excused Sessions', description: 'Attended sessions with excused left-early minutes within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_left_early_excused_minutes', label: 'Student Punctuality Span Left-Early Excused Minutes', description: 'Excused left-early minutes within report period.' }),
     Object.freeze({ key: 'student_punctuality_span_total_issue_sessions', label: 'Student Punctuality Span Total Issue Sessions', description: 'Attended sessions with either late-arrival or left-early minutes within report period.' }),
     Object.freeze({ key: 'student_punctuality_span_percent', label: 'Student Punctuality Span Percent', description: 'On-time percentage across attended sessions within report period.' }),
     Object.freeze({ key: 'student_punctuality_span_label', label: 'Student Punctuality Span Label', description: 'Readable punctuality label for the report period.' }),
@@ -438,7 +450,11 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
     acf: 0,
     notApplicable: 0,
     lateMinutes: 0,
-    earlyLeaveMinutes: 0
+    earlyLeaveMinutes: 0,
+    lateExcusedSessions: 0,
+    lateExcusedMinutes: 0,
+    earlyLeaveExcusedSessions: 0,
+    earlyLeaveExcusedMinutes: 0
   };
 
   const target = toPublicId(studentId);
@@ -486,6 +502,8 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
         status,
         lateMinutes: 0,
         earlyLeaveMinutes: 0,
+        lateExcused: false,
+        earlyLeaveExcused: false,
         scheduledMinutes
       });
       return;
@@ -494,12 +512,23 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
     out.totalSessions += 1;
     incrementAttendanceStatusCount(out, status);
 
-    out.lateMinutes += normalizeNumber(row?.lateMinutes);
-    out.earlyLeaveMinutes += normalizeNumber(row?.earlyLeaveMinutes);
+    const timing = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(row);
+    out.lateMinutes += timing.lateMinutes;
+    out.earlyLeaveMinutes += timing.earlyLeaveMinutes;
+    if (timing.lateExcused) {
+      out.lateExcusedSessions += 1;
+      out.lateExcusedMinutes += timing.lateMinutes;
+    }
+    if (timing.earlyLeaveExcused) {
+      out.earlyLeaveExcusedSessions += 1;
+      out.earlyLeaveExcusedMinutes += timing.earlyLeaveMinutes;
+    }
     matrixRecords.push({
       status,
-      lateMinutes: row?.lateMinutes || 0,
-      earlyLeaveMinutes: row?.earlyLeaveMinutes || 0,
+      lateMinutes: timing.lateMinutes,
+      earlyLeaveMinutes: timing.earlyLeaveMinutes,
+      lateExcused: timing.lateExcused,
+      earlyLeaveExcused: timing.earlyLeaveExcused,
       scheduledMinutes
     });
   });
@@ -531,6 +560,10 @@ function buildStudentPunctualitySummary(sessions, studentId, statusMap = null, o
     leftEarlySessions: 0,
     lateMinutes: 0,
     leftEarlyMinutes: 0,
+    lateExcusedSessions: 0,
+    lateExcusedMinutes: 0,
+    leftEarlyExcusedSessions: 0,
+    leftEarlyExcusedMinutes: 0,
     totalIssueSessions: 0,
     punctualityPercent: 'N/A',
     punctualityLabel: 'Not available'
@@ -562,13 +595,22 @@ function buildStudentPunctualitySummary(sessions, studentId, statusMap = null, o
     const status = String(normalized?.attendance || '').trim().toLowerCase();
     if (status !== 'present' && status !== 'late' && status !== 'excused') return;
 
-    const late = Math.max(0, normalizeNumber(normalized?.lateMinutes));
-    const leftEarly = Math.max(0, normalizeNumber(normalized?.earlyLeaveMinutes));
+    const timing = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(normalized);
+    const late = timing.lateMinutes;
+    const leftEarly = timing.earlyLeaveMinutes;
     out.attendedSessions += 1;
     out.lateMinutes += late;
     out.leftEarlyMinutes += leftEarly;
     if (late > 0) out.lateSessions += 1;
     if (leftEarly > 0) out.leftEarlySessions += 1;
+    if (timing.lateExcused) {
+      out.lateExcusedSessions += 1;
+      out.lateExcusedMinutes += late;
+    }
+    if (timing.earlyLeaveExcused) {
+      out.leftEarlyExcusedSessions += 1;
+      out.leftEarlyExcusedMinutes += leftEarly;
+    }
     if (late > 0 || leftEarly > 0) out.totalIssueSessions += 1;
     if (late <= 0 && leftEarly <= 0) out.onTimeSessions += 1;
   });
@@ -740,16 +782,21 @@ async function buildClassAttendanceSpanSummary(sessions, statusMap = null, optio
           status,
           lateMinutes: 0,
           earlyLeaveMinutes: 0,
+          lateExcused: false,
+          earlyLeaveExcused: false,
           scheduledMinutes
         });
         return;
       }
       out.total += 1;
       incrementAttendanceStatusCount(out, status);
+      const timing = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(row);
       matrixRecords.push({
         status,
-        lateMinutes: row?.lateMinutes || 0,
-        earlyLeaveMinutes: row?.earlyLeaveMinutes || 0,
+        lateMinutes: timing.lateMinutes,
+        earlyLeaveMinutes: timing.earlyLeaveMinutes,
+        lateExcused: timing.lateExcused,
+        earlyLeaveExcused: timing.earlyLeaveExcused,
         scheduledMinutes
       });
     });
@@ -1237,7 +1284,11 @@ function buildStudentCollectionRow({ personId, person, studentRecord, rosterName
     student_attendance_span_na: attendanceSummary.notApplicable,
     student_attendance_span_percent: attendanceSummary.attendancePercent,
     student_attendance_span_late_minutes: attendanceSummary.lateMinutes,
-    student_attendance_span_early_leave_minutes: attendanceSummary.earlyLeaveMinutes
+    student_attendance_span_early_leave_minutes: attendanceSummary.earlyLeaveMinutes,
+    student_attendance_span_late_excused_sessions: attendanceSummary.lateExcusedSessions || 0,
+    student_attendance_span_late_excused_minutes: attendanceSummary.lateExcusedMinutes || 0,
+    student_attendance_span_early_leave_excused_sessions: attendanceSummary.earlyLeaveExcusedSessions || 0,
+    student_attendance_span_early_leave_excused_minutes: attendanceSummary.earlyLeaveExcusedMinutes || 0
   };
 }
 
@@ -1258,14 +1309,15 @@ function buildSessionCollectionRow(session, index, statusMap = null, options = {
         row?.attendance,
         attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
       );
+    const timing = status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+      ? { lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false }
+      : attendanceMatrixMetricsService.normalizeAttendanceTimingFields(row);
     return {
       status,
-      lateMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
-        ? 0
-        : (row?.lateMinutes || 0),
-      earlyLeaveMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
-        ? 0
-        : (row?.earlyLeaveMinutes || 0),
+      lateMinutes: timing.lateMinutes,
+      earlyLeaveMinutes: timing.earlyLeaveMinutes,
+      lateExcused: timing.lateExcused,
+      earlyLeaveExcused: timing.earlyLeaveExcused,
       scheduledMinutes
     };
   });
@@ -1431,6 +1483,9 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
       });
       const statusDetails = attendanceStatusDetails(statusSource);
       const studentRow = studentRows[studentIndex] || {};
+      const timing = statusDetails.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+        ? { lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false }
+        : attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRow);
       attendanceRows.push({
         row_no: attendanceRows.length + 1,
         student_no: studentIndex + 1,
@@ -1445,8 +1500,10 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
         session_end_time: String(session?.endTime || ''),
         attendance_status: statusDetails.status,
         attendance_status_label: statusDetails.label,
-        attendance_late_minutes: statusDetails.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRow ? normalizeNumber(rosterRow?.lateMinutes) : 0),
-        attendance_early_leave_minutes: statusDetails.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRow ? normalizeNumber(rosterRow?.earlyLeaveMinutes) : 0)
+        attendance_late_minutes: timing.lateMinutes,
+        attendance_early_leave_minutes: timing.earlyLeaveMinutes,
+        attendance_late_excused: timing.lateExcused,
+        attendance_early_leave_excused: timing.earlyLeaveExcused
       });
     });
   });
@@ -1727,6 +1784,10 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_attendance_percent: studentAttendance.attendancePercent,
     student_late_minutes: studentAttendance.lateMinutes,
     student_early_leave_minutes: studentAttendance.earlyLeaveMinutes,
+    student_late_excused_sessions: studentAttendance.lateExcusedSessions || 0,
+    student_late_excused_minutes: studentAttendance.lateExcusedMinutes || 0,
+    student_early_leave_excused_sessions: studentAttendance.earlyLeaveExcusedSessions || 0,
+    student_early_leave_excused_minutes: studentAttendance.earlyLeaveExcusedMinutes || 0,
     student_attendance_span_total_sessions: studentAttendanceSpan.totalSessions,
     student_attendance_span_present: studentAttendanceSpan.present,
     student_attendance_span_late: studentAttendanceSpan.late,
@@ -1737,12 +1798,20 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_attendance_span_percent: studentAttendanceSpan.attendancePercent,
     student_attendance_span_late_minutes: studentAttendanceSpan.lateMinutes,
     student_attendance_span_early_leave_minutes: studentAttendanceSpan.earlyLeaveMinutes,
+    student_attendance_span_late_excused_sessions: studentAttendanceSpan.lateExcusedSessions || 0,
+    student_attendance_span_late_excused_minutes: studentAttendanceSpan.lateExcusedMinutes || 0,
+    student_attendance_span_early_leave_excused_sessions: studentAttendanceSpan.earlyLeaveExcusedSessions || 0,
+    student_attendance_span_early_leave_excused_minutes: studentAttendanceSpan.earlyLeaveExcusedMinutes || 0,
     student_punctuality_span_attended_sessions: studentPunctualitySpan.attendedSessions,
     student_punctuality_span_on_time_sessions: studentPunctualitySpan.onTimeSessions,
     student_punctuality_span_late_sessions: studentPunctualitySpan.lateSessions,
     student_punctuality_span_left_early_sessions: studentPunctualitySpan.leftEarlySessions,
     student_punctuality_span_late_minutes: studentPunctualitySpan.lateMinutes,
     student_punctuality_span_left_early_minutes: studentPunctualitySpan.leftEarlyMinutes,
+    student_punctuality_span_late_excused_sessions: studentPunctualitySpan.lateExcusedSessions || 0,
+    student_punctuality_span_late_excused_minutes: studentPunctualitySpan.lateExcusedMinutes || 0,
+    student_punctuality_span_left_early_excused_sessions: studentPunctualitySpan.leftEarlyExcusedSessions || 0,
+    student_punctuality_span_left_early_excused_minutes: studentPunctualitySpan.leftEarlyExcusedMinutes || 0,
     student_punctuality_span_total_issue_sessions: studentPunctualitySpan.totalIssueSessions,
     student_punctuality_span_percent: studentPunctualitySpan.punctualityPercent,
     student_punctuality_span_label: studentPunctualitySpan.punctualityLabel,

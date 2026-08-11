@@ -7,7 +7,8 @@ const {
   ATTENDANCE_STATUS,
   ALL_ATTENDANCE_STATUSES_ORDERED,
   normalizeAttendanceStatusForSave,
-  normalizeEnabledAttendanceStatuses
+  normalizeEnabledAttendanceStatuses,
+  normalizeAttendanceTimingExcuseFlag
 } = attendanceMatrixMetricsService;
 
 const STATUS_EXPORT_META = Object.freeze({
@@ -173,10 +174,12 @@ function formatExportCellDisplay(record = {}) {
   if (!code) return '';
   const late = Number(record.lateMinutes) || 0;
   const early = Number(record.earlyLeaveMinutes) || 0;
+  const lateSuffix = late > 0 && normalizeAttendanceTimingExcuseFlag(record.lateExcused) ? 'E' : '';
+  const earlySuffix = early > 0 && normalizeAttendanceTimingExcuseFlag(record.earlyLeaveExcused) ? 'E' : '';
   if (late <= 0 && early <= 0) return code;
-  if (late > 0 && early > 0) return `${code} ${late}'/${early}'`;
-  if (late > 0) return `${code} ${late}'`;
-  return `${code} /${early}'`;
+  if (late > 0 && early > 0) return `${code} ${late}'${lateSuffix}/${early}'${earlySuffix}`;
+  if (late > 0) return `${code} ${late}'${lateSuffix}`;
+  return `${code} /${early}'${earlySuffix}`;
 }
 
 function statusFillArgb(status, { forLegend = false } = {}) {
@@ -301,10 +304,12 @@ function collectRosterStatusNotes(record = {}) {
 function formatTimingMinutesLabel(record = {}) {
   const late = Number(record.lateMinutes) || 0;
   const early = Number(record.earlyLeaveMinutes) || 0;
+  const lateLabel = `Late ${late}m${late > 0 && normalizeAttendanceTimingExcuseFlag(record.lateExcused) ? ' (excused)' : ''}`;
+  const earlyLabel = `Early ${early}m${early > 0 && normalizeAttendanceTimingExcuseFlag(record.earlyLeaveExcused) ? ' (excused)' : ''}`;
   if (late <= 0 && early <= 0) return '';
-  if (late > 0 && early > 0) return `Late ${late}m / Early ${early}m`;
-  if (late > 0) return `Late ${late}m`;
-  return `Early ${early}m`;
+  if (late > 0 && early > 0) return `${lateLabel} / ${earlyLabel}`;
+  if (late > 0) return lateLabel;
+  return earlyLabel;
 }
 
 function formatTimingMinutesFragment(record = {}) {
@@ -366,6 +371,10 @@ function buildStatusNoteText(record = {}) {
   const fragments = [];
   const excuseRef = clean(record.excuseRef);
   if (excuseRef) fragments.push(`Excuse: ${excuseRef}`);
+  const timingExcuses = [];
+  if (Number(record.lateMinutes || 0) > 0 && normalizeAttendanceTimingExcuseFlag(record.lateExcused)) timingExcuses.push('late arrival');
+  if (Number(record.earlyLeaveMinutes || 0) > 0 && normalizeAttendanceTimingExcuseFlag(record.earlyLeaveExcused)) timingExcuses.push('early leave');
+  if (timingExcuses.length) fragments.push(`Timing excuse: ${timingExcuses.join(', ')}`);
 
   collectRosterStatusNotes(record).forEach((note) => {
     fragments.push(note.startsWith('Note:') ? note : `Note: ${note}`);

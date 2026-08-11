@@ -555,7 +555,7 @@
 
         <div class="tab-pane fade" id="tab-attendance-statuses">
            <h6 class="fw-bold text-primary mb-2">Student Attendance Statuses</h6>
-           <p class="small text-muted mb-3">Choose which attendance statuses teachers can mark in sessions for this class. Present, Absent, and N/A are always available.</p>
+           <p class="small text-muted mb-3">Choose which attendance statuses teachers can mark in sessions for this class. Present, Absent, N/A, and timing excuse tracking are always available.</p>
            <div class="row g-3">
               <div class="col-md-6">
                  <div class="form-check">
@@ -569,6 +569,14 @@
                  <div class="form-check mt-2">
                     <input class="form-check-input" type="checkbox" id="attStatus_not_applicable" checked disabled>
                     <label class="form-check-label" for="attStatus_not_applicable">N/A (Not Applicable) <span class="text-muted">(required)</span></label>
+                 </div>
+                 <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="attStatus_late_excused" checked disabled>
+                    <label class="form-check-label" for="attStatus_late_excused">Late excused <span class="text-muted">(required)</span></label>
+                 </div>
+                 <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="attStatus_early_leave_excused" checked disabled>
+                    <label class="form-check-label" for="attStatus_early_leave_excused">Early leave excused <span class="text-muted">(required)</span></label>
                  </div>
               </div>
               <div class="col-md-6">

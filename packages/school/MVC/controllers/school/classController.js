@@ -1390,7 +1390,7 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
         const pid = cleanPersonId(row?.personId);
         if (!pid) return row;
         if (forceSessionNotApplicable) {
-            return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0 };
+            return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false };
         }
         if (!hasApprovedLeaveFor(pid)) return row;
         const normalized = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
@@ -1398,7 +1398,7 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
             && normalized !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
             return row;
         }
-        return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0 };
+        return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false };
     });
 
     const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(
@@ -3579,6 +3579,18 @@ async function saveSession1(req, res) {
             
             // FIX: Merge the new attendance data with the existing records to preserve comments!
             const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
+            const orgPolicyCatalogSave1 = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(
+                classData?.orgId || getActiveOrgIdOrThrow(req.user)
+            );
+            const sessionMinutesSave1 = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+                sessions[sessionIndex],
+                attendanceMatrixPolicyModel.DEFAULT_POLICY.scheduledMinutes
+            );
+            const orgPolicyLayerSave1 = attendanceMatrixMetricsService.pickOrgPolicyLayerForMinutes(
+                orgPolicyCatalogSave1,
+                sessionMinutesSave1
+            );
+            const matrixPolicySave1 = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSave1);
             sessions[sessionIndex].roster = incomingRoster.map(incRec => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
@@ -3597,11 +3609,13 @@ async function saveSession1(req, res) {
                 const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent, null);
                 const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent, null);
                 const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent, null);
-                return {
+                const merged = {
                     personId: incomingPersonId,
                     attendance,
                     lateMinutes: incRec.lateMinutes,
                     earlyLeaveMinutes: incRec.earlyLeaveMinutes,
+                    lateExcused: incRec.lateExcused === undefined ? existRec.lateExcused : incRec.lateExcused,
+                    earlyLeaveExcused: incRec.earlyLeaveExcused === undefined ? existRec.earlyLeaveExcused : incRec.earlyLeaveExcused,
                     excuseRef: incRec.excuseRef,
                     excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
                     classEffortPercent: incRec.classEffortPercent === undefined
@@ -3619,6 +3633,18 @@ async function saveSession1(req, res) {
                     conductSavedAt: resolveConductSavedAtForRosterMerge(incRec, existRec),
                     notes: existRec.notes || '',       // Preserve existing student-specific notes if any
                     comments: existRec.comments || []  // PRESERVE the interactive admin comments!
+                };
+                const ruled = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(
+                    merged,
+                    matrixPolicySave1,
+                    enabledAttendanceStatuses
+                );
+                return {
+                    ...ruled,
+                    attendance: attendanceMatrixMetricsService.coerceAttendanceStatusToEnabled(
+                        ruled.attendance,
+                        enabledAttendanceStatuses
+                    )
                 };
             });
         }
@@ -4854,6 +4880,8 @@ async function saveSession(req, res) {
                     attendance,
                     lateMinutes: incRec.lateMinutes,
                     earlyLeaveMinutes: incRec.earlyLeaveMinutes,
+                    lateExcused: incRec.lateExcused === undefined ? existRec.lateExcused : incRec.lateExcused,
+                    earlyLeaveExcused: incRec.earlyLeaveExcused === undefined ? existRec.earlyLeaveExcused : incRec.earlyLeaveExcused,
                     excuseRef: incRec.excuseRef,
                     excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
                     classEffortPercent: incRec.classEffortPercent === undefined

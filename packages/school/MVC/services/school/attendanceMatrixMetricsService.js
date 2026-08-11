@@ -281,6 +281,31 @@ function parseNonNegIntRoster(v) {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 }
 
+function normalizeAttendanceTimingExcuseFlag(value) {
+  if (value === true || value === 1) return true;
+  const token = String(value ?? '').trim().toLowerCase();
+  return token === 'true' || token === '1' || token === 'yes' || token === 'on';
+}
+
+function normalizeAttendanceTimingFields(record = {}) {
+  const lateMinutes = parseNonNegIntRoster(record?.lateMinutes);
+  const earlyLeaveMinutes = parseNonNegIntRoster(record?.earlyLeaveMinutes);
+  return {
+    lateMinutes,
+    earlyLeaveMinutes,
+    lateExcused: lateMinutes > 0 && normalizeAttendanceTimingExcuseFlag(record?.lateExcused),
+    earlyLeaveExcused: earlyLeaveMinutes > 0 && normalizeAttendanceTimingExcuseFlag(record?.earlyLeaveExcused)
+  };
+}
+
+function attendanceTimingPenaltyMinutes(record = {}) {
+  const timing = normalizeAttendanceTimingFields(record);
+  return {
+    latePenaltyMinutes: timing.lateExcused ? 0 : timing.lateMinutes,
+    earlyLeavePenaltyMinutes: timing.earlyLeaveExcused ? 0 : timing.earlyLeaveMinutes
+  };
+}
+
 function policyThresholdsAreEnabled(policy) {
   const value = policy?.thresholdsEnabled;
   if (value === false || value === 0) return false;
@@ -306,8 +331,7 @@ function resolveEffectiveAttendanceStatus(record, policy, enabledStatuses = null
     return status;
   }
 
-  const late = parseNonNegIntRoster(record?.lateMinutes);
-  const early = parseNonNegIntRoster(record?.earlyLeaveMinutes);
+  const { lateMinutes: late, earlyLeaveMinutes: early } = normalizeAttendanceTimingFields(record);
   const hasTimingIssue = late > 0 || early > 0;
   if (!hasTimingIssue && status !== ATTENDANCE_STATUS.LATE) return status;
 
@@ -334,11 +358,13 @@ function applyAttendanceMatrixRosterRules(record, policy, enabledStatuses = null
 
   const attendance = normalizeAttendanceStatusForSave(base.attendance, '');
 
-  const late = parseNonNegIntRoster(base.lateMinutes);
-  const early = parseNonNegIntRoster(base.earlyLeaveMinutes);
+  const timing = normalizeAttendanceTimingFields(base);
+  const late = timing.lateMinutes;
+  const early = timing.earlyLeaveMinutes;
+  const penalty = attendanceTimingPenaltyMinutes(timing);
 
   if (attendance === ATTENDANCE_STATUS.NOT_APPLICABLE) {
-    return { ...base, attendance, lateMinutes: 0, earlyLeaveMinutes: 0 };
+    return { ...base, attendance, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false };
   }
 
   if (!policyThresholdsAreEnabled(pol)) {
@@ -350,7 +376,9 @@ function applyAttendanceMatrixRosterRules(record, policy, enabledStatuses = null
         enabledStatuses
       ),
       lateMinutes: late,
-      earlyLeaveMinutes: early
+      earlyLeaveMinutes: early,
+      lateExcused: timing.lateExcused,
+      earlyLeaveExcused: timing.earlyLeaveExcused
     };
   }
 
@@ -358,19 +386,19 @@ function applyAttendanceMatrixRosterRules(record, policy, enabledStatuses = null
   const earlyCut = pol.disqualifyEarlyLeaveMinutes;
   const combRaw = pol.disqualifyCombinedMissedMinutes;
 
-  if (late >= lateCut || early >= earlyCut) {
-    return { ...base, attendance: 'absent', lateMinutes: late, earlyLeaveMinutes: early };
+  if (penalty.latePenaltyMinutes >= lateCut || penalty.earlyLeavePenaltyMinutes >= earlyCut) {
+    return { ...base, attendance: 'absent', lateMinutes: late, earlyLeaveMinutes: early, lateExcused: timing.lateExcused, earlyLeaveExcused: timing.earlyLeaveExcused };
   }
   const comb = combRaw === null || combRaw === undefined || combRaw === ''
     ? null
     : Number(combRaw);
-  if (comb != null && Number.isFinite(comb) && late + early >= comb) {
-    return { ...base, attendance: 'absent', lateMinutes: late, earlyLeaveMinutes: early };
+  if (comb != null && Number.isFinite(comb) && penalty.latePenaltyMinutes + penalty.earlyLeavePenaltyMinutes >= comb) {
+    return { ...base, attendance: 'absent', lateMinutes: late, earlyLeaveMinutes: early, lateExcused: timing.lateExcused, earlyLeaveExcused: timing.earlyLeaveExcused };
   }
 
   // Unmarked (white): keep empty unless minutes forced absent above.
   if (!attendance) {
-    return { ...base, attendance: '', lateMinutes: late, earlyLeaveMinutes: early };
+    return { ...base, attendance: '', lateMinutes: late, earlyLeaveMinutes: early, lateExcused: timing.lateExcused, earlyLeaveExcused: timing.earlyLeaveExcused };
   }
 
   let next = attendance;
@@ -378,7 +406,7 @@ function applyAttendanceMatrixRosterRules(record, policy, enabledStatuses = null
     next = 'late';
   }
 
-  return { ...base, attendance: next, lateMinutes: late, earlyLeaveMinutes: early };
+  return { ...base, attendance: next, lateMinutes: late, earlyLeaveMinutes: early, lateExcused: timing.lateExcused, earlyLeaveExcused: timing.earlyLeaveExcused };
 }
 
 function resolvePolicy(classData = {}, orgPolicyLayer = {}) {
@@ -457,8 +485,10 @@ function computePresenceRatio(record, policy) {
   const sched = scheduledMinutesForRecord(record, policy);
   if (!Number.isFinite(sched) || sched <= 0) return 0;
 
-  const late = Math.max(0, Number(record?.lateMinutes) || 0);
-  const early = Math.max(0, Number(record?.earlyLeaveMinutes) || 0);
+  const timing = normalizeAttendanceTimingFields(record);
+  const late = timing.lateMinutes;
+  const early = timing.earlyLeaveMinutes;
+  const penalty = attendanceTimingPenaltyMinutes(timing);
   const rawStatus = record?.status !== undefined ? record.status : record?.attendance;
   const st = normalizeStatus(rawStatus);
 
@@ -466,7 +496,7 @@ function computePresenceRatio(record, policy) {
     return 0;
   }
 
-  const attended = Math.max(0, sched - late - early);
+  const attended = Math.max(0, sched - penalty.latePenaltyMinutes - penalty.earlyLeavePenaltyMinutes);
   return attended / sched;
 }
 
@@ -613,6 +643,9 @@ module.exports = {
   resolvePolicyForScheduledMinutes,
   parseTimeToMinutes,
   scheduledMinutesFromSession,
+  normalizeAttendanceTimingExcuseFlag,
+  normalizeAttendanceTimingFields,
+  attendanceTimingPenaltyMinutes,
   computePresenceRatio,
   computeSessionCredit,
   computeRosterAttendancePercent,

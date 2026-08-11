@@ -25,6 +25,16 @@
     .btn-check[value="absent"]:checked + .att-label { background-color: #dc3545; color: #fff; font-weight: bold; }
     .btn-check[value="acf"]:checked + .att-label { background-color: #b02a37; color: #fff; font-weight: bold; }
     .btn-check[value="not_applicable"]:checked + .att-label { background-color: #6c757d; color: #fff; font-weight: bold; }
+    .attendance-timing-toggle {
+        min-height: 2.25rem;
+        border-radius: 8px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        width: 100%;
+    }
     .conduct-rating-input {
         max-width: 7rem;
         text-align: center;
@@ -1871,6 +1881,8 @@
                                                     </div>
                                                     <input type="hidden" class="att-late" value="<%= student.lateMinutes || '' %>">
                                                     <input type="hidden" class="att-leave" value="<%= student.earlyLeaveMinutes || '' %>">
+                                                    <input type="hidden" class="att-late-excused" value="<%= student.lateMinutes && student.lateExcused ? 'true' : 'false' %>">
+                                                    <input type="hidden" class="att-early-excused" value="<%= student.earlyLeaveMinutes && student.earlyLeaveExcused ? 'true' : 'false' %>">
                                                     <input type="hidden" class="att-excuse" value="<%= student.excuseRef || '' %>">
                                                     <input type="hidden" class="att-excuse-attachment" value="">
                                                     <input type="hidden" class="att-comments" value="">
@@ -2374,14 +2386,16 @@
 </div>
 
 <div class="modal fade" id="attendanceDetailsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title fw-bold">
                     <i class="bi bi-person-lines-fill me-2"></i>
                     Details: <span id="modalStudentName"></span>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="modalPersonId">
@@ -2390,10 +2404,20 @@
                     <div class="col-md-4">
                         <label class="form-label fw-bold small">Late Arrival (Mins)</label>
                         <input type="number" class="form-control" id="modalLateMins" placeholder="e.g. 15" min="0" <%- disabledAttr %>>
+                        <div class="mt-2 d-none" id="wrap_modalLateExcused">
+                            <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalLateExcused" aria-pressed="false" <%- disabledAttr %>>
+                                <i class="bi bi-shield-plus"></i><span>Mark late excused</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold small">Left Early (Mins)</label>
                         <input type="number" class="form-control" id="modalLeaveMins" placeholder="e.g. 30" min="0" <%- disabledAttr %>>
+                        <div class="mt-2 d-none" id="wrap_modalEarlyLeaveExcused">
+                            <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalEarlyLeaveExcused" aria-pressed="false" <%- disabledAttr %>>
+                                <i class="bi bi-shield-plus"></i><span>Mark early leave excused</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-12">
                         <label class="form-label fw-bold small">Excuse / reference notes</label>
@@ -2421,7 +2445,7 @@
                         <input type="file" class="form-control form-control-sm mb-2" id="inp_newCommentFile" <%- disabledAttr %>>
                         <div class="d-flex justify-content-between align-items-center border-top pt-2">
                             <button class="btn btn-sm btn-outline-secondary" id="btn_mentionUser"><i class="bi bi-at"></i> Tag User</button>
-                            <button class="btn btn-sm btn-primary fw-bold" id="btn_saveComment">Save Note Directly</button>
+                            <button class="btn btn-sm btn-primary fw-bold" id="btn_saveComment">Send Note</button>
                         </div>
                     </div>
                 </div>
@@ -2672,11 +2696,64 @@ let detailsModalInstance = null;
 let detailsModalAllowClose = false;
 let detailsModalSnapshot = null;
 let currentMentions = [];
+let modalLateExcused = false;
+let modalEarlyLeaveExcused = false;
+
+function truthyAttendanceFlag(value) {
+    return value === true || value === 1 || ['true', '1', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function parseModalAttendanceMinutes(id) {
+    const n = Number(document.getElementById(id)?.value || 0);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+function syncModalTimingExcuseButton({ minutesInputId, wrapperId, buttonId, stateKey, inactiveText, activeText }) {
+    const minutes = parseModalAttendanceMinutes(minutesInputId);
+    const wrapper = document.getElementById(wrapperId);
+    const button = document.getElementById(buttonId);
+    if (!wrapper || !button) return;
+    if (minutes <= 0) {
+        if (stateKey === 'late') modalLateExcused = false;
+        if (stateKey === 'early') modalEarlyLeaveExcused = false;
+        wrapper.classList.add('d-none');
+    } else {
+        wrapper.classList.remove('d-none');
+    }
+    const active = stateKey === 'late' ? modalLateExcused : modalEarlyLeaveExcused;
+    button.classList.toggle('btn-success', active);
+    button.classList.toggle('btn-outline-success', !active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.innerHTML = active
+        ? `<i class="bi bi-shield-check"></i><span>${activeText}</span>`
+        : `<i class="bi bi-shield-plus"></i><span>${inactiveText}</span>`;
+}
+
+function syncModalTimingExcuseControls() {
+    syncModalTimingExcuseButton({
+        minutesInputId: 'modalLateMins',
+        wrapperId: 'wrap_modalLateExcused',
+        buttonId: 'btn_modalLateExcused',
+        stateKey: 'late',
+        inactiveText: 'Mark late excused',
+        activeText: 'Late excused'
+    });
+    syncModalTimingExcuseButton({
+        minutesInputId: 'modalLeaveMins',
+        wrapperId: 'wrap_modalEarlyLeaveExcused',
+        buttonId: 'btn_modalEarlyLeaveExcused',
+        stateKey: 'early',
+        inactiveText: 'Mark early leave excused',
+        activeText: 'Early leave excused'
+    });
+}
 
 function captureDetailsModalFormSnapshot() {
     return {
         late: String(document.getElementById('modalLateMins')?.value || '').trim(),
         leave: String(document.getElementById('modalLeaveMins')?.value || '').trim(),
+        lateExcused: modalLateExcused === true,
+        earlyLeaveExcused: modalEarlyLeaveExcused === true,
         excuse: String(document.getElementById('modalExcuseRef')?.value || '').trim(),
         excuseFileSelected: Boolean(document.getElementById('modalExcuseFile')?.files?.length),
         commentDraft: String(document.getElementById('inp_newComment')?.value || '').trim(),
@@ -2691,6 +2768,8 @@ function isDetailsModalDirty() {
     return (
         current.late !== detailsModalSnapshot.late ||
         current.leave !== detailsModalSnapshot.leave ||
+        current.lateExcused !== detailsModalSnapshot.lateExcused ||
+        current.earlyLeaveExcused !== detailsModalSnapshot.earlyLeaveExcused ||
         current.excuse !== detailsModalSnapshot.excuse ||
         current.excuseFileSelected !== detailsModalSnapshot.excuseFileSelected ||
         current.commentDraft !== detailsModalSnapshot.commentDraft ||
@@ -4835,8 +4914,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (att === 'not_applicable') {
             const lateInput = row.querySelector('.att-late');
             const leaveInput = row.querySelector('.att-leave');
+            const lateExcusedInput = row.querySelector('.att-late-excused');
+            const earlyExcusedInput = row.querySelector('.att-early-excused');
             if (lateInput) lateInput.value = '';
             if (leaveInput) leaveInput.value = '';
+            if (lateExcusedInput) lateExcusedInput.value = 'false';
+            if (earlyExcusedInput) earlyExcusedInput.value = 'false';
             return;
         }
 
@@ -4853,12 +4936,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const earlyCut = Number(pol.disqualifyEarlyLeaveMinutes);
             const comb = pol.disqualifyCombinedMissedMinutes;
 
-            if ((Number.isFinite(lateCut) && late >= lateCut) || (Number.isFinite(earlyCut) && early >= earlyCut)) {
+            const lateExcused = late > 0 && row.querySelector('.att-late-excused')?.value === 'true';
+            const earlyExcused = early > 0 && row.querySelector('.att-early-excused')?.value === 'true';
+            const latePenalty = lateExcused ? 0 : late;
+            const earlyPenalty = earlyExcused ? 0 : early;
+
+            if ((Number.isFinite(lateCut) && latePenalty >= lateCut) || (Number.isFinite(earlyCut) && earlyPenalty >= earlyCut)) {
                 setAttendanceRadio(row, 'absent');
                 return;
             }
             const combN = comb === null || comb === undefined || comb === '' ? null : Number(comb);
-            if (combN != null && Number.isFinite(combN) && late + early >= combN) {
+            if (combN != null && Number.isFinite(combN) && latePenalty + earlyPenalty >= combN) {
                 setAttendanceRadio(row, 'absent');
                 return;
             }
@@ -5530,7 +5618,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const btn = document.getElementById('btn_saveComment');
             const origBtn = btn.innerHTML;
-            btn.innerHTML = 'Saving...'; btn.disabled = true;
+            btn.innerHTML = 'Sending...'; btn.disabled = true;
 
             try {
                 const payload = {
@@ -5556,7 +5644,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error('Server returned an invalid response. Please verify the API route exists.');
                 }
                 const guarded = typeof window.applyGuardedApiResult === 'function'
-                    ? await window.applyGuardedApiResult(result, { busyTitle: 'Save Comment In Progress', replayTitle: 'Comment Already Saved' })
+                    ? await window.applyGuardedApiResult(result, { busyTitle: 'Send Note In Progress', replayTitle: 'Note Already Sent' })
                     : { stop: false };
                 if (guarded.stop) return;
 
@@ -5603,7 +5691,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (err) {
                 await sessionMessageBox({
-                    title: 'Error Saving Note',
+                    title: 'Error Sending Note',
                     icon: 'error',
                     message: err.message,
                     okText: 'Close',
@@ -5617,44 +5705,74 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const btnSaveDetails = document.getElementById('btnSaveDetails');
+    ['modalLateMins', 'modalLeaveMins'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('input', syncModalTimingExcuseControls);
+        document.getElementById(id)?.addEventListener('change', syncModalTimingExcuseControls);
+    });
+    document.getElementById('btn_modalLateExcused')?.addEventListener('click', () => {
+        modalLateExcused = !modalLateExcused;
+        syncModalTimingExcuseControls();
+    });
+    document.getElementById('btn_modalEarlyLeaveExcused')?.addEventListener('click', () => {
+        modalEarlyLeaveExcused = !modalEarlyLeaveExcused;
+        syncModalTimingExcuseControls();
+    });
     if (btnSaveDetails) {
         btnSaveDetails.addEventListener('click', async () => {
             const personId = document.getElementById('modalPersonId').value;
             const row = document.querySelector(`.roster-row[data-personid="${personId}"]`);
+            const saveButtons = [btnSaveDetails].filter(Boolean);
+            const originalButtons = saveButtons.map((btn) => ({ btn, html: btn.innerHTML }));
+            saveButtons.forEach((btn) => {
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                btn.disabled = true;
+            });
 
-            if (row) {
-                const lateVal = document.getElementById('modalLateMins').value;
-                const leaveVal = document.getElementById('modalLeaveMins').value;
-                const excuseVal = document.getElementById('modalExcuseRef').value;
-                const details = getAttendanceDetails(personId);
-                const selectedExcuseAttachment = await uploadSchoolSessionFile(document.getElementById('modalExcuseFile'), 'excuse', personId);
-                const excuseAttachment = selectedExcuseAttachment || details.excuseAttachment || null;
-                details.excuseAttachment = excuseAttachment || null;
+            try {
+                if (row) {
+                    const lateVal = document.getElementById('modalLateMins').value;
+                    const leaveVal = document.getElementById('modalLeaveMins').value;
+                    const excuseVal = document.getElementById('modalExcuseRef').value;
+                    const details = getAttendanceDetails(personId);
+                    const selectedExcuseAttachment = await uploadSchoolSessionFile(document.getElementById('modalExcuseFile'), 'excuse', personId);
+                    const excuseAttachment = selectedExcuseAttachment || details.excuseAttachment || null;
+                    details.excuseAttachment = excuseAttachment || null;
 
-                row.querySelector('.att-late').value = lateVal;
-                row.querySelector('.att-leave').value = leaveVal;
-                row.querySelector('.att-excuse').value = excuseVal;
+                    row.querySelector('.att-late').value = lateVal;
+                    row.querySelector('.att-leave').value = leaveVal;
+                    row.querySelector('.att-excuse').value = excuseVal;
+                    const lateExcusedInput = row.querySelector('.att-late-excused');
+                    const earlyExcusedInput = row.querySelector('.att-early-excused');
+                    if (lateExcusedInput) lateExcusedInput.value = parseModalAttendanceMinutes('modalLateMins') > 0 && modalLateExcused ? 'true' : 'false';
+                    if (earlyExcusedInput) earlyExcusedInput.value = parseModalAttendanceMinutes('modalLeaveMins') > 0 && modalEarlyLeaveExcused ? 'true' : 'false';
 
-                applyAttendanceRulesToRow(row);
-                updateLateMissingMinuteState(row);
-                if (typeof gbOnAttendanceChanged === 'function') gbOnAttendanceChanged();
-                markSessionAutosaveRosterDirty();
+                    applyAttendanceRulesToRow(row);
+                    updateLateMissingMinuteState(row);
+                    if (typeof gbOnAttendanceChanged === 'function') gbOnAttendanceChanged();
+                    markSessionAutosaveRosterDirty();
 
-                const btn = row.querySelector('.btn-details');
-                const icon = btn.querySelector('i');
+                    const btn = row.querySelector('.btn-details');
+                    const icon = btn.querySelector('i');
 
-                const hasComments = (details.comments || []).length > 0;
-                if (lateVal || leaveVal || excuseVal || excuseAttachment || hasComments) {
-                    btn.className = 'btn btn-sm btn-details btn-warning text-dark';
-                    icon.className = 'bi bi-sticky-fill';
-                } else {
-                    btn.className = 'btn btn-sm btn-details btn-outline-secondary';
-                    icon.className = 'bi bi-three-dots';
+                    const hasComments = (details.comments || []).length > 0;
+                    const hasTimingExcuse = (lateExcusedInput?.value === 'true') || (earlyExcusedInput?.value === 'true');
+                    if (lateVal || leaveVal || excuseVal || excuseAttachment || hasComments || hasTimingExcuse) {
+                        btn.className = 'btn btn-sm btn-details btn-warning text-dark';
+                        icon.className = 'bi bi-sticky-fill';
+                    } else {
+                        btn.className = 'btn btn-sm btn-details btn-outline-secondary';
+                        icon.className = 'bi bi-three-dots';
+                    }
                 }
-            }
 
-            detailsModalAllowClose = true;
-            if (detailsModalInstance) detailsModalInstance.hide();
+                detailsModalAllowClose = true;
+                if (detailsModalInstance) detailsModalInstance.hide();
+            } finally {
+                originalButtons.forEach(({ btn, html }) => {
+                    btn.innerHTML = html;
+                    btn.disabled = false;
+                });
+            }
         });
     }
 
@@ -5672,8 +5790,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const lateInput = row.querySelector('.att-late');
             const leaveInput = row.querySelector('.att-leave');
+            const lateExcusedInput = row.querySelector('.att-late-excused');
+            const earlyExcusedInput = row.querySelector('.att-early-excused');
             if (lateInput && !lateInput.disabled) lateInput.value = '';
             if (leaveInput && !leaveInput.disabled) leaveInput.value = '';
+            if (lateExcusedInput) lateExcusedInput.value = 'false';
+            if (earlyExcusedInput) earlyExcusedInput.value = 'false';
             updateLateMissingMinuteState(row);
         });
     }
@@ -7608,6 +7730,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const attendance = row.querySelector('.att-radio:checked')?.value || '';
             const lateMinutes = row.querySelector('.att-late').value || null;
             const earlyLeaveMinutes = row.querySelector('.att-leave').value || null;
+            const lateExcused = Number(lateMinutes || 0) > 0 && row.querySelector('.att-late-excused')?.value === 'true';
+            const earlyLeaveExcused = Number(earlyLeaveMinutes || 0) > 0 && row.querySelector('.att-early-excused')?.value === 'true';
             const excuseRef = row.querySelector('.att-excuse').value || '';
             const excuseAttachment = getAttendanceDetails(personId).excuseAttachment || null;
             const conductRow = conductRowsByPersonId.get(personId);
@@ -7620,6 +7744,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 attendance,
                 lateMinutes,
                 earlyLeaveMinutes,
+                lateExcused,
+                earlyLeaveExcused,
                 excuseRef,
                 excuseAttachment,
                 notes: ''
@@ -7913,6 +8039,9 @@ function openDetailsModal(personId, name) {
         document.getElementById('modalLateMins').value = row.querySelector('.att-late').value;
         document.getElementById('modalLeaveMins').value = row.querySelector('.att-leave').value;
         document.getElementById('modalExcuseRef').value = row.querySelector('.att-excuse').value;
+        modalLateExcused = parseModalAttendanceMinutes('modalLateMins') > 0 && truthyAttendanceFlag(row.querySelector('.att-late-excused')?.value);
+        modalEarlyLeaveExcused = parseModalAttendanceMinutes('modalLeaveMins') > 0 && truthyAttendanceFlag(row.querySelector('.att-early-excused')?.value);
+        syncModalTimingExcuseControls();
         const details = window.getAttendanceDetails(personId);
         const excuseAttachment = details.excuseAttachment || null;
         const excuseFileInput = document.getElementById('modalExcuseFile');
@@ -7942,6 +8071,13 @@ function openDetailsModal(personId, name) {
         } else {
             thread.innerHTML = '<div class="text-muted small text-center py-2">No notes yet. Be the first to comment.</div>';
         }
+    } else {
+        document.getElementById('modalLateMins').value = '';
+        document.getElementById('modalLeaveMins').value = '';
+        document.getElementById('modalExcuseRef').value = '';
+        modalLateExcused = false;
+        modalEarlyLeaveExcused = false;
+        syncModalTimingExcuseControls();
     }
 
     document.getElementById('inp_newComment').value = '';
