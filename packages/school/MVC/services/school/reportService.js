@@ -33,6 +33,37 @@ const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
  * - Type conversion applied at runtime (checkbox to boolean, number to finite)
  * - Braced keys {{key}} normalized to bare keys at save time
  */
+const OVERALL_ATTENDANCE_DAY_COUNT = 31;
+
+function formatOverallAttendanceDayIndex(dayNo) {
+  return String(dayNo).padStart(2, '0');
+}
+
+function buildOverallAttendanceDayCatalogEntries() {
+  const rows = [];
+  for (let dayNo = 1; dayNo <= OVERALL_ATTENDANCE_DAY_COUNT; dayNo += 1) {
+    const suffix = formatOverallAttendanceDayIndex(dayNo);
+    rows.push(
+      Object.freeze({
+        key: `attendance_day_${suffix}`,
+        label: `Attendance Day ${dayNo}`,
+        description: `Fixed overall-attendance row ${dayNo} day number.`
+      }),
+      Object.freeze({
+        key: `attendance_presence_${suffix}`,
+        label: `Attendance Presence ${dayNo}`,
+        description: `Y/N presence value for fixed overall-attendance row ${dayNo}.`
+      }),
+      Object.freeze({
+        key: `attendance_note_${suffix}`,
+        label: `Attendance Note ${dayNo}`,
+        description: `Readable attendance note for fixed overall-attendance row ${dayNo}.`
+      })
+    );
+  }
+  return rows;
+}
+
 const PREFILL_CATALOG = Object.freeze({
   common: Object.freeze([
     Object.freeze({ key: 'teacher_id', label: 'Teacher ID', description: 'Teacher person id assigned to this report instance.' }),
@@ -166,6 +197,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_session_rating_span_class_participation_percent', label: 'Student Session Rating Span Class Participation %', description: 'Average class participation rating across attended sessions within report period.' }),
     Object.freeze({ key: 'student_session_rating_span_respects_teachers_percent', label: 'Student Session Rating Span Respects The Teachers %', description: 'Average respects-the-teachers rating across attended sessions within report period.' }),
     Object.freeze({ key: 'student_session_rating_span_respects_students_percent', label: 'Student Session Rating Span Treats Other Students With Respect %', description: 'Average treats-other-students-with-respect rating across attended sessions within report period.' }),
+    ...buildOverallAttendanceDayCatalogEntries(),
     Object.freeze({ key: 'CLB_goal_listening', label: 'CLB Goal Listening', description: 'Latest CLB goal for listening from student profile history.' }),
     Object.freeze({ key: 'CLB_goal_speaking', label: 'CLB Goal Speaking', description: 'Latest CLB goal for speaking from student profile history.' }),
     Object.freeze({ key: 'CLB_goal_reading', label: 'CLB Goal Reading', description: 'Latest CLB goal for reading from student profile history.' }),
@@ -1233,6 +1265,126 @@ function resolveEffectiveAttendanceStatus({ session, rosterRow, statusMap, deriv
   }
   return attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT;
 }
+
+function sortAttendancePrefillSessions(sessions = []) {
+  return [...(Array.isArray(sessions) ? sessions : [])].sort((a, b) => {
+    const dateA = String(a?.date || '');
+    const dateB = String(b?.date || '');
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+    const startA = String(a?.startTime || '');
+    const startB = String(b?.startTime || '');
+    if (startA !== startB) return startA.localeCompare(startB);
+    return String(a?.sessionId || a?.id || '').localeCompare(String(b?.sessionId || b?.id || ''));
+  });
+}
+
+function buildReportMonthDateForDay(reportStartDate, dayNo) {
+  const start = String(reportStartDate || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return '';
+  const day = Number(dayNo);
+  if (!Number.isInteger(day) || day < 1 || day > OVERALL_ATTENDANCE_DAY_COUNT) return '';
+  const candidate = `${start.slice(0, 8)}${String(day).padStart(2, '0')}`;
+  const parsed = parseDateOnlyToUtcDay(candidate);
+  if (!Number.isFinite(parsed)) return '';
+  return toDateOnly(new Date(parsed)) === candidate ? candidate : '';
+}
+
+function isDateWithinRange(dateKey, startDate, dueDate) {
+  const dateTs = parseDateOnlyToUtcDay(dateKey);
+  const startTs = parseDateOnlyToUtcDay(startDate);
+  const dueTs = parseDateOnlyToUtcDay(dueDate);
+  return Number.isFinite(dateTs)
+    && Number.isFinite(startTs)
+    && Number.isFinite(dueTs)
+    && dateTs >= startTs
+    && dateTs <= dueTs;
+}
+
+function buildOverallAttendanceNote(status, timing = {}) {
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) return '';
+
+  const lateMinutes = Number(timing?.lateMinutes || 0);
+  const earlyLeaveMinutes = Number(timing?.earlyLeaveMinutes || 0);
+  const noteParts = [];
+  if (lateMinutes > 0 || (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE && earlyLeaveMinutes <= 0)) {
+    noteParts.push(`Late${timing?.lateExcused ? ' Excused' : ''}`);
+  }
+  if (earlyLeaveMinutes > 0) {
+    noteParts.push(`Left Early${timing?.earlyLeaveExcused ? ' Excused' : ''}`);
+  }
+  if (noteParts.length) return noteParts.join('; ');
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) return 'Absent Excused';
+  if (
+    status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT ||
+    status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF
+  ) {
+    return 'Absent';
+  }
+  return '';
+}
+
+function buildOverallAttendanceDayPrefill({ sessions, studentPersonId, statusMap, applicability, reportPeriod } = {}) {
+  const out = {};
+  const sortedSessions = sortAttendancePrefillSessions(sessions);
+  const sessionsByDate = new Map();
+  sortedSessions.forEach((session) => {
+    const dateKey = String(session?.date || '').trim();
+    if (!dateKey) return;
+    if (!sessionsByDate.has(dateKey)) sessionsByDate.set(dateKey, []);
+    sessionsByDate.get(dateKey).push(session);
+  });
+  const expectedSessionIds = applicability?.expectedSessionIds instanceof Set ? applicability.expectedSessionIds : null;
+  const notApplicableSessionIds = applicability?.notApplicableSessionIds instanceof Set ? applicability.notApplicableSessionIds : null;
+  const startDate = String(reportPeriod?.startDate || '').trim();
+  const dueDate = String(reportPeriod?.dueDate || '').trim();
+
+  for (let dayNo = 1; dayNo <= OVERALL_ATTENDANCE_DAY_COUNT; dayNo += 1) {
+    const suffix = formatOverallAttendanceDayIndex(dayNo);
+    const dateKey = buildReportMonthDateForDay(startDate, dayNo);
+    const inReportRange = isDateWithinRange(dateKey, startDate, dueDate);
+    const daySessions = inReportRange ? (sessionsByDate.get(dateKey) || []) : [];
+    const sessionEntries = daySessions.map((session) => {
+      const sessionKey = buildSessionMetricKey(session);
+      const roster = Array.isArray(session?.roster) ? session.roster : [];
+      const rosterRow = studentPersonId ? roster.find((row) => idsEqual(row?.personId, studentPersonId)) : null;
+      const expectedForSession = !expectedSessionIds || !sessionKey || expectedSessionIds.has(sessionKey);
+      const derivedNotApplicable = Boolean(sessionKey && notApplicableSessionIds && notApplicableSessionIds.has(sessionKey));
+      const status = resolveEffectiveAttendanceStatus({
+        session,
+        rosterRow,
+        statusMap,
+        derivedNotApplicable,
+        expectedForSession
+      });
+      return {
+        status,
+        timing: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+          ? { lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false }
+          : attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRow)
+      };
+    });
+    const selectedEntry = sessionEntries.find((entry) => entry.status !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE)
+      || sessionEntries[0]
+      || null;
+    const present = selectedEntry?.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT
+      || selectedEntry?.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE;
+
+    out[`attendance_day_${suffix}`] = dayNo;
+    if (!inReportRange) {
+      out[`attendance_presence_${suffix}`] = 'X';
+      out[`attendance_note_${suffix}`] = 'Not in the report date range';
+    } else if (!selectedEntry || selectedEntry.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
+      out[`attendance_presence_${suffix}`] = 'X';
+      out[`attendance_note_${suffix}`] = 'No Class';
+    } else {
+      out[`attendance_presence_${suffix}`] = present ? 'Y' : 'N';
+      out[`attendance_note_${suffix}`] = buildOverallAttendanceNote(selectedEntry.status, selectedEntry.timing);
+    }
+  }
+
+  return out;
+}
+
 function attendanceStatusDetails(statusValue) {
   const status = attendanceMatrixMetricsService.normalizeStatus(
     statusValue,
@@ -1675,6 +1827,13 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     classData,
     orgPolicyLayer
   });
+  const overallAttendanceDayPrefill = buildOverallAttendanceDayPrefill({
+    sessions: periodSessions,
+    studentPersonId,
+    statusMap,
+    applicability: attendanceApplicabilityContext,
+    reportPeriod
+  });
   const primaryAttendance = studentPersonId
     ? {
         total: studentAttendanceSpan.totalSessions,
@@ -1822,6 +1981,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_session_rating_span_respects_students_percent: studentSessionRatingSpan.respectsStudentsPercent,
     student_org_member_role: String(studentOrgMembership?.role || ''),
     student_org_member_status: String(studentOrgMembership?.memberStatus || ''),
+    ...overallAttendanceDayPrefill,
     ...gradebookPeriodStats,
     ...gradebookSkillPrefillStats,
     ...examPeriodStats
@@ -1908,7 +2068,12 @@ function isStudentTargetedScope(scopeRaw) {
   return scope === 'each_student' || scope === 'selected_students';
 }
 
-function buildPlaceholderPayloadDetailed(template, instance, assignment = null, { applyDocxValueCase = false } = {}) {
+function buildPlaceholderPayloadDetailed(
+  template,
+  instance,
+  assignment = null,
+  { applyDocxValueCase = false, includeFieldIdTokens = false } = {}
+) {
   const merged = mergeTemplateData(template, instance, assignment);
   const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
     ? template.placeholderMap
@@ -1941,6 +2106,9 @@ function buildPlaceholderPayloadDetailed(template, instance, assignment = null, 
       ? reportRuleEngineService.applyExportTextCase(printableValue, field?.exportTextCase)
       : printableValue;
     out[token] = exportedValue;
+    if (includeFieldIdTokens && fieldId) {
+      out[`{{${fieldId}}}`] = exportedValue;
+    }
     const docxAlias = reportRuleEngineService.normalizeDocxAlias(field?.docxAlias);
     if (applyDocxValueCase && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(docxAlias)) {
       out[`{{${docxAlias}}}`] = exportedValue;
@@ -1957,6 +2125,13 @@ function buildPlaceholderPayloadDetailed(template, instance, assignment = null, 
 
 function buildDocxPlaceholderPayloadDetailed(template, instance, assignment = null) {
   return buildPlaceholderPayloadDetailed(template, instance, assignment, { applyDocxValueCase: true });
+}
+
+function buildPdfPlaceholderPayloadDetailed(template, instance, assignment = null) {
+  return buildPlaceholderPayloadDetailed(template, instance, assignment, {
+    applyDocxValueCase: true,
+    includeFieldIdTokens: true
+  });
 }
 
 function buildPlaceholderPayload(template, instance, assignment = null) {
@@ -2029,6 +2204,7 @@ module.exports = {
   partitionInstanceSave,
   buildPlaceholderPayloadDetailed,
   buildDocxPlaceholderPayloadDetailed,
+  buildPdfPlaceholderPayloadDetailed,
   buildPlaceholderPayload,
   buildReportDocxCollections,
   getPrefillCatalog,

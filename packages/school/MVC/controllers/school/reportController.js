@@ -9,6 +9,7 @@ const schoolDataService = require('../../services/school/schoolDataService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const reportService = require('../../services/school/reportService');
 const reportDocxRenderService = require('../../services/school/reportDocxRenderService');
+const reportPdfRenderService = require('../../services/school/reportPdfRenderService');
 const reportIntegrityService = require('../../services/school/reportIntegrityService');
 const reportViewService = require('../../services/school/reportViewService');
 const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
@@ -17,6 +18,7 @@ const reportInstanceSaveService = require('../../services/school/reportInstanceS
 const reportMatrixService = require('../../services/school/reportMatrixService');
 const matrixWindowService = require('../../services/school/matrixWindowService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
+const reportFunderPdfService = require('../../services/school/reportFunderPdfService');
 const reportScopePolicy = require('../../services/school/reportScopePolicy');
 const sessionConductService = require('../../services/school/sessionConductService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
@@ -514,6 +516,9 @@ function buildCopiedTemplateDraft(sourceTemplate = {}, templates = [], activeOrg
     placeholderMap: clonePlainValue(sourceTemplate?.placeholderMap, {}),
     docxTemplate: clonePlainValue(sourceTemplate?.docxTemplate, null),
     docxTemplatesByFunder: clonePlainValue(sourceTemplate?.docxTemplatesByFunder, []),
+    pdfTemplate: clonePlainValue(sourceTemplate?.pdfTemplate, null),
+    pdfTemplatesByFunder: clonePlainValue(sourceTemplate?.pdfTemplatesByFunder, []),
+    pdfFieldMap: clonePlainValue(sourceTemplate?.pdfFieldMap, {}),
     allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(sourceTemplate)
   };
 }
@@ -626,6 +631,14 @@ async function saveTemplate(req, res) {
       && Array.isArray(copySourceTemplate.docxTemplatesByFunder) && copySourceTemplate.docxTemplatesByFunder.length) {
       payload.docxTemplatesByFunder = clonePlainValue(copySourceTemplate.docxTemplatesByFunder, []);
     }
+    if (!isEdit && copySourceTemplate && !uploadedFiles.some((file) => String(file?.fieldname || '') === 'pdfTemplate')
+      && copySourceTemplate.pdfTemplate) {
+      payload.pdfTemplate = clonePlainValue(copySourceTemplate.pdfTemplate, null);
+    }
+    if (!isEdit && copySourceTemplate && !(Array.isArray(payload.pdfTemplatesByFunder) && payload.pdfTemplatesByFunder.length)
+      && Array.isArray(copySourceTemplate.pdfTemplatesByFunder) && copySourceTemplate.pdfTemplatesByFunder.length) {
+      payload.pdfTemplatesByFunder = clonePlainValue(copySourceTemplate.pdfTemplatesByFunder, []);
+    }
 
     const invalidPrefillKeys = reportService.validateTemplatePrefillKeys(payload.schema);
     if (invalidPrefillKeys.length) {
@@ -652,6 +665,31 @@ async function saveTemplate(req, res) {
   } catch (error) {
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+async function inspectTemplatePdfFields(req, res) {
+  try {
+    const template = await reportIntegrityService.assertTemplateAccessible(req.params.id, req.user);
+    const selectedPdfKey = String(req.query.pdfKey || req.body?.pdfKey || 'default').trim();
+    const resolved = reportFunderPdfService.resolvePdfTemplateForFunder({
+      template,
+      funderKey: selectedPdfKey || 'default'
+    });
+    if (!resolved.pdfTemplate) {
+      throw new Error('This report template has no PDF file configured. Upload a PDF template first.');
+    }
+    const inspected = await reportPdfRenderService.inspectPdfTemplateFields(resolved.pdfTemplate);
+    return res.json({
+      status: 'success',
+      templateId: template.id,
+      pdfKey: resolved.pdfKey,
+      label: resolved.label,
+      fields: inspected.fields,
+      filePath: inspected.filePath
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 }
 
@@ -1893,9 +1931,6 @@ async function exportInstance(req, res) {
       schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user)
     ]);
     if (!template) throw new Error('Template not found.');
-    if (!reportFunderDocxService.templateHasAnyDocx(template)) {
-      throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
-    }
 
     const effectiveAssignment = reportViewService.applyAssignmentRow(
       assignment,
@@ -1904,7 +1939,9 @@ async function exportInstance(req, res) {
     const format = String(req.query.format || req.body?.format || 'json').trim().toLowerCase();
     const placeholderBundle = format === 'docx'
       ? reportService.buildDocxPlaceholderPayloadDetailed(template, instance, effectiveAssignment)
-      : reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
+      : (format === 'pdf'
+          ? reportService.buildPdfPlaceholderPayloadDetailed(template, instance, effectiveAssignment)
+          : reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment));
     const placeholders = placeholderBundle.placeholders;
     const collections = await reportService.buildReportDocxCollections({
       template,
@@ -1932,6 +1969,9 @@ async function exportInstance(req, res) {
     };
 
     if (format === 'docx') {
+      if (!reportFunderDocxService.templateHasAnyDocx(template)) {
+        throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
+      }
       const selectedDocxKey = String(
         req.body?.docxKey
         || req.body?.selections?.[0]?.docxKey
@@ -1953,6 +1993,35 @@ async function exportInstance(req, res) {
         docxTemplateOverride: resolved.docxTemplate
       });
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${rendered.fileName}"`);
+      return res.send(rendered.buffer);
+    }
+
+    if (format === 'pdf') {
+      if (!reportFunderPdfService.templateHasAnyPdf(template)) {
+        throw new Error('This report template has no PDF file configured. Upload a PDF template first.');
+      }
+      const selectedPdfKey = String(
+        req.body?.pdfKey
+        || req.body?.selections?.[0]?.pdfKey
+        || req.query.pdfKey
+        || ''
+      ).trim();
+      const resolved = reportFunderPdfService.resolvePdfTemplateForFunder({
+        template,
+        funderKey: selectedPdfKey || 'default'
+      });
+      if (!resolved.pdfTemplate) {
+        throw new Error('This report template has no PDF file configured. Upload a PDF template first.');
+      }
+      const rendered = await reportPdfRenderService.renderReportInstancePdf({
+        template,
+        instance,
+        placeholders,
+        mergedAnswers,
+        pdfTemplateOverride: resolved.pdfTemplate
+      });
+      res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${rendered.fileName}"`);
       return res.send(rendered.buffer);
     }
@@ -1990,6 +2059,41 @@ async function previewInstanceDocxExport(req, res) {
       || ''
     ).trim();
     const suggestions = await reportFunderDocxService.buildExportDocxSuggestions({
+      template,
+      assignment: effectiveAssignment,
+      reqUser: req.user,
+      students: [{
+        studentId: instance.studentId,
+        personId: instance.personId || '',
+        instanceId: instance.id,
+        studentName
+      }]
+    });
+    return res.json({ status: 'success', ...suggestions });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function previewInstancePdfExport(req, res) {
+  try {
+    const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(req.params.id, req.user);
+    const [template, assignment] = await Promise.all([
+      schoolDataService.getDataById('reportTemplates', instance.templateId, req.user),
+      schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user)
+    ]);
+    if (!template) throw new Error('Template not found.');
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+    );
+    const studentName = String(
+      instance?.prefillSnapshot?.student_full_name
+      || instance?.studentName
+      || instance?.studentId
+      || ''
+    ).trim();
+    const suggestions = await reportFunderPdfService.buildExportPdfSuggestions({
       template,
       assignment: effectiveAssignment,
       reqUser: req.user,
@@ -2106,6 +2210,51 @@ async function previewReportMatrixDocxExport(req, res) {
   }
 }
 
+async function previewReportMatrixPdfExport(req, res) {
+  try {
+    const payload = await reportMatrixService.buildMatrixExportPayload({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: req.query.assignmentRowId || req.query.rowId || req.body?.assignmentRowId || '',
+      teacherId: req.query.teacherId || req.body?.teacherId || '',
+      reqUser: req.user
+    });
+    const [template, assignment] = await Promise.all([
+      schoolDataService.getDataById('reportTemplates', payload.templateId, req.user),
+      schoolDataService.getDataById('reportAssignments', payload.assignmentId, req.user)
+    ]);
+    if (!template) throw new Error('Template not found.');
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, payload.assignmentRowId)
+    );
+    const suggestions = await reportFunderPdfService.buildExportPdfSuggestions({
+      template,
+      assignment: {
+        ...effectiveAssignment,
+        reportStartDate: payload.reportStartDate || effectiveAssignment?.reportStartDate,
+        reportDueDate: payload.reportDueDate || effectiveAssignment?.reportDueDate,
+        classId: payload.classId || effectiveAssignment?.classId
+      },
+      reqUser: req.user,
+      students: (payload.rows || []).map((row) => ({
+        studentId: row.studentId,
+        personId: row.personId || '',
+        instanceId: row.instanceId || '',
+        studentName: row.studentName || row.name || row.studentId
+      }))
+    });
+    return res.json({
+      status: 'success',
+      assignmentId: payload.assignmentId,
+      assignmentRowId: payload.assignmentRowId || '',
+      teacherId: payload.teacherId || '',
+      ...suggestions
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function exportReportMatrix(req, res) {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -2116,7 +2265,7 @@ async function exportReportMatrix(req, res) {
       reqUser: req.user
     });
     const format = String(req.query.format || body.format || 'json').trim().toLowerCase();
-    if (format !== 'docx') {
+    if (format !== 'docx' && format !== 'pdf') {
       const output = JSON.stringify({ status: 'success', payload }, null, 2);
       if (String(req.query.download || '') === '1') {
         res.setHeader('Content-Type', 'application/json');
@@ -2129,6 +2278,84 @@ async function exportReportMatrix(req, res) {
       schoolDataService.getDataById('reportTemplates', payload.templateId, req.user),
       schoolDataService.getDataById('reportAssignments', payload.assignmentId, req.user)
     ]);
+    if (!template) throw new Error('Template not found.');
+    if (format === 'pdf') {
+      if (!reportFunderPdfService.templateHasAnyPdf(template)) {
+        throw new Error('This report template has no PDF file configured. Upload a PDF template first.');
+      }
+      const effectiveAssignment = reportViewService.applyAssignmentRow(
+        assignment,
+        reportViewService.findAssignmentRow(assignment, payload.assignmentRowId)
+      );
+      const selectionByStudent = new Map(
+        (Array.isArray(body.selections) ? body.selections : [])
+          .map((row) => [String(row?.studentId || '').trim(), String(row?.pdfKey || '').trim()])
+          .filter(([studentId]) => studentId)
+      );
+      const suggestions = await reportFunderPdfService.buildExportPdfSuggestions({
+        template,
+        assignment: {
+          ...effectiveAssignment,
+          reportStartDate: payload.reportStartDate || effectiveAssignment?.reportStartDate,
+          reportDueDate: payload.reportDueDate || effectiveAssignment?.reportDueDate,
+          classId: payload.classId || effectiveAssignment?.classId
+        },
+        reqUser: req.user,
+        students: (payload.rows || []).map((row) => ({
+          studentId: row.studentId,
+          personId: row.personId || '',
+          instanceId: row.instanceId || '',
+          studentName: row.studentName || row.name || row.studentId
+        }))
+      });
+      const suggestedByStudent = new Map(
+        suggestions.rows.map((row) => [String(row.studentId), row.suggestedPdfKey])
+      );
+
+      const rendered = [];
+      for (const row of payload.rows) {
+        const instance = {
+          id: row.instanceId || ('pending-' + row.studentId),
+          assignmentId: payload.assignmentId,
+          assignmentRowId: payload.assignmentRowId,
+          templateId: payload.templateId,
+          teacherId: payload.teacherId,
+          studentId: row.studentId,
+          status: row.status,
+          answers: row.answers,
+          prefillSnapshot: row.prefillSnapshot
+        };
+        const pdfKey = selectionByStudent.get(String(row.studentId))
+          || suggestedByStudent.get(String(row.studentId))
+          || 'default';
+        const resolved = reportFunderPdfService.resolvePdfTemplateForFunder({ template, funderKey: pdfKey });
+        if (!resolved.pdfTemplate) {
+          throw new Error(`No PDF template available for student ${row.studentName || row.studentId}.`);
+        }
+        const placeholderBundle = reportService.buildPdfPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
+        const mergedAnswers = reportService.mergeTemplateData(template, instance, effectiveAssignment);
+        const file = await reportPdfRenderService.renderReportInstancePdf({
+          template,
+          instance,
+          placeholders: placeholderBundle.placeholders,
+          mergedAnswers,
+          pdfTemplateOverride: resolved.pdfTemplate
+        });
+        const safeName = String(row.studentName || row.studentId || file.fileName)
+          .trim()
+          .replace(/[^A-Za-z0-9_-]+/g, '_')
+          .slice(0, 60);
+        rendered.push({
+          ...file,
+          fileName: `${safeName || 'student'}_report.pdf`
+        });
+      }
+      const zipBuffer = await reportPdfRenderService.zipReportInstancePdfFiles(rendered);
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', 'attachment; filename="report-matrix-' + payload.assignmentId + '-pdf.zip"');
+      return res.send(zipBuffer);
+    }
+
     if (!reportFunderDocxService.templateHasAnyDocx(template)) {
       throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
     }
@@ -2232,6 +2459,7 @@ module.exports = {
   showTemplateForm,
   showTemplateCopyForm,
   saveTemplate,
+  inspectTemplatePdfFields,
   deleteTemplate,
   listAssignments,
   showAssignmentForm,
@@ -2252,6 +2480,7 @@ module.exports = {
   previewReportMatrixPrefill,
   applyReportMatrixPrefill,
   previewReportMatrixDocxExport,
+  previewReportMatrixPdfExport,
   exportReportMatrix,
   saveInstance,
   previewInstancePrefillRefresh,
@@ -2261,6 +2490,7 @@ module.exports = {
   reopenInstance,
   deleteInstance,
   previewInstanceDocxExport,
+  previewInstancePdfExport,
   exportInstance
 };
 

@@ -233,7 +233,7 @@ function sanitizePlaceholderMap(v, schema) {
   return out;
 }
 
-function sanitizeDocxTemplate(v) {
+function sanitizeTemplateFile(v) {
   if (!isPlainObject(v)) return null;
   const fileName = cleanString(v.fileName || v.filename, { max: 260, allowEmpty: false });
   const originalName = cleanString(v.originalName, { max: 260, allowEmpty: true });
@@ -248,6 +248,14 @@ function sanitizeDocxTemplate(v) {
     url,
     uploadedAt
   };
+}
+
+function sanitizeDocxTemplate(v) {
+  return sanitizeTemplateFile(v);
+}
+
+function sanitizePdfTemplate(v) {
+  return sanitizeTemplateFile(v);
 }
 
 function sanitizeDocxTemplatesByFunder(rawList, existingList = []) {
@@ -279,6 +287,61 @@ function sanitizeDocxTemplatesByFunder(rawList, existingList = []) {
         || (funderKey === 'self' ? 'Self Fund' : funderKey),
       docxTemplate
     });
+  });
+  return out;
+}
+
+function sanitizePdfTemplatesByFunder(rawList, existingList = []) {
+  const existingByKey = new Map(
+    (Array.isArray(existingList) ? existingList : [])
+      .map((row) => [String(row?.funderKey || '').trim().toLowerCase(), row])
+      .filter(([key]) => key)
+  );
+  const seen = new Set();
+  const out = [];
+  (Array.isArray(rawList) ? rawList : []).forEach((row) => {
+    if (!isPlainObject(row)) return;
+    const funderKeyRaw = cleanString(row.funderKey || row.funderId, { max: 80, allowEmpty: false });
+    if (!funderKeyRaw) return;
+    const funderKey = funderKeyRaw.toLowerCase() === 'self'
+      ? 'self'
+      : cleanId(funderKeyRaw, { max: 80, allowEmpty: false });
+    if (!funderKey) return;
+    const keyNorm = funderKey.toLowerCase();
+    if (seen.has(keyNorm)) return;
+    seen.add(keyNorm);
+    const existing = existingByKey.get(keyNorm) || null;
+    const pdfTemplate = sanitizePdfTemplate(row.pdfTemplate)
+      || sanitizePdfTemplate(existing?.pdfTemplate);
+    if (!pdfTemplate) return;
+    out.push({
+      funderKey,
+      label: cleanString(row.label || existing?.label, { max: 180, allowEmpty: true })
+        || (funderKey === 'self' ? 'Self Fund' : funderKey),
+      pdfTemplate
+    });
+  });
+  return out;
+}
+
+function sanitizePdfFieldMap(rawMap, schema) {
+  if (!isPlainObject(rawMap)) return {};
+  const fields = Array.isArray(schema?.fields) ? schema.fields : [];
+  const blockedSourceKeys = new Set();
+  fields.forEach((field) => {
+    const type = cleanString(field?.type, { max: 40, allowEmpty: true }).toLowerCase();
+    if (type !== 'section' && type !== 'subheader' && type !== 'row_break') return;
+    const id = cleanId(field?.id, { max: 80, allowEmpty: false });
+    if (id) blockedSourceKeys.add(id.toLowerCase());
+  });
+
+  const out = {};
+  Object.keys(rawMap).forEach((key) => {
+    const sourceKey = cleanString(key, { max: 120, allowEmpty: false });
+    if (!sourceKey || sourceKey.startsWith('__') || blockedSourceKeys.has(sourceKey.toLowerCase())) return;
+    const pdfFieldName = cleanString(rawMap[key], { max: 260, allowEmpty: false });
+    if (!pdfFieldName) return;
+    out[sourceKey] = pdfFieldName;
   });
   return out;
 }
@@ -323,6 +386,12 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
       input.docxTemplatesByFunder,
       existing?.docxTemplatesByFunder
     ),
+    pdfTemplate: sanitizePdfTemplate(input.pdfTemplate) || sanitizePdfTemplate(existing?.pdfTemplate),
+    pdfTemplatesByFunder: sanitizePdfTemplatesByFunder(
+      input.pdfTemplatesByFunder,
+      existing?.pdfTemplatesByFunder
+    ),
+    pdfFieldMap: sanitizePdfFieldMap(input.pdfFieldMap, schema),
     audit: sanitizeAudit(input.audit, existing?.audit || {})
   };
 
@@ -437,6 +506,9 @@ module.exports = {
   REPORT_SCOPE_DEFINITIONS: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
   sanitizeDocxTemplate,
   sanitizeDocxTemplatesByFunder,
+  sanitizePdfTemplate,
+  sanitizePdfTemplatesByFunder,
+  sanitizePdfFieldMap,
   sanitizeTemplate,
   getAllTemplates,
   getTemplateById,

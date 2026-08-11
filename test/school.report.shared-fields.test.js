@@ -354,13 +354,15 @@ test('buildPrefillSnapshot uses attendance matrix percent and counts missing mar
     sessionId: 'SES-3',
     sessionDate: '2026-06-18',
     reportStartDate: '2026-06-16',
-    reportDueDate: '2026-06-18',
+    reportDueDate: '2026-06-20',
     teacherIds: ['TEACHER-1']
   };
   const sessions = [
     { sessionId: 'SES-1', date: '2026-06-16', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'present' }] },
-    { sessionId: 'SES-2', date: '2026-06-17', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'late', lateMinutes: 15 }] },
-    { sessionId: 'SES-3', date: '2026-06-18', status: 'scheduled', startTime: '09:00', endTime: '10:00', roster: [] }
+    { sessionId: 'SES-2', date: '2026-06-17', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'late', lateMinutes: 15, lateExcused: true, earlyLeaveMinutes: 5, earlyLeaveExcused: true }] },
+    { sessionId: 'SES-3', date: '2026-06-18', status: 'scheduled', startTime: '09:00', endTime: '10:00', roster: [] },
+    { sessionId: 'SES-4', date: '2026-06-19', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'late', lateMinutes: 0, earlyLeaveMinutes: 10, earlyLeaveExcused: true }] },
+    { sessionId: 'SES-5', date: '2026-06-20', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'not_applicable' }] }
   ];
 
   await withPatched(schoolDataService, {
@@ -405,14 +407,41 @@ test('buildPrefillSnapshot uses attendance matrix percent and counts missing mar
             reqUser: { id: 'USER-1', activeOrgId: '900000' }
           });
 
-          assert.equal(snapshot.class_attendance_total, 3);
-          assert.equal(snapshot.class_attendance_present, 58.33);
+          assert.equal(snapshot.class_attendance_total, 4);
+          assert.equal(snapshot.class_attendance_present, 75);
           assert.equal(snapshot.class_attendance_absent, 1);
-          assert.equal(snapshot.student_attendance_span_total_sessions, 3);
+          assert.equal(snapshot.student_attendance_span_total_sessions, 4);
           assert.equal(snapshot.student_attendance_span_present, 1);
-          assert.equal(snapshot.student_attendance_span_late, 1);
+          assert.equal(snapshot.student_attendance_span_late, 2);
           assert.equal(snapshot.student_attendance_span_absent, 1);
-          assert.equal(snapshot.student_attendance_span_percent, 58.33);
+          assert.equal(snapshot.student_attendance_span_percent, 75);
+          assert.equal(snapshot.attendance_day_01, 1);
+          assert.equal(snapshot.attendance_presence_01, 'X');
+          assert.equal(snapshot.attendance_note_01, 'Not in the report date range');
+          assert.equal(snapshot.attendance_day_15, 15);
+          assert.equal(snapshot.attendance_presence_15, 'X');
+          assert.equal(snapshot.attendance_note_15, 'Not in the report date range');
+          assert.equal(snapshot.attendance_day_16, 16);
+          assert.equal(snapshot.attendance_presence_16, 'Y');
+          assert.equal(snapshot.attendance_note_16, '');
+          assert.equal(snapshot.attendance_day_17, 17);
+          assert.equal(snapshot.attendance_presence_17, 'Y');
+          assert.equal(snapshot.attendance_note_17, 'Late Excused; Left Early Excused');
+          assert.equal(snapshot.attendance_day_18, 18);
+          assert.equal(snapshot.attendance_presence_18, 'N');
+          assert.equal(snapshot.attendance_note_18, 'Absent');
+          assert.equal(snapshot.attendance_day_19, 19);
+          assert.equal(snapshot.attendance_presence_19, 'Y');
+          assert.equal(snapshot.attendance_note_19, 'Left Early Excused');
+          assert.equal(snapshot.attendance_day_20, 20);
+          assert.equal(snapshot.attendance_presence_20, 'X');
+          assert.equal(snapshot.attendance_note_20, 'No Class');
+          assert.equal(snapshot.attendance_day_21, 21);
+          assert.equal(snapshot.attendance_presence_21, 'X');
+          assert.equal(snapshot.attendance_note_21, 'Not in the report date range');
+          assert.equal(snapshot.attendance_day_31, 31);
+          assert.equal(snapshot.attendance_presence_31, 'X');
+          assert.equal(snapshot.attendance_note_31, 'Not in the report date range');
         });
       });
     });

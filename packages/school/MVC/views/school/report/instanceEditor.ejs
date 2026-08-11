@@ -183,6 +183,9 @@
         <% if (template?.docxTemplate?.path || (Array.isArray(template?.docxTemplatesByFunder) && template.docxTemplatesByFunder.some((row) => row?.docxTemplate?.path))) { %>
           <button type="button" class="btn btn-outline-primary btn-sm" id="btnInstanceExportDocx"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</button>
         <% } %>
+        <% if (template?.pdfTemplate?.path || (Array.isArray(template?.pdfTemplatesByFunder) && template.pdfTemplatesByFunder.some((row) => row?.pdfTemplate?.path))) { %>
+          <button type="button" class="btn btn-outline-danger btn-sm" id="btnInstanceExportPdf"><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</button>
+        <% } %>
         <% if (!isV2) { %>
           <a href="/school/reports/instances/export/<%= instance.id %>?download=1" class="btn btn-outline-dark btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
         <% } %>
@@ -2001,6 +2004,10 @@
     const instanceDocxModal = instanceDocxModalEl && window.bootstrap?.Modal
       ? window.bootstrap.Modal.getOrCreateInstance(instanceDocxModalEl)
       : null;
+    const instancePdfModalEl = document.getElementById('instancePdfExportModal');
+    const instancePdfModal = instancePdfModalEl && window.bootstrap?.Modal
+      ? window.bootstrap.Modal.getOrCreateInstance(instancePdfModalEl)
+      : null;
     const instanceExportId = String(<%= JSON.stringify(String(instance?.id || '')) %>);
 
     document.getElementById('btnInstanceExportDocx')?.addEventListener('click', async () => {
@@ -2089,6 +2096,93 @@
         }
       }
     });
+
+    document.getElementById('btnInstanceExportPdf')?.addEventListener('click', async () => {
+      try {
+        const response = await fetch(
+          '/school/reports/instances/export/' + encodeURIComponent(instanceExportId) + '/pdf-preview',
+          { headers: { Accept: 'application/json', 'x-ajax-request': 'true' } }
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.status === 'error') {
+          throw new Error(result.message || 'Unable to prepare PDF export.');
+        }
+        const row = (result.rows || [])[0] || {};
+        document.getElementById('instancePdfFunderLabel').textContent = row.funderLabel || 'Default / unknown';
+        const select = document.getElementById('instancePdfKeySelect');
+        select.innerHTML = '';
+        (row.availablePdfOptions || result.availablePdfOptions || []).forEach((opt) => {
+          const option = document.createElement('option');
+          option.value = opt.key;
+          option.textContent = opt.label + (opt.fileName ? ` (${opt.fileName})` : '');
+          if (String(opt.key) === String(row.suggestedPdfKey || '')) option.selected = true;
+          select.appendChild(option);
+        });
+        instancePdfModal?.show();
+      } catch (error) {
+        await showReportInstanceMessage({
+          title: 'Export Failed',
+          icon: 'error',
+          message: error?.message || 'Unable to open PDF export options.'
+        });
+      }
+    });
+
+    document.getElementById('btnConfirmInstancePdfExport')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnConfirmInstancePdfExport');
+      const original = btn?.innerHTML;
+      try {
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = 'Exporting...';
+        }
+        const pdfKey = document.getElementById('instancePdfKeySelect')?.value || 'default';
+        const response = await fetch(
+          '/school/reports/instances/export/' + encodeURIComponent(instanceExportId),
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/octet-stream',
+              'x-ajax-request': 'true'
+            },
+            body: JSON.stringify({ format: 'pdf', pdfKey })
+          }
+        );
+        if (!response.ok) {
+          let message = 'Export failed.';
+          try {
+            const err = await response.json();
+            message = err.message || message;
+          } catch (_) {}
+          throw new Error(message);
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const fileName = match?.[1] || `report-${instanceExportId}.pdf`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        instancePdfModal?.hide();
+      } catch (error) {
+        await showReportInstanceMessage({
+          title: 'Export Failed',
+          icon: 'error',
+          message: error?.message || 'Unable to export PDF file.'
+        });
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = original;
+        }
+      }
+    });
   })();
 </script>
 
@@ -2107,6 +2201,26 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-primary" id="btnConfirmInstanceDocxExport">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="instancePdfExportModal" tabindex="-1" aria-labelledby="instancePdfExportModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="instancePdfExportModalLabel">Export PDF report</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 text-muted small">Detected funder: <strong id="instancePdfFunderLabel">-</strong></div>
+        <label class="form-label fw-semibold" for="instancePdfKeySelect">PDF template</label>
+        <select class="form-select" id="instancePdfKeySelect"></select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnConfirmInstancePdfExport">Export</button>
       </div>
     </div>
   </div>

@@ -541,6 +541,7 @@ function createSchoolRepository(config) {
   const assignmentScopeKind = String(config.assignmentScopeKind || 'personId').trim() || 'personId';
   const generateMongoCreateId = config.generateMongoCreateId;
   const normalizePayload = config.normalizePayload;
+  const replaceObjectFields = new Set(Array.isArray(config.replaceObjectFields) ? config.replaceObjectFields : []);
 
   async function runLocalList(plan = {}, options = {}) {
     const query = plan?.query || {};
@@ -742,7 +743,11 @@ function createSchoolRepository(config) {
           if (!existing) throw new Error('Record not found');
           const incomingRaw = stampUpdateAuditPayload(normalizedData, options);
           const { payload: incoming, unsetFields } = splitRepositoryUnsetPayload(incomingRaw);
-          const merged = preserveExistingOwnershipFields(deepMerge(existing, incoming || {}), existing);
+          const mergeBase = { ...existing };
+          for (const field of replaceObjectFields) {
+            if (Object.prototype.hasOwnProperty.call(incoming || {}, field)) delete mergeBase[field];
+          }
+          const merged = preserveExistingOwnershipFields(deepMerge(mergeBase, incoming || {}), existing);
           for (const field of unsetFields) {
             delete merged[field];
           }
@@ -962,6 +967,7 @@ const schoolRepositories = {
       ...row,
       allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(row)
     }),
+    replaceObjectFields: ['placeholderMap', 'pdfFieldMap'],
     defaultSearchFields: ['id', 'orgId', 'title', 'type', 'status', 'description']
   }),
   reportAssignments: createSchoolRepository({

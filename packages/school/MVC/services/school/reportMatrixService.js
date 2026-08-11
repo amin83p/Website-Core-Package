@@ -38,6 +38,13 @@ function isStudentNameField(field = {}) {
   return STUDENT_NAME_KEYS.has(prefillKey) || STUDENT_NAME_KEYS.has(fieldId);
 }
 
+function isOverallAttendanceDayField(field = {}) {
+  const fieldId = clean(field?.id).toLowerCase();
+  const prefillKey = clean(field?.prefillKey).toLowerCase();
+  return /^attendance_(day|presence|note)_\d{2}$/.test(fieldId)
+    || /^attendance_(day|presence|note)_\d{2}$/.test(prefillKey);
+}
+
 function stableValueToken(value) {
   if (value === undefined) return '__undefined__';
   try {
@@ -262,7 +269,12 @@ function classifyMatrixFields(template, rows, assignment) {
   const commonReadOnlyFields = [...sharedReadOnlyFields];
 
   fields.forEach((field) => {
-    if (consumed.has(clean(field.id)) || !isReadOnlyField(field) || isCalculatedField(field)) return;
+    if (
+      consumed.has(clean(field.id))
+      || !isReadOnlyField(field)
+      || isCalculatedField(field)
+      || isOverallAttendanceDayField(field)
+    ) return;
     const values = rows.map((row) => row.answers?.[field.id]);
     if (valuesAreIdentical(values)) {
       commonReadOnlyFields.push(field);

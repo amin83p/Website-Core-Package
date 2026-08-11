@@ -170,6 +170,35 @@ test('DOCX value case supports all modes after conversion without changing store
   assert.equal(genericBundle.placeholders['{{title}}'], 'ÉCOLE du NORD');
 });
 
+test('PDF placeholder payload supports conversion, value case, and direct field tokens', () => {
+  const template = {
+    schema: {
+      fields: [
+        {
+          id: 'modified_value',
+          label: 'Modified Value',
+          type: 'text',
+          exportTextCase: 'upper',
+          conversionRule: { enabled: true, expression: '"pdf calculated value"', onError: 'use_raw' }
+        }
+      ]
+    },
+    placeholderMap: {
+      modified_value: '{{custom_pdf_token}}'
+    }
+  };
+  const instance = {
+    answers: { modified_value: 'raw value' },
+    prefillSnapshot: {}
+  };
+
+  const bundle = reportService.buildPdfPlaceholderPayloadDetailed(template, instance, null);
+
+  assert.equal(bundle.placeholders['{{custom_pdf_token}}'], 'PDF CALCULATED VALUE');
+  assert.equal(bundle.placeholders['{{modified_value}}'], 'PDF CALCULATED VALUE');
+  assert.equal(instance.answers.modified_value, 'raw value');
+});
+
 test('DOCX shortcuts are generated uniquely and reject invalid or conflicting values', () => {
   const template = {
     schema: {

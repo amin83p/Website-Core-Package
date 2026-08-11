@@ -206,6 +206,11 @@ router.get('/templates/copy/:id',
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
   ctrl.showTemplateCopyForm);
 
+router.get('/templates/:id/pdf-fields',
+  requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  ctrl.inspectTemplatePdfFields);
+
 router.get('/templates/edit/:id',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
@@ -641,6 +646,11 @@ router.get('/instances/matrix/:assignmentId/export-docx-preview',
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   ctrl.previewReportMatrixDocxExport);
 
+router.get('/instances/matrix/:assignmentId/export-pdf-preview',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  ctrl.previewReportMatrixPdfExport);
+
 router.get('/instances/matrix/:assignmentId/export',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
@@ -727,6 +737,11 @@ router.get('/instances/export/:id/docx-preview',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   ctrl.previewInstanceDocxExport);
+
+router.get('/instances/export/:id/pdf-preview',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  ctrl.previewInstancePdfExport);
 
 router.get('/instances/export/:id',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),

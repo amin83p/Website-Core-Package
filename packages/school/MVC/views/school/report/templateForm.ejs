@@ -23,8 +23,9 @@
       { id: 'teacher_name', label: 'Teacher Name', type: 'text', required: false, readOnly: false, prefillKey: 'teacher_name', helpText: '', placeholder: '', options: [] },
       { id: 'class_name', label: 'Class Name', type: 'text', required: false, readOnly: false, prefillKey: 'class_name', helpText: '', placeholder: '', options: [] },
       { id: 'report_date', label: 'Report Date', type: 'date', required: false, readOnly: false, prefillKey: 'report_date', helpText: '', placeholder: '', options: [] }
-    ];
+  ];
   const initialMap = template?.placeholderMap || {};
+  const initialPdfFieldMap = template?.pdfFieldMap || {};
   const prefillCatalogData = (typeof prefillCatalog !== 'undefined' && prefillCatalog)
     ? prefillCatalog
     : {
@@ -68,7 +69,7 @@
   <div class="row g-2 align-items-start mb-4">
     <div class="col">
       <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;"><i class="bi bi-pencil-square me-2"></i><%= title %></h1>
-      <div class="text-muted small mt-1">Define online fields and map each field to DOCX placeholder tokens.</div>
+      <div class="text-muted small mt-1">Define online fields and map each field to DOCX placeholders or PDF form fields.</div>
     </div>
     <div class="col-auto d-flex flex-column align-items-end gap-1">
       <% if (isEdit && template?.id) { %>
@@ -82,6 +83,7 @@
     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
     <input type="hidden" name="schemaJson" id="schemaJsonInput">
     <input type="hidden" name="placeholderMapJson" id="placeholderMapJsonInput">
+    <input type="hidden" name="pdfFieldMapJson" id="pdfFieldMapJsonInput">
     <input type="hidden" name="allowedReportScopesPresent" value="true">
     <% if (!isEdit && sourceTemplateForCopy?.id) { %>
       <input type="hidden" name="copySourceTemplateId" value="<%= sourceTemplateForCopy.id %>">
@@ -135,7 +137,7 @@
             <textarea name="description" class="form-control" rows="2" maxlength="4000"><%= template?.description || '' %></textarea>
           </div>
 
-          <div class="col-12">
+          <div class="col-12 order-3">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
               <label class="form-label fw-bold mb-0">Word templates by funder</label>
               <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -187,7 +189,7 @@
             <div class="form-text">Map a Word file for Self Fund and each registered funder. Students without a mapping use the default Word file below.</div>
           </div>
 
-          <div class="col-md-8">
+          <div class="col-md-6 order-1">
             <label class="form-label fw-bold">Default DOCX Template File</label>
             <input type="file" name="docxTemplate" class="form-control" accept=".docx">
             <% if (template?.docxTemplate?.url) { %>
@@ -196,9 +198,81 @@
               </div>
             <% } %>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-6 order-1">
+            <label class="form-label fw-bold">Default PDF Template File</label>
+            <input type="file" name="pdfTemplate" class="form-control" accept=".pdf">
+            <% if (template?.pdfTemplate?.url) { %>
+              <div class="small text-muted mt-1">
+                Current: <a href="<%= template.pdfTemplate.url %>" target="_blank"><%= template.pdfTemplate.originalName || template.pdfTemplate.fileName %></a>
+              </div>
+            <% } %>
+          </div>
+          <div class="col-md-4 order-2">
             <label class="form-label fw-bold">Schema Version</label>
             <input type="number" id="schemaVersionInput" class="form-control" min="1" max="1000" value="<%= Number(template?.schema?.version || 1) %>">
+          </div>
+          <div class="col-12 order-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <label class="form-label fw-bold mb-0">PDF templates by funder</label>
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <select id="funderPdfPicker" class="form-select form-select-sm" style="min-width: 220px;">
+                  <option value="">Add funder...</option>
+                  <% availableFunderPickerOptions.forEach((opt) => { %>
+                    <option value="<%= opt.id %>" data-label="<%= opt.label %>"><%= opt.label %></option>
+                  <% }); %>
+                </select>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddFunderPdfRow">
+                  <i class="bi bi-plus-lg me-1"></i>Add
+                </button>
+              </div>
+            </div>
+            <div class="table-responsive border rounded">
+              <table class="table table-sm align-middle mb-0" id="funderPdfTable">
+                <thead class="table-light">
+                  <tr>
+                    <th style="min-width: 160px;">Funder</th>
+                    <th>PDF file</th>
+                    <th style="width: 90px;"></th>
+                  </tr>
+                </thead>
+                <tbody id="funderPdfTableBody">
+                  <% (Array.isArray(template?.pdfTemplatesByFunder) ? template.pdfTemplatesByFunder : []).forEach((row) => { %>
+                    <tr data-funder-key="<%= row.funderKey %>">
+                      <td>
+                        <input type="hidden" name="funderPdfKeys" value="<%= row.funderKey %>">
+                        <input type="hidden" name="funderPdfLabels" value="<%= row.label || row.funderKey %>">
+                        <span class="fw-semibold"><%= row.label || row.funderKey %></span>
+                      </td>
+                      <td>
+                        <input type="file" class="form-control form-control-sm" name="funderPdfFile_<%= row.funderKey %>" accept=".pdf">
+                        <% if (row?.pdfTemplate?.url) { %>
+                          <div class="small text-muted mt-1">
+                            Current:
+                            <a href="<%= row.pdfTemplate.url %>" target="_blank"><%= row.pdfTemplate.originalName || row.pdfTemplate.fileName %></a>
+                          </div>
+                        <% } %>
+                      </td>
+                      <td class="text-end">
+                        <button type="button" class="btn btn-outline-danger btn-sm btn-remove-funder-pdf">Remove</button>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+            <div class="form-text">Students without a funder PDF mapping use the default PDF file above.</div>
+          </div>
+          <div class="col-12 order-5">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+              <label class="form-label fw-bold mb-0">PDF Field Map</label>
+              <% if (isEdit && (template?.pdfTemplate?.path || (Array.isArray(template?.pdfTemplatesByFunder) && template.pdfTemplatesByFunder.some((row) => row?.pdfTemplate?.path)))) { %>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnInspectPdfFields" data-template-id="<%= template.id %>">
+                  <i class="bi bi-search me-1"></i>Inspect Saved PDF Fields
+                </button>
+              <% } %>
+            </div>
+            <textarea class="form-control font-monospace" id="pdfFieldMapEditor" rows="8" spellcheck="false"><%= JSON.stringify(initialPdfFieldMap, null, 2) %></textarea>
+            <div class="form-text">Map report field IDs or prefill keys to exact PDF AcroForm field names. Example: <code>"attendance_presence_01": "YN1"</code>. You can also type placeholders like <code>{{attendance_presence_01}}</code> directly into PDF text fields; export will replace them with calculated/converted values.</div>
           </div>
         </div>
       </div>
@@ -804,6 +878,8 @@
     const approvedReportScopeInputs = Array.from(form.querySelectorAll('.approved-report-scope'));
     const schemaJsonInput = document.getElementById('schemaJsonInput');
     const placeholderMapJsonInput = document.getElementById('placeholderMapJsonInput');
+    const pdfFieldMapJsonInput = document.getElementById('pdfFieldMapJsonInput');
+    const pdfFieldMapEditor = document.getElementById('pdfFieldMapEditor');
     const schemaVersionInput = document.getElementById('schemaVersionInput');
     const prefillSearchInput = document.getElementById('prefillKeySearch');
     const btnExpandPrefill = document.getElementById('btnExpandPrefill');
@@ -2191,6 +2267,43 @@ num(value) <= 95</code></pre>
     });
     btnExportPrefillJson?.addEventListener('click', () => exportPrefillRows('json'));
     btnExportPrefillCsv?.addEventListener('click', () => exportPrefillRows('csv'));
+    document.getElementById('btnInspectPdfFields')?.addEventListener('click', async (event) => {
+      const btn = event.currentTarget;
+      const templateId = String(btn?.getAttribute('data-template-id') || '').trim();
+      if (!templateId) return;
+      const original = btn.innerHTML;
+      try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Inspecting...';
+        const response = await fetch('/school/reports/templates/' + encodeURIComponent(templateId) + '/pdf-fields', {
+          headers: { Accept: 'application/json', 'x-ajax-request': 'true' }
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.status === 'error') {
+          throw new Error(result.message || 'Unable to inspect saved PDF fields.');
+        }
+        const names = (Array.isArray(result.fields) ? result.fields : []).map((field) => String(field?.name || '').trim()).filter(Boolean);
+        const html = names.length
+          ? '<div class="text-start"><div class="small text-muted mb-2">Saved PDF fields for ' + escapeHtml(result.label || 'Default') + ':</div><pre class="small bg-light border rounded p-2 mb-0 text-wrap">' + escapeHtml(names.join('\n')) + '</pre></div>'
+          : 'No fillable PDF fields were found in the saved file.';
+        await showReportModal({
+          title: 'PDF Fields',
+          icon: names.length ? 'info' : 'warning',
+          message: html,
+          html: true
+        });
+      } catch (error) {
+        await showReportModal({
+          title: 'PDF Field Inspection Failed',
+          icon: 'error',
+          message: error?.message || 'Unable to inspect saved PDF fields.',
+          buttonClass: 'btn-danger'
+        });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!approvedReportScopeInputs.some((input) => input.checked)) {
@@ -2206,8 +2319,27 @@ num(value) <= 95</code></pre>
         showReportModal({ title: 'Field Required', icon: 'warning', message: 'Add at least one field before saving the template.' });
         return;
       }
+      let pdfFieldMap = {};
+      const pdfMapText = String(pdfFieldMapEditor?.value || '').trim();
+      if (pdfMapText) {
+        try {
+          pdfFieldMap = JSON.parse(pdfMapText);
+          if (!pdfFieldMap || Array.isArray(pdfFieldMap) || typeof pdfFieldMap !== 'object') {
+            throw new Error('PDF Field Map must be a JSON object.');
+          }
+        } catch (error) {
+          await showReportModal({
+            title: 'Invalid PDF Field Map',
+            icon: 'warning',
+            message: error?.message || 'PDF Field Map must be valid JSON.',
+            buttonClass: 'btn-warning'
+          });
+          return;
+        }
+      }
       schemaJsonInput.value = JSON.stringify(payload.schema);
       placeholderMapJsonInput.value = JSON.stringify(payload.placeholderMap);
+      pdfFieldMapJsonInput.value = JSON.stringify(pdfFieldMap);
 
       const submitter = e.submitter || form.querySelector('button[type="submit"]');
       const originalHtml = submitter ? submitter.innerHTML : '';
@@ -2315,6 +2447,66 @@ num(value) <= 95</code></pre>
     });
 
     syncFunderDocxPickerDisabled();
+
+    function syncFunderPdfPickerDisabled() {
+      const picker = document.getElementById('funderPdfPicker');
+      if (!picker) return;
+      const used = new Set(
+        [...document.querySelectorAll('#funderPdfTableBody tr[data-funder-key]')]
+          .map((row) => String(row.getAttribute('data-funder-key') || '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+      [...picker.options].forEach((opt) => {
+        if (!opt.value) return;
+        opt.disabled = used.has(String(opt.value).trim().toLowerCase());
+      });
+    }
+
+    function addFunderPdfRow(funderKey, funderLabel) {
+      const tbody = document.getElementById('funderPdfTableBody');
+      if (!tbody || !funderKey) return;
+      const key = String(funderKey).trim();
+      const label = String(funderLabel || funderKey).trim() || key;
+      if ([...tbody.querySelectorAll('tr[data-funder-key]')].some((row) => (
+        String(row.getAttribute('data-funder-key') || '').toLowerCase() === key.toLowerCase()
+      ))) return;
+
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-funder-key', key);
+      tr.innerHTML = `
+        <td>
+          <input type="hidden" name="funderPdfKeys" value="${key.replace(/"/g, '&quot;')}">
+          <input type="hidden" name="funderPdfLabels" value="${label.replace(/"/g, '&quot;')}">
+          <span class="fw-semibold"></span>
+        </td>
+        <td>
+          <input type="file" class="form-control form-control-sm" name="funderPdfFile_${key.replace(/"/g, '&quot;')}" accept=".pdf">
+        </td>
+        <td class="text-end">
+          <button type="button" class="btn btn-outline-danger btn-sm btn-remove-funder-pdf">Remove</button>
+        </td>
+      `;
+      tr.querySelector('.fw-semibold').textContent = label;
+      tbody.appendChild(tr);
+      syncFunderPdfPickerDisabled();
+    }
+
+    document.getElementById('btnAddFunderPdfRow')?.addEventListener('click', () => {
+      const picker = document.getElementById('funderPdfPicker');
+      if (!picker || !picker.value) return;
+      const opt = picker.options[picker.selectedIndex];
+      addFunderPdfRow(picker.value, opt?.dataset?.label || opt?.textContent || picker.value);
+      picker.value = '';
+    });
+
+    document.getElementById('funderPdfTableBody')?.addEventListener('click', (event) => {
+      const btn = event.target.closest('.btn-remove-funder-pdf');
+      if (!btn) return;
+      btn.closest('tr')?.remove();
+      syncFunderPdfPickerDisabled();
+    });
+
+    syncFunderPdfPickerDisabled();
 
     initializeState();
     renderFieldRows();

@@ -94,6 +94,34 @@ test('matrix classification omits visual fields and separates shared, common, an
   assert.equal(groups.sharedFields.some((field) => field.id === 'average_class_mark'), false);
 });
 
+test('matrix keeps overall attendance day rows student-specific even when values match', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'student_full_name', type: 'text', label: 'Student', readOnly: true, prefillKey: 'student_full_name' },
+        { id: 'class_name', type: 'text', label: 'Class', readOnly: true, prefillKey: 'class_name' },
+        { id: 'attendance_day_01', type: 'text', label: 'Day 1', readOnly: true, prefillKey: 'attendance_day_01' },
+        { id: 'attendance_presence_01', type: 'text', label: 'Presence 1', readOnly: true, prefillKey: 'attendance_presence_01' },
+        { id: 'attendance_note_01', type: 'text', label: 'Note 1', readOnly: true, prefillKey: 'attendance_note_01' }
+      ]
+    }
+  };
+  const rows = [
+    { answers: { student_full_name: 'Alice', class_name: 'Class A', attendance_day_01: 1, attendance_presence_01: 'X', attendance_note_01: 'Not in the report date range' } },
+    { answers: { student_full_name: 'Bob', class_name: 'Class A', attendance_day_01: 1, attendance_presence_01: 'X', attendance_note_01: 'Not in the report date range' } }
+  ];
+  const groups = reportMatrixService.classifyMatrixFields(template, rows, {
+    reportScope: 'each_student',
+    sharedAnswers: {}
+  });
+
+  assert.deepEqual(groups.commonFields.map((field) => field.id), ['class_name']);
+  assert.deepEqual(
+    groups.tableFields.map((field) => field.id),
+    ['attendance_day_01', 'attendance_presence_01', 'attendance_note_01']
+  );
+});
+
 test('matrix marks an unsaved shared value as conflicting instead of choosing a student value', () => {
   const template = {
     schema: { fields: [{ id: 'shared_goal', type: 'text', label: 'Goal', sharedAcrossStudents: true }] }

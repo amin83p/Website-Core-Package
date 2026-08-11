@@ -11,6 +11,7 @@ const classEnrollmentReadService = require('./classEnrollmentReadService');
 const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const reportFunderDocxService = require('./reportFunderDocxService');
+const reportFunderPdfService = require('./reportFunderPdfService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const reportScopePolicy = require('./reportScopePolicy');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -558,6 +559,11 @@ function buildPlaceholderMapFromPayload(body) {
   return mapFromHidden && typeof mapFromHidden === 'object' ? mapFromHidden : {};
 }
 
+function buildPdfFieldMapFromPayload(body) {
+  const mapFromHidden = parseJsonSafe(body.pdfFieldMapJson || body.pdfFieldMap, null);
+  return mapFromHidden && typeof mapFromHidden === 'object' ? mapFromHidden : {};
+}
+
 async function buildPersonNameMap(reqUser) {
   const payload = await schoolIdentityLookupService.listSchoolPersonRecords({
     reqUser,
@@ -913,11 +919,24 @@ function buildTemplateSavePayload({
   if (uploadedDocx) payload.docxTemplate = uploadedDocx;
   else if (existingTemplate?.docxTemplate) payload.docxTemplate = existingTemplate.docxTemplate;
 
+  const defaultPdfUpload = (Array.isArray(uploadedFiles) ? uploadedFiles : [])
+    .find((file) => String(file?.fieldname || '') === 'pdfTemplate')
+    || null;
+  const uploadedPdf = resolveUploadedFileRecord(defaultPdfUpload);
+  if (uploadedPdf) payload.pdfTemplate = uploadedPdf;
+  else if (existingTemplate?.pdfTemplate) payload.pdfTemplate = existingTemplate.pdfTemplate;
+
   payload.docxTemplatesByFunder = buildDocxTemplatesByFunderFromUpload({
     body,
     existingTemplate,
     uploadedFiles
   });
+  payload.pdfTemplatesByFunder = buildPdfTemplatesByFunderFromUpload({
+    body,
+    existingTemplate,
+    uploadedFiles
+  });
+  payload.pdfFieldMap = buildPdfFieldMapFromPayload(body);
 
   return payload;
 }
@@ -961,6 +980,50 @@ function buildDocxTemplatesByFunderFromUpload({ body = {}, existingTemplate = nu
       funderKey,
       label: String(labels[index] || existing?.label || (funderKey === 'self' ? 'Self Fund' : funderKey)).trim(),
       docxTemplate
+    });
+  });
+  return out;
+}
+
+function buildPdfTemplatesByFunderFromUpload({ body = {}, existingTemplate = null, uploadedFiles = [] } = {}) {
+  const existingByKey = new Map(
+    (Array.isArray(existingTemplate?.pdfTemplatesByFunder) ? existingTemplate.pdfTemplatesByFunder : [])
+      .map((row) => [String(row?.funderKey || '').trim().toLowerCase(), row])
+      .filter(([key]) => key)
+  );
+
+  let keys = body.funderPdfKeys;
+  if (typeof keys === 'string') keys = [keys];
+  if (!Array.isArray(keys)) keys = [];
+  keys = keys.map((key) => String(key || '').trim()).filter(Boolean);
+
+  let labels = body.funderPdfLabels;
+  if (typeof labels === 'string') labels = [labels];
+  if (!Array.isArray(labels)) labels = [];
+
+  const filesByField = new Map();
+  (Array.isArray(uploadedFiles) ? uploadedFiles : []).forEach((file) => {
+    const field = String(file?.fieldname || '').trim();
+    if (!field.startsWith('funderPdfFile_')) return;
+    const key = field.slice('funderPdfFile_'.length);
+    if (key) filesByField.set(key, file);
+  });
+
+  const out = [];
+  const seen = new Set();
+  keys.forEach((rawKey, index) => {
+    const funderKey = rawKey.toLowerCase() === 'self' ? 'self' : rawKey;
+    const keyNorm = funderKey.toLowerCase();
+    if (seen.has(keyNorm)) return;
+    seen.add(keyNorm);
+    const uploaded = resolveUploadedFileRecord(filesByField.get(rawKey) || filesByField.get(funderKey));
+    const existing = existingByKey.get(keyNorm) || null;
+    const pdfTemplate = uploaded || existing?.pdfTemplate || null;
+    if (!pdfTemplate) return;
+    out.push({
+      funderKey,
+      label: String(labels[index] || existing?.label || (funderKey === 'self' ? 'Self Fund' : funderKey)).trim(),
+      pdfTemplate
     });
   });
   return out;
@@ -1403,6 +1466,7 @@ async function buildInstanceListRows({
         classLifecycle: buildClassLifecycleSnapshot(classItem || {}),
         templateTitle: template?.title || row.templateId,
         hasDocxTemplate: reportFunderDocxService.templateHasAnyDocx(template),
+        hasPdfTemplate: reportFunderPdfService.templateHasAnyPdf(template),
         assignmentStatus: assignment?.status || '',
         reportDueDate: resolveInstanceReportDueDate(row, assignment),
         teacherId: participants.teacherId,
@@ -1492,6 +1556,7 @@ async function buildInstanceListRows({
             classLifecycle: buildClassLifecycleSnapshot(classItem || {}),
             templateTitle: template?.title || assignment.templateId,
             hasDocxTemplate: reportFunderDocxService.templateHasAnyDocx(template),
+            hasPdfTemplate: reportFunderPdfService.templateHasAnyPdf(template),
             assignmentStatus: assignment.status || '',
             audit: assignment.audit || {}
           });
@@ -1898,6 +1963,8 @@ module.exports = {
   buildHomeSummary,
   buildTemplateSavePayload,
   buildDocxTemplatesByFunderFromUpload,
+  buildPdfTemplatesByFunderFromUpload,
+  buildPdfFieldMapFromPayload,
   parseAssignmentSaveRequest,
   parseTargetRowsField,
   buildAssignmentListContext,
