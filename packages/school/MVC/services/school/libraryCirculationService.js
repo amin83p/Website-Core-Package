@@ -7,7 +7,9 @@ const {
 } = require('../../models/school/libraryCopyModel');
 const {
   PATRON_STATUSES,
-  normalizePatronRole
+  normalizePatronRole,
+  getActivePolicyOverrideRecord,
+  isPatronAccountValid
 } = require('../../models/school/libraryPatronModel');
 const {
   DEFAULT_POLICIES,
@@ -20,11 +22,45 @@ const {
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
+const POLICY_OVERRIDE_FIELDS = Object.freeze([
+  'maxConcurrentLoans',
+  'loanPeriodDays',
+  'digitalAccessDays',
+  'allowDigitalDownload',
+  'maxRenewals'
+]);
+
+const LIBRARY_CARD_ROLE_PREFIX = Object.freeze({
+  student: 'STU',
+  teacher: 'TCH',
+  staff: 'STF'
+});
+
 async function fetchOrgRows(entityType, orgId, user, predicate = null) {
   const rows = await schoolDataService.fetchAllData(entityType, {}, user);
   let list = (Array.isArray(rows) ? rows : []).filter((row) => idsEqual(row.orgId, orgId));
   if (predicate) list = list.filter(predicate);
   return list;
+}
+
+function cardToken(value, fallback = '') {
+  const token = String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(-8);
+  return token || fallback;
+}
+
+function buildLibraryCardNumber({ patronRole, personId, roleRecordId, existingNumbers = [] } = {}) {
+  const role = normalizePatronRole(patronRole);
+  const prefix = LIBRARY_CARD_ROLE_PREFIX[role] || 'LIB';
+  const token = cardToken(personId, cardToken(roleRecordId, Date.now().toString(36).toUpperCase()));
+  const base = `LIB-${prefix}-${token}`;
+  const existing = new Set((Array.isArray(existingNumbers) ? existingNumbers : []).map((value) => String(value || '').toUpperCase()));
+  if (!existing.has(base.toUpperCase())) return base;
+  let suffix = 2;
+  while (existing.has(`${base}-${suffix}`.toUpperCase())) suffix += 1;
+  return `${base}-${suffix}`;
 }
 
 function addDaysIso(baseDate, days) {
@@ -67,6 +103,72 @@ async function getPolicyForRole(orgId, patronRole, user) {
   return policies.find((row) => String(row.patronRole) === normalizePatronRole(patronRole)) || null;
 }
 
+function todayDateKey(now = new Date()) {
+  const date = now instanceof Date ? now : new Date(now);
+  const validDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  const year = validDate.getFullYear();
+  const month = String(validDate.getMonth() + 1).padStart(2, '0');
+  const day = String(validDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function hasPolicyOverrideValue(value) {
+  return value !== undefined && value !== null && value !== '';
+}
+
+function isPatronPolicyOverrideActive(patron, now = new Date()) {
+  const activeRecord = getActivePolicyOverrideRecord(patron?.policyOverrideRecords, now);
+  if (activeRecord) return true;
+  const overrides = patron?.policyOverrides && typeof patron.policyOverrides === 'object'
+    ? patron.policyOverrides
+    : { maxConcurrentLoans: patron?.maxConcurrentLoans };
+  const hasOverride = POLICY_OVERRIDE_FIELDS.some((field) => hasPolicyOverrideValue(overrides[field]));
+  if (!hasOverride) return false;
+  const expiresAt = String(patron?.policyOverrideExpiresAt || '').trim();
+  if (!expiresAt) return true;
+  return expiresAt.slice(0, 10) >= todayDateKey(now);
+}
+
+function applyPatronPolicyOverrides(policy, patron, { now = new Date() } = {}) {
+  const activeRecord = getActivePolicyOverrideRecord(patron?.policyOverrideRecords, now);
+  const effective = {
+    ...(policy || {}),
+    overrideActive: false,
+    overrideRecordId: activeRecord?.id || '',
+    overrideValidFrom: activeRecord?.validFrom || '',
+    overrideExpiresAt: activeRecord?.validTo || String(patron?.policyOverrideExpiresAt || '').trim()
+  };
+  if (!activeRecord && !isPatronPolicyOverrideActive(patron, now)) return effective;
+  const overrides = activeRecord?.policyOverrides || (patron?.policyOverrides && typeof patron.policyOverrides === 'object'
+    ? patron.policyOverrides
+    : { maxConcurrentLoans: patron?.maxConcurrentLoans });
+  for (const field of POLICY_OVERRIDE_FIELDS) {
+    if (hasPolicyOverrideValue(overrides[field])) {
+      effective[field] = overrides[field];
+    }
+  }
+  effective.overrideActive = true;
+  return effective;
+}
+
+async function getEffectivePolicyForPatron(orgId, patron, user, options = {}) {
+  const policy = await getPolicyForRole(orgId, patron?.patronRole, user);
+  return applyPatronPolicyOverrides(policy, patron, options);
+}
+
+async function getEffectivePolicyForLoan(loan, user, options = {}) {
+  let patron = null;
+  if (loan?.patronId) {
+    patron = await schoolDataService.getDataById('libraryPatrons', loan.patronId, user);
+    if (patron && !idsEqual(patron.orgId, loan.orgId)) patron = null;
+  }
+  if (patron) {
+    assertPatronEligible(patron);
+    return getEffectivePolicyForPatron(loan.orgId, patron, user, options);
+  }
+  return getPolicyForRole(loan.orgId, loan.patronRole, user);
+}
+
 async function countOpenLoansForPatron(orgId, patronId, user) {
   const rows = await fetchOrgRows('libraryLoans', orgId, user, (row) => String(row.patronId) === String(patronId));
   return rows.filter(isLoanOpen).length;
@@ -84,19 +186,31 @@ async function resolveOrCreatePatron(orgId, {
   const rows = await fetchOrgRows('libraryPatrons', orgId, user, (row) => idsEqual(row.personId, normalizedPersonId));
   const existing = rows[0];
   if (existing) return existing;
+  const patronRows = await fetchOrgRows('libraryPatrons', orgId, user);
+  const existingNumbers = patronRows.map((row) => row.libraryCardNumber).filter(Boolean);
+  const normalizedRole = normalizePatronRole(patronRole);
 
   return schoolDataService.addData('libraryPatrons', {
     orgId,
     personId: normalizedPersonId,
-    patronRole: normalizePatronRole(patronRole),
+    patronRole: normalizedRole,
     roleRecordId: toPublicId(roleRecordId) || '',
     status: PATRON_STATUSES.ACTIVE,
+    libraryCardNumber: buildLibraryCardNumber({
+      patronRole: normalizedRole,
+      personId: normalizedPersonId,
+      roleRecordId,
+      existingNumbers
+    }),
     audit: { createUser: userId, lastUpdateUser: userId }
   }, user);
 }
 
 function assertPatronEligible(patron) {
   const status = String(patron?.status || '').trim().toLowerCase();
+  if (!isPatronAccountValid(patron)) {
+    throw new Error('This patron account is outside its validity dates.');
+  }
   if (status === PATRON_STATUSES.BLOCKED) {
     throw new Error('This patron is blocked from library services.');
   }
@@ -110,7 +224,9 @@ async function checkout({
   patronId,
   copyId,
   staffUserId,
-  notes
+  notes,
+  dueAt: requestedDueAt,
+  digitalAccessExpiresAt: requestedDigitalAccessExpiresAt
 }, user) {
   const patron = await schoolDataService.getDataById('libraryPatrons', patronId, user);
   if (!patron || !idsEqual(patron.orgId, orgId)) throw new Error('Patron not found.');
@@ -128,10 +244,8 @@ async function checkout({
     throw new Error('Digital copy cannot be lent because the catalog book has no PDF.');
   }
 
-  const policy = await getPolicyForRole(orgId, patron.patronRole, user);
-  const maxLoans = patron.maxConcurrentLoans != null
-    ? Number(patron.maxConcurrentLoans)
-    : Number(policy?.maxConcurrentLoans || 0);
+  const policy = await getEffectivePolicyForPatron(orgId, patron, user);
+  const maxLoans = Number(policy?.maxConcurrentLoans || 0);
   const openCount = await countOpenLoansForPatron(orgId, patron.id, user);
   if (maxLoans > 0 && openCount >= maxLoans) {
     throw new Error(`Patron has reached the maximum of ${maxLoans} concurrent loans.`);
@@ -142,7 +256,10 @@ async function checkout({
   const loanDays = isDigital
     ? Number(policy?.digitalAccessDays || 30)
     : Number(policy?.loanPeriodDays || 14);
-  const dueAt = addDaysIso(now, loanDays);
+  const dueAt = requestedDueAt || addDaysIso(now, loanDays);
+  const digitalAccessExpiresAt = isDigital
+    ? (requestedDigitalAccessExpiresAt || dueAt)
+    : requestedDigitalAccessExpiresAt || null;
 
   const loan = await schoolDataService.addData('libraryLoans', {
     orgId,
@@ -155,7 +272,7 @@ async function checkout({
     status: LOAN_STATUSES.ACTIVE,
     checkoutAt: now,
     dueAt,
-    digitalAccessExpiresAt: isDigital ? dueAt : null,
+    digitalAccessExpiresAt,
     renewalCount: 0,
     checkedOutByUserId: String(staffUserId || 'SYSTEM'),
     notes: String(notes || '').trim(),
@@ -199,7 +316,7 @@ async function renewLoan(loanId, staffUserId, user) {
   if (!loan) throw new Error('Loan not found.');
   if (!isLoanOpen(loan)) throw new Error('Only active or overdue loans can be renewed.');
 
-  const policy = await getPolicyForRole(loan.orgId, loan.patronRole, user);
+  const policy = await getEffectivePolicyForLoan(loan, user);
   const maxRenewals = Number(policy?.maxRenewals || 0);
   const currentRenewals = Number(loan.renewalCount || 0);
   if (currentRenewals >= maxRenewals) {
@@ -286,6 +403,10 @@ async function ensureDigitalCopyForBook(book, userId, user) {
 module.exports = {
   listOrgPolicies,
   getPolicyForRole,
+  getEffectivePolicyForPatron,
+  getEffectivePolicyForLoan,
+  applyPatronPolicyOverrides,
+  isPatronPolicyOverrideActive,
   resolveOrCreatePatron,
   checkout,
   returnLoan,
@@ -296,5 +417,6 @@ module.exports = {
   listOpenLoansForPerson,
   ensureDigitalCopyForBook,
   isLoanOpen,
-  isDigitalAccessValid
+  isDigitalAccessValid,
+  assertPatronEligible
 };

@@ -79,7 +79,7 @@ exports.apiOpenDigital = async (req, res) => {
       throw new Error('Digital access has expired.');
     }
 
-    const policy = await libraryCirculationService.getPolicyForRole(orgId, loan.patronRole, req.user);
+    const policy = await libraryCirculationService.getEffectivePolicyForLoan(loan, req.user);
     if (!policy?.allowDigitalDownload) {
       throw new Error('Digital download is not allowed for your patron role.');
     }

@@ -496,6 +496,30 @@ function buildDateRangeOverlapFilter(startDate, endDate, options = {}) {
   };
 }
 
+function normalizeLibraryLocationPayload(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  const output = { ...data };
+  if (Object.prototype.hasOwnProperty.call(output, 'code')) {
+    const code = String(output.code || '').trim();
+    if (code) {
+      output.code = code;
+    } else {
+      delete output.code;
+      output.__unsetFields = Array.from(new Set([...(Array.isArray(output.__unsetFields) ? output.__unsetFields : []), 'code']));
+    }
+  }
+  return output;
+}
+
+function splitRepositoryUnsetPayload(data) {
+  const source = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  const { __unsetFields, ...payload } = source;
+  const unsetFields = Array.isArray(__unsetFields)
+    ? __unsetFields.map((field) => String(field || '').trim()).filter(Boolean)
+    : [];
+  return { payload, unsetFields };
+}
+
 function createSchoolRepository(config) {
   const getAll = config.getAll;
   const getById = config.getById;
@@ -684,7 +708,7 @@ function createSchoolRepository(config) {
           if (Array.isArray(normalizedData)) {
             const payloads = [];
             for (const raw of stampedData) {
-              const payload = { ...(raw || {}) };
+              const { payload } = splitRepositoryUnsetPayload(raw || {});
               // eslint-disable-next-line no-await-in-loop
               payload.id = typeof generateMongoCreateId === 'function'
                 ? await generateMongoCreateId(collection, payload)
@@ -694,7 +718,7 @@ function createSchoolRepository(config) {
             if (payloads.length) await collection.insertMany(payloads);
             return payloads.map((row) => normalizeMongoDocument(row)).filter(Boolean);
           }
-          const payload = { ...(stampedData || {}) };
+          const { payload } = splitRepositoryUnsetPayload(stampedData || {});
           payload.id = typeof generateMongoCreateId === 'function'
             ? await generateMongoCreateId(collection, payload)
             : await generateUniqueStringId(collection, payload.id);
@@ -716,11 +740,22 @@ function createSchoolRepository(config) {
           const collection = getMongoCollection(collectionName);
           const existing = await collection.findOne(resolveMongoIdFilter(id));
           if (!existing) throw new Error('Record not found');
-          const incoming = stampUpdateAuditPayload(normalizedData, options);
+          const incomingRaw = stampUpdateAuditPayload(normalizedData, options);
+          const { payload: incoming, unsetFields } = splitRepositoryUnsetPayload(incomingRaw);
           const merged = preserveExistingOwnershipFields(deepMerge(existing, incoming || {}), existing);
+          for (const field of unsetFields) {
+            delete merged[field];
+          }
           merged.id = toPublicId(existing?.id || existing?._id);
           const { _id, ...toSet } = merged;
-          await collection.updateOne({ _id: existing._id }, { $set: toSet });
+          const updateOperation = { $set: toSet };
+          if (unsetFields.length) {
+            updateOperation.$unset = unsetFields.reduce((acc, field) => {
+              acc[field] = '';
+              return acc;
+            }, {});
+          }
+          await collection.updateOne({ _id: existing._id }, updateOperation);
           return normalizeMongoDocument(await collection.findOne({ _id: existing._id }));
         }
       }, `school.${entityName || 'entity'}.update`);
@@ -1199,6 +1234,8 @@ const schoolRepositories = {
     update: bookModel.updateBook,
     remove: bookModel.deleteBook,
     defaultSearchFields: ['id', 'orgId', 'title', 'subtitle', 'authors', 'publisher', 'isbn', 'subjectArea'],
+    transformList: (rows) => normalizeRows(rows).map((row) => bookModel.normalizeStoredBook(row)),
+    transformItem: (row) => bookModel.normalizeStoredBook(row),
     allowSystemFallback: false
   }),
   libraryCopies: createSchoolRepository({
@@ -1254,7 +1291,8 @@ const schoolRepositories = {
     update: libraryLocationModel.updateLibraryLocation,
     remove: libraryLocationModel.deleteLibraryLocation,
     defaultSearchFields: ['id', 'orgId', 'parentId', 'locationType', 'name', 'code'],
-    allowSystemFallback: false
+    allowSystemFallback: false,
+    normalizePayload: normalizeLibraryLocationPayload
   }),
   teachingOutlineLevels: createSchoolRepository({
     entityName: 'teachingOutlineLevels',

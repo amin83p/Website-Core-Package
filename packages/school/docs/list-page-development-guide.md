@@ -11,6 +11,7 @@ Use this guide when building or extending **server-rendered list pages** in the 
 | Standard list page | Skills | `packages/school/MVC/views/school/skill/skillList.ejs` |
 | List controller | Skills | `packages/school/MVC/controllers/school/skillController.js` (`listSkills`) |
 | Routes + access | Skills | `packages/school/MVC/routes/skillRoutes.js` |
+| Guarded delete + row removal | Library Patrons | `packages/school/MVC/views/school/library/patronList.ejs`, `packages/school/MVC/controllers/school/libraryPatronController.js` |
 | Page shell / toolbar | Shared partial | `MVC/views/partials/tablePages-start.ejs` |
 | Quick search bar | Shared partial | `MVC/views/partials/tablePages-search.ejs` |
 | Pagination | Shared partial | `MVC/views/partials/pagination.ejs` |
@@ -53,6 +54,7 @@ When adding a new list page, plan and implement each layer:
 ### 3. View (EJS)
 
 - [ ] `tablePages-start` with title, toolbar flags, navigation buttons.
+- [ ] Put primary create/register actions in `tablePages-start` (`newUrl` or `newHref`), not in `headerManageBtns`.
 - [ ] Optional **filter card** (Rolling Enrollment pattern) when filters are more than quick search.
 - [ ] `tablePages-search` with meaningful placeholder.
 - [ ] Optional contextual **warning** alerts (org required, workflow blocked)—not decorative info banners.
@@ -60,6 +62,7 @@ When adding a new list page, plan and implement each layer:
 - [ ] `pagination` partial when server-paginated.
 - [ ] `tablePages-end`.
 - [ ] Page-specific modals/scripts only if needed.
+- [ ] Use `showMessageModal` for validation, blocked, success, and error messages before writing any operation message into the page.
 
 ### 4. Client behavior
 
@@ -69,6 +72,8 @@ When adding a new list page, plan and implement each layer:
 - [ ] `tableName` → per-user column settings key (e.g. `School_Skills`).
 - [ ] `newUrl` + `newLabel` → New + Import buttons; also sets `#urlRef` for delete URL building.
 - [ ] Row actions: `data-floating-row-actions="true"` on wrapper when using overflow action menus.
+- [ ] `newHref` + `newLabel` gives a direct green New/Register button without Import or `newUrl`-derived behavior.
+- [ ] Delete actions confirm with `showMessageModal`, call a server-guarded endpoint, remove the deleted row without refreshing, and show the empty state if no rows remain.
 
 ### 5. Tests
 
@@ -158,6 +163,12 @@ Opens `.sections-page`, injects hidden context for print/delete/settings, render
 - `#user-id`, `#tableName`, `#activeOrgIdRef`, print metadata refs.
 - `#actionStateIdRef` when `actionStateId` is passed.
 
+**Choosing `newUrl` vs `newHref`:**
+
+- Use `newUrl: 'school/skills'` for catalog-style pages that should get shared New + Import behavior and the generic `.delete-btn` flow through `#urlRef`.
+- Use `newHref: '/school/library/patrons/new'` when the page should show the standard green New/Register button but should not show Import.
+- Keep primary create/register buttons out of `headerManageBtns`; that array is for navigation/context buttons such as School Dashboard and section dashboard links.
+
 ### B. Filter card (Rolling Enrollment pattern)
 
 Use when the page needs **structured GET filters** (dropdowns, enums) separate from quick search. Place **after** `tablePages-start`, **before** `tablePages-search`.
@@ -228,7 +239,26 @@ Includes:
 
 Server-side advanced search uses query params: `q`, `type` (`contains` | `starts_with` | `exact_match`), optional `searchFields`.
 
-### D. Contextual alerts (optional)
+### D. Messages and contextual alerts
+
+Use the shared message modal for operation messages:
+
+```javascript
+await window.showMessageModal({
+  title: 'Delete Failed',
+  icon: 'error',
+  message: error.message || 'Unable to delete this item.',
+  buttons: [{ text: 'OK', class: 'btn-danger' }]
+});
+```
+
+Rules:
+
+- Use `showMessageModal` for validation failures, blocked deletes, confirmations, success, and operation errors.
+- Inline alerts are only for persistent contextual page state such as org required or workflow blocked.
+- If an operation writes a message into the page, show the message modal first for app consistency.
+- Controllers/models must still validate required data and delete guards. Client modal validation is convenience, not protection.
+- Set `includeModal: true` on pages that call `showMessageModal`, including edit pages with client-side validation.
 
 Use for **actionable** state (org required, workflow blocked). Do **not** add static informational banners that only describe the module unless product explicitly wants them.
 
@@ -267,7 +297,7 @@ Skills example (org guard):
 - Use `data-sort-value` on `<td>` when display text ≠ sort value (dates, numbers, badges).
 - `modal-table.js` sorts by `data-sort-value` first, then text.
 
-**Row actions (Skills pattern):**
+**Row actions (standard three-dot pattern):**
 
 ```ejs
 <td class="table-actions text-end pe-4">
@@ -288,6 +318,53 @@ Global handlers in `main.js`:
 
 - **Delete** — `.delete-btn` + `#urlRef` → `GET /{urlRef}/delete/{id}` with `X-AJAX-Request`.
 - **Row actions menu** — floating menu when wrapper has `data-floating-row-actions="true"`.
+
+Use `class="table-actions text-end pe-4"` on the action cell and keep the Actions header as `class="text-end pe-4"` without `data-column`. This keeps export/print/table settings from treating actions as data.
+
+For a custom guarded delete, add a page-specific button class and row id:
+
+```ejs
+<tr data-entity-row-id="<%= item.id %>">
+  ...
+  <td class="table-actions text-end pe-4">
+    <div class="row-actions-wrap">
+      <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle"
+        data-row-actions-id="<%= item.id %>" title="Item actions">
+        <i class="bi bi-three-dots-vertical"></i>
+      </button>
+      <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+        <a href="/school/items/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-pencil-square me-2"></i>Edit
+        </a>
+        <button type="button" class="btn btn-outline-danger btn-sm delete-item-btn"
+          data-id="<%= item.id %>" data-label="<%= item.name || item.id %>">
+          <i class="bi bi-trash me-2"></i>Delete
+        </button>
+      </div>
+    </div>
+  </td>
+</tr>
+```
+
+The custom script should confirm with `showMessageModal`, call the route with `X-AJAX-Request`, then remove the row without page refresh:
+
+```javascript
+function removeEntityRow(id) {
+  const row = Array.from(document.querySelectorAll('[data-entity-row-id]'))
+    .find((item) => String(item.getAttribute('data-entity-row-id') || '') === String(id));
+  if (!row) return;
+  row.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+  row.style.opacity = '0';
+  row.style.transform = 'translateX(0.75rem)';
+  setTimeout(() => {
+    row.remove();
+    if (!document.querySelector('[data-entity-row-id]')) {
+      document.querySelector('#first-table tbody').innerHTML =
+        '<tr><td colspan="6" class="text-center py-5 text-muted">No items found.</td></tr>';
+    }
+  }, 220);
+}
+```
 
 ### F. Pagination
 
@@ -376,7 +453,7 @@ Expose boolean to view for alerts and hiding row actions.
 
 ---
 
-## Delete flow
+## Delete Flow
 
 1. `newUrl` on page → `#urlRef` dataset.
 2. Delete button: `class="delete-btn" data-id="..."`.
@@ -384,6 +461,43 @@ Expose boolean to view for alerts and hiding row actions.
 4. Route: `GET` or `DELETE` on `/{resource}/delete/:id` (Skills uses GET with AJAX).
 5. Use idempotency guard for destructive ops when concurrent clicks are a risk.
 6. Return JSON `{ status, message, redirectTo }` for AJAX deletes.
+
+For DELETE routes that receive page/list tokens, use action-state fallback only when the workflow is safe for retry:
+
+```javascript
+trackActionState(SECTION, OPERATIONS.DELETE, {
+  requireToken: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+})
+```
+
+### Guarded delete with no page refresh
+
+Use when delete is conditional, for example "delete only when no history exists" or when the blocked message must be domain-specific.
+
+Required server behavior:
+
+- Controller loads the row by id and verifies org access.
+- Controller checks all related history/child collections before deleting.
+- If history exists, throw a clear blocked-delete message.
+- Only after all guards pass, call `schoolDataService.deleteData(entityType, id, req.user)`.
+- AJAX errors return JSON with HTTP 400; HTML requests render the error page or redirect according to the page standard.
+
+Required client behavior:
+
+- Delete button lives inside the standard three-dot row menu.
+- Confirmation uses `showMessageModal`.
+- AJAX request sends `X-AJAX-Request: true` and `Accept: application/json`.
+- On success, show the success message modal, remove the row from `#first-table` without refreshing, and insert the empty-state row if no data rows remain.
+- On blocked/error response, show `showMessageModal({ icon: 'error' | 'warning' })`; do not write a one-off inline message.
+- Do not call `window.location.reload()` for normal row deletes.
+
+Library Patrons is the reference for guarded delete:
+
+- View: `packages/school/MVC/views/school/library/patronList.ejs`
+- Controller: `packages/school/MVC/controllers/school/libraryPatronController.js`
+- Routes: `packages/school/MVC/routes/libraryPatronRoutes.js`
 
 ---
 
@@ -432,7 +546,7 @@ Use the same filter/pagination pipeline as HTML render. Rolling Enrollment uses 
 6. Fit to Screen toggles layout.
 7. Pagination and per-page limit preserve filters.
 8. Row actions menu works on narrow rows (floating menu).
-9. Delete confirms, handles errors, refreshes or redirects.
+9. Delete confirms with the message modal, handles blocked/history errors, and removes the row without refreshing.
 10. Print opens settings and produces sensible output (logo, orientation).
 11. Export: CSV/JSON from visible table; Full DB when `/export` exists; Excel when `exportExcelUrl` set.
 12. Empty state message when no rows.

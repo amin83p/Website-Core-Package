@@ -250,7 +250,7 @@ const INDEX_DEFINITIONS = Object.freeze({
   ],
   schoolBooks: [
     { key: { id: 1 }, options: { name: 'idx_school_books_id', unique: true } },
-    { key: { orgId: 1, isbn: 1 }, options: { name: 'idx_school_books_org_isbn', unique: true, sparse: true } },
+    { key: { orgId: 1, isbn: 1 }, options: { name: 'idx_school_books_org_isbn', sparse: true } },
     { key: { orgId: 1, active: 1, sortOrder: 1 }, options: { name: 'idx_school_books_org_active_order' } }
   ],
   schoolLibraryCopies: [
@@ -280,7 +280,16 @@ const INDEX_DEFINITIONS = Object.freeze({
     { key: { id: 1 }, options: { name: 'idx_school_library_locations_id', unique: true } },
     { key: { orgId: 1, parentId: 1, sortOrder: 1 }, options: { name: 'idx_school_library_locations_org_parent_order' } },
     { key: { orgId: 1, locationType: 1, active: 1 }, options: { name: 'idx_school_library_locations_org_type_active' } },
-    { key: { orgId: 1, code: 1 }, options: { name: 'idx_school_library_locations_org_code', unique: true, sparse: true } }
+    {
+      key: { orgId: 1, code: 1 },
+      options: {
+        name: 'idx_school_library_locations_org_code',
+        unique: true,
+        partialFilterExpression: {
+          code: { $exists: true, $type: 'string', $gt: '' }
+        }
+      }
+    }
   ],
   schoolClassEnrollmentPeriods: [
     { key: { id: 1 }, options: { name: 'idx_school_class_enrollment_periods_id' } },
@@ -564,6 +573,49 @@ function buildCreateIndexesPayload(specs = []) {
     .filter(Boolean);
 }
 
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function indexOptionsMatch(existing, desired) {
+  const desiredPartial = desired?.partialFilterExpression || null;
+  const existingPartial = existing?.partialFilterExpression || null;
+  return Boolean(existing)
+    && Boolean(desired)
+    && existing.unique === desired.unique
+    && stableStringify(existingPartial) === stableStringify(desiredPartial)
+    && Boolean(existing.sparse) === Boolean(desired.sparse);
+}
+
+async function repairKnownIndexOptionDrift(collection, collectionName, indexes, verbose) {
+  if (!collection || typeof collection.listIndexes !== 'function' || typeof collection.dropIndex !== 'function') return [];
+  const repairableIndexes = {
+    schoolLibraryLocations: 'idx_school_library_locations_org_code',
+    schoolBooks: 'idx_school_books_org_isbn'
+  };
+  const repairableIndexName = repairableIndexes[collectionName];
+  if (!repairableIndexName) return [];
+  const desired = (Array.isArray(indexes) ? indexes : []).find((index) => index?.name === repairableIndexName);
+  if (!desired) return [];
+
+  const existingIndexes = await collection.listIndexes().toArray();
+  const existing = (Array.isArray(existingIndexes) ? existingIndexes : []).find((index) => index?.name === desired.name);
+  if (!existing || indexOptionsMatch(existing, desired)) return [];
+
+  await collection.dropIndex(desired.name);
+  if (verbose) {
+    startupLogger.warn('MONGOINDEX', 'REPAIR', 'Dropped stale index before recreating with current options.', {
+      collection: collectionName,
+      index: desired.name
+    });
+  }
+  return [desired.name];
+}
+
 function getIndexDefinitions(options = {}) {
   if (options?.includePackageIndexes !== false) {
     packageMongoIndexRegistry.loadMongoIndexDefinitionsFromPackageManifests(options);
@@ -647,13 +699,16 @@ async function ensureMongoIndexes(db, options = {}) {
     if (!indexes.length) continue;
 
     try {
-      const result = await db.collection(collectionName).createIndexes(indexes);
+      const collection = db.collection(collectionName);
+      const repairedIndexes = await repairKnownIndexOptionDrift(collection, collectionName, indexes, verbose);
+      const result = await collection.createIndexes(indexes);
       report.push({
         collection: collectionName,
         ok: true,
         requested: indexes.length,
         created: Array.isArray(result) ? result.length : 0,
-        createdNames: Array.isArray(result) ? result : []
+        createdNames: Array.isArray(result) ? result : [],
+        repairedIndexes
       });
     } catch (error) {
       report.push({

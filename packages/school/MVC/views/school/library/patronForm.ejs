@@ -1,60 +1,293 @@
 <%
   const item = patronItem || {};
   const isEdit = !!item.id;
+  const policyCatalogData = typeof policyCatalog !== 'undefined' ? (policyCatalog || {}) : {};
+  const effectivePolicyData = typeof effectivePolicy !== 'undefined' ? (effectivePolicy || null) : null;
+  const suggestedCard = typeof suggestedLibraryCardNumber !== 'undefined' ? (suggestedLibraryCardNumber || '') : '';
+  const existingCards = typeof existingLibraryCardNumbers !== 'undefined' ? (existingLibraryCardNumbers || []) : [];
+  const selectedPerson = typeof selectedPersonSummary !== 'undefined' ? selectedPersonSummary : null;
+  const selectedRole = item.patronRole || 'student';
+  const emptyOverrides = {
+    maxConcurrentLoans: null,
+    loanPeriodDays: null,
+    digitalAccessDays: null,
+    allowDigitalDownload: null,
+    maxRenewals: null
+  };
+  const legacyRecord = item.policyOverrides && Object.values(item.policyOverrides || {}).some((value) => value !== null && value !== undefined && value !== '')
+    ? [{ id: '', validFrom: item.policyOverrideStartsAt || '', validTo: item.policyOverrideExpiresAt || '', policyOverrides: item.policyOverrides }]
+    : [];
+  const overrideRecords = Array.isArray(item.policyOverrideRecords) && item.policyOverrideRecords.length > 0
+    ? item.policyOverrideRecords
+    : legacyRecord;
+  const initialPolicy = effectivePolicyData || policyCatalogData[selectedRole] || {};
+  const initialCard = item.libraryCardNumber || suggestedCard || '';
+  const cardWasAutofilled = !item.libraryCardNumber && !!suggestedCard;
+  const policyCatalogJson = JSON.stringify(policyCatalogData).replace(/</g, '\\u003c');
+  const suggestedCardJson = JSON.stringify(suggestedCard).replace(/</g, '\\u003c');
+  const existingCardsJson = JSON.stringify(existingCards).replace(/</g, '\\u003c');
+  const selectedPersonJson = JSON.stringify(selectedPerson || null).replace(/</g, '\\u003c');
+  const policyFields = [
+    { key: 'maxConcurrentLoans', label: 'Max concurrent loans' },
+    { key: 'loanPeriodDays', label: 'Physical loan days' },
+    { key: 'digitalAccessDays', label: 'Digital access days' },
+    { key: 'maxRenewals', label: 'Max renewals' },
+    { key: 'allowDigitalDownload', label: 'Digital download' }
+  ];
+  const overrideValue = (record, key) => {
+    const overrides = record?.policyOverrides || emptyOverrides;
+    return overrides[key] === undefined || overrides[key] === null ? '' : overrides[key];
+  };
+  const formatPolicyValue = (key, value) => {
+    if (key === 'allowDigitalDownload') return value === false ? 'Blocked' : 'Allowed';
+    return value === undefined || value === null || value === '' ? 'Not set' : String(value);
+  };
 %>
 <div class="sections-page">
+  <style>
+    .patron-form-panel {
+      border: 1px solid var(--bs-border-color);
+      border-radius: 6px;
+      background: #fff;
+    }
+    .patron-person-card {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 0.85rem;
+      align-items: start;
+    }
+    .patron-person-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #eef5ff;
+      color: #0d6efd;
+      font-size: 1.2rem;
+    }
+    .patron-person-name {
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .patron-person-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-top: 0.35rem;
+    }
+    .patron-person-meta span {
+      border: 1px solid var(--bs-border-color);
+      border-radius: 6px;
+      padding: 0.2rem 0.45rem;
+      background: #f8f9fa;
+      font-size: 0.78rem;
+    }
+    .patron-policy-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.65rem;
+    }
+    .patron-policy-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      border-bottom: 1px solid var(--bs-border-color);
+      padding-bottom: 0.55rem;
+    }
+    .patron-policy-row:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+    .library-card-barcode-panel {
+      min-height: 116px;
+    }
+    .library-card-barcode-svg {
+      display: block;
+      width: 100%;
+      height: 74px;
+    }
+    .library-card-barcode-empty {
+      min-height: 74px;
+    }
+    .policy-override-record {
+      border: 1px solid var(--bs-border-color);
+      border-radius: 6px;
+      padding: 0.85rem;
+      background: #fff;
+    }
+  </style>
+
   <div class="d-flex align-items-center justify-content-between mb-4">
     <h1 class="page-heading size-md m-0"><i class="bi bi-person-vcard me-2"></i><%= isEdit ? 'Edit Patron' : 'Register Patron' %></h1>
     <a href="/school/library/patrons" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back</a>
   </div>
-  <% if (includeModal) { %><%- include('partials/modal_GenericPicker', { user }) %><% } %>
-  <div class="form-container wide" style="max-width: 900px;">
+  <% if (typeof includeGenericPicker !== 'undefined' && includeGenericPicker) { %><%- include('partials/modal_GenericPicker', { user }) %><% } %>
+  <div class="form-container wide" style="max-width: 1400px;">
     <form id="patronForm" action="<%= isEdit ? '/school/library/patrons/edit/' + item.id : '/school/library/patrons/new' %>" method="POST">
       <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
       <input type="hidden" name="personId" id="hid_personId" value="<%= item.personId || '' %>">
       <input type="hidden" name="roleRecordId" id="hid_roleRecordId" value="<%= item.roleRecordId || '' %>">
+      <input type="hidden" name="patronRole" id="hid_patronRole" value="<%= selectedRole %>">
       <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-person-vcard me-2"></i>Library patron details</h6>
+        </div>
         <div class="card-body p-4">
-          <% if (!isEdit) { %>
-          <div class="mb-3">
-            <label class="form-label fw-bold">School person *</label>
-            <div class="d-flex gap-2 flex-wrap">
-              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickStudent"><i class="bi bi-person-vcard me-1"></i> Student</button>
-              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickTeacher"><i class="bi bi-person-workspace me-1"></i> Teacher</button>
-              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickStaff"><i class="bi bi-person-badge me-1"></i> Staff</button>
+          <div class="row g-4">
+            <div class="col-lg-7">
+              <div class="mb-3">
+                <label class="form-label fw-bold">School person *</label>
+                <% if (!isEdit) { %>
+                <div class="d-flex gap-2 flex-wrap mb-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickStudent"><i class="bi bi-person-vcard me-1"></i> Student</button>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickTeacher"><i class="bi bi-person-workspace me-1"></i> Teacher</button>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickStaff"><i class="bi bi-person-badge me-1"></i> Staff</button>
+                </div>
+                <% } %>
+                <div id="pickedPersonCard" class="patron-form-panel patron-person-card p-3 <%= selectedPerson ? '' : 'd-none' %>">
+                  <div class="patron-person-icon"><i id="pickedPersonIcon" class="bi bi-person-vcard"></i></div>
+                  <div>
+                    <div class="patron-person-name" id="pickedPersonName"><%= selectedPerson?.name || '' %></div>
+                    <div class="text-muted small" id="pickedPersonSubline"><%= selectedPerson?.email || selectedPerson?.personId || '' %></div>
+                    <div class="patron-person-meta" id="pickedPersonMeta">
+                      <% if (selectedPerson?.role) { %><span><%= selectedPerson.role %></span><% } %>
+                      <% if (selectedPerson?.primaryCode) { %><span><%= selectedPerson.primaryCode %></span><% } %>
+                      <% if (selectedPerson?.recordId) { %><span class="font-monospace"><%= selectedPerson.recordId %></span><% } %>
+                      <% if (selectedPerson?.status) { %><span><%= selectedPerson.status %></span><% } %>
+                    </div>
+                  </div>
+                </div>
+                <div id="pickedPersonEmpty" class="small text-muted <%= selectedPerson ? 'd-none' : '' %>">No person selected.</div>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold" for="patronRole">Role</label>
+                  <select id="patronRole" class="form-select size-md" disabled>
+                    <% (patronRoles || []).forEach((role) => { %>
+                      <option value="<%= role %>" <%= selectedRole === role ? 'selected' : '' %>><%= role %></option>
+                    <% }) %>
+                  </select>
+                  <div class="small text-muted mt-1">Locked to the selected person type.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold" for="status">Status</label>
+                  <select id="status" name="status" class="form-select size-md">
+                    <% (patronStatuses || []).forEach((status) => { %>
+                      <option value="<%= status %>" <%= item.status === status ? 'selected' : '' %>><%= status %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold" for="validFrom">Account valid from</label>
+                  <input id="validFrom" name="validFrom" type="date" class="form-control size-md" value="<%= item.validFrom || '' %>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold" for="validTo">Account valid to</label>
+                  <input id="validTo" name="validTo" type="date" class="form-control size-md" value="<%= item.validTo || '' %>">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold" for="libraryCardNumber">Library card *</label>
+                  <input id="libraryCardNumber" name="libraryCardNumber" class="form-control size-md font-monospace" value="<%= initialCard %>" data-autofilled="<%= cardWasAutofilled ? 'true' : 'false' %>" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold" for="notes">Notes</label>
+                  <textarea id="notes" name="notes" class="form-control size-md" rows="4"><%= item.notes || '' %></textarea>
+                </div>
+              </div>
             </div>
-            <div id="pickedPersonLabel" class="small text-muted mt-2"><%= item.personId ? 'Selected: ' + item.personId : 'No person selected.' %></div>
-          </div>
-          <% } %>
-          <div class="row g-3">
-            <div class="col-md-4">
-              <label class="form-label fw-bold" for="patronRole">Role</label>
-              <select id="patronRole" name="patronRole" class="form-select size-md" <%= isEdit ? 'disabled' : '' %>>
-                <% (patronRoles || []).forEach((role) => { %>
-                  <option value="<%= role %>" <%= item.patronRole === role ? 'selected' : '' %>><%= role %></option>
-                <% }) %>
-              </select>
-              <% if (isEdit) { %><input type="hidden" name="patronRole" value="<%= item.patronRole %>"><% } %>
+
+            <div class="col-lg-5">
+              <div class="patron-form-panel library-card-barcode-panel p-3 mb-3" id="libraryCardBarcodePanel">
+                <div class="d-flex align-items-center justify-content-between gap-3 mb-2">
+                  <div class="fw-bold">Library card barcode</div>
+                  <span class="badge text-bg-light font-monospace">Code 128</span>
+                </div>
+                <svg id="libraryCardBarcodeSvg" class="library-card-barcode-svg" role="img" aria-label="Library card barcode"></svg>
+                <div id="libraryCardBarcodeEmpty" class="library-card-barcode-empty d-none align-items-center justify-content-center small text-muted">Barcode preview unavailable for this value.</div>
+                <div class="font-monospace small text-center mt-2" id="libraryCardBarcodeText"><%= initialCard %></div>
+              </div>
+
+              <div class="patron-form-panel p-3">
+                <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+                  <div>
+                    <div class="fw-bold">Applied policy</div>
+                    <div class="small text-muted" id="policySourceLabel"><%= selectedRole %></div>
+                  </div>
+                  <span class="badge text-bg-primary" id="policyOverrideBadge"><%= initialPolicy.overrideActive ? 'Override' : 'Default' %></span>
+                </div>
+                <div class="patron-policy-grid">
+                  <% policyFields.forEach((field) => { %>
+                    <div class="patron-policy-row">
+                      <span class="text-muted"><%= field.label %></span>
+                      <span class="fw-semibold text-end" data-policy-field="<%= field.key %>"><%= formatPolicyValue(field.key, initialPolicy[field.key]) %></span>
+                    </div>
+                  <% }) %>
+                </div>
+                <div class="small text-muted mt-3" id="policyExpiryLabel"></div>
+              </div>
             </div>
-            <div class="col-md-4">
-              <label class="form-label fw-bold" for="status">Status</label>
-              <select id="status" name="status" class="form-select size-md">
-                <% (patronStatuses || []).forEach((status) => { %>
-                  <option value="<%= status %>" <%= item.status === status ? 'selected' : '' %>><%= status %></option>
-                <% }) %>
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label fw-bold" for="libraryCardNumber">Library card #</label>
-              <input id="libraryCardNumber" name="libraryCardNumber" class="form-control size-md" value="<%= item.libraryCardNumber || '' %>">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label fw-bold" for="maxConcurrentLoans">Max loans override</label>
-              <input id="maxConcurrentLoans" name="maxConcurrentLoans" type="number" min="0" class="form-control size-md" value="<%= item.maxConcurrentLoans != null ? item.maxConcurrentLoans : '' %>" placeholder="Policy default">
-            </div>
+
             <div class="col-12">
-              <label class="form-label fw-bold" for="notes">Notes</label>
-              <textarea id="notes" name="notes" class="form-control size-md" rows="3"><%= item.notes || '' %></textarea>
+              <div class="patron-form-panel p-3">
+                <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
+                  <div class="fw-bold">Policy override history</div>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddPolicyOverride"><i class="bi bi-plus-lg me-1"></i> Add override</button>
+                </div>
+                <div id="policyOverrideError" class="alert alert-warning py-2 px-3 d-none"></div>
+                <div id="policyOverrideRecords" class="d-grid gap-3">
+                  <% overrideRecords.forEach((record, index) => {
+                    const allowDownloadOverride = overrideValue(record, 'allowDigitalDownload');
+                  %>
+                    <div class="policy-override-record" data-override-row>
+                      <input type="hidden" name="policyOverrideRecords[<%= index %>][id]" value="<%= record.id || '' %>">
+                      <div class="row g-3 align-items-end">
+                        <div class="col-md-2">
+                          <label class="form-label fw-bold">Valid from</label>
+                          <input name="policyOverrideRecords[<%= index %>][validFrom]" type="date" class="form-control size-md policy-override-date" value="<%= record.validFrom || '' %>" data-policy-date="from">
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label fw-bold">Valid to</label>
+                          <input name="policyOverrideRecords[<%= index %>][validTo]" type="date" class="form-control size-md policy-override-date" value="<%= record.validTo || '' %>" data-policy-date="to">
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label fw-bold">Max loans</label>
+                          <input name="policyOverrideRecords[<%= index %>][policyOverrides][maxConcurrentLoans]" type="number" min="0" max="99" class="form-control size-md policy-override-input" value="<%= overrideValue(record, 'maxConcurrentLoans') %>" placeholder="Default" data-policy-key="maxConcurrentLoans">
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label fw-bold">Loan days</label>
+                          <input name="policyOverrideRecords[<%= index %>][policyOverrides][loanPeriodDays]" type="number" min="1" max="365" class="form-control size-md policy-override-input" value="<%= overrideValue(record, 'loanPeriodDays') %>" placeholder="Default" data-policy-key="loanPeriodDays">
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label fw-bold">Digital days</label>
+                          <input name="policyOverrideRecords[<%= index %>][policyOverrides][digitalAccessDays]" type="number" min="1" max="365" class="form-control size-md policy-override-input" value="<%= overrideValue(record, 'digitalAccessDays') %>" placeholder="Default" data-policy-key="digitalAccessDays">
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label fw-bold">Renewals</label>
+                          <input name="policyOverrideRecords[<%= index %>][policyOverrides][maxRenewals]" type="number" min="0" max="20" class="form-control size-md policy-override-input" value="<%= overrideValue(record, 'maxRenewals') %>" placeholder="Default" data-policy-key="maxRenewals">
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label fw-bold">Digital download</label>
+                          <select name="policyOverrideRecords[<%= index %>][policyOverrides][allowDigitalDownload]" class="form-select size-md policy-override-input" data-policy-key="allowDigitalDownload">
+                            <option value="" <%= allowDownloadOverride === '' ? 'selected' : '' %>>Policy default</option>
+                            <option value="true" <%= allowDownloadOverride === true || allowDownloadOverride === 'true' ? 'selected' : '' %>>Allowed</option>
+                            <option value="false" <%= allowDownloadOverride === false || allowDownloadOverride === 'false' ? 'selected' : '' %>>Blocked</option>
+                          </select>
+                        </div>
+                        <div class="col-md-7">
+                          <label class="form-label fw-bold">Notes</label>
+                          <input name="policyOverrideRecords[<%= index %>][notes]" class="form-control size-md" value="<%= record.notes || '' %>">
+                        </div>
+                        <div class="col-md-1 d-grid">
+                          <button type="button" class="btn btn-outline-danger btn-sm" data-remove-override title="Remove override"><i class="bi bi-trash"></i></button>
+                        </div>
+                      </div>
+                    </div>
+                  <% }) %>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -67,8 +300,381 @@
   </div>
 </div>
 
+<template id="policyOverrideTemplate">
+  <div class="policy-override-record" data-override-row>
+    <input type="hidden" data-name-template="policyOverrideRecords[__INDEX__][id]" value="">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label fw-bold">Valid from</label>
+        <input data-name-template="policyOverrideRecords[__INDEX__][validFrom]" type="date" class="form-control size-md policy-override-date" data-policy-date="from">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold">Valid to</label>
+        <input data-name-template="policyOverrideRecords[__INDEX__][validTo]" type="date" class="form-control size-md policy-override-date" data-policy-date="to">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold">Max loans</label>
+        <input data-name-template="policyOverrideRecords[__INDEX__][policyOverrides][maxConcurrentLoans]" type="number" min="0" max="99" class="form-control size-md policy-override-input" placeholder="Default" data-policy-key="maxConcurrentLoans">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold">Loan days</label>
+        <input data-name-template="policyOverrideRecords[__INDEX__][policyOverrides][loanPeriodDays]" type="number" min="1" max="365" class="form-control size-md policy-override-input" placeholder="Default" data-policy-key="loanPeriodDays">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold">Digital days</label>
+        <input data-name-template="policyOverrideRecords[__INDEX__][policyOverrides][digitalAccessDays]" type="number" min="1" max="365" class="form-control size-md policy-override-input" placeholder="Default" data-policy-key="digitalAccessDays">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold">Renewals</label>
+        <input data-name-template="policyOverrideRecords[__INDEX__][policyOverrides][maxRenewals]" type="number" min="0" max="20" class="form-control size-md policy-override-input" placeholder="Default" data-policy-key="maxRenewals">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold">Digital download</label>
+        <select data-name-template="policyOverrideRecords[__INDEX__][policyOverrides][allowDigitalDownload]" class="form-select size-md policy-override-input" data-policy-key="allowDigitalDownload">
+          <option value="">Policy default</option>
+          <option value="true">Allowed</option>
+          <option value="false">Blocked</option>
+        </select>
+      </div>
+      <div class="col-md-7">
+        <label class="form-label fw-bold">Notes</label>
+        <input data-name-template="policyOverrideRecords[__INDEX__][notes]" class="form-control size-md">
+      </div>
+      <div class="col-md-1 d-grid">
+        <button type="button" class="btn btn-outline-danger btn-sm" data-remove-override title="Remove override"><i class="bi bi-trash"></i></button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script id="policyCatalogJson" type="application/json"><%- policyCatalogJson %></script>
 <script>
 (function () {
+  const IS_EDIT = <%= isEdit ? 'true' : 'false' %>;
+  const SUGGESTED_CARD = <%- suggestedCardJson %>;
+  const EXISTING_CARDS = new Set((<%- existingCardsJson %>).map((value) => String(value || '').toUpperCase()));
+  const INITIAL_PERSON = <%- selectedPersonJson %>;
+  const POLICY_FIELDS = [
+    { key: 'maxConcurrentLoans', label: 'Max concurrent loans' },
+    { key: 'loanPeriodDays', label: 'Physical loan days' },
+    { key: 'digitalAccessDays', label: 'Digital access days' },
+    { key: 'maxRenewals', label: 'Max renewals' },
+    { key: 'allowDigitalDownload', label: 'Digital download' }
+  ];
+  const rolePrefixes = { student: 'STU', teacher: 'TCH', staff: 'STF' };
+  const roleIcons = { student: 'bi-person-vcard', teacher: 'bi-person-workspace', staff: 'bi-person-badge' };
+  const roleSelect = document.getElementById('patronRole');
+  const hiddenRole = document.getElementById('hid_patronRole');
+  const cardInput = document.getElementById('libraryCardNumber');
+  const barcodeSvg = document.getElementById('libraryCardBarcodeSvg');
+  const barcodeEmpty = document.getElementById('libraryCardBarcodeEmpty');
+  const barcodeText = document.getElementById('libraryCardBarcodeText');
+  const overrideBadge = document.getElementById('policyOverrideBadge');
+  const policySourceLabel = document.getElementById('policySourceLabel');
+  const policyExpiryLabel = document.getElementById('policyExpiryLabel');
+  const overrideList = document.getElementById('policyOverrideRecords');
+  const overrideTemplate = document.getElementById('policyOverrideTemplate');
+  const overrideError = document.getElementById('policyOverrideError');
+  const pickedPersonCard = document.getElementById('pickedPersonCard');
+  const pickedPersonEmpty = document.getElementById('pickedPersonEmpty');
+  const pickedPersonIcon = document.getElementById('pickedPersonIcon');
+  const pickedPersonName = document.getElementById('pickedPersonName');
+  const pickedPersonSubline = document.getElementById('pickedPersonSubline');
+  const pickedPersonMeta = document.getElementById('pickedPersonMeta');
+  let policyCatalog = {};
+  let overrideIndex = document.querySelectorAll('[data-override-row]').length;
+
+  try {
+    policyCatalog = JSON.parse(document.getElementById('policyCatalogJson')?.textContent || '{}');
+  } catch (_) {
+    policyCatalog = {};
+  }
+
+  function cleanCardToken(value, fallback) {
+    const token = String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-8);
+    return token || fallback || '';
+  }
+
+  function suggestLibraryCardNumber(role, personId, roleRecordId) {
+    const prefix = rolePrefixes[String(role || '').toLowerCase()] || 'LIB';
+    const token = cleanCardToken(personId, cleanCardToken(roleRecordId, SUGGESTED_CARD.split('-').pop() || 'NEW'));
+    const base = 'LIB-' + prefix + '-' + token;
+    if (!EXISTING_CARDS.has(base.toUpperCase())) return base;
+    let suffix = 2;
+    while (EXISTING_CARDS.has((base + '-' + suffix).toUpperCase())) suffix += 1;
+    return base + '-' + suffix;
+  }
+
+  function fillSuggestedCard(personId, roleRecordId) {
+    if (!cardInput) return;
+    const canReplace = cardInput.dataset.autofilled === 'true' || !String(cardInput.value || '').trim();
+    if (!canReplace) return;
+    cardInput.value = suggestLibraryCardNumber(roleSelect?.value || 'student', personId, roleRecordId);
+    cardInput.dataset.autofilled = 'true';
+    renderLibraryCardBarcode();
+  }
+
+  function textFrom(row, fields) {
+    for (const field of fields) {
+      const value = field.split('.').reduce((current, key) => current?.[key], row);
+      if (value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+    }
+    return '';
+  }
+
+  function buildPersonSummary(row, role) {
+    const first = textFrom(row, ['firstName', 'name.first']);
+    const last = textFrom(row, ['lastName', 'name.last']);
+    const fullName = textFrom(row, ['displayName', 'fullName', 'name']) || (first + ' ' + last).trim();
+    return {
+      role,
+      name: textFrom(row, ['label']) || fullName || textFrom(row, ['id', 'personId']),
+      personId: textFrom(row, ['personId', 'id']),
+      recordId: textFrom(row, ['id']),
+      primaryCode: role === 'student'
+        ? textFrom(row, ['customStudentId', 'localId', 'studentNumber'])
+        : textFrom(row, ['employeeNumber', 'staffNumber', 'teacherNumber']),
+      email: textFrom(row, ['email', 'contact.email', 'primaryEmail']),
+      status: textFrom(row, ['status', 'studentStatus', 'employmentStatus', 'activeStatus'])
+    };
+  }
+
+  function renderSelectedPerson(summary) {
+    const person = summary || INITIAL_PERSON;
+    if (!person || !person.personId) {
+      pickedPersonCard?.classList.add('d-none');
+      pickedPersonEmpty?.classList.remove('d-none');
+      return;
+    }
+    pickedPersonCard?.classList.remove('d-none');
+    pickedPersonEmpty?.classList.add('d-none');
+    if (pickedPersonName) pickedPersonName.textContent = person.name || person.personId;
+    if (pickedPersonSubline) pickedPersonSubline.textContent = person.email || person.personId || '';
+    if (pickedPersonIcon) pickedPersonIcon.className = 'bi ' + (roleIcons[person.role] || 'bi-person-vcard');
+    if (pickedPersonMeta) {
+      pickedPersonMeta.replaceChildren();
+      [person.role, person.primaryCode, person.recordId, person.status].filter(Boolean).forEach((value) => {
+        const item = document.createElement('span');
+        item.textContent = value;
+        pickedPersonMeta.appendChild(item);
+      });
+    }
+  }
+
+  const CODE128_PATTERNS = [
+    '11011001100', '11001101100', '11001100110', '10010011000', '10010001100', '10001001100',
+    '10011001000', '10011000100', '10001100100', '11001001000', '11001000100', '11000100100',
+    '10110011100', '10011011100', '10011001110', '10111001100', '10011101100', '10011100110',
+    '11001110010', '11001011100', '11001001110', '11011100100', '11001110100', '11101101110',
+    '11101001100', '11100101100', '11100100110', '11101100100', '11100110100', '11100110010',
+    '11011011000', '11011000110', '11000110110', '10100011000', '10001011000', '10001000110',
+    '10110001000', '10001101000', '10001100010', '11010001000', '11000101000', '11000100010',
+    '10110111000', '10110001110', '10001101110', '10111011000', '10111000110', '10001110110',
+    '11101110110', '11010001110', '11000101110', '11011101000', '11011100010', '11011101110',
+    '11101011000', '11101000110', '11100010110', '11101101000', '11101100010', '11100011010',
+    '11101111010', '11001000010', '11110001010', '10100110000', '10100001100', '10010110000',
+    '10010000110', '10000101100', '10000100110', '10110010000', '10110000100', '10011010000',
+    '10011000010', '10000110100', '10000110010', '11000010010', '11001010000', '11110111010',
+    '11000010100', '10001111010', '10100111100', '10010111100', '10010011110', '10111100100',
+    '10011110100', '10011110010', '11110100100', '11110010100', '11110010010', '11011011110',
+    '11011110110', '11110110110', '10101111000', '10100011110', '10001011110', '10111101000',
+    '10111100010', '11110101000', '11110100010', '10111011110', '10111101110', '11101011110',
+    '11110101110', '11010000100', '11010010000', '11010011100', '1100011101011'
+  ];
+
+  function buildCode128BitString(value) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    const codes = [];
+    for (let index = 0; index < text.length; index += 1) {
+      const codePoint = text.charCodeAt(index);
+      if (codePoint < 32 || codePoint > 126) return '';
+      codes.push(codePoint - 32);
+    }
+    let checksum = 104;
+    codes.forEach((code, index) => {
+      checksum += code * (index + 1);
+    });
+    const sequence = [104, ...codes, checksum % 103, 106];
+    return sequence.map((code) => CODE128_PATTERNS[code] || '').join('');
+  }
+
+  function renderLibraryCardBarcode() {
+    if (!barcodeSvg || !cardInput) return;
+    const value = String(cardInput.value || '').trim();
+    const bits = buildCode128BitString(value);
+    const showBarcode = Boolean(bits);
+    barcodeSvg.classList.toggle('d-none', !showBarcode);
+    barcodeEmpty?.classList.toggle('d-none', showBarcode);
+    barcodeEmpty?.classList.toggle('d-flex', !showBarcode);
+    if (barcodeText) barcodeText.textContent = value;
+    if (!showBarcode) {
+      barcodeSvg.replaceChildren();
+      return;
+    }
+    const quietZone = 10;
+    const moduleWidth = 2;
+    const height = 74;
+    const totalModules = bits.length + (quietZone * 2);
+    const svgWidth = totalModules * moduleWidth;
+    barcodeSvg.setAttribute('viewBox', '0 0 ' + svgWidth + ' ' + height);
+    barcodeSvg.setAttribute('preserveAspectRatio', 'none');
+    barcodeSvg.replaceChildren();
+    let start = null;
+    for (let index = 0; index <= bits.length; index += 1) {
+      const bit = bits[index] || '0';
+      if (bit === '1' && start === null) start = index;
+      if ((bit !== '1' || index === bits.length) && start !== null) {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', String((quietZone + start) * moduleWidth));
+        rect.setAttribute('y', '0');
+        rect.setAttribute('width', String((index - start) * moduleWidth));
+        rect.setAttribute('height', String(height));
+        rect.setAttribute('fill', '#000');
+        barcodeSvg.appendChild(rect);
+        start = null;
+      }
+    }
+  }
+
+  function todayKey() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return year + '-' + month + '-' + day;
+  }
+
+  function selectedPolicy() {
+    return policyCatalog[String(roleSelect?.value || 'student')] || {};
+  }
+
+  function rowHasOverrideValue(row) {
+    return Array.from(row.querySelectorAll('.policy-override-input')).some((input) => String(input.value || '') !== '');
+  }
+
+  function readOverrideRows() {
+    return Array.from(document.querySelectorAll('[data-override-row]'))
+      .map((row) => ({
+        row,
+        validFrom: String(row.querySelector('[data-policy-date="from"]')?.value || '').trim(),
+        validTo: String(row.querySelector('[data-policy-date="to"]')?.value || '').trim(),
+        hasValue: rowHasOverrideValue(row)
+      }))
+      .filter((row) => row.hasValue);
+  }
+
+  function activeOverrideRow() {
+    const today = todayKey();
+    return readOverrideRows().find((row) => row.validFrom && row.validTo && row.validFrom <= today && row.validTo >= today) || null;
+  }
+
+  function coerceOverrideValue(key, value) {
+    if (value === '') return '';
+    if (key === 'allowDigitalDownload') return value === 'true';
+    return Number(value);
+  }
+
+  function formatPolicyValue(key, value) {
+    if (key === 'allowDigitalDownload') return value === false ? 'Blocked' : 'Allowed';
+    return value === undefined || value === null || value === '' ? 'Not set' : String(value);
+  }
+
+  function validateOverrideDates() {
+    const rows = readOverrideRows().sort((a, b) => String(a.validFrom).localeCompare(String(b.validFrom)));
+    let message = '';
+    rows.forEach((row) => {
+      if (message) return;
+      if (!row.validFrom || !row.validTo) message = 'Policy override rows need both start and end dates.';
+      if (row.validFrom && row.validTo && row.validTo < row.validFrom) message = 'Policy override end date must be on or after the start date.';
+    });
+    for (let index = 1; !message && index < rows.length; index += 1) {
+      if (rows[index].validFrom <= rows[index - 1].validTo) {
+        message = 'Policy override date ranges cannot overlap.';
+      }
+    }
+    overrideError?.classList.toggle('d-none', !message);
+    if (overrideError) overrideError.textContent = message;
+    return !message;
+  }
+
+  function validateSelectedPerson() {
+    const selectedPersonId = String(document.getElementById('hid_personId')?.value || '').trim();
+    return IS_EDIT || Boolean(selectedPersonId);
+  }
+
+  function showValidationMessage(title, message) {
+    if (typeof window.showMessageModal === 'function') {
+      return window.showMessageModal({
+        title,
+        icon: 'warning',
+        message,
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+    }
+    alert(message);
+    return Promise.resolve('OK');
+  }
+
+  function updatePolicyPreview() {
+    const basePolicy = selectedPolicy();
+    const activeRow = activeOverrideRow();
+    const effective = { ...basePolicy };
+    if (activeRow) {
+      activeRow.row.querySelectorAll('.policy-override-input').forEach((input) => {
+        const key = input.dataset.policyKey;
+        const overrideValue = coerceOverrideValue(key, String(input.value || ''));
+        if (overrideValue !== '') effective[key] = overrideValue;
+      });
+    }
+    document.querySelectorAll('.policy-override-input').forEach((input) => {
+      const key = input.dataset.policyKey;
+      if (basePolicy[key] !== undefined && input.tagName !== 'SELECT') {
+        input.placeholder = 'Default: ' + formatPolicyValue(key, basePolicy[key]);
+      }
+    });
+    POLICY_FIELDS.forEach((field) => {
+      const target = document.querySelector('[data-policy-field="' + field.key + '"]');
+      if (target) target.textContent = formatPolicyValue(field.key, effective[field.key]);
+    });
+    if (policySourceLabel) policySourceLabel.textContent = String(roleSelect?.value || 'student') + ' policy';
+    if (overrideBadge) {
+      overrideBadge.textContent = activeRow ? 'Override' : 'Default';
+      overrideBadge.className = 'badge ' + (activeRow ? 'text-bg-warning' : 'text-bg-primary');
+    }
+    if (policyExpiryLabel) {
+      policyExpiryLabel.textContent = activeRow
+        ? 'Override active from ' + activeRow.validFrom + ' through ' + activeRow.validTo
+        : '';
+    }
+    validateOverrideDates();
+  }
+
+  function bindOverrideRow(row) {
+    row.querySelectorAll('input, select').forEach((input) => {
+      input.addEventListener('input', updatePolicyPreview);
+      input.addEventListener('change', updatePolicyPreview);
+    });
+    row.querySelector('[data-remove-override]')?.addEventListener('click', () => {
+      row.remove();
+      updatePolicyPreview();
+    });
+  }
+
+  function addOverrideRow() {
+    if (!overrideTemplate || !overrideList) return;
+    const fragment = overrideTemplate.content.cloneNode(true);
+    const row = fragment.querySelector('[data-override-row]');
+    row.querySelectorAll('[data-name-template]').forEach((input) => {
+      input.name = input.dataset.nameTemplate.replace('__INDEX__', String(overrideIndex));
+      input.removeAttribute('data-name-template');
+    });
+    overrideIndex += 1;
+    overrideList.appendChild(fragment);
+    bindOverrideRow(row);
+    updatePolicyPreview();
+  }
+
   function bindPicker(btnId, presetName, role) {
     const btn = document.getElementById(btnId);
     if (!btn || !window.GenericPicker || !window.GenericPickerPresets) return;
@@ -79,15 +685,52 @@
           const recordId = row.id || '';
           document.getElementById('hid_personId').value = personId;
           document.getElementById('hid_roleRecordId').value = recordId;
-          document.getElementById('patronRole').value = role;
-          const label = row.label || row.name || row.localId || personId;
-          document.getElementById('pickedPersonLabel').textContent = 'Selected: ' + label;
+          if (roleSelect) roleSelect.value = role;
+          if (hiddenRole) hiddenRole.value = role;
+          renderSelectedPerson(buildPersonSummary(row, role));
+          fillSuggestedCard(personId, recordId);
+          updatePolicyPreview();
         }
       }));
     });
   }
+
+  cardInput?.addEventListener('input', () => {
+    cardInput.dataset.autofilled = 'false';
+    renderLibraryCardBarcode();
+  });
+  roleSelect?.addEventListener('change', () => {
+    fillSuggestedCard(document.getElementById('hid_personId')?.value, document.getElementById('hid_roleRecordId')?.value);
+    updatePolicyPreview();
+  });
+  document.getElementById('btnAddPolicyOverride')?.addEventListener('click', addOverrideRow);
+  document.getElementById('patronForm')?.addEventListener('submit', async (event) => {
+    const personIsValid = validateSelectedPerson();
+    const overrideDatesAreValid = validateOverrideDates();
+    if (!personIsValid || !overrideDatesAreValid) {
+      event.preventDefault();
+      if (!personIsValid) {
+        await showValidationMessage('School Person Required', 'Select a student, teacher, or staff member before saving.');
+        document.querySelector('#btnPickStudent, #btnPickTeacher, #btnPickStaff')?.focus({ preventScroll: true });
+        return;
+      }
+      const overrideMessage = overrideError?.textContent || 'Check the policy override dates before saving.';
+      await showValidationMessage('Policy Override Dates', overrideMessage);
+      overrideError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  document.querySelectorAll('[data-override-row]').forEach(bindOverrideRow);
   bindPicker('btnPickStudent', 'student', 'student');
   bindPicker('btnPickTeacher', 'teacher', 'teacher');
   bindPicker('btnPickStaff', 'staff', 'staff');
+
+  if (!IS_EDIT && cardInput && !String(cardInput.value || '').trim() && SUGGESTED_CARD) {
+    cardInput.value = SUGGESTED_CARD;
+    cardInput.dataset.autofilled = 'true';
+  }
+  renderSelectedPerson(INITIAL_PERSON);
+  renderLibraryCardBarcode();
+  updatePolicyPreview();
 })();
 </script>

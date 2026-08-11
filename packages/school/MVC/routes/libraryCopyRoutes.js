@@ -13,6 +13,12 @@ const {
 
 router.use(requireAuth);
 
+const copyMutationActionState = {
+  requireToken: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+};
+
 router.get('/api/available',
   requireAccess(SECTIONS.SCHOOL_LIBRARY_CIRCULATION, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_LIBRARY_CIRCULATION, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
@@ -30,12 +36,12 @@ router.get('/new',
 
 router.post('/new',
   requireAccess(SECTIONS.SCHOOL_LIBRARY_COPIES, OPERATIONS.CREATE),
-  trackActionState(SECTIONS.SCHOOL_LIBRARY_COPIES, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_COPIES, OPERATIONS.CREATE, copyMutationActionState),
   ctrl.saveCopy);
 
 router.post('/duplicate/:id',
   requireAccess(SECTIONS.SCHOOL_LIBRARY_COPIES, OPERATIONS.CREATE),
-  trackActionState(SECTIONS.SCHOOL_LIBRARY_COPIES, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_COPIES, OPERATIONS.CREATE, copyMutationActionState),
   ctrl.duplicateCopy);
 
 router.get('/edit/:id',
@@ -45,7 +51,7 @@ router.get('/edit/:id',
 
 router.post('/edit/:id',
   requireAccess(SECTIONS.SCHOOL_LIBRARY_COPIES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_LIBRARY_COPIES, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_COPIES, OPERATIONS.UPDATE, copyMutationActionState),
   ctrl.saveCopy);
 
 router.get('/delete/:id',

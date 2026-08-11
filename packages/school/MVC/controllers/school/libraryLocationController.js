@@ -39,6 +39,44 @@ function typeLabel(type) {
   return map[String(type || '').toLowerCase()] || type;
 }
 
+function buildLocationPayload(req, orgId, locationType, parentId, userId) {
+  const payload = {
+    orgId,
+    parentId: parentId || null,
+    locationType,
+    name: String(req.body?.name || '').trim(),
+    code: String(req.body?.code || '').trim(),
+    sortOrder: Number(req.body?.sortOrder || 0),
+    active: toBoolean(req.body?.active, true),
+    notes: String(req.body?.notes || '').trim(),
+    audit: { createUser: userId, lastUpdateUser: userId }
+  };
+  return payload;
+}
+
+function buildLocationUpdatePayload(req, userId) {
+  const payload = {
+    name: String(req.body?.name || '').trim(),
+    code: String(req.body?.code || '').trim(),
+    sortOrder: Number(req.body?.sortOrder || 0),
+    active: toBoolean(req.body?.active, true),
+    notes: String(req.body?.notes || '').trim(),
+    audit: { lastUpdateUser: userId }
+  };
+  return payload;
+}
+
+function isDuplicateKeyError(error) {
+  return Number(error?.code) === 11000 || /E11000 duplicate key/i.test(String(error?.message || ''));
+}
+
+function formatLocationSaveError(error) {
+  if (isDuplicateKeyError(error)) {
+    return 'Location code is already used for this organization. Leave Code blank or enter a unique code.';
+  }
+  return error?.message || 'Unable to save location.';
+}
+
 exports.listLocations = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
@@ -79,6 +117,7 @@ exports.showCreateForm = async (req, res) => {
       parent,
       locationType,
       user: req.user,
+      includeModal: true,
       actionStateId: req.actionStateId
     });
   } catch (error) {
@@ -102,6 +141,7 @@ exports.showEditForm = async (req, res) => {
       parent,
       locationType: row.locationType,
       user: req.user,
+      includeModal: true,
       actionStateId: req.actionStateId
     });
   } catch (error) {
@@ -121,14 +161,7 @@ exports.saveLocation = async (req, res) => {
       const existing = await schoolDataService.getDataById('libraryLocations', id, req.user);
       if (!existing) throw new Error('Library location not found.');
       assertOrgAccess(existing, orgId);
-      await schoolDataService.updateData('libraryLocations', id, {
-        name: String(req.body?.name || '').trim(),
-        code: String(req.body?.code || '').trim(),
-        sortOrder: Number(req.body?.sortOrder || 0),
-        active: toBoolean(req.body?.active, true),
-        notes: String(req.body?.notes || '').trim(),
-        audit: { lastUpdateUser: userId }
-      }, req.user);
+      await schoolDataService.updateData('libraryLocations', id, buildLocationUpdatePayload(req, userId), req.user);
     } else {
       const parentId = String(req.body?.parentId || '').trim();
       let locationType = String(req.body?.locationType || '').trim().toLowerCase();
@@ -139,17 +172,7 @@ exports.saveLocation = async (req, res) => {
         assertOrgAccess(parent, orgId);
         locationType = getChildTypeForParent(parent.locationType);
       }
-      await schoolDataService.addData('libraryLocations', {
-        orgId,
-        parentId: parentId || null,
-        locationType,
-        name: String(req.body?.name || '').trim(),
-        code: String(req.body?.code || '').trim(),
-        sortOrder: Number(req.body?.sortOrder || 0),
-        active: toBoolean(req.body?.active, true),
-        notes: String(req.body?.notes || '').trim(),
-        audit: { createUser: userId, lastUpdateUser: userId }
-      }, req.user);
+      await schoolDataService.addData('libraryLocations', buildLocationPayload(req, orgId, locationType, parentId, userId), req.user);
     }
 
     const response = {
@@ -160,8 +183,9 @@ exports.saveLocation = async (req, res) => {
     if (isAjax(req)) return res.json(response);
     return res.redirect('/school/library/locations');
   } catch (error) {
-    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
-    return res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+    const message = formatLocationSaveError(error);
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message });
+    return res.status(400).render('error', { title: 'Error', message, user: req.user });
   }
 };
 

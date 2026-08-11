@@ -327,10 +327,14 @@ exports.saveCopy = async (req, res) => {
 };
 
 exports.duplicateCopy = async (req, res) => {
+  let guardKey = '';
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
     const sourceId = String(req.params?.id || '').trim();
     if (!sourceId) throw new Error('Copy id is required.');
+    const guard = beginGuard(['school_library_copy_duplicate', orgId, sourceId, req.user?.id || 'SYSTEM']);
+    guardKey = guard.key;
+    if (respondGuard(req, res, guard.result, 'Copy duplication is already in progress.')) return;
     const source = await schoolDataService.getDataById('libraryCopies', sourceId, req.user);
     if (!source) throw new Error('Library copy not found.');
     assertOrgAccess(source, orgId);
@@ -358,9 +362,11 @@ exports.duplicateCopy = async (req, res) => {
       copy: created,
       redirectTo: `/school/library/copies?duplicateNotice=${encodeURIComponent(created.id)}`
     };
+    idempotencyGuardService.completeGuard(guardKey, response);
     if (isAjax(req)) return res.json(response);
     return res.redirect(response.redirectTo);
   } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     return res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
   }

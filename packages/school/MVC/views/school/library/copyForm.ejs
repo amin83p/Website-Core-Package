@@ -15,6 +15,22 @@
 %>
 
 <div class="sections-page">
+  <style>
+    .copy-barcode-panel {
+      border: 1px solid var(--bs-border-color);
+      border-radius: 6px;
+      background: #fff;
+      min-height: 104px;
+    }
+    .copy-barcode-svg {
+      display: block;
+      width: 100%;
+      height: 72px;
+    }
+    .copy-barcode-empty {
+      min-height: 72px;
+    }
+  </style>
 
   <div class="d-flex align-items-center justify-content-between mb-4">
 
@@ -132,11 +148,37 @@
 
             </div>
 
-            <div class="col-md-6">
+            <div class="<%= isEdit ? 'col-12' : 'col-md-6' %>">
 
-              <label class="form-label fw-bold" for="copyCode">Copy code / barcode *</label>
+              <div class="<%= isEdit ? 'row g-3 align-items-end copy-barcode-row' : '' %>">
 
-              <input id="copyCode" name="copyCode" class="form-control size-md font-monospace" value="<%= item.copyCode || '' %>" required>
+                <div class="<%= isEdit ? 'col-md-5' : '' %>">
+
+                  <label class="form-label fw-bold" for="copyCode">Copy code / barcode *</label>
+
+                  <input id="copyCode" name="copyCode" class="form-control size-md font-monospace" value="<%= item.copyCode || '' %>" required>
+
+                </div>
+
+                <% if (isEdit) { %>
+
+                  <div class="col-md-7">
+
+                    <div class="copy-barcode-panel p-3" id="copyBarcodePanel">
+
+                      <svg id="copyBarcodeSvg" class="copy-barcode-svg" role="img" aria-label="Copy barcode"></svg>
+
+                      <div id="copyBarcodeEmpty" class="copy-barcode-empty d-none align-items-center justify-content-center small text-muted">Barcode preview unavailable for this value.</div>
+
+                      <div class="font-monospace small text-center mt-2" id="copyBarcodeText"><%= item.copyCode || '' %></div>
+
+                    </div>
+
+                  </div>
+
+                <% } %>
+
+              </div>
 
             </div>
 
@@ -264,9 +306,95 @@
 
   const locationSpotList = document.getElementById('locationSpotList');
 
+  const copyCodeInput = document.getElementById('copyCode');
+
+  const barcodeSvg = document.getElementById('copyBarcodeSvg');
+
+  const barcodeEmpty = document.getElementById('copyBarcodeEmpty');
+
+  const barcodeText = document.getElementById('copyBarcodeText');
+
   let assignableSpots = [];
 
   let locationModal = null;
+
+  const CODE128_PATTERNS = [
+    '11011001100', '11001101100', '11001100110', '10010011000', '10010001100', '10001001100',
+    '10011001000', '10011000100', '10001100100', '11001001000', '11001000100', '11000100100',
+    '10110011100', '10011011100', '10011001110', '10111001100', '10011101100', '10011100110',
+    '11001110010', '11001011100', '11001001110', '11011100100', '11001110100', '11101101110',
+    '11101001100', '11100101100', '11100100110', '11101100100', '11100110100', '11100110010',
+    '11011011000', '11011000110', '11000110110', '10100011000', '10001011000', '10001000110',
+    '10110001000', '10001101000', '10001100010', '11010001000', '11000101000', '11000100010',
+    '10110111000', '10110001110', '10001101110', '10111011000', '10111000110', '10001110110',
+    '11101110110', '11010001110', '11000101110', '11011101000', '11011100010', '11011101110',
+    '11101011000', '11101000110', '11100010110', '11101101000', '11101100010', '11100011010',
+    '11101111010', '11001000010', '11110001010', '10100110000', '10100001100', '10010110000',
+    '10010000110', '10000101100', '10000100110', '10110010000', '10110000100', '10011010000',
+    '10011000010', '10000110100', '10000110010', '11000010010', '11001010000', '11110111010',
+    '11000010100', '10001111010', '10100111100', '10010111100', '10010011110', '10111100100',
+    '10011110100', '10011110010', '11110100100', '11110010100', '11110010010', '11011011110',
+    '11011110110', '11110110110', '10101111000', '10100011110', '10001011110', '10111101000',
+    '10111100010', '11110101000', '11110100010', '10111011110', '10111101110', '11101011110',
+    '11110101110', '11010000100', '11010010000', '11010011100', '1100011101011'
+  ];
+
+  function buildCode128BitString(value) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    const codes = [];
+    for (let index = 0; index < text.length; index += 1) {
+      const codePoint = text.charCodeAt(index);
+      if (codePoint < 32 || codePoint > 126) return '';
+      codes.push(codePoint - 32);
+    }
+    let checksum = 104;
+    codes.forEach((code, index) => {
+      checksum += code * (index + 1);
+    });
+    const sequence = [104, ...codes, checksum % 103, 106];
+    return sequence.map((code) => CODE128_PATTERNS[code] || '').join('');
+  }
+
+  function renderCopyBarcode() {
+    if (!barcodeSvg || !copyCodeInput) return;
+    const value = String(copyCodeInput.value || '').trim();
+    const bits = buildCode128BitString(value);
+    const showBarcode = Boolean(bits);
+    barcodeSvg.classList.toggle('d-none', !showBarcode);
+    barcodeEmpty?.classList.toggle('d-none', showBarcode);
+    barcodeEmpty?.classList.toggle('d-flex', !showBarcode);
+    if (barcodeText) barcodeText.textContent = value;
+    if (!showBarcode) {
+      barcodeSvg.replaceChildren();
+      return;
+    }
+
+    const quietZone = 10;
+    const moduleWidth = 2;
+    const height = 72;
+    const totalModules = bits.length + (quietZone * 2);
+    const svgWidth = totalModules * moduleWidth;
+    barcodeSvg.setAttribute('viewBox', '0 0 ' + svgWidth + ' ' + height);
+    barcodeSvg.setAttribute('preserveAspectRatio', 'none');
+    barcodeSvg.replaceChildren();
+
+    let start = null;
+    for (let index = 0; index <= bits.length; index += 1) {
+      const bit = bits[index] || '0';
+      if (bit === '1' && start === null) start = index;
+      if ((bit !== '1' || index === bits.length) && start !== null) {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', String((quietZone + start) * moduleWidth));
+        rect.setAttribute('y', '0');
+        rect.setAttribute('width', String((index - start) * moduleWidth));
+        rect.setAttribute('height', String(height));
+        rect.setAttribute('fill', '#000');
+        barcodeSvg.appendChild(rect);
+        start = null;
+      }
+    }
+  }
 
 
 
@@ -391,6 +519,10 @@
 
 
   copyTypeSelect?.addEventListener('change', toggleLocationField);
+
+  copyCodeInput?.addEventListener('input', renderCopyBarcode);
+
+  renderCopyBarcode();
 
   toggleLocationField();
 

@@ -47,6 +47,8 @@ const BUILTIN_DEFINITIONS = Object.freeze([
   { key: 'school.examMedia', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Exam Media', defaultTemplate: 'school-exams/{templateId}/{questionId}', placeholders: ['templateId', 'questionId'] },
   { key: 'school.classWorkspace', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Class Workspaces', defaultTemplate: 'school/classes/{classId}', placeholders: ['classId'] },
   { key: 'school.subjectWorkspace', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Subject Workspaces', defaultTemplate: 'school/subjects/{subjectId}', placeholders: ['subjectId'] },
+  { key: 'school.bookCover', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Book Cover Photos', defaultTemplate: 'school/books/{bookId}/cover', placeholders: ['bookId'] },
+  { key: 'school.bookPdf', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Book Digital PDFs', defaultTemplate: 'school/books/{bookId}/pdf', placeholders: ['bookId'] },
 
   { key: 'generated.heic', packageName: 'CORE', group: GROUPS.GENERATED, label: 'HEIC Converter Jobs', defaultTemplate: 'heic-converter/{jobDate}/{jobId}', placeholders: ['jobDate', 'jobId'] },
   { key: 'generated.importReports', packageName: 'CORE', group: GROUPS.GENERATED, label: 'Import Reports', defaultTemplate: 'importReports', placeholders: [] },

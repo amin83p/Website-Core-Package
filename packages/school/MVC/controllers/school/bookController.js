@@ -34,7 +34,7 @@ function toBoolean(value, fallback = false) {
 }
 
 function buildPayload(reqBody, activeOrgId, userId) {
-  return {
+  const rawPayload = {
     orgId: activeOrgId,
     title: String(reqBody?.title || '').trim(),
     subtitle: String(reqBody?.subtitle || '').trim(),
@@ -59,6 +59,11 @@ function buildPayload(reqBody, activeOrgId, userId) {
       createUser: String(userId || 'SYSTEM'),
       lastUpdateUser: String(userId || 'SYSTEM')
     }
+  };
+  const sanitized = bookModel.sanitizeInput(rawPayload);
+  return {
+    ...sanitized,
+    audit: rawPayload.audit
   };
 }
 
@@ -203,6 +208,30 @@ async function listOrgBooks(orgId, reqUser) {
   return (Array.isArray(rows) ? rows : []).filter((row) => idsEqual(row.orgId, orgId));
 }
 
+async function buildDuplicateIsbnWarning(payload, orgId, reqUser, excludeId = '') {
+  const isbn = bookModel.normalizeIsbn(payload?.isbn);
+  if (!isbn) return null;
+  const rows = await listOrgBooks(orgId, reqUser);
+  const duplicates = bookModel.findDuplicateIsbnRows(rows, { ...payload, orgId, isbn }, { excludeId });
+  if (!duplicates.length) return null;
+  const names = duplicates
+    .slice(0, 3)
+    .map((row) => [row.title, row.subtitle, row.edition].map((value) => String(value || '').trim()).filter(Boolean).join(' - '))
+    .filter(Boolean);
+  return {
+    code: 'DUPLICATE_ISBN_ALLOWED',
+    message: `This ISBN is already used by ${duplicates.length} other catalog item${duplicates.length === 1 ? '' : 's'} in this organization. The book was saved because ISBN is allowed to repeat for related items such as student books and workbooks.`,
+    duplicates: duplicates.map((row) => ({
+      id: row.id,
+      title: row.title,
+      subtitle: row.subtitle,
+      edition: row.edition,
+      isbn: row.isbn
+    })),
+    displayText: names.length ? `Also used by: ${names.join('; ')}${duplicates.length > names.length ? '; ...' : ''}` : ''
+  };
+}
+
 exports.listBooks = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
@@ -310,11 +339,13 @@ exports.saveBook = async (req, res) => {
     const guard = beginGuard(['school_book_save', orgId, id, req.body || {}]);
     guardKey = guard.key;
     if (respondGuard(req, res, guard.result, 'Book save is already in progress. Please wait.')) return;
+    let duplicateIsbnWarning = null;
     if (id) {
       const existing = await schoolDataService.getDataById('books', id, req.user);
       if (!existing) throw new Error('Book not found.');
       assertOrgAccess(existing, orgId);
       const payload = buildPayload(req.body, existing.orgId, req.user?.id || 'SYSTEM');
+      duplicateIsbnWarning = await buildDuplicateIsbnWarning(payload, existing.orgId, req.user, id);
       const updated = await schoolDataService.updateData('books', id, payload, req.user);
       let saved = updated || { ...existing, ...payload, id };
       saved = await relocateCoverPhotoIfNeeded(saved, existing.orgId, req.user);
@@ -322,6 +353,7 @@ exports.saveBook = async (req, res) => {
       await libraryCirculationService.ensureDigitalCopyForBook(saved, req.user?.id || 'SYSTEM', req.user);
     } else {
       const payload = buildPayload(req.body, orgId, req.user?.id || 'SYSTEM');
+      duplicateIsbnWarning = await buildDuplicateIsbnWarning(payload, orgId, req.user);
       const created = await schoolDataService.addData('books', payload, req.user);
       if (created?.id) {
         let saved = created;
@@ -333,6 +365,7 @@ exports.saveBook = async (req, res) => {
     const response = {
       status: 'success',
       message: id ? 'Book updated successfully.' : 'Book created successfully.',
+      warning: duplicateIsbnWarning,
       redirectTo: '/school/library/books'
     };
     idempotencyGuardService.completeGuard(guardKey, response);
@@ -411,4 +444,10 @@ exports.deleteBook = async (req, res) => {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
     return respondSchoolDeleteError(req, res, error, { user: req.user });
   }
+};
+
+exports._test = {
+  buildPayload,
+  buildBookFileFromUpload,
+  bookAssetNeedsRelocation
 };

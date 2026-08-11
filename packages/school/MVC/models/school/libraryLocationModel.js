@@ -200,12 +200,18 @@ async function updateLibraryLocation(id, payload) {
     const index = rows.findIndex((row) => String(row.id) === String(id));
     if (index < 0) throw new Error('Library location not found.');
     const current = rows[index];
-    const sanitized = sanitizeInput({
+    const mergedInput = {
       ...current,
       ...payload,
       orgId: current.orgId,
       locationType: current.locationType,
       parentId: current.parentId
+    };
+    if (Array.isArray(payload?.__unsetFields) && payload.__unsetFields.includes('code')) {
+      mergedInput.code = '';
+    }
+    const sanitized = sanitizeInput({
+      ...mergedInput
     }, rows, { isUpdate: true, existing: current });
     assertUniqueCode(rows, sanitized, { excludeId: current.id });
     rows[index] = {

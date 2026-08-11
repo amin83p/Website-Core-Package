@@ -15,16 +15,27 @@ const {
 
 router.use(requireAuth);
 
+const bookMutationActionState = {
+  requireToken: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+};
+
+const bookStagedUploadActionState = {
+  ...bookMutationActionState,
+  keepActive: true
+};
+
 router.post('/api/upload-cover',
   requireAccess(SECTIONS.SCHOOL_BOOKS, OPERATIONS.CREATE),
   upload('school-books', true).single('coverPhoto'),
-  trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.CREATE, bookStagedUploadActionState),
   ctrl.uploadCoverPhoto);
 
 router.post('/api/upload-pdf',
   requireAccess(SECTIONS.SCHOOL_BOOKS, OPERATIONS.CREATE),
   upload('school-books-pdf', true).single('digitalPdf'),
-  trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.CREATE, bookStagedUploadActionState),
   ctrl.uploadDigitalPdf);
 
 router.get('/api/template/:id',
@@ -43,7 +54,7 @@ router.get('/new',
 
 router.post('/new',
   requireAccess(SECTIONS.SCHOOL_BOOKS, OPERATIONS.CREATE),
-  trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.CREATE, bookMutationActionState),
   ctrl.saveBook);
 
 router.get('/edit/:id',
@@ -53,7 +64,7 @@ router.get('/edit/:id',
 
 router.post('/edit/:id',
   requireAccess(SECTIONS.SCHOOL_BOOKS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.UPDATE, bookMutationActionState),
   ctrl.saveBook);
 
 router.get('/delete/:id',

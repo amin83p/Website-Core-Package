@@ -43,4 +43,18 @@ router.post('/edit/:id',
   trackActionState(SECTIONS.SCHOOL_LIBRARY_PATRONS, OPERATIONS.UPDATE, { requireToken: true }),
   ctrl.savePatron);
 
+router.get('/delete/:id',
+  requireAccess(SECTIONS.SCHOOL_LIBRARY_PATRONS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_PATRONS, OPERATIONS.DELETE),
+  ctrl.deletePatron);
+
+router.delete('/delete/:id',
+  requireAccess(SECTIONS.SCHOOL_LIBRARY_PATRONS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_PATRONS, OPERATIONS.DELETE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.deletePatron);
+
 module.exports = router;

@@ -21,19 +21,6 @@
   ]
 }) %>
 
-<% if (duplicateNoticeId && duplicateNoticeCopy) { %>
-  <div class="alert alert-success border d-flex gap-3 align-items-start">
-    <i class="bi bi-check-circle-fill fs-5"></i>
-    <div>
-      <div class="fw-semibold">A similar copy was created (<span class="font-monospace"><%= duplicateNoticeCopy.copyCode %></span>).</div>
-      <div class="small mt-1">To change the barcode or other details for this copy, open the new copy and edit it.</div>
-      <a href="/school/library/copies/edit/<%= duplicateNoticeCopy.id %>" class="btn btn-outline-primary btn-sm mt-2">
-        <i class="bi bi-pencil-square me-1"></i>Open new copy
-      </a>
-    </div>
-  </div>
-<% } %>
-
 <% if (filterBookId) { %>
   <div class="alert alert-info border">Filtered to catalog book <span class="font-monospace"><%= filterBookId %></span></div>
 <% } %>
@@ -75,7 +62,7 @@
               </button>
               <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
                 <a href="/school/library/copies/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
-                <form method="POST" action="/school/library/copies/duplicate/<%= item.id %>" class="d-inline">
+                <form method="POST" action="/school/library/copies/duplicate/<%= item.id %>" class="d-inline" data-duplicate-copy-form="true">
                   <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
                   <button type="submit" class="btn btn-outline-secondary btn-sm w-100 text-start"><i class="bi bi-copy me-2"></i>Make a Copy</button>
                 </form>
@@ -93,3 +80,110 @@
 </div>
 
 <%- include('partials/tablePages-end') %>
+
+<script>
+(function () {
+  const duplicateNoticeCopy = <%- JSON.stringify(duplicateNoticeCopy || null).replace(/</g, '\\u003c') %>;
+
+  function reloadCopyList() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('duplicateNotice');
+    window.location.href = url.toString();
+  }
+
+  async function showDuplicateResult(copy, fallbackMessage) {
+    const created = copy || {};
+    const copyId = String(created.id || '').trim();
+    const copyCode = String(created.copyCode || '').trim();
+    const message = copyCode
+      ? 'A similar copy was created: <span class="font-monospace">' + copyCode + '</span>.'
+      : (fallbackMessage || 'A similar copy was created.');
+
+    if (typeof window.showMessageModal === 'function') {
+      const result = await window.showMessageModal({
+        title: 'Copy Created',
+        icon: 'success',
+        message,
+        buttons: [
+          { text: 'Open Copied Item', class: 'btn-primary' },
+          { text: 'Stay on List', class: 'btn-secondary' }
+        ]
+      });
+      if (result === 'Open Copied Item' && copyId) {
+        window.location.href = '/school/library/copies/edit/' + encodeURIComponent(copyId);
+        return;
+      }
+      reloadCopyList();
+      return;
+    }
+
+    if (copyId && confirm(String(message || '').replace(/<[^>]*>/g, '') + '\n\nOpen copied item?')) {
+      window.location.href = '/school/library/copies/edit/' + encodeURIComponent(copyId);
+      return;
+    }
+    reloadCopyList();
+  }
+
+  async function duplicateCopy(form) {
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalHtml = submitButton?.innerHTML || '';
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating...';
+    }
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: new FormData(form)
+      });
+      let result = await response.json().catch(() => ({}));
+      if (typeof window.applyGuardedApiResult === 'function') {
+        const guarded = await window.applyGuardedApiResult(result, {
+          busyTitle: 'Duplicate In Progress',
+          replayTitle: 'Copy Already Created'
+        });
+        if (guarded?.stop) return;
+        result = guarded?.result || result;
+      }
+      if (!response.ok || result.status === 'error') {
+        throw new Error(result.message || 'Unable to create a similar copy.');
+      }
+      await showDuplicateResult(result.copy, result.message);
+    } catch (error) {
+      if (typeof window.showMessageModal === 'function') {
+        await window.showMessageModal({
+          title: 'Copy Failed',
+          icon: 'error',
+          message: error.message || 'Unable to create a similar copy.',
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+      } else {
+        alert(error.message || 'Unable to create a similar copy.');
+      }
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalHtml;
+      }
+    }
+  }
+
+  document.querySelectorAll('form[data-duplicate-copy-form="true"]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      duplicateCopy(form);
+    });
+  });
+
+  if (duplicateNoticeCopy) {
+    window.addEventListener('DOMContentLoaded', () => {
+      showDuplicateResult(duplicateNoticeCopy, 'A similar copy was created.');
+    }, { once: true });
+  }
+})();
+</script>

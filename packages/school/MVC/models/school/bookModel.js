@@ -211,9 +211,9 @@ function normalizeStoredBook(row = {}) {
     description: cleanString(row.description, { max: 4000, allowEmpty: true }),
     active: cleanBoolean(row.active, true),
     sortOrder: cleanSortOrder(row.sortOrder, 100),
-    tableOfContents: normalizeTableOfContents(row.tableOfContents || [], totalPages),
-    coverPhoto: sanitizeBookFileAsset(row.coverPhoto),
-    digitalPdf: sanitizeBookFileAsset(row.digitalPdf),
+    tableOfContents: normalizeTableOfContents(parseTableOfContentsInput(row.tableOfContents), totalPages),
+    coverPhoto: sanitizeCoverPhoto(parseCoverPhotoInput(row.coverPhoto)),
+    digitalPdf: sanitizeDigitalPdf(parseDigitalPdfInput(row.digitalPdf)),
     pdfBookPageOne: row.pdfBookPageOne === null || row.pdfBookPageOne === undefined || row.pdfBookPageOne === ''
       ? null
       : normalizePdfBookPageOne(row.pdfBookPageOne),
@@ -338,15 +338,18 @@ function sanitizeInput(input, { isUpdate = false } = {}) {
   return output;
 }
 
-function assertUniqueIsbn(rows, candidate, { excludeId = null } = {}) {
+function findDuplicateIsbnRows(rows, candidate, { excludeId = null } = {}) {
   const candidateIsbn = normalizeIsbn(candidate.isbn);
-  if (!candidateIsbn) return;
-  const duplicate = (Array.isArray(rows) ? rows : []).some((row) => (
+  if (!candidateIsbn) return [];
+  return (Array.isArray(rows) ? rows : []).filter((row) => (
     (!excludeId || String(row.id) !== String(excludeId))
     && String(row.orgId || '') === String(candidate.orgId || '')
     && normalizeIsbn(row.isbn) === candidateIsbn
   ));
-  if (duplicate) throw new Error(`ISBN "${candidate.isbn}" already exists for this organization.`);
+}
+
+function assertUniqueIsbn(rows, candidate, options = {}) {
+  return findDuplicateIsbnRows(rows, candidate, options);
 }
 
 async function ensureDataFile() {
@@ -379,7 +382,6 @@ async function addBook(payload) {
   return queueWrite(async () => {
     const rows = await getAllBooks();
     const sanitized = sanitizeInput(payload, { isUpdate: false });
-    assertUniqueIsbn(rows, sanitized);
     const now = new Date().toISOString();
     const created = {
       id: sanitized.id || generateBookId(),
@@ -408,7 +410,6 @@ async function updateBook(id, payload) {
       ...payload,
       orgId: current.orgId
     }, { isUpdate: true });
-    assertUniqueIsbn(rows, sanitized, { excludeId: current.id });
     const now = new Date().toISOString();
     rows[index] = {
       ...current,
@@ -458,5 +459,6 @@ module.exports = {
   parseDigitalPdfInput,
   generateBookId,
   generateTocEntryId,
+  findDuplicateIsbnRows,
   assertUniqueIsbn
 };

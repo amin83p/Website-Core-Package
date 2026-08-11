@@ -13,6 +13,12 @@ const {
 
 router.use(requireAuth);
 
+const locationMutationActionState = {
+  requireToken: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+};
+
 router.get('/api/assignable-spots',
   requireAccess(SECTIONS.SCHOOL_LIBRARY_COPIES, OPERATIONS.READ_ALL),
   ctrl.apiAssignableSpots);
@@ -29,7 +35,7 @@ router.get('/new',
 
 router.post('/new',
   requireAccess(SECTIONS.SCHOOL_LIBRARY_LOCATIONS, OPERATIONS.CREATE),
-  trackActionState(SECTIONS.SCHOOL_LIBRARY_LOCATIONS, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_LOCATIONS, OPERATIONS.CREATE, locationMutationActionState),
   ctrl.saveLocation);
 
 router.get('/edit/:id',
@@ -39,7 +45,7 @@ router.get('/edit/:id',
 
 router.post('/edit/:id',
   requireAccess(SECTIONS.SCHOOL_LIBRARY_LOCATIONS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_LIBRARY_LOCATIONS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_LOCATIONS, OPERATIONS.UPDATE, locationMutationActionState),
   ctrl.saveLocation);
 
 router.post('/deactivate/:id',

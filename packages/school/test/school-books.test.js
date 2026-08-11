@@ -7,10 +7,16 @@ const ROOT = path.resolve(__dirname, '../../..');
 const bookModel = require('../MVC/models/school/bookModel');
 const bookController = require('../MVC/controllers/school/bookController');
 const accessConstants = require('../config/accessConstants');
+const { requireCoreModule } = require('../MVC/services/school/schoolCoreContracts');
+const uploadCategoryResolverService = requireCoreModule('MVC/services/uploadCategoryResolverService');
+const coreFilesService = requireCoreModule('MVC/services/coreFilesService');
+const { registerSchoolUploadCategoryResolvers } = require('../MVC/services/school/schoolUploadCategoryRegistration');
 
 const BOOK_LIST_VIEW = path.join(ROOT, 'packages/school/MVC/views/school/book/bookList.ejs');
 const BOOK_FORM_VIEW = path.join(ROOT, 'packages/school/MVC/views/school/book/bookForm.ejs');
 const BOOK_ROUTES = path.join(ROOT, 'packages/school/MVC/routes/bookRoutes.js');
+const BOOK_CONTROLLER = path.join(ROOT, 'packages/school/MVC/controllers/school/bookController.js');
+const MONGO_INDEX_MANAGER = path.join(ROOT, 'MVC/infrastructure/mongo/mongoIndexManager.js');
 
 test('access constants declare SCHOOL_BOOKS', () => {
   assert.equal(accessConstants.SCHOOL_SECTIONS.SCHOOL_BOOKS, 'SCHOOL_BOOKS');
@@ -62,6 +68,58 @@ test('book form view includes TOC editor and AJAX save', () => {
   assert.match(source, /X-AJAX-Request/);
   assert.match(source, /Table of contents/);
   assert.match(source, /Cover & PDF/);
+  assert.match(source, /result\.warning/);
+  assert.match(source, /Book Saved/);
+});
+
+test('book controller parses cover photo payload before repository save', () => {
+  const coverUrl = '/uploads/ORG_42/school/books/book_unsaved/cover/cover_123.png';
+  const payload = bookController._test.buildPayload({
+    title: 'Railway Cover Book',
+    coverPhoto: JSON.stringify({
+      fileName: 'cover_123.png',
+      originalName: 'cover.png',
+      path: coverUrl,
+      url: coverUrl
+    }),
+    tableOfContents: '[]'
+  }, '42', 'USER_TEST');
+
+  assert.equal(payload.title, 'Railway Cover Book');
+  assert.equal(typeof payload.coverPhoto, 'object');
+  assert.equal(payload.coverPhoto.url, coverUrl);
+  assert.equal(payload.coverPhoto.path, coverUrl);
+  assert.equal(payload.audit.createUser, 'USER_TEST');
+});
+
+test('bookModel normalizes legacy string cover photo metadata on read', () => {
+  const coverUrl = '/uploads/ORG_42/school/books/BK001/cover/cover_123.png';
+  const normalized = bookModel.normalizeStoredBook({
+    id: 'BK001',
+    orgId: '42',
+    title: 'Legacy Cover Book',
+    authors: [],
+    tableOfContents: '[]',
+    coverPhoto: JSON.stringify({
+      fileName: 'cover_123.png',
+      path: coverUrl,
+      url: coverUrl
+    })
+  });
+
+  assert.equal(normalized.coverPhoto.url, coverUrl);
+  assert.equal(normalized.coverPhoto.fileName, 'cover_123.png');
+});
+
+test('book cover uploads resolve to the configured School book cover folder', () => {
+  uploadCategoryResolverService.resetUploadCategoryResolvers();
+  registerSchoolUploadCategoryResolvers();
+
+  const category = coreFilesService.resolveUploadCategory('school-books', true, {
+    body: { bookId: 'BK 123' }
+  });
+
+  assert.equal(category, 'school/books/BK_123/cover');
 });
 
 test('bookModel normalizes authors from comma-separated text', () => {
@@ -89,7 +147,7 @@ test('bookModel validates TOC end page is not before start page', () => {
   }, /end page must be greater than or equal to start page/);
 });
 
-test('bookModel sanitizeInput rejects duplicate ISBN for same org', () => {
+test('bookModel detects duplicate ISBN for warning without rejecting it', () => {
   const payload = {
     orgId: 'ORG_TEST',
     title: 'Sample Book',
@@ -98,11 +156,24 @@ test('bookModel sanitizeInput rejects duplicate ISBN for same org', () => {
   };
   const sanitized = bookModel.sanitizeInput(payload);
   assert.equal(sanitized.isbn, '9780123456789');
-  assert.throws(() => {
-    bookModel.assertUniqueIsbn([
-      { id: 'BK-1', orgId: 'ORG_TEST', isbn: '9780123456789' }
-    ], sanitized);
-  }, /already exists/);
+  const duplicates = bookModel.assertUniqueIsbn([
+    { id: 'BK-1', orgId: 'ORG_TEST', isbn: '9780123456789' }
+  ], sanitized);
+  assert.equal(duplicates.length, 1);
+  assert.doesNotThrow(() => bookModel.assertUniqueIsbn([
+    { id: 'BK-1', orgId: 'ORG_OTHER', isbn: '9780123456789' }
+  ], sanitized));
+});
+
+test('book save returns duplicate ISBN warnings without blocking catalog variants', () => {
+  const controller = fs.readFileSync(BOOK_CONTROLLER, 'utf8');
+  const indexes = fs.readFileSync(MONGO_INDEX_MANAGER, 'utf8');
+  assert.match(controller, /buildDuplicateIsbnWarning/);
+  assert.match(controller, /DUPLICATE_ISBN_ALLOWED/);
+  assert.match(controller, /warning:\s*duplicateIsbnWarning/);
+  assert.match(indexes, /idx_school_books_org_isbn',\s*sparse:\s*true/);
+  assert.doesNotMatch(indexes, /idx_school_books_org_isbn',\s*unique:\s*true/);
+  assert.match(indexes, /schoolBooks:\s*'idx_school_books_org_isbn'/);
 });
 
 test('bookModel sorts TOC entries by sortOrder then startPage', () => {

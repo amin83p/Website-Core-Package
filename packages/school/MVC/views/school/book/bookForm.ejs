@@ -1478,6 +1478,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (result.status !== 'success') throw new Error(result.message || 'Save failed.');
 
+      if (result.warning && typeof showMessageModal === 'function') {
+
+        const warningMessage = [
+
+          result.message || 'Book saved successfully.',
+
+          result.warning.message || '',
+
+          result.warning.displayText || ''
+
+        ].filter(Boolean).join('<br><br>');
+
+        await showMessageModal({
+
+          title: 'Book Saved',
+
+          icon: 'warning',
+
+          message: warningMessage,
+
+          buttons: [{ text: 'OK', class: 'btn-warning' }]
+
+        });
+
+      }
+
       window.location.href = result.redirectTo || '/school/library/books';
 
     } catch (error) {

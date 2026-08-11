@@ -10,7 +10,7 @@
   </div>
 
   <div class="form-container wide" style="max-width: 1400px;">
-    <form action="<%= isEdit ? '/school/library/locations/edit/' + item.id : '/school/library/locations/new' %>" method="POST">
+    <form id="libraryLocationForm" action="<%= isEdit ? '/school/library/locations/edit/' + item.id : '/school/library/locations/new' %>" method="POST">
       <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
       <% if (!isEdit) { %>
         <input type="hidden" name="locationType" value="<%= locationType %>">
@@ -70,3 +70,99 @@
     </form>
   </div>
 </div>
+
+<script>
+(function () {
+  const form = document.getElementById('libraryLocationForm');
+  if (!form) return;
+
+  function showLocationMessage(options) {
+    if (typeof window.showMessageModal === 'function') {
+      return window.showMessageModal(options || {});
+    }
+    console.error('showMessageModal is unavailable for library location messaging.', options || {});
+    return Promise.resolve('OK');
+  }
+
+  function stripHtml(value) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = String(value || '');
+    return wrapper.textContent || wrapper.innerText || '';
+  }
+
+  function setButtonBusy(button, isBusy, originalHtml) {
+    if (!button) return;
+    button.disabled = isBusy;
+    button.innerHTML = isBusy
+      ? '<span class="spinner-border spinner-border-sm me-2"></span>Saving...'
+      : originalHtml;
+  }
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+
+    const nameField = form.querySelector('[name="name"]');
+    if (!String(nameField?.value || '').trim()) {
+      await showLocationMessage({
+        title: 'Location Required',
+        icon: 'warning',
+        message: 'Enter the location name before saving.',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      nameField?.focus();
+      return;
+    }
+
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalHtml = submitButton?.innerHTML || '';
+    setButtonBusy(submitButton, true, originalHtml);
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'X-AJAX-Request': 'true',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json'
+        },
+        body: new URLSearchParams(new FormData(form)).toString()
+      });
+
+      let result = await response.json().catch(() => ({
+        status: 'error',
+        message: 'Server returned an unexpected response.'
+      }));
+
+      if (typeof window.applyGuardedApiResult === 'function') {
+        const guarded = await window.applyGuardedApiResult(result, {
+          busyTitle: 'Save In Progress',
+          replayTitle: 'Location Already Saved'
+        });
+        if (guarded?.stop) return;
+        result = guarded?.result || result;
+      }
+
+      if (!response.ok || result.status === 'error') {
+        throw new Error(stripHtml(result.message || 'Unable to save location.'));
+      }
+
+      await showLocationMessage({
+        title: 'Location Saved',
+        icon: 'success',
+        message: result.message || 'Location saved successfully.',
+        buttons: [{ text: 'OK', class: 'btn-success' }]
+      });
+      window.location.href = result.redirectTo || '/school/library/locations';
+    } catch (error) {
+      await showLocationMessage({
+        title: 'Unable to Save Location',
+        icon: 'error',
+        message: error.message || 'Unable to save location.',
+        buttons: [{ text: 'Close', class: 'btn-danger' }]
+      });
+    } finally {
+      setButtonBusy(submitButton, false, originalHtml);
+    }
+  });
+})();
+</script>
