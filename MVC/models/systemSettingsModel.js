@@ -118,6 +118,7 @@ const DEFAULTS = {
   app: {                        // NEW SECTION
     defaultPageSize: 30,
     searchDefaultKeyword: 'aaa',
+    genericPickerSearchDebounceMs: 400,
     requestCacheTtlSeconds: 900,
     requestCacheMaxEntries: 500,
     buildVersionOverride: '',

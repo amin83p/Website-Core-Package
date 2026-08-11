@@ -57,6 +57,7 @@ test('updateAppSettings persists buildVersionOverride and refreshes runtime buil
       body: {
         defaultPageSize: '30',
         searchDefaultKeyword: 'aaa',
+        genericPickerSearchDebounceMs: '450',
         buildVersionOverride: '  RELEASE-abc123def456  ',
         uploadsPath: 'uploads'
       },
@@ -77,7 +78,59 @@ test('updateAppSettings persists buildVersionOverride and refreshes runtime buil
     assert.equal(res.jsonPayload?.status, 'success');
     assert.equal(refreshCalled, 1);
     assert.equal(buildRefreshCalled, 1);
+    assert.equal(capturedUpdate?.app?.genericPickerSearchDebounceMs, 450);
     assert.equal(capturedUpdate?.app?.buildVersionOverride, 'RELEASE-abc123def456');
+  } finally {
+    systemSettingsRepository.getSettings = originalGetSettings;
+    systemSettingsRepository.updateSettings = originalUpdateSettings;
+    settingService.refresh = originalRefresh;
+  }
+});
+
+test('updateAppSettings clamps generic picker search debounce setting', async () => {
+  const originalGetSettings = systemSettingsRepository.getSettings;
+  const originalUpdateSettings = systemSettingsRepository.updateSettings;
+  const originalRefresh = settingService.refresh;
+  const res = makeJsonResponse();
+  let capturedUpdate = null;
+
+  systemSettingsRepository.getSettings = async () => ({
+    app: {
+      publicMenu: {
+        defaultHomePath: '/',
+        items: []
+      },
+      brand: {},
+      contactPage: {}
+    }
+  });
+  systemSettingsRepository.updateSettings = async (payload) => {
+    capturedUpdate = payload;
+  };
+  settingService.refresh = async () => {};
+
+  try {
+    await systemSettingsController.updateAppSettings({
+      body: {
+        defaultPageSize: '30',
+        searchDefaultKeyword: 'aaa',
+        genericPickerSearchDebounceMs: '9999',
+        buildVersionOverride: '',
+        uploadsPath: 'uploads'
+      },
+      headers: {
+        'x-ajax-request': 'true'
+      },
+      user: { id: 'USER_APP_SETTINGS_2' },
+      app: {
+        locals: {
+          refreshBuildVersion() {}
+        }
+      }
+    }, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(capturedUpdate?.app?.genericPickerSearchDebounceMs, 2000);
   } finally {
     systemSettingsRepository.getSettings = originalGetSettings;
     systemSettingsRepository.updateSettings = originalUpdateSettings;

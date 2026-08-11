@@ -1280,6 +1280,7 @@ const schoolRepositories = {
     update: libraryLoanModel.updateLibraryLoan,
     remove: libraryLoanModel.deleteLibraryLoan,
     defaultSearchFields: ['id', 'orgId', 'patronId', 'personId', 'copyId', 'bookId', 'status', 'copyType'],
+    dateFields: ['checkoutAt', 'returnedAt', 'dueAt', 'audit.createDateTime', 'audit.lastUpdateDateTime'],
     allowSystemFallback: false
   }),
   libraryLocations: createSchoolRepository({

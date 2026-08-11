@@ -120,6 +120,19 @@ app.locals.refreshBuildVersion = refreshBuildVersionLocals;
 app.locals.buildVersion = { shortHash: '', source: '' };
 app.locals.buildVersionShort = '';
 app.locals.staticAssetUrl = (assetPath) => buildStaticAssetUrl(assetPath, app.locals.buildVersionShort);
+
+function resolveAppUiSettings() {
+  const settings = settingService.get();
+  const appSettings = settings && settings.app && typeof settings.app === 'object' ? settings.app : {};
+  const rawPickerDelay = Number.parseInt(String(appSettings.genericPickerSearchDebounceMs ?? ''), 10);
+  const genericPickerSearchDebounceMs = Number.isFinite(rawPickerDelay)
+    ? Math.max(0, Math.min(2000, rawPickerDelay))
+    : 400;
+  return {
+    genericPickerSearchDebounceMs
+  };
+}
+
 function createAppStaticMiddleware(rootPath, cacheProfile = 'static') {
   return staticAssetMiddleware.createStaticAssetMiddleware(rootPath, {
     isProduction,
@@ -319,6 +332,7 @@ app.use(async (req, res, next) => {
   res.locals.appContactPage = appBrandingService.getContactPage();
   res.locals.publicMenu = appBrandingService.getPublicMenu(req.user || null);
   res.locals.publicMenuEndpointOptions = appBrandingService.getPublicMenuEndpointOptions();
+  res.locals.appUiSettings = resolveAppUiSettings();
   res.locals.buildVersionShort = cleanBuildVersionToken(req.app?.locals?.buildVersionShort);
   res.locals.staticAssetUrl = (assetPath) => buildStaticAssetUrl(assetPath, res.locals.buildVersionShort);
   res.locals.canUseAdminAuthenticator = Boolean(

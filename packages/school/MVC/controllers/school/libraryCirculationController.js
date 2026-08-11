@@ -4,14 +4,92 @@ const schoolDataService = require('../../services/school/schoolDataService');
 const libraryCirculationService = require('../../services/school/libraryCirculationService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
-const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
-const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
-const settingService = requireCoreModule('MVC/services/settingService');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
 const { OPEN_STATUSES, LOAN_STATUSES } = require('../../models/school/libraryLoanModel');
 const { COPY_TYPES, COPY_STATUSES } = require('../../models/school/libraryCopyModel');
+
+const LOAN_LIST_SEARCH_FIELDS = Object.freeze([
+  'id',
+  'patronId',
+  'personId',
+  'copyId',
+  'bookId',
+  'status',
+  'copyType',
+  'checkedOutByUserId',
+  'returnedByUserId',
+  'notes'
+]);
+
+const LOAN_LIST_EXACT_FILTERS = Object.freeze([
+  'patronId',
+  'personId',
+  'copyId',
+  'bookId',
+  'copyType'
+]);
+
+function cleanQueryToken(value) {
+  return String(value || '').trim();
+}
+
+function normalizeLoanListStatus(value) {
+  const token = cleanQueryToken(value).toLowerCase();
+  if (!token) return '';
+  if (token === 'open') return 'open';
+  return Object.values(LOAN_STATUSES).includes(token) ? token : '';
+}
+
+function normalizeLoanListCopyType(value) {
+  const token = cleanQueryToken(value).toLowerCase();
+  return Object.values(COPY_TYPES).includes(token) ? token : '';
+}
+
+async function buildLoanListQuery(rawQuery = {}) {
+  const query = await buildDataServiceQuery(rawQuery, {
+    allowedExactKeys: null,
+    allowedSearchFields: LOAN_LIST_SEARCH_FIELDS,
+    defaultSearchFields: LOAN_LIST_SEARCH_FIELDS
+  });
+
+  const status = normalizeLoanListStatus(rawQuery.status);
+  delete query.status;
+  if (status === 'open') {
+    query.status__in = Array.from(OPEN_STATUSES).join(',');
+  } else if (status) {
+    query.status__eq = status;
+  }
+
+  LOAN_LIST_EXACT_FILTERS.forEach((field) => {
+    const rawValue = field === 'copyType'
+      ? normalizeLoanListCopyType(rawQuery[field])
+      : cleanQueryToken(rawQuery[field]);
+    delete query[field];
+    if (rawValue) query[`${field}__eq`] = rawValue;
+  });
+
+  if (!query.sort) query.sort = '-checkoutAt';
+  return query;
+}
+
+function buildLoanListFilters(rawQuery = {}) {
+  return {
+    status: normalizeLoanListStatus(rawQuery.status),
+    patronId: cleanQueryToken(rawQuery.patronId),
+    personId: cleanQueryToken(rawQuery.personId),
+    copyId: cleanQueryToken(rawQuery.copyId),
+    bookId: cleanQueryToken(rawQuery.bookId),
+    copyType: normalizeLoanListCopyType(rawQuery.copyType),
+    startDate: cleanQueryToken(rawQuery.startDate),
+    endDate: cleanQueryToken(rawQuery.endDate)
+  };
+}
+
+function hasLoanListFiltersApplied(filters = {}) {
+  return Object.values(filters).some((value) => cleanQueryToken(value) !== '');
+}
 
 async function enrichLoans(loans, reqUser) {
   const bookMap = new Map();
@@ -31,10 +109,21 @@ async function enrichLoans(loans, reqUser) {
   return loans.map((loan) => ({
     ...loan,
     bookTitle: bookMap.get(loan.bookId)?.title || '',
+    bookSubtitle: bookMap.get(loan.bookId)?.subtitle || '',
+    bookAuthors: Array.isArray(bookMap.get(loan.bookId)?.authors) ? bookMap.get(loan.bookId).authors : [],
+    bookPublisher: bookMap.get(loan.bookId)?.publisher || '',
+    bookEdition: bookMap.get(loan.bookId)?.edition || '',
+    bookPublicationYear: bookMap.get(loan.bookId)?.publicationYear || '',
     bookIsbn: bookMap.get(loan.bookId)?.isbn || '',
+    bookLanguage: bookMap.get(loan.bookId)?.language || '',
+    bookSubjectArea: bookMap.get(loan.bookId)?.subjectArea || '',
+    bookTotalPages: bookMap.get(loan.bookId)?.totalPages || '',
+    bookDescription: bookMap.get(loan.bookId)?.description || '',
     coverPhoto: bookMap.get(loan.bookId)?.coverPhoto || null,
     coverPhotoUrl: bookMap.get(loan.bookId)?.coverPhoto?.url || '',
     copyCode: copyMap.get(loan.copyId)?.copyCode || '',
+    copyStatus: copyMap.get(loan.copyId)?.status || '',
+    copyLocation: copyMap.get(loan.copyId)?.locationPath || copyMap.get(loan.copyId)?.location || '',
     patronPersonId: patronMap.get(loan.patronId)?.personId || loan.personId
   }));
 }
@@ -268,31 +357,23 @@ exports.listLoans = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
     await libraryCirculationService.markOverdueLoans(orgId, req.user);
-    const query = await buildDataServiceQuery(req.query, { allowedExactKeys: ['status'] });
-    const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
-    if (query.q === searchDefaultKeyword) query.q = '';
-
-    const rows = await schoolDataService.fetchAllData('libraryLoans', {}, req.user);
-    let loans = (Array.isArray(rows) ? rows : []).filter((row) => idsEqual(row.orgId, orgId));
-    if (query.status) {
-      loans = loans.filter((row) => String(row.status) === String(query.status));
-    } else {
-      loans = loans.filter((row) => OPEN_STATUSES.has(String(row.status || '').toLowerCase()));
-    }
-    loans = await enrichLoans(loans, req.user);
-    loans = loans.sort((a, b) => String(b.checkoutAt || '').localeCompare(String(a.checkoutAt || '')));
-
-    const searchableFields = ['id', 'bookTitle', 'copyCode', 'personId', 'patronPersonId', 'status', 'copyType'];
-    loans = applyGenericFilter(loans, query, { defaultSearchFields: searchableFields });
-    const { data, pagination } = paginate(loans, query.page, query.limit);
+    const loanFilters = buildLoanListFilters(req.query);
+    const query = await buildLoanListQuery(req.query);
+    const paged = await schoolDataService.fetchDataPaged('libraryLoans', query, req.user);
+    const data = await enrichLoans(paged.rows, req.user);
+    const pagination = paged.pagination;
 
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
     return res.render('school/library/loanList', {
-      title: 'Active Library Loans',
+      title: 'Library Loan Transactions',
       tableName: 'School_Library_Loans',
+      newUrl: 'school/library/circulation/loans',
       data,
-      filterStatus: String(query.status || ''),
-      searchableFields,
+      loanFilters,
+      statusOptions: Object.values(LOAN_STATUSES),
+      typeOptions: Object.values(COPY_TYPES),
+      hasLoanFiltersApplied: hasLoanListFiltersApplied(loanFilters),
+      searchableFields: LOAN_LIST_SEARCH_FIELDS,
       includeModal: true,
       includeModal_Table: true,
       print: true,

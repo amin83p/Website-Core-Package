@@ -648,6 +648,15 @@
             </div>
 
             <div class="mb-4">
+                <label class="form-label fw-bold">Generic Picker Search Delay</label>
+                <div class="input-group">
+                    <input type="number" name="genericPickerSearchDebounceMs" class="form-control" value="<%= settings.app.genericPickerSearchDebounceMs ?? 400 %>" min="0" max="2000" step="50">
+                    <span class="input-group-text text-muted">milliseconds</span>
+                </div>
+                <div class="form-text">Delay before searchable picker modals query the server after typing stops. Use 0 to search immediately.</div>
+            </div>
+
+            <div class="mb-4">
                 <label class="form-label fw-bold">Build Version Override</label>
                 <input type="text" name="buildVersionOverride" class="form-control font-monospace" value="<%= settings.app.buildVersionOverride || '' %>" placeholder="Optional commit hash override">
                 <div class="form-text">Optional per-app override. Leave empty to use repo `config/build-version.json`, then env/git fallback.</div>

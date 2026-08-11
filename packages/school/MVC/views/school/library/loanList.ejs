@@ -1,3 +1,64 @@
+<%
+  const loanListFilters = (typeof loanFilters !== 'undefined' && loanFilters && typeof loanFilters === 'object')
+    ? loanFilters
+    : {};
+  const loanStatusOptions = Array.isArray(typeof statusOptions !== 'undefined' ? statusOptions : null)
+    ? statusOptions
+    : ['active', 'overdue', 'returned', 'lost', 'cancelled'];
+  const loanTypeOptions = Array.isArray(typeof typeOptions !== 'undefined' ? typeOptions : null)
+    ? typeOptions
+    : ['physical', 'digital'];
+  const hasLoanFiltersAppliedFlag = typeof hasLoanFiltersApplied !== 'undefined' && hasLoanFiltersApplied === true;
+  const loanFilterAction = '/school/library/circulation/loans';
+  const statusLabel = function statusLabel(value) {
+    return String(value || '')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, function replaceFirst(ch) { return ch.toUpperCase(); });
+  };
+  const dateTimeText = function dateTimeText(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value || '').slice(0, 19);
+    return date.toLocaleString();
+  };
+  const statusBadgeClass = function statusBadgeClass(value) {
+    const status = String(value || '').trim().toLowerCase();
+    if (status === 'returned') return 'bg-success';
+    if (status === 'overdue') return 'bg-danger';
+    if (status === 'lost' || status === 'cancelled') return 'bg-secondary';
+    return 'bg-warning text-dark';
+  };
+  const loanDetailRowsJson = JSON.stringify(Array.isArray(typeof data !== 'undefined' ? data : null) ? data : [])
+    .replace(/</g, '\\u003c');
+%>
+
+<style>
+  .library-loans-page .card-body {
+    padding: 0.9rem 1rem;
+  }
+  .library-loans-page .form-label {
+    margin-bottom: 0.2rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .library-loans-page .table-sm thead th {
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+  .library-loans-page .loan-detail-row {
+    cursor: pointer;
+  }
+  .library-loans-page .loan-detail-row:hover > td {
+    background-color: var(--bs-light, #f8f9fa);
+  }
+  #loanDetailModal .loan-cover-frame {
+    width: 112px;
+    min-width: 112px;
+    aspect-ratio: 3 / 4;
+  }
+</style>
+
+<div class="library-loans-page">
 <%- include('partials/tablePages-start', {
   title,
   user,
@@ -11,44 +72,371 @@
   manageBtns: []
 }) %>
 
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Loan Transactions</div>
+    <button
+      id="loanFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#loanFilterCollapse"
+      aria-expanded="<%= hasLoanFiltersAppliedFlag ? 'true' : 'false' %>"
+      aria-controls="loanFilterCollapse"
+      aria-label="<%= hasLoanFiltersAppliedFlag ? 'Close filters' : 'Open filters' %>">
+      <i id="loanFilterToggleIcon" class="bi <%= hasLoanFiltersAppliedFlag ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasLoanFiltersAppliedFlag ? ' show' : '' %>" id="loanFilterCollapse">
+    <form class="card-body p-3" method="get" action="<%= loanFilterAction %>">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label" for="loanStatusFilter">Status</label>
+          <select class="form-select size-md" id="loanStatusFilter" name="status">
+            <option value="" <%= !loanListFilters.status ? 'selected' : '' %>>All transactions</option>
+            <option value="open" <%= String(loanListFilters.status || '') === 'open' ? 'selected' : '' %>>Open loans</option>
+            <% loanStatusOptions.forEach((value) => { %>
+              <option value="<%= value %>" <%= String(loanListFilters.status || '') === String(value) ? 'selected' : '' %>><%= statusLabel(value) %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label" for="loanTypeFilter">Type</label>
+          <select class="form-select size-md" id="loanTypeFilter" name="copyType">
+            <option value="" <%= !loanListFilters.copyType ? 'selected' : '' %>>All types</option>
+            <% loanTypeOptions.forEach((value) => { %>
+              <option value="<%= value %>" <%= String(loanListFilters.copyType || '') === String(value) ? 'selected' : '' %>><%= statusLabel(value) %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label" for="loanPatronFilter">Patron ID</label>
+          <input class="form-control size-md font-monospace" id="loanPatronFilter" name="patronId" value="<%= loanListFilters.patronId || '' %>">
+        </div>
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label" for="loanPersonFilter">Person ID</label>
+          <input class="form-control size-md font-monospace" id="loanPersonFilter" name="personId" value="<%= loanListFilters.personId || '' %>">
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label" for="loanBookFilter">Book ID</label>
+          <input class="form-control size-md font-monospace" id="loanBookFilter" name="bookId" value="<%= loanListFilters.bookId || '' %>">
+        </div>
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label" for="loanCopyFilter">Copy ID</label>
+          <input class="form-control size-md font-monospace" id="loanCopyFilter" name="copyId" value="<%= loanListFilters.copyId || '' %>">
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label" for="loanStartDateFilter">From</label>
+          <input class="form-control size-md" id="loanStartDateFilter" type="date" name="startDate" value="<%= loanListFilters.startDate || '' %>">
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label" for="loanEndDateFilter">To</label>
+          <input class="form-control size-md" id="loanEndDateFilter" type="date" name="endDate" value="<%= loanListFilters.endDate || '' %>">
+        </div>
+        <div class="col-12 d-flex justify-content-lg-end gap-2 pt-2">
+          <a href="<%= loanFilterAction %>" class="btn btn-outline-secondary btn-md" id="loanFilterResetLink">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <%- include('partials/tablePages-search', {
-  placeholder: 'Search active loans...',
-  fields: [
-    { name: 'status', label: 'Status', type: 'select', options: ['active', 'overdue'] },
-    { name: 'copyType', label: 'Type', type: 'select', options: ['physical', 'digital'] }
-  ]
+  placeholder: 'Search loan transactions...',
+  fields: []
 }) %>
 
 <div class="table-scroll-wrapper">
   <table class="table-responsive size-md" id="first-table">
     <thead>
       <tr>
-        <th class="ps-4">Loan</th>
-        <th>Book</th>
-        <th>Copy</th>
-        <th>Patron</th>
-        <th>Due</th>
-        <th>Status</th>
-        <th class="text-end pe-4">Type</th>
+        <th class="ps-4 draggable" data-column="id">Loan</th>
+        <th class="draggable" data-column="bookTitle">Book</th>
+        <th class="draggable" data-column="copyCode">Copy</th>
+        <th class="draggable" data-column="patronPersonId">Patron</th>
+        <th class="draggable" data-column="checkoutAt">Checkout</th>
+        <th class="draggable" data-column="dueAt">Due</th>
+        <th class="draggable" data-column="returnedAt">Returned</th>
+        <th class="draggable" data-column="status">Status</th>
+        <th class="text-end pe-4 draggable" data-column="copyType">Type</th>
       </tr>
     </thead>
     <tbody>
       <% if (!data || data.length === 0) { %>
-        <tr><td colspan="7" class="text-center py-5 text-muted">No active loans.</td></tr>
+        <tr><td colspan="9" class="text-center py-5 text-muted">No loan transactions found.</td></tr>
       <% } %>
       <% (data || []).forEach((item) => { %>
-        <tr>
+        <tr class="loan-detail-row" data-loan-id="<%= item.id %>" role="button" tabindex="0" aria-label="View loan <%= item.id %> details">
           <td class="ps-4 font-monospace"><%= item.id %></td>
-          <td><%= item.bookTitle || item.bookId %></td>
-          <td class="font-monospace"><%= item.copyCode || item.copyId %></td>
-          <td class="font-monospace"><%= item.patronPersonId || item.personId %></td>
-          <td><%= item.dueAt ? new Date(item.dueAt).toLocaleString() : '—' %></td>
-          <td><span class="badge <%= item.status === 'overdue' ? 'bg-danger' : 'bg-warning text-dark' %>"><%= item.status %></span></td>
-          <td class="text-end pe-4"><%= item.copyType %></td>
+          <td>
+            <div class="fw-semibold text-dark"><%= item.bookTitle || item.bookId %></div>
+            <div class="x-small text-muted font-monospace"><%= item.bookId || '' %></div>
+          </td>
+          <td>
+            <div class="font-monospace"><%= item.copyCode || item.copyId %></div>
+            <div class="x-small text-muted font-monospace"><%= item.copyId || '' %></div>
+          </td>
+          <td>
+            <div class="font-monospace"><%= item.patronPersonId || item.personId %></div>
+            <div class="x-small text-muted font-monospace"><%= item.patronId || '' %></div>
+          </td>
+          <td><%= dateTimeText(item.checkoutAt) %></td>
+          <td><%= dateTimeText(item.dueAt) %></td>
+          <td><%= dateTimeText(item.returnedAt) %></td>
+          <td><span class="badge <%= statusBadgeClass(item.status) %>"><%= statusLabel(item.status) %></span></td>
+          <td class="text-end pe-4"><%= statusLabel(item.copyType) %></td>
         </tr>
       <% }) %>
     </tbody>
   </table>
 </div>
 
+<%- include('partials/pagination', {
+  pagination,
+  filters,
+  baseUrlPath: newUrl
+}) %>
+
+<div class="modal fade" id="loanDetailModal" tabindex="-1" aria-labelledby="loanDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-header border-bottom-0 pb-0 bg-white">
+        <h5 class="modal-title fw-bold text-primary" id="loanDetailModalLabel"><i class="bi bi-journal-check me-2"></i>Loan Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-2" id="loanDetailModalBody"></div>
+      <div class="modal-footer bg-light border-top-0 py-3">
+        <button type="button" class="btn btn-secondary btn-filled btn-sm rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/tablePages-end') %>
+</div>
+
+<script>
+(function () {
+  function initLoanTransactionDetails() {
+  const loanRows = <%- loanDetailRowsJson %>;
+  const loansById = new Map((Array.isArray(loanRows) ? loanRows : []).map((loan) => [String(loan.id || ''), loan]));
+  const loanFilterCollapse = document.getElementById('loanFilterCollapse');
+  const loanFilterToggleIcon = document.getElementById('loanFilterToggleIcon');
+  const loanDetailModalEl = document.getElementById('loanDetailModal');
+  const loanDetailModalBody = document.getElementById('loanDetailModalBody');
+  const loanDetailModalTitle = document.getElementById('loanDetailModalLabel');
+  let loanDetailModal = null;
+
+  function getLoanDetailModal() {
+    if (!loanDetailModalEl || !window.bootstrap?.Modal) return null;
+    if (loanDetailModalEl.parentElement !== document.body) {
+      document.body.appendChild(loanDetailModalEl);
+    }
+    loanDetailModal = loanDetailModal || window.bootstrap.Modal.getOrCreateInstance(loanDetailModalEl);
+    return loanDetailModal;
+  }
+
+  function raiseLoanModalAboveStack() {
+    if (!loanDetailModalEl) return;
+    let maxZ = 1050;
+    document.querySelectorAll('.modal.show').forEach((openModal) => {
+      if (openModal === loanDetailModalEl) return;
+      const z = parseInt(window.getComputedStyle(openModal).zIndex, 10);
+      if (!Number.isNaN(z) && z > maxZ) maxZ = z;
+    });
+    const modalZ = Math.max(maxZ + 10, 12000);
+    loanDetailModalEl.style.setProperty('z-index', String(modalZ), 'important');
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    const backdrop = backdrops[backdrops.length - 1];
+    if (backdrop) backdrop.style.zIndex = String(modalZ - 5);
+  }
+
+  function escapeHtml(value) {
+    return String(value === undefined || value === null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function labelize(value) {
+    return String(value || '')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (ch) => ch.toUpperCase());
+  }
+
+  function formatDateTime(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value || '').slice(0, 19);
+    return date.toLocaleString();
+  }
+
+  function display(value, fallback) {
+    const text = String(value === undefined || value === null ? '' : value).trim();
+    return escapeHtml(text || fallback || '-');
+  }
+
+  function detailItem(label, value) {
+    return `
+      <div class="col-md-6">
+        <div class="text-muted small">${escapeHtml(label)}</div>
+        <div class="fw-semibold text-dark">${display(value)}</div>
+      </div>
+    `;
+  }
+
+  function renderCover(loan) {
+    const url = String(loan?.coverPhotoUrl || loan?.coverPhoto?.url || '').trim();
+    if (url) {
+      return `<img src="${escapeHtml(url)}" alt="" class="loan-cover-frame rounded border bg-white object-fit-cover">`;
+    }
+    return `
+      <div class="loan-cover-frame rounded border bg-light text-muted d-flex align-items-center justify-content-center">
+        <i class="bi bi-book fs-1"></i>
+      </div>
+    `;
+  }
+
+  function statusBadgeClass(statusValue) {
+    const status = String(statusValue || '').trim().toLowerCase();
+    if (status === 'returned') return 'bg-success';
+    if (status === 'overdue') return 'bg-danger';
+    if (status === 'lost' || status === 'cancelled') return 'bg-secondary';
+    return 'bg-warning text-dark';
+  }
+
+  function renderLoanDetail(loan) {
+    const authors = Array.isArray(loan.bookAuthors) ? loan.bookAuthors.join(', ') : '';
+    const editionYear = [loan.bookEdition, loan.bookPublicationYear].filter(Boolean).join(' / ');
+    const returnedAt = String(loan.returnedAt || '').trim();
+    return `
+      <div class="d-flex align-items-start gap-3 mb-4 flex-wrap flex-sm-nowrap">
+        ${renderCover(loan)}
+        <div class="min-w-0 flex-grow-1">
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <span class="badge ${statusBadgeClass(loan.status)}">${escapeHtml(labelize(loan.status))}</span>
+            <span class="badge bg-light text-dark border">${escapeHtml(labelize(loan.copyType))}</span>
+            <span class="badge bg-light text-dark border font-monospace">${display(loan.id)}</span>
+          </div>
+          <h5 class="mb-1">${display(loan.bookTitle || loan.bookId)}</h5>
+          ${loan.bookSubtitle ? `<div class="text-muted mb-2">${display(loan.bookSubtitle)}</div>` : ''}
+          <div class="small text-muted">${display(authors)}</div>
+          <div class="small font-monospace text-muted">${display(loan.bookIsbn)}</div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        ${detailItem('Publisher', loan.bookPublisher)}
+        ${detailItem('Edition / Year', editionYear)}
+        ${detailItem('Language', loan.bookLanguage)}
+        ${detailItem('Subject', loan.bookSubjectArea)}
+        ${detailItem('Pages', loan.bookTotalPages)}
+        ${detailItem('Book ID', loan.bookId)}
+      </div>
+
+      ${loan.bookDescription ? `
+        <div class="border rounded-2 p-3 bg-light mb-4">
+          <div class="text-muted small mb-1">Description</div>
+          <div class="small">${display(loan.bookDescription)}</div>
+        </div>
+      ` : ''}
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <div class="border rounded-2 p-3 h-100">
+            <div class="fw-bold text-primary mb-3"><i class="bi bi-box-arrow-up-right me-1"></i>Loan</div>
+            <div class="row g-3">
+              ${detailItem('Checked out', formatDateTime(loan.checkoutAt))}
+              ${detailItem('Due', formatDateTime(loan.dueAt))}
+              ${detailItem('Checked out by', loan.checkedOutByUserId)}
+              ${detailItem('Renewals', Number(loan.renewalCount || 0))}
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="border rounded-2 p-3 h-100">
+            <div class="fw-bold text-success mb-3"><i class="bi bi-box-arrow-in-left me-1"></i>Return</div>
+            ${returnedAt ? `
+              <div class="row g-3">
+                ${detailItem('Returned', formatDateTime(loan.returnedAt))}
+                ${detailItem('Returned by', loan.returnedByUserId)}
+              </div>
+            ` : '<div class="text-muted small">No return recorded yet.</div>'}
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        ${detailItem('Copy code', loan.copyCode || loan.copyId)}
+        ${detailItem('Copy ID', loan.copyId)}
+        ${detailItem('Copy status', labelize(loan.copyStatus))}
+        ${detailItem('Copy location', loan.copyLocation)}
+        ${detailItem('Patron ID', loan.patronId)}
+        ${detailItem('Person ID', loan.patronPersonId || loan.personId)}
+      </div>
+
+      ${loan.notes ? `
+        <div class="border rounded-2 p-3 mt-4">
+          <div class="text-muted small mb-1">Notes</div>
+          <div class="small">${display(loan.notes)}</div>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  function openLoanDetail(loanId) {
+    const loan = loansById.get(String(loanId || ''));
+    if (!loan || !loanDetailModalBody) return;
+    if (loanDetailModalTitle) loanDetailModalTitle.innerHTML = '<i class="bi bi-journal-check me-2"></i>Loan ' + escapeHtml(loan.id || '');
+    loanDetailModalBody.innerHTML = renderLoanDetail(loan);
+    const modal = getLoanDetailModal();
+    if (modal) {
+      modal.show();
+      window.setTimeout(raiseLoanModalAboveStack, 0);
+      return;
+    }
+    if (loanDetailModalEl) {
+      loanDetailModalEl.style.display = 'block';
+      loanDetailModalEl.removeAttribute('aria-hidden');
+      loanDetailModalEl.setAttribute('aria-modal', 'true');
+      loanDetailModalEl.style.setProperty('z-index', '12000', 'important');
+      loanDetailModalEl.classList.add('show');
+    }
+  }
+
+  loanDetailModalEl?.addEventListener('shown.bs.modal', raiseLoanModalAboveStack);
+
+  document.querySelectorAll('.library-loans-page .loan-detail-row').forEach((row) => {
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('a, button, input, select, textarea, label')) return;
+      openLoanDetail(row.getAttribute('data-loan-id'));
+    });
+    row.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      openLoanDetail(row.getAttribute('data-loan-id'));
+    });
+  });
+
+  loanFilterCollapse?.addEventListener('show.bs.collapse', () => {
+    loanFilterToggleIcon?.classList.remove('bi-chevron-down');
+    loanFilterToggleIcon?.classList.add('bi-chevron-up');
+  });
+  loanFilterCollapse?.addEventListener('hide.bs.collapse', () => {
+    loanFilterToggleIcon?.classList.remove('bi-chevron-up');
+    loanFilterToggleIcon?.classList.add('bi-chevron-down');
+  });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initLoanTransactionDetails);
+  } else {
+    initLoanTransactionDetails();
+  }
+})();
+</script>

@@ -101,6 +101,7 @@ window.GenericPicker = (function() {
     let currentConfig = {};
     let debounceTimer;
     const SHOW_ALL_KEYWORDS = new Set(['aaa', '---']);
+    const DEFAULT_SEARCH_DEBOUNCE_MS = 400;
     const pickerState = {
       term: '',
       forceShowAll: false,
@@ -198,15 +199,52 @@ window.GenericPicker = (function() {
 
     /* --- LOGIC --- */
 
+    function clearSearchDebounce() {
+        if (!debounceTimer) return;
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+    }
+
+    function normalizeSearchDebounceMs(rawValue, fallback = DEFAULT_SEARCH_DEBOUNCE_MS) {
+        const parsed = Number.parseInt(String(rawValue ?? '').trim(), 10);
+        const safe = Number.isFinite(parsed) ? parsed : fallback;
+        return Math.max(0, Math.min(2000, safe));
+    }
+
+    function getSearchDebounceMs() {
+        if (currentConfig && Object.prototype.hasOwnProperty.call(currentConfig, 'searchDebounceMs')) {
+            return normalizeSearchDebounceMs(currentConfig.searchDebounceMs);
+        }
+        const appUiSettings = window.__APP_UI_SETTINGS__ && typeof window.__APP_UI_SETTINGS__ === 'object'
+          ? window.__APP_UI_SETTINGS__
+          : {};
+        return normalizeSearchDebounceMs(appUiSettings.genericPickerSearchDebounceMs);
+    }
+
+    function scheduleSearch(term) {
+        clearSearchDebounce();
+        const delay = getSearchDebounceMs();
+        if (delay <= 0) {
+            fetchData(term);
+            return;
+        }
+        debounceTimer = setTimeout(() => {
+            debounceTimer = null;
+            fetchData(term);
+        }, delay);
+    }
+
     function init() {
         if (!inputEl) return;
         inputEl.addEventListener('input', (e) => {
             const term = e.target.value.trim();
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => { fetchData(term); }, 300);
+            scheduleSearch(term);
         });
         modalEl.addEventListener('shown.bs.modal', () => {
             inputEl.focus();
+        });
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            clearSearchDebounce();
         });
         if (loadMoreBtn) {
             loadMoreBtn.addEventListener('click', () => {
@@ -715,6 +753,7 @@ window.GenericPicker = (function() {
 
     return {
         open: function(config) {
+            clearSearchDebounce();
             currentConfig = window.GenericPickerPresets?.normalizeConfig
               ? window.GenericPickerPresets.normalizeConfig(config || {})
               : (config || {});

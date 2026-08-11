@@ -37,6 +37,9 @@
       } catch (_) {}
     })();
   </script>
+  <script>
+    window.__APP_UI_SETTINGS__ = <%- JSON.stringify((typeof appUiSettings !== 'undefined' && appUiSettings) ? appUiSettings : { genericPickerSearchDebounceMs: 400 }) %>;
+  </script>
 
   <link rel="icon" type="image/svg+xml" href="<%= layoutIconSvgUrl %>">
   <link rel="icon" type="image/png" href="<%= layoutLogoUrl %>">

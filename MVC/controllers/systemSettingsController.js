@@ -263,6 +263,12 @@ function cleanFormText(value, max = 500) {
   return token.length > max ? token.slice(0, max) : token;
 }
 
+function parseClampedInteger(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  const safe = Number.isFinite(parsed) ? parsed : fallback;
+  return Math.max(min, Math.min(max, safe));
+}
+
 function parseFileFieldSelectionInput(value) {
   if (!value) return {};
   if (typeof value === 'object' && !Array.isArray(value)) return value;
@@ -594,6 +600,7 @@ exports.updateAppSettings = async (req, res) => {
       app: {
         defaultPageSize: parseInt(req.body.defaultPageSize, 10),
         searchDefaultKeyword: req.body.searchDefaultKeyword,
+        genericPickerSearchDebounceMs: parseClampedInteger(req.body.genericPickerSearchDebounceMs, 400, 0, 2000),
         requestCacheTtlSeconds: parseInt(req.body.requestCacheTtlSeconds, 10),
         requestCacheMaxEntries: parseInt(req.body.requestCacheMaxEntries, 10),
         buildVersionOverride: cleanFormText(req.body.buildVersionOverride, 120),
