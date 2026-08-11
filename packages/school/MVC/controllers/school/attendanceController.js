@@ -343,6 +343,7 @@ async function showAttendancePage(req, res) {
         res.render('school/attendance/attendanceViewer', {
             title: 'Attendance Matrix',
             includeModal: true,
+            includePrintManager: true,
             user: req.user,
             actionStateId: req.actionStateId,
             tableName: 'Attendance_Matrix',

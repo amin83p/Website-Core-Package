@@ -115,7 +115,8 @@
           <div class="vr mx-2 text-muted"></div>
           <button class="tool-btn" id="btnFocusMode" title="Focus Mode (Hide Sidebars)"><i class="bi bi-arrows-fullscreen"></i></button>
           <button class="tool-btn" id="btnReaderMode" title="Reader View"><i class="bi bi-book"></i></button>
-          <button class="tool-btn" title="Print" onclick="window.print()"><i class="bi bi-printer"></i></button>
+          <!-- Intentionally browser-native: reader/article pages print the current article view. -->
+          <button class="tool-btn" title="Print" data-print-native="article" onclick="window.print()"><i class="bi bi-printer"></i></button>
         </div>
 
         <div class="article-body" id="articleBodyContent">

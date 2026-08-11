@@ -783,6 +783,36 @@ document.addEventListener('DOMContentLoaded', () => {
       weightParts.push(weights.finalExam != null ? `Final exam ${weights.finalExam}%` : null);
     }
     const weightsLabel = weightParts.filter(Boolean).join(' · ') || '—';
+    const fallbackSettings = {
+      includeOrg: true,
+      orgName,
+      includeHeaderNote: false,
+      headerNote: '',
+      orientation: 'landscape',
+      density: 'compact',
+      requestedByLabel: '',
+      logoUrl: ''
+    };
+    const settings = window.AppPrintManager?.normalizeSettings
+      ? window.AppPrintManager.normalizeSettings({ ...fallbackSettings, ...(meta.printSettings || {}) })
+      : fallbackSettings;
+    const displayOrgName = settings.includeOrg ? String(settings.orgName || orgName || '').trim() : '';
+    const logoUrl = String(settings.logoUrl || '').trim();
+    const logoHtml = logoUrl
+      ? `<img class="print-logo" src="${gmPrintEscapeHtml(logoUrl)}" alt="Organization logo" onerror="this.style.display='none'">`
+      : '';
+    const pageCss = window.PrintDocumentBuilder?.buildPageCss
+      ? window.PrintDocumentBuilder.buildPageCss(settings.orientation)
+      : `@page { margin: 10mm; size: ${settings.orientation === 'portrait' ? 'portrait' : 'landscape'}; }`;
+    const previewControlsHtml = window.AppPrintManager?.buildPreviewControlsHtml
+      ? window.AppPrintManager.buildPreviewControlsHtml(settings)
+      : '<div class="screen-actions no-print"><button type="button" onclick="window.print()">Print</button><button type="button" onclick="window.close()">Close</button></div>';
+    const printNoteHtml = window.AppPrintManager?.buildPrintNoteHtml
+      ? window.AppPrintManager.buildPrintNoteHtml(settings)
+      : '';
+    const orientationScript = window.PrintDocumentBuilder?.buildPreviewOrientationScript
+      ? window.PrintDocumentBuilder.buildPreviewOrientationScript({ orientation: settings.orientation, sourcePath: location.pathname, mode: 'grades-matrix' })
+      : '';
 
     const groups = [];
     let gi = 0;
@@ -839,8 +869,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <head>
   <meta charset="utf-8">
   <title>${gmPrintEscapeHtml(`Grades Matrix — ${className}`)}</title>
+  <style id="print-page-orientation-css">${pageCss}</style>
   <style>
-    @page { size: letter landscape; margin: 10mm; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -849,7 +879,11 @@ document.addEventListener('DOMContentLoaded', () => {
       color: #111;
       line-height: 1.25;
     }
+    body.print-density-normal { font-size: 11px; line-height: 1.35; }
     .sheet { padding: 0; }
+    .identity-block { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 8px; }
+    .identity-copy { min-width: 0; flex: 1 1 auto; }
+    .print-logo { display: block; flex: 0 0 auto; width: auto; height: 58px; max-width: 180px; object-fit: contain; object-position: right top; }
     .doc-header { margin-bottom: 8px; }
     .doc-header h1 {
       margin: 0 0 2px 0;
@@ -860,6 +894,14 @@ document.addEventListener('DOMContentLoaded', () => {
       font-size: 13px;
       font-weight: 700;
       margin: 0 0 4px 0;
+    }
+    .print-note {
+      margin: 0 0 8px;
+      border: 1px solid #cfd7e3;
+      background: #f4f7fb;
+      padding: 6px 8px;
+      color: #333;
+      white-space: pre-wrap;
     }
     .meta-row {
       display: flex;
@@ -955,32 +997,44 @@ document.addEventListener('DOMContentLoaded', () => {
       .screen-actions {
         margin-bottom: 10px;
         display: flex;
+        align-items: center;
+        flex-wrap: wrap;
         gap: 8px;
       }
+      .screen-actions-label { color: #333; font-weight: 600; }
       .screen-actions button {
         font: inherit;
         padding: 6px 12px;
         cursor: pointer;
+        border: 1px solid #adb5bd;
+        background: #fff;
+        border-radius: 4px;
       }
+      .screen-actions button.is-active { background: #174ea6; border-color: #174ea6; color: #fff; }
+      .screen-actions-hint { margin: -4px 0 10px; color: #555; font-size: 11px; }
     }
   </style>
 </head>
-<body>
-  <div class="screen-actions no-print">
-    <button type="button" onclick="window.print()">Print</button>
-    <button type="button" onclick="window.close()">Close</button>
-  </div>
+<body class="print-density-${settings.density}" data-print-orientation="${settings.orientation}">
+  ${previewControlsHtml}
   <div class="sheet">
-    <header class="doc-header">
-      ${orgName ? `<div class="org-name">${gmPrintEscapeHtml(orgName)}</div>` : ''}
+    <div class="identity-block">
+      <div class="identity-copy">
+        <header class="doc-header">
+      ${displayOrgName ? `<div class="org-name">${gmPrintEscapeHtml(displayOrgName)}</div>` : ''}
       <h1>Grades Matrix</h1>
       <div class="meta-row">
         <span><strong>Class:</strong> ${gmPrintEscapeHtml(className)}</span>
         <span><strong>Range:</strong> ${gmPrintEscapeHtml(rangeLabel)}</span>
         <span><strong>Printed:</strong> ${gmPrintEscapeHtml(printedAtLabel)}</span>
+        ${settings.requestedByLabel ? `<span><strong>Requested by:</strong> ${gmPrintEscapeHtml(settings.requestedByLabel)}</span>` : ''}
       </div>
       <div class="eval-line"><strong>Passing:</strong> ${gmPrintEscapeHtml(passing)} · <strong>Weights:</strong> ${gmPrintEscapeHtml(weightsLabel)}</div>
-    </header>
+        </header>
+      </div>
+      ${logoHtml}
+    </div>
+    ${printNoteHtml}
 
     <div class="summary">
       <span class="stat"><b>${summary.studentCount}</b> students</span>
@@ -1020,6 +1074,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <span>${gmPrintEscapeHtml(className)} · ${gmPrintEscapeHtml(rangeLabel)}</span>
     </footer>
   </div>
+  ${orientationScript}
 </body>
 </html>`;
   }
@@ -1042,48 +1097,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const orgName = String(document.getElementById('activeOrgNameRef')?.getAttribute('data-name') || '').trim();
     const startDate = document.getElementById('gm_startDate')?.value || '';
     const endDate = document.getElementById('gm_endDate')?.value || '';
-    const html = buildGradesPrintDocument(window.currentGradesMatrixData, {
-      orgName,
-      startDate,
-      endDate,
-      className: window.currentGradesMatrixData.className,
-      printedAt: new Date()
-    });
-
-    // Do not pass noopener/noreferrer in features: browsers return null and we cannot write the print HTML.
-    const printWindow = window.open('', '_blank', 'height=720,width=1100');
-    if (!printWindow) {
-      if (typeof showMessageModal === 'function') {
-        showMessageModal({
-          title: 'Popup blocked',
-          icon: 'warning',
-          message: 'Allow pop-ups for this site to open the print page.',
-          buttons: [{ text: 'Close', class: 'btn-secondary' }]
-        });
-      } else {
-        alert('Allow pop-ups for this site to open the print page.');
+    const defaults = { orgName, orientation: 'landscape', density: 'compact' };
+    const openPreview = (settings = defaults) => {
+      const html = buildGradesPrintDocument(window.currentGradesMatrixData, {
+        orgName,
+        startDate,
+        endDate,
+        className: window.currentGradesMatrixData.className,
+        printedAt: new Date(),
+        printSettings: settings
+      });
+      const printWindow = window.AppPrintManager?.openHtmlPreview
+        ? window.AppPrintManager.openHtmlPreview({
+          title: 'Grades Matrix',
+          html,
+          settings,
+          sourcePath: location.pathname,
+          view: 'grades-matrix'
+        })
+        : null;
+      if (!printWindow) {
+        if (typeof showMessageModal === 'function') {
+          showMessageModal({
+            title: 'Popup blocked',
+            icon: 'warning',
+            message: 'Allow pop-ups for this site to open the print page.',
+            buttons: [{ text: 'Close', class: 'btn-secondary' }]
+          });
+        } else {
+          alert('Allow pop-ups for this site to open the print page.');
+        }
       }
-      return;
+    };
+
+    if (window.AppPrintManager?.openSettings) {
+      window.AppPrintManager.openSettings({
+        mode: 'grades-matrix',
+        defaults,
+        onConfirm: openPreview
+      });
+    } else {
+      openPreview(defaults);
     }
-
-    try {
-      printWindow.opener = null;
-    } catch (_) { /* ignore */ }
-
-    try {
-      const byLabel = String(document.getElementById('activeOrgIdRef')?.getAttribute('data-id') || '').trim();
-      const qsParts = ['print=1', 'view=grades-matrix'];
-      if (byLabel) qsParts.push(`org=${encodeURIComponent(byLabel)}`);
-      printWindow.history.replaceState({}, '', `${location.pathname}?${qsParts.join('&')}`);
-    } catch (_) { /* ignore */ }
-
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      try { printWindow.print(); } catch (_) { /* ignore */ }
-    }, 250);
   }
 
   document.getElementById('btn_printGradesMatrix')?.addEventListener('click', () => openGradesPrint());

@@ -5,6 +5,14 @@
   const printBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
   const printLogoUrl = printBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
   const printLogoAlt = `${printBrand.appName || printBrand.ownerDisplayName || context.organizationName || 'Website'} Logo`;
+  const rawPrintSettings = (typeof printSettings !== 'undefined' && printSettings && typeof printSettings === 'object') ? printSettings : {};
+  const printOrientation = String(rawPrintSettings.orientation || '').trim().toLowerCase() === 'portrait' ? 'portrait' : 'landscape';
+  const printDensity = String(rawPrintSettings.density || '').trim().toLowerCase() === 'normal' ? 'normal' : 'compact';
+  const printIncludeOrg = rawPrintSettings.includeOrg !== false;
+  const printOrgName = printIncludeOrg ? String(rawPrintSettings.orgName || context.organizationName || '').trim() : '';
+  const printIncludeHeaderNote = rawPrintSettings.includeHeaderNote === true;
+  const printHeaderNote = printIncludeHeaderNote ? String(rawPrintSettings.headerNote || '').trim() : '';
+  const printRequestedByLabel = String(rawPrintSettings.requestedByLabel || context.printedByName || '').trim();
 %>
 <!doctype html>
 <html lang="en">
@@ -12,6 +20,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title || 'Timesheet Print' %></title>
+  <style id="print-page-orientation-css">@page { margin: 10mm; size: <%= printOrientation %>; }</style>
   <style>
     :root {
       color-scheme: light;
@@ -33,16 +42,25 @@
       font-size: 11px;
       line-height: 1.35;
     }
+    body.print-density-normal { font-size: 11px; line-height: 1.35; }
     .screen-actions {
       display: flex;
+      align-items: center;
+      flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 10px;
     }
+    .screen-actions-label { color: var(--muted); font-weight: 700; }
     .screen-actions button {
       padding: 6px 12px;
       cursor: pointer;
       font: inherit;
+      border: 1px solid #adb5bd;
+      background: #fff;
+      border-radius: 4px;
     }
+    .screen-actions button.is-active { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .screen-actions-hint { margin: -4px 0 10px; color: var(--muted); font-size: 11px; }
     .print-sheet {
       break-after: page;
       page-break-after: always;
@@ -51,6 +69,7 @@
     .identity-block { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
     .identity-copy { min-width: 0; flex: 1 1 auto; }
     .print-logo { display: block; flex: 0 0 auto; width: auto; height: 58px; max-width: 180px; object-fit: contain; object-position: right top; }
+    .print-note { margin: 0 0 8px; border: 1px solid var(--line); background: var(--soft); padding: 6px 8px; color: var(--muted); white-space: pre-wrap; }
     .organization-name { margin: 0 0 2px; color: var(--ink); font-size: 19px; font-weight: 800; line-height: 1.1; }
     .document-name { color: var(--blue); font-size: 15px; font-weight: 800; }
     .person-name { color: var(--blue); font-size: 16px; font-weight: 700; }
@@ -105,9 +124,6 @@
     .department-table td:not(:first-child) { text-align: right; }
     .optional-row td { background: #eef9ff !important; color: var(--optional); }
     .optional-row td:first-child { padding-left: 18px; font-weight: 700; }
-    /* Leave paper size and orientation unset so the browser's Layout control
-       can switch freely between Portrait and Landscape. */
-    @page { margin: 10mm; }
     @media print {
       html, body { width: auto; min-width: 0; max-width: none; }
       body { margin: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
@@ -131,6 +147,12 @@
       .hours-value, .total-hours { font-size: 9px; }
       .department-section { margin-top: 5px; }
       .department-heading { margin-bottom: 2px; font-size: 10px; }
+      body.print-density-normal { font-size: 10px; line-height: 1.28; }
+      body.print-density-normal .print-logo { height: 52px; max-width: 165px; }
+      body.print-density-normal .organization-name { font-size: 17px; }
+      body.print-density-normal .document-name { font-size: 13px; }
+      body.print-density-normal .person-name { font-size: 14px; }
+      body.print-density-normal th, body.print-density-normal td { padding: 4px 5px; }
     }
     @media screen {
       body { background: #e9ecef; padding: 16px; }
@@ -147,20 +169,25 @@
     }
   </style>
 </head>
-<body>
+<body class="print-density-<%= printDensity %>" data-print-orientation="<%= printOrientation %>">
   <div class="screen-actions no-print">
+    <span class="screen-actions-label">Orientation:</span>
+    <button type="button" data-print-orientation="landscape" class="<%= printOrientation === 'landscape' ? 'is-active' : '' %>" aria-pressed="<%= printOrientation === 'landscape' ? 'true' : 'false' %>">Landscape</button>
+    <button type="button" data-print-orientation="portrait" class="<%= printOrientation === 'portrait' ? 'is-active' : '' %>" aria-pressed="<%= printOrientation === 'portrait' ? 'true' : 'false' %>">Portrait</button>
     <button type="button" onclick="window.print()">Print</button>
     <button type="button" onclick="window.close()">Close</button>
   </div>
+  <p class="screen-actions-hint no-print">Change orientation here, then click Print. Browser Scale (%) still applies in the print dialog.</p>
 
   <% documents.forEach((document) => { %>
     <section class="print-sheet">
       <div class="identity-block">
         <div class="identity-copy">
-          <% if (context.organizationName) { %><h1 class="organization-name"><%= context.organizationName %></h1><% } %>
+          <% if (printOrgName) { %><h1 class="organization-name"><%= printOrgName %></h1><% } %>
           <div class="document-name">Timesheet</div>
           <div class="person-name"><%= document.person.name %></div>
           <div class="period-name"><%= period.name %></div>
+          <% if (printRequestedByLabel) { %><div class="period-name">Requested by: <%= printRequestedByLabel %></div><% } %>
           <% if (document.reconciliationEntryCount > 0) { %>
             <div class="reconciliation-summary">
               Deadline-window reconciliation: <strong><%= document.provisionalEntryCount %></strong> provisional session(s),
@@ -177,6 +204,7 @@
         </div>
         <img class="print-logo" src="<%= printLogoUrl %>" alt="<%= printLogoAlt %>" onerror="this.style.display='none'">
       </div>
+      <% if (printHeaderNote) { %><div class="print-note"><%= printHeaderNote %></div><% } %>
 
       <table class="timesheet-table">
         <thead>
@@ -295,5 +323,37 @@
     </section>
   <% }); %>
 
+  <script>
+  (function() {
+    function normalizeOrientation(value) {
+      return String(value || 'landscape').trim().toLowerCase() === 'portrait' ? 'portrait' : 'landscape';
+    }
+
+    function buildPageCss(orientation) {
+      return '@page { margin: 10mm; size: ' + normalizeOrientation(orientation) + '; }';
+    }
+
+    function applyPrintOrientation(orientation) {
+      var mode = normalizeOrientation(orientation);
+      var styleEl = document.getElementById('print-page-orientation-css');
+      if (styleEl) styleEl.textContent = buildPageCss(mode);
+      document.body.dataset.printOrientation = mode;
+      document.querySelectorAll('[data-print-orientation]').forEach(function(btn) {
+        var active = btn.getAttribute('data-print-orientation') === mode;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    }
+
+    document.querySelectorAll('[data-print-orientation]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        applyPrintOrientation(btn.getAttribute('data-print-orientation'));
+      });
+    });
+
+    applyPrintOrientation('<%= printOrientation %>');
+    window.applyPrintOrientation = applyPrintOrientation;
+  })();
+  </script>
 </body>
 </html>

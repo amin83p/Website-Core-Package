@@ -3691,7 +3691,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function openTimesheetPrintPreview() {
+    async function openTimesheetPrintPreview(printSettings = null) {
         const printButton = document.getElementById('btnPrintTimesheet');
         if (!printButton) return;
 
@@ -3708,6 +3708,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 title: 'Save Before Printing',
                 icon: 'warning',
                 message: 'This timesheet has unsaved changes. Save the timesheet before opening the print preview.'
+            });
+            return;
+        }
+
+        if (!printSettings && window.AppPrintManager?.openSettings) {
+            window.AppPrintManager.openSettings({
+                mode: 'timesheet-editor',
+                defaults: {
+                    orgName: window.AppPrintManager?.resolveActiveOrgName ? window.AppPrintManager.resolveActiveOrgName() : '',
+                    orientation: 'landscape',
+                    density: 'compact'
+                },
+                onConfirm: (settings) => {
+                    void openTimesheetPrintPreview(settings);
+                }
             });
             return;
         }
@@ -3737,6 +3752,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (TIMESHEET_PRINT_MODE === 'management') {
                 params.set('periodId', PERIOD_ID);
                 params.set('personIds', TARGET_TEACHER_ID);
+            }
+            if (window.AppPrintManager?.appendSettingsToSearchParams) {
+                window.AppPrintManager.appendSettingsToSearchParams(params, printSettings || {});
             }
             const response = await fetch(TIMESHEET_PRINT_ACTION, {
                 method: 'POST',

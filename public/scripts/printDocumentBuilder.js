@@ -44,10 +44,12 @@
   function buildPreviewOrientationScript(options = {}) {
     const initialOrientation = normalizeOrientation(options.orientation);
     const sourcePath = String(options.sourcePath || '').trim();
+    const storageMode = String(options.mode || 'table').trim() || 'table';
     return `<script>
 (function() {
-  var STORAGE_PREFIX = 'tablePrintSettings_v1:';
+  var STORAGE_PREFIX = 'appPrintSettings_v1:';
   var sourcePath = ${JSON.stringify(sourcePath)};
+  var storageMode = ${JSON.stringify(storageMode)};
 
   function normalizeOrientation(value) {
     return String(value || 'landscape').trim().toLowerCase() === 'portrait' ? 'portrait' : 'landscape';
@@ -70,7 +72,7 @@
     });
     try {
       if (window.opener && sourcePath) {
-        var key = STORAGE_PREFIX + sourcePath;
+        var key = STORAGE_PREFIX + sourcePath + ':' + storageMode;
         var stored = JSON.parse(window.opener.localStorage.getItem(key) || '{}') || {};
         stored.orientation = mode;
         window.opener.localStorage.setItem(key, JSON.stringify(stored));
@@ -250,6 +252,7 @@
     const landscapeActive = orientation === 'landscape';
     const portraitActive = orientation === 'portrait';
     const sourcePath = String(options.sourcePath || '').trim();
+    const mode = String(options.mode || 'table').trim() || 'table';
 
     return `<!doctype html>
 <html lang="en">
@@ -291,7 +294,7 @@
     ${legendBlock}
     <div class="doc-footer">Generated from ${escapeHtml(sourcePath || '/')}</div>
   </div>
-  ${buildPreviewOrientationScript({ orientation, sourcePath })}
+  ${buildPreviewOrientationScript({ orientation, sourcePath, mode })}
 </body>
 </html>`;
   }

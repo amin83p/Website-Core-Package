@@ -709,6 +709,37 @@ function parsePrintPersonIds(value) {
     return [...new Set(flattened.map((item) => String(item || '').trim()).filter(Boolean))];
 }
 
+function cleanPrintSettingText(value, maxLength = 1000) {
+    const text = String(value ?? '').replace(/\0/g, '').trim();
+    return text.length > maxLength ? text.slice(0, maxLength) : text;
+}
+
+function parsePrintSettingBoolean(value, fallback = false) {
+    if (typeof value === 'boolean') return value;
+    const normalized = String(value ?? '').trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+    return fallback;
+}
+
+function parseTimesheetPrintSettings(body = {}) {
+    const orientation = String(body.printOrientation || '').trim().toLowerCase() === 'portrait'
+        ? 'portrait'
+        : 'landscape';
+    const density = String(body.printDensity || '').trim().toLowerCase() === 'normal'
+        ? 'normal'
+        : 'compact';
+    return {
+        orientation,
+        density,
+        includeOrg: parsePrintSettingBoolean(body.printIncludeOrg, true),
+        orgName: cleanPrintSettingText(body.printOrgName, 240),
+        includeHeaderNote: parsePrintSettingBoolean(body.printIncludeHeaderNote, false),
+        headerNote: cleanPrintSettingText(body.printHeaderNote, 3000),
+        requestedByLabel: cleanPrintSettingText(body.printRequestedByLabel, 240)
+    };
+}
+
 function setTimesheetPrintResponseHeaders(res) {
     res.set('Cache-Control', 'no-store, private, max-age=0');
     res.set('Pragma', 'no-cache');
@@ -1091,6 +1122,7 @@ exports.showTimesheetManagement = async (req, res) => {
             includeModal: true,
             includeModal_Table: true,
             print: false,
+            includePrintManager: true,
             canPrintManagedTimesheets,
             user: req.user,
             actionStateId: req.actionStateId
@@ -1364,7 +1396,7 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
     }
 };
 
-async function renderTimesheetPrintPreview(req, res, { period, people, activeOrgId }) {
+async function renderTimesheetPrintPreview(req, res, { period, people, activeOrgId, printSettings = {} }) {
     const printContext = await timesheetPrintService.buildTimesheetPrintContext({
         period,
         people,
@@ -1381,6 +1413,7 @@ async function renderTimesheetPrintPreview(req, res, { period, people, activeOrg
         layout: false,
         title: people.length > 1 ? `Timesheets: ${period.name}` : `Timesheet: ${period.name}`,
         printContext,
+        printSettings,
         user: req.user
     });
 }
@@ -1398,7 +1431,8 @@ exports.printOwnTimesheet = async (req, res) => {
         return renderTimesheetPrintPreview(req, res, {
             period,
             activeOrgId,
-            people: [{ id: self.teacherId, name: self.teacherName }]
+            people: [{ id: self.teacherId, name: self.teacherName }],
+            printSettings: parseTimesheetPrintSettings(req.body)
         });
     } catch (error) {
         return renderTimesheetPrintError(res, req, error, 400);
@@ -1448,7 +1482,12 @@ exports.printManagedTimesheets = async (req, res) => {
             throw new Error('One or more selected timesheets is not available in the active organization.');
         }
 
-        return renderTimesheetPrintPreview(req, res, { period, people, activeOrgId });
+        return renderTimesheetPrintPreview(req, res, {
+            period,
+            people,
+            activeOrgId,
+            printSettings: parseTimesheetPrintSettings(req.body)
+        });
     } catch (error) {
         return renderTimesheetPrintError(res, req, error, 400);
     }
@@ -1901,6 +1940,7 @@ exports.viewTimesheet = async (req, res) => {
             roleAccounts: payrollEditor.roleAccounts,
             payrollWarnings: payrollEditor.payrollWarnings,
             includeModal: true,
+            includePrintManager: true,
             actionStateId: req.actionStateId,
             showPriorAdjustmentReview: priorReviewPending,
             useFrozenSnapshot,

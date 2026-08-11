@@ -126,7 +126,7 @@ async function handlePrintTable(tableId, titleSelector, options = {}) {
 
     try {
         const byLabelShort = (() => {
-            const requestedByLabel = String(settings.requestingUserLabel || '').trim();
+            const requestedByLabel = String(settings.requestedByLabel || settings.requestingUserLabel || '').trim();
             const id = extractTrailingParensId(requestedByLabel);
             if (id) return id;
             if (requestedByLabel && requestedByLabel.length <= 60) return requestedByLabel;
@@ -151,18 +151,19 @@ async function handlePrintTable(tableId, titleSelector, options = {}) {
         title,
         printTitleHtml,
         orgName: String(settings.orgName || '').trim(),
-        logoUrl: resolveBrandLogoUrl(),
+        logoUrl: String(settings.logoUrl || '').trim() || (window.AppPrintManager?.resolveBrandLogoUrl ? window.AppPrintManager.resolveBrandLogoUrl() : resolveBrandLogoUrl()),
         includeOrg: settings.includeOrg !== false,
         includeHeaderNote: settings.includeHeaderNote === true,
         headerNote: String(settings.headerNote || '').trim(),
         summary,
         legendHtml: resolvePagePrintLegendHtml(),
-        requestedByLabel: String(settings.requestingUserLabel || '').trim(),
+        requestedByLabel: String(settings.requestedByLabel || settings.requestingUserLabel || '').trim(),
         tableHtml,
         orientation: settings.orientation,
         density: settings.density,
         css,
         sourcePath: location.pathname,
+        mode: 'table',
         printedAt: new Date()
     });
 
@@ -219,16 +220,6 @@ function isPrintAdminUser() {
     return Boolean(user?.isSystemAdmin || user?.isVirtualSuperAdmin || role === 'admin');
 }
 
-function loadPrintSettings() {
-    const key = `tablePrintSettings_v1:${location.pathname}`;
-    try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { return {}; }
-}
-
-function savePrintSettings(settings) {
-    const key = `tablePrintSettings_v1:${location.pathname}`;
-    try { localStorage.setItem(key, JSON.stringify(settings || {})); } catch {}
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     if (window.PrintDocumentBuilder?.ensurePrintTableCssLoaded) {
         void window.PrintDocumentBuilder.ensurePrintTableCssLoaded();
@@ -237,58 +228,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const printButton = document.getElementById('printTableBtn');
     if (!printButton) return;
 
-    const modalEl = document.getElementById('printSettingsModal');
-    const applyBtn = document.getElementById('printSettingsApplyBtn');
-
-    if (!modalEl || !applyBtn || !window.bootstrap?.Modal) {
+    if (!window.AppPrintManager?.openSettings) {
         printButton.addEventListener('click', () => {
             void handlePrintTable('first-table', '.page-heading');
         });
         return;
     }
 
-    const modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
-
-    function populateModal() {
-        const stored = loadPrintSettings();
-        const isAdmin = isPrintAdminUser();
-        const orgName = resolveActiveOrgName() || '';
-
-        document.getElementById('printSettingOrgName').value = isAdmin ? (stored.orgName || orgName) : orgName;
-        document.getElementById('printSettingIncludeOrg').checked = isAdmin ? (stored.includeOrg !== false) : true;
-        document.getElementById('printSettingHeaderNote').value = stored.headerNote || '';
-        document.getElementById('printSettingIncludeHeaderNote').checked = isAdmin ? (stored.includeHeaderNote === true) : true;
-        document.getElementById('printSettingOrientation').value = stored.orientation === 'portrait' ? 'portrait' : 'landscape';
-        document.getElementById('printSettingDensity').value = stored.density === 'normal' ? 'normal' : 'compact';
-    }
-
     printButton.addEventListener('click', () => {
-        populateModal();
-        modal.show();
-    });
-
-    applyBtn.addEventListener('click', () => {
-        const isAdmin = isPrintAdminUser();
-        const nextSettings = {
-            includeOrg: isAdmin ? Boolean(document.getElementById('printSettingIncludeOrg').checked) : true,
-            orgName: isAdmin ? String(document.getElementById('printSettingOrgName').value || '').trim() : (resolveActiveOrgName() || ''),
-            includeHeaderNote: isAdmin ? Boolean(document.getElementById('printSettingIncludeHeaderNote').checked) : true,
-            headerNote: String(document.getElementById('printSettingHeaderNote').value || ''),
-            orientation: String(document.getElementById('printSettingOrientation').value || 'landscape'),
-            density: String(document.getElementById('printSettingDensity').value || 'compact'),
-            requestingUserLabel: resolveRequestingUserLabel()
-        };
-
-        const persisted = isAdmin
-          ? nextSettings
-          : {
-            headerNote: nextSettings.headerNote,
-            includeHeaderNote: nextSettings.includeHeaderNote,
-            orientation: nextSettings.orientation,
-            density: nextSettings.density
-          };
-        savePrintSettings(persisted);
-        modal.hide();
-        void handlePrintTable('first-table', '.page-heading', nextSettings);
+        window.AppPrintManager.openSettings({
+            mode: 'table',
+            onConfirm: (settings) => {
+                void handlePrintTable('first-table', '.page-heading', settings);
+            }
+        });
     });
 });

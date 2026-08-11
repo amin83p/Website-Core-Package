@@ -239,20 +239,35 @@ test('standalone print view renders safe single and batch documents with print C
         deadlineLabel: '2026-07-30 23:59'
       },
       documents: [sampleDocument('Person One'), reconciliationDocument]
+    },
+    printSettings: {
+      orientation: 'portrait',
+      density: 'normal',
+      includeOrg: true,
+      orgName: 'Printed School Name',
+      includeHeaderNote: true,
+      headerNote: 'Payroll copy',
+      requestedByLabel: 'Print Clerk'
     }
   }, { filename: viewPath });
 
   assert.equal((html.match(/class="print-sheet"/g) || []).length, 2);
-  assert.match(html, /@page \{ margin: 10mm; \}/);
-  assert.doesNotMatch(html, /@page\s*\{[^}]*\bsize\s*:/);
+  assert.match(html, /@page \{ margin: 10mm; size: portrait; \}/);
+  assert.doesNotMatch(html, /size:\s*letter/i);
   assert.match(html, /html, body \{ width: auto; min-width: 0; max-width: none; \}/);
   assert.match(html, /break-after: page/);
   assert.match(html, /class="screen-actions no-print"/);
+  assert.match(html, /data-print-orientation="landscape"/);
+  assert.match(html, /data-print-orientation="portrait"/);
+  assert.match(html, /screen-actions-hint/);
+  assert.match(html, /applyPrintOrientation/);
   assert.match(html, />Print<\/button>/);
   assert.doesNotMatch(html, /Print Again/);
   assert.match(html, /window\.print\(\)/);
-  assert.match(html, /Example School/);
-  assert.match(html, /<h1 class="organization-name">Example School<\/h1>/);
+  assert.match(html, /Printed School Name/);
+  assert.match(html, /<h1 class="organization-name">Printed School Name<\/h1>/);
+  assert.match(html, /Payroll copy/);
+  assert.match(html, /Requested by: Print Clerk/);
   assert.match(html, /<div class="document-name">Timesheet<\/div>/);
   assert.match(html, /class="print-logo" src="\/uploads\/GLOBAL\/logo\/example-logo\.png" alt="Example Website Logo"/);
   assert.match(html, /\.print-logo \{[^}]*height: 58px;[^}]*max-width: 180px;/);
@@ -292,6 +307,8 @@ test('timesheet editor always exposes Print and blocks dirty drafts', () => {
   assert.match(editor, /hasUnsavedTimesheetPrintChanges\(\)/);
   assert.match(editor, /Save Before Printing/);
   assert.match(editor, /This timesheet has unsaved changes\. Save the timesheet before opening the print preview\./);
+  assert.match(editor, /AppPrintManager\.openSettings/);
+  assert.match(editor, /appendSettingsToSearchParams/);
   assert.match(editor, /window\.open\('', '_blank', 'height=720,width=1100'\)/);
   assert.match(editor, /fetch\(TIMESHEET_PRINT_ACTION/);
   assert.match(editor, /printWindow\.document\.write\(html\)/);
@@ -305,6 +322,7 @@ test('timesheet management page exposes selection print and disables generic tab
   const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
   assert.match(controller, /showTimesheetManagement[\s\S]*?canPrintManagedTimesheets/);
   assert.match(controller, /showTimesheetManagement[\s\S]*?print:\s*false/);
+  assert.match(controller, /showTimesheetManagement[\s\S]*?includePrintManager:\s*true/);
   assert.match(manage, /timesheetSelectAllVisible/);
   assert.match(manage, /timesheet-print-select/);
   assert.match(manage, /btnPrintSelectedTimesheets/);
@@ -312,6 +330,8 @@ test('timesheet management page exposes selection print and disables generic tab
   assert.match(manage, /optionalBtnsBeforePrint/);
   assert.match(manage, /TIMESHEET_MANAGE_PRINT_ACTION = '\/school\/timesheets\/manage\/print'/);
   assert.match(manage, /openSelectedTimesheetPrintPreview/);
+  assert.match(manage, /AppPrintManager\.openSettings/);
+  assert.match(manage, /appendSettingsToSearchParams/);
   assert.match(manage, /isPrintableRow/);
   assert.match(manage, /submitted.*processed|processed.*submitted/);
   assert.doesNotMatch(manage, /printTableBtn/);

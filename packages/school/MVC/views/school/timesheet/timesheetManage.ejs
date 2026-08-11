@@ -516,7 +516,7 @@
     }
   }
 
-  async function openSelectedTimesheetPrintPreview() {
+  async function openSelectedTimesheetPrintPreview(printSettings = null) {
     if (!CAN_PRINT_MANAGED_TIMESHEETS) {
       await showMessage({ title: 'Print Access Required', icon: 'warning', message: 'EXPORT access is required to print timesheets.' });
       return;
@@ -529,6 +529,21 @@
     const personIds = Array.from(selectedPersonIds).filter(Boolean);
     if (!personIds.length) {
       await showMessage({ title: 'Timesheet Management', icon: 'warning', message: 'Select at least one submitted or processed timesheet to print.' });
+      return;
+    }
+
+    if (!printSettings && window.AppPrintManager?.openSettings) {
+      window.AppPrintManager.openSettings({
+        mode: 'timesheet-management',
+        defaults: {
+          orgName: window.AppPrintManager?.resolveActiveOrgName ? window.AppPrintManager.resolveActiveOrgName() : '',
+          orientation: 'landscape',
+          density: 'compact'
+        },
+        onConfirm: (settings) => {
+          void openSelectedTimesheetPrintPreview(settings);
+        }
+      });
       return;
     }
 
@@ -548,6 +563,9 @@
       const params = new URLSearchParams();
       params.set('periodId', periodId);
       personIds.forEach((personId) => params.append('personIds', personId));
+      if (window.AppPrintManager?.appendSettingsToSearchParams) {
+        window.AppPrintManager.appendSettingsToSearchParams(params, printSettings || {});
+      }
       const response = await fetch(TIMESHEET_MANAGE_PRINT_ACTION, {
         method: 'POST',
         credentials: 'same-origin',

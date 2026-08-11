@@ -109,6 +109,9 @@
   <% if (typeof user !== 'undefined' && user && typeof chatAccess !== 'undefined' && chatAccess && (chatAccess.canRead || chatAccess.canReadAll)) { %>
     <%- include('../partials/chatModal') %>
   <% } %>
+  <% if ((typeof print !== 'undefined' && print) || (typeof includePrintManager !== 'undefined' && includePrintManager)) { %>
+    <%- include('../partials/printSettingsModal') %>
+  <% } %>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <% if (typeof orgTimeZone !== 'undefined' && orgTimeZone) { %>
@@ -129,8 +132,9 @@
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/modal-table.js') : '/scripts/modal-table.js' %>"></script>
   <% } %>
 
-  <% if (typeof print !== 'undefined' && print) { %>
+  <% if ((typeof print !== 'undefined' && print) || (typeof includePrintManager !== 'undefined' && includePrintManager)) { %>
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/printDocumentBuilder.js') : '/scripts/printDocumentBuilder.js' %>"></script>
+    <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/appPrintManager.js') : '/scripts/appPrintManager.js' %>"></script>
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/print.js') : '/scripts/print.js' %>"></script>
   <% } %>
   

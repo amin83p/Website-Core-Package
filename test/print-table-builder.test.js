@@ -242,23 +242,52 @@ test('buildFilterSummaryFromLocation summarizes active query params', () => {
   assert.match(summary, /Search: maria/);
 });
 
-test('layout and print.js load builder before print script', () => {
+test('layout and print.js load shared print manager between builder and print script', () => {
   const layout = read('MVC/views/layouts/layout.ejs');
   const printJs = read('public/scripts/print.js');
   assert.match(layout, /printDocumentBuilder\.js/);
+  assert.match(layout, /appPrintManager\.js/);
   assert.match(layout, /print\.js/);
   const builderIndex = layout.indexOf('printDocumentBuilder.js');
+  const managerIndex = layout.indexOf('appPrintManager.js');
   const printIndex = layout.indexOf('print.js');
-  assert.ok(builderIndex >= 0 && printIndex > builderIndex);
+  assert.ok(builderIndex >= 0 && managerIndex > builderIndex && printIndex > managerIndex);
+  assert.match(layout, /includePrintManager/);
   assert.match(printJs, /PrintDocumentBuilder/);
+  assert.match(printJs, /AppPrintManager\.openSettings/);
   assert.match(printJs, /buildPrintPlaceholderHtml/);
   assert.doesNotMatch(printJs, /printWindow\.close\(\)/);
 });
 
-test('tablePages-start includes print brand logo ref', () => {
+test('print settings modal is shared outside tablePages-start', () => {
   const partial = read('MVC/views/partials/tablePages-start.ejs');
+  const modal = read('MVC/views/partials/printSettingsModal.ejs');
   assert.match(partial, /id="printBrandLogoRef"/);
   assert.match(partial, /printLogoUrl/);
+  assert.doesNotMatch(partial, /id="printSettingsModal"/);
+  assert.match(modal, /id="printSettingsModal"/);
+  assert.match(modal, /id="printSettingOrientation"/);
+  assert.match(modal, /Scale \(%\)/);
+});
+
+test('app print manager exposes shared settings and preview APIs', () => {
+  const manager = require('../public/scripts/appPrintManager.js');
+  assert.equal(manager.getStorageKey('grades-matrix', '/school/grades/matrix'), 'appPrintSettings_v1:/school/grades/matrix:grades-matrix');
+  const normalized = manager.normalizeSettings({
+    orientation: 'portrait',
+    density: 'normal',
+    includeOrg: false,
+    includeHeaderNote: true,
+    headerNote: 'Note',
+    requestedByLabel: 'Printer',
+    logoUrl: '/logo.png'
+  });
+  assert.equal(normalized.orientation, 'portrait');
+  assert.equal(normalized.density, 'normal');
+  assert.equal(normalized.includeOrg, false);
+  assert.equal(normalized.headerNote, 'Note');
+  assert.match(manager.buildPreviewControlsHtml(normalized), /data-print-orientation="portrait"/);
+  assert.match(manager.buildPrintNoteHtml(normalized), /Note/);
 });
 
 test('print-table.css defines shared print tokens', () => {

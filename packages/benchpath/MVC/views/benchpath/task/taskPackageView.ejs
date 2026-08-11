@@ -17,7 +17,8 @@
       <a href="/benchpath/tasks/package/<%= pkg.taskId %>?refresh=1" class="btn btn-outline-primary btn-md">
         <i class="bi bi-arrow-repeat me-1"></i> Refresh Package
       </a>
-      <button type="button" class="btn btn-filled btn-primary btn-md" onclick="window.print()">
+      <!-- Intentionally browser-native: this package view prints the current long-form document. -->
+      <button type="button" class="btn btn-filled btn-primary btn-md" data-print-native="document-package" onclick="window.print()">
         <i class="bi bi-printer me-1"></i> Print
       </button>
     </div>

@@ -501,6 +501,7 @@ async function showGradesMatrixPage(req, res) {
     res.render('school/grades/gradesMatrix', {
       title: 'Grades Matrix',
       includeModal: true,
+      includePrintManager: true,
       user: req.user,
       actionStateId: req.actionStateId,
       tableName: 'Grades_Matrix',
