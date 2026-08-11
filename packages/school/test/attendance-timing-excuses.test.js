@@ -96,6 +96,7 @@ test('attendance views and controller wire timing excuse fields', () => {
   const sessionManager = read('MVC/views/school/class/sessionManager.ejs');
   const classForm = read('MVC/views/school/class/classForm.ejs');
   const controller = read('MVC/controllers/school/attendanceController.js');
+  const routes = read('MVC/routes/attendanceRoutes.js');
 
   assert.match(viewer, /inp_cellLateExcused/);
   assert.match(viewer, /wrap_cellEarlyLeaveExcused/);
@@ -106,6 +107,7 @@ test('attendance views and controller wire timing excuse fields', () => {
   assert.match(viewer, /grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(viewer, /modal-dialog modal-xl/);
   assert.doesNotMatch(viewer, /btn_saveAttendanceTop/);
+  assert.doesNotMatch(viewer, /btnSaveAttendanceTop/);
   assert.match(viewer, /btn_cellLateExcused/);
   assert.match(viewer, /btn_cellEarlyLeaveExcused/);
   assert.match(viewer, />Send Note</);
@@ -138,6 +140,7 @@ test('attendance views and controller wire timing excuse fields', () => {
   assert.match(classForm, /attStatus_early_leave_excused/);
   assert.match(controller, /lateExcused/);
   assert.match(controller, /earlyLeaveExcused/);
+  assert.match(routes, /\/api\/rollups'[\s\S]*?requireToken:\s*false/);
 });
 
 test('Excel export and report catalog expose timing excuse details', () => {
@@ -149,7 +152,7 @@ test('Excel export and report catalog expose timing excuse details', () => {
       earlyLeaveMinutes: 8,
       earlyLeaveExcused: true
     }),
-    'Late 12m (excused) / Early 8m (excused)'
+    'Late 12m (excused) / Left Early 8m (excused)'
   );
   assert.equal(
     attendanceExcelExportService.buildStatusNoteText({
@@ -159,7 +162,7 @@ test('Excel export and report catalog expose timing excuse details', () => {
       earlyLeaveMinutes: 8,
       earlyLeaveExcused: true
     }),
-    'Timing excuse: late arrival, early leave'
+    'Timing: Late 12m (excused) / Left Early 8m (excused)'
   );
   assert.equal(
     attendanceExcelExportService.formatExportCellDisplay({
@@ -168,7 +171,15 @@ test('Excel export and report catalog expose timing excuse details', () => {
       lateExcused: true,
       earlyLeaveMinutes: 8
     }),
-    "L 12'E/8'"
+    'L\nLate 12m (excused) / Left Early 8m (not excused)'
+  );
+  assert.equal(
+    attendanceExcelExportService.buildStatusNoteText({
+      status: 'late',
+      earlyLeaveMinutes: 60,
+      earlyLeaveExcused: false
+    }),
+    'Timing: Left Early 60m (not excused)'
   );
 
   const catalogKeys = Object.values(reportService.getPrefillCatalog()).flat().map((item) => item.key);

@@ -45,7 +45,7 @@ router.get('/api/data',
 
 router.post('/api/rollups',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.postAttendanceRollups);
 
 router.get('/api/export.xlsx',

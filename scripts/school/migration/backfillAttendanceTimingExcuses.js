@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 const { resolveDataBackendConfig } = require('../../../config/dataBackend');
 const { setActiveDataBackendConfig } = require('../../../MVC/infrastructure/runtime/dataBackendRuntime');
-const { connectMongo, disconnectMongo } = require('../../../MVC/infrastructure/mongo/mongoConnection');
+const { connectMongo, disconnectMongo, getMongoCollection } = require('../../../MVC/infrastructure/mongo/mongoConnection');
 const schoolDataService = require('../../../packages/school/MVC/services/school/schoolDataService');
 
 function parseArgs(argv = []) {
@@ -66,6 +66,11 @@ function backfillClassSessions(sessions = []) {
   };
 }
 
+function backfillClassDocument(classRow = {}) {
+  const sessions = Array.isArray(classRow?.sessions) ? classRow.sessions : [];
+  return backfillClassSessions(sessions);
+}
+
 async function listClasses({ orgId }) {
   const query = {
     page: 1,
@@ -104,6 +109,42 @@ async function runBackfill({ apply = false, orgId = '' } = {}) {
   return summary;
 }
 
+async function runMongoBackfill({ apply = false, orgId = '' } = {}) {
+  const collection = getMongoCollection('schoolClasses');
+  const query = orgId ? { orgId } : {};
+  const cursor = collection.find(query);
+  const summary = {
+    scannedClasses: 0,
+    changedClasses: 0,
+    scannedRosterRows: 0,
+    changedRosterRows: 0
+  };
+
+  while (await cursor.hasNext()) {
+    const classRow = await cursor.next();
+    summary.scannedClasses += 1;
+    const result = backfillClassDocument(classRow);
+    summary.scannedRosterRows += result.scannedRosterRows;
+    summary.changedRosterRows += result.changedRosterRows;
+    if (!result.changedRosterRows) continue;
+    summary.changedClasses += 1;
+    if (apply) {
+      // eslint-disable-next-line no-await-in-loop
+      await collection.updateOne(
+        { _id: classRow._id },
+        {
+          $set: {
+            sessions: result.sessions,
+            updatedAt: new Date().toISOString()
+          }
+        }
+      );
+    }
+  }
+
+  return summary;
+}
+
 async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   const backendConfig = resolveDataBackendConfig(process.env, { preferredMode: args.backend || undefined });
@@ -115,7 +156,9 @@ async function main(argv = process.argv.slice(2)) {
     await connectMongo({ uri });
   }
 
-  const summary = await runBackfill(args);
+  const summary = resolved.mode === 'mongo'
+    ? await runMongoBackfill(args)
+    : await runBackfill(args);
   const report = {
     mode: args.apply ? 'apply' : 'dry_run',
     orgId: args.orgId || null,
@@ -145,6 +188,8 @@ module.exports = {
   parseArgs,
   backfillRosterRow,
   backfillClassSessions,
+  backfillClassDocument,
   runBackfill,
+  runMongoBackfill,
   main
 };

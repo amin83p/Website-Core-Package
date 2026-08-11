@@ -168,18 +168,17 @@ function statusToExportCode(status) {
   return STATUS_EXPORT_META[normalized]?.code || '';
 }
 
+function hasAttendanceTiming(record = {}) {
+  return (Number(record.lateMinutes) || 0) > 0
+    || (Number(record.earlyLeaveMinutes) || 0) > 0;
+}
+
 /** Mirrors attendance print matrix cell text (status letter + late/early minutes). */
 function formatExportCellDisplay(record = {}) {
   const code = statusToExportCode(record.status);
   if (!code) return '';
-  const late = Number(record.lateMinutes) || 0;
-  const early = Number(record.earlyLeaveMinutes) || 0;
-  const lateSuffix = late > 0 && normalizeAttendanceTimingExcuseFlag(record.lateExcused) ? 'E' : '';
-  const earlySuffix = early > 0 && normalizeAttendanceTimingExcuseFlag(record.earlyLeaveExcused) ? 'E' : '';
-  if (late <= 0 && early <= 0) return code;
-  if (late > 0 && early > 0) return `${code} ${late}'${lateSuffix}/${early}'${earlySuffix}`;
-  if (late > 0) return `${code} ${late}'${lateSuffix}`;
-  return `${code} /${early}'${earlySuffix}`;
+  const timingLabel = formatTimingMinutesLabel(record, { includeNotExcused: true });
+  return timingLabel ? `${code}\n${timingLabel}` : code;
 }
 
 function statusFillArgb(status, { forLegend = false } = {}) {
@@ -216,7 +215,7 @@ function applyLegendCellStyle(cell, status) {
   applyVerticalMiddle(cell);
 }
 
-function applyStatusCellStyle(cell, status) {
+function applyStatusCellStyle(cell, status, { wrapText = false } = {}) {
   const normalized = normalizeAttendanceStatusForSave(status, '');
   const fillArgb = statusFillArgb(normalized, { forLegend: false });
   if (fillArgb) applySolidFill(cell, fillArgb);
@@ -227,7 +226,7 @@ function applyStatusCellStyle(cell, status) {
     name: 'Calibri'
   };
   applyTableCellBorder(cell);
-  applyVerticalMiddle(cell, { horizontal: 'center' });
+  applyVerticalMiddle(cell, { horizontal: 'center', wrapText });
 }
 
 function applyHeaderCellStyle(cell) {
@@ -301,15 +300,22 @@ function collectRosterStatusNotes(record = {}) {
   return notes;
 }
 
-function formatTimingMinutesLabel(record = {}) {
+function formatTimingExcuseSuffix(value, { includeNotExcused = false } = {}) {
+  if (normalizeAttendanceTimingExcuseFlag(value)) return ' (excused)';
+  return includeNotExcused ? ' (not excused)' : '';
+}
+
+function formatTimingMinutesLabel(record = {}, { includeNotExcused = false } = {}) {
   const late = Number(record.lateMinutes) || 0;
   const early = Number(record.earlyLeaveMinutes) || 0;
-  const lateLabel = `Late ${late}m${late > 0 && normalizeAttendanceTimingExcuseFlag(record.lateExcused) ? ' (excused)' : ''}`;
-  const earlyLabel = `Early ${early}m${early > 0 && normalizeAttendanceTimingExcuseFlag(record.earlyLeaveExcused) ? ' (excused)' : ''}`;
-  if (late <= 0 && early <= 0) return '';
-  if (late > 0 && early > 0) return `${lateLabel} / ${earlyLabel}`;
-  if (late > 0) return lateLabel;
-  return earlyLabel;
+  const fragments = [];
+  if (late > 0) {
+    fragments.push(`Late ${late}m${formatTimingExcuseSuffix(record.lateExcused, { includeNotExcused })}`);
+  }
+  if (early > 0) {
+    fragments.push(`Left Early ${early}m${formatTimingExcuseSuffix(record.earlyLeaveExcused, { includeNotExcused })}`);
+  }
+  return fragments.join(' / ');
 }
 
 function formatTimingMinutesFragment(record = {}) {
@@ -366,15 +372,13 @@ function buildLateExcusedCommentFragment(record = {}) {
   return timing;
 }
 
-/** Status-only Excel Note text (excuse, roster notes). Timing is shown in the cell value. */
+/** Status-only Excel Note text (excuse, timing, roster notes). */
 function buildStatusNoteText(record = {}) {
   const fragments = [];
   const excuseRef = clean(record.excuseRef);
   if (excuseRef) fragments.push(`Excuse: ${excuseRef}`);
-  const timingExcuses = [];
-  if (Number(record.lateMinutes || 0) > 0 && normalizeAttendanceTimingExcuseFlag(record.lateExcused)) timingExcuses.push('late arrival');
-  if (Number(record.earlyLeaveMinutes || 0) > 0 && normalizeAttendanceTimingExcuseFlag(record.earlyLeaveExcused)) timingExcuses.push('early leave');
-  if (timingExcuses.length) fragments.push(`Timing excuse: ${timingExcuses.join(', ')}`);
+  const timingLabel = formatTimingMinutesLabel(record, { includeNotExcused: true });
+  if (timingLabel) fragments.push(`Timing: ${timingLabel}`);
 
   collectRosterStatusNotes(record).forEach((note) => {
     fragments.push(note.startsWith('Note:') ? note : `Note: ${note}`);
@@ -722,14 +726,17 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
     applyBodyMetaCellStyle(clbCell, { banded, wrapText: true });
     applyBodyMetaCellStyle(attPctCell, { banded, wrapText: true });
 
+    let bodyHasTiming = false;
     sessions.forEach((session, sessionIdx) => {
       const record = recordBySessionId.get(clean(session.id || session.sessionId))
         || records[sessionIdx]
         || {};
       const cell = sheet.getCell(bodyRow, firstSessionCol + sessionIdx);
       const displayValue = formatExportCellDisplay(record);
+      const hasTiming = hasAttendanceTiming(record);
+      if (hasTiming) bodyHasTiming = true;
       cell.value = displayValue;
-      applyStatusCellStyle(cell, record.status);
+      applyStatusCellStyle(cell, record.status, { wrapText: hasTiming });
       const noteOptions = {
         receiverName: [firstName, lastName].filter(Boolean).join(' ') || clean(student.name),
         receiverEmail: clean(student.email)
@@ -749,6 +756,9 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
         });
       }
     });
+    if (bodyHasTiming) {
+      sheet.getRow(bodyRow).height = 36;
+    }
 
     bodyRow += 1;
   });
@@ -758,7 +768,7 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
   sheet.getColumn(lastNameCol).width = 18;
   sheet.getColumn(firstNameCol).width = 18;
   for (let col = firstSessionCol; col < firstSessionCol + sessions.length; col += 1) {
-    sheet.getColumn(col).width = 5;
+    sheet.getColumn(col).width = 16;
   }
   sheet.getColumn(commentCol).width = 18;
   sheet.getColumn(startEndCol).width = 28;

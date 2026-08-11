@@ -2112,7 +2112,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const saveButtons = [btnSaveAttendance, btnSaveAttendanceTop].filter(Boolean);
+            const saveButtons = [btnSaveAttendance].filter(Boolean);
             const originalSaveButtons = saveButtons.map((btn) => ({ btn, html: btn.innerHTML }));
             saveButtons.forEach((btn) => {
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
