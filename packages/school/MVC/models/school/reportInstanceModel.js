@@ -74,6 +74,17 @@ function cleanPlainObject(v, label) {
   return out;
 }
 
+function sanitizeDerivedOverrides(value) {
+  const derivedOverrides = {};
+  if (!isPlainObject(value)) return derivedOverrides;
+  Object.entries(value).forEach(([fieldId, overridden]) => {
+    const safeFieldId = cleanString(fieldId, { max: 100, allowEmpty: false });
+    if (!safeFieldId) return;
+    derivedOverrides[safeFieldId] = overridden === true || String(overridden).toLowerCase() === 'true';
+  });
+  return derivedOverrides;
+}
+
 function sanitizeGeneratedDocs(v) {
   const list = Array.isArray(v) ? v : [];
   return list.map((doc) => ({
@@ -132,6 +143,7 @@ function sanitizeInstance(input, { isUpdate = false, existing = null } = {}) {
     status,
     answers: cleanPlainObject(input.answers, 'answers'),
     prefillSnapshot: cleanPlainObject(input.prefillSnapshot, 'prefillSnapshot'),
+    derivedOverrides: sanitizeDerivedOverrides(input.derivedOverrides),
     generatedDocs: sanitizeGeneratedDocs(input.generatedDocs),
     audit: sanitizeAudit(input.audit, existing?.audit || {})
   };

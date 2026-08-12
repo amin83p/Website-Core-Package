@@ -16,11 +16,25 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     order: 20
   }),
   Object.freeze({
+    key: 'attendance-rollup',
+    title: 'Attendance Rollup Formula',
+    description: 'Configure how rollup % is calculated across matrix, reports, and exports.',
+    icon: 'bi-percent',
+    order: 25
+  }),
+  Object.freeze({
     key: 'autosave',
     title: 'Autosave',
     description: 'Configure default autosave intervals and per-section defaults for school pages.',
     icon: 'bi-arrow-repeat',
     order: 30
+  }),
+  Object.freeze({
+    key: 'student-attendance-report',
+    title: 'Student Attendance Report',
+    description: 'Choose report templates used for generated student attendance reports.',
+    icon: 'bi-file-earmark-person',
+    order: 40
   })
 ]);
 

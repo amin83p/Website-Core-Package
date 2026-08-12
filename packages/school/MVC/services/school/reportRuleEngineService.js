@@ -5,7 +5,7 @@ const MAX_CALCULATION_EXPRESSION_LENGTH = 0; // 0 = no explicit length cap
 const VALID_SEVERITIES = new Set(['error', 'warning']);
 const VALID_WHEN_VALUES = new Set(['always', 'if_has_value']);
 const VALID_CONVERSION_ON_ERROR = new Set(['use_raw', 'empty']);
-const VALID_VALUE_MODES = new Set(['manual', 'calculated']);
+const VALID_VALUE_MODES = new Set(['manual', 'calculated', 'derived_editable']);
 const VALID_CALC_ON_ERROR = new Set(['keep_last', 'empty']);
 const VALID_EXPORT_TEXT_CASES = new Set(['as_entered', 'upper', 'lower', 'title']);
 const DOCX_ALIAS_PATTERN = /^[a-z][a-z0-9]{3}$/;
@@ -63,6 +63,15 @@ function normalizeCalculationRule(rawRule) {
 function isCalculatedField(field) {
   if (isVisualOnlyField(field)) return false;
   return normalizeValueMode(field?.valueMode) === 'calculated';
+}
+
+function isDerivedEditableField(field) {
+  if (isVisualOnlyField(field)) return false;
+  return normalizeValueMode(field?.valueMode) === 'derived_editable';
+}
+
+function expressionReferencesPrefill(expression) {
+  return /\bprefill\.[A-Za-z_][A-Za-z0-9_]*/.test(String(expression || ''));
 }
 
 function toFiniteNumber(value, fallback = 0) {
@@ -132,11 +141,6 @@ function createHelperSet() {
       }
       if (hasDefault) return branches[branches.length - 1];
       return value;
-    },
-    initials(value) {
-      const text = value === undefined || value === null ? '' : String(value);
-      const matches = text.match(/\b\w/g);
-      return matches ? matches.join('') : '';
     },
     digits(value) {
       const text = value === undefined || value === null ? '' : String(value);
@@ -667,12 +671,45 @@ function validateCalculatedFieldExpressions(template, { strict = true } = {}) {
     const field = plan.fieldMap.get(fieldId);
     const rule = normalizeCalculationRule(field?.calculationRule || {});
     if (!rule.enabled || !rule.expression) return;
+    const label = String(field?.label || fieldId || 'Field').trim();
     try {
       validateExpressionSyntax(rule.expression);
+      validateExpressionSymbols(rule.expression);
     } catch (error) {
-      const label = String(field?.label || fieldId || 'Field').trim();
       throw new Error(`Calculated field "${label}" has an invalid calculation expression: ${error.message}`);
     }
+  });
+
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    if (!isDerivedEditableField(field) || !field?.id) return;
+    const fieldId = String(field.id);
+    const label = String(field?.label || fieldId || 'Field').trim();
+    const rule = normalizeCalculationRule(field?.calculationRule || {});
+    if (strict && !rule.expression) {
+      throw new Error(`Derived editable field "${label}" must include a calculation expression.`);
+    }
+    if (!rule.expression) return;
+    try {
+      validateExpressionSyntax(rule.expression);
+      validateExpressionSymbols(rule.expression);
+    } catch (error) {
+      throw new Error(`Derived editable field "${label}" has an invalid calculation expression: ${error.message}`);
+    }
+    const deps = normalizeCalculationDependencies(field?.calculationDependencies || []);
+    if (strict && deps.length === 0 && !expressionReferencesPrefill(rule.expression)) {
+      throw new Error(`Derived editable field "${label}" must define at least one dependency or reference prefill catalog keys.`);
+    }
+    deps.forEach((depIdRaw) => {
+      const depId = String(depIdRaw || '').trim();
+      if (!depId) return;
+      if (depId === fieldId) {
+        throw new Error(`Derived editable field "${label}" cannot depend on itself.`);
+      }
+      if (!plan.fieldMap.has(depId)) {
+        throw new Error(`Derived editable field "${label}" depends on unknown field "${depId}".`);
+      }
+    });
   });
   return true;
 }
@@ -786,8 +823,8 @@ function buildCalculatedFieldPlan(template, { strict = true } = {}) {
     if (strict && !calcRule.expression) {
       throw new Error(`Calculated field "${label}" is missing calculation expression.`);
     }
-    if (strict && deps.length === 0) {
-      throw new Error(`Calculated field "${label}" must define at least one dependency.`);
+    if (strict && deps.length === 0 && !expressionReferencesPrefill(calcRule.expression)) {
+      throw new Error(`Calculated field "${label}" must define at least one dependency or reference prefill catalog keys.`);
     }
 
     deps.forEach((depIdRaw) => {
@@ -1056,6 +1093,8 @@ module.exports = {
   normalizeCalculationDependencies,
   normalizeCalculationRule,
   isCalculatedField,
+  isDerivedEditableField,
+  expressionReferencesPrefill,
   normalizeValidationRule,
   normalizeConversionRule,
   buildCalculatedFieldPlan,

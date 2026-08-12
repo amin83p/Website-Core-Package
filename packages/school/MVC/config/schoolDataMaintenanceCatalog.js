@@ -60,6 +60,7 @@ const LABEL_FIELDS = Object.freeze({
   attendanceMatrixPolicy: ['orgId'],
   conductRatingScalePolicy: ['orgId'],
   autosavePolicy: ['orgId'],
+  studentAttendanceReportPolicy: ['orgId'],
   studentEnrollments: ['key'],
   teacherSchedules: ['key']
 });
@@ -120,6 +121,7 @@ const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
   { entityType: 'attendanceMatrixPolicy', label: 'Attendance Matrix Policies', group: 'operations', collectionName: 'schoolAttendanceMatrixPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'attendanceMatrix' },
   { entityType: 'conductRatingScalePolicy', label: 'Conduct Rating Scale Policies', group: 'operations', collectionName: 'schoolConductRatingScalePolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'conductRatingScale' },
   { entityType: 'autosavePolicy', label: 'Autosave Policies', group: 'operations', collectionName: 'schoolAutosavePolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'autosave' },
+  { entityType: 'studentAttendanceReportPolicy', label: 'Student Attendance Report Policies', group: 'operations', collectionName: 'schoolStudentAttendanceReportPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'studentAttendanceReport' },
   { entityType: 'leaveRequests', label: 'Leave Requests', group: 'operations', collectionName: 'schoolLeaveRequests', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'tasks', label: 'Tasks', group: 'operations', collectionName: 'schoolTasks', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'taskRoutingRules', label: 'Task Routing Rules', group: 'operations', collectionName: 'schoolTaskRoutingRules', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },

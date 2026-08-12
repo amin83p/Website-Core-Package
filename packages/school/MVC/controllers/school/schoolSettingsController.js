@@ -3,6 +3,9 @@
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
+const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
+const schoolDataService = require('../../services/school/schoolDataService');
+const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
 const { listSchoolSettingsGroups } = require('../../config/schoolSettingsCatalog');
 const { listAutosaveSections } = require('../../config/autosaveSectionCatalog');
 const { userCanUpdateSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
@@ -42,6 +45,10 @@ function defaultAttendanceItems() {
     id: '',
     isDefault: true
   }];
+}
+
+function defaultAttendanceRollupFormula() {
+  return { ...attendanceMatrixPolicyModel.DEFAULT_ROLLUP_FORMULA };
 }
 
 function attendanceFlag(value) {
@@ -121,6 +128,91 @@ function validateAttendanceItemsInput(items) {
   return items;
 }
 
+function validateRollupGraceItemsInput(items) {
+  if (!Array.isArray(items) || !items.length) {
+    const error = new Error('At least one session duration row is required for rollup grace settings.');
+    error.statusCode = 400;
+    throw error;
+  }
+  items.forEach((item, index) => {
+    const rowLabel = `Rollup grace row ${index + 1}`;
+    const scheduledMinutes = Number(item?.scheduledMinutes);
+    if (!Number.isInteger(scheduledMinutes) || scheduledMinutes < 1 || scheduledMinutes > 1440) {
+      const error = new Error(`${rowLabel} must reference a whole-number duration from 1 to 1440 minutes.`);
+      error.statusCode = 400;
+      throw error;
+    }
+    const lateGrace = Number(item?.rollupLateGraceMinutes);
+    if (!Number.isFinite(lateGrace) || lateGrace < 0 || lateGrace > 1440) {
+      const error = new Error(`${rowLabel} must have a late grace from 0 to 1440 minutes.`);
+      error.statusCode = 400;
+      throw error;
+    }
+    const earlyGrace = Number(item?.rollupEarlyLeaveGraceMinutes);
+    if (!Number.isFinite(earlyGrace) || earlyGrace < 0 || earlyGrace > 1440) {
+      const error = new Error(`${rowLabel} must have an early-leave grace from 0 to 1440 minutes.`);
+      error.statusCode = 400;
+      throw error;
+    }
+  });
+  return items;
+}
+
+function parseGraceItemsFromBody(body = {}) {
+  let rawItems = body?.graceItems;
+  if (typeof rawItems === 'string' && rawItems.trim()) {
+    try {
+      rawItems = JSON.parse(rawItems);
+    } catch (_) {
+      throw new Error('Rollup grace items must be valid JSON.');
+    }
+  }
+  if (!Array.isArray(rawItems)) {
+    rawItems = attendanceMatrixPolicyModel.parsePolicyItemsFromBody(body);
+  }
+  return rawItems;
+}
+
+async function mergeThresholdItemsPreservingGrace(activeOrgId, rawItems) {
+  const existingConfig = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(activeOrgId);
+  const existingItems = Array.isArray(existingConfig.items) ? existingConfig.items : [];
+  const graceByDuration = new Map(
+    existingItems.map((row) => [Number(row.scheduledMinutes), row])
+  );
+  const graceById = new Map(
+    existingItems.map((row) => [String(row.id || '').trim(), row]).filter(([id]) => id)
+  );
+  return rawItems.map((item) => {
+    const id = String(item?.id || '').trim();
+    const mins = Number(item.scheduledMinutes);
+    const existing = (id && graceById.get(id)) || graceByDuration.get(mins) || null;
+    return {
+      ...item,
+      rollupLateGraceMinutes: Number(existing?.rollupLateGraceMinutes) || 0,
+      rollupEarlyLeaveGraceMinutes: Number(existing?.rollupEarlyLeaveGraceMinutes) || 0
+    };
+  });
+}
+
+async function resolveStudentAttendanceReportLabels(policy = {}, reqUser) {
+  const reportTemplate = policy.reportTemplateId
+    ? await schoolDataService.getDataById('reportTemplates', policy.reportTemplateId, reqUser)
+    : null;
+  const overallTemplate = policy.overallReportTemplateId
+    ? await schoolDataService.getDataById('overallReportTemplates', policy.overallReportTemplateId, reqUser)
+    : null;
+  return {
+    reportTemplateLabel: studentAttendanceReportPolicyService.formatTemplateLabel(
+      reportTemplate,
+      policy.reportTemplateId
+    ),
+    overallReportTemplateLabel: studentAttendanceReportPolicyService.formatTemplateLabel(
+      overallTemplate,
+      policy.overallReportTemplateId
+    )
+  };
+}
+
 async function loadSettingsPageData(req) {
   const activeOrgId = activeOrgIdOrThrow(req.user);
   const [
@@ -128,14 +220,20 @@ async function loadSettingsPageData(req) {
     attendancePolicy,
     attendanceConfig,
     autosavePolicy,
+    studentAttendanceReportPolicy,
     canUpdate
   ] = await Promise.all([
     conductRatingScalePolicyModel.getPolicyForOrg(activeOrgId),
     attendanceMatrixPolicyModel.getPolicyForOrg(activeOrgId),
     attendanceMatrixPolicyModel.getPolicyCatalogForOrg(activeOrgId),
     autosavePolicyModel.getPolicyForOrg(activeOrgId),
+    studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
   ]);
+  const studentAttendanceReportLabels = await resolveStudentAttendanceReportLabels(
+    studentAttendanceReportPolicy,
+    req.user
+  );
 
   return {
     activeOrgId,
@@ -146,8 +244,12 @@ async function loadSettingsPageData(req) {
     attendancePolicy,
     attendanceThresholdsEnabled: attendanceConfig.thresholdsEnabled,
     attendanceItems: attendanceConfig.items.length ? attendanceConfig.items : defaultAttendanceItems(),
+    rollupFormula: attendanceConfig.rollupFormula || defaultAttendanceRollupFormula(),
     autosavePolicy,
-    autosaveSections: listAutosaveSections()
+    autosaveSections: listAutosaveSections(),
+    studentAttendanceReportPolicy,
+    studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
+    studentAttendanceReportOverallLabel: studentAttendanceReportLabels.overallReportTemplateLabel
   };
 }
 
@@ -157,6 +259,7 @@ async function showSchoolSettings(req, res) {
     return res.render('school/settings/index', {
       title: 'School Settings',
       includeModal: true,
+      includeGenericPicker: true,
       user: req.user,
       actionStateId: req.actionStateId,
       ...pageData
@@ -196,6 +299,42 @@ async function saveConductRatingScale(req, res) {
   }
 }
 
+function showAttendanceRollupFormula(_req, res) {
+  return res.redirect('/school/settings#attendance-rollup');
+}
+
+async function saveAttendanceRollupFormula(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const rollupFormula = attendanceMatrixPolicyModel.parseRollupFormulaFromBody(req.body || {});
+    let graceItems;
+    try {
+      graceItems = parseGraceItemsFromBody(req.body || {});
+      validateRollupGraceItemsInput(graceItems);
+    } catch (validationError) {
+      validationError.statusCode = 400;
+      throw validationError;
+    }
+    const config = await attendanceMatrixPolicyModel.saveRollupFormulaForOrg(
+      activeOrgId,
+      rollupFormula,
+      graceItems,
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'Attendance rollup formula settings were updated.',
+      rollupFormula: config.rollupFormula,
+      graceItems: config.items
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save attendance rollup formula settings.'
+    });
+  }
+}
+
 async function saveAttendanceMatrix(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
@@ -203,17 +342,22 @@ async function saveAttendanceMatrix(req, res) {
     try {
       rawItems = attendanceMatrixPolicyModel.parsePolicyItemsFromBody(req.body || {});
       validateAttendanceItemsInput(rawItems);
+      rawItems = await mergeThresholdItemsPreservingGrace(activeOrgId, rawItems);
       attendanceMatrixPolicyModel.normalizePolicyItemsForSave(rawItems);
     } catch (validationError) {
       validationError.statusCode = 400;
       throw validationError;
     }
     const hasThresholdsEnabled = Object.prototype.hasOwnProperty.call(req.body || {}, 'thresholdsEnabled');
+    const saveOptions = {};
+    if (hasThresholdsEnabled) {
+      saveOptions.thresholdsEnabled = attendanceFlag(req.body.thresholdsEnabled);
+    }
     await attendanceMatrixPolicyModel.savePolicyItemsForOrg(
       activeOrgId,
       rawItems,
       req.user?.id,
-      hasThresholdsEnabled ? { thresholdsEnabled: attendanceFlag(req.body.thresholdsEnabled) } : {}
+      saveOptions
     );
     const [config, policy] = await Promise.all([
       attendanceMatrixPolicyModel.getPolicyCatalogForOrg(activeOrgId),
@@ -230,6 +374,31 @@ async function saveAttendanceMatrix(req, res) {
     return res.status(Number(error?.statusCode) || 500).json({
       status: 'error',
       message: error?.message || 'Failed to save attendance matrix threshold settings.'
+    });
+  }
+}
+
+async function saveStudentAttendanceReportSettings(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const normalized = await studentAttendanceReportPolicyService.validatePolicyInput(req.body || {}, req.user);
+    const policy = await studentAttendanceReportPolicyModel.savePolicyForOrg(
+      activeOrgId,
+      normalized,
+      req.user?.id
+    );
+    const labels = await resolveStudentAttendanceReportLabels(policy, req.user);
+    return res.json({
+      status: 'success',
+      message: 'Student Attendance Report settings were updated.',
+      policy,
+      reportTemplateLabel: labels.reportTemplateLabel,
+      overallReportTemplateLabel: labels.overallReportTemplateLabel
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save Student Attendance Report settings.'
     });
   }
 }
@@ -267,10 +436,14 @@ module.exports = {
   activeOrgIdOrThrow,
   validateConductLevelsInput,
   validateAttendanceItemsInput,
+  validateRollupGraceItemsInput,
   loadSettingsPageData,
   showSchoolSettings,
+  showAttendanceRollupFormula,
   saveConductRatingScale,
   saveAttendanceMatrix,
+  saveAttendanceRollupFormula,
+  saveStudentAttendanceReportSettings,
   saveAutosavePolicy,
   redirectLegacyConductSettings,
   redirectLegacyAttendanceSettings

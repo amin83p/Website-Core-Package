@@ -38,6 +38,31 @@ router.get('/',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
   ctrl.showAttendancePage);
 
+router.get('/report',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.showStudentAttendanceReportPage);
+
+router.get('/report/api/data',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.getStudentAttendanceReportData);
+
+router.post('/report/api/generate',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.generateStudentAttendanceReport);
+
+router.get('/report/api/export-plan',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.getStudentAttendanceReportExportPlan);
+
+router.post('/report/api/export',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.exportStudentAttendanceReport);
+
 router.get('/api/data',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),

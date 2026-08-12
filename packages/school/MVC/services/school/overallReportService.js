@@ -436,6 +436,15 @@ function nextRevision(instance = {}) {
   return Math.max(1, Number(instance?.revision || 1) || 1) + 1;
 }
 
+function buildSourceValuesFromPlaceholders(template = {}, placeholders = {}) {
+  const values = {};
+  Object.entries(placeholders || {}).forEach(([token, value]) => {
+    const key = normalizeTokenKey(token);
+    if (key) values[key] = value;
+  });
+  return mirrorDocxAliasValues(template, values);
+}
+
 async function buildSourcePayload(instance, reqUser) {
   const [template, assignment] = await Promise.all([
     schoolDataService.getDataById('reportTemplates', instance.templateId, reqUser),
@@ -445,12 +454,8 @@ async function buildSourcePayload(instance, reqUser) {
   ]);
   if (!template) throw new Error(`Report template not found for source instance ${instance.id}.`);
   const bundle = reportService.buildDocxPlaceholderPayloadDetailed(template, instance, assignment);
-  const values = {};
-  Object.entries(bundle.placeholders || {}).forEach(([token, value]) => {
-    const key = normalizeTokenKey(token);
-    if (key) values[key] = value;
-  });
-  return { template, assignment, values: mirrorDocxAliasValues(template, values), diagnostics: bundle.conversionDiagnostics || [] };
+  const values = buildSourceValuesFromPlaceholders(template, bundle.placeholders);
+  return { template, assignment, values, diagnostics: bundle.conversionDiagnostics || [] };
 }
 
 async function createOverallInstance({
@@ -1623,6 +1628,7 @@ module.exports = {
   validateTemplateReferences,
   calculateAnswers,
   validateAnswers,
+  buildSourceValuesFromPlaceholders,
   buildSourcePayload,
   createOverallInstance,
   createOverallWorkspace,

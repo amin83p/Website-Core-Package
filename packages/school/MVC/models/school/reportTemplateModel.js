@@ -149,9 +149,18 @@ function sanitizeField(rawField, index) {
     ? sanitizeCalculationRule({ enabled: false, expression: '', onError: 'keep_last' })
     : sanitizeCalculationRule(rawField.calculationRule);
   const calculationDependencies = visualOnly ? [] : sanitizeCalculationDependencies(rawField.calculationDependencies);
-  if (!visualOnly && valueMode === 'calculated') {
-    if (!calculationRule.expression) throw new Error(`Calculated field "${id}" must include calculation expression.`);
-    if (calculationDependencies.length === 0) throw new Error(`Calculated field "${id}" must include dependencies.`);
+  const usesExpression = valueMode === 'calculated' || valueMode === 'derived_editable';
+  if (!visualOnly && usesExpression) {
+    if (!calculationRule.expression) {
+      throw new Error(`${valueMode === 'derived_editable' ? 'Derived editable' : 'Calculated'} field "${id}" must include calculation expression.`);
+    }
+    if (
+      valueMode === 'calculated'
+      && calculationDependencies.length === 0
+      && !reportRuleEngineService.expressionReferencesPrefill(calculationRule.expression)
+    ) {
+      throw new Error(`Calculated field "${id}" must include dependencies or reference prefill catalog keys.`);
+    }
   }
 
   return {
@@ -160,21 +169,21 @@ function sanitizeField(rawField, index) {
     type,
     required: rawField.required === true || String(rawField.required) === 'true',
     sharedAcrossStudents: rawField.sharedAcrossStudents === true || String(rawField.sharedAcrossStudents) === 'true',
-    readOnly: (rawField.readOnly === true || String(rawField.readOnly) === 'true') || valueMode === 'calculated',
+    readOnly: valueMode === 'calculated' || (rawField.readOnly === true || String(rawField.readOnly) === 'true'),
     fullPageWidth:
       rawField.fullPageWidth === true ||
       String(rawField.fullPageWidth) === 'true' ||
       rawField.fullWidth === true ||
       String(rawField.fullWidth) === 'true',
     valueMode,
-    calculationRule: valueMode === 'calculated'
+    calculationRule: usesExpression
       ? {
           enabled: true,
           expression: calculationRule.expression,
           onError: calculationRule.onError
         }
       : sanitizeCalculationRule({ enabled: false, expression: '', onError: 'keep_last' }),
-    calculationDependencies: valueMode === 'calculated' ? calculationDependencies : [],
+    calculationDependencies: usesExpression ? calculationDependencies : [],
     hasBorder: visualOnly ? false : (rawField.hasBorder === true || String(rawField.hasBorder) === 'true'),
     backgroundColor: visualOnly ? '' : cleanHexColor(rawField.backgroundColor, { allowEmpty: true }),
     exportTextCase: visualOnly

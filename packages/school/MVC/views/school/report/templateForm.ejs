@@ -626,9 +626,13 @@
               </select>
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-3" id="fieldEditorPrefillWrap">
               <label class="form-label fw-bold">Prefill Key</label>
-              <input type="text" class="form-control" id="fieldEditorPrefill" list="prefillKeyOptions" maxlength="120" placeholder="teacher_name">
+              <div class="input-group">
+                <input type="text" class="form-control" id="fieldEditorPrefill" list="prefillKeyOptions" maxlength="120" placeholder="teacher_name">
+                <button type="button" class="btn btn-outline-primary" id="btnBrowsePrefillKey" title="Browse catalog keys"><i class="bi bi-search"></i></button>
+              </div>
+              <div class="form-text">Optional for manual fields. Use value behavior below to combine multiple catalog keys.</div>
             </div>
             <div class="col-md-3">
               <label class="form-label fw-bold">Placeholder Token</label>
@@ -695,47 +699,56 @@
               </div>
               <div class="form-text">Conversion runs only for export/DOCX placeholders. Raw answers stay unchanged.</div>
               <div class="form-text">Branching examples: <code>ifelse(num(value) >= 90, "A", "B")</code> or <code>caseof(value, "excellent", 4, "good", 3, "fair", 2, 0)</code>.</div>
+              <div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="btnInsertCatalogKeyConversion"><i class="bi bi-search me-1"></i>Insert Catalog Key</button>
+              </div>
             </div>
 
-            <div class="col-12">
-              <div class="d-flex align-items-center justify-content-between">
-                <label class="form-label fw-bold mb-1">Calculated Value</label>
-              </div>
-              <div class="row g-2">
-                <div class="col-md-2">
-                  <div class="form-check mt-2">
-                    <input class="form-check-input" type="checkbox" id="fieldEditorCalculatedEnabled">
-                    <label class="form-check-label" for="fieldEditorCalculatedEnabled">Enable</label>
+            <div class="col-12" id="fieldEditorValueBehaviorWrap">
+              <label class="form-label fw-bold" for="fieldEditorValueMode">Value behavior</label>
+              <select class="form-select" id="fieldEditorValueMode">
+                <option value="manual">User-entered (optional single prefill key)</option>
+                <option value="derived_editable">Starts from catalog/formula (editable on report)</option>
+                <option value="calculated">Always calculated (read-only)</option>
+              </select>
+              <div class="form-text" id="fieldEditorValueModeHelp"></div>
+            </div>
+
+            <div class="col-12 d-none" id="fieldEditorExpressionPanel">
+              <div class="border rounded p-3 bg-light-subtle">
+                <label class="form-label fw-bold mb-1">Formula expression</label>
+                <textarea class="form-control font-monospace" id="fieldEditorCalculationExpression" rows="3" placeholder="concat(prefill.student_first_name, &quot; &quot;, prefill.student_last_name)"></textarea>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                  <button type="button" class="btn btn-sm btn-outline-primary" id="btnInsertCatalogKeyFormula"><i class="bi bi-search me-1"></i>Insert Catalog Key</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="btnInsertCalcFieldFormula"><i class="bi bi-plus-lg me-1"></i>Insert Field</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearFieldExpression">Clear Formula</button>
+                </div>
+                <div class="row g-2 mt-2">
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold mb-1">Calculation error</label>
+                    <select class="form-select" id="fieldEditorCalculationOnError">
+                      <option value="keep_last">On error: keep last value</option>
+                      <option value="empty">On error: blank value</option>
+                    </select>
                   </div>
                 </div>
-                <div class="col-md-6">
-                  <textarea class="form-control font-monospace" id="fieldEditorCalculationExpression" rows="3" placeholder="round(num(answers.part_a) + num(answers.part_b), 2)"></textarea>
+                <div class="mt-2">
+                  <label class="form-label fw-bold mb-1">Dependencies (comma-separated field IDs)</label>
+                  <textarea class="form-control font-monospace" id="fieldEditorCalculationDependencies" rows="2" placeholder="part_a, part_b"></textarea>
+                  <div class="form-text">Only needed when the formula references other calculated fields. Catalog keys like <code>prefill.student_full_name</code> do not need to be listed here.</div>
                 </div>
-                <div class="col-md-4">
-                  <select class="form-select" id="fieldEditorCalculationOnError">
-                    <option value="keep_last">On error: keep last value</option>
-                    <option value="empty">On error: blank value</option>
-                  </select>
-                </div>
-              </div>
-              <div class="mt-2">
-                <label class="form-label fw-bold mb-1">Dependencies (comma-separated field IDs)</label>
-                <textarea class="form-control font-monospace" id="fieldEditorCalculationDependencies" rows="2" placeholder="part_a, part_b"></textarea>
-              </div>
-              <div class="mt-2 border rounded p-2 bg-light">
-                <label class="form-label fw-bold mb-1">Available Fields</label>
-                <div class="row g-2">
-                  <div class="col-md-8">
-                    <select class="form-select font-monospace" id="fieldEditorCalculationFieldList" size="6" aria-label="Available fields for calculation"></select>
-                  </div>
-                  <div class="col-md-4 d-grid gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnInsertCalcFieldFormula"><i class="bi bi-plus-lg me-1"></i>Insert in Formula</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAddCalcFieldDependency"><i class="bi bi-diagram-3 me-1"></i>Add Dependency</button>
+                <div class="mt-2 border rounded p-2 bg-light">
+                  <label class="form-label fw-bold mb-1">Available Fields</label>
+                  <div class="row g-2">
+                    <div class="col-md-8">
+                      <select class="form-select font-monospace" id="fieldEditorCalculationFieldList" size="6" aria-label="Available fields for calculation"></select>
+                    </div>
+                    <div class="col-md-4 d-grid gap-2">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAddCalcFieldDependency"><i class="bi bi-diagram-3 me-1"></i>Add Dependency</button>
+                    </div>
                   </div>
                 </div>
-                <div class="form-text">Select a field, then insert <code>answers.&lt;fieldId&gt;</code> into formula or append its ID to dependencies.</div>
               </div>
-              <div class="form-text">Calculated fields are auto-updated and read-only in Report Instance. Dependencies must reference existing non-visual field IDs.</div>
             </div>
 
             <div class="col-12">
@@ -822,6 +835,7 @@
 </datalist>
 
 <%- include('partials/reportMessageHelpers') %>
+<%- include('partials/modal_GenericPicker', { user: typeof user !== 'undefined' ? user : {} }) %>
 <script src="/scripts/reportSelectField.js"></script>
 
 <script>
@@ -859,13 +873,21 @@
     const fieldEditorConversionEnabledInput = document.getElementById('fieldEditorConversionEnabled');
     const fieldEditorConversionExpressionInput = document.getElementById('fieldEditorConversionExpression');
     const fieldEditorConversionOnErrorInput = document.getElementById('fieldEditorConversionOnError');
-    const fieldEditorCalculatedEnabledInput = document.getElementById('fieldEditorCalculatedEnabled');
+    const fieldEditorValueModeInput = document.getElementById('fieldEditorValueMode');
+    const fieldEditorValueModeHelp = document.getElementById('fieldEditorValueModeHelp');
+    const fieldEditorValueBehaviorWrap = document.getElementById('fieldEditorValueBehaviorWrap');
+    const fieldEditorExpressionPanel = document.getElementById('fieldEditorExpressionPanel');
+    const fieldEditorPrefillWrap = document.getElementById('fieldEditorPrefillWrap');
     const fieldEditorCalculationExpressionInput = document.getElementById('fieldEditorCalculationExpression');
     const fieldEditorCalculationOnErrorInput = document.getElementById('fieldEditorCalculationOnError');
     const fieldEditorCalculationDependenciesInput = document.getElementById('fieldEditorCalculationDependencies');
     const fieldEditorCalculationFieldList = document.getElementById('fieldEditorCalculationFieldList');
     const insertCalcFieldFormulaBtn = document.getElementById('btnInsertCalcFieldFormula');
     const addCalcFieldDependencyBtn = document.getElementById('btnAddCalcFieldDependency');
+    const btnBrowsePrefillKey = document.getElementById('btnBrowsePrefillKey');
+    const btnInsertCatalogKeyFormula = document.getElementById('btnInsertCatalogKeyFormula');
+    const btnInsertCatalogKeyConversion = document.getElementById('btnInsertCatalogKeyConversion');
+    const btnClearFieldExpression = document.getElementById('btnClearFieldExpression');
     const fieldEditorRequiredInput = document.getElementById('fieldEditorRequired');
     const fieldEditorReadonlyInput = document.getElementById('fieldEditorReadonly');
     const fieldEditorSharedInput = document.getElementById('fieldEditorShared');
@@ -888,7 +910,7 @@
     const btnExportPrefillCsv = document.getElementById('btnExportPrefillCsv');
     const prefillCatalog = <%- JSON.stringify(prefillCatalogData).replace(/</g, '\\u003c') %>;
     const isEditMode = <%- JSON.stringify(isEdit) %>;
-    const VALUE_MODES = Object.freeze({ MANUAL: 'manual', CALCULATED: 'calculated' });
+    const VALUE_MODES = Object.freeze({ MANUAL: 'manual', DERIVED_EDITABLE: 'derived_editable', CALCULATED: 'calculated' });
     const CALC_ON_ERROR = Object.freeze({ KEEP_LAST: 'keep_last', EMPTY: 'empty' });
     const EXPORT_TEXT_CASES = Object.freeze({ AS_ENTERED: 'as_entered', UPPER: 'upper', LOWER: 'lower', TITLE: 'title' });
     const DOCX_ALIAS_PATTERN = /^[a-z][a-z0-9]{3}$/;
@@ -905,6 +927,99 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    function normalizeClientValueMode(rawMode) {
+      const token = String(rawMode || VALUE_MODES.MANUAL).trim().toLowerCase();
+      if (token === VALUE_MODES.CALCULATED) return VALUE_MODES.CALCULATED;
+      if (token === VALUE_MODES.DERIVED_EDITABLE) return VALUE_MODES.DERIVED_EDITABLE;
+      return VALUE_MODES.MANUAL;
+    }
+
+    function expressionReferencesPrefill(expression) {
+      return /\bprefill\.[A-Za-z_][A-Za-z0-9_]*/.test(String(expression || ''));
+    }
+
+    function pickerConfig(config) {
+      return window.GenericPickerPresets?.normalizeConfig
+        ? window.GenericPickerPresets.normalizeConfig(config)
+        : config;
+    }
+
+    function openLocalPicker(config) {
+      if (!window.GenericPicker || typeof window.GenericPicker.open !== 'function') {
+        showReportModal({ title: 'Picker Unavailable', message: 'The searchable picker could not be loaded.', icon: 'error' });
+        return;
+      }
+      window.GenericPicker.open(pickerConfig({ sourceMode: 'local', multiselect: false, limit: 5000, ...config }));
+    }
+
+    function prefillCatalogItems() {
+      const groups = [
+        { key: 'common', label: 'Common' },
+        { key: 'classOnly', label: 'Class' },
+        { key: 'gradebookPeriodClass', label: 'Gradebook (Class)' },
+        { key: 'gradebookPeriodSkillsClass', label: 'Gradebook Skills (Class)' },
+        { key: 'examPeriodClass', label: 'Exam (Class)' },
+        { key: 'studentOnly', label: 'Student' },
+        { key: 'gradebookPeriodStudent', label: 'Gradebook (Student)' },
+        { key: 'gradebookPeriodSkillsStudent', label: 'Gradebook Skills (Student)' },
+        { key: 'examPeriodStudent', label: 'Exam (Student)' }
+      ];
+      const items = [];
+      groups.forEach((group) => {
+        const rows = Array.isArray(prefillCatalog?.[group.key]) ? prefillCatalog[group.key] : [];
+        rows.forEach((row) => {
+          const key = String(row?.key || '').trim();
+          if (!key) return;
+          items.push({
+            id: `${group.key}|${key}`,
+            key,
+            label: String(row?.label || key).trim(),
+            description: String(row?.description || '').trim(),
+            group: group.label,
+            origin: 'catalog',
+            title: String(row?.label || key).trim()
+          });
+        });
+      });
+      return items;
+    }
+
+    function renderPrefillCatalogItem(item) {
+      return `<div><div class="fw-bold">${escapeHtml(item.label || item.key)}</div><div class="small"><code>${escapeHtml(item.key)}</code></div><div class="small text-muted">${escapeHtml(item.group || '')}${item.description ? ` &middot; ${escapeHtml(item.description)}` : ''}</div></div>`;
+    }
+
+    function choosePrefillCatalogKey({ targetInput, replaceExpression = false, setPrefillKey = false } = {}) {
+      const items = prefillCatalogItems();
+      if (!items.length) {
+        showReportModal({ title: 'No Catalog Keys', message: 'Prefill catalog keys are not available on this page.', icon: 'warning' });
+        return;
+      }
+      openLocalPicker({
+        title: 'Select Catalog Key',
+        icon: 'bi-braces',
+        placeholder: 'Search by key, label, description, or group...',
+        localItems: items,
+        searchFields: 'key,label,description,group,title',
+        renderer: renderPrefillCatalogItem,
+        onSelect(item) {
+          const token = `prefill.${String(item.key || '').trim()}`;
+          if (setPrefillKey && fieldEditorPrefillInput) {
+            fieldEditorPrefillInput.value = String(item.key || '').trim();
+            fieldEditorPrefillInput.focus();
+            return;
+          }
+          const input = targetInput || fieldEditorCalculationExpressionInput;
+          if (!input) return;
+          if (replaceExpression || !String(input.value || '').trim()) {
+            input.value = token;
+          } else {
+            insertTextAtCursor(input, token);
+          }
+          input.focus();
+        }
+      });
     }
 
     function defaultField() {
@@ -1206,9 +1321,8 @@ caseof(value, "excellent", 4, "good", 3, "fair", 2, 0)</code></pre>
           <h6 class="fw-bold">Text/Select Mapping</h6>
           <pre class="small bg-light border rounded p-2 mb-2"><code>str(value)
 caseof(value, "male", "M", "female", "F", "U")
-ifelse(len(str(value)) > 0, str(value), "N/A")
-initials(value)</code></pre>
-          <div class="form-text mb-2">Use <code>initials(value)</code> for first letter of each word (e.g. "John Smith" &rarr; "JS"). JavaScript regex/method chains are not supported.</div>
+ifelse(len(str(value)) > 0, str(value), "N/A")</code></pre>
+          <div class="form-text mb-2">For student name initials, prefill from <code>student_full_name_initial</code> instead of a conversion expression. JavaScript regex/method chains are not supported.</div>
 
           <h6 class="fw-bold">Phone / Digit Splitting</h6>
           <pre class="small bg-light border rounded p-2 mb-2"><code>digits(value)
@@ -1287,10 +1401,10 @@ num(value) <= 95</code></pre>
       const validationRules = Array.isArray(raw.validationRules) ? raw.validationRules : [];
       const conversionRuleRaw = raw && typeof raw.conversionRule === 'object' ? raw.conversionRule : {};
       const valueModeRaw = String(raw?.valueMode || VALUE_MODES.MANUAL).trim().toLowerCase();
-      const valueMode = visualOnly ? VALUE_MODES.MANUAL : (valueModeRaw === VALUE_MODES.CALCULATED ? VALUE_MODES.CALCULATED : VALUE_MODES.MANUAL);
+      const valueMode = visualOnly ? VALUE_MODES.MANUAL : normalizeClientValueMode(valueModeRaw);
       const calculationRuleRaw = raw && typeof raw.calculationRule === 'object' ? raw.calculationRule : {};
       const calculationDependencies = visualOnly ? [] : normalizeCalculationDependencies(raw?.calculationDependencies || []);
-      const calcEnabled = valueMode === VALUE_MODES.CALCULATED;
+      const usesExpression = valueMode === VALUE_MODES.CALCULATED || valueMode === VALUE_MODES.DERIVED_EDITABLE;
 
       return {
         id: visualOnly ? (id || buildAutoVisualId(type, raw.label || '', -1)) : id,
@@ -1298,17 +1412,17 @@ num(value) <= 95</code></pre>
         type,
         required: visualOnly ? false : (raw.required === true || String(raw.required) === 'true'),
         sharedAcrossStudents: raw.sharedAcrossStudents === true || String(raw.sharedAcrossStudents) === 'true',
-        readOnly: visualOnly ? false : (raw.readOnly === true || String(raw.readOnly) === 'true'),
+        readOnly: visualOnly ? false : (valueMode === VALUE_MODES.CALCULATED || raw.readOnly === true || String(raw.readOnly) === 'true'),
         fullPageWidth: visualOnly ? true : (raw.fullPageWidth === true || String(raw.fullPageWidth) === 'true'),
         valueMode,
         calculationRule: visualOnly
           ? { enabled: false, expression: '', onError: CALC_ON_ERROR.KEEP_LAST }
           : {
-              enabled: calcEnabled,
-              expression: calcEnabled ? String(calculationRuleRaw?.expression || '').trim() : '',
+              enabled: usesExpression,
+              expression: usesExpression ? String(calculationRuleRaw?.expression || '').trim() : '',
               onError: String(calculationRuleRaw?.onError || CALC_ON_ERROR.KEEP_LAST).trim().toLowerCase() === CALC_ON_ERROR.EMPTY ? CALC_ON_ERROR.EMPTY : CALC_ON_ERROR.KEEP_LAST
             },
-        calculationDependencies: calcEnabled ? calculationDependencies : [],
+        calculationDependencies: usesExpression ? calculationDependencies : [],
         hasBorder: visualOnly ? false : (raw.hasBorder === true || String(raw.hasBorder) === 'true'),
         backgroundColor: visualOnly ? '' : normalizeHexColor(raw.backgroundColor),
         exportTextCase: visualOnly ? EXPORT_TEXT_CASES.AS_ENTERED : normalizeExportTextCase(raw.exportTextCase),
@@ -1381,6 +1495,7 @@ num(value) <= 95</code></pre>
       if (field.sharedAcrossStudents) flags.push('<span class="badge bg-info-subtle text-info-emphasis border">Shared</span>');
       if (field.fullPageWidth) flags.push('<span class="badge bg-primary-subtle text-primary-emphasis border">Full width</span>');
       if (String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED) flags.push('<span class="badge bg-warning-subtle text-warning-emphasis border">Calculated</span>');
+      if (String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.DERIVED_EDITABLE) flags.push('<span class="badge bg-info-subtle text-info-emphasis border">Derived</span>');
       if (field.hasBorder) flags.push('<span class="badge bg-secondary-subtle text-secondary-emphasis border">Border</span>');
       if (field.backgroundColor) flags.push(`<span class="badge border" style="background-color:${escapeHtml(field.backgroundColor)};">Back color</span>`);
       if (normalizeExportTextCase(field.exportTextCase) !== EXPORT_TEXT_CASES.AS_ENTERED) flags.push(`<span class="badge bg-dark-subtle text-dark border">DOCX: ${escapeHtml(normalizeExportTextCase(field.exportTextCase))}</span>`);
@@ -1410,7 +1525,9 @@ num(value) <= 95</code></pre>
           : '';
         const calcSummary = String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED
           ? `Calculated: ${String(field?.calculationRule?.expression || '').trim()} | deps: ${(Array.isArray(field?.calculationDependencies) ? field.calculationDependencies : []).join(', ')}`
-          : '';
+          : (String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.DERIVED_EDITABLE
+            ? `Derived: ${String(field?.calculationRule?.expression || '').trim()}`
+            : '');
         const borderSummary = field.hasBorder ? 'Border: enabled' : '';
         const backgroundSummary = field.backgroundColor ? `Back color: ${field.backgroundColor}` : '';
         const exportCaseSummary = normalizeExportTextCase(field.exportTextCase) !== EXPORT_TEXT_CASES.AS_ENTERED
@@ -1477,10 +1594,9 @@ num(value) <= 95</code></pre>
         const effectiveId = visualOnly ? (id || buildAutoVisualId(source?.type, label, -1)) : id;
 
         const normalizedType = normalizeFieldType(source?.type);
-        const valueMode = visualOnly
-          ? VALUE_MODES.MANUAL
-          : (String(source?.valueMode || VALUE_MODES.MANUAL).trim().toLowerCase() === VALUE_MODES.CALCULATED ? VALUE_MODES.CALCULATED : VALUE_MODES.MANUAL);
-        const calculationDependencies = valueMode === VALUE_MODES.CALCULATED
+        const valueMode = visualOnly ? VALUE_MODES.MANUAL : normalizeClientValueMode(source?.valueMode);
+        const usesExpression = valueMode === VALUE_MODES.CALCULATED || valueMode === VALUE_MODES.DERIVED_EDITABLE;
+        const calculationDependencies = usesExpression
           ? normalizeCalculationDependencies(source?.calculationDependencies || [])
           : [];
         fields.push({
@@ -1492,7 +1608,7 @@ num(value) <= 95</code></pre>
           sharedAcrossStudents: source?.sharedAcrossStudents === true,
           fullPageWidth: visualOnly ? true : source?.fullPageWidth === true,
           valueMode,
-          calculationRule: valueMode === VALUE_MODES.CALCULATED
+          calculationRule: usesExpression
             ? {
                 enabled: true,
                 expression: String(source?.calculationRule?.expression || '').trim(),
@@ -1544,14 +1660,19 @@ num(value) <= 95</code></pre>
     function updateFieldEditorOptionsVisibility() {
       const type = normalizeFieldType(fieldEditorTypeInput?.value || 'text');
       const visualOnly = isVisualOnlyType(type);
-      const calculatedMode = !visualOnly && fieldEditorCalculatedEnabledInput?.checked === true;
+      const valueMode = visualOnly ? VALUE_MODES.MANUAL : normalizeClientValueMode(fieldEditorValueModeInput?.value || VALUE_MODES.MANUAL);
+      const expressionMode = valueMode === VALUE_MODES.CALCULATED || valueMode === VALUE_MODES.DERIVED_EDITABLE;
+      const calculatedMode = valueMode === VALUE_MODES.CALCULATED;
       if (fieldEditorOptionsWrap) fieldEditorOptionsWrap.style.display = (type === 'select' && !visualOnly) ? '' : 'none';
-      if (fieldEditorPrefillInput) fieldEditorPrefillInput.disabled = visualOnly;
+      if (fieldEditorPrefillWrap) fieldEditorPrefillWrap.style.display = (visualOnly || expressionMode) ? 'none' : '';
+      if (fieldEditorPrefillInput) fieldEditorPrefillInput.disabled = visualOnly || expressionMode;
+      if (fieldEditorValueBehaviorWrap) fieldEditorValueBehaviorWrap.classList.toggle('d-none', visualOnly);
+      if (fieldEditorExpressionPanel) fieldEditorExpressionPanel.classList.toggle('d-none', visualOnly || !expressionMode);
       if (fieldEditorPlaceholderInput) fieldEditorPlaceholderInput.disabled = visualOnly;
       if (fieldEditorDocxAliasInput) fieldEditorDocxAliasInput.disabled = visualOnly;
       if (fieldEditorExportTextCaseInput) fieldEditorExportTextCaseInput.disabled = visualOnly;
       if (fieldEditorRequiredInput) fieldEditorRequiredInput.disabled = visualOnly || calculatedMode;
-      if (fieldEditorReadonlyInput) fieldEditorReadonlyInput.disabled = visualOnly || calculatedMode;
+      if (fieldEditorReadonlyInput) fieldEditorReadonlyInput.disabled = visualOnly || calculatedMode || valueMode === VALUE_MODES.DERIVED_EDITABLE;
       if (fieldEditorFullWidthInput) fieldEditorFullWidthInput.disabled = visualOnly;
       if (fieldEditorBorderInput) fieldEditorBorderInput.disabled = visualOnly;
       if (fieldEditorBackgroundColorInput) fieldEditorBackgroundColorInput.disabled = visualOnly;
@@ -1559,13 +1680,23 @@ num(value) <= 95</code></pre>
       if (fieldEditorConversionEnabledInput) fieldEditorConversionEnabledInput.disabled = visualOnly;
       if (fieldEditorConversionExpressionInput) fieldEditorConversionExpressionInput.disabled = visualOnly;
       if (fieldEditorConversionOnErrorInput) fieldEditorConversionOnErrorInput.disabled = visualOnly;
-      if (fieldEditorCalculatedEnabledInput) fieldEditorCalculatedEnabledInput.disabled = visualOnly;
-      if (fieldEditorCalculationExpressionInput) fieldEditorCalculationExpressionInput.disabled = visualOnly || !calculatedMode;
-      if (fieldEditorCalculationOnErrorInput) fieldEditorCalculationOnErrorInput.disabled = visualOnly || !calculatedMode;
-      if (fieldEditorCalculationDependenciesInput) fieldEditorCalculationDependenciesInput.disabled = visualOnly || !calculatedMode;
-      if (fieldEditorCalculationFieldList) fieldEditorCalculationFieldList.disabled = visualOnly || !calculatedMode;
-      if (insertCalcFieldFormulaBtn) insertCalcFieldFormulaBtn.disabled = visualOnly || !calculatedMode;
-      if (addCalcFieldDependencyBtn) addCalcFieldDependencyBtn.disabled = visualOnly || !calculatedMode;
+      if (fieldEditorValueModeInput) fieldEditorValueModeInput.disabled = visualOnly;
+      if (fieldEditorCalculationExpressionInput) fieldEditorCalculationExpressionInput.disabled = visualOnly || !expressionMode;
+      if (fieldEditorCalculationOnErrorInput) fieldEditorCalculationOnErrorInput.disabled = visualOnly || !expressionMode;
+      if (fieldEditorCalculationDependenciesInput) fieldEditorCalculationDependenciesInput.disabled = visualOnly || !expressionMode;
+      if (fieldEditorCalculationFieldList) fieldEditorCalculationFieldList.disabled = visualOnly || !expressionMode;
+      if (insertCalcFieldFormulaBtn) insertCalcFieldFormulaBtn.disabled = visualOnly || !expressionMode;
+      if (addCalcFieldDependencyBtn) addCalcFieldDependencyBtn.disabled = visualOnly || !expressionMode;
+      if (btnInsertCatalogKeyFormula) btnInsertCatalogKeyFormula.disabled = visualOnly || !expressionMode;
+      if (btnClearFieldExpression) btnClearFieldExpression.disabled = visualOnly || !expressionMode;
+      if (btnBrowsePrefillKey) btnBrowsePrefillKey.disabled = visualOnly || expressionMode;
+      if (fieldEditorValueModeHelp) {
+        fieldEditorValueModeHelp.textContent = valueMode === VALUE_MODES.MANUAL
+          ? 'Users enter the value. Optionally bind one catalog key for automatic prefill.'
+          : (valueMode === VALUE_MODES.DERIVED_EDITABLE
+            ? 'The value starts from the formula and can be overridden on the report instance.'
+            : 'The value is always recalculated and read-only on the report instance.');
+      }
       if (visualOnly) {
         fieldEditorPrefillInput.value = '';
         fieldEditorPlaceholderInput.value = '';
@@ -1582,7 +1713,7 @@ num(value) <= 95</code></pre>
         fieldEditorConversionEnabledInput.checked = false;
         fieldEditorConversionExpressionInput.value = '';
         fieldEditorConversionOnErrorInput.value = 'use_raw';
-        fieldEditorCalculatedEnabledInput.checked = false;
+        if (fieldEditorValueModeInput) fieldEditorValueModeInput.value = VALUE_MODES.MANUAL;
         fieldEditorCalculationExpressionInput.value = '';
         fieldEditorCalculationOnErrorInput.value = CALC_ON_ERROR.KEEP_LAST;
         fieldEditorCalculationDependenciesInput.value = '';
@@ -1590,6 +1721,9 @@ num(value) <= 95</code></pre>
       if (calculatedMode) {
         fieldEditorRequiredInput.checked = false;
         fieldEditorReadonlyInput.checked = true;
+      }
+      if (valueMode === VALUE_MODES.DERIVED_EDITABLE) {
+        fieldEditorReadonlyInput.checked = false;
       }
     }
 
@@ -1612,7 +1746,7 @@ num(value) <= 95</code></pre>
       fieldEditorConversionEnabledInput.checked = field?.conversionRule?.enabled === true;
       fieldEditorConversionExpressionInput.value = String(field?.conversionRule?.expression || '').trim();
       fieldEditorConversionOnErrorInput.value = String(field?.conversionRule?.onError || 'use_raw').trim().toLowerCase() === 'empty' ? 'empty' : 'use_raw';
-      fieldEditorCalculatedEnabledInput.checked = String(field?.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED;
+      if (fieldEditorValueModeInput) fieldEditorValueModeInput.value = normalizeClientValueMode(field?.valueMode);
       fieldEditorCalculationExpressionInput.value = String(field?.calculationRule?.expression || '').trim();
       fieldEditorCalculationOnErrorInput.value = String(field?.calculationRule?.onError || CALC_ON_ERROR.KEEP_LAST).trim().toLowerCase() === CALC_ON_ERROR.EMPTY ? CALC_ON_ERROR.EMPTY : CALC_ON_ERROR.KEEP_LAST;
       fieldEditorCalculationDependenciesInput.value = normalizeCalculationDependencies(field?.calculationDependencies || []).join(', ');
@@ -1667,10 +1801,11 @@ num(value) <= 95</code></pre>
       const options = type === 'select' ? parseOptionsCsv(fieldEditorOptionsInput.value) : [];
       const visualOnly = isVisualOnlyType(type);
       const docxAlias = visualOnly ? '' : (normalizeDocxAlias(fieldEditorDocxAliasInput.value) || generateUniqueDocxAlias());
-      const calculatedEnabled = !visualOnly && fieldEditorCalculatedEnabledInput.checked === true;
+      const valueMode = visualOnly ? VALUE_MODES.MANUAL : normalizeClientValueMode(fieldEditorValueModeInput?.value || VALUE_MODES.MANUAL);
+      const usesExpression = valueMode === VALUE_MODES.CALCULATED || valueMode === VALUE_MODES.DERIVED_EDITABLE;
       const calculationExpression = String(fieldEditorCalculationExpressionInput.value || '').trim();
       const calculationOnError = String(fieldEditorCalculationOnErrorInput.value || CALC_ON_ERROR.KEEP_LAST).trim().toLowerCase() === CALC_ON_ERROR.EMPTY ? CALC_ON_ERROR.EMPTY : CALC_ON_ERROR.KEEP_LAST;
-      const calculationDependencies = calculatedEnabled
+      const calculationDependencies = usesExpression
         ? normalizeCalculationDependencies(fieldEditorCalculationDependenciesInput.value)
         : [];
       let validationRules = [];
@@ -1691,12 +1826,12 @@ num(value) <= 95</code></pre>
         showReportModal({ title: 'Invalid Conversion Rule', icon: 'warning', message: 'Conversion expression must be 240 characters or less.' });
         return;
       }
-      if (calculatedEnabled && !calculationExpression) {
-        showReportModal({ title: 'Invalid Calculated Field', icon: 'warning', message: 'Calculation expression is required when calculated mode is enabled.' });
+      if (usesExpression && !calculationExpression) {
+        showReportModal({ title: 'Invalid Formula', icon: 'warning', message: 'Formula expression is required for derived or calculated value behavior.' });
         return;
       }
-      if (calculatedEnabled && calculationDependencies.length === 0) {
-        showReportModal({ title: 'Invalid Calculated Field', icon: 'warning', message: 'At least one dependency is required for calculated fields.' });
+      if (valueMode === VALUE_MODES.CALCULATED && calculationDependencies.length === 0 && !expressionReferencesPrefill(calculationExpression)) {
+        showReportModal({ title: 'Invalid Calculated Field', icon: 'warning', message: 'Calculated fields need at least one field dependency or a prefill catalog reference in the formula.' });
         return;
       }
       const effectiveId = visualOnly ? (id || buildAutoVisualId(type, label, editingIndex)) : id;
@@ -1709,10 +1844,10 @@ num(value) <= 95</code></pre>
         showReportModal({ title: 'Invalid Field ID', icon: 'warning', message: 'Field ID format is invalid. Use letters, numbers, `_`, `-`, `:` only.' });
         return;
       }
-      if (calculatedEnabled) {
+      if (usesExpression) {
         const selfConflict = calculationDependencies.some((dep) => String(dep || '').trim().toLowerCase() === String(effectiveId || '').trim().toLowerCase());
         if (selfConflict) {
-          showReportModal({ title: 'Invalid Calculated Field', icon: 'warning', message: 'Calculated field cannot depend on itself.' });
+          showReportModal({ title: 'Invalid Formula', icon: 'warning', message: 'A field cannot depend on itself.' });
           return;
         }
         const knownFieldIds = new Set(
@@ -1723,7 +1858,7 @@ num(value) <= 95</code></pre>
         );
         const unknownDep = calculationDependencies.find((dep) => !knownFieldIds.has(String(dep || '').trim().toLowerCase()));
         if (unknownDep) {
-          showReportModal({ title: 'Invalid Calculated Field', icon: 'warning', message: `Dependency "${unknownDep}" does not exist in current field list.` });
+          showReportModal({ title: 'Invalid Formula', icon: 'warning', message: `Dependency "${unknownDep}" does not exist in current field list.` });
           return;
         }
       }
@@ -1743,17 +1878,17 @@ num(value) <= 95</code></pre>
         id: effectiveId,
         label,
         type,
-        prefillKey: visualOnly ? '' : prefillKey,
+        prefillKey: visualOnly ? '' : (usesExpression ? '' : prefillKey),
         placeholderToken: visualOnly ? '' : placeholderToken,
         helpText,
         required: visualOnly ? false : required,
-        readOnly: visualOnly ? false : (calculatedEnabled ? true : readOnly),
+        readOnly: visualOnly ? false : (valueMode === VALUE_MODES.CALCULATED ? true : readOnly),
         sharedAcrossStudents,
         fullPageWidth: visualOnly ? true : fullPageWidth,
-        valueMode: visualOnly ? VALUE_MODES.MANUAL : (calculatedEnabled ? VALUE_MODES.CALCULATED : VALUE_MODES.MANUAL),
+        valueMode: visualOnly ? VALUE_MODES.MANUAL : valueMode,
         calculationRule: visualOnly
           ? { enabled: false, expression: '', onError: CALC_ON_ERROR.KEEP_LAST }
-          : (calculatedEnabled
+          : (usesExpression
             ? {
                 enabled: true,
                 expression: calculationExpression,
@@ -1764,7 +1899,7 @@ num(value) <= 95</code></pre>
                 expression: '',
                 onError: CALC_ON_ERROR.KEEP_LAST
               }),
-        calculationDependencies: visualOnly ? [] : (calculatedEnabled ? calculationDependencies : []),
+        calculationDependencies: visualOnly ? [] : (usesExpression ? calculationDependencies : []),
         hasBorder: visualOnly ? false : hasBorder,
         backgroundColor: visualOnly ? '' : backgroundColor,
         exportTextCase: visualOnly ? EXPORT_TEXT_CASES.AS_ENTERED : exportTextCase,
@@ -1793,6 +1928,7 @@ num(value) <= 95</code></pre>
       const valueHint = prefillHint || (type === 'checkbox' ? '' : 'Sample value');
       const options = Array.isArray(field.options) ? field.options : [];
       const calculatedMode = String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED;
+      const derivedMode = String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.DERIVED_EDITABLE;
 
       if (field.readOnly || calculatedMode) {
         if (type === 'textarea') {
@@ -1879,6 +2015,7 @@ num(value) <= 95</code></pre>
         field.sharedAcrossStudents ? '<span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span>' : '',
         field.fullPageWidth ? '<span class="badge bg-primary-subtle text-primary-emphasis border ms-1">Full width</span>' : '',
         String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED ? '<span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Auto-calculated</span>' : '',
+        String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.DERIVED_EDITABLE ? '<span class="badge bg-info-subtle text-info-emphasis border ms-1">Starts from catalog keys</span>' : '',
         field.hasBorder ? '<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1">Border</span>' : '',
         field.backgroundColor ? `<span class="badge border ms-1" style="background-color:${escapeHtml(field.backgroundColor)};">Back color</span>` : '',
         normalizeExportTextCase(field.exportTextCase) !== EXPORT_TEXT_CASES.AS_ENTERED ? `<span class="badge bg-dark-subtle text-dark border ms-1">DOCX: ${escapeHtml(normalizeExportTextCase(field.exportTextCase))}</span>` : ''
@@ -2017,7 +2154,13 @@ num(value) <= 95</code></pre>
     btnValidationHelp?.addEventListener('click', () => openExpressionHelp('validation'));
     btnConversionHelp?.addEventListener('click', () => openExpressionHelp('conversion'));
     fieldEditorTypeInput?.addEventListener('change', updateFieldEditorOptionsVisibility);
-    fieldEditorCalculatedEnabledInput?.addEventListener('change', updateFieldEditorOptionsVisibility);
+    fieldEditorValueModeInput?.addEventListener('change', updateFieldEditorOptionsVisibility);
+    btnBrowsePrefillKey?.addEventListener('click', () => choosePrefillCatalogKey({ setPrefillKey: true }));
+    btnInsertCatalogKeyFormula?.addEventListener('click', () => choosePrefillCatalogKey({ targetInput: fieldEditorCalculationExpressionInput }));
+    btnInsertCatalogKeyConversion?.addEventListener('click', () => choosePrefillCatalogKey({ targetInput: fieldEditorConversionExpressionInput }));
+    btnClearFieldExpression?.addEventListener('click', () => {
+      if (fieldEditorCalculationExpressionInput) fieldEditorCalculationExpressionInput.value = '';
+    });
     insertCalcFieldFormulaBtn?.addEventListener('click', () => {
       const selected = String(fieldEditorCalculationFieldList?.value || '').trim();
       if (!selected) return;

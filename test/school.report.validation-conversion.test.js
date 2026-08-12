@@ -3,6 +3,24 @@ const assert = require('node:assert/strict');
 
 const reportRuleEngineService = require('../packages/school/MVC/services/school/reportRuleEngineService');
 const reportService = require('../packages/school/MVC/services/school/reportService');
+const reportController = require('../packages/school/MVC/controllers/school/reportController');
+const reportInstanceSaveService = require('../packages/school/MVC/services/school/reportInstanceSaveService');
+const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+
+function withPatched(target, replacements, callback) {
+  const originals = {};
+  Object.entries(replacements).forEach(([key, value]) => {
+    originals[key] = target[key];
+    target[key] = value;
+  });
+  return Promise.resolve()
+    .then(callback)
+    .finally(() => {
+      Object.entries(originals).forEach(([key, value]) => {
+        target[key] = value;
+      });
+    });
+}
 
 test('safe expression blocks unknown globals', () => {
   assert.throws(
@@ -173,32 +191,23 @@ test('digits and substr helpers split phone numbers for export conversion', () =
   assert.equal(formatted.value, '(123) 456-7890');
 });
 
-test('initials helper extracts first letter of each word for export conversion', () => {
-  const converted = reportRuleEngineService.convertFieldValueForExport({
+test('prefill catalog includes student_full_name_initial and initials conversion helper is removed', () => {
+  const catalog = reportService.getPrefillCatalog();
+  const studentKeys = catalog.studentOnly.map((row) => row.key);
+  assert.ok(studentKeys.includes('student_full_name_initial'));
+
+  const rejected = reportRuleEngineService.convertFieldValueForExport({
     field: {
       id: 'student_full_name',
       label: 'Student Name',
-      conversionRule: { enabled: true, expression: 'initials(value)', onError: 'use_raw' }
+      conversionRule: { enabled: true, expression: 'initials(value)', onError: 'empty' }
     },
     value: 'John Smith',
     answers: {},
     prefill: {}
   });
-  assert.equal(converted.value, 'JS');
-  assert.equal(converted.diagnostic, null);
-
-  const empty = reportRuleEngineService.convertFieldValueForExport({
-    field: {
-      id: 'student_full_name',
-      label: 'Student Name',
-      conversionRule: { enabled: true, expression: 'initials(value)', onError: 'use_raw' }
-    },
-    value: '',
-    answers: {},
-    prefill: {}
-  });
-  assert.equal(empty.value, '');
-  assert.equal(empty.diagnostic, null);
+  assert.equal(rejected.value, '');
+  assert.equal(Boolean(rejected.diagnostic), true);
 });
 
 test('javascript method chains in conversion expressions are rejected on save', () => {
@@ -678,4 +687,274 @@ test('calculated expressions longer than 240 chars still evaluate', () => {
     prefill: {}
   });
   assert.equal(recomputed.answers.avg, 83.75);
+});
+
+const reportTemplateModel = require('../packages/school/MVC/models/school/reportTemplateModel');
+
+test('derived_editable field accepts prefill-only formula without field dependencies', () => {
+  const sanitized = reportTemplateModel.sanitizeTemplate({
+    orgId: '900000',
+    type: 'progress_report_v1',
+    title: 'Derived Template',
+    status: 'draft',
+    allowedReportScopes: ['class'],
+    schema: {
+      fields: [{
+        id: 'student_name_combo',
+        label: 'Student Name Combo',
+        type: 'text',
+        valueMode: 'derived_editable',
+        calculationRule: {
+          enabled: true,
+          expression: 'concat(prefill.student_first_name, " ", prefill.student_last_name)',
+          onError: 'keep_last'
+        },
+        calculationDependencies: []
+      }]
+    }
+  });
+  assert.equal(sanitized.schema.fields[0].valueMode, 'derived_editable');
+  assert.equal(sanitized.schema.fields[0].readOnly, false);
+  assert.equal(sanitized.schema.fields[0].calculationRule.expression, 'concat(prefill.student_first_name, " ", prefill.student_last_name)');
+});
+
+test('calculated field with only prefill references passes validation plan', () => {
+  const template = {
+    schema: {
+      fields: [{
+        id: 'full_name_init',
+        label: 'Full Name Initial',
+        type: 'text',
+        valueMode: 'calculated',
+        calculationRule: {
+          enabled: true,
+          expression: 'prefill.student_full_name_initial',
+          onError: 'empty'
+        },
+        calculationDependencies: []
+      }]
+    }
+  };
+  const plan = reportRuleEngineService.buildCalculatedFieldPlan(template, { strict: true });
+  assert.deepEqual(plan.orderedIds, ['full_name_init']);
+});
+
+test('recomputeCalculatedAnswers skips derived_editable fields', () => {
+  const template = {
+    schema: {
+      fields: [
+        {
+          id: 'derived_combo',
+          label: 'Derived Combo',
+          type: 'text',
+          valueMode: 'derived_editable',
+          calculationRule: {
+            enabled: true,
+            expression: 'concat(prefill.student_first_name, prefill.student_last_name)',
+            onError: 'keep_last'
+          }
+        },
+        {
+          id: 'calc_total',
+          label: 'Calc Total',
+          type: 'number',
+          valueMode: 'calculated',
+          calculationRule: {
+            enabled: true,
+            expression: 'num(answers.part_a) + num(answers.part_b)',
+            onError: 'empty'
+          },
+          calculationDependencies: ['part_a', 'part_b']
+        },
+        { id: 'part_a', label: 'Part A', type: 'number', valueMode: 'manual' },
+        { id: 'part_b', label: 'Part B', type: 'number', valueMode: 'manual' }
+      ]
+    }
+  };
+  const result = reportRuleEngineService.recomputeCalculatedAnswers({
+    template,
+    mergedAnswers: { part_a: 2, part_b: 3, derived_combo: 'user edit' },
+    prefill: { student_first_name: 'John', student_last_name: 'Smith' }
+  });
+  assert.equal(result.answers.derived_combo, 'user edit');
+  assert.equal(result.answers.calc_total, 5);
+});
+
+test('isDerivedEditableField identifies derived editable mode', () => {
+  assert.equal(reportRuleEngineService.isDerivedEditableField({ id: 'x', type: 'text', valueMode: 'derived_editable' }), true);
+  assert.equal(reportRuleEngineService.isDerivedEditableField({ id: 'x', type: 'text', valueMode: 'calculated' }), false);
+});
+
+test('hydrateInitialAnswersFromPrefill evaluates multi-key derived_editable expression', () => {
+  const template = {
+    schema: {
+      fields: [{
+        id: 'student_name_combo',
+        label: 'Student Name Combo',
+        type: 'text',
+        valueMode: 'derived_editable',
+        calculationRule: {
+          enabled: true,
+          expression: 'concat(prefill.student_first_name, " ", prefill.student_last_name)',
+          onError: 'keep_last'
+        }
+      }]
+    }
+  };
+  const instance = {
+    answers: {},
+    prefillSnapshot: { student_first_name: 'Sam', student_last_name: 'Olsen' }
+  };
+  const hydrated = reportController.hydrateInitialAnswersFromPrefill(template, instance);
+  assert.equal(hydrated.changed, true);
+  assert.equal(hydrated.answers.student_name_combo, 'Sam Olsen');
+});
+
+test('hydrateInitialAnswersFromPrefill preserves derived_editable answers already stored', () => {
+  const template = {
+    schema: {
+      fields: [{
+        id: 'student_name_combo',
+        label: 'Student Name Combo',
+        type: 'text',
+        valueMode: 'derived_editable',
+        calculationRule: {
+          enabled: true,
+          expression: 'concat(prefill.student_first_name, " ", prefill.student_last_name)',
+          onError: 'keep_last'
+        }
+      }]
+    }
+  };
+  const instance = {
+    answers: { student_name_combo: 'User Override' },
+    prefillSnapshot: { student_first_name: 'Sam', student_last_name: 'Olsen' }
+  };
+  const hydrated = reportController.hydrateInitialAnswersFromPrefill(template, instance);
+  assert.equal(hydrated.changed, false);
+  assert.equal(hydrated.answers.student_name_combo, 'User Override');
+});
+
+test('prefill refresh preview marks derived_editable overrides as skippedDueToOverride', async () => {
+  const template = {
+    schema: {
+      fields: [{
+        id: 'student_name_combo',
+        label: 'Student Name Combo',
+        type: 'text',
+        valueMode: 'derived_editable',
+        calculationRule: {
+          enabled: true,
+          expression: 'concat(prefill.student_first_name, " ", prefill.student_last_name)',
+          onError: 'keep_last'
+        }
+      }]
+    }
+  };
+  const instance = {
+    answers: { student_name_combo: 'User Override' },
+    derivedOverrides: { student_name_combo: true },
+    prefillSnapshot: { student_first_name: 'Sam', student_last_name: 'Olsen' },
+    teacherId: 'T-1',
+    studentId: 'S-1',
+    classId: 'C-1',
+    orgId: '900000',
+    sessionId: 'SES-1',
+    sessionDate: '2026-01-01'
+  };
+
+  await withPatched(reportService, {
+    buildPrefillSnapshot: async () => ({
+      student_first_name: 'NewFirst',
+      student_last_name: 'NewLast'
+    })
+  }, async () => {
+    const preview = await reportController.buildPrefillRefreshPreview({
+      instance,
+      template,
+      assignment: null,
+      reqUser: { id: 'USER-1' }
+    });
+    const change = preview.changes.find((item) => item.prefillKey === '__field__student_name_combo');
+    assert.ok(change);
+    assert.equal(change.expressionDriven, true);
+    assert.equal(change.fields[0].skippedDueToOverride, true);
+  });
+});
+
+test('persistInstanceAnswers tracks derivedOverrides for edited derived_editable fields', async () => {
+  const template = {
+    schema: {
+      fields: [{
+        id: 'student_name_combo',
+        label: 'Student Name Combo',
+        type: 'text',
+        valueMode: 'derived_editable',
+        calculationRule: {
+          enabled: true,
+          expression: 'concat(prefill.student_first_name, " ", prefill.student_last_name)',
+          onError: 'keep_last'
+        }
+      }]
+    }
+  };
+  const instance = {
+    id: 'INS-1',
+    status: 'draft',
+    answers: {},
+    derivedOverrides: {},
+    prefillSnapshot: { student_first_name: 'Sam', student_last_name: 'Olsen' },
+    audit: {}
+  };
+
+  await withPatched(schoolDataService, {
+    updateData: async (_entityType, _id, payload) => ({ id: 'INS-1', ...payload })
+  }, async () => {
+    const result = await reportInstanceSaveService.persistInstanceAnswers({
+      instance,
+      template,
+      assignment: { reportScope: 'class' },
+      body: {
+        submitAction: 'save',
+        field__student_name_combo: 'Custom Name'
+      },
+      reqUser: { id: 'USER-1' }
+    });
+    assert.equal(result.updatedInstance.derivedOverrides.student_name_combo, true);
+    assert.equal(result.studentAnswers.student_name_combo, 'Custom Name');
+  });
+});
+
+test('derived_editable edited answer exports through conversion rules', () => {
+  const template = {
+    schema: {
+      fields: [{
+        id: 'student_name_combo',
+        label: 'Student Name Combo',
+        type: 'text',
+        valueMode: 'derived_editable',
+        calculationRule: {
+          enabled: true,
+          expression: 'concat(prefill.student_first_name, " ", prefill.student_last_name)',
+          onError: 'keep_last'
+        },
+        conversionRule: {
+          enabled: true,
+          expression: 'concat("Edited: ", value)',
+          onError: 'use_raw'
+        }
+      }]
+    },
+    placeholderMap: { student_name_combo: '{{student_name_combo}}' }
+  };
+  const instance = {
+    answers: { student_name_combo: 'Custom Name' },
+    prefillSnapshot: { student_first_name: 'Sam', student_last_name: 'Olsen' }
+  };
+
+  const merged = reportService.mergeTemplateData(template, instance, null);
+  const bundle = reportService.buildPlaceholderPayloadDetailed(template, instance, null);
+
+  assert.equal(merged.student_name_combo, 'Custom Name');
+  assert.equal(bundle.placeholders['{{student_name_combo}}'], 'Edited: Custom Name');
 });

@@ -1859,7 +1859,7 @@ function buildInstanceAnswers(template, body = {}, existingMerged = {}) {
     const visualOnly = fieldType === 'section' || fieldType === 'subheader' || fieldType === 'row_break';
     if (visualOnly || !field?.id) return;
     const calculatedField = reportRuleEngineService.isCalculatedField(field);
-    if (field.readOnly === true || calculatedField) {
+    if (calculatedField || field.readOnly === true) {
       const prev = existing[field.id];
       if (field.type === 'checkbox') {
         answers[field.id] = prev === true || String(prev).toLowerCase() === 'true';

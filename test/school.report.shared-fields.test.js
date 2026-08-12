@@ -322,6 +322,7 @@ test('report template editor renders valid client JavaScript with DOCX shortcuts
     {
       title: 'Edit Report Template',
       actionStateId: 'ACTION-1',
+      user: { id: 'USER-1', activeOrgId: '900000' },
       template: {
         id: 'TPL-1',
         title: 'Progress',
@@ -338,6 +339,12 @@ test('report template editor renders valid client JavaScript with DOCX shortcuts
         common: [], classOnly: [], gradebookPeriodClass: [], gradebookPeriodSkillsClass: [], examPeriodClass: [],
         studentOnly: [], gradebookPeriodStudent: [], gradebookPeriodSkillsStudent: [], examPeriodStudent: []
       }
+    },
+    {
+      views: [
+        path.join(ROOT, 'packages/school/MVC/views'),
+        path.join(ROOT, 'MVC/views')
+      ]
     }
   );
   assert.match(html, /"docxAlias":"x6i4"/);
@@ -912,6 +919,7 @@ test('report template prefill catalog keys are all produced with correct represe
           assert.equal(snapshot.session_date, '2026-06-18');
           assert.equal(snapshot.student_preferred_name, 'Student Preferred');
           assert.equal(snapshot.student_full_name, 'Student One');
+          assert.equal(snapshot.student_full_name_initial, 'SO');
           assert.equal(snapshot.student_email, 'student@example.com');
           assert.equal(snapshot.student_phone, '555-0100');
           assert.deepEqual(snapshot.student_phones, [

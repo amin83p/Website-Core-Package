@@ -218,6 +218,9 @@
           "id": "778768"
         },
         {
+          "id": "778770"
+        },
+        {
           "id": "445569"
         },
         {
@@ -469,7 +472,95 @@
         }
       ],
       "subsections": [],
-      "related": [],
+      "related": [
+        {
+          "id": "778770"
+        }
+      ],
+      "adoptExisting": true
+    },
+    {
+      "id": "778770",
+      "name": "SCHOOL_ATTENDANCE_REPORT",
+      "category": "SCHOOL",
+      "description": "Student-centric attendance report across enrolled classes for a selected date range.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/attendances/report",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1006",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1010",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [
+        {
+          "id": "778768"
+        }
+      ],
       "adoptExisting": true
     },
     {
@@ -3535,6 +3626,18 @@
       "adoptExisting": true
     },
     {
+      "id": "SYM_SYSTEM_133",
+      "name": "SCHOOL_ATTENDANCE_REPORT",
+      "type": "class",
+      "value": "bi bi-person-lines-fill",
+      "tags": [
+        "SCHOOL_ATTENDANCE_REPORT",
+        "778770"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
       "id": "SYM_SYSTEM_034",
       "name": "SCHOOL_CLASSES",
       "type": "class",
@@ -4438,6 +4541,26 @@
         },
         {
           "sectionId": "778768",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "778770",
           "adminAccess": false,
           "operations": [
             {
@@ -5807,6 +5930,26 @@
           ]
         },
         {
+          "sectionId": "778770",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
           "sectionId": "445570",
           "adminAccess": false,
           "operations": [
@@ -7063,6 +7206,26 @@
         },
         {
           "sectionId": "778768",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "778770",
           "adminAccess": false,
           "operations": [
             {

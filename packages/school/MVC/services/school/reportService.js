@@ -141,6 +141,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_middle_name', label: 'Student Middle Name', description: 'Student middle name from person profile.' }),
     Object.freeze({ key: 'student_last_name', label: 'Student Last Name', description: 'Student last name from person profile.' }),
     Object.freeze({ key: 'student_full_name', label: 'Student Full Name', description: 'Student full name from person profile.' }),
+    Object.freeze({ key: 'student_full_name_initial', label: 'Student Full Name Initial', description: 'Initials from student full name (first letter of each word).' }),
     Object.freeze({ key: 'student_preferred_name', label: 'Student Preferred Name', description: 'Student preferred display name.' }),
     Object.freeze({ key: 'student_active', label: 'Student Active', description: 'Whether student person profile is active.' }),
     Object.freeze({ key: 'student_gender', label: 'Student Gender', description: 'Student gender from person profile.' }),
@@ -1238,6 +1239,12 @@ function getPersonNameParts(person) {
   return { first, middle, last, preferred, full };
 }
 
+function buildNameInitials(fullName) {
+  const text = fullName === undefined || fullName === null ? '' : String(fullName);
+  const matches = text.match(/\b\w/g);
+  return matches ? matches.join('') : '';
+}
+
 function getPersonDisplayName(person, fallback = '') {
   const parts = getPersonNameParts(person);
   return firstNonEmpty(parts.preferred, parts.full, fallback);
@@ -1562,6 +1569,7 @@ function buildStudentCollectionRow({ personId, person, studentRecord, rosterName
     student_middle_name: nameParts.middle,
     student_last_name: nameParts.last,
     student_full_name: fullName,
+    student_full_name_initial: buildNameInitials(fullName),
     student_preferred_name: nameParts.preferred || displayName,
     student_display_name: displayName,
     student_attendance_span_total_sessions: attendanceSummary.totalSessions,
@@ -2014,6 +2022,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_middle_name: studentNameParts.middle,
     student_last_name: studentNameParts.last,
     student_full_name: studentNameParts.full,
+    student_full_name_initial: buildNameInitials(studentNameParts.full),
     student_preferred_name: studentNameParts.preferred,
     student_active: studentPerson ? studentPerson?.active === true : '',
     student_gender: String(studentPerson?.demographics?.gender || ''),

@@ -4,6 +4,7 @@ const reportIntegrityService = require('./reportIntegrityService');
 const reportInstanceSaveService = require('./reportInstanceSaveService');
 const sessionConductService = require('./sessionConductService');
 const reportViewService = require('./reportViewService');
+const reportGenerationEngineService = require('./reportGenerationEngineService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getPrefillValue } = require('./reportPrefillKeyUtils');
@@ -832,9 +833,39 @@ async function buildMatrixExportPayload({ assignmentId, assignmentRowId = '', te
   });
   const rows = [];
   for (const row of matrix.rows) {
-    const instance = findMatchingInstance(source.instances, { assignmentId: source.assignment.id, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, studentId: row.studentId });
-    const effective = instance || { id: '', status: 'pending', studentId: row.studentId, teacherId: source.resolvedTeacherId, answers: {}, prefillSnapshot: await reportService.buildPrefillSnapshot({ assignment: source.assignment, teacherId: source.resolvedTeacherId, studentId: row.studentId, reqUser }) };
-    rows.push({ studentId: row.studentId, studentName: row.studentName, status: row.status, locked: row.locked, pending: row.isPending, instanceId: row.instanceId, prefillSnapshot: effective.prefillSnapshot || {}, answers: effective.answers || {}, rawAnswers: effective.answers || {}, mergedAnswers: reportService.mergeTemplateData(source.template, effective, source.assignment) });
+    const instance = findMatchingInstance(source.instances, {
+      assignmentId: source.assignment.id,
+      assignmentRowId: source.assignmentRowId,
+      teacherId: source.resolvedTeacherId,
+      studentId: row.studentId
+    });
+    const effective = instance || await reportGenerationEngineService.buildSyntheticInstance({
+      template: source.template,
+      assignment: source.assignment,
+      teacherId: source.resolvedTeacherId,
+      studentId: row.studentId,
+      reqUser
+    });
+    const payload = await reportGenerationEngineService.buildStudentPayload({
+      template: source.template,
+      assignment: source.assignment,
+      instance: effective,
+      reqUser,
+      options: { format: 'json' }
+    });
+    rows.push({
+      studentId: row.studentId,
+      studentName: row.studentName,
+      status: row.status,
+      locked: row.locked,
+      pending: row.isPending,
+      instanceId: row.instanceId,
+      prefillSnapshot: effective.prefillSnapshot || {},
+      answers: effective.answers || {},
+      rawAnswers: effective.answers || {},
+      mergedAnswers: payload.mergedAnswers,
+      warnings: payload.warnings || []
+    });
   }
   return {
     assignmentId: matrix.assignmentId,

@@ -6,6 +6,7 @@ const sessionIdRemapService = require('./sessionIdRemapService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
+const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { getActiveDataBackendMode } = requireCoreModule('MVC/infrastructure/runtime/dataBackendRuntime');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -55,6 +56,7 @@ function resolvePolicyModel(catalogEntry) {
   if (catalogEntry?.policyModel === 'attendanceMatrix') return attendanceMatrixPolicyModel;
   if (catalogEntry?.policyModel === 'conductRatingScale') return conductRatingScalePolicyModel;
   if (catalogEntry?.policyModel === 'autosave') return autosavePolicyModel;
+  if (catalogEntry?.policyModel === 'studentAttendanceReport') return studentAttendanceReportPolicyModel;
   return null;
 }
 

@@ -4,17 +4,14 @@
  *
  * Per-session length: from session startTime/endTime, else durationHours, else policy scheduledMinutes.
  *
- * Attendance percentage (always time-weighted, regardless of status label):
+ * Attendance percentage (configurable via org rollupFormula in school settings):
  * - excused → full session weight
  * - N/A / not_applicable → excluded from the denominator
- * - unmarked → excluded from the denominator
+ * - unmarked → excluded by default, or counted as absent when configured
  * - present / late / absent / acf → credit = weight × presenceRatio
- *   presenceRatio = max(0, scheduled - late - early) / scheduled
- *   lateExcused / earlyLeaveExcused are display-only; they do not waive missed time in rollup math
- *   absent / acf with no late/early minutes → presenceRatio = 0
- *
- * Threshold cutoffs (when enabled) may change stored status on roster save only;
- * they do not zero out or override percentage credit.
+ *   presenceRatio = max(0, scheduled - rollupLatePenalty - rollupEarlyPenalty) / scheduled
+ *   rollup penalties apply per-duration grace minutes; timing excuse flags follow rollupFormula
+ * - disqualifyLateMinutes / etc. affect roster save status only, not rollup grace
  */
 
 const ATTENDANCE_STATUS = Object.freeze({
@@ -91,6 +88,110 @@ function isUnmarkedAttendanceStatus(status) {
 function isAbsentLikeStatus(status) {
   const st = normalizeStatus(status);
   return st === ATTENDANCE_STATUS.ABSENT || st === ATTENDANCE_STATUS.ACF;
+}
+
+const ROLLUP_UNMARKED_TREATMENTS = Object.freeze({
+  EXCLUDE: 'exclude',
+  COUNT_AS_ABSENT: 'count_as_absent'
+});
+
+const ROLLUP_TIMING_EXCUSE_TREATMENTS = Object.freeze({
+  REDUCE_CREDIT: 'reduce_credit',
+  WAIVE_PENALTY: 'waive_penalty',
+  COUNT_AS_ABSENT: 'count_as_absent'
+});
+
+const DEFAULT_ROLLUP_FORMULA = Object.freeze({
+  includeUnmarkedSessions: false,
+  countUnmarkedAsAbsent: false,
+  includeLateGrace: true,
+  includeEarlyGrace: true,
+  includeLateExcusedRule: true,
+  includeEarlyExcusedRule: true,
+  lateExcusedTreatment: ROLLUP_TIMING_EXCUSE_TREATMENTS.REDUCE_CREDIT,
+  earlyExcusedTreatment: ROLLUP_TIMING_EXCUSE_TREATMENTS.REDUCE_CREDIT,
+  unmarkedTreatment: ROLLUP_UNMARKED_TREATMENTS.EXCLUDE,
+  timingExcuseTreatment: ROLLUP_TIMING_EXCUSE_TREATMENTS.REDUCE_CREDIT
+});
+
+function rollupFeatureFlag(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (value === false || value === 0) return false;
+  const token = String(value).trim().toLowerCase();
+  if (['false', '0', 'off', 'no'].includes(token)) return false;
+  if (['true', '1', 'on', 'yes'].includes(token)) return true;
+  return fallback;
+}
+
+function normalizeTimingExcuseTreatmentValue(value, fallback = ROLLUP_TIMING_EXCUSE_TREATMENTS.REDUCE_CREDIT) {
+  const token = String(value || fallback || '').trim().toLowerCase();
+  if (token === ROLLUP_TIMING_EXCUSE_TREATMENTS.WAIVE_PENALTY) return ROLLUP_TIMING_EXCUSE_TREATMENTS.WAIVE_PENALTY;
+  if (token === ROLLUP_TIMING_EXCUSE_TREATMENTS.COUNT_AS_ABSENT) return ROLLUP_TIMING_EXCUSE_TREATMENTS.COUNT_AS_ABSENT;
+  return ROLLUP_TIMING_EXCUSE_TREATMENTS.REDUCE_CREDIT;
+}
+
+function normalizeRollupFormula(formula = {}) {
+  const source = formula && typeof formula === 'object' ? formula : {};
+  const legacyUnmarked = String(source.unmarkedTreatment || DEFAULT_ROLLUP_FORMULA.unmarkedTreatment).trim().toLowerCase();
+  const legacyTiming = normalizeTimingExcuseTreatmentValue(source.timingExcuseTreatment);
+
+  const includeUnmarkedSessions = source.includeUnmarkedSessions !== undefined
+    ? rollupFeatureFlag(source.includeUnmarkedSessions, false)
+    : legacyUnmarked === ROLLUP_UNMARKED_TREATMENTS.COUNT_AS_ABSENT;
+  const countUnmarkedAsAbsent = source.countUnmarkedAsAbsent !== undefined
+    ? rollupFeatureFlag(source.countUnmarkedAsAbsent, false)
+    : legacyUnmarked === ROLLUP_UNMARKED_TREATMENTS.COUNT_AS_ABSENT;
+
+  const includeLateGrace = rollupFeatureFlag(source.includeLateGrace, true);
+  const includeEarlyGrace = rollupFeatureFlag(source.includeEarlyGrace, true);
+  const includeLateExcusedRule = rollupFeatureFlag(source.includeLateExcusedRule, true);
+  const includeEarlyExcusedRule = rollupFeatureFlag(source.includeEarlyExcusedRule, true);
+
+  const lateExcusedTreatment = normalizeTimingExcuseTreatmentValue(
+    source.lateExcusedTreatment || source.timingExcuseTreatment,
+    legacyTiming
+  );
+  const earlyExcusedTreatment = normalizeTimingExcuseTreatmentValue(
+    source.earlyExcusedTreatment || source.timingExcuseTreatment,
+    lateExcusedTreatment
+  );
+
+  const unmarkedTreatment = includeUnmarkedSessions && countUnmarkedAsAbsent
+    ? ROLLUP_UNMARKED_TREATMENTS.COUNT_AS_ABSENT
+    : ROLLUP_UNMARKED_TREATMENTS.EXCLUDE;
+  const timingExcuseTreatment = lateExcusedTreatment === earlyExcusedTreatment
+    ? lateExcusedTreatment
+    : ROLLUP_TIMING_EXCUSE_TREATMENTS.REDUCE_CREDIT;
+
+  return {
+    includeUnmarkedSessions,
+    countUnmarkedAsAbsent,
+    includeLateGrace,
+    includeEarlyGrace,
+    includeLateExcusedRule,
+    includeEarlyExcusedRule,
+    lateExcusedTreatment,
+    earlyExcusedTreatment,
+    unmarkedTreatment,
+    timingExcuseTreatment
+  };
+}
+
+function isEligibleRollupStatus(status, rollupFormula = DEFAULT_ROLLUP_FORMULA) {
+  if (isNotApplicableStatus(status)) return false;
+  if (isUnmarkedAttendanceStatus(status)) {
+    return normalizeRollupFormula(rollupFormula).includeUnmarkedSessions;
+  }
+  return true;
+}
+
+function countsAsAbsentForRollupSummary(status, rollupFormula = DEFAULT_ROLLUP_FORMULA) {
+  const formula = normalizeRollupFormula(rollupFormula);
+  if (isAbsentLikeStatus(status)) return true;
+  if (isUnmarkedAttendanceStatus(status)) {
+    return formula.includeUnmarkedSessions && formula.countUnmarkedAsAbsent;
+  }
+  return false;
 }
 
 /** Counted toward attendance % — excludes N/A and unmarked (not yet decided). */
@@ -301,10 +402,56 @@ function normalizeAttendanceTimingFields(record = {}) {
 
 function attendanceTimingPenaltyMinutes(record = {}) {
   const timing = normalizeAttendanceTimingFields(record);
-  // Timing excuse flags are informational only; missed minutes always reduce rollup credit.
+  // Roster save thresholds use raw minutes; rollup uses rollupPenaltyMinutes.
   return {
     latePenaltyMinutes: timing.lateMinutes,
     earlyLeavePenaltyMinutes: timing.earlyLeaveMinutes
+  };
+}
+
+function rollupPenaltyMinutes(record = {}, policy = {}) {
+  const timing = normalizeAttendanceTimingFields(record);
+  const formula = normalizeRollupFormula(policy?.rollupFormula);
+  const lateGrace = formula.includeLateGrace
+    ? Math.max(0, Number(policy?.rollupLateGraceMinutes) || 0)
+    : 0;
+  const earlyGrace = formula.includeEarlyGrace
+    ? Math.max(0, Number(policy?.rollupEarlyLeaveGraceMinutes) || 0)
+    : 0;
+  let latePenaltyMinutes = Math.max(0, timing.lateMinutes - lateGrace);
+  let earlyPenaltyMinutes = Math.max(0, timing.earlyLeaveMinutes - earlyGrace);
+
+  if (
+    formula.includeLateExcusedRule
+    && formula.lateExcusedTreatment === ROLLUP_TIMING_EXCUSE_TREATMENTS.WAIVE_PENALTY
+    && timing.lateExcused
+  ) {
+    latePenaltyMinutes = 0;
+  }
+  if (
+    formula.includeEarlyExcusedRule
+    && formula.earlyExcusedTreatment === ROLLUP_TIMING_EXCUSE_TREATMENTS.WAIVE_PENALTY
+    && timing.earlyLeaveExcused
+  ) {
+    earlyPenaltyMinutes = 0;
+  }
+
+  const countAsAbsentForExcuse = (
+    formula.includeLateExcusedRule
+    && formula.lateExcusedTreatment === ROLLUP_TIMING_EXCUSE_TREATMENTS.COUNT_AS_ABSENT
+    && timing.lateExcused
+    && timing.lateMinutes > 0
+  ) || (
+    formula.includeEarlyExcusedRule
+    && formula.earlyExcusedTreatment === ROLLUP_TIMING_EXCUSE_TREATMENTS.COUNT_AS_ABSENT
+    && timing.earlyLeaveExcused
+    && timing.earlyLeaveMinutes > 0
+  );
+
+  return {
+    latePenaltyMinutes,
+    earlyPenaltyMinutes,
+    countAsAbsentForExcuse
   };
 }
 
@@ -420,6 +567,9 @@ function resolvePolicy(classData = {}, orgPolicyLayer = {}) {
       : {};
   const ap = { ...org, ...cls };
   const thresholdsEnabled = policyThresholdsAreEnabled(org);
+  const rollupFormula = normalizeRollupFormula(
+    org.rollupFormula || orgPolicyLayer?.rollupFormula || cls.rollupFormula
+  );
   const num = (v, fallback) => {
     const n = Number(v);
     return Number.isFinite(n) ? n : fallback;
@@ -427,6 +577,8 @@ function resolvePolicy(classData = {}, orgPolicyLayer = {}) {
   const scheduled = num(ap.scheduledMinutes, 180);
   const disqualifyLate = num(ap.disqualifyLateMinutes, 30);
   const disqualifyEarly = num(ap.disqualifyEarlyLeaveMinutes, 30);
+  const rollupLateGrace = num(ap.rollupLateGraceMinutes, 0);
+  const rollupEarlyGrace = num(ap.rollupEarlyLeaveGraceMinutes, 0);
   let combined = ap.disqualifyCombinedMissedMinutes;
   if (combined === '' || combined === undefined || combined === null) {
     combined = null;
@@ -436,10 +588,13 @@ function resolvePolicy(classData = {}, orgPolicyLayer = {}) {
   }
   return {
     thresholdsEnabled,
+    rollupFormula,
     scheduledMinutes: scheduled > 0 ? scheduled : 180,
     disqualifyLateMinutes: disqualifyLate >= 0 ? disqualifyLate : 30,
     disqualifyEarlyLeaveMinutes: disqualifyEarly >= 0 ? disqualifyEarly : 30,
-    disqualifyCombinedMissedMinutes: combined
+    disqualifyCombinedMissedMinutes: combined,
+    rollupLateGraceMinutes: rollupLateGrace >= 0 ? rollupLateGrace : 0,
+    rollupEarlyLeaveGraceMinutes: rollupEarlyGrace >= 0 ? rollupEarlyGrace : 0
   };
 }
 
@@ -455,18 +610,19 @@ function pickOrgPolicyLayerForMinutes(orgPolicyLayer, scheduledMinutes) {
     : (Array.isArray(orgPolicyLayer) ? orgPolicyLayer : null);
   if (!items) return orgPolicyLayer;
   const thresholdsEnabled = policyThresholdsAreEnabled(orgPolicyLayer);
-  if (!items.length) return { thresholdsEnabled };
+  const rollupFormula = normalizeRollupFormula(orgPolicyLayer?.rollupFormula);
+  if (!items.length) return { thresholdsEnabled, rollupFormula };
   const mins = Number(scheduledMinutes);
   if (Number.isFinite(mins) && mins > 0) {
     const exact = items.find((item) => Number(item?.scheduledMinutes) === mins);
-    if (exact) return { ...exact, thresholdsEnabled };
+    if (exact) return { ...exact, thresholdsEnabled, rollupFormula };
   }
   const def = items.find((item) => item && item.isDefault)
     || items.find((item) => Number(item?.scheduledMinutes) === 180)
     || items[0];
   return def && typeof def === 'object'
-    ? { ...def, thresholdsEnabled }
-    : { thresholdsEnabled };
+    ? { ...def, thresholdsEnabled, rollupFormula }
+    : { thresholdsEnabled, rollupFormula };
 }
 
 function resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, scheduledMinutes) {
@@ -490,7 +646,8 @@ function computePresenceRatio(record, policy) {
   const timing = normalizeAttendanceTimingFields(record);
   const late = timing.lateMinutes;
   const early = timing.earlyLeaveMinutes;
-  const penalty = attendanceTimingPenaltyMinutes(timing);
+  const penalty = rollupPenaltyMinutes(record, policy);
+  if (penalty.countAsAbsentForExcuse) return 0;
   const rawStatus = record?.status !== undefined ? record.status : record?.attendance;
   const st = normalizeStatus(rawStatus);
 
@@ -498,7 +655,7 @@ function computePresenceRatio(record, policy) {
     return 0;
   }
 
-  const attended = Math.max(0, sched - penalty.latePenaltyMinutes - penalty.earlyLeavePenaltyMinutes);
+  const attended = Math.max(0, sched - penalty.latePenaltyMinutes - penalty.earlyPenaltyMinutes);
   return attended / sched;
 }
 
@@ -509,15 +666,25 @@ function computePresenceRatio(record, policy) {
  */
 function computeSessionCredit(record, sessionWeight, policy) {
   const st = resolveEffectiveAttendanceStatus(record, policy);
+  const rollupFormula = normalizeRollupFormula(policy?.rollupFormula);
 
   if (st === ATTENDANCE_STATUS.NOT_APPLICABLE) {
     return { credit: 0, disqualified: false, exempt: true, reason: 'not_applicable' };
   }
   if (st === '') {
+    const formula = normalizeRollupFormula(policy?.rollupFormula);
+    if (formula.includeUnmarkedSessions) {
+      return { credit: 0, disqualified: false, reason: formula.countUnmarkedAsAbsent ? 'unmarked_absent' : 'unmarked_zero' };
+    }
     return { credit: 0, disqualified: false, exempt: false, reason: 'no_record' };
   }
   if (st === ATTENDANCE_STATUS.EXCUSED) {
     return { credit: sessionWeight, disqualified: false, reason: 'excused_full' };
+  }
+
+  const penalty = rollupPenaltyMinutes(record, policy);
+  if (penalty.countAsAbsentForExcuse) {
+    return { credit: 0, disqualified: false, reason: 'excuse_counts_absent' };
   }
 
   const presenceRatio = computePresenceRatio({ ...record, status: st }, policy);
@@ -537,12 +704,13 @@ function computeSessionCredit(record, sessionWeight, policy) {
 function computeRosterAttendancePercent(records, classData = {}, orgPolicyLayer = {}) {
   const allRecords = Array.isArray(records) ? records : [];
   const enabledStatuses = resolveEnabledAttendanceStatuses(classData);
+  const rollupFormula = normalizeRollupFormula(orgPolicyLayer?.rollupFormula);
   const prepared = allRecords.map((rec) => {
     const policy = resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, rec?.scheduledMinutes);
     const effectiveStatus = resolveEffectiveAttendanceStatus(rec, policy, enabledStatuses);
     return { rec, policy, effectiveStatus };
   });
-  const eligible = prepared.filter((row) => isEligibleAttendanceStatus(row.effectiveStatus));
+  const eligible = prepared.filter((row) => isEligibleRollupStatus(row.effectiveStatus, rollupFormula));
   const n = eligible.length;
   if (!n) return null;
 
@@ -567,12 +735,13 @@ function computeRosterAttendancePercent(records, classData = {}, orgPolicyLayer 
 function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {}) {
   const allRecords = Array.isArray(records) ? records : [];
   const enabledStatuses = resolveEnabledAttendanceStatuses(classData);
+  const rollupFormula = normalizeRollupFormula(orgPolicyLayer?.rollupFormula);
   const preparedRecords = allRecords.map((rec) => {
     const policy = resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, rec?.scheduledMinutes);
     const effectiveStatus = resolveEffectiveAttendanceStatus(rec, policy, enabledStatuses);
     return { rec, policy, effectiveStatus };
   });
-  const eligibleRecords = preparedRecords.filter((row) => isEligibleAttendanceStatus(row.effectiveStatus));
+  const eligibleRecords = preparedRecords.filter((row) => isEligibleRollupStatus(row.effectiveStatus, rollupFormula));
   const n = eligibleRecords.length;
   const notApplicableSessionCount = preparedRecords.filter((row) => isNotApplicableStatus(row.effectiveStatus)).length;
   if (!n) {
@@ -595,16 +764,21 @@ function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {
 
   for (const row of eligibleRecords) {
     const { rec, policy, effectiveStatus: st } = row;
-    if (st === ATTENDANCE_STATUS.PRESENT || st === ATTENDANCE_STATUS.LATE) totalPresentSessions += 1;
-    if (isAbsentLikeStatus(st)) totalAbsentSessions += 1;
-
-    const { credit, disqualified } = computeSessionCredit(
+    const sessionCredit = computeSessionCredit(
       { ...rec, status: st },
       sessionWeight,
       policy
     );
-    sumCredit += credit;
-    if (disqualified) disqualifiedSessionCount += 1;
+    const excuseCountsAbsent = sessionCredit.reason === 'excuse_counts_absent';
+    if ((st === ATTENDANCE_STATUS.PRESENT || st === ATTENDANCE_STATUS.LATE) && !excuseCountsAbsent) {
+      totalPresentSessions += 1;
+    }
+    if (countsAsAbsentForRollupSummary(st, rollupFormula) || excuseCountsAbsent) {
+      totalAbsentSessions += 1;
+    }
+
+    sumCredit += sessionCredit.credit;
+    if (sessionCredit.disqualified) disqualifiedSessionCount += 1;
   }
 
   const performancePercentRaw = sumCredit;
@@ -648,6 +822,13 @@ module.exports = {
   normalizeAttendanceTimingExcuseFlag,
   normalizeAttendanceTimingFields,
   attendanceTimingPenaltyMinutes,
+  rollupPenaltyMinutes,
+  normalizeRollupFormula,
+  isEligibleRollupStatus,
+  countsAsAbsentForRollupSummary,
+  DEFAULT_ROLLUP_FORMULA,
+  ROLLUP_UNMARKED_TREATMENTS,
+  ROLLUP_TIMING_EXCUSE_TREATMENTS,
   computePresenceRatio,
   computeSessionCredit,
   computeRosterAttendancePercent,

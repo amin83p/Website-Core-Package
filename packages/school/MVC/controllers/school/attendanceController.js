@@ -22,6 +22,8 @@ const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityServ
 const schoolRecordAccessService = require('../../services/school/schoolRecordAccessService');
 const matrixWindowService = require('../../services/school/matrixWindowService');
 const matrixRollupService = require('../../services/school/matrixRollupService');
+const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
+const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
 
 function buildAttendanceRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
@@ -1088,11 +1090,158 @@ async function updateAttendanceRosterCell(req, res) {
     }
 }
 
+async function showStudentAttendanceReportPage(req, res) {
+    try {
+        const q = req.query || {};
+        const initialStartDate = String(q.startDate || '').trim();
+        const initialEndDate = String(q.endDate || '').trim();
+        const initialStudentIds = parseIdListParam(q.studentIds || q.personIds || '');
+        let initialStudents = [];
+        if (initialStudentIds.length) {
+            const studentAttendanceReportService = require('../../services/school/studentAttendanceReportService');
+            initialStudents = await studentAttendanceReportService.resolveSelectedStudents(req, initialStudentIds);
+        }
+        const activeOrgId = String(req.user?.activeOrgId || '').trim();
+        const policy = activeOrgId
+            ? await studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId)
+            : studentAttendanceReportPolicyService.resolvePolicy();
+        const [reportTemplate, overallTemplate] = await Promise.all([
+            policy.reportTemplateId
+                ? schoolDataService.getDataById('reportTemplates', policy.reportTemplateId, req.user)
+                : null,
+            policy.overallReportTemplateId
+                ? schoolDataService.getDataById('overallReportTemplates', policy.overallReportTemplateId, req.user)
+                : null
+        ]);
+        res.render('school/attendance/studentAttendanceReportViewer', {
+            title: 'Student Attendance Report',
+            includeModal: true,
+            user: req.user,
+            actionStateId: req.actionStateId,
+            tableName: 'Student_Attendance_Report',
+            initialStartDate,
+            initialEndDate,
+            initialStudentIds,
+            initialStudents,
+            canGenerateReport: Boolean(policy.reportTemplateId),
+            reportTemplateLabel: studentAttendanceReportPolicyService.formatTemplateLabel(
+                reportTemplate,
+                policy.reportTemplateId
+            ),
+            overallReportTemplateLabel: studentAttendanceReportPolicyService.formatTemplateLabel(
+                overallTemplate,
+                policy.overallReportTemplateId
+            )
+        });
+    } catch (error) {
+        res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    }
+}
+
+async function generateStudentAttendanceReport(req, res) {
+    try {
+        const studentAttendanceReportGenerationService = require('../../services/school/studentAttendanceReportGenerationService');
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const fauxReq = {
+            user: req.user,
+            query: {
+                startDate: body.startDate || req.query?.startDate,
+                endDate: body.endDate || req.query?.endDate,
+                studentIds: body.studentIds || req.query?.studentIds
+            }
+        };
+        const result = await studentAttendanceReportGenerationService.generateStudentAttendanceReports(fauxReq);
+        res.setHeader('Content-Type', result.contentType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${String(result.fileName || 'student_attendance_report').replace(/"/g, '')}"`);
+        return res.send(result.buffer);
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not generate student attendance report.'
+        });
+    }
+}
+
+async function getStudentAttendanceReportData(req, res) {
+    try {
+        const studentAttendanceReportService = require('../../services/school/studentAttendanceReportService');
+        const payload = await studentAttendanceReportService.buildStudentAttendanceReportPayload(req);
+        res.json({
+            status: 'success',
+            ...payload
+        });
+    } catch (error) {
+        res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function getStudentAttendanceReportExportPlan(req, res) {
+    try {
+        const studentAttendanceReportGenerationService = require('../../services/school/studentAttendanceReportGenerationService');
+        const q = req.query || {};
+        const fauxReq = {
+            user: req.user,
+            query: {
+                startDate: q.startDate,
+                endDate: q.endDate,
+                studentIds: q.studentIds || q.personIds
+            }
+        };
+        const plan = await studentAttendanceReportGenerationService.buildStudentAttendanceReportExportPlan(fauxReq);
+        return res.json({ status: 'success', plan });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not build student attendance export plan.'
+        });
+    }
+}
+
+async function exportStudentAttendanceReport(req, res) {
+    try {
+        const studentAttendanceReportGenerationService = require('../../services/school/studentAttendanceReportGenerationService');
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const fauxReq = {
+            user: req.user,
+            body,
+            query: {
+                startDate: body.startDate || req.query?.startDate,
+                endDate: body.endDate || req.query?.endDate,
+                studentIds: body.studentIds || req.query?.studentIds
+            }
+        };
+        const result = await studentAttendanceReportGenerationService.exportStudentAttendanceReportSelections(fauxReq);
+        res.setHeader('Content-Type', result.contentType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${String(result.fileName || 'student_attendance_export').replace(/"/g, '')}"`);
+        return res.send(result.buffer);
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not export student attendance reports.'
+        });
+    }
+}
+
+function parseIdListParam(value = '') {
+    if (Array.isArray(value)) {
+        return value.map((item) => String(item || '').trim()).filter(Boolean);
+    }
+    return String(value || '')
+        .split(/[,|]/)
+        .map((item) => String(item || '').trim())
+        .filter(Boolean);
+}
+
 module.exports = {
     showAttendancePage,
+    showStudentAttendanceReportPage,
+    generateStudentAttendanceReport,
+    getStudentAttendanceReportExportPlan,
+    exportStudentAttendanceReport,
     listActiveAttendanceClasses,
     buildAttendanceMatrixPayload,
     getAttendanceData,
+    getStudentAttendanceReportData,
     postAttendanceRollups,
     exportAttendanceExcel,
     uploadAttendanceFile,

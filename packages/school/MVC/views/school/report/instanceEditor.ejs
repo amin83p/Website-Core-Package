@@ -434,6 +434,7 @@
                           <% const rawVal = mergedData[field.id]; %>
                           <% const value = (rawVal === undefined || rawVal === null) ? '' : rawVal; %>
                           <% const calculatedField = String(field.valueMode || 'manual').trim().toLowerCase() === 'calculated'; %>
+                          <% const derivedEditableField = String(field.valueMode || 'manual').trim().toLowerCase() === 'derived_editable'; %>
                           <% const readOnlyField = field.readOnly === true || calculatedField; %>
                           <% const fullWidthField = field.fullPageWidth === true || String(field.fullPageWidth).toLowerCase() === 'true'; %>
                           <% const fieldColClass = fullWidthField ? 'col-12' : 'col'; %>
@@ -458,6 +459,7 @@
                                 <% if (hasSharedFields && field.sharedAcrossStudents === true) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %>
                                 <% if (readOnlyField) { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } %>
                                 <% if (calculatedField) { %><span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Auto-calculated</span><% } %>
+                                <% if (derivedEditableField) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Starts from catalog keys</span><% } %>
                               </label>
 
                               <% if (readOnlyField) { %>
@@ -555,6 +557,7 @@
                       <% const rawVal = mergedData[field.id]; %>
                       <% const value = (rawVal === undefined || rawVal === null) ? '' : rawVal; %>
                       <% const calculatedField = String(field.valueMode || 'manual').trim().toLowerCase() === 'calculated'; %>
+                      <% const derivedEditableField = String(field.valueMode || 'manual').trim().toLowerCase() === 'derived_editable'; %>
                       <% const readOnlyField = field.readOnly === true || calculatedField; %>
                       <% const fullWidthField = field.fullPageWidth === true || String(field.fullPageWidth).toLowerCase() === 'true'; %>
                       <% const fieldColClass = fullWidthField ? 'col-12' : 'col'; %>
@@ -579,6 +582,7 @@
                             <% if (hasSharedFields && field.sharedAcrossStudents === true) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %>
                             <% if (readOnlyField) { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } %>
                             <% if (calculatedField) { %><span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Auto-calculated</span><% } %>
+                            <% if (derivedEditableField) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Starts from catalog keys</span><% } %>
                           </label>
                           <% if (readOnlyField) { %>
                             <% if (field.type === 'textarea') { %>
@@ -1178,7 +1182,7 @@
         const newValues = fields.map((field) => formatPreviewValue(field.newValue)).join('<hr class="my-1">');
         return `
           <tr>
-            <td><input type="checkbox" class="form-check-input js-prefill-refresh-key" value="${escapeHtml(change.prefillKey)}" checked></td>
+            <td><input type="checkbox" class="form-check-input js-prefill-refresh-key" value="${escapeHtml(change.prefillKey)}" ${change.fields?.some((field) => field.skippedDueToOverride) ? '' : 'checked'}></td>
             <td>${escapeHtml(labels || '-')}</td>
             <td>${currentValues || '<span class="text-muted">empty</span>'}</td>
             <td>${oldValues || '<span class="text-muted">empty</span>'}</td>
@@ -1280,7 +1284,12 @@
     }
 
     function normalizeValueMode(rawMode) {
-      return String(rawMode || 'manual').trim().toLowerCase() === 'calculated' ? 'calculated' : 'manual';
+      return String(rawMode || 'manual').trim().toLowerCase() === 'calculated' ? 'calculated'
+        : (String(rawMode || 'manual').trim().toLowerCase() === 'derived_editable' ? 'derived_editable' : 'manual');
+    }
+
+    function isDerivedEditableField(field) {
+      return !isVisualOnlyField(field) && normalizeValueMode(field?.valueMode) === 'derived_editable';
     }
 
     function isCalculatedField(field) {

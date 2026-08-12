@@ -535,6 +535,7 @@ module.exports = {
   getEffectiveTargetRows,
   findEffectiveTargetRow,
   applyTargetRowToAssignment,
+  sanitizeAssignment,
   getAllAssignments,
   getAssignmentById,
   addAssignment,

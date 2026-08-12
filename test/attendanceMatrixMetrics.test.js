@@ -13,6 +13,7 @@ const {
   assertAttendanceStatusAllowedForSave,
   coerceAttendanceStatusToEnabled,
   resolveEffectiveAttendanceStatus,
+  computePresenceRatio,
   ALL_ATTENDANCE_STATUSES_ORDERED
 } = require('../packages/school/MVC/services/school/attendanceMatrixMetricsService');
 
@@ -473,4 +474,75 @@ test('coerceAttendanceStatusToEnabled maps disabled late to absent but keeps N/A
   assert.equal(coerceAttendanceStatusToEnabled('not_applicable', enabled), 'not_applicable');
   assert.equal(coerceAttendanceStatusToEnabled('present', enabled), 'present');
   assert.equal(coerceAttendanceStatusToEnabled('', enabled), '');
+});
+
+test('rollup grace minutes waive small late penalties per duration item', () => {
+  const policy = {
+    scheduledMinutes: 120,
+    includeLateGrace: true,
+    rollupLateGraceMinutes: 5,
+    rollupEarlyLeaveGraceMinutes: 0,
+    rollupFormula: {
+      includeLateGrace: true,
+      includeEarlyGrace: true,
+      timingExcuseTreatment: 'reduce_credit'
+    }
+  };
+  const full = computeSessionCredit({ status: 'late', lateMinutes: 5, scheduledMinutes: 120 }, 100, policy);
+  assert.equal(full.credit, 100);
+  const partial = computeSessionCredit({ status: 'late', lateMinutes: 6, scheduledMinutes: 120 }, 100, policy);
+  assert.ok(Math.abs(partial.credit - (100 * (119 / 120))) < 1e-9);
+});
+
+test('rollup formula can count unmarked sessions as absent', () => {
+  const catalog = {
+    rollupFormula: {
+      includeUnmarkedSessions: true,
+      countUnmarkedAsAbsent: true
+    },
+    items: [{ scheduledMinutes: 180, isDefault: true }]
+  };
+  const summary = computeStudentMatrixSummary([
+    { status: 'present', scheduledMinutes: 180 },
+    { status: '', scheduledMinutes: 180 }
+  ], {}, catalog);
+  assert.equal(summary.totalEligibleSessions, 2);
+  assert.equal(summary.totalPresentSessions, 1);
+  assert.equal(summary.totalAbsentSessions, 1);
+  assert.equal(summary.performancePercent, 50);
+});
+
+test('rollup formula can waive excused timing penalties', () => {
+  const policy = {
+    scheduledMinutes: 120,
+    rollupFormula: {
+      includeLateExcusedRule: true,
+      lateExcusedTreatment: 'waive_penalty'
+    }
+  };
+  const ratio = computePresenceRatio({
+    status: 'late',
+    lateMinutes: 30,
+    lateExcused: true,
+    scheduledMinutes: 120
+  }, policy);
+  assert.equal(ratio, 1);
+});
+
+test('rollup formula can count excused timing as absent', () => {
+  const policy = {
+    scheduledMinutes: 120,
+    rollupFormula: {
+      includeLateExcusedRule: true,
+      lateExcusedTreatment: 'count_as_absent'
+    }
+  };
+  const credit = computeSessionCredit({
+    status: 'late',
+    lateMinutes: 10,
+    lateExcused: true,
+    scheduledMinutes: 120
+  }, 50, policy);
+  assert.equal(credit.credit, 0);
+  assert.equal(credit.reason, 'excuse_counts_absent');
 });

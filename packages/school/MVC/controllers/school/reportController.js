@@ -16,6 +16,7 @@ const reportAssignmentBulkRowService = require('../../services/school/reportAssi
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
+const reportGenerationEngineService = require('../../services/school/reportGenerationEngineService');
 const matrixWindowService = require('../../services/school/matrixWindowService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const reportFunderPdfService = require('../../services/school/reportFunderPdfService');
@@ -208,77 +209,23 @@ function sendGuardedResponse(res, guardResult, duplicateMessage, duplicateStatus
 }
 
 function hydrateInitialAnswersFromPrefill(template, instance, options = {}) {
-  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
-  const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
-    ? instance.prefillSnapshot
-    : {};
-  const currentAnswers = instance?.answers && typeof instance.answers === 'object'
-    ? { ...instance.answers }
-    : {};
-  const overwritePrefillFields = options?.overwritePrefillFields === true;
-  let changed = false;
-
-  fields.forEach((field) => {
-    const type = String(field?.type || '').trim().toLowerCase();
-    if (!field?.id || type === 'section' || type === 'subheader' || type === 'row_break') return;
-    const resolvedPrefill = getPrefillValue(prefill, field?.prefillKey);
-    if (!resolvedPrefill.found) return;
-
-    const currentValue = currentAnswers[field.id];
-    const hasCurrentValue = !(currentValue === undefined || currentValue === null || String(currentValue) === '');
-    const looksRating = /session_rating|classEffort|classParticipation|respectsTeachers|respectsStudents|conduct/i.test(
-      String(field?.prefillKey || '')
-    );
-    const currentIsNa = ['n/a', 'na'].includes(String(currentValue ?? '').trim().toLowerCase());
-    const canOverwriteNaRating = looksRating && currentIsNa;
-    if (hasCurrentValue && !overwritePrefillFields && !canOverwriteNaRating) return;
-
-    const rawPrefill = resolvedPrefill.value;
-    let nextValue = rawPrefill;
-    if (type === 'checkbox') {
-      nextValue = rawPrefill === true || String(rawPrefill).toLowerCase() === 'true' || String(rawPrefill) === '1';
-    } else if (type === 'number') {
-      const n = Number(rawPrefill);
-      nextValue = Number.isFinite(n) ? n : '';
-    } else if (rawPrefill === undefined || rawPrefill === null) {
-      nextValue = '';
-    } else {
-      nextValue = String(rawPrefill).trim();
-    }
-
-    currentAnswers[field.id] = nextValue;
-    changed = true;
-  });
-
-  return { changed, answers: currentAnswers };
+  return reportGenerationEngineService.hydrateAnswersFromPrefill(template, instance, options);
 }
 
 function coercePrefillValueForField(field, rawPrefill) {
-  const type = String(field?.type || '').trim().toLowerCase();
-  if (type === 'checkbox') {
-    return rawPrefill === true || String(rawPrefill).toLowerCase() === 'true' || String(rawPrefill) === '1';
-  }
-  if (type === 'number') {
-    const n = Number(rawPrefill);
-    return Number.isFinite(n) ? n : '';
-  }
-  if (Array.isArray(rawPrefill)) {
-    if (rawPrefill.length && rawPrefill.every((item) => item && typeof item === 'object' && Object.prototype.hasOwnProperty.call(item, 'number'))) {
-      return reportService.formatStudentPhonesList(rawPrefill);
-    }
-    return rawPrefill.map((item) => String(item ?? '')).filter(Boolean).join(', ');
-  }
-  if (rawPrefill === undefined || rawPrefill === null) return '';
-  return String(rawPrefill).trim();
+  return reportGenerationEngineService.coercePrefillValueForField(field, rawPrefill);
+}
+
+function evaluateExpressionFieldValue(field, answers, prefill) {
+  return reportGenerationEngineService.evaluateExpressionFieldValue(field, answers, prefill);
+}
+
+function coerceExpressionValueForField(field, rawValue) {
+  return reportGenerationEngineService.coerceExpressionValueForField(field, rawValue);
 }
 
 function stableValueToken(value) {
-  if (value === undefined) return '__undefined__';
-  try {
-    return JSON.stringify(value);
-  } catch (_) {
-    return String(value);
-  }
+  return reportGenerationEngineService.stableValueToken(value);
 }
 
 function buildAssignmentSnapshotFallback(instance, assignment) {
@@ -311,6 +258,40 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
   fields.forEach((field) => {
     const type = String(field?.type || '').trim().toLowerCase();
     if (!field?.id || type === 'section' || type === 'subheader' || type === 'row_break') return;
+
+    const valueMode = reportRuleEngineService.normalizeValueMode(field?.valueMode);
+    if (valueMode === 'calculated' || valueMode === 'derived_editable') {
+      const oldExprValue = evaluateExpressionFieldValue(field, instance?.answers || {}, oldPrefill);
+      const newExprValue = evaluateExpressionFieldValue(field, instance?.answers || {}, refreshedPrefill);
+      if (stableValueToken(oldExprValue) === stableValueToken(newExprValue)) return;
+
+      const changeKey = `__field__${String(field.id)}`;
+      const oldValue = coerceExpressionValueForField(field, oldExprValue);
+      const newValue = coerceExpressionValueForField(field, newExprValue);
+      const skippedDueToOverride = valueMode === 'derived_editable'
+        && instance?.derivedOverrides?.[field.id] === true;
+
+      changesByKey.set(changeKey, {
+        prefillKey: changeKey,
+        expressionDriven: true,
+        fieldId: String(field.id),
+        oldRawValue: oldExprValue,
+        newRawValue: newExprValue,
+        fields: [{
+          fieldId: String(field.id || ''),
+          label: String(field.label || field.id || ''),
+          type,
+          oldValue,
+          newValue,
+          currentValue: currentMerged[field.id],
+          oldRawValue: oldExprValue,
+          newRawValue: newExprValue,
+          skippedDueToOverride
+        }]
+      });
+      return;
+    }
+
     const prefillKey = reportService.normalizePrefillKey(field?.prefillKey || '');
     if (!prefillKey) return;
 
@@ -1711,11 +1692,19 @@ async function applyInstancePrefillRefresh(req, res) {
     const nextAnswers = {
       ...((instance.answers && typeof instance.answers === 'object') ? instance.answers : {})
     };
+    const nextDerivedOverrides = {
+      ...((instance.derivedOverrides && typeof instance.derivedOverrides === 'object') ? instance.derivedOverrides : {})
+    };
     selectedChanges.forEach((change) => {
-      nextPrefill[change.prefillKey] = change.newRawValue;
+      if (!change?.expressionDriven) {
+        nextPrefill[change.prefillKey] = change.newRawValue;
+      }
       (change.fields || []).forEach((fieldChange) => {
         if (!fieldChange?.fieldId) return;
         nextAnswers[fieldChange.fieldId] = fieldChange.newValue;
+        if (change.expressionDriven) {
+          nextDerivedOverrides[fieldChange.fieldId] = false;
+        }
       });
     });
 
@@ -1737,13 +1726,14 @@ async function applyInstancePrefillRefresh(req, res) {
     fields.forEach((field) => {
       const type = String(field?.type || '').trim().toLowerCase();
       if (!field?.id || type === 'section' || type === 'subheader' || type === 'row_break') return;
-      if (String(field?.valueMode || 'manual').trim().toLowerCase() !== 'calculated') return;
+      if (reportRuleEngineService.normalizeValueMode(field?.valueMode) !== 'calculated') return;
       nextAnswers[field.id] = recomputedAfterPrefillRefresh.answers[field.id];
     });
 
     await schoolDataService.updateData('reportInstances', instance.id, {
       prefillSnapshot: nextPrefill,
       answers: nextAnswers,
+      derivedOverrides: nextDerivedOverrides,
       audit: {
         lastUpdateUser: req.user?.id || '',
         lastUpdateDateTime: new Date().toISOString(),
@@ -2497,6 +2487,8 @@ module.exports = {
   deleteInstance,
   previewInstanceDocxExport,
   previewInstancePdfExport,
-  exportInstance
+  exportInstance,
+  hydrateInitialAnswersFromPrefill,
+  buildPrefillRefreshPreview
 };
 

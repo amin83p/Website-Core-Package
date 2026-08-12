@@ -1,0 +1,1825 @@
+<style>
+    .att-cell { text-align: center; vertical-align: middle; min-width: 64px; position: relative; }
+    .att-cell[data-sar-cell-key] { cursor: pointer; }
+    .status-present { color: #198754; font-weight: bold; }
+    .status-late { color: #ffc107; font-weight: bold; }
+    .status-excused { color: #0dcaf0; font-weight: bold; }
+    .status-absent { color: #dc3545; font-weight: bold; }
+    .status-acf { color: #b02a37; font-weight: bold; }
+    .status-na { color: #adb5bd; }
+    .attendance-no-session-cell {
+        background-color: #f1f3f5;
+        min-width: 64px;
+        text-align: center;
+        vertical-align: middle;
+    }
+    .sar-no-session-icon {
+        color: #6c757d;
+        font-size: 0.9rem;
+        line-height: 1;
+        opacity: 0.75;
+    }
+    .student-report-wrapper { max-height: 520px; overflow: auto; border: 1px solid #dee2e6; border-radius: 12px; }
+    .student-report-table th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 2;
+        font-size: 0.72rem;
+        white-space: nowrap;
+    }
+    .student-report-table th.matrix-sticky-rollup,
+    .student-report-table td.matrix-sticky-rollup {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        border-right: 1px solid #dee2e6;
+        background-color: #f8f9fa;
+        width: 96px;
+        min-width: 96px;
+        max-width: 96px;
+        vertical-align: middle;
+    }
+    .student-report-table td.matrix-sticky-rollup { background-color: #fff; z-index: 2; }
+    .student-report-table th.matrix-sticky-class,
+    .student-report-table td.matrix-sticky-class {
+        position: sticky;
+        left: 96px;
+        z-index: 3;
+        background-color: #f8f9fa;
+        min-width: 180px;
+        max-width: 220px;
+        border-right: 2px solid #dee2e6;
+        box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.06);
+    }
+    .student-report-table td.matrix-sticky-class { background-color: #fff; z-index: 1; }
+    .student-summary-chip { font-size: 0.82rem; }
+    .sar-selected-students-menu {
+        min-width: 320px;
+        max-width: min(420px, 100vw - 24px);
+        max-height: min(360px, calc(100vh - 120px));
+        overflow-y: auto;
+    }
+    .sar-selected-student-row {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        background: #fff;
+        padding: 0.35rem 0.5rem;
+        margin-bottom: 0.35rem;
+    }
+    .sar-selected-student-row:last-child { margin-bottom: 0; }
+    .sar-collapse-chevron {
+        transition: transform 0.2s ease;
+        font-size: 0.9rem;
+    }
+    .sar-collapse-toggle[aria-expanded="true"] .sar-collapse-chevron {
+        transform: rotate(180deg);
+    }
+    .schedule-shell .filter-panel {
+        background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
+        border: 1px solid #dce9ff;
+        border-radius: 14px;
+    }
+    .schedule-shell .range-chip.active {
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+    }
+    .sar-comment-thread { max-height: 300px; overflow-y: auto; background: #f8f9fa; border-radius: 6px; padding: 10px; }
+    .sar-comment-bubble { background: #fff; border: 1px solid #e9ecef; border-radius: 8px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .sar-comment-time { font-size: 0.72rem; color: #6c757d; }
+    .sar-comment-author { font-weight: 600; font-size: 0.85rem; }
+    .sar-mention-badge { display: inline-block; background: #e7f1ff; color: #0d6efd; border-radius: 4px; padding: 0 0.35rem; font-size: 0.75rem; }
+    .sar-detail-label { font-size: 0.72rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 0.15rem; }
+    .sar-detail-value { font-size: 0.92rem; }
+    .sar-readonly-notice { border-left: 3px solid #0d6efd; background: #f8f9fa; border-radius: 6px; padding: 0.65rem 0.85rem; font-size: 0.85rem; }
+    .sar-export-table-wrap { max-height: min(480px, 55vh); overflow: auto; border: 1px solid #e9ecef; border-radius: 10px; }
+    .sar-export-table th.sar-export-student-col,
+    .sar-export-table td.sar-export-student-col {
+        position: sticky;
+        left: 0;
+        min-width: 160px;
+        max-width: 200px;
+        z-index: 2;
+        background: var(--bs-body-bg);
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+    .sar-export-table thead th.sar-export-student-col { z-index: 3; background: #f8f9fa; }
+    .sar-export-table thead th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: #6c757d; }
+    .sar-export-class-row {
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 0.55rem 0.7rem;
+        margin-bottom: 0.5rem;
+        background: #f8fafc;
+        transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    .sar-export-class-row:hover { border-color: #cfe2ff; background: #fff; }
+    .sar-export-class-row:last-child { margin-bottom: 0; }
+    .sar-export-overall-cell { min-width: 240px; }
+    .sar-export-bulk-panel {
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 0.65rem 0.85rem;
+        background: #f8f9fa;
+    }
+    .sar-export-bulk-panel.overall-panel { background: linear-gradient(145deg, #f3f8ff 0%, #f8f9fa 100%); border-color: #dce9ff; }
+    .sar-export-bulk-toolbar { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
+    .sar-export-template-card {
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 0.65rem 0.85rem;
+        background: #fff;
+        min-height: 100%;
+    }
+    .sar-export-template-card.overall-card { border-color: #dce9ff; background: linear-gradient(145deg, #f8fbff 0%, #fff 100%); }
+    .sar-export-format-badge {
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+    .sar-export-class-name { font-weight: 600; font-size: 0.88rem; color: #212529; }
+    .sar-export-template-label { font-size: 0.78rem; color: #6c757d; }
+    #sarExportModal .modal-header { border-bottom: 1px solid #e9ecef; }
+    #sarExportModal .modal-footer { border-top: 1px solid #e9ecef; background: #f8f9fa; }
+</style>
+
+<%
+  const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
+    ? schoolSectionDashboardHref
+    : '/dashboard/section-nav/SCHOOL';
+  const manageBtns = [
+    '<a href="/school/attendances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-clipboard-check me-1"></i> Attendance Matrix</a>',
+    '<a href="/school/grades-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-table me-1"></i> Grades Matrix</a>'
+  ];
+%>
+
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName: typeof tableName !== 'undefined' ? tableName : 'Student_Attendance_Report',
+  btn_export: false,
+  print: false,
+  headerManageBtns: [
+    '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
+  ],
+  manageBtns
+}) %>
+
+<div class="schedule-shell">
+    <p class="text-muted small mb-3">Review attendance across all enrolled classes for one or more students. Pick students, set a date range, then apply to load the report.</p>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body py-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                    <div class="fw-semibold mb-1">Report templates</div>
+                    <div class="small text-muted mb-1">
+                        Report: <span id="sarSettingsReportTemplateLabel"><%= typeof reportTemplateLabel !== 'undefined' && reportTemplateLabel ? reportTemplateLabel : 'Not configured' %></span>
+                    </div>
+                    <div class="small text-muted">
+                        Overall: <span id="sarSettingsOverallTemplateLabel"><%= typeof overallReportTemplateLabel !== 'undefined' && overallReportTemplateLabel ? overallReportTemplateLabel : 'None (per-class DOCX/ZIP)' %></span>
+                    </div>
+                </div>
+                <a href="/school/settings#student-attendance-report" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-gear me-1"></i> School Settings
+                </a>
+            </div>
+            <% if (!canGenerateReport) { %>
+                <div class="alert alert-warning border-0 mt-3 mb-0 small" role="status">
+                    Configure a report template under School Settings before generating documents.
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+            <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Student Attendance Report</div>
+            <button
+                id="sarFilterToggleBtn"
+                type="button"
+                class="btn btn-outline-secondary btn-sm px-2"
+                data-bs-toggle="collapse"
+                data-bs-target="#sarFilterCollapse"
+                aria-expanded="true"
+                aria-controls="sarFilterCollapse"
+                aria-label="Close filters">
+                <i id="sarFilterToggleIcon" class="bi bi-chevron-up"></i>
+            </button>
+        </div>
+        <div class="collapse show" id="sarFilterCollapse">
+            <div class="card-body filter-panel p-3" id="sarFilterForm">
+                <div class="row g-3 align-items-end">
+                    <div class="col-lg-5 col-md-6">
+                        <label class="form-label">Students</label>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="btn_openStudentPicker">
+                                <i class="bi bi-people me-1"></i> Select Students
+                            </button>
+                            <div class="dropdown" id="selectedStudentsDropdown">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                    id="btn_selectedStudentsMenu"
+                                    data-bs-toggle="dropdown"
+                                    data-bs-auto-close="outside"
+                                    aria-expanded="false"
+                                    disabled>
+                                    <span id="selectedStudentsMenuLabel">No students selected</span>
+                                </button>
+                                <div class="dropdown-menu sar-selected-students-menu p-2" id="selectedStudentsMenu" aria-labelledby="btn_selectedStudentsMenu">
+                                    <div class="small text-muted px-1 pb-2">Order sets report precedence. Use arrows to reorder.</div>
+                                    <div id="selectedStudentsList"></div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_clearStudents" title="Clear students">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-lg-2 col-md-3">
+                        <label class="form-label" for="filter_startDate">Start Date</label>
+                        <input type="date" id="filter_startDate" class="form-control size-md">
+                    </div>
+                    <div class="col-lg-2 col-md-3">
+                        <label class="form-label" for="filter_endDate">End Date</label>
+                        <input type="date" id="filter_endDate" class="form-control size-md">
+                    </div>
+                    <div class="col-12 col-lg-3 d-flex justify-content-lg-end gap-2 pt-lg-2 flex-wrap">
+                        <button type="button" id="btn_copyReportLink" class="btn btn-outline-secondary btn-md" title="Copy a shareable link with the current students and date range">
+                            <i class="bi bi-link-45deg me-1"></i> Copy Link
+                        </button>
+                        <button type="button" id="btn_reset" class="btn btn-outline-secondary btn-md">Reset</button>
+                        <button type="button" id="btn_loadData" class="btn btn-filled btn-primary btn-md">
+                            <i class="bi bi-funnel me-1"></i> Apply
+                        </button>
+                        <button type="button" id="btn_generateReport" class="btn btn-success btn-md" <%= canGenerateReport ? '' : 'disabled' %>>
+                            <i class="bi bi-file-earmark-word me-1"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
+                <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
+                    <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="today">Today</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="twoWeeks">Two Weeks</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="thisWeek">This Week</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="prevWeek">Prev Week</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="thisMonth">This Month</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="prevMonth">Prev Month</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm d-none" id="resultsContainer">
+        <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="small text-muted">
+                <span class="me-3"><i class="bi bi-check-circle-fill text-success"></i> Present</span>
+                <span class="me-3"><i class="bi bi-clock-fill text-warning"></i> Late</span>
+                <span class="me-3"><i class="bi bi-envelope-paper-fill text-info"></i> Excused</span>
+                <span class="me-3"><i class="bi bi-x-circle-fill text-danger"></i> Absent</span>
+                <span class="me-3"><i class="bi bi-camera-video-off-fill status-acf"></i> ACF</span>
+                <span class="me-3"><i class="bi bi-percent text-secondary"></i> Rollup % = time-based credit</span>
+                <span><i class="bi bi-chat-dots-fill text-primary"></i> Notes Exist</span>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_expandAllStudents">Expand All</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_collapseAllStudents">Collapse All</button>
+            </div>
+        </div>
+        <div class="card-body" id="studentReportSections"></div>
+    </div>
+</div>
+
+<div class="modal fade" id="sarExportModal" tabindex="-1" aria-labelledby="sarExportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-3">
+                <div>
+                    <h5 class="modal-title fw-bold" id="sarExportModalLabel">
+                        <i class="bi bi-download me-2 text-primary"></i>Export Reports
+                    </h5>
+                    <div class="small text-muted mt-1" id="sarExportDateRange">Select students and a date range, then choose exports.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-3">
+                <div class="row g-3 mb-3" id="sarExportTemplateCards">
+                    <div class="col-md-6">
+                        <div class="sar-export-template-card h-100">
+                            <div class="small text-uppercase text-muted fw-semibold mb-1">Class report template</div>
+                            <div class="fw-semibold" id="sarExportReportTemplateTitle">—</div>
+                            <div class="small text-muted mt-1">Per-class attendance reports with DOCX, PDF, or payload export.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 d-none" id="sarExportOverallTemplateCardWrap">
+                        <div class="sar-export-template-card overall-card h-100">
+                            <div class="small text-uppercase text-muted fw-semibold mb-1">Overall report template</div>
+                            <div class="fw-semibold" id="sarExportOverallTemplateTitle">—</div>
+                            <div class="small text-muted mt-1">Merged report when all required class sources are selected.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sar-export-bulk-panel mb-3 d-none" id="sarExportClassBulkPanel">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <div>
+                            <div class="fw-semibold small"><i class="bi bi-journal-text me-1 text-primary"></i>Class report templates</div>
+                            <div class="small text-muted">Bulk export checked class reports only.</div>
+                        </div>
+                    </div>
+                    <div class="sar-export-bulk-toolbar">
+                        <button type="button" class="btn btn-outline-primary btn-sm js-sar-bulk-export" data-format="docx" data-export-scope="class">
+                            <i class="bi bi-filetype-docx me-1"></i>DOCX
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm js-sar-bulk-export" data-format="pdf" data-export-scope="class">
+                            <i class="bi bi-filetype-pdf me-1"></i>PDF
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm js-sar-bulk-export" data-format="json" data-export-scope="class">
+                            <i class="bi bi-braces me-1"></i>Payload
+                        </button>
+                    </div>
+                </div>
+
+                <div id="sarExportLoading" class="text-center text-muted py-5 d-none">
+                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
+                    Loading export options…
+                </div>
+                <div id="sarExportEmpty" class="text-center text-muted py-5 d-none">
+                    <i class="bi bi-inbox d-block fs-3 mb-2 opacity-50"></i>
+                    No exportable reports found for the current filters.
+                </div>
+                <div class="d-none" id="sarExportTableWrap">
+                    <div class="table-responsive sar-export-table-wrap">
+                        <table class="table table-sm align-middle sar-export-table mb-0" id="sarExportTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="sar-export-student-col ps-3">Student</th>
+                                    <th><i class="bi bi-journal-text me-1"></i>Class reports</th>
+                                    <th id="sarExportOverallHeader" class="sar-export-overall-cell d-none"><i class="bi bi-layers me-1"></i>Overall report</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sarExportTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="sar-export-bulk-panel overall-panel mt-3 d-none" id="sarExportOverallBulkPanel">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <div>
+                            <div class="fw-semibold small"><i class="bi bi-layers me-1 text-primary"></i>Overall report template</div>
+                            <div class="small text-muted">Bulk export checked overall reports only (DOCX and payload).</div>
+                        </div>
+                    </div>
+                    <div class="sar-export-bulk-toolbar">
+                        <button type="button" class="btn btn-outline-primary btn-sm js-sar-bulk-export" data-format="docx" data-export-scope="overall">
+                            <i class="bi bi-filetype-docx me-1"></i>DOCX
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm js-sar-bulk-export" data-format="json" data-export-scope="overall">
+                            <i class="bi bi-braces me-1"></i>Payload
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="sarCellDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-eye me-2"></i> Attendance Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 pb-3 border-bottom">
+                    <h5 class="fw-bold mb-1" id="sar_det_studentName">Student</h5>
+                    <div class="text-muted small" id="sar_det_classLine"></div>
+                    <div class="text-muted small" id="sar_det_dateLine"></div>
+                </div>
+
+                <div class="sar-readonly-notice mb-3">
+                    This view is read-only. To change attendance, notes, or comments, open the Attendance Matrix page in a new tab.
+                </div>
+
+                <p class="text-warning small mb-2 d-none" id="sar_det_lock_notice">This session is locked.</p>
+                <p class="text-warning small mb-2 d-none" id="sar_det_makeup_notice">This session requires a make-up session.</p>
+                <p class="text-secondary small mb-2 d-none" id="sar_det_enrollment_notice">This student was not enrolled for this session date.</p>
+
+                <div class="mb-3">
+                    <div class="sar-detail-label">Status</div>
+                    <div class="sar-detail-value d-flex align-items-center gap-2" id="sar_det_status"></div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <div class="sar-detail-label">Late arrival</div>
+                        <div class="sar-detail-value" id="sar_det_late"></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="sar-detail-label">Left early</div>
+                        <div class="sar-detail-value" id="sar_det_early"></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="sar-detail-label">Scheduled minutes</div>
+                        <div class="sar-detail-value" id="sar_det_scheduled"></div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="sar-detail-label">Excuse / reference</div>
+                    <div class="sar-detail-value" id="sar_det_excuseRef"></div>
+                    <div class="small mt-1" id="sar_det_excuseAttachment"></div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="sar-detail-label">Student note (roster)</div>
+                    <div class="sar-detail-value" id="sar_det_rosterNote"></div>
+                </div>
+
+                <div class="mb-0">
+                    <div class="sar-detail-label mb-2"><i class="bi bi-chat-text me-1"></i> Admin discussion</div>
+                    <div class="sar-comment-thread" id="sar_det_commentsThread"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="btn_sarOpenMatrix">
+                    <i class="bi bi-box-arrow-up-right me-1"></i> Open in Attendance Matrix
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/modal_GenericPicker') %>
+<%- include('../report/partials/reportMessageHelpers') %>
+<%- include('partials/tablePages-end') %>
+
+<script>
+(() => {
+    const initialStudentIds = <%- JSON.stringify(Array.isArray(initialStudentIds) ? initialStudentIds : []) %>;
+    const initialStudents = <%- JSON.stringify(Array.isArray(initialStudents) ? initialStudents : []) %>;
+    const initialStartDate = <%- JSON.stringify(initialStartDate || '') %>;
+    const initialEndDate = <%- JSON.stringify(initialEndDate || '') %>;
+    const canGenerateReport = <%= (typeof canGenerateReport !== 'undefined' && canGenerateReport) ? 'true' : 'false' %>;
+    const sarActionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+
+    let selectedStudents = [];
+    const cellDetailByKey = new Map();
+    let sarCellDetailModalInstance = null;
+    let sarCurrentMatrixUrl = '';
+    let sarExportPlan = null;
+    let sarExportModalInstance = null;
+
+    function getSarExportRoot() {
+        return document.getElementById('sarExportModal');
+    }
+
+    function showSarExportModal() {
+        const modalEl = document.getElementById('sarExportModal');
+        if (!modalEl || !window.bootstrap?.Modal) return;
+        sarExportModalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+        sarExportModalInstance.show();
+    }
+
+    function buildCellKey(personId, classId, date) {
+        return `${String(personId || '').trim()}|${String(classId || '').trim()}|${String(date || '').trim()}`;
+    }
+
+    function formatSchoolInstant(value) {
+        if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatSchoolInstant === 'function') {
+            return window.AppOrgDateTime.formatSchoolInstant(value);
+        }
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        const parsed = new Date(raw);
+        return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleString();
+    }
+
+    function renderSarAttachmentLink(attachment, emptyText = '—') {
+        const att = attachment && typeof attachment === 'object' ? attachment : null;
+        if (!att) return emptyText;
+        const href = String(att.url || att.dataUrl || att.uploadUrl || att.storagePath || att.path || '').trim();
+        const name = escapeHtml(att.name || att.originalName || 'Attached file');
+        if (!href) return `<span class="text-muted">${name}</span>`;
+        return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener" class="text-decoration-none"><i class="bi bi-paperclip me-1"></i>${name}</a>`;
+    }
+
+    function buildStatusLabel(detail = {}) {
+        const status = String(detail.status || '').trim();
+        if (status === 'present') return 'Present';
+        if (status === 'late') return 'Late';
+        if (status === 'excused') return 'Excused absence';
+        if (status === 'absent') return 'Absent';
+        if (status === 'acf') return 'Absent Camera Off';
+        if (status === 'not_applicable') {
+            if (detail.withinEnrollmentWindow === false) return 'N/A — not enrolled for this session';
+            if (detail.applicability === 'approved_leave') return 'N/A — approved leave';
+            if (detail.applicability === 'makeup_required') return 'N/A — make-up session required';
+            return 'Not applicable';
+        }
+        return status || 'Not marked';
+    }
+
+    function formatTimingDetail(minutes, excused, label) {
+        const mins = Number(minutes) || 0;
+        if (mins <= 0) return '—';
+        const excusedBadge = excused
+            ? ' <span class="badge bg-success-subtle text-success border border-success-subtle">Excused</span>'
+            : '';
+        return `${mins} min${excusedBadge}`;
+    }
+
+    function formatReadonlyText(value, emptyText = '—') {
+        const text = String(value || '').trim();
+        if (!text) return `<span class="text-muted">${escapeHtml(emptyText)}</span>`;
+        return escapeHtml(text);
+    }
+
+    function populateCellDetailsFromPayload(students = [], startDate = '', endDate = '') {
+        cellDetailByKey.clear();
+        students.forEach((student) => {
+            const personId = String(student?.personId || '').trim();
+            const studentName = String(student?.name || personId).trim();
+            const studentRecordId = String(student?.studentRecordId || '').trim();
+            (student.classes || []).forEach((classRow) => {
+                const classId = String(classRow.classId || '').trim();
+                const className = String(classRow.className || classId).trim();
+                const teacherName = String(classRow.teacherName || '').trim();
+                const matrixUrl = `/school/attendances?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&studentId=${encodeURIComponent(personId)}`;
+                (classRow.days || []).forEach((day) => {
+                    if (!day?.hasSession) return;
+                    const date = String(day.date || '').trim();
+                    if (!date) return;
+                    const matrixCellUrl = day.sessionId
+                        ? `${matrixUrl}&sessionId=${encodeURIComponent(day.sessionId)}`
+                        : matrixUrl;
+                    const key = buildCellKey(personId, classId, date);
+                    cellDetailByKey.set(key, {
+                        ...day,
+                        matrixUrl: matrixCellUrl,
+                        personId,
+                        studentName,
+                        studentRecordId,
+                        classId,
+                        className,
+                        teacherName
+                    });
+                });
+            });
+        });
+    }
+
+    function removeCellDetailsForPerson(student = {}) {
+        const personId = String(student?.personId || '').trim();
+        if (!personId) return;
+        const prefix = `${personId}|`;
+        for (const key of cellDetailByKey.keys()) {
+            if (key.startsWith(prefix)) cellDetailByKey.delete(key);
+        }
+    }
+
+    function ensureSarCellDetailModal() {
+        if (!sarCellDetailModalInstance && window.bootstrap?.Modal) {
+            const modalEl = document.getElementById('sarCellDetailModal');
+            if (modalEl) sarCellDetailModalInstance = new window.bootstrap.Modal(modalEl);
+        }
+        return sarCellDetailModalInstance;
+    }
+
+    function openCellDetailModal(cellKey = '') {
+        const key = String(cellKey || '').trim();
+        const detail = cellDetailByKey.get(key);
+        if (!detail) {
+            showReportMessage({ icon: 'error', message: 'Attendance details are not available for this cell.' });
+            return;
+        }
+
+        sarCurrentMatrixUrl = String(detail.matrixUrl || '').trim();
+
+        const studentNameEl = document.getElementById('sar_det_studentName');
+        if (studentNameEl) {
+            if (typeof schoolRenderStudentNameHtml === 'function') {
+                studentNameEl.innerHTML = schoolRenderStudentNameHtml(
+                    detail.studentName,
+                    detail.studentRecordId,
+                    { className: 'text-decoration-none fw-bold' }
+                );
+            } else {
+                studentNameEl.textContent = detail.studentName || detail.personId || 'Student';
+            }
+        }
+
+        const classLine = document.getElementById('sar_det_classLine');
+        if (classLine) {
+            const teacherSuffix = detail.teacherName ? ` · ${detail.teacherName}` : '';
+            classLine.textContent = `Class: ${detail.className || detail.classId || '—'}${teacherSuffix}`;
+        }
+
+        const dateLine = document.getElementById('sar_det_dateLine');
+        if (dateLine) dateLine.textContent = `Session date: ${detail.date || '—'}`;
+
+        const lockNotice = document.getElementById('sar_det_lock_notice');
+        const makeupNotice = document.getElementById('sar_det_makeup_notice');
+        const enrollmentNotice = document.getElementById('sar_det_enrollment_notice');
+        if (lockNotice) lockNotice.classList.toggle('d-none', !detail.sessionLocked);
+        if (makeupNotice) makeupNotice.classList.toggle('d-none', detail.applicability !== 'makeup_required');
+        if (enrollmentNotice) enrollmentNotice.classList.toggle('d-none', detail.withinEnrollmentWindow !== false);
+
+        const statusEl = document.getElementById('sar_det_status');
+        if (statusEl) {
+            statusEl.innerHTML = `${buildStatusIcon(detail)}<span class="fw-semibold">${escapeHtml(buildStatusLabel(detail))}</span>`;
+        }
+
+        const lateEl = document.getElementById('sar_det_late');
+        if (lateEl) lateEl.innerHTML = formatTimingDetail(detail.lateMinutes, detail.lateExcused, 'Late');
+
+        const earlyEl = document.getElementById('sar_det_early');
+        if (earlyEl) earlyEl.innerHTML = formatTimingDetail(detail.earlyLeaveMinutes, detail.earlyLeaveExcused, 'Early');
+
+        const scheduledEl = document.getElementById('sar_det_scheduled');
+        if (scheduledEl) {
+            const scheduled = Number(detail.scheduledMinutes) || 0;
+            scheduledEl.innerHTML = scheduled > 0 ? `${scheduled} min` : '<span class="text-muted">—</span>';
+        }
+
+        const excuseRefEl = document.getElementById('sar_det_excuseRef');
+        if (excuseRefEl) excuseRefEl.innerHTML = formatReadonlyText(detail.excuseRef);
+
+        const excuseAttachmentEl = document.getElementById('sar_det_excuseAttachment');
+        if (excuseAttachmentEl) {
+            excuseAttachmentEl.innerHTML = detail.excuseAttachment
+                ? renderSarAttachmentLink(detail.excuseAttachment)
+                : '';
+        }
+
+        const rosterNoteEl = document.getElementById('sar_det_rosterNote');
+        if (rosterNoteEl) rosterNoteEl.innerHTML = formatReadonlyText(detail.rosterStudentNotes);
+
+        const thread = document.getElementById('sar_det_commentsThread');
+        if (thread) {
+            const comments = Array.isArray(detail.comments) ? detail.comments : [];
+            if (!comments.length) {
+                thread.innerHTML = '<div class="text-muted small text-center py-2">No administrative notes.</div>';
+            } else {
+                thread.innerHTML = comments.map((comment) => {
+                    const mentionHtml = (comment.mentions || []).map((mention) =>
+                        `<span class="sar-mention-badge me-1">@${escapeHtml(mention.name || mention.id || 'user')}</span>`
+                    ).join('');
+                    const attachmentHtml = comment.attachment
+                        ? `<div class="small mt-1">${renderSarAttachmentLink(comment.attachment)}</div>`
+                        : '';
+                    const timeLabel = formatSchoolInstant(comment.timestamp);
+                    return `
+                        <div class="sar-comment-bubble">
+                            ${timeLabel ? `<div class="sar-comment-time">${escapeHtml(timeLabel)}</div>` : ''}
+                            <div class="sar-comment-author">${escapeHtml(comment.authorName || 'Staff')}</div>
+                            <div class="mt-1">${mentionHtml}${escapeHtml(comment.text || '')}</div>
+                            ${attachmentHtml}
+                        </div>`;
+                }).join('');
+            }
+        }
+
+        const modal = ensureSarCellDetailModal();
+        if (modal) modal.show();
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function toYmd(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function setDateRange(start, end) {
+        document.getElementById('filter_startDate').value = start ? toYmd(start) : '';
+        document.getElementById('filter_endDate').value = end ? toYmd(end) : '';
+        syncSarUrlFromFilters();
+    }
+
+    const startOfLocalDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+    function setActiveRangeChip(range) {
+        document.querySelectorAll('.btn-range.range-chip').forEach((btn) => {
+            btn.classList.toggle('active', btn.getAttribute('data-range') === range);
+        });
+    }
+
+    async function showReportMessage({ title = 'Student Attendance Report', icon = 'info', message = '' } = {}) {
+        const safeMessage = String(message || '').trim() || 'Operation could not be completed.';
+        if (window.ReportMessaging?.showReportMessage) {
+            return window.ReportMessaging.showReportMessage({
+                title,
+                icon,
+                message: safeMessage,
+                buttonClass: icon === 'error' ? 'btn-danger' : 'btn-primary'
+            });
+        }
+        if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+            return window.showMessageModal({
+                title,
+                icon,
+                message: safeMessage,
+                buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+            });
+        }
+        console.error('Message modal is unavailable on this page.');
+        return 'OK';
+    }
+
+    async function confirmOpenAttendanceMatrix(url = '') {
+        const targetUrl = String(url || '').trim();
+        if (!targetUrl) return;
+        const openLabel = 'Open in New Tab';
+        let confirmed = false;
+        if (window.ReportMessaging?.confirmReportAction) {
+            confirmed = await window.ReportMessaging.confirmReportAction({
+                title: 'Attendance Matrix',
+                message: 'Open this attendance record in the Attendance Matrix page in a new tab?',
+                confirmText: openLabel,
+                cancelText: 'Cancel',
+                confirmClass: 'btn-primary',
+                icon: 'question'
+            });
+        } else if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+            const result = await window.showMessageModal({
+                title: 'Attendance Matrix',
+                icon: 'question',
+                message: 'Open this attendance record in the Attendance Matrix page in a new tab?',
+                buttons: [
+                    { text: 'Cancel', class: 'btn-secondary' },
+                    { text: openLabel, class: 'btn-primary' }
+                ]
+            });
+            confirmed = result === openLabel;
+        }
+        if (confirmed) window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    function studentDisplayName(item) {
+        const first = String(item?.firstName || item?.name?.first || '').trim();
+        const last = String(item?.lastName || item?.name?.last || '').trim();
+        return `${first} ${last}`.trim() || String(item?.name || item?.displayName || item?.id || '').trim();
+    }
+
+    function renderSelectedStudents() {
+        const menuLabel = document.getElementById('selectedStudentsMenuLabel');
+        const menuBtn = document.getElementById('btn_selectedStudentsMenu');
+        const listEl = document.getElementById('selectedStudentsList');
+        if (!menuLabel || !menuBtn || !listEl) return;
+
+        if (!selectedStudents.length) {
+            menuLabel.textContent = 'No students selected';
+            menuBtn.disabled = true;
+            listEl.innerHTML = '<div class="text-muted small px-1">No students selected.</div>';
+            return;
+        }
+
+        menuLabel.textContent = `${selectedStudents.length} student${selectedStudents.length === 1 ? '' : 's'} selected`;
+        menuBtn.disabled = false;
+        listEl.innerHTML = selectedStudents.map((student, index) => {
+            const studentId = String(student.studentRecordId || student.id || '').trim();
+            const canMoveUp = index > 0;
+            const canMoveDown = index < selectedStudents.length - 1;
+            return `
+                <div class="sar-selected-student-row">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-secondary">${index + 1}</span>
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="fw-semibold small text-truncate">${escapeHtml(student.name || studentId)}</div>
+                            <div class="text-muted x-small font-monospace">${escapeHtml(studentId)}</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" data-move-student-up="${index}" title="Move up" ${canMoveUp ? '' : 'disabled'}>
+                                <i class="bi bi-arrow-up"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" data-move-student-down="${index}" title="Move down" ${canMoveDown ? '' : 'disabled'}>
+                                <i class="bi bi-arrow-down"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1" data-remove-student-index="${index}" title="Remove">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+
+        listEl.querySelectorAll('[data-move-student-up]').forEach((btn) => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const index = Number(btn.getAttribute('data-move-student-up'));
+                moveSelectedStudent(index, -1);
+            });
+        });
+        listEl.querySelectorAll('[data-move-student-down]').forEach((btn) => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const index = Number(btn.getAttribute('data-move-student-down'));
+                moveSelectedStudent(index, 1);
+            });
+        });
+        listEl.querySelectorAll('[data-remove-student-index]').forEach((btn) => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const index = Number(btn.getAttribute('data-remove-student-index'));
+                removeSelectedStudentAt(index);
+            });
+        });
+        syncSarUrlFromFilters();
+    }
+
+    function findStudentReportCard(student = {}) {
+        const container = document.getElementById('studentReportSections');
+        if (!container) return null;
+        const personId = String(student?.personId || '').trim();
+        const studentRecordId = String(student?.studentRecordId || student?.id || '').trim();
+        if (personId) {
+            const byPerson = container.querySelector(`.student-report-card[data-person-id="${CSS.escape(personId)}"]`);
+            if (byPerson) return byPerson;
+        }
+        if (studentRecordId) {
+            return container.querySelector(`.student-report-card[data-student-record-id="${CSS.escape(studentRecordId)}"]`);
+        }
+        return null;
+    }
+
+    function removeStudentReportSection(student = {}) {
+        const card = findStudentReportCard(student);
+        if (card) card.remove();
+        removeCellDetailsForPerson(student);
+        syncResultsContainerVisibility();
+    }
+
+    function syncStudentReportSectionOrder() {
+        const container = document.getElementById('studentReportSections');
+        if (!container || !selectedStudents.length) return;
+        selectedStudents.forEach((student) => {
+            const card = findStudentReportCard(student);
+            if (card) container.appendChild(card);
+        });
+    }
+
+    function syncResultsContainerVisibility() {
+        const results = document.getElementById('resultsContainer');
+        const container = document.getElementById('studentReportSections');
+        if (!results || !container) return;
+        if (!selectedStudents.length) {
+            container.innerHTML = '';
+            results.classList.add('d-none');
+            return;
+        }
+        const remainingCards = container.querySelectorAll('.student-report-card').length;
+        if (remainingCards === 0 && !container.querySelector('p.text-muted')) {
+            container.innerHTML = '<p class="text-muted mb-0">Click Apply to load attendance for the selected students.</p>';
+        }
+        results.classList.remove('d-none');
+    }
+
+    function moveSelectedStudent(index, delta) {
+        const fromIndex = Number(index);
+        const toIndex = fromIndex + Number(delta);
+        if (fromIndex < 0 || fromIndex >= selectedStudents.length) return;
+        if (toIndex < 0 || toIndex >= selectedStudents.length) return;
+        const [row] = selectedStudents.splice(fromIndex, 1);
+        selectedStudents.splice(toIndex, 0, row);
+        renderSelectedStudents();
+        syncStudentReportSectionOrder();
+    }
+
+    function removeSelectedStudentAt(index) {
+        const targetIndex = Number(index);
+        if (targetIndex < 0 || targetIndex >= selectedStudents.length) return;
+        const removed = selectedStudents[targetIndex];
+        selectedStudents.splice(targetIndex, 1);
+        removeStudentReportSection(removed);
+        renderSelectedStudents();
+    }
+
+    function orderReportStudentsBySelection(students = []) {
+        const rankById = new Map();
+        selectedStudents.forEach((row, index) => {
+            const studentId = String(row.studentRecordId || row.id || '').trim();
+            const personId = String(row.personId || '').trim();
+            if (studentId) rankById.set(studentId, index);
+            if (personId) rankById.set(personId, index);
+        });
+        return [...students].sort((a, b) => {
+            const aKey = String(a?.studentRecordId || a?.personId || '').trim();
+            const bKey = String(b?.studentRecordId || b?.personId || '').trim();
+            const aRank = rankById.get(aKey);
+            const bRank = rankById.get(bKey);
+            const aIndex = Number.isFinite(Number(aRank)) ? Number(aRank) : 9999;
+            const bIndex = Number.isFinite(Number(bRank)) ? Number(bRank) : 9999;
+            if (aIndex !== bIndex) return aIndex - bIndex;
+            return String(a?.name || '').localeCompare(String(b?.name || ''));
+        });
+    }
+
+    function setAllStudentSectionsExpanded(expanded) {
+        document.querySelectorAll('.student-report-collapse').forEach((sectionEl) => {
+            const collapse = window.bootstrap?.Collapse?.getOrCreateInstance(sectionEl, { toggle: false });
+            if (collapse) {
+                if (expanded) collapse.show();
+                else collapse.hide();
+            } else {
+                sectionEl.classList.toggle('show', expanded);
+            }
+            const toggleBtn = document.querySelector(`[data-bs-target="#${sectionEl.id}"]`);
+            if (toggleBtn) toggleBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        });
+    }
+
+    function openStudentPicker() {
+        if (!window.GenericPicker || !window.GenericPickerPresets) {
+            showReportMessage({ icon: 'warning', message: 'Student picker is not available on this page yet.' });
+            return;
+        }
+        window.GenericPicker.open(window.GenericPickerPresets.student({
+            title: 'Select Students',
+            placeholder: 'Search students, select one or more...',
+            multiselect: true,
+            selectedItems: selectedStudents.map((row) => ({
+                id: row.studentRecordId || row.id,
+                firstName: row.name,
+                name: row.name
+            })),
+            onSelect: (items) => {
+                const list = Array.isArray(items) ? items : (items ? [items] : []);
+                selectedStudents = list.map((item) => {
+                    const studentRecordId = String(item?.id || '').trim();
+                    return {
+                        id: studentRecordId,
+                        studentRecordId,
+                        personId: String(item?.personId || '').trim(),
+                        name: studentDisplayName(item)
+                    };
+                }).filter((row) => row.studentRecordId);
+                renderSelectedStudents();
+            }
+        }));
+    }
+
+    function buildStatusIcon(cell) {
+        if (!cell?.hasSession) return '';
+        const status = String(cell.status || '').trim();
+        if (!status) return '<i class="bi bi-dash text-muted"></i>';
+        if (status === 'present') return '<i class="bi bi-check-circle-fill status-present"></i>';
+        if (status === 'late') return '<i class="bi bi-clock-fill status-late"></i>';
+        if (status === 'excused') return '<i class="bi bi-envelope-paper-fill status-excused"></i>';
+        if (status === 'absent') return '<i class="bi bi-x-circle-fill status-absent"></i>';
+        if (status === 'acf') return '<i class="bi bi-camera-video-off-fill status-acf"></i>';
+        if (status === 'not_applicable') return '<i class="bi bi-dash-circle-fill status-na"></i>';
+        return '<i class="bi bi-dash text-muted"></i>';
+    }
+
+    function buildDayHeader(dateToken) {
+        const d = new Date(`${dateToken}T00:00:00`);
+        const shortDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+        return `<th class="text-center px-1 py-2" title="${escapeHtml(dateToken)}">${escapeHtml(weekday)}<br>${escapeHtml(shortDate)}</th>`;
+    }
+
+    function buildAttendanceRollupCellHtml(summary = {}) {
+        const s = summary && typeof summary === 'object' ? summary : {};
+        const p = Number(s.totalPresentSessions) || 0;
+        const a = Number(s.totalAbsentSessions) || 0;
+        const na = Number(s.totalNotApplicableSessions) || 0;
+        const pct = s.performancePercent;
+        const pctStr = pct == null ? '—' : `${pct}%`;
+        const rollupTitle = [
+            `Present (marked): ${p}`,
+            `Absent: ${a}`,
+            na ? `N/A: ${na}` : null,
+            `Efficiency: ${pctStr}`
+        ].filter(Boolean).join(' · ');
+        return `<td class="matrix-sticky-rollup px-2 py-2 text-center small" title="${escapeHtml(rollupTitle)}">
+            <div><span class="text-success fw-semibold">${p}</span><span class="text-muted"> / </span><span class="text-danger fw-semibold">${a}</span>${na ? `<span class="text-muted"> / </span><span class="text-secondary fw-semibold">${na}</span>` : ''}</div>
+            <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${escapeHtml(pctStr)}</div>
+        </td>`;
+    }
+
+    function buildStudentSection(student, days, startDate, endDate) {
+        const personId = String(student?.personId || '').trim();
+        const collapseId = `student-report-${personId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+        const summary = student?.summary || {};
+        const rollupPct = summary.rollupPercent == null ? '—' : `${summary.rollupPercent}%`;
+        const notesLabel = summary.notesExist ? 'Yes' : 'No';
+        const studentNameHtml = typeof schoolRenderStudentNameHtml === 'function'
+            ? schoolRenderStudentNameHtml(student.name, student.studentRecordId, { className: 'text-decoration-none fw-bold' })
+            : escapeHtml(student.name || personId);
+
+        let classRows = '';
+        (student.classes || []).forEach((classRow) => {
+            const classId = String(classRow.classId || '').trim();
+            const matrixUrl = `/school/attendances?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&studentId=${encodeURIComponent(personId)}`;
+            let cells = '';
+            (classRow.days || []).forEach((dayCell) => {
+                if (!dayCell.hasSession) {
+                    cells += '<td class="attendance-no-session-cell" title="No session scheduled"><i class="bi bi-x-lg sar-no-session-icon" aria-hidden="true"></i><span class="visually-hidden">No session scheduled</span></td>';
+                    return;
+                }
+                const noteBadge = dayCell.notesExist
+                    ? '<div class="position-absolute top-0 end-0 pe-1 pt-1"><i class="bi bi-chat-dots-fill text-primary" style="font-size: 0.65rem;"></i></div>'
+                    : '';
+                const cellKey = buildCellKey(personId, classId, dayCell.date);
+                cells += `<td class="att-cell position-relative" data-sar-cell-key="${escapeHtml(cellKey)}" title="View attendance details">${buildStatusIcon(dayCell)}${noteBadge}</td>`;
+            });
+            classRows += `
+                <tr>
+                    ${buildAttendanceRollupCellHtml(classRow.summary)}
+                    <td class="matrix-sticky-class px-3 py-2 small fw-semibold">
+                        <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold sar-matrix-link" data-sar-matrix-url="${escapeHtml(matrixUrl)}">${escapeHtml(classRow.className || classId)}</button>
+                        ${classRow.teacherName ? `<div class="text-muted" style="font-size:0.72rem;">${escapeHtml(classRow.teacherName)}</div>` : ''}
+                    </td>
+                    ${cells}
+                </tr>`;
+        });
+
+        if (!classRows) {
+            classRows = `<tr><td class="matrix-sticky-class px-3 py-2 text-muted small" colspan="${days.length + 2}">No enrolled classes with attendance in this range.</td></tr>`;
+        }
+
+        const dayHeaders = days.map((day) => buildDayHeader(day)).join('');
+
+        return `
+            <div class="card border shadow-sm mb-3 student-report-card" data-person-id="${escapeHtml(personId)}" data-student-record-id="${escapeHtml(String(student.studentRecordId || '').trim())}">
+                <div class="card-header bg-white py-2">
+                    <button
+                        class="btn btn-link text-decoration-none text-dark w-100 text-start p-0 sar-collapse-toggle"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#${escapeHtml(collapseId)}"
+                        aria-expanded="false"
+                        aria-controls="${escapeHtml(collapseId)}">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div class="d-flex align-items-center gap-2 fw-bold">
+                                <i class="bi bi-chevron-down sar-collapse-chevron"></i>
+                                <span>${studentNameHtml}</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 student-summary-chip">
+                                <span><span class="text-success fw-semibold">Present</span> ${Number(summary.present || 0)}</span>
+                                <span><span class="text-warning fw-semibold">Late</span> ${Number(summary.late || 0)}</span>
+                                <span><span class="text-info fw-semibold">Excused</span> ${Number(summary.excused || 0)}</span>
+                                <span><span class="text-danger fw-semibold">Absent</span> ${Number(summary.absent || 0)}</span>
+                                <span><span class="status-acf fw-semibold">ACF</span> ${Number(summary.acf || 0)}</span>
+                                <span><span class="text-primary fw-semibold">Rollup %</span> ${escapeHtml(rollupPct)}</span>
+                                <span><span class="text-primary fw-semibold">Notes Exist</span> ${escapeHtml(notesLabel)}</span>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+                <div id="${escapeHtml(collapseId)}" class="collapse student-report-collapse">
+                    <div class="card-body p-0">
+                        <div class="student-report-wrapper">
+                            <table class="table table-sm table-hover mb-0 student-report-table">
+                                <thead>
+                                    <tr>
+                                        <th class="matrix-sticky-rollup text-center small px-2 py-2" title="Attendance rollup">
+                                            <div class="fw-bold text-secondary">Rollup</div>
+                                            <div class="text-muted" style="font-size: 0.68rem; line-height: 1.2;">P / A / %</div>
+                                        </th>
+                                        <th class="matrix-sticky-class px-3 py-2">Class</th>
+                                        ${dayHeaders}
+                                    </tr>
+                                </thead>
+                                <tbody>${classRows}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    async function loadStudentAttendanceReport() {
+        const startDate = String(document.getElementById('filter_startDate').value || '').trim();
+        const endDate = String(document.getElementById('filter_endDate').value || '').trim();
+        const studentIds = selectedStudents.map((row) => String(row.studentRecordId || row.id || '').trim()).filter(Boolean);
+        if (!studentIds.length) {
+            showReportMessage({ icon: 'warning', message: 'Select at least one student.' });
+            return;
+        }
+        if (!startDate || !endDate) {
+            showReportMessage({ icon: 'warning', message: 'Start date and end date are required.' });
+            return;
+        }
+
+        const params = new URLSearchParams();
+        params.set('startDate', startDate);
+        params.set('endDate', endDate);
+        params.set('studentIds', studentIds.join(','));
+
+        const response = await fetch(`/school/attendances/report/api/data?${params.toString()}`, {
+            headers: { 'X-AJAX-Request': 'true' }
+        });
+        const payload = await response.json();
+        if (payload.status !== 'success') {
+            throw new Error(payload.message || 'Could not load student attendance report.');
+        }
+
+        const days = Array.isArray(payload.days) ? payload.days : [];
+        const students = orderReportStudentsBySelection(Array.isArray(payload.students) ? payload.students : []);
+        const container = document.getElementById('studentReportSections');
+        container.innerHTML = students.length
+            ? students.map((student) => buildStudentSection(student, days, payload.startDate, payload.endDate)).join('')
+            : '<p class="text-muted mb-0">No attendance data found for the selected students.</p>';
+        populateCellDetailsFromPayload(students, payload.startDate, payload.endDate);
+        mergeSelectedStudentsFromReportPayload(students);
+        syncSarUrlFromFilters();
+        document.getElementById('resultsContainer').classList.remove('d-none');
+    }
+
+    async function generateStudentAttendanceReport() {
+        return openStudentAttendanceExportPanel();
+    }
+
+    function getSarFilterParams() {
+        const startDate = String(document.getElementById('filter_startDate').value || '').trim();
+        const endDate = String(document.getElementById('filter_endDate').value || '').trim();
+        const studentIds = selectedStudents.map((row) => String(row.studentRecordId || row.id || '').trim()).filter(Boolean);
+        return { startDate, endDate, studentIds };
+    }
+
+    function buildSarShareUrl() {
+        const { startDate, endDate, studentIds } = getSarFilterParams();
+        const url = new URL('/school/attendances/report', window.location.origin);
+        if (startDate) url.searchParams.set('startDate', startDate);
+        if (endDate) url.searchParams.set('endDate', endDate);
+        if (studentIds.length) url.searchParams.set('studentIds', studentIds.join(','));
+        return url.toString();
+    }
+
+    function syncSarUrlFromFilters() {
+        if (!window.history?.replaceState) return;
+        const { startDate, endDate, studentIds } = getSarFilterParams();
+        const url = new URL(window.location.pathname, window.location.origin);
+        if (startDate) url.searchParams.set('startDate', startDate);
+        else url.searchParams.delete('startDate');
+        if (endDate) url.searchParams.set('endDate', endDate);
+        else url.searchParams.delete('endDate');
+        if (studentIds.length) url.searchParams.set('studentIds', studentIds.join(','));
+        else url.searchParams.delete('studentIds');
+        url.searchParams.delete('personIds');
+        const nextUrl = url.pathname + url.search;
+        const currentUrl = window.location.pathname + window.location.search;
+        if (currentUrl !== nextUrl) {
+            window.history.replaceState({}, document.title, nextUrl);
+        }
+    }
+
+    function mergeSelectedStudentsFromReportPayload(students = []) {
+        if (!Array.isArray(students) || !students.length || !selectedStudents.length) return;
+        const byPersonId = new Map(students.map((row) => [String(row.personId || '').trim(), row]));
+        const byStudentRecordId = new Map(students.map((row) => [String(row.studentRecordId || '').trim(), row]));
+        selectedStudents = selectedStudents.map((row) => {
+            const studentRecordId = String(row.studentRecordId || row.id || '').trim();
+            const personId = String(row.personId || '').trim();
+            const match = byStudentRecordId.get(studentRecordId)
+                || byPersonId.get(personId)
+                || byPersonId.get(studentRecordId);
+            if (!match) return row;
+            return {
+                id: String(match.studentRecordId || studentRecordId || row.id || '').trim(),
+                studentRecordId: String(match.studentRecordId || studentRecordId || row.id || '').trim(),
+                personId: String(match.personId || personId || '').trim(),
+                name: String(match.name || row.name || '').trim()
+            };
+        });
+        renderSelectedStudents();
+    }
+
+    async function copySarShareLink() {
+        const { studentIds, startDate, endDate } = getSarFilterParams();
+        if (!studentIds.length) {
+            showReportMessage({ icon: 'warning', message: 'Select at least one student before copying a link.' });
+            return;
+        }
+        if (!startDate || !endDate) {
+            showReportMessage({ icon: 'warning', message: 'Set a start and end date before copying a link.' });
+            return;
+        }
+        const shareUrl = buildSarShareUrl();
+        syncSarUrlFromFilters();
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(shareUrl);
+            } else {
+                const input = document.createElement('textarea');
+                input.value = shareUrl;
+                input.setAttribute('readonly', '');
+                input.style.position = 'fixed';
+                input.style.left = '-9999px';
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                input.remove();
+            }
+            showReportMessage({
+                icon: 'success',
+                message: 'Shareable link copied. Anyone with access can open it to view the same students and date range.'
+            });
+        } catch (error) {
+            showReportMessage({ icon: 'error', message: error.message || 'Could not copy the link.' });
+        }
+    }
+
+    function validateSarFilters() {
+        const { startDate, endDate, studentIds } = getSarFilterParams();
+        if (!canGenerateReport) {
+            showReportMessage({ icon: 'warning', message: 'Configure a report template in School Settings first.' });
+            return null;
+        }
+        if (!studentIds.length) {
+            showReportMessage({ icon: 'warning', message: 'Select at least one student.' });
+            return null;
+        }
+        if (!startDate || !endDate) {
+            showReportMessage({ icon: 'warning', message: 'Start date and end date are required.' });
+            return null;
+        }
+        return { startDate, endDate, studentIds };
+    }
+
+    function buildSarFormatBadges(row = {}, exportType = 'class') {
+        const badges = [];
+        if (row.hasDocx) badges.push('<span class="badge bg-primary-subtle text-primary border sar-export-format-badge">DOCX</span>');
+        if (row.hasPdf && exportType === 'class') badges.push('<span class="badge bg-danger-subtle text-danger border sar-export-format-badge">PDF</span>');
+        badges.push('<span class="badge bg-secondary-subtle text-secondary border sar-export-format-badge">Payload</span>');
+        return badges.length ? `<div class="d-flex flex-wrap gap-1 mt-1">${badges.join('')}</div>` : '';
+    }
+
+    function buildSarFormatButtons(row = {}, exportType = 'class') {
+        const hasDocx = Boolean(row.hasDocx);
+        const hasPdf = Boolean(row.hasPdf && exportType === 'class');
+        const buttons = [];
+        if (hasDocx) {
+            buttons.push('<button type="button" class="btn btn-outline-primary btn-sm js-sar-row-export" data-format="docx"><i class="bi bi-filetype-docx me-1"></i>DOCX</button>');
+        }
+        if (hasPdf) {
+            buttons.push('<button type="button" class="btn btn-outline-danger btn-sm js-sar-row-export" data-format="pdf"><i class="bi bi-filetype-pdf me-1"></i>PDF</button>');
+        }
+        buttons.push('<button type="button" class="btn btn-outline-secondary btn-sm js-sar-row-export" data-format="json"><i class="bi bi-braces me-1"></i>Payload</button>');
+        return `<div class="btn-group btn-group-sm flex-wrap mt-2">${buttons.join('')}</div>`;
+    }
+
+    function evaluateOverallEligibilityForStudent(studentId) {
+        const student = (sarExportPlan?.students || []).find((row) => String(row.personId || '').trim() === String(studentId || '').trim());
+        if (!student?.overall?.defined) return { eligible: false, reason: 'No overall template configured.' };
+
+        const slotCount = Number(student.overall.slotCount) || 0;
+        if (!slotCount) return { eligible: false, reason: 'Overall template has no source slots.' };
+
+        const panel = getSarExportRoot();
+        if (!panel) return { eligible: false, reason: 'Export modal not ready.' };
+
+        for (let index = 0; index < slotCount; index += 1) {
+            const classRow = (student.classes || []).find((row) => Number(row.slotIndex) === index);
+            if (!classRow) {
+                return { eligible: false, reason: `Missing class for slot ${index + 1}.` };
+            }
+            const checkbox = panel.querySelector(
+                `.js-sar-export-check[data-sar-export-type="class"][data-student-id="${CSS.escape(String(student.personId))}"][data-class-id="${CSS.escape(String(classRow.classId))}"]`
+            );
+            const checked = checkbox ? checkbox.checked : true;
+            if (!checked) {
+                return { eligible: false, reason: 'Select all required class reports for the overall template.' };
+            }
+            if (!classRow.exportable) {
+                return { eligible: false, reason: classRow.warning || 'A required class report is not exportable.' };
+            }
+        }
+        return { eligible: true, reason: '' };
+    }
+
+    function updateOverallEligibilityUi(studentId) {
+        const panel = getSarExportRoot();
+        if (!panel || !studentId) return;
+        const cell = panel.querySelector(`.js-sar-overall-cell[data-student-id="${CSS.escape(String(studentId))}"]`);
+        if (!cell) return;
+
+        const student = (sarExportPlan?.students || []).find((row) => String(row.personId || '').trim() === String(studentId).trim());
+        if (!student?.overall?.defined) return;
+
+        const { eligible, reason } = evaluateOverallEligibilityForStudent(studentId);
+        const checkbox = cell.querySelector('.js-sar-export-check[data-sar-export-type="overall"]');
+        const statusEl = cell.querySelector('.js-sar-overall-status');
+        const actionsEl = cell.querySelector('.js-sar-overall-actions');
+
+        if (checkbox) {
+            checkbox.disabled = !eligible;
+            if (!eligible) checkbox.checked = false;
+            else if (!checkbox.hasAttribute('data-user-touched')) checkbox.checked = true;
+        }
+
+        if (statusEl) {
+            statusEl.textContent = eligible ? '' : (reason || 'Overall report not available.');
+            statusEl.classList.toggle('d-none', eligible);
+        }
+
+        if (actionsEl) {
+            actionsEl.classList.toggle('d-none', !eligible);
+            actionsEl.querySelectorAll('.js-sar-row-export').forEach((btn) => {
+                btn.disabled = !eligible || !(checkbox && checkbox.checked);
+            });
+        }
+    }
+
+    function renderSarExportPlan(plan = {}) {
+        sarExportPlan = plan;
+        const root = getSarExportRoot();
+        const loadingEl = document.getElementById('sarExportLoading');
+        const emptyEl = document.getElementById('sarExportEmpty');
+        const tableWrap = document.getElementById('sarExportTableWrap');
+        const tableBody = document.getElementById('sarExportTableBody');
+        const overallHeader = document.getElementById('sarExportOverallHeader');
+        const classBulkPanel = document.getElementById('sarExportClassBulkPanel');
+        const overallBulkPanel = document.getElementById('sarExportOverallBulkPanel');
+        const overallTemplateCardWrap = document.getElementById('sarExportOverallTemplateCardWrap');
+        const reportTemplateTitleEl = document.getElementById('sarExportReportTemplateTitle');
+        const overallTemplateTitleEl = document.getElementById('sarExportOverallTemplateTitle');
+        const dateRangeEl = document.getElementById('sarExportDateRange');
+
+        if (!root || !tableBody) return;
+
+        loadingEl?.classList.add('d-none');
+        const students = Array.isArray(plan.students) ? plan.students : [];
+        const hasOverall = Boolean(plan.overallReportTemplateId);
+
+        if (reportTemplateTitleEl) {
+            reportTemplateTitleEl.textContent = plan.reportTemplateTitle || plan.reportTemplateId || '—';
+        }
+        if (overallTemplateTitleEl) {
+            overallTemplateTitleEl.textContent = plan.overallReportTemplateTitle || plan.overallReportTemplateId || '—';
+        }
+        overallTemplateCardWrap?.classList.toggle('d-none', !hasOverall);
+        if (dateRangeEl && plan.startDate && plan.endDate) {
+            dateRangeEl.textContent = `${plan.startDate} → ${plan.endDate} · ${students.length} student${students.length === 1 ? '' : 's'}`;
+        }
+
+        overallHeader?.classList.toggle('d-none', !hasOverall);
+        overallBulkPanel?.classList.toggle('d-none', !hasOverall);
+
+        if (!students.length) {
+            emptyEl?.classList.remove('d-none');
+            tableWrap?.classList.add('d-none');
+            classBulkPanel?.classList.add('d-none');
+            overallBulkPanel?.classList.add('d-none');
+            tableBody.innerHTML = '';
+            return;
+        }
+
+        emptyEl?.classList.add('d-none');
+        tableWrap?.classList.remove('d-none');
+        classBulkPanel?.classList.remove('d-none');
+        if (hasOverall) overallBulkPanel?.classList.remove('d-none');
+
+        tableBody.innerHTML = students.map((student) => {
+            const personId = String(student.personId || '').trim();
+            const classBlocks = (student.classes || []).map((classRow) => {
+                const classId = String(classRow.classId || '').trim();
+                const className = escapeHtml(classRow.className || classId);
+                const templateTitle = escapeHtml(classRow.templateTitle || classRow.templateId || '');
+                const label = `${className} — ${templateTitle}`;
+                const disabled = !classRow.exportable;
+                return `
+                    <div class="sar-export-class-row">
+                        <div class="d-flex flex-wrap align-items-start gap-2">
+                            <input
+                                type="checkbox"
+                                class="form-check-input mt-1 js-sar-export-check"
+                                data-sar-export-type="class"
+                                data-student-id="${escapeHtml(personId)}"
+                                data-class-id="${escapeHtml(classId)}"
+                                ${disabled ? 'disabled' : 'checked'}
+                                aria-label="Include ${label}">
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="sar-export-class-name">${className}</div>
+                                <div class="sar-export-template-label">${templateTitle}</div>
+                                ${!disabled ? buildSarFormatBadges(classRow, 'class') : ''}
+                                ${disabled && classRow.warning ? `<div class="small text-warning mt-1">${escapeHtml(classRow.warning)}</div>` : ''}
+                                ${!disabled ? buildSarFormatButtons(classRow, 'class') : ''}
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('') || '<div class="small text-muted py-2">No classes in range.</div>';
+
+            const overallCell = hasOverall
+                ? (() => {
+                    const overall = student.overall || {};
+                    const overallTitle = escapeHtml(overall.templateTitle || plan.overallReportTemplateTitle || '');
+                    const initialEligible = Boolean(overall.eligible);
+                    return `
+                        <td class="sar-export-overall-cell js-sar-overall-cell" data-student-id="${escapeHtml(personId)}">
+                            <div class="d-flex flex-wrap align-items-start gap-2">
+                                <input
+                                    type="checkbox"
+                                    class="form-check-input mt-1 js-sar-export-check"
+                                    data-sar-export-type="overall"
+                                    data-student-id="${escapeHtml(personId)}"
+                                    ${initialEligible ? 'checked' : 'disabled'}
+                                    aria-label="Include overall report for ${escapeHtml(student.name || personId)}">
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="sar-export-class-name">${overallTitle}</div>
+                                    <div class="small text-muted">Overall merged report</div>
+                                    ${initialEligible ? buildSarFormatBadges({ hasDocx: overall.hasDocx, hasPdf: false }, 'overall') : ''}
+                                    <div class="small text-warning js-sar-overall-status ${initialEligible ? 'd-none' : ''}">
+                                        ${escapeHtml((overall.warnings || []).join(' ') || 'Overall report not available for this student.')}
+                                    </div>
+                                    <div class="js-sar-overall-actions ${initialEligible ? '' : 'd-none'}">
+                                        ${buildSarFormatButtons({ hasDocx: overall.hasDocx, hasPdf: false }, 'overall')}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>`;
+                })()
+                : '';
+
+            return `
+                <tr data-student-id="${escapeHtml(personId)}">
+                    <td class="sar-export-student-col ps-3 fw-semibold align-top">${escapeHtml(student.name || personId)}</td>
+                    <td class="align-top">${classBlocks}</td>
+                    ${overallCell}
+                </tr>`;
+        }).join('');
+
+        students.forEach((student) => updateOverallEligibilityUi(student.personId));
+    }
+
+    function gatherSarExportTargets(format = '', scope = 'all') {
+        const root = getSarExportRoot();
+        if (!root) return [];
+        const normalizedFormat = String(format || '').trim().toLowerCase();
+        const normalizedScope = String(scope || 'all').trim().toLowerCase();
+        const targets = [];
+        const includeClass = normalizedScope === 'all' || normalizedScope === 'class';
+        const includeOverall = normalizedScope === 'all' || normalizedScope === 'overall';
+
+        if (includeClass) {
+            root.querySelectorAll('.js-sar-export-check[data-sar-export-type="class"]:checked').forEach((checkbox) => {
+                const studentId = String(checkbox.getAttribute('data-student-id') || '').trim();
+                const classId = String(checkbox.getAttribute('data-class-id') || '').trim();
+                const student = (sarExportPlan?.students || []).find((row) => String(row.personId || '').trim() === studentId);
+                const classRow = (student?.classes || []).find((row) => String(row.classId || '').trim() === classId);
+                if (!studentId || !classId || !classRow) return;
+                if (normalizedFormat === 'docx' && !classRow.hasDocx) return;
+                if (normalizedFormat === 'pdf' && !classRow.hasPdf) return;
+                targets.push({ type: 'class', studentId, classId });
+            });
+        }
+
+        if (includeOverall) {
+            root.querySelectorAll('.js-sar-export-check[data-sar-export-type="overall"]:checked:not(:disabled)').forEach((checkbox) => {
+                const studentId = String(checkbox.getAttribute('data-student-id') || '').trim();
+                if (!studentId) return;
+                const student = (sarExportPlan?.students || []).find((row) => String(row.personId || '').trim() === studentId);
+                const overall = student?.overall;
+                if (!overall?.defined) return;
+                if (normalizedFormat === 'pdf') return;
+                if (normalizedFormat === 'docx' && !overall.hasDocx) return;
+                const classIds = [];
+                root.querySelectorAll(
+                    `.js-sar-export-check[data-sar-export-type="class"][data-student-id="${CSS.escape(studentId)}"]:checked`
+                ).forEach((classCheckbox) => {
+                    const classId = String(classCheckbox.getAttribute('data-class-id') || '').trim();
+                    if (classId) classIds.push(classId);
+                });
+                targets.push({ type: 'overall', studentId, classIds });
+            });
+        }
+
+        return targets;
+    }
+
+    function getSarExportLoadingLabel(format = '') {
+        const token = String(format || '').trim().toLowerCase();
+        if (token === 'docx') return 'Word (DOCX)';
+        if (token === 'pdf') return 'PDF';
+        if (token === 'json') return 'Payload (JSON)';
+        return 'report';
+    }
+
+    function showSarExportWaiting(format = '', targetCount = 1) {
+        if (typeof window.showLoading !== 'function') return null;
+        const label = getSarExportLoadingLabel(format);
+        const count = Number(targetCount) || 1;
+        const countLabel = count > 1 ? `${count} selected report${count === 1 ? '' : 's'}` : 'selected report';
+        return window.showLoading({
+            title: 'Exporting Reports',
+            note: `Generating ${label} for ${countLabel}. Please wait…`,
+            operation: `Export ${label}`
+        });
+    }
+
+    function hideSarExportWaiting(token) {
+        if (typeof window.hideLoading !== 'function') return;
+        if (token) window.hideLoading(token);
+        else window.hideLoading({ force: true });
+    }
+
+    async function runSarExport(format, targets = []) {
+        const filters = validateSarFilters();
+        if (!filters) return;
+        if (!targets.length) {
+            showReportMessage({ icon: 'warning', message: 'Select at least one report that supports this export format.' });
+            return;
+        }
+
+        const loadingToken = showSarExportWaiting(format, targets.length);
+        try {
+            const response = await fetch('/school/attendances/report/api/export', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    Accept: 'application/octet-stream, application/json',
+                    'X-AJAX-Request': 'true'
+                },
+                body: new URLSearchParams({
+                    actionStateId: sarActionStateId,
+                    startDate: filters.startDate,
+                    endDate: filters.endDate,
+                    studentIds: filters.studentIds.join(','),
+                    format: String(format || 'json'),
+                    targets: JSON.stringify(targets)
+                }).toString()
+            });
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => null);
+                throw new Error(payload?.message || 'Export failed.');
+            }
+
+            const blob = await response.blob();
+            const disposition = response.headers.get('Content-Disposition') || '';
+            const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
+            const fileName = fileNameMatch?.[1] || `student_attendance_export_${filters.startDate}_${filters.endDate}`;
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            showReportMessage({ icon: 'success', message: 'Export downloaded successfully.' });
+        } finally {
+            hideSarExportWaiting(loadingToken);
+        }
+    }
+
+    async function openStudentAttendanceExportPanel() {
+        const filters = validateSarFilters();
+        if (!filters) return;
+
+        const loadingEl = document.getElementById('sarExportLoading');
+        const button = document.getElementById('btn_generateReport');
+
+        showSarExportModal();
+        loadingEl?.classList.remove('d-none');
+        document.getElementById('sarExportEmpty')?.classList.add('d-none');
+        document.getElementById('sarExportTableWrap')?.classList.add('d-none');
+        document.getElementById('sarExportClassBulkPanel')?.classList.add('d-none');
+        document.getElementById('sarExportOverallBulkPanel')?.classList.add('d-none');
+
+        const dateRangeEl = document.getElementById('sarExportDateRange');
+        if (dateRangeEl) {
+            dateRangeEl.textContent = `${filters.startDate} → ${filters.endDate} · loading…`;
+        }
+
+        if (button) button.disabled = true;
+        try {
+            const params = new URLSearchParams();
+            params.set('startDate', filters.startDate);
+            params.set('endDate', filters.endDate);
+            params.set('studentIds', filters.studentIds.join(','));
+
+            const response = await fetch(`/school/attendances/report/api/export-plan?${params.toString()}`, {
+                headers: { 'X-AJAX-Request': 'true' }
+            });
+            const payload = await response.json();
+            if (payload.status !== 'success') {
+                throw new Error(payload.message || 'Could not load export options.');
+            }
+            renderSarExportPlan(payload.plan || {});
+        } catch (error) {
+            showReportMessage({ icon: 'error', message: error.message || 'Could not load export options.' });
+        } finally {
+            loadingEl?.classList.add('d-none');
+            if (button && canGenerateReport) button.disabled = false;
+        }
+    }
+
+    document.getElementById('studentReportSections').addEventListener('click', (event) => {
+        const cellTrigger = event.target.closest('[data-sar-cell-key]');
+        if (cellTrigger) {
+            event.preventDefault();
+            openCellDetailModal(cellTrigger.getAttribute('data-sar-cell-key'));
+            return;
+        }
+        const matrixTrigger = event.target.closest('[data-sar-matrix-url]');
+        if (!matrixTrigger) return;
+        event.preventDefault();
+        confirmOpenAttendanceMatrix(matrixTrigger.getAttribute('data-sar-matrix-url'));
+    });
+
+    document.getElementById('btn_sarOpenMatrix')?.addEventListener('click', () => {
+        confirmOpenAttendanceMatrix(sarCurrentMatrixUrl);
+    });
+
+    document.getElementById('btn_copyReportLink')?.addEventListener('click', () => {
+        copySarShareLink().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Could not copy link.' }));
+    });
+    document.getElementById('filter_startDate')?.addEventListener('change', syncSarUrlFromFilters);
+    document.getElementById('filter_endDate')?.addEventListener('change', syncSarUrlFromFilters);
+    document.getElementById('btn_openStudentPicker').addEventListener('click', openStudentPicker);
+    document.getElementById('btn_clearStudents').addEventListener('click', () => {
+        selectedStudents = [];
+        renderSelectedStudents();
+        cellDetailByKey.clear();
+        document.getElementById('studentReportSections').innerHTML = '';
+        document.getElementById('resultsContainer').classList.add('d-none');
+        sarExportPlan = null;
+    });
+    document.getElementById('btn_expandAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(true));
+    document.getElementById('btn_collapseAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(false));
+    document.getElementById('btn_loadData').addEventListener('click', () => {
+        loadStudentAttendanceReport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Load failed.' }));
+    });
+    document.getElementById('btn_generateReport')?.addEventListener('click', () => {
+        openStudentAttendanceExportPanel().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Export panel failed.' }));
+    });
+
+    document.getElementById('sarExportModal')?.addEventListener('click', (event) => {
+        const exportBtn = event.target.closest('.js-sar-row-export');
+        if (exportBtn) {
+            event.preventDefault();
+            const format = String(exportBtn.getAttribute('data-format') || 'json').trim().toLowerCase();
+            const rowHost = exportBtn.closest('.sar-export-class-row, .js-sar-overall-cell');
+            const checkbox = rowHost?.querySelector('.js-sar-export-check');
+            if (!checkbox) return;
+            const studentId = String(checkbox.getAttribute('data-student-id') || '').trim();
+            const exportType = String(checkbox.getAttribute('data-sar-export-type') || '').trim().toLowerCase();
+            const targets = [];
+            if (exportType === 'class') {
+                const classId = String(checkbox.getAttribute('data-class-id') || '').trim();
+                if (!studentId || !classId) return;
+                targets.push({ type: 'class', studentId, classId });
+            } else if (exportType === 'overall') {
+                const classIds = [];
+                getSarExportRoot()?.querySelectorAll(
+                    `.js-sar-export-check[data-sar-export-type="class"][data-student-id="${CSS.escape(studentId)}"]:checked`
+                ).forEach((classCheckbox) => {
+                    const classId = String(classCheckbox.getAttribute('data-class-id') || '').trim();
+                    if (classId) classIds.push(classId);
+                });
+                targets.push({ type: 'overall', studentId, classIds });
+            }
+            runSarExport(format, targets).catch((error) => {
+                showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
+            });
+            return;
+        }
+
+        const bulkBtn = event.target.closest('.js-sar-bulk-export');
+        if (bulkBtn) {
+            event.preventDefault();
+            const format = String(bulkBtn.getAttribute('data-format') || 'json').trim().toLowerCase();
+            const scope = String(bulkBtn.getAttribute('data-export-scope') || 'all').trim().toLowerCase();
+            const targets = gatherSarExportTargets(format, scope);
+            const scopeLabel = scope === 'overall' ? 'overall report' : 'class report';
+            if (!targets.length) {
+                showReportMessage({ icon: 'warning', message: `Select at least one ${scopeLabel} that supports this format.` });
+                return;
+            }
+            runSarExport(format, targets).catch((error) => {
+                showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
+            });
+        }
+    });
+
+    document.getElementById('sarExportModal')?.addEventListener('change', (event) => {
+        const checkbox = event.target.closest('.js-sar-export-check');
+        if (!checkbox) return;
+        const studentId = String(checkbox.getAttribute('data-student-id') || '').trim();
+        if (checkbox.getAttribute('data-sar-export-type') === 'overall') {
+            checkbox.setAttribute('data-user-touched', '1');
+            const cell = checkbox.closest('.js-sar-overall-cell');
+            const actionsEl = cell?.querySelector('.js-sar-overall-actions');
+            if (actionsEl) {
+                actionsEl.querySelectorAll('.js-sar-row-export').forEach((btn) => {
+                    btn.disabled = !checkbox.checked;
+                });
+            }
+            return;
+        }
+        updateOverallEligibilityUi(studentId);
+    });
+    document.getElementById('btn_reset').addEventListener('click', () => {
+        selectedStudents = [];
+        renderSelectedStudents();
+        setDateRange(null, null);
+        setActiveRangeChip('');
+        cellDetailByKey.clear();
+        document.getElementById('resultsContainer').classList.add('d-none');
+        document.getElementById('studentReportSections').innerHTML = '';
+        sarExportPlan = null;
+    });
+
+    document.querySelectorAll('.btn-range').forEach((btn) => {
+        btn.addEventListener('click', (event) => {
+            const range = event.currentTarget.getAttribute('data-range');
+            const today = new Date();
+            let start;
+            let end;
+            if (range === 'today') {
+                start = startOfLocalDay(today);
+                end = new Date(start);
+            } else if (range === 'twoWeeks') {
+                const day = today.getDay() || 7;
+                start = startOfLocalDay(today);
+                start.setDate(today.getDate() - (day - 1));
+                end = new Date(start);
+                end.setDate(start.getDate() + 13);
+            } else if (range === 'thisWeek') {
+                const day = today.getDay() || 7;
+                start = startOfLocalDay(today);
+                start.setDate(today.getDate() - (day - 1));
+                end = new Date(start);
+                end.setDate(start.getDate() + 6);
+            } else if (range === 'prevWeek') {
+                const day = today.getDay() || 7;
+                start = startOfLocalDay(today);
+                start.setDate(today.getDate() - (day - 1) - 7);
+                end = new Date(start);
+                end.setDate(start.getDate() + 6);
+            } else if (range === 'thisMonth') {
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            } else if (range === 'prevMonth') {
+                start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                end = new Date(today.getFullYear(), today.getMonth(), 0);
+            } else {
+                return;
+            }
+            setDateRange(start, end);
+            setActiveRangeChip(range);
+            if (selectedStudents.length) {
+                loadStudentAttendanceReport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Load failed.' }));
+            }
+        });
+    });
+
+    if (initialStartDate) document.getElementById('filter_startDate').value = initialStartDate;
+    if (initialEndDate) document.getElementById('filter_endDate').value = initialEndDate;
+    if (initialStudents.length) {
+        selectedStudents = initialStudents.map((row) => ({
+            id: String(row.studentRecordId || '').trim(),
+            studentRecordId: String(row.studentRecordId || '').trim(),
+            personId: String(row.personId || '').trim(),
+            name: String(row.name || row.studentRecordId || '').trim()
+        })).filter((row) => row.studentRecordId);
+        renderSelectedStudents();
+    } else if (initialStudentIds.length) {
+        selectedStudents = initialStudentIds.map((id) => ({
+            id,
+            studentRecordId: id,
+            name: `Student ${id}`
+        }));
+        renderSelectedStudents();
+    } else {
+        renderSelectedStudents();
+        const today = new Date();
+        const day = today.getDay() || 7;
+        const start = startOfLocalDay(today);
+        start.setDate(today.getDate() - (day - 1));
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        setDateRange(start, end);
+        setActiveRangeChip('thisWeek');
+    }
+
+    syncSarUrlFromFilters();
+
+    if ((initialStudents.length || initialStudentIds.length) && initialStartDate && initialEndDate) {
+        loadStudentAttendanceReport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Load failed.' }));
+    }
+})();
+</script>

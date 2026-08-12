@@ -97,6 +97,7 @@ test('legacy settings routes redirect or save through the centralized controller
   assert.match(attendanceRoutes, /settingsCtrl\.saveAttendanceMatrix/);
   assert.match(controller, /res\.redirect\('\/school\/settings#conduct-rating-scale'\)/);
   assert.match(controller, /res\.redirect\('\/school\/settings#attendance-matrix'\)/);
+  assert.match(controller, /res\.redirect\('\/school\/settings#attendance-rollup'\)/);
 });
 
 test('settings page supports read-only rendering, independent AJAX saves, and modal-first feedback', () => {
@@ -104,18 +105,30 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   const catalog = require('../packages/school/MVC/config/schoolSettingsCatalog');
   assert.deepEqual(
     catalog.listSchoolSettingsGroups().map((row) => row.key),
-    ['conduct-rating-scale', 'attendance-matrix', 'autosave']
+    ['conduct-rating-scale', 'attendance-matrix', 'attendance-rollup', 'autosave', 'student-attendance-report']
   );
+  const rollupGroup = catalog.listSchoolSettingsGroups().find((row) => row.key === 'attendance-rollup');
+  assert.equal(rollupGroup?.href, undefined);
   assert.match(view, /activeOrgName/);
   assert.match(view, /read-only access/);
   assert.match(view, /canUpdateFlag/);
   assert.match(view, /id="conduct-rating-scale"/);
   assert.match(view, /id="attendance-matrix"/);
+  assert.match(view, /id="student-attendance-report"/);
+  assert.match(view, /id="sarReportTemplateId"/);
+  assert.match(view, /includeGenericPicker/);
+  assert.match(view, /modal_GenericPicker/);
+  assert.match(view, /\/school\/settings\/student-attendance-report/);
+  assert.match(view, /id="attendance-rollup"/);
+  assert.match(view, /id="includeUnmarkedSessions"/);
   assert.match(view, /id="attendanceThresholdsEnabled"/);
   assert.match(view, /role="switch"/);
   assert.match(view, /thresholdsEnabled/);
   assert.match(view, /\/school\/settings\/conduct-rating-scale/);
   assert.match(view, /\/school\/settings\/attendance-matrix/);
+  assert.match(view, /\/school\/settings\/attendance-rollup/);
+  assert.match(view, /#attendance-rollup/);
+  assert.doesNotMatch(view, /rollupUnmarkedTreatment/);
   assert.match(view, /id="autosave"/);
   assert.match(view, /\/school\/settings\/autosave/);
   assert.match(view, /stored on their device only/);
@@ -132,6 +145,8 @@ test('settings page uses a collapsible left sidebar and displays one selected ed
   assert.match(view, /data-settings-target="<%= group\.key %>"/);
   assert.match(view, /class="school-settings-panel active[^"]*" id="conduct-rating-scale"/);
   assert.match(view, /id="attendance-matrix"[^>]*hidden/);
+  assert.match(view, /id="attendance-rollup"[^>]*hidden/);
+  assert.match(view, /id="student-attendance-report"[^>]*hidden/);
   assert.match(view, /function setActiveSettingsPanel/);
   assert.match(view, /function setSettingsSidebarCollapsed/);
   assert.match(view, /schoolSettingsSidebarCollapsed/);
@@ -166,6 +181,22 @@ test('settings page renders in editable and read-only modes with valid client Ja
       isDefault: true
     }],
     attendanceThresholdsEnabled: false,
+    rollupFormula: {
+      includeUnmarkedSessions: false,
+      countUnmarkedAsAbsent: false,
+      includeLateGrace: true,
+      includeEarlyGrace: true,
+      includeLateExcusedRule: true,
+      includeEarlyExcusedRule: true,
+      lateExcusedTreatment: 'reduce_credit',
+      earlyExcusedTreatment: 'reduce_credit'
+    },
+    studentAttendanceReportPolicy: {
+      reportTemplateId: '',
+      overallReportTemplateId: ''
+    },
+    studentAttendanceReportTemplateLabel: '',
+    studentAttendanceReportOverallLabel: '',
     autosavePolicy: {
       defaultMinutes: 5,
       sections: {
@@ -179,6 +210,8 @@ test('settings page renders in editable and read-only modes with valid client Ja
   const editableHtml = await ejs.renderFile(templatePath, { ...baseLocals, canUpdate: true });
   assert.match(editableHtml, /Save Conduct Scale/);
   assert.match(editableHtml, /Save Attendance Thresholds/);
+  assert.match(editableHtml, /Save Rollup Formula/);
+  assert.match(editableHtml, /id="attendance-rollup"[^>]*hidden/);
   assert.match(editableHtml, /id="attendanceThresholdsEnabledLabel">Off/);
   assert.match(editableHtml, /When Off, late and early-leaving students receive full attendance credit/);
   assert.match(editableHtml, /Fixed non-percentage option/);

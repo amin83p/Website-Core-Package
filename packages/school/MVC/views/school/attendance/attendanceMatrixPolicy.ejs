@@ -9,6 +9,12 @@
       </p>
     </div>
     <div class="d-flex flex-wrap gap-2">
+      <a href="/school/settings" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-gear me-1"></i> School Settings
+      </a>
+      <a href="/school/settings#attendance-rollup" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-percent me-1"></i> Rollup Formula
+      </a>
       <a href="/school/attendances" class="school-navigator-dashboard btn btn-outline-secondary btn-sm">
         <i class="bi bi-grid-3x3 me-1"></i> Attendance Matrix
       </a>
@@ -24,6 +30,11 @@
   <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
     <div class="alert alert-danger border-0 shadow-sm"><%= errorMessage %></div>
   <% } %>
+
+  <p class="small text-muted mb-3">
+    Rollup % rules are configured separately on the
+    <a href="/school/settings#attendance-rollup">Attendance Rollup Formula</a> section.
+  </p>
 
   <form method="post" action="/school/attendances/settings" id="attendanceMatrixPolicyForm">
     <% if (typeof actionStateId !== 'undefined' && actionStateId) { %>
@@ -57,7 +68,7 @@
       </div>
       <div class="card-footer bg-white border-top">
         <button type="submit" class="btn btn-primary fw-bold">
-          <i class="bi bi-save me-1"></i> Save settings
+          <i class="bi bi-save me-1"></i> Save thresholds
         </button>
       </div>
     </div>
@@ -69,8 +80,8 @@
       <ul class="mb-0 ps-3">
         <li>Each class session length comes from <code>startTime</code>/<code>endTime</code> or <code>durationHours</code>.</li>
         <li>The system picks the item whose duration minutes match exactly; otherwise the default item; otherwise built-in 180 / 30 / 30.</li>
-        <li>Class-level <code>attendancePolicy</code> on a class record still overrides org item fields when set.</li>
-        <li>Absent / ACF → 0%; excused → full weight; present/late → proportional minutes unless a cutoff applies.</li>
+        <li>Disqualify thresholds change saved roster status; rollup formula affects the % column only.</li>
+        <li>Class-level <code>attendancePolicy</code> on a class record still overrides org item numeric fields when set.</li>
       </ul>
     </div>
   </div>
@@ -113,7 +124,7 @@
 
   function readFromDom() {
     const rows = Array.from(tbody.querySelectorAll('tr[data-item-index]'));
-    items = rows.map((tr, idx) => {
+    items = rows.map((tr) => {
       const combinedOn = tr.querySelector('.item-combined-on')?.checked === true;
       const combinedVal = tr.querySelector('.item-combined')?.value;
       return {

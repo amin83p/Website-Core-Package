@@ -19,6 +19,15 @@ async function persistInstanceAnswers({
   if (!instance?.id) throw new Error('Report instance is required.');
   if (!template) throw new Error('Template not found.');
 
+  function stableValueToken(value) {
+    if (value === undefined) return '__undefined__';
+    try {
+      return JSON.stringify(value);
+    } catch (_) {
+      return String(value);
+    }
+  }
+
   const mergedBeforeSave = reportService.mergeTemplateData(template, instance, assignment);
   const parsedAnswers = reportViewService.buildInstanceAnswers(template, body, mergedBeforeSave);
   const recomputedBeforeSave = reportService.recomputeCalculatedAnswers({
@@ -31,6 +40,29 @@ async function persistInstanceAnswers({
   const requestedAction = String(submitAction || body?.submitAction || '').trim().toLowerCase();
   const nextStatus = reportViewService.resolveInstanceNextStatus(instance, requestedAction);
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const derivedOverrides = {
+    ...(instance?.derivedOverrides && typeof instance.derivedOverrides === 'object' ? instance.derivedOverrides : {})
+  };
+  const prefillSnapshot = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
+    ? instance.prefillSnapshot
+    : {};
+  fields.forEach((field) => {
+    if (!reportRuleEngineService.isDerivedEditableField(field) || !field?.id) return;
+    const rule = reportRuleEngineService.normalizeCalculationRule(field?.calculationRule || {});
+    if (!rule.expression) return;
+    try {
+      const computed = reportRuleEngineService.evaluateSafeExpression(rule.expression, {
+        value: studentAnswers[field.id],
+        answers: studentAnswers,
+        prefill: prefillSnapshot
+      });
+      const submitted = studentAnswers[field.id];
+      derivedOverrides[field.id] = stableValueToken(computed) !== stableValueToken(submitted);
+    } catch (_) {
+      derivedOverrides[field.id] = true;
+    }
+  });
+
   const sharedFieldIds = fields
     .filter((field) => !isVisualOnlyField(field) && field?.sharedAcrossStudents === true && field?.id)
     .map((field) => String(field.id));
@@ -109,6 +141,7 @@ async function persistInstanceAnswers({
 
   const updatedInstance = await schoolDataService.updateData('reportInstances', instance.id, {
     answers: studentAnswers,
+    derivedOverrides,
     status: nextStatus,
     audit: {
       lastUpdateUser: reqUser?.id || '',

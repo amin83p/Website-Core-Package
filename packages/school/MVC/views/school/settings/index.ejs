@@ -4,9 +4,11 @@
   const attendanceItemsJson = JSON.stringify(attendanceItems || []).replace(/</g, '\\u003c');
   const autosavePolicyJson = JSON.stringify(typeof autosavePolicy !== 'undefined' ? autosavePolicy : { defaultMinutes: 5, sections: {} }).replace(/</g, '\\u003c');
   const autosaveSectionsJson = JSON.stringify(typeof autosaveSections !== 'undefined' ? autosaveSections : []).replace(/</g, '\\u003c');
+  const studentAttendanceReportPolicyJson = JSON.stringify(typeof studentAttendanceReportPolicy !== 'undefined' ? studentAttendanceReportPolicy : { reportTemplateId: '', overallReportTemplateId: '' }).replace(/</g, '\\u003c');
   const attendanceThresholdsEnabledFlag = typeof attendanceThresholdsEnabled === 'undefined'
     ? true
     : attendanceThresholdsEnabled !== false;
+  const rollupFormulaJson = JSON.stringify(typeof rollupFormula !== 'undefined' ? rollupFormula : {}).replace(/</g, '\\u003c');
 %>
 
 <style>
@@ -139,6 +141,20 @@
   .attendance-threshold-editor.is-disabled {
     opacity: .58;
   }
+  .rollup-feature-card {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 12px;
+    padding: 1rem 1.15rem;
+    background: var(--bs-body-bg);
+  }
+  .rollup-feature-card.is-disabled {
+    opacity: 0.72;
+  }
+  .rollup-feature-options {
+    border-top: 1px solid var(--bs-border-color-translucent);
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+  }
   @media (max-width: 767.98px) {
     .school-settings-workspace,
     .school-settings-workspace.sidebar-collapsed {
@@ -194,6 +210,16 @@
       </div>
       <nav class="school-settings-nav" id="schoolSettingsNav" role="tablist" aria-orientation="vertical">
         <% (groups || []).forEach((group, index) => { %>
+          <% if (group.href) { %>
+          <a
+            class="school-settings-nav-item"
+            href="<%= group.href %>"
+            title="<%= group.title %>"
+          >
+            <span class="school-settings-nav-icon"><i class="bi <%= group.icon %>" aria-hidden="true"></i></span>
+            <span class="school-settings-nav-label"><%= group.title %></span>
+          </a>
+          <% } else { %>
           <a
             class="school-settings-nav-item <%= index === 0 ? 'active' : '' %>"
             href="#<%= group.key %>"
@@ -207,6 +233,7 @@
             <span class="school-settings-nav-icon"><i class="bi <%= group.icon %>" aria-hidden="true"></i></span>
             <span class="school-settings-nav-label"><%= group.title %></span>
           </a>
+          <% } %>
         <% }); %>
       </nav>
       <div class="school-settings-sidebar-org d-flex align-items-center gap-2">
@@ -298,6 +325,10 @@
             the selected default item and then the built-in 180 / 30 / 30 defaults.
           </p>
           <p class="small text-muted">When On, class-level attendance policy values continue to override these organization defaults.</p>
+          <p class="small text-muted mb-3">
+            Rollup % rules are configured separately in the
+            <a href="#attendance-rollup">Attendance Rollup Formula</a> section.
+          </p>
           <div class="alert alert-danger d-none js-settings-error" id="attendanceSettingsError" role="alert"></div>
           <form id="attendanceSettingsForm" novalidate>
             <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
@@ -329,6 +360,118 @@
               <div class="d-flex justify-content-end">
                 <button class="btn btn-primary" type="submit" id="btnSaveAttendanceSettings">
                   <i class="bi bi-save me-1"></i>Save Attendance Thresholds
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
+
+      <section class="school-settings-panel card border-0 shadow-sm" id="attendance-rollup" role="tabpanel" aria-labelledby="settings-tab-attendance-rollup" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-percent" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Attendance Rollup Formula</h2>
+              <p class="small text-muted mb-0">Control how rollup % is calculated for the matrix, student report, Excel export, and print.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted mb-3">
+            Turn each rule on or off. Disabled rules do not affect rollup %. Matrix thresholds above change saved roster status only.
+            Session durations for grace minutes come from your Attendance Matrix Thresholds configuration.
+          </p>
+          <div class="alert alert-danger d-none js-settings-error" id="rollupSettingsError" role="alert"></div>
+          <form id="rollupFormulaForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="row g-3 mb-4">
+              <div class="col-lg-6">
+                <div class="rollup-feature-card" id="cardUnmarked">
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="includeUnmarkedSessions" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="includeUnmarkedSessions">Include unmarked sessions in rollup</label>
+                  </div>
+                  <p class="small text-muted mt-2 mb-0">When off, sessions with no attendance status are excluded from the rollup denominator.</p>
+                  <div class="rollup-feature-options" id="unmarkedOptions">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="countUnmarkedAsAbsent" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      <label class="form-check-label" for="countUnmarkedAsAbsent">Count unmarked sessions as absent (0% credit)</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="rollup-feature-card" id="cardLateGrace">
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="includeLateGrace" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="includeLateGrace">Apply late arrival grace minutes</label>
+                  </div>
+                  <p class="small text-muted mt-2 mb-0">When on, late minutes up to the grace value per duration do not reduce rollup credit.</p>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="rollup-feature-card" id="cardEarlyGrace">
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="includeEarlyGrace" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="includeEarlyGrace">Apply early leave grace minutes</label>
+                  </div>
+                  <p class="small text-muted mt-2 mb-0">When on, early-leave minutes up to the grace value per duration do not reduce rollup credit.</p>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="rollup-feature-card" id="cardLateExcused">
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="includeLateExcusedRule" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="includeLateExcusedRule">Apply late excused rules in rollup</label>
+                  </div>
+                  <p class="small text-muted mt-2 mb-0">When off, the late excused flag is ignored for rollup math (minutes still apply).</p>
+                  <div class="rollup-feature-options" id="lateExcusedOptions">
+                    <label class="form-label small fw-semibold" for="lateExcusedTreatment">When late is excused</label>
+                    <select class="form-select form-select-sm" id="lateExcusedTreatment" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      <option value="reduce_credit">Reduce credit by minutes</option>
+                      <option value="waive_penalty">Waive penalty minutes</option>
+                      <option value="count_as_absent">Count as absent (0% credit)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="rollup-feature-card" id="cardEarlyExcused">
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="includeEarlyExcusedRule" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="includeEarlyExcusedRule">Apply early leave excused rules in rollup</label>
+                  </div>
+                  <p class="small text-muted mt-2 mb-0">When off, the early leave excused flag is ignored for rollup math (minutes still apply).</p>
+                  <div class="rollup-feature-options" id="earlyExcusedOptions">
+                    <label class="form-label small fw-semibold" for="earlyExcusedTreatment">When early leave is excused</label>
+                    <select class="form-select form-select-sm" id="earlyExcusedTreatment" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      <option value="reduce_credit">Reduce credit by minutes</option>
+                      <option value="waive_penalty">Waive penalty minutes</option>
+                      <option value="count_as_absent">Count as absent (0% credit)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <h3 class="h6 fw-bold mb-2">Grace minutes by session duration</h3>
+            <p class="small text-muted mb-3">Grace values apply only when the corresponding grace rule above is enabled.</p>
+            <div class="table-responsive mb-4">
+              <table class="table table-sm align-middle school-settings-table mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Duration (min)</th>
+                    <th>Late grace (min)</th>
+                    <th>Early leave grace (min)</th>
+                  </tr>
+                </thead>
+                <tbody id="rollupGraceBody"></tbody>
+              </table>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end">
+                <button type="submit" class="btn btn-primary" id="btnSaveRollupFormula">
+                  <i class="bi bi-save me-1"></i>Save Rollup Formula
                 </button>
               </div>
             <% } %>
@@ -393,9 +536,67 @@
           </form>
         </div>
       </section>
+
+      <section class="school-settings-panel card border-0 shadow-sm" id="student-attendance-report" role="tabpanel" aria-labelledby="settings-tab-student-attendance-report" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-file-earmark-person" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Student Attendance Report</h2>
+              <p class="small text-muted mb-0">Choose templates used when generating reports from the Student Attendance Report page.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted mb-3">
+            The report template supplies per-class attendance span data for each enrolled class in the selected date range.
+            An optional overall report template merges multiple source slots into one document (classes map to slots by order).
+          </p>
+          <div class="alert alert-danger d-none js-settings-error" id="studentAttendanceReportSettingsError" role="alert"></div>
+          <form id="studentAttendanceReportSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="row g-3 mb-3">
+              <div class="col-lg-6">
+                <label class="form-label fw-semibold" for="sarReportTemplateTitle">Report template</label>
+                <input type="hidden" name="reportTemplateId" id="sarReportTemplateId" value="<%= typeof studentAttendanceReportPolicy !== 'undefined' && studentAttendanceReportPolicy?.reportTemplateId ? studentAttendanceReportPolicy.reportTemplateId : '' %>">
+                <div class="input-group">
+                  <input class="form-control" type="text" id="sarReportTemplateTitle" readonly placeholder="No template selected" value="<%= typeof studentAttendanceReportTemplateLabel !== 'undefined' ? studentAttendanceReportTemplateLabel : '' %>">
+                  <% if (canUpdateFlag) { %>
+                    <button class="btn btn-outline-secondary" type="button" id="btnPickSarReportTemplate"><i class="bi bi-search"></i></button>
+                  <% } %>
+                </div>
+                <div class="form-text">Required to generate reports from the Student Attendance Report page.</div>
+              </div>
+              <div class="col-lg-6">
+                <label class="form-label fw-semibold" for="sarOverallTemplateTitle">Overall report template (optional)</label>
+                <input type="hidden" name="overallReportTemplateId" id="sarOverallTemplateId" value="<%= typeof studentAttendanceReportPolicy !== 'undefined' && studentAttendanceReportPolicy?.overallReportTemplateId ? studentAttendanceReportPolicy.overallReportTemplateId : '' %>">
+                <div class="input-group">
+                  <input class="form-control" type="text" id="sarOverallTemplateTitle" readonly placeholder="No overall template selected" value="<%= typeof studentAttendanceReportOverallLabel !== 'undefined' ? studentAttendanceReportOverallLabel : '' %>">
+                  <% if (canUpdateFlag) { %>
+                    <button class="btn btn-outline-secondary" type="button" id="btnPickSarOverallTemplate"><i class="bi bi-search"></i></button>
+                    <button class="btn btn-outline-secondary" type="button" id="btnClearSarOverallTemplate" title="Clear overall template"><i class="bi bi-x-lg"></i></button>
+                  <% } %>
+                </div>
+                <div class="form-text">When set, classes are mapped to overall source slots by sorted class order.</div>
+              </div>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit" id="btnSaveStudentAttendanceReportSettings">
+                  <i class="bi bi-save me-1"></i>Save Student Attendance Report Settings
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
     </main>
   </div>
 </div>
+
+<% if (typeof includeGenericPicker !== 'undefined' && includeGenericPicker) { %>
+  <%- include('partials/modal_GenericPicker', { user }) %>
+<% } %>
 
 <script>
 (() => {
@@ -404,9 +605,12 @@
   let attendanceItems = <%- attendanceItemsJson %>;
   let autosavePolicy = <%- autosavePolicyJson %>;
   const autosaveSections = <%- autosaveSectionsJson %>;
+  let studentAttendanceReportPolicy = <%- studentAttendanceReportPolicyJson %>;
   let attendanceThresholdsEnabled = <%= attendanceThresholdsEnabledFlag ? 'true' : 'false' %>;
+  let rollupFormula = <%- rollupFormulaJson %>;
   const conductBody = document.getElementById('conductSettingsBody');
   const attendanceBody = document.getElementById('attendanceSettingsBody');
+  const rollupGraceBody = document.getElementById('rollupGraceBody');
   const autosaveBody = document.getElementById('autosaveSettingsBody');
   const settingsWorkspace = document.getElementById('schoolSettingsWorkspace');
   const settingsSidebarToggle = document.getElementById('btnToggleSettingsSidebar');
@@ -720,6 +924,7 @@
     attendanceThresholdsEnabled = result.thresholdsEnabled !== false;
     attendanceItems = Array.isArray(result.items) ? result.items : attendanceItems;
     renderAttendanceItems();
+    renderRollupGraceItems();
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 
@@ -744,6 +949,149 @@
     readAttendanceItems();
     attendanceThresholdsEnabled = event.currentTarget.checked === true;
     renderAttendanceItems();
+  });
+
+  function rollupFlag(value, fallback = false) {
+    if (value === true || value === 1) return true;
+    if (value === false || value === 0) return false;
+    const token = String(value ?? '').trim().toLowerCase();
+    if (['true', '1', 'on', 'yes'].includes(token)) return true;
+    if (['false', '0', 'off', 'no'].includes(token)) return false;
+    return fallback;
+  }
+
+  function syncRollupFormulaFromDom() {
+    rollupFormula = {
+      includeUnmarkedSessions: document.getElementById('includeUnmarkedSessions')?.checked === true,
+      countUnmarkedAsAbsent: document.getElementById('countUnmarkedAsAbsent')?.checked === true,
+      includeLateGrace: document.getElementById('includeLateGrace')?.checked === true,
+      includeEarlyGrace: document.getElementById('includeEarlyGrace')?.checked === true,
+      includeLateExcusedRule: document.getElementById('includeLateExcusedRule')?.checked === true,
+      includeEarlyExcusedRule: document.getElementById('includeEarlyExcusedRule')?.checked === true,
+      lateExcusedTreatment: String(document.getElementById('lateExcusedTreatment')?.value || 'reduce_credit'),
+      earlyExcusedTreatment: String(document.getElementById('earlyExcusedTreatment')?.value || 'reduce_credit')
+    };
+    return rollupFormula;
+  }
+
+  function readRollupGraceItems() {
+    if (!rollupGraceBody) return attendanceItems;
+    return [...rollupGraceBody.querySelectorAll('tr[data-grace-index]')].map((row, index) => {
+      const base = attendanceItems[index] || {};
+      return {
+        id: String(base.id || ''),
+        scheduledMinutes: Number(base.scheduledMinutes) || 0,
+        rollupLateGraceMinutes: Number(row.querySelector('.js-late-grace')?.value || 0),
+        rollupEarlyLeaveGraceMinutes: Number(row.querySelector('.js-early-grace')?.value || 0),
+        isDefault: base.isDefault === true
+      };
+    });
+  }
+
+  function refreshRollupFeatureCards() {
+    const unmarkedOn = document.getElementById('includeUnmarkedSessions')?.checked === true;
+    const lateGraceOn = document.getElementById('includeLateGrace')?.checked === true;
+    const earlyGraceOn = document.getElementById('includeEarlyGrace')?.checked === true;
+    const lateExcusedOn = document.getElementById('includeLateExcusedRule')?.checked === true;
+    const earlyExcusedOn = document.getElementById('includeEarlyExcusedRule')?.checked === true;
+
+    document.getElementById('cardUnmarked')?.classList.toggle('is-disabled', !unmarkedOn);
+    const countUnmarked = document.getElementById('countUnmarkedAsAbsent');
+    if (countUnmarked) countUnmarked.disabled = !canUpdate || !unmarkedOn;
+
+    document.getElementById('cardLateGrace')?.classList.toggle('is-disabled', !lateGraceOn);
+    document.getElementById('cardEarlyGrace')?.classList.toggle('is-disabled', !earlyGraceOn);
+
+    document.getElementById('cardLateExcused')?.classList.toggle('is-disabled', !lateExcusedOn);
+    const lateTreatment = document.getElementById('lateExcusedTreatment');
+    if (lateTreatment) lateTreatment.disabled = !canUpdate || !lateExcusedOn;
+
+    document.getElementById('cardEarlyExcused')?.classList.toggle('is-disabled', !earlyExcusedOn);
+    const earlyTreatment = document.getElementById('earlyExcusedTreatment');
+    if (earlyTreatment) earlyTreatment.disabled = !canUpdate || !earlyExcusedOn;
+
+    rollupGraceBody?.querySelectorAll('.js-late-grace').forEach((input) => {
+      input.disabled = !canUpdate || !lateGraceOn;
+    });
+    rollupGraceBody?.querySelectorAll('.js-early-grace').forEach((input) => {
+      input.disabled = !canUpdate || !earlyGraceOn;
+    });
+  }
+
+  function renderRollupFormulaControls() {
+    const includeUnmarked = document.getElementById('includeUnmarkedSessions');
+    const countUnmarked = document.getElementById('countUnmarkedAsAbsent');
+    const includeLateGrace = document.getElementById('includeLateGrace');
+    const includeEarlyGrace = document.getElementById('includeEarlyGrace');
+    const includeLateExcused = document.getElementById('includeLateExcusedRule');
+    const includeEarlyExcused = document.getElementById('includeEarlyExcusedRule');
+    const lateTreatment = document.getElementById('lateExcusedTreatment');
+    const earlyTreatment = document.getElementById('earlyExcusedTreatment');
+    if (!includeUnmarked) return;
+
+    includeUnmarked.checked = rollupFlag(rollupFormula.includeUnmarkedSessions, false);
+    countUnmarked.checked = rollupFlag(rollupFormula.countUnmarkedAsAbsent, false);
+    includeLateGrace.checked = rollupFlag(rollupFormula.includeLateGrace, true);
+    includeEarlyGrace.checked = rollupFlag(rollupFormula.includeEarlyGrace, true);
+    includeLateExcused.checked = rollupFlag(rollupFormula.includeLateExcusedRule, true);
+    includeEarlyExcused.checked = rollupFlag(rollupFormula.includeEarlyExcusedRule, true);
+    lateTreatment.value = rollupFormula.lateExcusedTreatment || 'reduce_credit';
+    earlyTreatment.value = rollupFormula.earlyExcusedTreatment || 'reduce_credit';
+    refreshRollupFeatureCards();
+  }
+
+  function renderRollupGraceItems() {
+    if (!rollupGraceBody) return;
+    normalizeAttendanceClientItems();
+    if (!attendanceItems.length) {
+      rollupGraceBody.innerHTML = '<tr><td colspan="3" class="text-muted small">No session durations configured. Add durations under Attendance Matrix Thresholds first.</td></tr>';
+      return;
+    }
+    const disabled = canUpdate ? '' : 'disabled';
+    rollupGraceBody.innerHTML = attendanceItems.map((item, index) => `
+      <tr data-grace-index="${index}">
+        <td class="fw-semibold">${escapeHtml(item.scheduledMinutes)}${item.isDefault ? ' <span class="badge bg-secondary-subtle text-secondary border">Default</span>' : ''}</td>
+        <td><input class="form-control form-control-sm js-late-grace" type="number" min="0" max="1440" step="1" value="${escapeHtml(item.rollupLateGraceMinutes ?? 0)}" ${disabled} aria-label="Late grace minutes"></td>
+        <td><input class="form-control form-control-sm js-early-grace" type="number" min="0" max="1440" step="1" value="${escapeHtml(item.rollupEarlyLeaveGraceMinutes ?? 0)}" ${disabled} aria-label="Early leave grace minutes"></td>
+      </tr>
+    `).join('');
+    refreshRollupFeatureCards();
+  }
+
+  [
+    'includeUnmarkedSessions', 'includeLateGrace', 'includeEarlyGrace',
+    'includeLateExcusedRule', 'includeEarlyExcusedRule'
+  ].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', refreshRollupFeatureCards);
+  });
+
+  document.getElementById('rollupFormulaForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveRollupFormula');
+    if (!button) return;
+    const formula = syncRollupFormulaFromDom();
+    const result = await postSettings('/school/settings/attendance-rollup', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      includeUnmarkedSessions: String(formula.includeUnmarkedSessions),
+      countUnmarkedAsAbsent: String(formula.countUnmarkedAsAbsent),
+      includeLateGrace: String(formula.includeLateGrace),
+      includeEarlyGrace: String(formula.includeEarlyGrace),
+      includeLateExcusedRule: String(formula.includeLateExcusedRule),
+      includeEarlyExcusedRule: String(formula.includeEarlyExcusedRule),
+      lateExcusedTreatment: formula.lateExcusedTreatment,
+      earlyExcusedTreatment: formula.earlyExcusedTreatment,
+      graceItems: JSON.stringify(readRollupGraceItems())
+    }, button, 'rollupSettingsError');
+    if (!result) return;
+    rollupFormula = result.rollupFormula && typeof result.rollupFormula === 'object'
+      ? result.rollupFormula
+      : rollupFormula;
+    if (Array.isArray(result.graceItems)) {
+      attendanceItems = result.graceItems;
+    }
+    renderRollupFormulaControls();
+    renderRollupGraceItems();
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 
   function renderAutosaveSections() {
@@ -787,6 +1135,77 @@
     return sections;
   }
 
+  function formatSarTemplateLabel(item = {}, fallbackId = '') {
+    const id = String(item?.id || fallbackId || '').trim();
+    const title = String(item?.title || id).trim();
+    const type = String(item?.type || '').trim();
+    const version = Number(item?.version) || 1;
+    if (!id) return '';
+    return type ? `${title} | ${type} v${version}` : `${title} v${version}`;
+  }
+
+  document.getElementById('btnPickSarReportTemplate')?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    GenericPicker.open(GenericPickerPresets.normalizeConfig({
+      title: 'Select Report Template',
+      icon: 'bi-journal-text',
+      apiEndpoint: '/school/reports/templates',
+      placeholder: 'Search templates...',
+      onSelect: (item) => {
+        const id = String(item?.id || '').trim();
+        if (!id) return;
+        document.getElementById('sarReportTemplateId').value = id;
+        document.getElementById('sarReportTemplateTitle').value = formatSarTemplateLabel(item, id);
+        studentAttendanceReportPolicy.reportTemplateId = id;
+      }
+    }));
+  });
+
+  document.getElementById('btnPickSarOverallTemplate')?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    GenericPicker.open(GenericPickerPresets.normalizeConfig({
+      title: 'Select Overall Report Template',
+      icon: 'bi-layers',
+      apiEndpoint: '/school/reports/overall-templates',
+      placeholder: 'Search overall templates...',
+      onSelect: (item) => {
+        const id = String(item?.id || '').trim();
+        if (!id) return;
+        document.getElementById('sarOverallTemplateId').value = id;
+        document.getElementById('sarOverallTemplateTitle').value = formatSarTemplateLabel(item, id);
+        studentAttendanceReportPolicy.overallReportTemplateId = id;
+      }
+    }));
+  });
+
+  document.getElementById('btnClearSarOverallTemplate')?.addEventListener('click', () => {
+    document.getElementById('sarOverallTemplateId').value = '';
+    document.getElementById('sarOverallTemplateTitle').value = '';
+    studentAttendanceReportPolicy.overallReportTemplateId = '';
+  });
+
+  document.getElementById('studentAttendanceReportSettingsForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveStudentAttendanceReportSettings');
+    if (!button) return;
+    const result = await postSettings('/school/settings/student-attendance-report', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      reportTemplateId: document.getElementById('sarReportTemplateId')?.value || '',
+      overallReportTemplateId: document.getElementById('sarOverallTemplateId')?.value || ''
+    }, button, 'studentAttendanceReportSettingsError');
+    if (!result) return;
+    studentAttendanceReportPolicy = result.policy && typeof result.policy === 'object'
+      ? result.policy
+      : studentAttendanceReportPolicy;
+    if (result.reportTemplateLabel) {
+      document.getElementById('sarReportTemplateTitle').value = result.reportTemplateLabel;
+    }
+    if (result.overallReportTemplateLabel !== undefined) {
+      document.getElementById('sarOverallTemplateTitle').value = result.overallReportTemplateLabel || '';
+    }
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
   document.getElementById('autosaveSettingsForm')?.addEventListener('submit', async event => {
     event.preventDefault();
     const button = document.getElementById('btnSaveAutosaveSettings');
@@ -804,6 +1223,8 @@
 
   renderConductLevels();
   renderAttendanceItems();
+  renderRollupFormulaControls();
+  renderRollupGraceItems();
   renderAutosaveSections();
 })();
 </script>

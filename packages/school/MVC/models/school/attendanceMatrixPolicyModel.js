@@ -17,10 +17,36 @@ const DEFAULT_THRESHOLD_FIELDS = Object.freeze({
   scheduledMinutes: 180,
   disqualifyLateMinutes: 30,
   disqualifyEarlyLeaveMinutes: 30,
-  disqualifyCombinedMissedMinutes: null
+  disqualifyCombinedMissedMinutes: null,
+  rollupLateGraceMinutes: 0,
+  rollupEarlyLeaveGraceMinutes: 0
 });
+
+const DEFAULT_ROLLUP_FORMULA = Object.freeze({
+  includeUnmarkedSessions: false,
+  countUnmarkedAsAbsent: false,
+  includeLateGrace: true,
+  includeEarlyGrace: true,
+  includeLateExcusedRule: true,
+  includeEarlyExcusedRule: true,
+  lateExcusedTreatment: 'reduce_credit',
+  earlyExcusedTreatment: 'reduce_credit',
+  unmarkedTreatment: 'exclude',
+  timingExcuseTreatment: 'reduce_credit'
+});
+
+function rollupPolicyFlag(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (value === false || value === 0) return false;
+  const token = String(value).trim().toLowerCase();
+  if (['false', '0', 'off', 'no'].includes(token)) return false;
+  if (['true', '1', 'on', 'yes'].includes(token)) return true;
+  return fallback;
+}
+
 const DEFAULT_POLICY = Object.freeze({
   thresholdsEnabled: true,
+  rollupFormula: { ...DEFAULT_ROLLUP_FORMULA },
   ...DEFAULT_THRESHOLD_FIELDS
 });
 
@@ -39,8 +65,72 @@ function pickStoredPolicyFields(row) {
     scheduledMinutes: row.scheduledMinutes,
     disqualifyLateMinutes: row.disqualifyLateMinutes,
     disqualifyEarlyLeaveMinutes: row.disqualifyEarlyLeaveMinutes,
-    disqualifyCombinedMissedMinutes: row.disqualifyCombinedMissedMinutes
+    disqualifyCombinedMissedMinutes: row.disqualifyCombinedMissedMinutes,
+    rollupLateGraceMinutes: row.rollupLateGraceMinutes,
+    rollupEarlyLeaveGraceMinutes: row.rollupEarlyLeaveGraceMinutes
   };
+}
+
+function normalizeUnmarkedTreatment(value, fallback = DEFAULT_ROLLUP_FORMULA.unmarkedTreatment) {
+  const token = String(value || fallback || '').trim().toLowerCase();
+  return token === 'count_as_absent' ? 'count_as_absent' : 'exclude';
+}
+
+function normalizeTimingExcuseTreatment(value, fallback = DEFAULT_ROLLUP_FORMULA.timingExcuseTreatment) {
+  const token = String(value || fallback || '').trim().toLowerCase();
+  if (token === 'waive_penalty' || token === 'count_as_absent') return token;
+  return 'reduce_credit';
+}
+
+function normalizeRollupFormulaFromStored(input = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+  const legacyUnmarked = normalizeUnmarkedTreatment(source.unmarkedTreatment);
+  const legacyTiming = normalizeTimingExcuseTreatment(source.timingExcuseTreatment);
+
+  const includeUnmarkedSessions = source.includeUnmarkedSessions !== undefined
+    ? rollupPolicyFlag(source.includeUnmarkedSessions, false)
+    : legacyUnmarked === 'count_as_absent';
+  const countUnmarkedAsAbsent = source.countUnmarkedAsAbsent !== undefined
+    ? rollupPolicyFlag(source.countUnmarkedAsAbsent, false)
+    : legacyUnmarked === 'count_as_absent';
+
+  const includeLateGrace = rollupPolicyFlag(source.includeLateGrace, true);
+  const includeEarlyGrace = rollupPolicyFlag(source.includeEarlyGrace, true);
+  const includeLateExcusedRule = rollupPolicyFlag(source.includeLateExcusedRule, true);
+  const includeEarlyExcusedRule = rollupPolicyFlag(source.includeEarlyExcusedRule, true);
+
+  const lateExcusedTreatment = normalizeTimingExcuseTreatment(
+    source.lateExcusedTreatment || source.timingExcuseTreatment,
+    legacyTiming
+  );
+  const earlyExcusedTreatment = normalizeTimingExcuseTreatment(
+    source.earlyExcusedTreatment || source.timingExcuseTreatment,
+    lateExcusedTreatment
+  );
+
+  const unmarkedTreatment = includeUnmarkedSessions && countUnmarkedAsAbsent
+    ? 'count_as_absent'
+    : 'exclude';
+  const timingExcuseTreatment = lateExcusedTreatment === earlyExcusedTreatment
+    ? lateExcusedTreatment
+    : 'reduce_credit';
+
+  return {
+    includeUnmarkedSessions,
+    countUnmarkedAsAbsent,
+    includeLateGrace,
+    includeEarlyGrace,
+    includeLateExcusedRule,
+    includeEarlyExcusedRule,
+    lateExcusedTreatment,
+    earlyExcusedTreatment,
+    unmarkedTreatment,
+    timingExcuseTreatment
+  };
+}
+
+function normalizeRollupFormulaFromForm(input = {}) {
+  return normalizeRollupFormulaFromStored(input);
 }
 
 function normalizeThresholdsEnabled(value, fallback = true) {
@@ -68,6 +158,14 @@ function applyNumericPolicyFields(input, out) {
   if (input.disqualifyEarlyLeaveMinutes !== undefined && input.disqualifyEarlyLeaveMinutes !== '') {
     const v = n(input.disqualifyEarlyLeaveMinutes, DEFAULT_POLICY.disqualifyEarlyLeaveMinutes);
     out.disqualifyEarlyLeaveMinutes = v >= 0 && v <= 24 * 60 ? v : DEFAULT_POLICY.disqualifyEarlyLeaveMinutes;
+  }
+  if (input.rollupLateGraceMinutes !== undefined && input.rollupLateGraceMinutes !== '') {
+    const v = n(input.rollupLateGraceMinutes, DEFAULT_POLICY.rollupLateGraceMinutes);
+    out.rollupLateGraceMinutes = v >= 0 && v <= 24 * 60 ? v : DEFAULT_POLICY.rollupLateGraceMinutes;
+  }
+  if (input.rollupEarlyLeaveGraceMinutes !== undefined && input.rollupEarlyLeaveGraceMinutes !== '') {
+    const v = n(input.rollupEarlyLeaveGraceMinutes, DEFAULT_POLICY.rollupEarlyLeaveGraceMinutes);
+    out.rollupEarlyLeaveGraceMinutes = v >= 0 && v <= 24 * 60 ? v : DEFAULT_POLICY.rollupEarlyLeaveGraceMinutes;
   }
 }
 
@@ -129,8 +227,9 @@ function normalizePolicyItem(input = {}, opts = {}) {
 function ensureDefaultItem(storage) {
   const items = Array.isArray(storage.items) ? storage.items.map((item) => ({ ...item })) : [];
   const thresholdsEnabled = normalizeThresholdsEnabled(storage.thresholdsEnabled, true);
+  const rollupFormula = normalizeRollupFormulaFromStored(storage.rollupFormula);
   if (!items.length) {
-    return { thresholdsEnabled, items: [], audit: storage.audit || null };
+    return { thresholdsEnabled, rollupFormula, items: [], audit: storage.audit || null };
   }
   const defaultCount = items.filter((item) => item.isDefault).length;
   if (defaultCount === 0) {
@@ -157,7 +256,7 @@ function ensureDefaultItem(storage) {
   if (!unique.some((item) => item.isDefault) && unique.length) {
     unique[0].isDefault = true;
   }
-  return { thresholdsEnabled, items: unique, audit: storage.audit || null };
+  return { thresholdsEnabled, rollupFormula, items: unique, audit: storage.audit || null };
 }
 
 /**
@@ -165,18 +264,19 @@ function ensureDefaultItem(storage) {
  */
 function normalizeOrgPolicyStorage(row) {
   if (!row || typeof row !== 'object') {
-    return { thresholdsEnabled: true, items: [] };
+    return { thresholdsEnabled: true, rollupFormula: { ...DEFAULT_ROLLUP_FORMULA }, items: [] };
   }
   const thresholdsEnabled = normalizeThresholdsEnabled(row.thresholdsEnabled, true);
+  const rollupFormula = normalizeRollupFormulaFromStored(row.rollupFormula);
   if (Array.isArray(row.items)) {
     const items = row.items.map((item) => normalizePolicyItem(item));
-    return ensureDefaultItem({ thresholdsEnabled, items, audit: row.audit || null });
+    return ensureDefaultItem({ thresholdsEnabled, rollupFormula, items, audit: row.audit || null });
   }
   if (isLegacyFlatPolicyRow(row)) {
     const item = normalizePolicyItem(pickStoredPolicyFields(row), { forceDefault: true });
-    return ensureDefaultItem({ thresholdsEnabled, items: [item], audit: row.audit || null });
+    return ensureDefaultItem({ thresholdsEnabled, rollupFormula, items: [item], audit: row.audit || null });
   }
-  return { thresholdsEnabled, items: [], audit: row.audit || null };
+  return { thresholdsEnabled, rollupFormula, items: [], audit: row.audit || null };
 }
 
 function policyFieldsFromItem(item) {
@@ -260,11 +360,12 @@ function policyCatalogFromDoc(doc, activeOrgId) {
   const key = orgKey(activeOrgId);
   const row = byOrg[key];
   if (!row || typeof row !== 'object') {
-    return { thresholdsEnabled: true, items: [] };
+    return { thresholdsEnabled: true, rollupFormula: { ...DEFAULT_ROLLUP_FORMULA }, items: [] };
   }
   const storage = normalizeOrgPolicyStorage(row);
   return {
     thresholdsEnabled: storage.thresholdsEnabled,
+    rollupFormula: storage.rollupFormula,
     items: storage.items
   };
 }
@@ -398,16 +499,75 @@ function normalizePolicyItemsForSave(rawItems) {
   return ensureDefaultItem({ items }).items;
 }
 
+function parseRollupFormulaFromBody(body = {}) {
+  const rollup = body?.rollupFormula && typeof body.rollupFormula === 'object'
+    ? body.rollupFormula
+    : body;
+  return normalizeRollupFormulaFromForm({
+    includeUnmarkedSessions: rollup.includeUnmarkedSessions,
+    countUnmarkedAsAbsent: rollup.countUnmarkedAsAbsent,
+    includeLateGrace: rollup.includeLateGrace,
+    includeEarlyGrace: rollup.includeEarlyGrace,
+    includeLateExcusedRule: rollup.includeLateExcusedRule,
+    includeEarlyExcusedRule: rollup.includeEarlyExcusedRule,
+    lateExcusedTreatment: rollup.lateExcusedTreatment,
+    earlyExcusedTreatment: rollup.earlyExcusedTreatment,
+    unmarkedTreatment: rollup.unmarkedTreatment || rollup.rollupUnmarkedTreatment,
+    timingExcuseTreatment: rollup.timingExcuseTreatment || rollup.rollupTimingExcuseTreatment
+  });
+}
+
+function mergeGraceIntoPolicyItems(existingItems = [], graceItems = []) {
+  const graceByKey = new Map();
+  (Array.isArray(graceItems) ? graceItems : []).forEach((row) => {
+    const id = String(row?.id || '').trim();
+    const mins = Number(row?.scheduledMinutes);
+    if (id) graceByKey.set(`id:${id}`, row);
+    if (Number.isFinite(mins) && mins > 0) graceByKey.set(`mins:${mins}`, row);
+  });
+  const baseItems = Array.isArray(existingItems) ? existingItems : [];
+  if (!baseItems.length) {
+    return normalizePolicyItemsForSave(graceItems);
+  }
+  return baseItems.map((item) => {
+    const id = String(item?.id || '').trim();
+    const mins = Number(item?.scheduledMinutes);
+    const patch = graceByKey.get(`id:${id}`) || graceByKey.get(`mins:${mins}`) || null;
+    if (!patch) return { ...item };
+    return {
+      ...item,
+      rollupLateGraceMinutes: Number(patch.rollupLateGraceMinutes) || 0,
+      rollupEarlyLeaveGraceMinutes: Number(patch.rollupEarlyLeaveGraceMinutes) || 0
+    };
+  });
+}
+
+async function saveRollupFormulaForOrg(activeOrgId, rollupFormula, graceItems = [], auditUserId, options = {}) {
+  const config = await getPolicyCatalogForOrg(activeOrgId);
+  const mergedItems = mergeGraceIntoPolicyItems(config.items, graceItems);
+  const normalizedItems = normalizePolicyItemsForSave(mergedItems);
+  await savePolicyItemsForOrg(activeOrgId, normalizedItems, auditUserId, {
+    rollupFormula: normalizeRollupFormulaFromForm(rollupFormula),
+    ...options
+  });
+  return getPolicyCatalogForOrg(activeOrgId);
+}
+
 async function savePolicyItemsForOrg(activeOrgId, rawItems, auditUserId, options = {}) {
   const items = normalizePolicyItemsForSave(rawItems);
   const hasExplicitEnabled = Object.prototype.hasOwnProperty.call(options || {}, 'thresholdsEnabled')
     && options.thresholdsEnabled !== undefined;
+  const hasExplicitRollupFormula = Object.prototype.hasOwnProperty.call(options || {}, 'rollupFormula')
+    && options.rollupFormula !== undefined;
   const buildStored = (existingRow) => {
     const existing = normalizeOrgPolicyStorage(existingRow);
     return {
       thresholdsEnabled: hasExplicitEnabled
         ? normalizeThresholdsEnabled(options.thresholdsEnabled, existing.thresholdsEnabled)
         : existing.thresholdsEnabled,
+      rollupFormula: hasExplicitRollupFormula
+        ? normalizeRollupFormulaFromForm(options.rollupFormula)
+        : existing.rollupFormula,
       items,
       audit: {
         lastUpdateUser: String(auditUserId || 'system'),
@@ -527,6 +687,7 @@ async function getStoredPolicyRowForOrg(activeOrgId) {
     id: key,
     orgId: key,
     thresholdsEnabled: storage.thresholdsEnabled,
+    rollupFormula: storage.rollupFormula,
     ...normalized,
     items: storage.items,
     status: 'stored',
@@ -537,6 +698,7 @@ async function getStoredPolicyRowForOrg(activeOrgId) {
 
 module.exports = {
   DEFAULT_POLICY,
+  DEFAULT_ROLLUP_FORMULA,
   getPolicyForOrg,
   getPolicyCatalogForOrg,
   listPolicyItemsForOrg,
@@ -554,6 +716,12 @@ module.exports = {
   normalizePolicyFromStored,
   normalizePolicyFromForm,
   normalizeThresholdsEnabled,
+  normalizeRollupFormulaFromForm,
+  normalizeRollupFormulaFromStored,
+  parseRollupFormulaFromBody,
+  mergeGraceIntoPolicyItems,
+  saveRollupFormulaForOrg,
+  rollupPolicyFlag,
   pickStoredPolicyFields,
   policyFieldsFromItem,
   orgKey
