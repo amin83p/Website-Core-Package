@@ -154,6 +154,8 @@
     : '/dashboard/section-nav/SCHOOL';
   const attManageBtns = [
     '<a href="/school/attendances/report" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-person-lines-fill me-1"></i> Student Attendance Report</a>',
+    '<a href="/school/settings" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-gear me-1"></i> School Settings</a>',
+    '<button type="button" id="btn_copyLink" class="btn btn-outline-primary btn-md mb-2" onclick="navigator.clipboard.writeText(window.location.href); alert(\'Link copied\');"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>',
     '<a href="/school/grades-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-table me-1"></i> Grades Matrix</a>'
   ];
 %>
@@ -220,10 +222,10 @@
                         <input type="date" id="filter_endDate" class="form-control size-md">
                     </div>
                     <div class="col-12 col-lg-4 d-flex justify-content-lg-end gap-2 pt-lg-2">
-                        <button type="button" id="btn_reset" class="btn btn-outline-secondary btn-md">Reset</button>
                         <button type="button" id="btn_loadData" class="btn btn-filled btn-primary btn-md">
                             <i class="bi bi-funnel me-1"></i> Apply
                         </button>
+                        <button type="button" id="btn_reset" class="btn btn-outline-secondary btn-md">Reset</button>
                     </div>
                 </div>
                 <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">

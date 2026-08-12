@@ -7,6 +7,26 @@
     .status-absent { color: #dc3545; font-weight: bold; }
     .status-acf { color: #b02a37; font-weight: bold; }
     .status-na { color: #adb5bd; }
+    .attendance-timing-excuse-icon {
+        position: relative;
+        display: inline-grid;
+        place-items: center;
+        width: 1.45em;
+        height: 1.45em;
+        line-height: 1;
+    }
+    .attendance-timing-excuse-icon::before {
+        content: "";
+        position: absolute;
+        inset: 0.02em;
+        border: 3px solid #198754;
+        border-radius: 50%;
+        pointer-events: none;
+    }
+    .attendance-timing-excuse-left::before { clip-path: inset(0 50% 0 0); }
+    .attendance-timing-excuse-right::before { clip-path: inset(0 0 0 50%); }
+    .attendance-timing-excuse-full::before { clip-path: none; }
+    .attendance-timing-excuse-icon > i { position: relative; z-index: 1; }
     .attendance-no-session-cell {
         background-color: #f1f3f5;
         min-width: 64px;
@@ -148,7 +168,12 @@
     : '/dashboard/section-nav/SCHOOL';
   const manageBtns = [
     '<a href="/school/attendances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-clipboard-check me-1"></i> Attendance Matrix</a>',
+    '<a href="/school/settings" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-gear me-1"></i> School Settings</a>',
     '<a href="/school/grades-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-table me-1"></i> Grades Matrix</a>'
+  ];
+  const optionalBtnsBeforePrint = [
+    '<button type="button" id="btn_copyReportLink" class="btn btn-outline-primary btn-md me-2 mb-2" title="Copy a shareable link with the current students and date range"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>',
+    '<button type="button" id="btn_exportSar" class="btn btn-filled btn-success btn-md me-2 mb-2"' + (canGenerateReport ? '' : ' disabled') + ' title="Export class and overall attendance reports"><i class="bi bi-cloud-download me-1"></i> Export</button>'
   ];
 %>
 
@@ -160,6 +185,7 @@
   tableName: typeof tableName !== 'undefined' ? tableName : 'Student_Attendance_Report',
   btn_export: false,
   print: false,
+  optionalBtnsBeforePrint,
   headerManageBtns: [
     '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
@@ -169,30 +195,6 @@
 
 <div class="schedule-shell">
     <p class="text-muted small mb-3">Review attendance across all enrolled classes for one or more students. Pick students, set a date range, then apply to load the report.</p>
-
-    <div class="card border-0 shadow-sm mb-3">
-        <div class="card-body py-3">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-                <div>
-                    <div class="fw-semibold mb-1">Report templates</div>
-                    <div class="small text-muted mb-1">
-                        Report: <span id="sarSettingsReportTemplateLabel"><%= typeof reportTemplateLabel !== 'undefined' && reportTemplateLabel ? reportTemplateLabel : 'Not configured' %></span>
-                    </div>
-                    <div class="small text-muted">
-                        Overall: <span id="sarSettingsOverallTemplateLabel"><%= typeof overallReportTemplateLabel !== 'undefined' && overallReportTemplateLabel ? overallReportTemplateLabel : 'None (per-class DOCX/ZIP)' %></span>
-                    </div>
-                </div>
-                <a href="/school/settings#student-attendance-report" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-gear me-1"></i> School Settings
-                </a>
-            </div>
-            <% if (!canGenerateReport) { %>
-                <div class="alert alert-warning border-0 mt-3 mb-0 small" role="status">
-                    Configure a report template under School Settings before generating documents.
-                </div>
-            <% } %>
-        </div>
-    </div>
 
     <div class="card border-0 shadow-sm mb-3">
         <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
@@ -248,16 +250,10 @@
                         <input type="date" id="filter_endDate" class="form-control size-md">
                     </div>
                     <div class="col-12 col-lg-3 d-flex justify-content-lg-end gap-2 pt-lg-2 flex-wrap">
-                        <button type="button" id="btn_copyReportLink" class="btn btn-outline-secondary btn-md" title="Copy a shareable link with the current students and date range">
-                            <i class="bi bi-link-45deg me-1"></i> Copy Link
-                        </button>
-                        <button type="button" id="btn_reset" class="btn btn-outline-secondary btn-md">Reset</button>
                         <button type="button" id="btn_loadData" class="btn btn-filled btn-primary btn-md">
                             <i class="bi bi-funnel me-1"></i> Apply
                         </button>
-                        <button type="button" id="btn_generateReport" class="btn btn-success btn-md" <%= canGenerateReport ? '' : 'disabled' %>>
-                            <i class="bi bi-file-earmark-word me-1"></i> Generate Report
-                        </button>
+                        <button type="button" id="btn_reset" class="btn btn-outline-secondary btn-md">Reset</button>
                     </div>
                 </div>
                 <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
@@ -280,9 +276,11 @@
             <div class="small text-muted">
                 <span class="me-3"><i class="bi bi-check-circle-fill text-success"></i> Present</span>
                 <span class="me-3"><i class="bi bi-clock-fill text-warning"></i> Late</span>
-                <span class="me-3"><i class="bi bi-envelope-paper-fill text-info"></i> Excused</span>
+                <span class="me-3"><span class="attendance-timing-excuse-icon attendance-timing-excuse-full d-inline-grid align-middle" style="width:1.2em;height:1.2em;vertical-align:-0.15em;"><i class="bi bi-x-circle-fill status-absent" style="font-size:0.82rem;"></i></span> Excused absence</span>
                 <span class="me-3"><i class="bi bi-x-circle-fill text-danger"></i> Absent</span>
                 <span class="me-3"><i class="bi bi-camera-video-off-fill status-acf"></i> ACF</span>
+                <span class="me-3"><span class="attendance-timing-excuse-icon attendance-timing-excuse-left d-inline-grid align-middle" style="width:1.2em;height:1.2em;vertical-align:-0.15em;"><i class="bi bi-clock-fill status-late" style="font-size:0.82rem;"></i></span> Late excused</span>
+                <span class="me-3"><span class="attendance-timing-excuse-icon attendance-timing-excuse-right d-inline-grid align-middle" style="width:1.2em;height:1.2em;vertical-align:-0.15em;"><i class="bi bi-clock-fill status-late" style="font-size:0.82rem;"></i></span> Early leave excused</span>
                 <span class="me-3"><i class="bi bi-percent text-secondary"></i> Rollup % = time-based credit</span>
                 <span><i class="bi bi-chat-dots-fill text-primary"></i> Notes Exist</span>
             </div>
@@ -481,6 +479,54 @@
     let sarCurrentMatrixUrl = '';
     let sarExportPlan = null;
     let sarExportModalInstance = null;
+    let sarReportLoadToken = null;
+    let sarReportLoadWaitingPoll = null;
+
+    function showSarReportWaiting() {
+        if (sarReportLoadToken) return sarReportLoadToken;
+        if (typeof window.showLoading === 'function') {
+            sarReportLoadToken = window.showLoading({
+                title: 'Loading Report',
+                note: 'Please wait while student attendance data is loaded…',
+                operation: 'Student Attendance Report'
+            });
+            return sarReportLoadToken;
+        }
+        if (!sarReportLoadWaitingPoll) {
+            sarReportLoadWaitingPoll = window.setInterval(() => {
+                if (typeof window.showLoading !== 'function') return;
+                window.clearInterval(sarReportLoadWaitingPoll);
+                sarReportLoadWaitingPoll = null;
+                showSarReportWaiting();
+            }, 50);
+        }
+        return null;
+    }
+
+    function hideSarReportWaiting() {
+        if (sarReportLoadWaitingPoll) {
+            window.clearInterval(sarReportLoadWaitingPoll);
+            sarReportLoadWaitingPoll = null;
+        }
+        if (!sarReportLoadToken || typeof window.hideLoading !== 'function') {
+            sarReportLoadToken = null;
+            return;
+        }
+        window.hideLoading(sarReportLoadToken);
+        sarReportLoadToken = null;
+    }
+
+    function runSarReportLoadWhenReady(callback) {
+        const run = () => {
+            if (typeof window.showLoading !== 'function') {
+                window.setTimeout(run, 50);
+                return;
+            }
+            callback();
+        };
+        if (document.readyState === 'complete') run();
+        else window.addEventListener('load', run, { once: true });
+    }
 
     function getSarExportRoot() {
         return document.getElementById('sarExportModal');
@@ -979,13 +1025,60 @@
         }));
     }
 
+    function attendanceFlagIsTrue(value) {
+        return value === true || value === 1 || ['true', '1', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+    }
+
+    function buildTimingExcuseIcon(innerIcon, ringClass) {
+        return `<span class="attendance-timing-excuse-icon ${ringClass}">${innerIcon}</span>`;
+    }
+
+    function buildLateTimingIcon(cell = {}) {
+        const late = Number(cell?.lateMinutes) || 0;
+        const early = Number(cell?.earlyLeaveMinutes) || 0;
+        const lateExcused = late > 0 && attendanceFlagIsTrue(cell?.lateExcused);
+        const earlyExcused = early > 0 && attendanceFlagIsTrue(cell?.earlyLeaveExcused);
+        const icon = '<i class="bi bi-clock-fill status-late"></i>';
+        if (lateExcused && earlyExcused) return buildTimingExcuseIcon(icon, 'attendance-timing-excuse-full');
+        if (lateExcused) return buildTimingExcuseIcon(icon, 'attendance-timing-excuse-left');
+        if (earlyExcused) return buildTimingExcuseIcon(icon, 'attendance-timing-excuse-right');
+        return icon;
+    }
+
+    function buildTimingExcuseTooltip(cell = {}, baseText = '') {
+        const late = Number(cell?.lateMinutes) || 0;
+        const early = Number(cell?.earlyLeaveMinutes) || 0;
+        const parts = [baseText];
+        if (late > 0 && attendanceFlagIsTrue(cell?.lateExcused)) parts.push('late arrival excused');
+        if (early > 0 && attendanceFlagIsTrue(cell?.earlyLeaveExcused)) parts.push('left early excused');
+        return parts.join(' - ');
+    }
+
+    function buildStatusTooltip(cell = {}) {
+        if (!cell?.hasSession) return '';
+        const status = String(cell.status || '').trim();
+        if (!status) return 'Not marked yet';
+        if (status === 'present') return 'Present';
+        if (status === 'late') return buildTimingExcuseTooltip(cell, 'Late');
+        if (status === 'excused') return 'Excused absence';
+        if (status === 'absent') return 'Absent';
+        if (status === 'acf') return 'Absent Camera Off';
+        if (status === 'not_applicable') {
+            if (cell.withinEnrollmentWindow === false) return 'N/A - not enrolled for this session';
+            if (cell.applicability === 'approved_leave') return 'N/A - approved leave';
+            if (cell.applicability === 'makeup_required') return 'N/A - make-up session required';
+            return 'N/A';
+        }
+        return status;
+    }
+
     function buildStatusIcon(cell) {
         if (!cell?.hasSession) return '';
         const status = String(cell.status || '').trim();
         if (!status) return '<i class="bi bi-dash text-muted"></i>';
         if (status === 'present') return '<i class="bi bi-check-circle-fill status-present"></i>';
-        if (status === 'late') return '<i class="bi bi-clock-fill status-late"></i>';
-        if (status === 'excused') return '<i class="bi bi-envelope-paper-fill status-excused"></i>';
+        if (status === 'late') return buildLateTimingIcon(cell);
+        if (status === 'excused') return buildTimingExcuseIcon('<i class="bi bi-x-circle-fill status-absent"></i>', 'attendance-timing-excuse-full');
         if (status === 'absent') return '<i class="bi bi-x-circle-fill status-absent"></i>';
         if (status === 'acf') return '<i class="bi bi-camera-video-off-fill status-acf"></i>';
         if (status === 'not_applicable') return '<i class="bi bi-dash-circle-fill status-na"></i>';
@@ -1042,7 +1135,8 @@
                     ? '<div class="position-absolute top-0 end-0 pe-1 pt-1"><i class="bi bi-chat-dots-fill text-primary" style="font-size: 0.65rem;"></i></div>'
                     : '';
                 const cellKey = buildCellKey(personId, classId, dayCell.date);
-                cells += `<td class="att-cell position-relative" data-sar-cell-key="${escapeHtml(cellKey)}" title="View attendance details">${buildStatusIcon(dayCell)}${noteBadge}</td>`;
+                const cellTitle = buildStatusTooltip(dayCell);
+                cells += `<td class="att-cell position-relative" data-sar-cell-key="${escapeHtml(cellKey)}" title="${escapeHtml(cellTitle)}">${buildStatusIcon(dayCell)}${noteBadge}</td>`;
             });
             classRows += `
                 <tr>
@@ -1123,29 +1217,45 @@
             return;
         }
 
-        const params = new URLSearchParams();
-        params.set('startDate', startDate);
-        params.set('endDate', endDate);
-        params.set('studentIds', studentIds.join(','));
-
-        const response = await fetch(`/school/attendances/report/api/data?${params.toString()}`, {
-            headers: { 'X-AJAX-Request': 'true' }
-        });
-        const payload = await response.json();
-        if (payload.status !== 'success') {
-            throw new Error(payload.message || 'Could not load student attendance report.');
+        const loadBtn = document.getElementById('btn_loadData');
+        const loadBtnHtml = loadBtn?.innerHTML;
+        showSarReportWaiting();
+        if (loadBtn) {
+            loadBtn.disabled = true;
+            loadBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
         }
 
-        const days = Array.isArray(payload.days) ? payload.days : [];
-        const students = orderReportStudentsBySelection(Array.isArray(payload.students) ? payload.students : []);
-        const container = document.getElementById('studentReportSections');
-        container.innerHTML = students.length
-            ? students.map((student) => buildStudentSection(student, days, payload.startDate, payload.endDate)).join('')
-            : '<p class="text-muted mb-0">No attendance data found for the selected students.</p>';
-        populateCellDetailsFromPayload(students, payload.startDate, payload.endDate);
-        mergeSelectedStudentsFromReportPayload(students);
-        syncSarUrlFromFilters();
-        document.getElementById('resultsContainer').classList.remove('d-none');
+        try {
+            const params = new URLSearchParams();
+            params.set('startDate', startDate);
+            params.set('endDate', endDate);
+            params.set('studentIds', studentIds.join(','));
+
+            const response = await fetch(`/school/attendances/report/api/data?${params.toString()}`, {
+                headers: { 'X-AJAX-Request': 'true' }
+            });
+            const payload = await response.json();
+            if (payload.status !== 'success') {
+                throw new Error(payload.message || 'Could not load student attendance report.');
+            }
+
+            const days = Array.isArray(payload.days) ? payload.days : [];
+            const students = orderReportStudentsBySelection(Array.isArray(payload.students) ? payload.students : []);
+            const container = document.getElementById('studentReportSections');
+            container.innerHTML = students.length
+                ? students.map((student) => buildStudentSection(student, days, payload.startDate, payload.endDate)).join('')
+                : '<p class="text-muted mb-0">No attendance data found for the selected students.</p>';
+            populateCellDetailsFromPayload(students, payload.startDate, payload.endDate);
+            mergeSelectedStudentsFromReportPayload(students);
+            syncSarUrlFromFilters();
+            document.getElementById('resultsContainer').classList.remove('d-none');
+        } finally {
+            hideSarReportWaiting();
+            if (loadBtn) {
+                loadBtn.disabled = false;
+                if (loadBtnHtml) loadBtn.innerHTML = loadBtnHtml;
+            }
+        }
     }
 
     async function generateStudentAttendanceReport() {
@@ -1590,7 +1700,7 @@
         if (!filters) return;
 
         const loadingEl = document.getElementById('sarExportLoading');
-        const button = document.getElementById('btn_generateReport');
+        const exportBtn = document.getElementById('btn_exportSar');
 
         showSarExportModal();
         loadingEl?.classList.remove('d-none');
@@ -1604,7 +1714,7 @@
             dateRangeEl.textContent = `${filters.startDate} → ${filters.endDate} · loading…`;
         }
 
-        if (button) button.disabled = true;
+        if (exportBtn) exportBtn.disabled = true;
         try {
             const params = new URLSearchParams();
             params.set('startDate', filters.startDate);
@@ -1623,7 +1733,7 @@
             showReportMessage({ icon: 'error', message: error.message || 'Could not load export options.' });
         } finally {
             loadingEl?.classList.add('d-none');
-            if (button && canGenerateReport) button.disabled = false;
+            if (exportBtn && canGenerateReport) exportBtn.disabled = false;
         }
     }
 
@@ -1647,8 +1757,9 @@
     document.getElementById('btn_copyReportLink')?.addEventListener('click', () => {
         copySarShareLink().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Could not copy link.' }));
     });
-    document.getElementById('filter_startDate')?.addEventListener('change', syncSarUrlFromFilters);
-    document.getElementById('filter_endDate')?.addEventListener('change', syncSarUrlFromFilters);
+    document.getElementById('btn_exportSar')?.addEventListener('click', () => {
+        openStudentAttendanceExportPanel().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Export failed.' }));
+    });
     document.getElementById('btn_openStudentPicker').addEventListener('click', openStudentPicker);
     document.getElementById('btn_clearStudents').addEventListener('click', () => {
         selectedStudents = [];
@@ -1663,9 +1774,8 @@
     document.getElementById('btn_loadData').addEventListener('click', () => {
         loadStudentAttendanceReport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Load failed.' }));
     });
-    document.getElementById('btn_generateReport')?.addEventListener('click', () => {
-        openStudentAttendanceExportPanel().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Export panel failed.' }));
-    });
+    document.getElementById('filter_startDate')?.addEventListener('change', syncSarUrlFromFilters);
+    document.getElementById('filter_endDate')?.addEventListener('change', syncSarUrlFromFilters);
 
     document.getElementById('sarExportModal')?.addEventListener('click', (event) => {
         const exportBtn = event.target.closest('.js-sar-row-export');
@@ -1819,7 +1929,10 @@
     syncSarUrlFromFilters();
 
     if ((initialStudents.length || initialStudentIds.length) && initialStartDate && initialEndDate) {
-        loadStudentAttendanceReport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Load failed.' }));
+        showSarReportWaiting();
+        runSarReportLoadWhenReady(() => {
+            loadStudentAttendanceReport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Load failed.' }));
+        });
     }
 })();
 </script>
