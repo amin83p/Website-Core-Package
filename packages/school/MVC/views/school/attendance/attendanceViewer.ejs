@@ -1157,16 +1157,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function refreshAttendanceDisplayRollups() {
         const data = window.currentMatrixData;
         if (!data?.classId || !Array.isArray(data.matrix)) return;
+        const startDate = String(document.getElementById('filter_startDate')?.value || data.startDate || '').trim();
+        const endDate = String(document.getElementById('filter_endDate')?.value || data.endDate || '').trim();
         try {
             const res = await fetch('/school/attendances/api/rollups', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
                 body: JSON.stringify({
                     classId: data.classId,
-                    students: data.matrix.map((row) => ({
-                        personId: row.personId,
-                        records: row.records || []
-                    }))
+                    startDate,
+                    endDate
                 })
             });
             const result = await res.json();
@@ -1350,6 +1350,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             bindAttendanceStudentVisibilityDropdown();
             applyAttendanceStudentVisibility();
+            await refreshAttendanceDisplayRollups();
 
             const currentUrlParams = new URLSearchParams(window.location.search);
             const targetStudentId = currentUrlParams.get('studentId');

@@ -289,7 +289,7 @@ function mergeLegacyCommentsXml(commentsXml, threads = []) {
     authorSnippets.push(`<author>tc=${escapeXml(rootId)}</author>`);
     const body = escapeXml(buildLegacyCompatibilityText(thread.messages));
     commentSnippets.push(
-      `<comment ref="${escapeXml(ref)}" authorId="${authorId}" shapeId="0" xr:uid="${escapeXml(rootId)}">`
+      `<comment ref="${escapeXml(ref)}" authorId="${authorId}" xr:uid="${escapeXml(rootId)}">`
       + `<text><t xml:space="preserve">${body}</t></text>`
       + `</comment>`
     );
@@ -336,22 +336,31 @@ function nextVmlShapeId(vmlXml = '') {
   return max + 1;
 }
 
-const NOTE_VML_WIDTH_PT = 220;
-const NOTE_VML_HEIGHT_PT = 150;
-const NOTE_ANCHOR_COL_SPAN = 5;
-const NOTE_ANCHOR_ROW_SPAN = 10;
+const NOTE_VML_WIDTH_PT = 97.8;
+const NOTE_VML_HEIGHT_PT = 59.1;
+const NOTE_VML_MARGIN_LEFT_PT = 105.3;
+const NOTE_VML_MARGIN_TOP_PT = 10.5;
+const NOTE_ANCHOR_COL_SPAN = 1;
+const NOTE_ANCHOR_ROW_SPAN = 1;
+
+/** ExcelJS default anchor — positions the red corner indicator correctly. */
+function buildDefaultVmlAnchor(col1, row1) {
+  const l = col1;
+  const t = Math.max(row1 - 2, 0);
+  return `${l}, 6, ${t}, 14, ${l + 2}, 2, ${t + 4}, 16`;
+}
 
 function buildVmlNoteShape({ shapeId, row0, col0 }) {
-  const anchorEndCol = col0 + NOTE_ANCHOR_COL_SPAN;
-  const anchorEndRow = row0 + NOTE_ANCHOR_ROW_SPAN;
-  const anchor = `${col0}, 8, ${row0}, 8, ${anchorEndCol}, 8, ${anchorEndRow}, 16`;
+  const col1 = col0 + 1;
+  const row1 = row0 + 1;
+  const anchor = buildDefaultVmlAnchor(col1, row1);
   return `<v:shape id="_x0000_s${shapeId}" type="#_x0000_t202"`
-    + ` style="position:absolute; margin-left:2pt;margin-top:2pt;width:${NOTE_VML_WIDTH_PT}pt;height:${NOTE_VML_HEIGHT_PT}pt;z-index:1;visibility:hidden"`
+    + ` style="position:absolute; margin-left:${NOTE_VML_MARGIN_LEFT_PT}pt;margin-top:${NOTE_VML_MARGIN_TOP_PT}pt;width:${NOTE_VML_WIDTH_PT}pt;height:${NOTE_VML_HEIGHT_PT}pt;z-index:1;visibility:hidden"`
     + ` fillcolor="infoBackground [80]" strokecolor="none [81]" o:insetmode="auto">`
     + `<v:fill color2="infoBackground [80]"/>`
     + `<v:shadow color="none [81]" obscured="t"/>`
     + `<v:path o:connecttype="none"/>`
-    + `<v:textbox style="mso-direction-alt:auto;mso-fit-shape-to-text:true" inset="2mm,2mm,2mm,2mm"><div style="text-align:left"/></v:textbox>`
+    + `<v:textbox style="mso-direction-alt:auto" inset="1.3mm,1.3mm,2.5mm,2.5mm"><div style="text-align:left"/></v:textbox>`
     + `<x:ClientData ObjectType="Note">`
     + `<x:MoveWithCells/><x:SizeWithCells/>`
     + `<x:Anchor>${anchor}</x:Anchor>`
@@ -359,6 +368,222 @@ function buildVmlNoteShape({ shapeId, row0, col0 }) {
     + `<x:Row>${row0}</x:Row><x:Column>${col0}</x:Column>`
     + `</x:ClientData>`
     + `</v:shape>`;
+}
+
+function assignPlainCommentShapeIds(commentsXml = '') {
+  let shapeIndex = 0;
+  return String(commentsXml).replace(
+    /<comment(\s+ref="[A-Z]+\d+")([^>]*)>/g,
+    (match, refPart, attrs) => {
+      if (/xr:uid=/.test(match)) return match;
+      if (/\bshapeId=/.test(attrs)) return match;
+      shapeIndex += 1;
+      return `<comment${refPart} shapeId="${shapeIndex - 1}"${attrs}>`;
+    }
+  );
+}
+
+function stripCommentShapeIds(commentsXml = '') {
+  return String(commentsXml || '').replace(/\s*shapeId="\d+"/g, '');
+}
+
+function assignSequentialCommentShapeIds(commentsXml = '') {
+  let shapeIndex = nextVmlShapeId(emptyVmlDrawingXml());
+  return String(commentsXml).replace(
+    /<comment(\s+ref="([A-Z]+\d+)")([^>]*)>/g,
+    (match, refPart, ref, attrs) => {
+      const cleanAttrs = attrs.replace(/\s*shapeId="\d+"/, '');
+      const id = shapeIndex;
+      shapeIndex += 1;
+      return `<comment${refPart}${cleanAttrs} shapeId="${id}">`;
+    }
+  );
+}
+
+function rebuildVmlFromCommentList(commentsXml = '') {
+  let xml = emptyVmlDrawingXml();
+  let shapeId = nextVmlShapeId(xml);
+  const shapes = [];
+  const re = /<comment\s+ref="([A-Z]+\d+)"[^>]*>[\s\S]*?<\/comment>/g;
+  let match = re.exec(String(commentsXml || ''));
+  while (match) {
+    const parsed = parseA1Ref(match[1]);
+    if (parsed) {
+      shapes.push(buildVmlNoteShape({
+        shapeId,
+        row0: parsed.row0,
+        col0: parsed.col0
+      }));
+      shapeId += 1;
+    }
+    match = re.exec(String(commentsXml || ''));
+  }
+  if (!shapes.length) return xml;
+  return xml.replace('</xml>', `${shapes.join('')}</xml>`);
+}
+
+/** Keep ExcelJS VML for timing notes; only append shapes for admin threaded bridges. */
+function prepareCommentsDrawing(commentsXml = '', existingVml = '', threads = []) {
+  if (!commentsXml || !/<comment\s+ref=/.test(commentsXml)) {
+    return {
+      commentsXml: commentsXml || '',
+      vmlXml: existingVml || emptyVmlDrawingXml()
+    };
+  }
+  const withoutShapeIds = stripCommentShapeIds(commentsXml);
+  let vmlXml = existingVml && /ObjectType="Note"/.test(existingVml)
+    ? existingVml
+    : rebuildVmlFromCommentList(withoutShapeIds);
+  if (threads.length) {
+    vmlXml = mergeLegacyVmlDrawing(vmlXml, threads);
+  }
+  return { commentsXml: withoutShapeIds, vmlXml };
+}
+
+function linkAllCommentShapeIds(commentsXml = '', vmlXml = '') {
+  const vmlOrder = [];
+  const shapeBlocks = String(vmlXml).match(/<v:shape[\s\S]*?ObjectType="Note"[\s\S]*?<\/v:shape>/g) || [];
+  shapeBlocks.forEach((block, index) => {
+    const rowMatch = block.match(/<x:Row>(\d+)<\/x:Row><x:Column>(\d+)<\/x:Column>/);
+    if (rowMatch) {
+      vmlOrder.push({
+        row0: Number(rowMatch[1]),
+        col0: Number(rowMatch[2]),
+        shapeId: index
+      });
+    }
+  });
+
+  return String(commentsXml).replace(
+    /<comment(\s+ref="([A-Z]+\d+)")([^>]*)>/g,
+    (match, refPart, ref, attrs) => {
+      const pos = parseA1Ref(ref);
+      if (!pos) return match;
+      const shape = vmlOrder.find((entry) => entry.row0 === pos.row0 && entry.col0 === pos.col0);
+      if (!shape) return match;
+      const cleanAttrs = attrs.replace(/\s*shapeId="\d+"/, '');
+      return `<comment${refPart}${cleanAttrs} shapeId="${shape.shapeId}">`;
+    }
+  );
+}
+
+function linkPlainCommentShapeIds(commentsXml = '', vmlXml = '') {
+  return linkAllCommentShapeIds(commentsXml, vmlXml);
+}
+
+function ensureSheetViewShowsObjects(sheetXml = '') {
+  if (!sheetXml) return sheetXml;
+  if (/\sshowObjects=/.test(sheetXml)) {
+    return sheetXml.replace(/\sshowObjects="[^"]*"/, ' showObjects="all"');
+  }
+  return sheetXml.replace(/<sheetView([^>]*)>/, '<sheetView$1 showObjects="all">');
+}
+
+/** Strip threaded bridge entries — internal helper for plain-note VML only. */
+function plainTimingCommentsXml(commentsXml = '') {
+  let xml = String(commentsXml || '');
+  if (!xml) return xml;
+
+  xml = xml.replace(
+    /<comment\s+ref="[A-Z]+\d+"[^>]*xr:uid=[^>]*>[\s\S]*?<\/comment>/g,
+    ''
+  );
+  xml = xml.replace(/<author>tc=[^<]+<\/author>/g, '');
+
+  if (!/xr:uid=/.test(xml)) {
+    xml = xml
+      .replace(/\s*xmlns:mc="[^"]*"/g, '')
+      .replace(/\s*mc:Ignorable="[^"]*"/g, '')
+      .replace(/\s*xmlns:xr="[^"]*"/g, '');
+  }
+
+  // ExcelJS plain notes omit shapeId; keep that format for indicator compatibility.
+  xml = xml.replace(/(<comment\s+ref="[A-Z]+\d+")\s+shapeId="\d+"([^>]*>)/g, '$1$2');
+
+  return xml;
+}
+
+function rebuildVmlForPlainComments(commentsXml = '') {
+  let xml = emptyVmlDrawingXml();
+  let shapeId = nextVmlShapeId(xml);
+  const shapes = [];
+  const re = /<comment\s+ref="([A-Z]+\d+)"[^>]*>[\s\S]*?<\/comment>/g;
+  let match = re.exec(String(commentsXml || ''));
+  while (match) {
+    const ref = match[1];
+    const block = match[0];
+    if (!/xr:uid=/.test(block)) {
+      const parsed = parseA1Ref(ref);
+      if (parsed) {
+        shapes.push(buildVmlNoteShape({
+          shapeId,
+          row0: parsed.row0,
+          col0: parsed.col0
+        }));
+        shapeId += 1;
+      }
+    }
+    match = re.exec(String(commentsXml || ''));
+  }
+  if (!shapes.length) return xml;
+  return xml.replace('</xml>', `${shapes.join('')}</xml>`);
+}
+
+function compactVmlNoteAnchors(vmlXml = '') {
+  if (!vmlXml) return vmlXml;
+  return vmlXml.replace(
+    /(<x:ClientData ObjectType="Note">[\s\S]*?<x:Anchor>)([\d,\s]+)(<\/x:Anchor>)/g,
+    (match, prefix, anchor, suffix) => {
+      const parts = String(anchor).split(',').map((token) => Number(String(token).trim()));
+      if (parts.length !== 8 || parts.some((n) => !Number.isFinite(n))) return match;
+      const [c1, d1, r1, dn1] = parts;
+      const compactAnchor = `${c1}, ${d1}, ${r1}, ${dn1}, ${c1 + 1}, ${d1}, ${r1 + 1}, ${dn1}`;
+      return `${prefix}${compactAnchor}${suffix}`;
+    }
+  );
+}
+
+function ensureVmlShapesForPlainComments(commentsXml, vmlXml) {
+  let xml = vmlXml || emptyVmlDrawingXml();
+  let shapeId = nextVmlShapeId(xml);
+  const shapes = [];
+  const re = /<comment\s+ref="([A-Z]+\d+)"[^>]*>[\s\S]*?<\/comment>/g;
+  let match = re.exec(String(commentsXml || ''));
+  while (match) {
+    const ref = match[1];
+    const block = match[0];
+    if (!/xr:uid=/.test(block) && !/tc=/.test(block)) {
+      const parsed = parseA1Ref(ref);
+      if (parsed) {
+        const already = new RegExp(
+          `<x:Row>${parsed.row0}</x:Row>\\s*<x:Column>${parsed.col0}</x:Column>`
+        );
+        if (!already.test(xml)) {
+          shapes.push(buildVmlNoteShape({
+            shapeId,
+            row0: parsed.row0,
+            col0: parsed.col0
+          }));
+          shapeId += 1;
+        }
+      }
+    }
+    match = re.exec(String(commentsXml || ''));
+  }
+  if (!shapes.length) return xml;
+  return xml.replace('</xml>', `${shapes.join('')}</xml>`);
+}
+
+function finalizeVmlDrawing(commentsXml, existingVml = '', threads = []) {
+  let xml = existingVml || emptyVmlDrawingXml();
+  xml = ensureVmlShapesForPlainComments(plainTimingCommentsXml(commentsXml), xml);
+  if (threads.length) {
+    xml = mergeLegacyVmlDrawing(xml, threads);
+  }
+  if (!existingVml && !/ObjectType="Note"/.test(xml)) {
+    return rebuildVmlForPlainComments(plainTimingCommentsXml(commentsXml));
+  }
+  return xml;
 }
 
 function enlargeVmlNoteShapes(vmlXml = '') {
@@ -449,9 +674,32 @@ async function injectThreadedComments(buffer, cellThreads = []) {
     ? await zip.file(vmlPath).async('string')
     : '';
 
+  const mergedCommentsXml = threads.length
+    ? mergeLegacyCommentsXml(existingComments, threads)
+    : existingComments;
+  const prepared = prepareCommentsDrawing(mergedCommentsXml, existingVml, threads);
+  const linkedCommentsXml = prepared.commentsXml;
+  const finalizedVml = prepared.vmlXml;
+  if (linkedCommentsXml) {
+    zip.file(commentsPath, linkedCommentsXml);
+  }
+  zip.file(vmlPath, finalizedVml);
+
   if (!threads.length) {
-    if (existingVml) {
-      zip.file(vmlPath, enlargeVmlNoteShapes(existingVml));
+    const sheetRelsPath = 'xl/worksheets/_rels/sheet1.xml.rels';
+    const sheetRelsFile = zip.file(sheetRelsPath);
+    if (sheetRelsFile) {
+      const sheetRelsXml = await sheetRelsFile.async('string');
+      const vmlRelId = findRelationshipId(sheetRelsXml, {
+        type: VML_REL_TYPE,
+        target: '../drawings/vmlDrawing1.vml'
+      });
+      const sheetPath = 'xl/worksheets/sheet1.xml';
+      const sheetXml = await zip.file(sheetPath).async('string');
+      zip.file(
+        sheetPath,
+        ensureSheetViewShowsObjects(ensureSheetLegacyDrawing(sheetXml, vmlRelId))
+      );
     }
     const out = await zip.generateAsync({
       type: 'nodebuffer',
@@ -462,12 +710,6 @@ async function injectThreadedComments(buffer, cellThreads = []) {
 
   zip.file('xl/persons/person.xml', buildPersonListXml(persons));
   zip.file('xl/threadedComments/threadedComment1.xml', buildThreadedCommentsXml(threads));
-  const mergedCommentsXml = mergeLegacyCommentsXml(existingComments, threads);
-  const commentsChanged = mergedCommentsXml !== existingComments;
-  if (commentsChanged) {
-    zip.file(commentsPath, mergedCommentsXml);
-  }
-  zip.file(vmlPath, enlargeVmlNoteShapes(mergeLegacyVmlDrawing(existingVml, threads)));
 
   const contentTypesPath = '[Content_Types].xml';
   let contentTypesXml = await zip.file(contentTypesPath).async('string');
@@ -522,7 +764,7 @@ async function injectThreadedComments(buffer, cellThreads = []) {
   });
   const sheetPath = 'xl/worksheets/sheet1.xml';
   const sheetXml = await zip.file(sheetPath).async('string');
-  zip.file(sheetPath, ensureSheetLegacyDrawing(sheetXml, vmlRelId));
+  zip.file(sheetPath, ensureSheetViewShowsObjects(ensureSheetLegacyDrawing(sheetXml, vmlRelId)));
 
   const out = await zip.generateAsync({
     type: 'nodebuffer',
@@ -540,6 +782,18 @@ module.exports = {
   buildLegacyCompatibilityText,
   mergeLegacyCommentsXml,
   mergeLegacyVmlDrawing,
+  compactVmlNoteAnchors,
+  ensureVmlShapesForPlainComments,
+  finalizePlainCommentsXml: plainTimingCommentsXml,
+  stripCommentShapeIds,
+  assignSequentialCommentShapeIds,
+  rebuildVmlFromCommentList,
+  prepareCommentsDrawing,
+  linkAllCommentShapeIds,
+  linkPlainCommentShapeIds,
+  ensureSheetViewShowsObjects,
+  rebuildVmlForPlainComments,
+  finalizeVmlDrawing,
   resolvePersonsAndThreads,
   buildPersonListXml,
   buildThreadedCommentsXml,

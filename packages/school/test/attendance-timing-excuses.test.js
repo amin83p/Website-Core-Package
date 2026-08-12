@@ -24,14 +24,14 @@ const policy = attendanceMatrixMetricsService.resolvePolicy({}, {
   disqualifyCombinedMissedMinutes: 45
 });
 
-test('timing excuse flags remove late and early minutes from attendance penalty', () => {
+test('timing excuse flags do not waive missed minutes in attendance rollup', () => {
   assert.equal(
     attendanceMatrixMetricsService.computePresenceRatio({ status: 'late', lateMinutes: 30 }, policy),
     0.75
   );
   assert.equal(
     attendanceMatrixMetricsService.computePresenceRatio({ status: 'late', lateMinutes: 30, lateExcused: true }, policy),
-    1
+    0.75
   );
   assert.equal(
     attendanceMatrixMetricsService.computePresenceRatio({ status: 'late', earlyLeaveMinutes: 30 }, policy),
@@ -39,7 +39,7 @@ test('timing excuse flags remove late and early minutes from attendance penalty'
   );
   assert.equal(
     attendanceMatrixMetricsService.computePresenceRatio({ status: 'late', earlyLeaveMinutes: 30, earlyLeaveExcused: true }, policy),
-    1
+    0.75
   );
   assert.equal(
     attendanceMatrixMetricsService.computePresenceRatio({
@@ -49,7 +49,7 @@ test('timing excuse flags remove late and early minutes from attendance penalty'
       lateExcused: true,
       earlyLeaveExcused: true
     }, policy),
-    1
+    (120 - 15 - 20) / 120
   );
 });
 
@@ -74,7 +74,7 @@ test('roster rules default missing timing excuse flags to false and clear them w
   assert.equal(cleared.earlyLeaveExcused, false);
 });
 
-test('excused timing minutes do not trigger absence thresholds', () => {
+test('timing minutes trigger absence thresholds regardless of excuse flags', () => {
   const notExcused = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules({
     attendance: 'present',
     lateMinutes: 35
@@ -86,7 +86,7 @@ test('excused timing minutes do not trigger absence thresholds', () => {
     lateMinutes: 35,
     lateExcused: true
   }, policy, ['present', 'late', 'absent', 'not_applicable']);
-  assert.equal(excused.attendance, 'late');
+  assert.equal(excused.attendance, 'absent');
   assert.equal(excused.lateMinutes, 35);
   assert.equal(excused.lateExcused, true);
 });
@@ -171,7 +171,7 @@ test('Excel export and report catalog expose timing excuse details', () => {
       lateExcused: true,
       earlyLeaveMinutes: 8
     }),
-    'L\nLate 12m (excused) / Left Early 8m (not excused)'
+    'L'
   );
   assert.equal(
     attendanceExcelExportService.buildStatusNoteText({

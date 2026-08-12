@@ -10,6 +10,7 @@
  * - unmarked → excluded from the denominator
  * - present / late / absent / acf → credit = weight × presenceRatio
  *   presenceRatio = max(0, scheduled - late - early) / scheduled
+ *   lateExcused / earlyLeaveExcused are display-only; they do not waive missed time in rollup math
  *   absent / acf with no late/early minutes → presenceRatio = 0
  *
  * Threshold cutoffs (when enabled) may change stored status on roster save only;
@@ -300,9 +301,10 @@ function normalizeAttendanceTimingFields(record = {}) {
 
 function attendanceTimingPenaltyMinutes(record = {}) {
   const timing = normalizeAttendanceTimingFields(record);
+  // Timing excuse flags are informational only; missed minutes always reduce rollup credit.
   return {
-    latePenaltyMinutes: timing.lateExcused ? 0 : timing.lateMinutes,
-    earlyLeavePenaltyMinutes: timing.earlyLeaveExcused ? 0 : timing.earlyLeaveMinutes
+    latePenaltyMinutes: timing.lateMinutes,
+    earlyLeavePenaltyMinutes: timing.earlyLeaveMinutes
   };
 }
 

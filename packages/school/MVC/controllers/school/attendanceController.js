@@ -394,6 +394,106 @@ async function listActiveAttendanceClasses(req, res) {
     }
 }
 
+function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
+    const {
+        rosterMaps,
+        classData,
+        orgPolicyCatalog,
+        attendancePolicy,
+        enabledAttendanceStatuses,
+        getApplicabilityForSession,
+        getEnrollmentWindowForSession,
+        forceNotApplicableSessionKeys,
+        userContactById
+    } = context;
+
+    const rosterRecord = matrixWindowService.rosterRecordForSession(rosterMaps, ses, stu.personId);
+    const sessionLocked = ses.locked === true || String(ses.locked) === 'true';
+    const applicabilityState = getApplicabilityForSession(stu, ses);
+    const enrollmentWindow = getEnrollmentWindowForSession(stu, ses);
+    const withinEnrollmentWindow = enrollmentWindow.withinEnrollmentWindow === true;
+    const forceNotApplicable = forceNotApplicableSessionKeys.has(String(ses?.sessionId || ses?.id || '').trim())
+        || forceNotApplicableSessionKeys.has(String(ses?.date || '').trim());
+    const expectedForSession = withinEnrollmentWindow && !forceNotApplicable && Boolean(applicabilityState.expected);
+    const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
+    let status = !withinEnrollmentWindow
+        ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+        : (forceNotApplicable
+        ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+        : (rosterRecord
+            ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
+            : (expectedForSession ? '' : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE)));
+    let applicability = !withinEnrollmentWindow
+        ? 'not_enrolled'
+        : (forceNotApplicable ? 'makeup_required' : (rosterRecord ? 'manual' : (expectedForSession ? 'expected_missing' : (applicabilityState.reason || 'not_enrolled'))));
+    if (withinEnrollmentWindow && !forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(status))) {
+        status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+        applicability = 'approved_leave';
+    } else if (withinEnrollmentWindow && !forceNotApplicable && status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE && rosterRecord) {
+        applicability = 'manual_not_applicable';
+    }
+    const scheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+        ses,
+        attendancePolicy.scheduledMinutes
+    );
+    const record = {
+        sessionId: ses.sessionId,
+        date: ses.date,
+        status,
+        applicability,
+        expectedForSession,
+        withinEnrollmentWindow,
+        enrollmentWindowReason: withinEnrollmentWindow ? '' : enrollmentWindow.reason,
+        hasApprovedLeave,
+        lateMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.lateMinutes || 0),
+        earlyLeaveMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.earlyLeaveMinutes || 0),
+        lateExcused: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+            ? false
+            : Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRecord).lateExcused),
+        earlyLeaveExcused: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+            ? false
+            : Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRecord).earlyLeaveExcused),
+        excuseRef: rosterRecord?.excuseRef || '',
+        excuseAttachment: rosterRecord?.excuseAttachment || null,
+        teacherNotes: (rosterRecord?.notes) || ses.notes || '',
+        rosterStudentNotes: rosterRecord?.notes || '',
+        sessionLevelNote: ses.notes || '',
+        sessionLocked,
+        comments: enrichAttendanceComments(rosterRecord?.comments || [], userContactById),
+        scheduledMinutes
+    };
+    const recordPolicy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
+        classData,
+        orgPolicyCatalog,
+        scheduledMinutes
+    );
+    const ruled = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(
+        {
+            attendance: record.status,
+            lateMinutes: record.lateMinutes,
+            earlyLeaveMinutes: record.earlyLeaveMinutes,
+            lateExcused: record.lateExcused,
+            earlyLeaveExcused: record.earlyLeaveExcused
+        },
+        recordPolicy,
+        enabledAttendanceStatuses
+    );
+    record.status = attendanceMatrixMetricsService.coerceAttendanceStatusToEnabled(
+        ruled.attendance,
+        enabledAttendanceStatuses
+    );
+    record.lateMinutes = ruled.lateMinutes;
+    record.earlyLeaveMinutes = ruled.earlyLeaveMinutes;
+    record.lateExcused = ruled.lateExcused;
+    record.earlyLeaveExcused = ruled.earlyLeaveExcused;
+    record.status = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus(
+        record,
+        recordPolicy,
+        enabledAttendanceStatuses
+    );
+    return record;
+}
+
 async function buildAttendanceMatrixPayload(req, options = {}) {
         const query = req?.query && typeof req.query === 'object' ? req.query : {};
         const { classId, startDate, endDate } = query;
@@ -601,83 +701,29 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
         );
         const buildStudentList = matrixStudentList.slice(buildPlan.studentStart, buildPlan.studentEnd);
         const buildSessions = matrixSessions.slice(buildPlan.sessionStart, buildPlan.sessionEnd);
-        const rosterMaps = matrixWindowService.buildRosterLookupMaps(buildSessions);
+        const windowRosterMaps = matrixWindowService.buildRosterLookupMaps(buildSessions);
+        const fullRosterMaps = matrixWindowService.buildRosterLookupMaps(matrixSessions);
+        const recordBuildContext = {
+            classData,
+            orgPolicyCatalog,
+            attendancePolicy,
+            enabledAttendanceStatuses,
+            getApplicabilityForSession,
+            getEnrollmentWindowForSession,
+            forceNotApplicableSessionKeys,
+            userContactById
+        };
 
         const matrix = buildStudentList.map((stu) => {
-            const records = buildSessions.map(ses => {
-                const rosterRecord = matrixWindowService.rosterRecordForSession(rosterMaps, ses, stu.personId);
-                const sessionLocked = ses.locked === true || String(ses.locked) === 'true';
-                const applicabilityState = getApplicabilityForSession(stu, ses);
-                const enrollmentWindow = getEnrollmentWindowForSession(stu, ses);
-                const withinEnrollmentWindow = enrollmentWindow.withinEnrollmentWindow === true;
-                const forceNotApplicable = forceNotApplicableSessionKeys.has(String(ses?.sessionId || ses?.id || '').trim())
-                    || forceNotApplicableSessionKeys.has(String(ses?.date || '').trim());
-                const expectedForSession = withinEnrollmentWindow && !forceNotApplicable && Boolean(applicabilityState.expected);
-                const hasApprovedLeave = applicabilityState.reason === 'approved_leave';
-                let status = !withinEnrollmentWindow
-                    ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
-                    : (forceNotApplicable
-                    ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
-                    : (rosterRecord
-                        ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
-                        : (expectedForSession ? '' : attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE)));
-                let applicability = !withinEnrollmentWindow
-                    ? 'not_enrolled'
-                    : (forceNotApplicable ? 'makeup_required' : (rosterRecord ? 'manual' : (expectedForSession ? 'expected_missing' : (applicabilityState.reason || 'not_enrolled'))));
-                if (withinEnrollmentWindow && !forceNotApplicable && hasApprovedLeave && (!rosterRecord || attendanceMatrixMetricsService.isAbsentLikeStatus(status))) {
-                    status = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
-                    applicability = 'approved_leave';
-                } else if (withinEnrollmentWindow && !forceNotApplicable && status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE && rosterRecord) {
-                    applicability = 'manual_not_applicable';
-                }
-                const scheduledMinutes = attendanceMatrixMetricsService.scheduledMinutesFromSession(
-                    ses,
-                    attendancePolicy.scheduledMinutes
-                );
-                const record = {
-                    sessionId: ses.sessionId,
-                    date: ses.date,
-                    status,
-                    applicability,
-                    expectedForSession,
-                    withinEnrollmentWindow,
-                    enrollmentWindowReason: withinEnrollmentWindow ? '' : enrollmentWindow.reason,
-                    hasApprovedLeave,
-                    lateMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.lateMinutes || 0),
-                    earlyLeaveMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.earlyLeaveMinutes || 0),
-                    lateExcused: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
-                        ? false
-                        : Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRecord).lateExcused),
-                    earlyLeaveExcused: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
-                        ? false
-                        : Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRecord).earlyLeaveExcused),
-                    excuseRef: rosterRecord?.excuseRef || '',
-                    excuseAttachment: rosterRecord?.excuseAttachment || null,
-                    teacherNotes: (rosterRecord?.notes) || ses.notes || '',
-                    rosterStudentNotes: rosterRecord?.notes || '',
-                    sessionLevelNote: ses.notes || '',
-                    sessionLocked,
-                    comments: enrichAttendanceComments(rosterRecord?.comments || [], userContactById),
-                    scheduledMinutes
-                };
-                const recordPolicy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
-                    classData,
-                    orgPolicyCatalog,
-                    scheduledMinutes
-                );
-                record.status = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus(
-                    record,
-                    recordPolicy,
-                    enabledAttendanceStatuses
-                );
-                return record;
-            });
-            const summary = attendanceMatrixMetricsService.computeStudentMatrixSummary(
-                records,
-                classData,
-                orgPolicyCatalog
-            );
-            return { ...stu, records, summary };
+            const records = buildSessions.map((ses) => buildAttendanceMatrixRecordForSession(stu, ses, {
+                ...recordBuildContext,
+                rosterMaps: windowRosterMaps
+            }));
+            const rollupRecords = matrixSessions.map((ses) => buildAttendanceMatrixRecordForSession(stu, ses, {
+                ...recordBuildContext,
+                rosterMaps: fullRosterMaps
+            }));
+            return { ...stu, records, _rollupRecords: rollupRecords };
         });
 
         const payload = {
@@ -746,16 +792,36 @@ async function exportAttendanceExcel(req, res) {
 
 async function postAttendanceRollups(req, res) {
     try {
-        const classId = String(req.body?.classId || '').trim();
+        const classId = String(req.body?.classId || req.query?.classId || '').trim();
         if (!classId) throw new Error('Class ID is required.');
-        const classData = await getAttendanceClassOrThrow(req, classId);
-        const orgPolicyCatalog = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(
-            String(req.user?.activeOrgId || classData?.orgId || '').trim()
-        );
-        const rollups = matrixRollupService.summarizeAttendanceRollupsForStudents(
-            req.body?.students,
-            { classData, orgPolicyCatalog }
-        );
+        const startDate = String(req.body?.startDate || req.query?.startDate || '').trim();
+        const endDate = String(req.body?.endDate || req.query?.endDate || '').trim();
+        const personIdsRaw = req.body?.personIds;
+        const personIdFilter = personIdsRaw == null
+            ? null
+            : new Set(
+                (Array.isArray(personIdsRaw) ? personIdsRaw : String(personIdsRaw).split(','))
+                    .map((id) => String(id || '').trim())
+                    .filter(Boolean)
+            );
+
+        const rollupReq = {
+            ...req,
+            query: {
+                ...(req.query && typeof req.query === 'object' ? req.query : {}),
+                classId,
+                startDate,
+                endDate
+            }
+        };
+        const payload = await buildAttendanceMatrixPayload(rollupReq, { applyWindow: false });
+        const rollups = {};
+        (Array.isArray(payload?.matrix) ? payload.matrix : []).forEach((row) => {
+            const personId = String(row?.personId || '').trim();
+            if (!personId || !row?.summary) return;
+            if (personIdFilter && !personIdFilter.has(personId)) return;
+            rollups[personId] = row.summary;
+        });
         return res.json({ status: 'success', rollups });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });

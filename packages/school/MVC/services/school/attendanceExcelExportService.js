@@ -173,12 +173,9 @@ function hasAttendanceTiming(record = {}) {
     || (Number(record.earlyLeaveMinutes) || 0) > 0;
 }
 
-/** Mirrors attendance print matrix cell text (status letter + late/early minutes). */
+/** Status letter only in the cell; timing details belong in Excel notes via buildStatusNoteText. */
 function formatExportCellDisplay(record = {}) {
-  const code = statusToExportCode(record.status);
-  if (!code) return '';
-  const timingLabel = formatTimingMinutesLabel(record, { includeNotExcused: true });
-  return timingLabel ? `${code}\n${timingLabel}` : code;
+  return statusToExportCode(record.status);
 }
 
 function statusFillArgb(status, { forLegend = false } = {}) {
@@ -726,17 +723,14 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
     applyBodyMetaCellStyle(clbCell, { banded, wrapText: true });
     applyBodyMetaCellStyle(attPctCell, { banded, wrapText: true });
 
-    let bodyHasTiming = false;
     sessions.forEach((session, sessionIdx) => {
       const record = recordBySessionId.get(clean(session.id || session.sessionId))
         || records[sessionIdx]
         || {};
       const cell = sheet.getCell(bodyRow, firstSessionCol + sessionIdx);
       const displayValue = formatExportCellDisplay(record);
-      const hasTiming = hasAttendanceTiming(record);
-      if (hasTiming) bodyHasTiming = true;
       cell.value = displayValue;
-      applyStatusCellStyle(cell, record.status, { wrapText: hasTiming });
+      applyStatusCellStyle(cell, record.status, { wrapText: false });
       const noteOptions = {
         receiverName: [firstName, lastName].filter(Boolean).join(' ') || clean(student.name),
         receiverEmail: clean(student.email)
@@ -756,9 +750,6 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
         });
       }
     });
-    if (bodyHasTiming) {
-      sheet.getRow(bodyRow).height = 36;
-    }
 
     bodyRow += 1;
   });
@@ -767,8 +758,9 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
   sheet.getColumn(numCol).width = 6;
   sheet.getColumn(lastNameCol).width = 18;
   sheet.getColumn(firstNameCol).width = 18;
+  const sessionColumnWidth = 5;
   for (let col = firstSessionCol; col < firstSessionCol + sessions.length; col += 1) {
-    sheet.getColumn(col).width = 16;
+    sheet.getColumn(col).width = sessionColumnWidth;
   }
   sheet.getColumn(commentCol).width = 18;
   sheet.getColumn(startEndCol).width = 28;
@@ -776,10 +768,12 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
   fitColumnWidthToContent(sheet, attPctCol, { min: 14, max: 36, padding: 2 });
 
   const rawBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
-  const buffer = await attendanceExcelThreadedComments.injectThreadedComments(
-    rawBuffer,
-    threadedCommentTargets
-  );
+  const buffer = threadedCommentTargets.length
+    ? await attendanceExcelThreadedComments.injectThreadedComments(
+      rawBuffer,
+      threadedCommentTargets
+    )
+    : rawBuffer;
   return {
     buffer,
     filename: buildExportFilename({

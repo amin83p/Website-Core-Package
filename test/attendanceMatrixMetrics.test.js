@@ -269,6 +269,43 @@ test('rollup: 10 sessions all present = 100%', () => {
   assert.equal(s.performancePercent, 100);
 });
 
+test('rollup: Hamid-style case still penalizes excused early leave minutes', () => {
+  const records = Array.from({ length: 8 }, () => ({
+    status: 'present',
+    lateMinutes: 0,
+    earlyLeaveMinutes: 0,
+    scheduledMinutes: 180
+  }));
+  records.push({
+    status: 'late',
+    lateMinutes: 0,
+    earlyLeaveMinutes: 60,
+    earlyLeaveExcused: true,
+    scheduledMinutes: 180
+  });
+  const summary = computeStudentMatrixSummary(records, {});
+  assert.equal(summary.performancePercent, 96.3);
+});
+
+test('rollup: Hamid-style 9 sessions with 60 min early leave on last session', () => {
+  const records = Array.from({ length: 8 }, () => ({
+    status: 'present',
+    lateMinutes: 0,
+    earlyLeaveMinutes: 0,
+    scheduledMinutes: 180
+  }));
+  records.push({
+    status: 'late',
+    lateMinutes: 0,
+    earlyLeaveMinutes: 60,
+    scheduledMinutes: 180
+  });
+  const s = computeStudentMatrixSummary(records, {});
+  assert.equal(s.totalPresentSessions, 9);
+  assert.equal(s.totalAbsentSessions, 0);
+  assert.equal(s.performancePercent, 96.3);
+});
+
 test('rollup: user example mix across 5 sessions', () => {
   const records = [
     { status: 'present', lateMinutes: 0, earlyLeaveMinutes: 0 },

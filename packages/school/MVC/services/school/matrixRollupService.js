@@ -37,19 +37,29 @@ function computeFinalPercent(evaluation, attendancePct, assignmentsPct, midtermP
   return { finalPercent: Math.round(finalPercent * 100) / 100, parts };
 }
 
+function rollupRecordsForStudentRow(row = {}) {
+  if (Array.isArray(row._rollupRecords) && row._rollupRecords.length) {
+    return row._rollupRecords;
+  }
+  return Array.isArray(row.records) ? row.records : [];
+}
+
 function recomputeAttendanceMatrixRollups(payload = {}, context = {}) {
   const { classData, orgPolicyCatalog } = context;
   const matrix = Array.isArray(payload?.matrix) ? payload.matrix : [];
   return {
     ...payload,
-    matrix: matrix.map((row) => ({
-      ...row,
-      summary: attendanceMatrixMetricsService.computeStudentMatrixSummary(
-        Array.isArray(row?.records) ? row.records : [],
-        classData,
-        orgPolicyCatalog
-      )
-    }))
+    matrix: matrix.map((row) => {
+      const { _rollupRecords, ...rest } = row;
+      return {
+        ...rest,
+        summary: attendanceMatrixMetricsService.computeStudentMatrixSummary(
+          rollupRecordsForStudentRow(row),
+          classData,
+          orgPolicyCatalog
+        )
+      };
+    })
   };
 }
 
@@ -60,7 +70,7 @@ function summarizeAttendanceRollupsForStudents(students = [], context = {}) {
     const personId = String(row?.personId || '').trim();
     if (!personId) return;
     rollups[personId] = attendanceMatrixMetricsService.computeStudentMatrixSummary(
-      Array.isArray(row?.records) ? row.records : [],
+      rollupRecordsForStudentRow(row),
       classData,
       orgPolicyCatalog
     );
@@ -148,6 +158,7 @@ function summarizeGradesRollupsForRows(rows = [], columns = [], context = {}) {
 }
 
 module.exports = {
+  rollupRecordsForStudentRow,
   recomputeAttendanceMatrixRollups,
   summarizeAttendanceRollupsForStudents,
   recomputeGradesMatrixRollups,

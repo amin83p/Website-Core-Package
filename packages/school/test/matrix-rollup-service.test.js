@@ -6,7 +6,7 @@ const matrixRollupService = require('../MVC/services/school/matrixRollupService'
 const classData = { enabledAttendanceStatuses: ['present', 'absent', 'not_applicable'] };
 const orgPolicyCatalog = {};
 
-test('attendance rollups recompute from windowed records only', () => {
+test('attendance rollups use display records when _rollupRecords is absent', () => {
   const payload = {
     matrix: [
       {
@@ -33,6 +33,33 @@ test('attendance rollups recompute from windowed records only', () => {
   }, { classData, orgPolicyCatalog });
   assert.equal(windowed.matrix[0].summary.totalPresentSessions, 1);
   assert.equal(windowed.matrix[0].summary.totalAbsentSessions, 0);
+});
+
+test('attendance rollups prefer _rollupRecords over windowed display records', () => {
+  const windowedRecords = Array.from({ length: 8 }, () => ({
+    status: 'present',
+    lateMinutes: 0,
+    earlyLeaveMinutes: 0,
+    scheduledMinutes: 180
+  }));
+  const rollupRecords = [
+    ...windowedRecords,
+    { status: 'late', lateMinutes: 0, earlyLeaveMinutes: 60, scheduledMinutes: 180 }
+  ];
+  const payload = {
+    matrix: [{
+      personId: 'hamid',
+      records: windowedRecords,
+      _rollupRecords: rollupRecords
+    }]
+  };
+  const out = matrixRollupService.recomputeAttendanceMatrixRollups(payload, {
+    classData,
+    orgPolicyCatalog
+  });
+  assert.equal(out.matrix[0].records.length, 8);
+  assert.equal(out.matrix[0].summary.performancePercent, 96.3);
+  assert.equal(out.matrix[0].summary.totalPresentSessions, 9);
 });
 
 test('summarizeAttendanceRollupsForStudents returns map keyed by personId', () => {

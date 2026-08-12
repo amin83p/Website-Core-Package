@@ -161,7 +161,7 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
       lateMinutes: 12,
       earlyLeaveMinutes: 8
     }),
-    'Late 12m / Early 8m'
+    'Late 12m / Left Early 8m'
   );
 
   const lateNote = attendanceExcelExportService.buildCellNoteText({
@@ -179,7 +179,7 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
     receiverName: 'Foroozan Haidari',
     receiverEmail: 'foroozan@example.com'
   });
-  assert.doesNotMatch(lateNote, /Late 10m/);
+  assert.match(lateNote, /Timing: Late 10m \(not excused\)/);
   assert.match(lateNote, /Note: traffic/);
   assert.doesNotMatch(lateNote, /From: Jane Admin/);
   assert.match(lateNote, /To: Bob Teacher <bob@school\.org>/);
@@ -193,7 +193,7 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
       rosterStudentNotes: 'traffic',
       comments: [{ authorName: 'Jane Admin', text: 'Please follow up' }]
     }),
-    'Note: traffic'
+    'Timing: Late 10m (not excused)\n\nNote: traffic'
   );
 
   assert.equal(
@@ -201,14 +201,14 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
       status: 'late',
       lateMinutes: 15
     }),
-    'L 15\''
+    'L'
   );
   assert.equal(
     attendanceExcelExportService.formatExportCellDisplay({
       status: 'present',
       earlyLeaveMinutes: 60
     }),
-    'P /60\''
+    'P'
   );
   assert.equal(
     attendanceExcelExportService.formatExportCellDisplay({
@@ -216,7 +216,7 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
       lateMinutes: 10,
       earlyLeaveMinutes: 60
     }),
-    'L 10\'/60\''
+    'L'
   );
 
   const threaded = attendanceExcelExportService.buildThreadedMessagesForRecord({
@@ -530,7 +530,7 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   assert.equal(sheet.getCell(9, 2).value, 1);
   assert.equal(sheet.getCell(9, 3).value, 'Haidari');
   assert.equal(sheet.getCell(9, 4).value, 'Foroozan');
-  assert.equal(sheet.getCell(9, 5).value, 'L 15\'');
+  assert.equal(sheet.getCell(9, 5).value, 'L');
   assert.equal(sheet.getCell(9, 6).value, 'E');
   assert.equal(sheet.getCell(9, 3).fill?.fgColor?.argb || null, null);
   assert.equal(sheet.getCell(9, 3).alignment?.vertical, 'middle');
@@ -553,7 +553,7 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   const threadedXml = await zip.file('xl/threadedComments/threadedComment1.xml').async('string');
   const commentsXml = await zip.file('xl/comments1.xml').async('string');
   const vmlXml = await zip.file('xl/drawings/vmlDrawing1.vml').async('string');
-  assert.doesNotMatch(commentsXml, /Late 15m/);
+  assert.match(commentsXml, /Timing: Late 15m/);
   assert.match(commentsXml, /Note: bus delay/);
   assert.doesNotMatch(commentsXml, /Please follow up/);
   assert.match(noteText(excusedCell), /Excuse: appointment/);
@@ -566,15 +566,18 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   assert.match(threadedXml, /To: Bob Teacher &lt;bob@school\.org&gt;/);
   assert.match(threadedXml, /Please follow up/);
   assert.doesNotMatch(threadedXml, /bus delay/);
-  assert.match(vmlXml, /width:220pt;height:150pt/);
+  assert.match(vmlXml, /ObjectType="Note"/);
+  assert.match(vmlXml, /width:\d+(?:\.\d+)?pt;height:\d+(?:\.\d+)?pt/);
 
   // Plain status notes stay in comments1.xml; threaded admin text only in threadedComment1.xml
   assert.doesNotMatch(commentsXml, /xmlns:xr=/);
   assert.doesNotMatch(commentsXml, /tc=\{/);
   assert.doesNotMatch(commentsXml, /\[Threaded comment\]/);
   assert.doesNotMatch(commentsXml, /Please follow up/);
-  // E9 => col 4 (0-based), row 8 (0-based) — ExcelJS note VML
+  // E9 => col 4 (0-based), row 8 (0-based) — ExcelJS note VML preserved after inject
   assert.match(vmlXml, /<x:Row>8<\/x:Row><x:Column>4<\/x:Column>/);
+  assert.doesNotMatch(vmlXml, /<x:Anchor>4, 8, 8, 8/);
+  assert.match(vmlXml, /, 14, /);
 
   const contentTypes = await zip.file('[Content_Types].xml').async('string');
   assert.match(contentTypes, /\/xl\/persons\/person\.xml/);
