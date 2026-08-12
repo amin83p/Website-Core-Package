@@ -86,3 +86,21 @@ test('instance list and master hub report instance actions include Open V2 links
   assert.match(masterHubServiceSource, /label:\s*'Open V2'/);
   assert.match(masterHubServiceSource, /\/school\/reports\/instances\/edit-v2\/\$\{encodedInstanceId\}/);
 });
+
+test('instance editor export script uses unescaped JSON for instance id', () => {
+  const viewSource = read('packages/school/MVC/views/school/report/instanceEditor.ejs');
+  assert.match(viewSource, /const instanceExportId = <%- JSON\.stringify\(String\(instance\?\.id \|\| ''\)\) %>;/);
+  assert.doesNotMatch(viewSource, /const instanceExportId = String\(<%= JSON\.stringify/);
+});
+
+test('instance editor export modals use lazy bootstrap initialization', () => {
+  const viewSource = read('packages/school/MVC/views/school/report/instanceEditor.ejs');
+  const pdfModalPos = viewSource.indexOf('id="instancePdfExportModal"');
+  const exportInitPos = viewSource.indexOf('const instancePdfModalEl');
+  assert.notEqual(pdfModalPos, -1);
+  assert.notEqual(exportInitPos, -1);
+  assert.ok(pdfModalPos < exportInitPos, 'PDF export modal must be in DOM before export script runs');
+  assert.match(viewSource, /function getInstancePdfExportModal\(\)/);
+  assert.match(viewSource, /getInstancePdfExportModal\(\)\?\.show\(\)/);
+  assert.doesNotMatch(viewSource, /const instancePdfModal = instancePdfModalEl && window\.bootstrap\?\.Modal/);
+});

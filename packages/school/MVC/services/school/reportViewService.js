@@ -210,6 +210,10 @@ function parseJsonSafe(v, fallback) {
   }
 }
 
+function isPlainObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
 function parseStringArrayField(rawValue) {
   const pushClean = (acc, value) => {
     const clean = String(value || '').trim();
@@ -561,7 +565,45 @@ function buildPlaceholderMapFromPayload(body) {
 
 function buildPdfFieldMapFromPayload(body) {
   const mapFromHidden = parseJsonSafe(body.pdfFieldMapJson || body.pdfFieldMap, null);
-  return mapFromHidden && typeof mapFromHidden === 'object' ? mapFromHidden : {};
+  return isPlainObject(mapFromHidden) ? mapFromHidden : {};
+}
+
+function findDuplicateTopLevelJsonKeys(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return [];
+  const seen = new Set();
+  const duplicates = [];
+  const keyPattern = /"((?:\\.|[^"\\])*)"\s*:/g;
+  let match;
+  while ((match = keyPattern.exec(trimmed)) !== null) {
+    let key = match[1];
+    try {
+      key = JSON.parse(`"${match[1]}"`);
+    } catch (_) {}
+    if (seen.has(key)) {
+      if (!duplicates.includes(key)) duplicates.push(key);
+    } else {
+      seen.add(key);
+    }
+  }
+  return duplicates;
+}
+
+function parsePdfFieldMapText(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return { map: {}, duplicates: [] };
+  const duplicates = findDuplicateTopLevelJsonKeys(trimmed);
+  if (duplicates.length) return { map: null, duplicates };
+  let map;
+  try {
+    map = JSON.parse(trimmed);
+  } catch (error) {
+    throw new Error(error?.message || 'PDF Field Map must be valid JSON.');
+  }
+  if (!isPlainObject(map)) {
+    throw new Error('PDF Field Map must be a JSON object.');
+  }
+  return { map, duplicates: [] };
 }
 
 async function buildPersonNameMap(reqUser) {
@@ -1965,6 +2007,8 @@ module.exports = {
   buildDocxTemplatesByFunderFromUpload,
   buildPdfTemplatesByFunderFromUpload,
   buildPdfFieldMapFromPayload,
+  findDuplicateTopLevelJsonKeys,
+  parsePdfFieldMapText,
   parseAssignmentSaveRequest,
   parseTargetRowsField,
   buildAssignmentListContext,

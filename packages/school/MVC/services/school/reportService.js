@@ -13,6 +13,22 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const { getPrefillValue, normalizePrefillKey } = require('./reportPrefillKeyUtils');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 
+const STUDENT_PHONE_TYPES = Object.freeze(['mobile', 'home', 'work', 'other']);
+const STUDENT_PHONE_TYPE_LABELS = Object.freeze({
+  mobile: 'Mobile',
+  home: 'Home',
+  work: 'Work',
+  other: 'Other'
+});
+const DOCUMENTED_STUDENT_PHONE_SLOTS = 5;
+const STUDENT_PHONE_PREFILL_KEY_PATTERNS = Object.freeze([
+  /^student_phone_\d+$/,
+  /^student_phone_\d+_label$/,
+  /^student_phone_\d+_type$/,
+  /^student_phone_(mobile|home|work|other)$/,
+  /^student_phone_(mobile|home|work|other)_label$/
+]);
+
 /**
  * PREFILL_CATALOG - Curated list of template variable keys available for report prefill.
  * 
@@ -131,6 +147,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_date_of_birth', label: 'Student Date Of Birth', description: 'Student date of birth from person profile.' }),
     Object.freeze({ key: 'student_email', label: 'Student Email', description: 'Primary student email address.' }),
     Object.freeze({ key: 'student_phone', label: 'Student Phone', description: 'Primary student phone number.' }),
+    ...buildStudentPhoneCatalogEntries(),
     Object.freeze({ key: 'student_avatar_url', label: 'Student Avatar URL', description: 'Avatar/profile image URL on person record.' }),
     Object.freeze({ key: 'student_person_notes', label: 'Student Person Notes', description: 'Notes from person profile.' }),
     Object.freeze({ key: 'student_address_line1', label: 'Student Address Line 1', description: 'Student address line 1.' }),
@@ -226,6 +243,52 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_exam_period_total_max_score', label: 'Student Exam Period Total Max Score', description: 'Sum of maxScoreComputed.' })
   ])
 });
+
+function buildStudentPhoneCatalogEntries() {
+  const entries = [
+    Object.freeze({
+      key: 'student_phones',
+      label: 'Student Phones',
+      description: 'Array of {type, label, number, isPrimary} for all phones on the student person profile.'
+    }),
+    Object.freeze({
+      key: 'student_phones_list',
+      label: 'Student Phones List',
+      description: 'Readable list like "Mobile: 555-0100; Home: 555-0200".'
+    })
+  ];
+  for (let slot = 1; slot <= DOCUMENTED_STUDENT_PHONE_SLOTS; slot += 1) {
+    entries.push(Object.freeze({
+      key: `student_phone_${slot}`,
+      label: `Student Phone ${slot}`,
+      description: `Phone number ${slot} from the person profile (by saved order).`
+    }));
+    entries.push(Object.freeze({
+      key: `student_phone_${slot}_label`,
+      label: `Student Phone ${slot} Label`,
+      description: `Label for phone ${slot} (Mobile, Home, Work, Other).`
+    }));
+    entries.push(Object.freeze({
+      key: `student_phone_${slot}_type`,
+      label: `Student Phone ${slot} Type`,
+      description: `Raw type token for phone ${slot} (mobile, home, work, other).`
+    }));
+  }
+  STUDENT_PHONE_TYPES.forEach((type) => {
+    const label = STUDENT_PHONE_TYPE_LABELS[type] || type;
+    entries.push(Object.freeze({
+      key: `student_phone_${type}`,
+      label: `Student ${label} Phone`,
+      description: `First ${label.toLowerCase()} phone number on the person profile.`
+    }));
+    entries.push(Object.freeze({
+      key: `student_phone_${type}_label`,
+      label: `Student ${label} Phone Label`,
+      description: `Label for the first ${label.toLowerCase()} phone (usually "${label}").`
+    }));
+  });
+  return entries;
+}
 
 function buildGradebookSkillPrefillCatalogEntries() {
   const classEntries = [];
@@ -757,7 +820,12 @@ function toPrintableValue(value) {
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '';
   if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.join(', ');
+  if (Array.isArray(value)) {
+    if (value.length && value.every((item) => item && typeof item === 'object' && Object.prototype.hasOwnProperty.call(item, 'number'))) {
+      return formatStudentPhonesList(value);
+    }
+    return value.join(', ');
+  }
   try {
     return JSON.stringify(value);
   } catch (_) {
@@ -1184,9 +1252,78 @@ function getPrimaryEmailFromPerson(person) {
   return String(first?.email || '').trim();
 }
 
-function getPrimaryPhoneFromPerson(person) {
+function normalizeStudentPhoneType(type) {
+  const token = String(type || 'other').trim().toLowerCase();
+  return STUDENT_PHONE_TYPES.includes(token) ? token : 'other';
+}
+
+function normalizeStudentPhoneLabel(type) {
+  return STUDENT_PHONE_TYPE_LABELS[normalizeStudentPhoneType(type)] || 'Phone';
+}
+
+function getPhonesFromPerson(person) {
   const phones = Array.isArray(person?.contact?.phones) ? person.contact.phones : [];
-  return String(phones[0]?.number || '').trim();
+  return phones
+    .map((row) => {
+      const number = String(row?.number || '').trim();
+      if (!number) return null;
+      const type = normalizeStudentPhoneType(row?.type);
+      return {
+        type,
+        label: normalizeStudentPhoneLabel(type),
+        number,
+        isPrimary: row?.isPrimary === true
+      };
+    })
+    .filter(Boolean);
+}
+
+function formatStudentPhonesList(phones) {
+  const list = Array.isArray(phones) ? phones : [];
+  return list
+    .map((row) => {
+      if (!row || typeof row !== 'object') return '';
+      const number = String(row.number || '').trim();
+      if (!number) return '';
+      const label = String(row.label || normalizeStudentPhoneLabel(row.type)).trim() || 'Phone';
+      return `${label}: ${number}`;
+    })
+    .filter(Boolean)
+    .join('; ');
+}
+
+function buildStudentPhonePrefillFields(person) {
+  const phones = getPhonesFromPerson(person);
+  const out = {
+    student_phone: getPrimaryPhoneFromPerson(person),
+    student_phones: phones,
+    student_phones_list: formatStudentPhonesList(phones)
+  };
+  for (let slot = 1; slot <= DOCUMENTED_STUDENT_PHONE_SLOTS; slot += 1) {
+    const phone = phones[slot - 1] || null;
+    out[`student_phone_${slot}`] = phone ? phone.number : '';
+    out[`student_phone_${slot}_label`] = phone ? phone.label : '';
+    out[`student_phone_${slot}_type`] = phone ? phone.type : '';
+  }
+  STUDENT_PHONE_TYPES.forEach((type) => {
+    const match = phones.find((row) => row.type === type);
+    out[`student_phone_${type}`] = match ? match.number : '';
+    out[`student_phone_${type}_label`] = match ? match.label : '';
+  });
+  phones.forEach((phone, index) => {
+    const slot = index + 1;
+    if (slot <= DOCUMENTED_STUDENT_PHONE_SLOTS) return;
+    out[`student_phone_${slot}`] = phone.number;
+    out[`student_phone_${slot}_label`] = phone.label;
+    out[`student_phone_${slot}_type`] = phone.type;
+  });
+  return out;
+}
+
+function getPrimaryPhoneFromPerson(person) {
+  const phones = getPhonesFromPerson(person);
+  const primary = phones.find((item) => item.isPrimary);
+  return String((primary || phones[0])?.number || '').trim();
 }
 
 function getAddressFromPerson(person) {
@@ -1882,7 +2019,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_gender: String(studentPerson?.demographics?.gender || ''),
     student_date_of_birth: String(studentPerson?.demographics?.dateOfBirth || ''),
     student_email: getPrimaryEmailFromPerson(studentPerson),
-    student_phone: getPrimaryPhoneFromPerson(studentPerson),
+    ...buildStudentPhonePrefillFields(studentPerson),
     student_avatar_url: String(studentPerson?.avatarUrl || ''),
     student_person_notes: String(studentPerson?.notes || ''),
     student_address_line1: String(studentAddress?.line1 || ''),
@@ -2167,23 +2304,30 @@ function getPrefillCatalog() {
  * @param {Object} templateOrSchema - Full template object or just schema object
  * @returns {Array} Array of {fieldId, label, prefillKey} for invalid keys; empty if all valid
  */
-function validateTemplatePrefillKeys(templateOrSchema) {
-  const schema = templateOrSchema?.schema && typeof templateOrSchema.schema === 'object'
-    ? templateOrSchema.schema
-    : templateOrSchema;
-  const fields = Array.isArray(schema?.fields) ? schema.fields : [];
+function isKnownPrefillKey(key) {
+  const normalized = normalizePrefillKey(key);
+  if (!normalized) return false;
   const allowed = new Set(
     Object.values(getPrefillCatalog())
       .flat()
       .map((item) => item.key)
   );
+  if (allowed.has(normalized)) return true;
+  return STUDENT_PHONE_PREFILL_KEY_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function validateTemplatePrefillKeys(templateOrSchema) {
+  const schema = templateOrSchema?.schema && typeof templateOrSchema.schema === 'object'
+    ? templateOrSchema.schema
+    : templateOrSchema;
+  const fields = Array.isArray(schema?.fields) ? schema.fields : [];
   const invalid = [];
 
   fields.forEach((field) => {
     if (isVisualOnlyField(field)) return;
     const key = normalizePrefillKey(field?.prefillKey || '');
     if (!key) return;
-    if (allowed.has(key)) return;
+    if (isKnownPrefillKey(key)) return;
     invalid.push({
       fieldId: String(field?.id || ''),
       label: String(field?.label || field?.id || ''),
@@ -2209,5 +2353,7 @@ module.exports = {
   buildReportDocxCollections,
   getPrefillCatalog,
   validateTemplatePrefillKeys,
+  isKnownPrefillKey,
+  formatStudentPhonesList,
   normalizePrefillKey
 };

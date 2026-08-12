@@ -132,8 +132,63 @@ function createHelperSet() {
       }
       if (hasDefault) return branches[branches.length - 1];
       return value;
+    },
+    initials(value) {
+      const text = value === undefined || value === null ? '' : String(value);
+      const matches = text.match(/\b\w/g);
+      return matches ? matches.join('') : '';
+    },
+    digits(value) {
+      const text = value === undefined || value === null ? '' : String(value);
+      const matches = text.match(/\d/g);
+      return matches ? matches.join('') : '';
+    },
+    substr(value, start, length) {
+      const text = value === undefined || value === null ? '' : String(value);
+      const offset = Math.max(0, Math.floor(toFiniteNumber(start, 0)));
+      if (length === undefined || length === null || String(length).trim() === '') {
+        return text.slice(offset);
+      }
+      const span = Math.max(0, Math.floor(toFiniteNumber(length, 0)));
+      return text.slice(offset, offset + span);
+    },
+    phoneAt(value, index = 0) {
+      const rows = normalizePhoneRows(value);
+      const i = Math.max(0, Math.floor(toFiniteNumber(index, 0)));
+      return String(rows[i]?.number || '').trim();
+    },
+    phoneLabelAt(value, index = 0) {
+      const rows = normalizePhoneRows(value);
+      const i = Math.max(0, Math.floor(toFiniteNumber(index, 0)));
+      return String(rows[i]?.label || '').trim();
+    },
+    phoneTypeAt(value, index = 0) {
+      const rows = normalizePhoneRows(value);
+      const i = Math.max(0, Math.floor(toFiniteNumber(index, 0)));
+      return String(rows[i]?.type || '').trim();
+    },
+    phoneByType(value, type) {
+      const wanted = String(type || '').trim().toLowerCase();
+      if (!wanted) return '';
+      const rows = normalizePhoneRows(value);
+      const match = rows.find((row) => row.type === wanted);
+      return String(match?.number || '').trim();
     }
   });
+}
+
+function normalizePhoneRows(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null;
+      const number = String(row.number || row.value || '').trim();
+      if (!number) return null;
+      const type = String(row.type || 'other').trim().toLowerCase() || 'other';
+      const label = String(row.label || type || 'Phone').trim() || 'Phone';
+      return { type, label, number, isPrimary: row.isPrimary === true };
+    })
+    .filter(Boolean);
 }
 
 const HELPERS = createHelperSet();
@@ -622,6 +677,25 @@ function validateCalculatedFieldExpressions(template, { strict = true } = {}) {
   return true;
 }
 
+function validateConversionExpressions(template, { strict = true } = {}) {
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    if (isVisualOnlyField(field) || !field?.id) return;
+    const rule = normalizeConversionRule(field?.conversionRule || {});
+    if (!rule.enabled || !rule.expression) return;
+    const label = String(field?.label || field.id || 'Field').trim();
+    try {
+      validateExpressionSyntax(rule.expression);
+      validateExpressionSymbols(rule.expression);
+    } catch (error) {
+      if (strict) {
+        throw new Error(`Field "${label}" has an invalid conversion expression: ${error.message}`);
+      }
+    }
+  });
+  return true;
+}
+
 function normalizeValidationRule(rawRule, index = 0) {
   const rule = rawRule && typeof rawRule === 'object' ? rawRule : {};
   const idRaw = String(rule.id || '').trim();
@@ -989,6 +1063,7 @@ module.exports = {
   validateExpressionSyntax,
   validateExpressionSymbols,
   validateCalculatedFieldExpressions,
+  validateConversionExpressions,
   evaluateSafeExpression,
   evaluateFieldValidations,
   evaluateTemplateValidations,

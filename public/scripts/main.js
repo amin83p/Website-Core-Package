@@ -84,7 +84,16 @@
 
             // Auxiliary school person-profile saves must not consume the parent form token.
             if (/\/school\/identity\/api\/linked-person\//i.test(requestUrl)) {
-                return nativeFetch(input, init);
+                const headers = mergeHeaders(input, init);
+                const csrfToken = resolveCsrfToken();
+                if (csrfToken && !headers.has('csrf-token')) {
+                    headers.set('csrf-token', csrfToken);
+                }
+                const nextInit = {
+                    ...(init && typeof init === 'object' ? init : {}),
+                    headers
+                };
+                return nativeFetch(input, nextInit);
             }
 
             const headers = mergeHeaders(input, init);

@@ -339,6 +339,11 @@ test('identity routes and forms expose linked person profile integration', () =>
   assert.match(read('public/scripts/schoolPersonProfileModal.js'), /SchoolPersonProfileModal/);
   assert.match(read('public/scripts/schoolPersonProfileModal.js'), /syncProfileTypeUi/);
   assert.match(read('public/scripts/schoolPersonProfileModal.js'), /organizationLegalName/);
+  assert.match(read('public/scripts/schoolPersonProfileModal.js'), /showUserMessage/);
+  assert.match(read('public/scripts/schoolPersonProfileModal.js'), /showMessageModal/);
+  const mainJs = read('public/scripts/main.js');
+  assert.match(mainJs, /linked-person/);
+  assert.match(mainJs, /linked-person[\s\S]{0,800}csrf-token/);
   assert.match(read('packages/school/MVC/views/school/partials/personProfileEditModal.ejs'), /schoolPersonProfileOrganizationLegalName/);
   assert.match(read('packages/school/MVC/views/school/partials/personProfileEditModal.ejs'), /school-person-organization-fields/);
   assert.match(read('packages/school/MVC/views/school/partials/personProfileEditModal.ejs'), /school-person-individual-fields/);

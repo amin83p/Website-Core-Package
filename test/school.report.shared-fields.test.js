@@ -860,7 +860,10 @@ test('report template prefill catalog keys are all produced with correct represe
               active: true,
               name: { preferred: 'Student Preferred', first: 'Student', middle: 'M', last: 'One' },
               demographics: { gender: 'F', dateOfBirth: '2000-01-01' },
-              contact: { email: 'student@example.com', phones: [{ number: '555-0100' }] },
+              contact: { email: 'student@example.com', phones: [
+                { type: 'mobile', number: '555-0100', isPrimary: true },
+                { type: 'home', number: '555-0200', isPrimary: false }
+              ] },
               avatarUrl: '/avatar.png',
               notes: 'Person note',
               address: { line1: '1 Main', line2: 'Unit 2', city: 'Calgary', province: 'AB', postalCode: 'T1T1T1', country: 'Canada' },
@@ -911,6 +914,17 @@ test('report template prefill catalog keys are all produced with correct represe
           assert.equal(snapshot.student_full_name, 'Student One');
           assert.equal(snapshot.student_email, 'student@example.com');
           assert.equal(snapshot.student_phone, '555-0100');
+          assert.deepEqual(snapshot.student_phones, [
+            { type: 'mobile', label: 'Mobile', number: '555-0100', isPrimary: true },
+            { type: 'home', label: 'Home', number: '555-0200', isPrimary: false }
+          ]);
+          assert.equal(snapshot.student_phones_list, 'Mobile: 555-0100; Home: 555-0200');
+          assert.equal(snapshot.student_phone_1, '555-0100');
+          assert.equal(snapshot.student_phone_1_label, 'Mobile');
+          assert.equal(snapshot.student_phone_2, '555-0200');
+          assert.equal(snapshot.student_phone_mobile, '555-0100');
+          assert.equal(snapshot.student_phone_home, '555-0200');
+          assert.equal(snapshot.student_phone_work, '');
           assert.equal(snapshot.student_org_member_role, 'student');
 
           assert.equal(snapshot.class_attendance_total, 3);

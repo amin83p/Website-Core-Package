@@ -271,8 +271,8 @@
                 </button>
               <% } %>
             </div>
-            <textarea class="form-control font-monospace" id="pdfFieldMapEditor" rows="8" spellcheck="false"><%= JSON.stringify(initialPdfFieldMap, null, 2) %></textarea>
-            <div class="form-text">Map report field IDs or prefill keys to exact PDF AcroForm field names. Example: <code>"attendance_presence_01": "YN1"</code>. You can also type placeholders like <code>{{attendance_presence_01}}</code> directly into PDF text fields; export will replace them with calculated/converted values.</div>
+            <textarea class="form-control font-monospace" id="pdfFieldMapEditor" rows="8" spellcheck="false"><%- JSON.stringify(initialPdfFieldMap, null, 2).replace(/</g, '\\u003c') %></textarea>
+            <div class="form-text">Map report field IDs or prefill keys to exact PDF AcroForm field names. Example: <code>"attendance_presence_01": "YN1"</code>. Each source key must appear only once; duplicate keys silently keep the last value. You can also type placeholders like <code>{{attendance_presence_01}}</code> directly into PDF text fields; export will replace them with calculated/converted values.</div>
           </div>
         </div>
       </div>
@@ -1206,7 +1206,19 @@ caseof(value, "excellent", 4, "good", 3, "fair", 2, 0)</code></pre>
           <h6 class="fw-bold">Text/Select Mapping</h6>
           <pre class="small bg-light border rounded p-2 mb-2"><code>str(value)
 caseof(value, "male", "M", "female", "F", "U")
-ifelse(len(str(value)) > 0, str(value), "N/A")</code></pre>
+ifelse(len(str(value)) > 0, str(value), "N/A")
+initials(value)</code></pre>
+          <div class="form-text mb-2">Use <code>initials(value)</code> for first letter of each word (e.g. "John Smith" &rarr; "JS"). JavaScript regex/method chains are not supported.</div>
+
+          <h6 class="fw-bold">Phone / Digit Splitting</h6>
+          <pre class="small bg-light border rounded p-2 mb-2"><code>digits(value)
+substr(digits(value), 0, 3)
+substr(digits(value), 3, 3)
+substr(digits(value), 6, 4)
+concat("(", substr(digits(value), 0, 3), ") ", substr(digits(value), 3, 3), "-", substr(digits(value), 6, 4))
+phoneAt(prefill.student_phones, 0)
+phoneByType(prefill.student_phones, "home")</code></pre>
+          <div class="form-text mb-2">Use indexed prefill keys like <code>student_phone_1</code>, <code>student_phone_mobile</code>, or <code>student_phones_list</code> directly. When a field is prefilled from <code>student_phones</code>, use <code>phoneAt(value, 0)</code> / <code>phoneByType(value, "home")</code> in conversion.</div>
 
           <h6 class="fw-bold">Checkbox / Boolean</h6>
           <pre class="small bg-light border rounded p-2 mb-2"><code>ifelse(value == true, "Yes", "No")</code></pre>
@@ -2304,6 +2316,25 @@ num(value) <= 95</code></pre>
         btn.innerHTML = original;
       }
     });
+    function findDuplicateTopLevelJsonKeys(text) {
+      const trimmed = String(text || '').trim();
+      if (!trimmed) return [];
+      const seen = new Set();
+      const duplicates = [];
+      const keyPattern = /"((?:\\.|[^"\\])*)"\s*:/g;
+      let match;
+      while ((match = keyPattern.exec(trimmed)) !== null) {
+        let key = match[1];
+        try { key = JSON.parse(`"${match[1]}"`); } catch (_) {}
+        if (seen.has(key)) {
+          if (!duplicates.includes(key)) duplicates.push(key);
+        } else {
+          seen.add(key);
+        }
+      }
+      return duplicates;
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!approvedReportScopeInputs.some((input) => input.checked)) {
@@ -2322,6 +2353,16 @@ num(value) <= 95</code></pre>
       let pdfFieldMap = {};
       const pdfMapText = String(pdfFieldMapEditor?.value || '').trim();
       if (pdfMapText) {
+        const duplicateKeys = findDuplicateTopLevelJsonKeys(pdfMapText);
+        if (duplicateKeys.length) {
+          await showReportModal({
+            title: 'Duplicate PDF Field Map Keys',
+            icon: 'warning',
+            message: 'Each source key must appear only once. JSON keeps the last value when a key is repeated, so earlier values are silently dropped. Duplicate key(s): ' + duplicateKeys.join(', '),
+            buttonClass: 'btn-warning'
+          });
+          return;
+        }
         try {
           pdfFieldMap = JSON.parse(pdfMapText);
           if (!pdfFieldMap || Array.isArray(pdfFieldMap) || typeof pdfFieldMap !== 'object') {

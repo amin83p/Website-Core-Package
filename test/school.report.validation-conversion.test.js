@@ -88,6 +88,142 @@ test('conversion falls back based on onError policy', () => {
   assert.equal(Boolean(empty.diagnostic), true);
 });
 
+test('prefill catalog includes student phone list and indexed keys', () => {
+  const catalog = reportService.getPrefillCatalog();
+  const studentKeys = catalog.studentOnly.map((row) => row.key);
+  assert.ok(studentKeys.includes('student_phone'));
+  assert.ok(studentKeys.includes('student_phones'));
+  assert.ok(studentKeys.includes('student_phones_list'));
+  assert.ok(studentKeys.includes('student_phone_1'));
+  assert.ok(studentKeys.includes('student_phone_mobile'));
+  assert.ok(reportService.isKnownPrefillKey('student_phone_6'));
+  assert.equal(reportService.isKnownPrefillKey('student_phone_invalid'), false);
+});
+
+test('phone helpers read numbers from student_phones arrays in conversion', () => {
+  const phones = [
+    { type: 'mobile', label: 'Mobile', number: '555-0100', isPrimary: true },
+    { type: 'home', label: 'Home', number: '555-0200', isPrimary: false }
+  ];
+  const home = reportRuleEngineService.convertFieldValueForExport({
+    field: {
+      id: 'home_phone',
+      label: 'Home Phone',
+      conversionRule: { enabled: true, expression: 'phoneByType(value, "home")', onError: 'use_raw' }
+    },
+    value: phones,
+    answers: {},
+    prefill: { student_phones: phones }
+  });
+  assert.equal(home.value, '555-0200');
+});
+
+test('digits and substr helpers split phone numbers for export conversion', () => {
+  const phone = '1234567890';
+  const area = reportRuleEngineService.convertFieldValueForExport({
+    field: {
+      id: 'phone_area',
+      label: 'Area Code',
+      conversionRule: { enabled: true, expression: 'substr(digits(value), 0, 3)', onError: 'use_raw' }
+    },
+    value: phone,
+    answers: {},
+    prefill: {}
+  });
+  assert.equal(area.value, '123');
+
+  const middle = reportRuleEngineService.convertFieldValueForExport({
+    field: {
+      id: 'phone_mid',
+      label: 'Phone Middle',
+      conversionRule: { enabled: true, expression: 'substr(digits(value), 3, 3)', onError: 'use_raw' }
+    },
+    value: phone,
+    answers: {},
+    prefill: {}
+  });
+  assert.equal(middle.value, '456');
+
+  const last = reportRuleEngineService.convertFieldValueForExport({
+    field: {
+      id: 'phone_last',
+      label: 'Phone Last',
+      conversionRule: { enabled: true, expression: 'substr(digits(value), 6, 4)', onError: 'use_raw' }
+    },
+    value: phone,
+    answers: {},
+    prefill: {}
+  });
+  assert.equal(last.value, '7890');
+
+  const formatted = reportRuleEngineService.convertFieldValueForExport({
+    field: {
+      id: 'phone_fmt',
+      label: 'Phone Formatted',
+      conversionRule: {
+        enabled: true,
+        expression: 'concat("(", substr(digits(value), 0, 3), ") ", substr(digits(value), 3, 3), "-", substr(digits(value), 6, 4))',
+        onError: 'use_raw'
+      }
+    },
+    value: '(123) 456-7890',
+    answers: {},
+    prefill: {}
+  });
+  assert.equal(formatted.value, '(123) 456-7890');
+});
+
+test('initials helper extracts first letter of each word for export conversion', () => {
+  const converted = reportRuleEngineService.convertFieldValueForExport({
+    field: {
+      id: 'student_full_name',
+      label: 'Student Name',
+      conversionRule: { enabled: true, expression: 'initials(value)', onError: 'use_raw' }
+    },
+    value: 'John Smith',
+    answers: {},
+    prefill: {}
+  });
+  assert.equal(converted.value, 'JS');
+  assert.equal(converted.diagnostic, null);
+
+  const empty = reportRuleEngineService.convertFieldValueForExport({
+    field: {
+      id: 'student_full_name',
+      label: 'Student Name',
+      conversionRule: { enabled: true, expression: 'initials(value)', onError: 'use_raw' }
+    },
+    value: '',
+    answers: {},
+    prefill: {}
+  });
+  assert.equal(empty.value, '');
+  assert.equal(empty.diagnostic, null);
+});
+
+test('javascript method chains in conversion expressions are rejected on save', () => {
+  const template = {
+    schema: {
+      fields: [
+        {
+          id: 'student_full_name',
+          label: 'Student Name',
+          type: 'text',
+          conversionRule: {
+            enabled: true,
+            expression: "value.match(/\\b\\w/g).join('')",
+            onError: 'use_raw'
+          }
+        }
+      ]
+    }
+  };
+  assert.throws(
+    () => reportRuleEngineService.validateConversionExpressions(template, { strict: true }),
+    /invalid conversion expression/i
+  );
+});
+
 test('placeholder payload uses converted values while merged/raw answers stay unchanged', () => {
   const template = {
     schema: {

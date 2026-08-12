@@ -848,6 +848,46 @@
   </div>
 </div>
 
+<div class="modal fade" id="instanceDocxExportModal" tabindex="-1" aria-labelledby="instanceDocxExportModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="instanceDocxExportModalLabel">Export Word report</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 text-muted small">Detected funder: <strong id="instanceDocxFunderLabel">-</strong></div>
+        <label class="form-label fw-semibold" for="instanceDocxKeySelect">Word template</label>
+        <select class="form-select" id="instanceDocxKeySelect"></select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnConfirmInstanceDocxExport">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="instancePdfExportModal" tabindex="-1" aria-labelledby="instancePdfExportModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="instancePdfExportModalLabel">Export PDF report</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 text-muted small">Detected funder: <strong id="instancePdfFunderLabel">-</strong></div>
+        <label class="form-label fw-semibold" for="instancePdfKeySelect">PDF template</label>
+        <select class="form-select" id="instancePdfKeySelect"></select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnConfirmInstancePdfExport">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/calculatedFieldsRuntime') %>
 <%- include('partials/reportMessageHelpers') %>
 <script src="/scripts/reportAssignmentDelete.js"></script>
@@ -2001,14 +2041,32 @@
     });
 
     const instanceDocxModalEl = document.getElementById('instanceDocxExportModal');
-    const instanceDocxModal = instanceDocxModalEl && window.bootstrap?.Modal
-      ? window.bootstrap.Modal.getOrCreateInstance(instanceDocxModalEl)
-      : null;
     const instancePdfModalEl = document.getElementById('instancePdfExportModal');
-    const instancePdfModal = instancePdfModalEl && window.bootstrap?.Modal
-      ? window.bootstrap.Modal.getOrCreateInstance(instancePdfModalEl)
-      : null;
-    const instanceExportId = String(<%= JSON.stringify(String(instance?.id || '')) %>);
+    let instanceDocxModal = null;
+    let instancePdfModal = null;
+    const instanceExportId = <%- JSON.stringify(String(instance?.id || '')) %>;
+
+    function getInstanceDocxExportModal() {
+      if (!instanceDocxModalEl) return null;
+      if (instanceDocxModal) return instanceDocxModal;
+      if (typeof window.bootstrap !== 'undefined' && window.bootstrap?.Modal) {
+        instanceDocxModal = window.bootstrap.Modal.getOrCreateInstance
+          ? window.bootstrap.Modal.getOrCreateInstance(instanceDocxModalEl)
+          : new window.bootstrap.Modal(instanceDocxModalEl);
+      }
+      return instanceDocxModal;
+    }
+
+    function getInstancePdfExportModal() {
+      if (!instancePdfModalEl) return null;
+      if (instancePdfModal) return instancePdfModal;
+      if (typeof window.bootstrap !== 'undefined' && window.bootstrap?.Modal) {
+        instancePdfModal = window.bootstrap.Modal.getOrCreateInstance
+          ? window.bootstrap.Modal.getOrCreateInstance(instancePdfModalEl)
+          : new window.bootstrap.Modal(instancePdfModalEl);
+      }
+      return instancePdfModal;
+    }
 
     document.getElementById('btnInstanceExportDocx')?.addEventListener('click', async () => {
       try {
@@ -2031,7 +2089,7 @@
           if (String(opt.key) === String(row.suggestedDocxKey || '')) option.selected = true;
           select.appendChild(option);
         });
-        instanceDocxModal?.show();
+        getInstanceDocxExportModal()?.show();
       } catch (error) {
         await showReportInstanceMessage({
           title: 'Export Failed',
@@ -2082,7 +2140,7 @@
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        instanceDocxModal?.hide();
+        getInstanceDocxExportModal()?.hide();
       } catch (error) {
         await showReportInstanceMessage({
           title: 'Export Failed',
@@ -2118,7 +2176,7 @@
           if (String(opt.key) === String(row.suggestedPdfKey || '')) option.selected = true;
           select.appendChild(option);
         });
-        instancePdfModal?.show();
+        getInstancePdfExportModal()?.show();
       } catch (error) {
         await showReportInstanceMessage({
           title: 'Export Failed',
@@ -2169,7 +2227,7 @@
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        instancePdfModal?.hide();
+        getInstancePdfExportModal()?.hide();
       } catch (error) {
         await showReportInstanceMessage({
           title: 'Export Failed',
@@ -2185,44 +2243,3 @@
     });
   })();
 </script>
-
-<div class="modal fade" id="instanceDocxExportModal" tabindex="-1" aria-labelledby="instanceDocxExportModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="instanceDocxExportModalLabel">Export Word report</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-2 text-muted small">Detected funder: <strong id="instanceDocxFunderLabel">-</strong></div>
-        <label class="form-label fw-semibold" for="instanceDocxKeySelect">Word template</label>
-        <select class="form-select" id="instanceDocxKeySelect"></select>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="btnConfirmInstanceDocxExport">Export</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="instancePdfExportModal" tabindex="-1" aria-labelledby="instancePdfExportModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="instancePdfExportModalLabel">Export PDF report</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-2 text-muted small">Detected funder: <strong id="instancePdfFunderLabel">-</strong></div>
-        <label class="form-label fw-semibold" for="instancePdfKeySelect">PDF template</label>
-        <select class="form-select" id="instancePdfKeySelect"></select>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="btnConfirmInstancePdfExport">Export</button>
-      </div>
-    </div>
-  </div>
-</div>
-

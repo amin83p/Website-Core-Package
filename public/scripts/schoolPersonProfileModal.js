@@ -207,6 +207,21 @@
     alert.classList.remove('d-none');
   }
 
+  async function showUserMessage({ title = 'Person Profile', message = '', icon = 'error', buttonClass = 'btn-danger' } = {}) {
+    const text = String(message || '').trim();
+    if (!text) return;
+    if (typeof global.showMessageModal === 'function') {
+      await global.showMessageModal({
+        title,
+        icon,
+        message: text,
+        buttons: [{ text: 'OK', class: buttonClass }]
+      });
+      return;
+    }
+    setAlert(text);
+  }
+
   function setLoading(isLoading) {
     loadingEl()?.classList.toggle('d-none', !isLoading);
     formEl()?.classList.toggle('d-none', isLoading);
@@ -330,7 +345,12 @@
       organizations = payload.data?.organizations || organizations;
       renderRoleSummary(document.getElementById('schoolPersonProfileRoleSummary'), organizations, organizationLookup);
     } catch (error) {
-      setAlert(error.message || 'Failed to load person profile.');
+      await showUserMessage({
+        title: 'Load Failed',
+        message: error.message || 'Failed to load person profile.',
+        icon: 'error',
+        buttonClass: 'btn-danger'
+      });
       throw error;
     } finally {
       setLoading(false);
@@ -367,7 +387,12 @@
       }
       modalInstance?.hide();
     } catch (error) {
-      setAlert(error.message || 'Failed to save person profile.');
+      await showUserMessage({
+        title: 'Save Failed',
+        message: error.message || 'Failed to save person profile.',
+        icon: 'error',
+        buttonClass: 'btn-danger'
+      });
     } finally {
       if (saveBtn()) saveBtn().disabled = false;
     }

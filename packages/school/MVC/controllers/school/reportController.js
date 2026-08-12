@@ -262,6 +262,12 @@ function coercePrefillValueForField(field, rawPrefill) {
     const n = Number(rawPrefill);
     return Number.isFinite(n) ? n : '';
   }
+  if (Array.isArray(rawPrefill)) {
+    if (rawPrefill.length && rawPrefill.every((item) => item && typeof item === 'object' && Object.prototype.hasOwnProperty.call(item, 'number'))) {
+      return reportService.formatStudentPhonesList(rawPrefill);
+    }
+    return rawPrefill.map((item) => String(item ?? '')).filter(Boolean).join(', ');
+  }
   if (rawPrefill === undefined || rawPrefill === null) return '';
   return String(rawPrefill).trim();
 }

@@ -204,6 +204,7 @@ function sanitizeSchema(v) {
   reportRuleEngineService.ensureTemplateDocxAliases({ schema: { fields } });
 
   reportRuleEngineService.validateCalculatedFieldExpressions({ schema: { fields } }, { strict: true });
+  reportRuleEngineService.validateConversionExpressions({ schema: { fields } }, { strict: true });
 
   return {
     version: cleanInteger(raw.version, { min: 1, max: 1000, allowEmpty: true }) || 1,

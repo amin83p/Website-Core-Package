@@ -156,3 +156,38 @@ test('report template repository replaces map objects on Mongo updates', () => {
   assert.match(source, /replaceObjectFields:\s*\[\s*'placeholderMap'\s*,\s*'pdfFieldMap'\s*\]/);
   assert.match(source, /for \(const field of replaceObjectFields\)/);
 });
+
+test('report template form renders PDF field map JSON without HTML entity encoding', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../packages/school/MVC/views/school/report/templateForm.ejs'), 'utf8');
+  assert.match(source, /id="pdfFieldMapEditor"[\s\S]*<%- JSON\.stringify\(initialPdfFieldMap, null, 2\)\.replace\(\/<\//);
+  assert.doesNotMatch(source, /id="pdfFieldMapEditor"[\s\S]*<%= JSON\.stringify\(initialPdfFieldMap/);
+});
+
+test('buildPdfFieldMapFromPayload accepts plain objects only', () => {
+  const reportViewService = require('../packages/school/MVC/services/school/reportViewService');
+  const map = reportViewService.buildPdfFieldMapFromPayload({
+    pdfFieldMapJson: JSON.stringify({ attendance_presence_01: 'YN1' })
+  });
+  assert.deepEqual(map, { attendance_presence_01: 'YN1' });
+  assert.deepEqual(reportViewService.buildPdfFieldMapFromPayload({ pdfFieldMapJson: '[]' }), {});
+  assert.deepEqual(reportViewService.buildPdfFieldMapFromPayload({ pdfFieldMapJson: '' }), {});
+});
+
+test('parsePdfFieldMapText rejects duplicate top-level keys before silent data loss', () => {
+  const reportViewService = require('../packages/school/MVC/services/school/reportViewService');
+  const duplicateText = [
+    '{',
+    '  "student_last_name": "s_surname",',
+    '  "student_first_name": "s_firstname",',
+    '  "student_last_name": "Area Telephone Number 2"',
+    '}'
+  ].join('\n');
+  assert.deepEqual(reportViewService.findDuplicateTopLevelJsonKeys(duplicateText), ['student_last_name']);
+  const parsed = reportViewService.parsePdfFieldMapText(duplicateText);
+  assert.equal(parsed.map, null);
+  assert.deepEqual(parsed.duplicates, ['student_last_name']);
+  assert.deepEqual(JSON.parse(duplicateText).student_last_name, 'Area Telephone Number 2');
+  const valid = reportViewService.parsePdfFieldMapText('{"student_last_name":"s_surname","student_first_name":"s_firstname"}');
+  assert.deepEqual(valid.map, { student_last_name: 's_surname', student_first_name: 's_firstname' });
+  assert.deepEqual(valid.duplicates, []);
+});
