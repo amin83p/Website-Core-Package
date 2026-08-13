@@ -1205,6 +1205,17 @@
             const key = (rawKey === 'n/a' || rawKey === 'na' || rawKey === 'absent_camera_off')
                 ? (rawKey === 'absent_camera_off' ? 'acf' : 'not_applicable')
                 : rawKey;
+            const absenceExcused = row?.absenceExcused === true
+                || String(row?.absenceExcused || '').trim().toLowerCase() === 'true'
+                || key === 'excused';
+            if (key === 'excused') {
+                acc.excused += 1;
+                return acc;
+            }
+            if ((key === 'absent' || key === 'acf') && absenceExcused) {
+                acc.excused += 1;
+                return acc;
+            }
             if (Object.prototype.hasOwnProperty.call(acc, key)) acc[key] += 1;
             return acc;
         }, { present: 0, late: 0, excused: 0, absent: 0, acf: 0, not_applicable: 0 });
@@ -1212,7 +1223,7 @@
             && Array.isArray(enabledAttendanceStatuses)
             && enabledAttendanceStatuses.length)
             ? enabledAttendanceStatuses.map((s) => String(s || '').trim().toLowerCase()).filter(Boolean)
-            : ['present', 'late', 'excused', 'absent', 'acf', 'not_applicable'];
+            : ['present', 'late', 'absent', 'acf', 'not_applicable'];
         const enabledAttendanceSet = new Set(resolvedEnabledAttendanceStatuses);
         const isAttendanceStatusShown = (code, currentAttendance) => {
             const normalized = String(code || '').trim().toLowerCase();
@@ -1769,14 +1780,12 @@
                         </div>
                     </div>
                     <% } %>
-                    <% if (enabledAttendanceSet.has('excused')) { %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Excused</div>
                             <div class="session-summary-value text-info"><%= attendanceSummary.excused %></div>
                         </div>
                     </div>
-                    <% } %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Absent</div>
@@ -1849,10 +1858,6 @@
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="l_<%= i %>" value="late" <%= student.attendance === 'late' ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="l_<%= i %>" title="Late"><i class="bi bi-clock-history"></i> Late</label>
                                                             <% } %>
-                                                            <% if (isAttendanceStatusShown('excused', student.attendance)) { %>
-                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="e_<%= i %>" value="excused" <%= student.attendance === 'excused' ? 'checked' : '' %> <%- disabledAttr %>>
-                                                            <label class="btn att-label" for="e_<%= i %>" title="Excused Absence"><i class="bi bi-envelope-paper"></i> Excused</label>
-                                                            <% } %>
                                                             <% if (isAttendanceStatusShown('absent', student.attendance)) { %>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="a_<%= i %>" value="absent" <%= student.attendance === 'absent' ? 'checked' : '' %> <%- disabledAttr %>>
                                                             <label class="btn att-label" for="a_<%= i %>" title="Absent"><i class="bi bi-x-lg"></i> Absent</label>
@@ -1883,6 +1888,7 @@
                                                     <input type="hidden" class="att-leave" value="<%= student.earlyLeaveMinutes || '' %>">
                                                     <input type="hidden" class="att-late-excused" value="<%= student.lateMinutes && student.lateExcused ? 'true' : 'false' %>">
                                                     <input type="hidden" class="att-early-excused" value="<%= student.earlyLeaveMinutes && student.earlyLeaveExcused ? 'true' : 'false' %>">
+                                                    <input type="hidden" class="att-absence-excused" value="<%= student.absenceExcused && (student.attendance === 'absent' || student.attendance === 'acf') ? 'true' : 'false' %>">
                                                     <input type="hidden" class="att-excuse" value="<%= student.excuseRef || '' %>">
                                                     <input type="hidden" class="att-excuse-attachment" value="">
                                                     <input type="hidden" class="att-comments" value="">
@@ -2420,6 +2426,13 @@
                         </div>
                     </div>
                     <div class="col-12">
+                        <div class="d-none" id="wrap_modalAbsenceExcused">
+                            <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalAbsenceExcused" aria-pressed="false" <%- disabledAttr %>>
+                                <i class="bi bi-shield-plus"></i><span>Mark absence excused</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-12">
                         <label class="form-label fw-bold small">Excuse / reference notes</label>
                         <div class="row g-2 align-items-start">
                             <div class="col-md-8">
@@ -2698,6 +2711,12 @@ let detailsModalSnapshot = null;
 let currentMentions = [];
 let modalLateExcused = false;
 let modalEarlyLeaveExcused = false;
+let modalAbsenceExcused = false;
+
+function isAbsentLikeAttendanceStatus(attendance) {
+    const att = String(attendance || '').trim().toLowerCase();
+    return att === 'absent' || att === 'acf';
+}
 
 function truthyAttendanceFlag(value) {
     return value === true || value === 1 || ['true', '1', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
@@ -2729,6 +2748,27 @@ function syncModalTimingExcuseButton({ minutesInputId, wrapperId, buttonId, stat
         : `<i class="bi bi-shield-plus"></i><span>${inactiveText}</span>`;
 }
 
+function syncModalAbsenceExcuseControls() {
+    const personId = document.getElementById('modalPersonId')?.value || '';
+    const row = personId ? document.querySelector(`.roster-row[data-personid="${personId}"]`) : null;
+    const attendance = row?.querySelector('.att-radio:checked')?.value || '';
+    const wrapper = document.getElementById('wrap_modalAbsenceExcused');
+    const button = document.getElementById('btn_modalAbsenceExcused');
+    if (!wrapper || !button) return;
+    if (!isAbsentLikeAttendanceStatus(attendance)) {
+        modalAbsenceExcused = false;
+        wrapper.classList.add('d-none');
+        return;
+    }
+    wrapper.classList.remove('d-none');
+    button.classList.toggle('btn-success', modalAbsenceExcused);
+    button.classList.toggle('btn-outline-success', !modalAbsenceExcused);
+    button.setAttribute('aria-pressed', modalAbsenceExcused ? 'true' : 'false');
+    button.innerHTML = modalAbsenceExcused
+        ? '<i class="bi bi-shield-check"></i><span>Absence excused</span>'
+        : '<i class="bi bi-shield-plus"></i><span>Mark absence excused</span>';
+}
+
 function syncModalTimingExcuseControls() {
     syncModalTimingExcuseButton({
         minutesInputId: 'modalLateMins',
@@ -2746,6 +2786,7 @@ function syncModalTimingExcuseControls() {
         inactiveText: 'Mark early leave excused',
         activeText: 'Early leave excused'
     });
+    syncModalAbsenceExcuseControls();
 }
 
 function captureDetailsModalFormSnapshot() {
@@ -2754,6 +2795,7 @@ function captureDetailsModalFormSnapshot() {
         leave: String(document.getElementById('modalLeaveMins')?.value || '').trim(),
         lateExcused: modalLateExcused === true,
         earlyLeaveExcused: modalEarlyLeaveExcused === true,
+        absenceExcused: modalAbsenceExcused === true,
         excuse: String(document.getElementById('modalExcuseRef')?.value || '').trim(),
         excuseFileSelected: Boolean(document.getElementById('modalExcuseFile')?.files?.length),
         commentDraft: String(document.getElementById('inp_newComment')?.value || '').trim(),
@@ -2770,6 +2812,7 @@ function isDetailsModalDirty() {
         current.leave !== detailsModalSnapshot.leave ||
         current.lateExcused !== detailsModalSnapshot.lateExcused ||
         current.earlyLeaveExcused !== detailsModalSnapshot.earlyLeaveExcused ||
+        current.absenceExcused !== detailsModalSnapshot.absenceExcused ||
         current.excuse !== detailsModalSnapshot.excuse ||
         current.excuseFileSelected !== detailsModalSnapshot.excuseFileSelected ||
         current.commentDraft !== detailsModalSnapshot.commentDraft ||
@@ -4916,15 +4959,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const leaveInput = row.querySelector('.att-leave');
             const lateExcusedInput = row.querySelector('.att-late-excused');
             const earlyExcusedInput = row.querySelector('.att-early-excused');
+            const absenceExcusedInput = row.querySelector('.att-absence-excused');
             if (lateInput) lateInput.value = '';
             if (leaveInput) leaveInput.value = '';
             if (lateExcusedInput) lateExcusedInput.value = 'false';
             if (earlyExcusedInput) earlyExcusedInput.value = 'false';
+            if (absenceExcusedInput) absenceExcusedInput.value = 'false';
             return;
         }
 
         if (window.__attendanceThresholdsEnabled === false) {
-            if (!att || att === 'acf' || att === 'excused') return;
+            if (!att || att === 'acf') return;
             if (late > 0 || early > 0 || att === 'late') {
                 if (!setAttendanceRadio(row, 'late')) setAttendanceRadio(row, 'present');
             }
@@ -4943,11 +4988,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if ((Number.isFinite(lateCut) && latePenalty >= lateCut) || (Number.isFinite(earlyCut) && earlyPenalty >= earlyCut)) {
                 setAttendanceRadio(row, 'absent');
+                const absenceExcusedInput = row.querySelector('.att-absence-excused');
+                if (absenceExcusedInput) absenceExcusedInput.value = 'false';
                 return;
             }
             const combN = comb === null || comb === undefined || comb === '' ? null : Number(comb);
             if (combN != null && Number.isFinite(combN) && latePenalty + earlyPenalty >= combN) {
                 setAttendanceRadio(row, 'absent');
+                const absenceExcusedInput = row.querySelector('.att-absence-excused');
+                if (absenceExcusedInput) absenceExcusedInput.value = 'false';
                 return;
             }
         }
@@ -4955,9 +5004,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!att) {
             return;
         }
-        if ((late > 0 || early > 0) && (att === 'present' || att === 'excused')) {
+        if ((late > 0 || early > 0) && att === 'present') {
             setAttendanceRadio(row, 'late');
         }
+        clearAbsenceExcusedUnlessAbsentLike(row);
+    }
+
+    function clearAbsenceExcusedUnlessAbsentLike(row) {
+        if (!row) return;
+        const att = row.querySelector('.att-radio:checked')?.value || '';
+        const absenceExcusedInput = row.querySelector('.att-absence-excused');
+        if (!absenceExcusedInput) return;
+        if (!isAbsentLikeAttendanceStatus(att)) absenceExcusedInput.value = 'false';
     }
 
     if (typeof bootstrap !== 'undefined') {
@@ -5717,6 +5775,10 @@ document.addEventListener('DOMContentLoaded', () => {
         modalEarlyLeaveExcused = !modalEarlyLeaveExcused;
         syncModalTimingExcuseControls();
     });
+    document.getElementById('btn_modalAbsenceExcused')?.addEventListener('click', () => {
+        modalAbsenceExcused = !modalAbsenceExcused;
+        syncModalAbsenceExcuseControls();
+    });
     if (btnSaveDetails) {
         btnSaveDetails.addEventListener('click', async () => {
             const personId = document.getElementById('modalPersonId').value;
@@ -5743,8 +5805,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     row.querySelector('.att-excuse').value = excuseVal;
                     const lateExcusedInput = row.querySelector('.att-late-excused');
                     const earlyExcusedInput = row.querySelector('.att-early-excused');
+                    const absenceExcusedInput = row.querySelector('.att-absence-excused');
                     if (lateExcusedInput) lateExcusedInput.value = parseModalAttendanceMinutes('modalLateMins') > 0 && modalLateExcused ? 'true' : 'false';
                     if (earlyExcusedInput) earlyExcusedInput.value = parseModalAttendanceMinutes('modalLeaveMins') > 0 && modalEarlyLeaveExcused ? 'true' : 'false';
+                    if (absenceExcusedInput) {
+                        const attendance = row.querySelector('.att-radio:checked')?.value || '';
+                        absenceExcusedInput.value = isAbsentLikeAttendanceStatus(attendance) && modalAbsenceExcused ? 'true' : 'false';
+                    }
 
                     applyAttendanceRulesToRow(row);
                     updateLateMissingMinuteState(row);
@@ -5756,7 +5823,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const hasComments = (details.comments || []).length > 0;
                     const hasTimingExcuse = (lateExcusedInput?.value === 'true') || (earlyExcusedInput?.value === 'true');
-                    if (lateVal || leaveVal || excuseVal || excuseAttachment || hasComments || hasTimingExcuse) {
+                    const hasAbsenceExcuse = absenceExcusedInput?.value === 'true';
+                    if (lateVal || leaveVal || excuseVal || excuseAttachment || hasComments || hasTimingExcuse || hasAbsenceExcuse) {
                         btn.className = 'btn btn-sm btn-details btn-warning text-dark';
                         icon.className = 'bi bi-sticky-fill';
                     } else {
@@ -5792,10 +5860,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const leaveInput = row.querySelector('.att-leave');
             const lateExcusedInput = row.querySelector('.att-late-excused');
             const earlyExcusedInput = row.querySelector('.att-early-excused');
+            const absenceExcusedInput = row.querySelector('.att-absence-excused');
             if (lateInput && !lateInput.disabled) lateInput.value = '';
             if (leaveInput && !leaveInput.disabled) leaveInput.value = '';
             if (lateExcusedInput) lateExcusedInput.value = 'false';
             if (earlyExcusedInput) earlyExcusedInput.value = 'false';
+            if (absenceExcusedInput) absenceExcusedInput.value = 'false';
             updateLateMissingMinuteState(row);
         });
     }
@@ -7582,6 +7652,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = e.target.closest('.roster-row');
             if (row) {
                 applyAttendanceRulesToRow(row);
+                clearAbsenceExcusedUnlessAbsentLike(row);
                 updateLateMissingMinuteState(row);
                 if (e.target.value === 'late' && isLateMissingMinutes(row)) {
                     openLateDetailsForRow(row);
@@ -7732,6 +7803,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const earlyLeaveMinutes = row.querySelector('.att-leave').value || null;
             const lateExcused = Number(lateMinutes || 0) > 0 && row.querySelector('.att-late-excused')?.value === 'true';
             const earlyLeaveExcused = Number(earlyLeaveMinutes || 0) > 0 && row.querySelector('.att-early-excused')?.value === 'true';
+            const absenceExcused = isAbsentLikeAttendanceStatus(attendance)
+                && row.querySelector('.att-absence-excused')?.value === 'true';
             const excuseRef = row.querySelector('.att-excuse').value || '';
             const excuseAttachment = getAttendanceDetails(personId).excuseAttachment || null;
             const conductRow = conductRowsByPersonId.get(personId);
@@ -7746,6 +7819,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 earlyLeaveMinutes,
                 lateExcused,
                 earlyLeaveExcused,
+                absenceExcused,
                 excuseRef,
                 excuseAttachment,
                 notes: ''
@@ -8041,6 +8115,9 @@ function openDetailsModal(personId, name) {
         document.getElementById('modalExcuseRef').value = row.querySelector('.att-excuse').value;
         modalLateExcused = parseModalAttendanceMinutes('modalLateMins') > 0 && truthyAttendanceFlag(row.querySelector('.att-late-excused')?.value);
         modalEarlyLeaveExcused = parseModalAttendanceMinutes('modalLeaveMins') > 0 && truthyAttendanceFlag(row.querySelector('.att-early-excused')?.value);
+        const rowAttendance = row.querySelector('.att-radio:checked')?.value || '';
+        modalAbsenceExcused = isAbsentLikeAttendanceStatus(rowAttendance)
+            && truthyAttendanceFlag(row.querySelector('.att-absence-excused')?.value);
         syncModalTimingExcuseControls();
         const details = window.getAttendanceDetails(personId);
         const excuseAttachment = details.excuseAttachment || null;
@@ -8077,6 +8154,7 @@ function openDetailsModal(personId, name) {
         document.getElementById('modalExcuseRef').value = '';
         modalLateExcused = false;
         modalEarlyLeaveExcused = false;
+        modalAbsenceExcused = false;
         syncModalTimingExcuseControls();
     }
 

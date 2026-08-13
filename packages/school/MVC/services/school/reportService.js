@@ -487,21 +487,30 @@ async function buildStudentAttendanceApplicabilityContext({ classData, sessions,
   return { notApplicableSessionIds, expectedSessionIds };
 }
 
-function incrementAttendanceStatusCount(summary, status) {
+function incrementAttendanceStatusCount(summary, status, rosterRow = null) {
   if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) return;
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) {
+  const record = rosterRow
+    ? attendanceMatrixMetricsService.normalizeLegacyAbsenceExcusedRecord(rosterRow)
+    : null;
+  const absenceExcused = record && attendanceMatrixMetricsService.isAbsenceExcused(record);
+  const st = attendanceMatrixMetricsService.normalizeStatus(
+    status,
+    attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+  );
+  if (st === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) {
     summary.present += 1;
     return;
   }
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) {
+  if (st === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) {
     summary.late += 1;
     return;
   }
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) {
+  if (st === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED || absenceExcused) {
     summary.excused += 1;
+    if (st === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) summary.acf += 1;
     return;
   }
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) {
+  if (st === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) {
     summary.acf += 1;
     summary.absent += 1;
     return;
@@ -531,7 +540,7 @@ function buildClassAttendanceSummary(session, statusMap = null) {
       return;
     }
     summary.total += 1;
-    incrementAttendanceStatusCount(summary, status);
+    incrementAttendanceStatusCount(summary, status, row);
   });
 
   return summary;
@@ -614,7 +623,7 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
     }
 
     out.totalSessions += 1;
-    incrementAttendanceStatusCount(out, status);
+    incrementAttendanceStatusCount(out, status, row);
 
     const timing = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(row);
     out.lateMinutes += timing.lateMinutes;
@@ -627,12 +636,16 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
       out.earlyLeaveExcusedSessions += 1;
       out.earlyLeaveExcusedMinutes += timing.earlyLeaveMinutes;
     }
+    const absentFields = attendanceMatrixMetricsService.normalizeAbsenceExcusedFields(
+      attendanceMatrixMetricsService.normalizeLegacyAbsenceExcusedRecord(row || {})
+    );
     matrixRecords.push({
       status,
       lateMinutes: timing.lateMinutes,
       earlyLeaveMinutes: timing.earlyLeaveMinutes,
       lateExcused: timing.lateExcused,
       earlyLeaveExcused: timing.earlyLeaveExcused,
+      absenceExcused: absentFields.absenceExcused,
       scheduledMinutes
     });
   });
@@ -697,7 +710,7 @@ function buildStudentPunctualitySummary(sessions, studentId, statusMap = null, o
       enabledAttendanceStatuses
     );
     const status = String(normalized?.attendance || '').trim().toLowerCase();
-    if (status !== 'present' && status !== 'late' && status !== 'excused') return;
+    if (status !== 'present' && status !== 'late') return;
 
     const timing = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(normalized);
     const late = timing.lateMinutes;
@@ -793,7 +806,6 @@ function buildStudentSessionRatingSummary(sessions, studentId, statusMap = null,
     // Still exclude absent / N/A / other non-attending statuses from rating averages.
     const attendanceEligible = status === 'present'
       || status === 'late'
-      || status === 'excused'
       || status === '';
     if (!attendanceEligible) return;
 
@@ -898,7 +910,7 @@ async function buildClassAttendanceSpanSummary(sessions, statusMap = null, optio
         return;
       }
       out.total += 1;
-      incrementAttendanceStatusCount(out, status);
+      incrementAttendanceStatusCount(out, status, row);
       const timing = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(row);
       matrixRecords.push({
         status,
@@ -1472,6 +1484,12 @@ function buildOverallAttendanceNote(status, timing = {}) {
     noteParts.push(`Left Early${timing?.earlyLeaveExcused ? ' Excused' : ''}`);
   }
   if (noteParts.length) return noteParts.join('; ');
+  if (timing?.absenceExcused && attendanceMatrixMetricsService.isAbsentLikeStatus(status)) {
+    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) {
+      return 'Absent Camera Off (Excused)';
+    }
+    return 'Absent Excused';
+  }
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) return 'Absent Excused';
   if (
     status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT ||
@@ -1518,8 +1536,13 @@ function buildOverallAttendanceDayPrefill({ sessions, studentPersonId, statusMap
       return {
         status,
         timing: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
-          ? { lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false }
-          : attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRow)
+          ? { lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false, absenceExcused: false }
+          : {
+            ...attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRow),
+            ...attendanceMatrixMetricsService.normalizeAbsenceExcusedFields(
+              attendanceMatrixMetricsService.normalizeLegacyAbsenceExcusedRecord(rosterRow || {})
+            )
+          }
       };
     });
     const selectedEntry = sessionEntries.find((entry) => entry.status !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE)
@@ -1547,20 +1570,29 @@ function buildOverallAttendanceDayPrefill({ sessions, studentPersonId, statusMap
   return out;
 }
 
-function attendanceStatusDetails(statusValue) {
+function attendanceStatusDetails(statusValue, rosterRow = null) {
   if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(statusValue)) {
     return { status: '', label: 'Not Marked' };
   }
+  const record = rosterRow
+    ? attendanceMatrixMetricsService.normalizeLegacyAbsenceExcusedRecord(rosterRow)
+    : null;
   const status = attendanceMatrixMetricsService.normalizeStatus(
     statusValue,
     attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
   );
+  const absenceExcused = record && attendanceMatrixMetricsService.isAbsenceExcused(record);
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
     return { status, label: 'N/A' };
   }
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) return { status, label: 'Present' };
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) return { status, label: 'Late' };
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) return { status, label: 'Absent Excused' };
+  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED || absenceExcused) {
+    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) {
+      return { status, label: 'Absent Camera Off (Excused)' };
+    }
+    return { status: attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT, label: 'Absent Excused' };
+  }
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) {
     return { status, label: 'Absent Camera Off' };
   }
@@ -1799,7 +1831,7 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
         derivedNotApplicable,
         expectedForSession
       });
-      const statusDetails = attendanceStatusDetails(statusSource);
+      const statusDetails = attendanceStatusDetails(statusSource, rosterRow);
       const studentRow = studentRows[studentIndex] || {};
       const timing = statusDetails.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
         ? { lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false }

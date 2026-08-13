@@ -1390,7 +1390,7 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
         const pid = cleanPersonId(row?.personId);
         if (!pid) return row;
         if (forceSessionNotApplicable) {
-            return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false };
+            return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false, absenceExcused: false };
         }
         if (!hasApprovedLeaveFor(pid)) return row;
         const normalized = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
@@ -1398,7 +1398,7 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
             && normalized !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
             return row;
         }
-        return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false };
+        return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false, absenceExcused: false };
     });
 
     const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(
@@ -1411,7 +1411,7 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
         const person = persons.find((p) => idsEqual(p.id, pid));
         const displayName = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : 'Unknown Student';
         return {
-            ...r,
+            ...attendanceMatrixMetricsService.normalizeLegacyAbsenceExcusedRecord(r),
             personId: pid,
             name: displayName,
             studentRecordId: schoolStudentProfileLinkService.resolveStudentRecordId({
@@ -3616,6 +3616,7 @@ async function saveSession1(req, res) {
                     earlyLeaveMinutes: incRec.earlyLeaveMinutes,
                     lateExcused: incRec.lateExcused === undefined ? existRec.lateExcused : incRec.lateExcused,
                     earlyLeaveExcused: incRec.earlyLeaveExcused === undefined ? existRec.earlyLeaveExcused : incRec.earlyLeaveExcused,
+                    absenceExcused: incRec.absenceExcused === undefined ? existRec.absenceExcused : incRec.absenceExcused,
                     excuseRef: incRec.excuseRef,
                     excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
                     classEffortPercent: incRec.classEffortPercent === undefined
@@ -4882,6 +4883,7 @@ async function saveSession(req, res) {
                     earlyLeaveMinutes: incRec.earlyLeaveMinutes,
                     lateExcused: incRec.lateExcused === undefined ? existRec.lateExcused : incRec.lateExcused,
                     earlyLeaveExcused: incRec.earlyLeaveExcused === undefined ? existRec.earlyLeaveExcused : incRec.earlyLeaveExcused,
+                    absenceExcused: incRec.absenceExcused === undefined ? existRec.absenceExcused : incRec.absenceExcused,
                     excuseRef: incRec.excuseRef,
                     excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
                     classEffortPercent: incRec.classEffortPercent === undefined

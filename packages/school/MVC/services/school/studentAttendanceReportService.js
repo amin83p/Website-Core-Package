@@ -75,13 +75,15 @@ function countStatusBreakdown(records = []) {
   };
   (Array.isArray(records) ? records : []).forEach((record) => {
     const status = attendanceMatrixMetricsService.normalizeStatus(record?.status, '');
+    const absenceExcused = attendanceMatrixMetricsService.isAbsenceExcused(record)
+      || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED;
     if (!status) {
       counts.unmarked += 1;
       return;
     }
     if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) counts.present += 1;
     else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE) counts.late += 1;
-    else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) counts.excused += 1;
+    else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED || absenceExcused) counts.excused += 1;
     else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT) counts.absent += 1;
     else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) counts.acf += 1;
     else if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) counts.notApplicable += 1;
@@ -168,6 +170,7 @@ function buildClassDayCells(days = [], rollupRecords = []) {
       earlyLeaveMinutes: Number(record?.earlyLeaveMinutes) || 0,
       lateExcused: Boolean(record?.lateExcused),
       earlyLeaveExcused: Boolean(record?.earlyLeaveExcused),
+      absenceExcused: Boolean(record?.absenceExcused),
       excuseRef: String(record?.excuseRef || '').trim(),
       excuseAttachment: serializeAttendanceAttachment(record?.excuseAttachment),
       rosterStudentNotes: String(record?.rosterStudentNotes || '').trim(),

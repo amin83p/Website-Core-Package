@@ -5074,11 +5074,19 @@
     }
   }
 
-  function hubAttendanceStatusIcon(status) {
+  function hubAttendanceStatusIcon(status, record = {}) {
     const value = String(status || '').trim().toLowerCase();
+    const absenceExcused = record?.absenceExcused === true
+      || String(record?.absenceExcused || '').trim().toLowerCase() === 'true'
+      || value === 'excused';
     if (value === 'present') return '<i class="bi bi-check-circle-fill attendance-status-present" title="Present"></i>';
     if (value === 'late') return '<i class="bi bi-clock-fill attendance-status-late" title="Late"></i>';
-    if (value === 'excused') return '<i class="bi bi-envelope-paper-fill attendance-status-excused" title="Excused"></i>';
+    if (absenceExcused && (value === 'absent' || value === 'acf' || value === 'excused')) {
+      const icon = value === 'acf'
+        ? '<i class="bi bi-camera-video-off-fill attendance-status-acf"></i>'
+        : '<i class="bi bi-x-circle-fill attendance-status-absent"></i>';
+      return '<span class="attendance-timing-excuse-icon attendance-timing-excuse-full" title="Excused absence">' + icon + '</span>';
+    }
     if (value === 'absent') return '<i class="bi bi-x-circle-fill attendance-status-absent" title="Absent"></i>';
     if (value === 'acf') return '<i class="bi bi-camera-video-off-fill attendance-status-acf" title="Absent Camera Off"></i>';
     if (value === 'not_applicable') return '<i class="bi bi-dash-circle-fill attendance-status-na" title="N/A"></i>';
@@ -5089,13 +5097,13 @@
     const enabled = new Set(
       (Array.isArray(enabledStatuses) && enabledStatuses.length
         ? enabledStatuses
-        : ['present', 'late', 'excused', 'absent', 'acf', 'not_applicable']
+        : ['present', 'late', 'absent', 'acf', 'not_applicable']
       ).map(function (s) { return String(s || '').trim().toLowerCase(); })
     );
     const parts = [];
     if (enabled.has('present')) parts.push('<span class="me-3"><i class="bi bi-check-circle-fill attendance-status-present"></i> Present</span>');
     if (enabled.has('late')) parts.push('<span class="me-3"><i class="bi bi-clock-fill attendance-status-late"></i> Late</span>');
-    if (enabled.has('excused')) parts.push('<span class="me-3"><i class="bi bi-envelope-paper-fill attendance-status-excused"></i> Excused</span>');
+    parts.push('<span class="me-3"><span class="attendance-timing-excuse-icon attendance-timing-excuse-full d-inline-grid align-middle" style="width:1.1em;height:1.1em;vertical-align:-0.12em;"><i class="bi bi-x-circle-fill attendance-status-absent"></i></span> Excused absence</span>');
     if (enabled.has('absent')) parts.push('<span class="me-3"><i class="bi bi-x-circle-fill attendance-status-absent"></i> Absent</span>');
     if (enabled.has('acf')) parts.push('<span class="me-3"><i class="bi bi-camera-video-off-fill attendance-status-acf"></i> ACF</span>');
     if (enabled.has('not_applicable')) parts.push('<span><i class="bi bi-dash attendance-status-na"></i> N/A</span>');
@@ -5166,7 +5174,7 @@
         const notesExist = Array.isArray(record.comments) && record.comments.length > 0;
         return [
           '<td class="hub-attendance-cell" data-hub-attendance-cell data-person-id="' + escapeHtml(student.personId || '') + '" data-session-id="' + escapeHtml(sessionId) + '" title="Open this attendance record in the full Attendance page">',
-          hubAttendanceStatusIcon(record.status),
+          hubAttendanceStatusIcon(record.status, record),
           notesExist ? '<div class="small mt-1"><i class="bi bi-chat-dots-fill text-primary"></i></div>' : '',
           '</td>'
         ].join('');
@@ -5292,7 +5300,7 @@
         const cells = records.map(function (record) {
           const sessionId = String(record.sessionId || '').trim();
           const notesExist = Array.isArray(record.comments) && record.comments.length > 0;
-          return '<td class="hub-attendance-cell" data-hub-attendance-cell data-class-id="' + escapeHtml(row.classId || '') + '" data-person-id="' + escapeHtml(student.personId || '') + '" data-session-id="' + escapeHtml(sessionId) + '" title="Open this attendance record in the full Attendance page">' + hubAttendanceStatusIcon(record.status) + (notesExist ? '<div class="small mt-1"><i class="bi bi-chat-dots-fill text-primary"></i></div>' : '') + '</td>';
+          return '<td class="hub-attendance-cell" data-hub-attendance-cell data-class-id="' + escapeHtml(row.classId || '') + '" data-person-id="' + escapeHtml(student.personId || '') + '" data-session-id="' + escapeHtml(sessionId) + '" title="Open this attendance record in the full Attendance page">' + hubAttendanceStatusIcon(record.status, record) + (notesExist ? '<div class="small mt-1"><i class="bi bi-chat-dots-fill text-primary"></i></div>' : '') + '</td>';
         }).join('');
         return '<tr class="hub-attendance-student-row" data-person-id="' + escapeHtml(personId) + '"><td class="hub-attendance-rollup text-center small"><div><span class="text-success fw-bold">' + escapeHtml(String(present)) + '</span><span class="text-muted"> / </span><span class="text-danger fw-bold">' + escapeHtml(String(absent)) + '</span></div><div class="text-primary fw-bold">' + escapeHtml(percent) + '</div></td><td class="hub-attendance-student"><div class="fw-semibold">' + hubStudentNameHtml(student.name || 'Student', student.studentRecordId) + '</div><div class="text-muted small font-monospace">' + escapeHtml(student.personId || '') + '</div></td>' + cells + '</tr>';
       }).join('') : '<tr><td colspan="' + escapeHtml(String(sessions.length + 2)) + '" class="text-center text-muted py-5">No matching students in this class matrix.</td></tr>';

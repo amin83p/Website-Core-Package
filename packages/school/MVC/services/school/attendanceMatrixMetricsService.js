@@ -5,7 +5,7 @@
  * Per-session length: from session startTime/endTime, else durationHours, else policy scheduledMinutes.
  *
  * Attendance percentage (configurable via org rollupFormula in school settings):
- * - excused → full session weight
+ * - absenceExcused on absent / acf → full session weight
  * - N/A / not_applicable → excluded from the denominator
  * - unmarked → excluded by default, or counted as absent when configured
  * - present / late / absent / acf → credit = weight × presenceRatio
@@ -47,7 +47,6 @@ const MANDATORY_ATTENDANCE_STATUSES = Object.freeze([
 /** Optional per-class toggles (mandatory statuses are never in this list). */
 const OPTIONAL_ATTENDANCE_STATUSES = Object.freeze([
   ATTENDANCE_STATUS.LATE,
-  ATTENDANCE_STATUS.EXCUSED,
   ATTENDANCE_STATUS.ACF
 ]);
 
@@ -60,6 +59,11 @@ const ALL_ATTENDANCE_STATUSES_ORDERED = Object.freeze([
   ATTENDANCE_STATUS.ACF,
   ATTENDANCE_STATUS.NOT_APPLICABLE
 ]);
+
+/** Statuses offered when a class has no explicit enabledAttendanceStatuses config. */
+const DEFAULT_ENABLED_ATTENDANCE_STATUSES = Object.freeze(
+  ALL_ATTENDANCE_STATUSES_ORDERED.filter((st) => st !== ATTENDANCE_STATUS.EXCUSED)
+);
 
 const ATTENDANCE_STATUS_META = Object.freeze({
   [ATTENDANCE_STATUS.PRESENT]: { code: ATTENDANCE_STATUS.PRESENT, label: 'Present', shortLabel: 'Present' },
@@ -235,18 +239,20 @@ function normalizeEnabledAttendanceStatuses(input) {
   const selected = new Set();
   for (const item of rawList) {
     const st = normalizeAttendanceStatusForSave(item, '');
-    if (st && known.has(st)) selected.add(st);
+    if (st && known.has(st) && st !== ATTENDANCE_STATUS.EXCUSED) selected.add(st);
   }
 
   if (!selected.size) {
-    return [...ALL_ATTENDANCE_STATUSES_ORDERED];
+    return [...DEFAULT_ENABLED_ATTENDANCE_STATUSES];
   }
 
   for (const mandatory of MANDATORY_ATTENDANCE_STATUSES) {
     selected.add(mandatory);
   }
 
-  return ALL_ATTENDANCE_STATUSES_ORDERED.filter((st) => selected.has(st));
+  return ALL_ATTENDANCE_STATUSES_ORDERED.filter(
+    (st) => selected.has(st) && st !== ATTENDANCE_STATUS.EXCUSED
+  );
 }
 
 /**
@@ -260,7 +266,7 @@ function resolveEnabledAttendanceStatuses(classData = {}) {
     ? classData.enabledAttendanceStatuses
     : undefined;
   if (raw == null || (Array.isArray(raw) && raw.length === 0)) {
-    return [...ALL_ATTENDANCE_STATUSES_ORDERED];
+    return [...DEFAULT_ENABLED_ATTENDANCE_STATUSES];
   }
   return normalizeEnabledAttendanceStatuses(raw);
 }
@@ -289,6 +295,11 @@ function assertAttendanceStatusAllowedForSave(opts = {}) {
     ? normalizeEnabledAttendanceStatuses(opts.enabledStatuses)
     : resolveEnabledAttendanceStatuses(opts.classData || {});
   const normalized = normalizeAttendanceStatusForSave(opts.status, '');
+  if (normalized === ATTENDANCE_STATUS.EXCUSED) {
+    throw new Error(
+      'Attendance status "Excused" is no longer supported. Mark absent or ACF and use absence excused.'
+    );
+  }
   // Empty = unmarked (white / not marked yet); allowed so Manage Session can reset.
   if (!normalized) {
     return '';
@@ -326,6 +337,9 @@ function coerceAttendanceStatusToEnabled(status, enabledStatuses) {
   if (normalized === ATTENDANCE_STATUS.NOT_APPLICABLE) {
     // System N/A may exist even when toggle is off; keep it.
     return normalized;
+  }
+  if (normalized === ATTENDANCE_STATUS.EXCUSED) {
+    return ATTENDANCE_STATUS.ABSENT;
   }
   return ATTENDANCE_STATUS.ABSENT;
 }
@@ -387,6 +401,36 @@ function normalizeAttendanceTimingExcuseFlag(value) {
   if (value === true || value === 1) return true;
   const token = String(value ?? '').trim().toLowerCase();
   return token === 'true' || token === '1' || token === 'yes' || token === 'on';
+}
+
+function normalizeAbsenceExcusedFields(record = {}) {
+  const rawStatus = record?.attendance !== undefined ? record.attendance : record?.status;
+  const attendance = normalizeStatus(rawStatus, '');
+  const allowed = isAbsentLikeStatus(attendance);
+  return {
+    absenceExcused: allowed && normalizeAttendanceTimingExcuseFlag(record?.absenceExcused)
+  };
+}
+
+function isAbsenceExcused(record = {}) {
+  return normalizeAbsenceExcusedFields(record).absenceExcused;
+}
+
+/**
+ * Map legacy excused status to absent + absenceExcused; normalize flag for absent-like rows.
+ * @param {object} record
+ * @returns {object}
+ */
+function normalizeLegacyAbsenceExcusedRecord(record = {}) {
+  const base = record && typeof record === 'object' ? { ...record } : {};
+  let attendance = normalizeAttendanceStatusForSave(base.attendance, '');
+  let absenceExcused = normalizeAttendanceTimingExcuseFlag(base.absenceExcused);
+  if (attendance === ATTENDANCE_STATUS.EXCUSED) {
+    attendance = ATTENDANCE_STATUS.ABSENT;
+    absenceExcused = true;
+  }
+  const absentFields = normalizeAbsenceExcusedFields({ ...base, attendance, absenceExcused });
+  return { ...base, attendance, ...absentFields };
 }
 
 function normalizeAttendanceTimingFields(record = {}) {
@@ -468,14 +512,16 @@ function policyThresholdsAreEnabled(policy) {
  */
 function resolveEffectiveAttendanceStatus(record, policy, enabledStatuses = null) {
   const rawStatus = record?.status !== undefined ? record.status : record?.attendance;
-  const status = normalizeStatus(rawStatus);
+  let status = normalizeStatus(rawStatus);
+  if (status === ATTENDANCE_STATUS.EXCUSED) {
+    status = ATTENDANCE_STATUS.ABSENT;
+  }
   if (policyThresholdsAreEnabled(policy)) return status;
 
   if (
     !status
     || status === ATTENDANCE_STATUS.NOT_APPLICABLE
     || status === ATTENDANCE_STATUS.ACF
-    || status === ATTENDANCE_STATUS.EXCUSED
   ) {
     return status;
   }
@@ -495,7 +541,7 @@ function resolveEffectiveAttendanceStatus(record, policy, enabledStatuses = null
 /**
  * Enforce Manage Session / roster rules aligned with the attendance matrix policy:
  * 1) Late minutes ≥ disqualifyLate, early ≥ disqualifyEarly, or combined missed ≥ combined threshold → absent.
- * 2) Otherwise, any late/early minutes with status present or excused → late.
+ * 2) Otherwise, any late/early minutes with status present → late.
  *
  * @param {object} record — roster row: attendance, lateMinutes, earlyLeaveMinutes, etc.
  * @param {ReturnType<typeof resolvePolicy>} policy
@@ -511,23 +557,39 @@ function applyAttendanceMatrixRosterRules(record, policy, enabledStatuses = null
   const late = timing.lateMinutes;
   const early = timing.earlyLeaveMinutes;
   const penalty = attendanceTimingPenaltyMinutes(timing);
+  const absenceFields = normalizeAbsenceExcusedFields({ ...base, attendance });
 
   if (attendance === ATTENDANCE_STATUS.NOT_APPLICABLE) {
-    return { ...base, attendance, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false };
+    return {
+      ...base,
+      attendance,
+      lateMinutes: 0,
+      earlyLeaveMinutes: 0,
+      lateExcused: false,
+      earlyLeaveExcused: false,
+      absenceExcused: false
+    };
   }
 
   if (!policyThresholdsAreEnabled(pol)) {
+    const resolvedAttendance = resolveEffectiveAttendanceStatus(
+      { ...base, attendance, lateMinutes: late, earlyLeaveMinutes: early },
+      pol,
+      enabledStatuses
+    );
+    const resolvedAbsence = normalizeAbsenceExcusedFields({
+      ...base,
+      attendance: resolvedAttendance,
+      absenceExcused: absenceFields.absenceExcused
+    });
     return {
       ...base,
-      attendance: resolveEffectiveAttendanceStatus(
-        { ...base, attendance, lateMinutes: late, earlyLeaveMinutes: early },
-        pol,
-        enabledStatuses
-      ),
+      attendance: resolvedAttendance,
       lateMinutes: late,
       earlyLeaveMinutes: early,
       lateExcused: timing.lateExcused,
-      earlyLeaveExcused: timing.earlyLeaveExcused
+      earlyLeaveExcused: timing.earlyLeaveExcused,
+      absenceExcused: resolvedAbsence.absenceExcused
     };
   }
 
@@ -536,26 +598,67 @@ function applyAttendanceMatrixRosterRules(record, policy, enabledStatuses = null
   const combRaw = pol.disqualifyCombinedMissedMinutes;
 
   if (penalty.latePenaltyMinutes >= lateCut || penalty.earlyLeavePenaltyMinutes >= earlyCut) {
-    return { ...base, attendance: 'absent', lateMinutes: late, earlyLeaveMinutes: early, lateExcused: timing.lateExcused, earlyLeaveExcused: timing.earlyLeaveExcused };
+    return {
+      ...base,
+      attendance: 'absent',
+      lateMinutes: late,
+      earlyLeaveMinutes: early,
+      lateExcused: timing.lateExcused,
+      earlyLeaveExcused: timing.earlyLeaveExcused,
+      absenceExcused: false
+    };
   }
   const comb = combRaw === null || combRaw === undefined || combRaw === ''
     ? null
     : Number(combRaw);
   if (comb != null && Number.isFinite(comb) && penalty.latePenaltyMinutes + penalty.earlyLeavePenaltyMinutes >= comb) {
-    return { ...base, attendance: 'absent', lateMinutes: late, earlyLeaveMinutes: early, lateExcused: timing.lateExcused, earlyLeaveExcused: timing.earlyLeaveExcused };
+    return {
+      ...base,
+      attendance: 'absent',
+      lateMinutes: late,
+      earlyLeaveMinutes: early,
+      lateExcused: timing.lateExcused,
+      earlyLeaveExcused: timing.earlyLeaveExcused,
+      absenceExcused: false
+    };
   }
 
   // Unmarked (white): keep empty unless minutes forced absent above.
   if (!attendance) {
-    return { ...base, attendance: '', lateMinutes: late, earlyLeaveMinutes: early, lateExcused: timing.lateExcused, earlyLeaveExcused: timing.earlyLeaveExcused };
+    return {
+      ...base,
+      attendance: '',
+      lateMinutes: late,
+      earlyLeaveMinutes: early,
+      lateExcused: timing.lateExcused,
+      earlyLeaveExcused: timing.earlyLeaveExcused,
+      absenceExcused: false
+    };
   }
 
   let next = attendance;
-  if ((late > 0 || early > 0) && (next === 'present' || next === 'excused')) {
+  if (attendance === ATTENDANCE_STATUS.EXCUSED) {
+    next = ATTENDANCE_STATUS.ABSENT;
+  }
+  if ((late > 0 || early > 0) && next === 'present') {
     next = 'late';
   }
 
-  return { ...base, attendance: next, lateMinutes: late, earlyLeaveMinutes: early, lateExcused: timing.lateExcused, earlyLeaveExcused: timing.earlyLeaveExcused };
+  const nextAbsence = normalizeAbsenceExcusedFields({
+    ...base,
+    attendance: next,
+    absenceExcused: absenceFields.absenceExcused
+  });
+
+  return {
+    ...base,
+    attendance: next,
+    lateMinutes: late,
+    earlyLeaveMinutes: early,
+    lateExcused: timing.lateExcused,
+    earlyLeaveExcused: timing.earlyLeaveExcused,
+    absenceExcused: nextAbsence.absenceExcused
+  };
 }
 
 function resolvePolicy(classData = {}, orgPolicyLayer = {}) {
@@ -678,8 +781,8 @@ function computeSessionCredit(record, sessionWeight, policy) {
     }
     return { credit: 0, disqualified: false, exempt: false, reason: 'no_record' };
   }
-  if (st === ATTENDANCE_STATUS.EXCUSED) {
-    return { credit: sessionWeight, disqualified: false, reason: 'excused_full' };
+  if (isAbsentLikeStatus(st) && isAbsenceExcused(record)) {
+    return { credit: sessionWeight, disqualified: false, reason: 'absence_excused_full' };
   }
 
   const penalty = rollupPenaltyMinutes(record, policy);
@@ -770,10 +873,11 @@ function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {
       policy
     );
     const excuseCountsAbsent = sessionCredit.reason === 'excuse_counts_absent';
+    const absenceExcusedFull = sessionCredit.reason === 'absence_excused_full';
     if ((st === ATTENDANCE_STATUS.PRESENT || st === ATTENDANCE_STATUS.LATE) && !excuseCountsAbsent) {
       totalPresentSessions += 1;
     }
-    if (countsAsAbsentForRollupSummary(st, rollupFormula) || excuseCountsAbsent) {
+    if ((countsAsAbsentForRollupSummary(st, rollupFormula) && !absenceExcusedFull) || excuseCountsAbsent) {
       totalAbsentSessions += 1;
     }
 
@@ -800,6 +904,7 @@ module.exports = {
   MANDATORY_ATTENDANCE_STATUSES,
   OPTIONAL_ATTENDANCE_STATUSES,
   ALL_ATTENDANCE_STATUSES_ORDERED,
+  DEFAULT_ENABLED_ATTENDANCE_STATUSES,
   ATTENDANCE_STATUS_META,
   normalizeStatus,
   isNotApplicableStatus,
@@ -821,6 +926,9 @@ module.exports = {
   scheduledMinutesFromSession,
   normalizeAttendanceTimingExcuseFlag,
   normalizeAttendanceTimingFields,
+  normalizeAbsenceExcusedFields,
+  isAbsenceExcused,
+  normalizeLegacyAbsenceExcusedRecord,
   attendanceTimingPenaltyMinutes,
   rollupPenaltyMinutes,
   normalizeRollupFormula,

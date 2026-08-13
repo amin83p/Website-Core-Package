@@ -38,7 +38,8 @@ test('buildClassDayCells serializes comments and detail fields', () => {
   const cells = studentAttendanceReportService.buildClassDayCells(['2026-01-01'], [{
     sessionId: 'SES-1',
     date: '2026-01-01',
-    status: 'excused',
+    status: 'absent',
+    absenceExcused: true,
     lateMinutes: 5,
     lateExcused: true,
     excuseRef: 'Medical',

@@ -63,10 +63,9 @@ test('legend includes only class-enabled statuses and omits disabled optional on
   ]);
   assert.deepEqual(
     mandatoryOnly.map((row) => row.code),
-    ['P', 'A', 'N/A']
+    ['P', 'A', 'N/A', 'E']
   );
   assert.equal(mandatoryOnly.some((row) => row.code === 'L'), false);
-  assert.equal(mandatoryOnly.some((row) => row.code === 'E'), false);
   assert.equal(mandatoryOnly.some((row) => row.code === 'ACF'), false);
 
   const withOptional = attendanceExcelExportService.buildLegendEntries([
@@ -82,10 +81,10 @@ test('legend includes only class-enabled statuses and omits disabled optional on
     [
       'P:Present',
       'L:Late',
-      'E:Excused',
       'A:Absent',
       'ACF:Absent Camera Off',
-      'N/A:Not Applicable'
+      'N/A:Not Applicable',
+      'E:Excused absence'
     ]
   );
 });
@@ -476,7 +475,7 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
 
   assert.match(filename, /Attendance_EAL_Morning_2026-07-01_to_2026-07-31\.xlsx/);
   assert.equal(title, 'Attendance July 2026 (1–31)');
-  assert.deepEqual(legend.map((row) => row.code), ['P', 'L', 'E', 'A', 'N/A']);
+  assert.deepEqual(legend.map((row) => row.code), ['P', 'L', 'A', 'N/A', 'E']);
   assert.equal(legend.some((row) => row.code === 'ACF'), false);
 
   const workbook = new ExcelJS.Workbook();
@@ -490,13 +489,12 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   assert.equal(sheet.getCell(1, 3).fill?.fgColor?.argb, 'FFA9CE91');
   assert.equal(sheet.getCell(2, 1).value, 'L');
   assert.equal(sheet.getCell(2, 1).fill?.fgColor?.argb, 'FFFFC000');
-  assert.equal(sheet.getCell(3, 1).value, 'E');
-  assert.equal(sheet.getCell(4, 1).value, 'A');
-  assert.equal(sheet.getCell(4, 1).fill?.fgColor?.argb, 'FFFF0000');
-  assert.equal(sheet.getCell(5, 1).value, 'N/A');
-  assert.equal(sheet.getCell(5, 1).fill?.fgColor?.argb, 'FFD9D9D9');
-  assert.equal(sheet.getCell(5, 2).fill?.fgColor?.argb, 'FFD9D9D9');
-  assert.equal(sheet.getCell(5, 3).fill?.fgColor?.argb, 'FFD9D9D9');
+  assert.equal(sheet.getCell(3, 1).value, 'A');
+  assert.equal(sheet.getCell(4, 1).value, 'N/A');
+  assert.equal(sheet.getCell(5, 1).value, 'E');
+  assert.equal(sheet.getCell(5, 1).fill?.fgColor?.argb, 'FF0DCAF0');
+  assert.equal(sheet.getCell(5, 2).fill?.fgColor?.argb, 'FF0DCAF0');
+  assert.equal(sheet.getCell(5, 3).fill?.fgColor?.argb, 'FF0DCAF0');
   // Legend labels span # + Last Name (cols 2–3)
   const mergeKeys = [
     ...Object.keys(sheet._merges || {}),

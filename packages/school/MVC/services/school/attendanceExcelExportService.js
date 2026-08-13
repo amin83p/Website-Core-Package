@@ -8,7 +8,10 @@ const {
   ALL_ATTENDANCE_STATUSES_ORDERED,
   normalizeAttendanceStatusForSave,
   normalizeEnabledAttendanceStatuses,
-  normalizeAttendanceTimingExcuseFlag
+  normalizeAttendanceTimingExcuseFlag,
+  isAbsenceExcused,
+  isAbsentLikeStatus,
+  normalizeLegacyAbsenceExcusedRecord
 } = attendanceMatrixMetricsService;
 
 const STATUS_EXPORT_META = Object.freeze({
@@ -153,19 +156,41 @@ function splitDisplayName(person = {}) {
 
 function buildLegendEntries(enabledAttendanceStatuses = []) {
   const enabled = new Set(normalizeEnabledAttendanceStatuses(enabledAttendanceStatuses));
-  return ALL_ATTENDANCE_STATUSES_ORDERED
+  const entries = ALL_ATTENDANCE_STATUSES_ORDERED
     .filter((status) => enabled.has(status) && STATUS_EXPORT_META[status])
     .map((status) => ({
       status,
       code: STATUS_EXPORT_META[status].code,
       label: STATUS_EXPORT_META[status].label
     }));
+  if (!entries.some((entry) => entry.code === 'E')) {
+    entries.push({
+      status: ATTENDANCE_STATUS.EXCUSED,
+      code: STATUS_EXPORT_META[ATTENDANCE_STATUS.EXCUSED].code,
+      label: 'Excused absence'
+    });
+  }
+  return entries;
 }
 
-function statusToExportCode(status) {
-  const normalized = normalizeAttendanceStatusForSave(status, '');
+function resolveExportStatusKey(record = {}) {
+  const legacy = normalizeLegacyAbsenceExcusedRecord(record);
+  const normalized = normalizeAttendanceStatusForSave(legacy.status || record.status, '');
   if (!normalized) return '';
-  return STATUS_EXPORT_META[normalized]?.code || '';
+  if (normalized === ATTENDANCE_STATUS.EXCUSED) return ATTENDANCE_STATUS.EXCUSED;
+  if (isAbsenceExcused(legacy) && isAbsentLikeStatus(normalized)) {
+    return ATTENDANCE_STATUS.EXCUSED;
+  }
+  return normalized;
+}
+
+function statusToExportCode(recordOrStatus) {
+  const record = recordOrStatus && typeof recordOrStatus === 'object'
+    ? recordOrStatus
+    : { status: recordOrStatus };
+  const statusKey = resolveExportStatusKey(record);
+  if (!statusKey) return '';
+  return STATUS_EXPORT_META[statusKey]?.code || '';
 }
 
 function hasAttendanceTiming(record = {}) {
@@ -175,7 +200,7 @@ function hasAttendanceTiming(record = {}) {
 
 /** Status letter only in the cell; timing details belong in Excel notes via buildStatusNoteText. */
 function formatExportCellDisplay(record = {}) {
-  return statusToExportCode(record.status);
+  return statusToExportCode(record);
 }
 
 function statusFillArgb(status, { forLegend = false } = {}) {
@@ -212,9 +237,12 @@ function applyLegendCellStyle(cell, status) {
   applyVerticalMiddle(cell);
 }
 
-function applyStatusCellStyle(cell, status, { wrapText = false } = {}) {
-  const normalized = normalizeAttendanceStatusForSave(status, '');
-  const fillArgb = statusFillArgb(normalized, { forLegend: false });
+function applyStatusCellStyle(cell, statusOrRecord, { wrapText = false } = {}) {
+  const record = statusOrRecord && typeof statusOrRecord === 'object'
+    ? statusOrRecord
+    : { status: statusOrRecord };
+  const statusKey = resolveExportStatusKey(record);
+  const fillArgb = statusFillArgb(statusKey, { forLegend: false });
   if (fillArgb) applySolidFill(cell, fillArgb);
   cell.font = {
     bold: false,
@@ -365,6 +393,9 @@ function buildLateExcusedCommentFragment(record = {}) {
   if (status === ATTENDANCE_STATUS.EXCUSED) {
     return 'Excused';
   }
+  if (isAbsenceExcused(record)) {
+    return isAbsentLikeStatus(status) ? 'Excused absence' : 'Excused';
+  }
 
   return timing;
 }
@@ -424,8 +455,14 @@ function countStatusesFromRecords(records = []) {
     [ATTENDANCE_STATUS.NOT_APPLICABLE]: 0
   };
   (Array.isArray(records) ? records : []).forEach((record) => {
-    const status = normalizeAttendanceStatusForSave(record?.status, '');
+    const legacy = normalizeLegacyAbsenceExcusedRecord(record);
+    const status = normalizeAttendanceStatusForSave(legacy.status || record?.status, '');
     if (!status) return;
+    if (status === ATTENDANCE_STATUS.EXCUSED || (isAbsenceExcused(legacy) && isAbsentLikeStatus(status))) {
+      counts[ATTENDANCE_STATUS.EXCUSED] += 1;
+      if (status === ATTENDANCE_STATUS.ACF) counts[ATTENDANCE_STATUS.ACF] += 1;
+      return;
+    }
     if (Object.prototype.hasOwnProperty.call(counts, status)) {
       counts[status] += 1;
     }
@@ -730,7 +767,7 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
       const cell = sheet.getCell(bodyRow, firstSessionCol + sessionIdx);
       const displayValue = formatExportCellDisplay(record);
       cell.value = displayValue;
-      applyStatusCellStyle(cell, record.status, { wrapText: false });
+      applyStatusCellStyle(cell, record, { wrapText: false });
       const noteOptions = {
         receiverName: [firstName, lastName].filter(Boolean).join(' ') || clean(student.name),
         receiverEmail: clean(student.email)

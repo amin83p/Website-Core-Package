@@ -111,9 +111,20 @@ test('absent and N/A yield zero credit', () => {
   assert.equal(computeSessionCredit({ status: 'N/A' }, w, policy180).credit, 0);
 });
 
-test('excused yields full session weight', () => {
+test('absence excused on absent or acf yields full session weight', () => {
   const w = 10;
-  assert.equal(computeSessionCredit({ status: 'excused' }, w, policy180).credit, w);
+  assert.equal(
+    computeSessionCredit({ status: 'absent', absenceExcused: true }, w, policy180).credit,
+    w
+  );
+  assert.equal(
+    computeSessionCredit({ status: 'acf', absenceExcused: true }, w, policy180).credit,
+    w
+  );
+  assert.equal(
+    computeSessionCredit({ status: 'excused' }, w, policy180).credit,
+    0
+  );
 });
 
 test('present on time yields full session weight', () => {
@@ -221,10 +232,10 @@ test('disabled thresholds still use time-weighted credit', () => {
   );
   assert.equal(
     resolveEffectiveAttendanceStatus(
-      { status: 'excused', lateMinutes: 60 },
+      { status: 'excused', lateMinutes: 60, absenceExcused: true },
       disabledPolicy
     ),
-    'excused'
+    'late'
   );
 });
 
@@ -392,6 +403,19 @@ test('computeRosterAttendancePercent averages eligible roster rows', () => {
   assert.ok(Math.abs(percent - expected) < 0.01);
 });
 
+test('rollup excludes absence-excused sessions from absent P/A count', () => {
+  const records = [
+    { status: 'present' },
+    { status: 'absent', absenceExcused: true },
+    { status: 'acf', absenceExcused: true }
+  ];
+  const s = computeStudentMatrixSummary(records, {});
+  assert.equal(s.totalEligibleSessions, 3);
+  assert.equal(s.totalPresentSessions, 1);
+  assert.equal(s.totalAbsentSessions, 0);
+  assert.equal(s.performancePercent, 100);
+});
+
 test('rollup counts ACF in totalAbsentSessions', () => {
   const records = [
     { status: 'present', lateMinutes: 0, earlyLeaveMinutes: 0 },
@@ -406,8 +430,9 @@ test('rollup counts ACF in totalAbsentSessions', () => {
 });
 
 test('resolveEnabledAttendanceStatuses defaults to all when missing', () => {
-  assert.deepEqual(resolveEnabledAttendanceStatuses({}), [...ALL_ATTENDANCE_STATUSES_ORDERED]);
-  assert.deepEqual(resolveEnabledAttendanceStatuses({ enabledAttendanceStatuses: [] }), [...ALL_ATTENDANCE_STATUSES_ORDERED]);
+  const expected = ALL_ATTENDANCE_STATUSES_ORDERED.filter((st) => st !== 'excused');
+  assert.deepEqual(resolveEnabledAttendanceStatuses({}), expected);
+  assert.deepEqual(resolveEnabledAttendanceStatuses({ enabledAttendanceStatuses: [] }), expected);
 });
 
 test('normalizeEnabledAttendanceStatuses always keeps present, absent, and N/A', () => {

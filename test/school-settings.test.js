@@ -234,7 +234,7 @@ test('operational attendance pages do not embed or link to centralized settings 
   assert.doesNotMatch(sessionView, /id="conductScaleSettingsModal"/);
   assert.doesNotMatch(sessionView, /btnSaveConductScaleSettings/);
   assert.doesNotMatch(sessionView, /attendanceMatrixThresholdHint/);
-  assert.match(sessionView, /att === 'acf' \|\| att === 'excused'/);
+  assert.match(sessionView, /isAbsentLikeAttendanceStatus/);
   assert.doesNotMatch(attendanceView, /\/school\/settings#/);
   assert.doesNotMatch(attendanceView, /Matrix Thresholds/);
   assert.doesNotMatch(attendanceView, /CAN_VIEW_SCHOOL_SETTINGS/);

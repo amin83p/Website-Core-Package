@@ -46,7 +46,7 @@ test('copy-from-class apply path syncs attendance status checkboxes', () => {
 
 test('resolver helpers remain the single source of truth for class status lists', () => {
   const enabled = attendanceMatrixMetricsService.normalizeEnabledAttendanceStatuses(['excused']);
-  assert.deepEqual(enabled, ['present', 'excused', 'absent', 'not_applicable']);
+  assert.deepEqual(enabled, [...attendanceMatrixMetricsService.DEFAULT_ENABLED_ATTENDANCE_STATUSES]);
   assert.equal(
     attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses({
       enabledAttendanceStatuses: ['present', 'absent', 'acf']

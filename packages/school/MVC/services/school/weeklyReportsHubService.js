@@ -180,14 +180,20 @@ function formatStudentSessionLabel(record = {}) {
   const status = attendanceMatrixMetricsService.normalizeStatus(record?.status);
   const lateMinutes = Math.max(0, Number(record?.lateMinutes) || 0);
   const earlyLeaveMinutes = Math.max(0, Number(record?.earlyLeaveMinutes) || 0);
-  if (attendanceMatrixMetricsService.isAbsentLikeStatus(status)) return 'Absent';
+  const absenceExcused = attendanceMatrixMetricsService.isAbsenceExcused(record)
+    || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED;
+  if (attendanceMatrixMetricsService.isAbsentLikeStatus(status)) {
+    if (absenceExcused) {
+      return status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF ? 'Excused ACF' : 'Excused';
+    }
+    return 'Absent';
+  }
   if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) return 'Unmarked';
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE || lateMinutes > 0) {
     return lateMinutes > 0 ? `Late (${lateMinutes}m)` : 'Late';
   }
   if (earlyLeaveMinutes > 0) return `Present (early leave ${earlyLeaveMinutes}m)`;
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) return 'Present';
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) return 'Excused';
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) return 'N/A';
   return status ? String(status) : 'Unmarked';
 }
@@ -219,6 +225,7 @@ function computeStudentAttendanceHealth(matrixRow = {}, classData = {}, orgPolic
       status: record?.status,
       lateMinutes: record?.lateMinutes,
       earlyLeaveMinutes: record?.earlyLeaveMinutes,
+      absenceExcused: record?.absenceExcused,
       scheduledMinutes: record?.scheduledMinutes
     }));
   if (!records.length) return 100;
@@ -239,16 +246,17 @@ function countStudentAttendanceBuckets(matrixRow = {}) {
     if (record?.expectedForSession !== true) return;
     const status = attendanceMatrixMetricsService.normalizeStatus(record?.status);
     const lateMinutes = Math.max(0, Number(record?.lateMinutes) || 0);
+    const absenceExcused = attendanceMatrixMetricsService.isAbsenceExcused(record)
+      || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED;
     if (attendanceMatrixMetricsService.isAbsentLikeStatus(status)) {
-      absenceCount += 1;
+      if (!absenceExcused) absenceCount += 1;
       return;
     }
     if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE || lateMinutes > 0) {
       lateCount += 1;
       return;
     }
-    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT
-      || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) {
+    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) {
       presentCount += 1;
     }
   });

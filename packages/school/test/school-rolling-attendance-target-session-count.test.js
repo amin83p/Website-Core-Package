@@ -16,12 +16,12 @@ const targetPeriod = {
   sessionCountPolicy: 'all_non_na'
 };
 
-function attendance(sessionId, date, status) {
+function attendance(sessionId, date, status, rosterExtra = {}) {
   return {
     sessionId,
     date,
     status: 'completed',
-    roster: [{ personId, attendance: status }]
+    roster: [{ personId, attendance: status, ...rosterExtra }]
   };
 }
 
@@ -35,7 +35,7 @@ test('target session count uses recorded non-N/A attendance after the start date
     attendance('SES_FORCE_NA', '2026-02-24', attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT),
     attendance('SES_APPROVED_LEAVE', '2026-02-25', attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT),
     attendance('SES_ABSENT', '2026-03-01', attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT),
-    attendance('SES_EXCUSED', '2026-03-08', attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED),
+    attendance('SES_EXCUSED', '2026-03-08', attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT, { absenceExcused: true }),
     attendance('SES_LATE', '2026-03-15', attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE),
     attendance('SES_AFTER_TARGET', '2026-03-22', attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT)
   ];

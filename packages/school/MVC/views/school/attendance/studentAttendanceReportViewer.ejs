@@ -562,11 +562,18 @@
         return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener" class="text-decoration-none"><i class="bi bi-paperclip me-1"></i>${name}</a>`;
     }
 
+    function sarAbsenceIsExcused(cell = {}) {
+        const status = String(cell?.status || '').trim();
+        return attendanceFlagIsTrue(cell?.absenceExcused) || status === 'excused';
+    }
+
     function buildStatusLabel(detail = {}) {
         const status = String(detail.status || '').trim();
         if (status === 'present') return 'Present';
         if (status === 'late') return 'Late';
-        if (status === 'excused') return 'Excused absence';
+        if (status === 'excused' || (sarAbsenceIsExcused(detail) && (status === 'absent' || status === 'acf'))) {
+            return status === 'acf' ? 'Excused ACF' : 'Excused absence';
+        }
         if (status === 'absent') return 'Absent';
         if (status === 'acf') return 'Absent Camera Off';
         if (status === 'not_applicable') {
@@ -1051,6 +1058,7 @@
         const parts = [baseText];
         if (late > 0 && attendanceFlagIsTrue(cell?.lateExcused)) parts.push('late arrival excused');
         if (early > 0 && attendanceFlagIsTrue(cell?.earlyLeaveExcused)) parts.push('left early excused');
+        if (sarAbsenceIsExcused(cell)) parts.push('absence excused');
         return parts.join(' - ');
     }
 
@@ -1060,9 +1068,9 @@
         if (!status) return 'Not marked yet';
         if (status === 'present') return 'Present';
         if (status === 'late') return buildTimingExcuseTooltip(cell, 'Late');
-        if (status === 'excused') return 'Excused absence';
+        if (status === 'excused' || (sarAbsenceIsExcused(cell) && status === 'absent')) return 'Excused absence';
         if (status === 'absent') return 'Absent';
-        if (status === 'acf') return 'Absent Camera Off';
+        if (status === 'acf') return sarAbsenceIsExcused(cell) ? 'Excused ACF' : 'Absent Camera Off';
         if (status === 'not_applicable') {
             if (cell.withinEnrollmentWindow === false) return 'N/A - not enrolled for this session';
             if (cell.applicability === 'approved_leave') return 'N/A - approved leave';
@@ -1078,9 +1086,16 @@
         if (!status) return '<i class="bi bi-dash text-muted"></i>';
         if (status === 'present') return '<i class="bi bi-check-circle-fill status-present"></i>';
         if (status === 'late') return buildLateTimingIcon(cell);
-        if (status === 'excused') return buildTimingExcuseIcon('<i class="bi bi-x-circle-fill status-absent"></i>', 'attendance-timing-excuse-full');
+        if (status === 'excused' || (sarAbsenceIsExcused(cell) && status === 'absent')) {
+            return buildTimingExcuseIcon('<i class="bi bi-x-circle-fill status-absent"></i>', 'attendance-timing-excuse-full');
+        }
         if (status === 'absent') return '<i class="bi bi-x-circle-fill status-absent"></i>';
-        if (status === 'acf') return '<i class="bi bi-camera-video-off-fill status-acf"></i>';
+        if (status === 'acf') {
+            if (sarAbsenceIsExcused(cell)) {
+                return buildTimingExcuseIcon('<i class="bi bi-camera-video-off-fill status-acf"></i>', 'attendance-timing-excuse-full');
+            }
+            return '<i class="bi bi-camera-video-off-fill status-acf"></i>';
+        }
         if (status === 'not_applicable') return '<i class="bi bi-dash-circle-fill status-na"></i>';
         return '<i class="bi bi-dash text-muted"></i>';
     }

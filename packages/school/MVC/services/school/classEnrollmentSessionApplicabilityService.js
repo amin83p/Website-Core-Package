@@ -18,7 +18,6 @@ const OPEN_STATUSES = new Set(['active', 'planned', 'to_be_confirmed']);
 const COUNTED_ATTENDANCE_STATUSES = new Set([
   attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT,
   attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE,
-  attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED,
   attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT,
   attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF
 ]);

@@ -13,7 +13,7 @@
   const selectedSkillIds = new Set(Array.isArray(c.skillIds) ? c.skillIds.map((value) => String(value || '').trim().toLowerCase()) : []);
   const initEnrollment = JSON.stringify(c.enrollment || { maxCapacity: 30, students: [] });
   const initEvaluation = JSON.stringify(c.evaluation || { passingScore: 60, weights: { attendance: 10, assignments: 40, midterm: 20, finalExam: 30 } });
-  const defaultEnabledAttendanceStatuses = ['present', 'late', 'excused', 'absent', 'acf', 'not_applicable'];
+  const defaultEnabledAttendanceStatuses = ['present', 'late', 'absent', 'acf', 'not_applicable'];
   const initEnabledAttendanceStatuses = JSON.stringify(
     Array.isArray(c.enabledAttendanceStatuses) && c.enabledAttendanceStatuses.length
       ? c.enabledAttendanceStatuses
@@ -585,16 +585,12 @@
                     <label class="form-check-label" for="attStatus_late">Late</label>
                  </div>
                  <div class="form-check mt-2">
-                    <input class="form-check-input att-status-optional" type="checkbox" id="attStatus_excused" value="excused" data-status="excused">
-                    <label class="form-check-label" for="attStatus_excused">Excused</label>
-                 </div>
-                 <div class="form-check mt-2">
                     <input class="form-check-input att-status-optional" type="checkbox" id="attStatus_acf" value="acf" data-status="acf">
                     <label class="form-check-label" for="attStatus_acf">Absent Camera Off (ACF)</label>
                  </div>
               </div>
            </div>
-           <p class="small text-muted mt-3 mb-0">N/A is also applied automatically by approved leave or session-status rules when needed.</p>
+           <p class="small text-muted mt-3 mb-0">Absence excuse is always available on Absent and ACF in session attendance. N/A is also applied automatically by approved leave or session-status rules when needed.</p>
         </div>
 
         <div class="tab-pane fade" id="tab-pricing">
@@ -1273,8 +1269,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('inp_wAss').value = dEval.weights?.assignments || 40;
     document.getElementById('inp_wMid').value = dEval.weights?.midterm || 20;
 
-    const OPTIONAL_ATTENDANCE_STATUSES = ['late', 'excused', 'acf'];
-    const ALL_ATTENDANCE_STATUSES_ORDERED = ['present', 'late', 'excused', 'absent', 'acf', 'not_applicable'];
+    const OPTIONAL_ATTENDANCE_STATUSES = ['late', 'acf'];
+    const ALL_ATTENDANCE_STATUSES_ORDERED = ['present', 'late', 'absent', 'acf', 'not_applicable'];
     const hidEnabledAttendanceStatuses = document.getElementById('hid_enabledAttendanceStatuses');
 
     function readEnabledAttendanceStatusesFromHidden() {

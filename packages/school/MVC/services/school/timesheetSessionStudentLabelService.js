@@ -15,7 +15,6 @@ const PERIOD_ENROLLMENT_STATUSES = Object.freeze([
 
 const OPTIONAL_BADGE_ATTENDANCE_STATUSES = new Set([
   'absent',
-  'excused',
   'acf',
   'absent_camera_off'
 ]);

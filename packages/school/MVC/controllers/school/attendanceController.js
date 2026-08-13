@@ -409,7 +409,10 @@ function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
         userContactById
     } = context;
 
-    const rosterRecord = matrixWindowService.rosterRecordForSession(rosterMaps, ses, stu.personId);
+    const rosterRecordRaw = matrixWindowService.rosterRecordForSession(rosterMaps, ses, stu.personId);
+    const rosterRecord = rosterRecordRaw
+        ? attendanceMatrixMetricsService.normalizeLegacyAbsenceExcusedRecord(rosterRecordRaw)
+        : null;
     const sessionLocked = ses.locked === true || String(ses.locked) === 'true';
     const applicabilityState = getApplicabilityForSession(stu, ses);
     const enrollmentWindow = getEnrollmentWindowForSession(stu, ses);
@@ -455,6 +458,9 @@ function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
         earlyLeaveExcused: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
             ? false
             : Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRecord).earlyLeaveExcused),
+        absenceExcused: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+            ? false
+            : Boolean(attendanceMatrixMetricsService.normalizeAbsenceExcusedFields(rosterRecord).absenceExcused),
         excuseRef: rosterRecord?.excuseRef || '',
         excuseAttachment: rosterRecord?.excuseAttachment || null,
         teacherNotes: (rosterRecord?.notes) || ses.notes || '',
@@ -475,7 +481,8 @@ function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
             lateMinutes: record.lateMinutes,
             earlyLeaveMinutes: record.earlyLeaveMinutes,
             lateExcused: record.lateExcused,
-            earlyLeaveExcused: record.earlyLeaveExcused
+            earlyLeaveExcused: record.earlyLeaveExcused,
+            absenceExcused: record.absenceExcused
         },
         recordPolicy,
         enabledAttendanceStatuses
@@ -488,6 +495,7 @@ function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
     record.earlyLeaveMinutes = ruled.earlyLeaveMinutes;
     record.lateExcused = ruled.lateExcused;
     record.earlyLeaveExcused = ruled.earlyLeaveExcused;
+    record.absenceExcused = ruled.absenceExcused;
     record.status = attendanceMatrixMetricsService.resolveEffectiveAttendanceStatus(
         record,
         recordPolicy,
@@ -1025,6 +1033,9 @@ async function updateAttendanceRosterCell(req, res) {
         }
         rosterRecord.lateExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.lateExcused);
         rosterRecord.earlyLeaveExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.earlyLeaveExcused);
+        if (req.body?.absenceExcused !== undefined) {
+            rosterRecord.absenceExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.absenceExcused);
+        }
         if (req.body?.excuseRef !== undefined) {
             rosterRecord.excuseRef = String(req.body.excuseRef || '').trim();
         }
@@ -1080,6 +1091,7 @@ async function updateAttendanceRosterCell(req, res) {
                 earlyLeaveMinutes: rosterRecord.earlyLeaveMinutes || 0,
                 lateExcused: Boolean(rosterRecord.lateExcused),
                 earlyLeaveExcused: Boolean(rosterRecord.earlyLeaveExcused),
+                absenceExcused: Boolean(rosterRecord.absenceExcused),
                 excuseRef: rosterRecord.excuseRef || '',
                 excuseAttachment: rosterRecord.excuseAttachment || null,
                 notes: rosterRecord.notes || ''

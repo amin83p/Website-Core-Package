@@ -121,7 +121,7 @@ test('disabled thresholds preserve true absent, ACF, N/A, and unmarked rows', ()
       { attendance: 'excused', lateMinutes: 5, earlyLeaveMinutes: 0 },
       disabledPolicy
     ).attendance,
-    'excused'
+    'late'
   );
   assert.equal(
     applyAttendanceMatrixRosterRules(
