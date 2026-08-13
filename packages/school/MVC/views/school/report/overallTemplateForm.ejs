@@ -65,7 +65,7 @@
       </div>
       <div class="table-responsive">
         <table class="table align-middle mb-0">
-          <thead class="table-light"><tr><th>Alias</th><th>Selected report template</th><th>Version</th><th class="text-end">Order</th><th></th></tr></thead>
+          <thead class="table-light"><tr><th>Alias</th><th>Selected report template</th><th>Requirement</th><th>Version</th><th class="text-end">Order</th><th></th></tr></thead>
           <tbody id="sourceSlotRows"></tbody>
         </table>
       </div>
@@ -210,7 +210,10 @@
   const sourceTemplates = <%- sourceTemplateJson %>;
   const funderOptions = <%- funderOptionsJson %>;
   const initial = <%- templateJson %>;
-  let slots = Array.isArray(initial.sourceSlots) ? initial.sourceSlots.map(row => ({...row})) : [];
+  let slots = Array.isArray(initial.sourceSlots) ? initial.sourceSlots.map(row => ({
+    ...row,
+    requirement: String(row.requirement || 'necessary').toLowerCase() === 'optional' ? 'optional' : 'necessary'
+  })) : [];
   let fields = Array.isArray(initial.schema?.fields) ? initial.schema.fields.map(row => ({...row})) : [];
   let nextSlot = Number(initial.nextSlotNumber || 3);
   let dragFieldIndex = -1;
@@ -424,10 +427,11 @@
   function renderSlots() {
     slotRows.innerHTML = slots.map((slot, index) => {
       const template = byTemplateId.get(String(slot.templateId));
+      const requirement = String(slot.requirement || 'necessary').toLowerCase() === 'optional' ? 'optional' : 'necessary';
       const summary = template
         ? `<strong>${escapeHtml(template.title || template.id)}</strong><div class="small text-muted">${escapeHtml(template.type || 'Report')} &middot; ${escapeHtml(template.id)}</div>`
         : '<span class="text-muted">No report template selected</span>';
-      return `<tr><td><span class="badge bg-primary">${escapeHtml(slot.slotKey)}</span></td><td><div class="input-group input-group-sm"><div class="form-control bg-white overall-picker-summary">${summary}</div><button type="button" class="btn btn-outline-primary js-pick-template" data-index="${index}"><i class="bi bi-search"></i> ${template ? 'Change' : 'Select'}</button></div></td><td>v${Number(slot.templateVersionAtSelection || template?.version || 1)}</td><td class="text-end text-nowrap"><button type="button" class="btn btn-outline-secondary btn-sm js-slot-up" data-index="${index}" ${index === 0 ? 'disabled' : ''} aria-label="Move source up"><i class="bi bi-arrow-up"></i></button> <button type="button" class="btn btn-outline-secondary btn-sm js-slot-down" data-index="${index}" ${index === slots.length - 1 ? 'disabled' : ''} aria-label="Move source down"><i class="bi bi-arrow-down"></i></button></td><td><button type="button" class="btn btn-outline-danger btn-sm js-slot-remove" data-index="${index}" ${slots.length <= 1 ? 'disabled' : ''}>Remove</button></td></tr>`;
+      return `<tr><td><span class="badge bg-primary">${escapeHtml(slot.slotKey)}</span></td><td><div class="input-group input-group-sm"><div class="form-control bg-white overall-picker-summary">${summary}</div><button type="button" class="btn btn-outline-primary js-pick-template" data-index="${index}"><i class="bi bi-search"></i> ${template ? 'Change' : 'Select'}</button></div></td><td><select class="form-select form-select-sm js-slot-requirement" data-index="${index}" aria-label="Source requirement for ${escapeHtml(slot.slotKey)}"><option value="necessary" ${requirement === 'necessary' ? 'selected' : ''}>Necessary</option><option value="optional" ${requirement === 'optional' ? 'selected' : ''}>Optional</option></select></td><td>v${Number(slot.templateVersionAtSelection || template?.version || 1)}</td><td class="text-end text-nowrap"><button type="button" class="btn btn-outline-secondary btn-sm js-slot-up" data-index="${index}" ${index === 0 ? 'disabled' : ''} aria-label="Move source up"><i class="bi bi-arrow-up"></i></button> <button type="button" class="btn btn-outline-secondary btn-sm js-slot-down" data-index="${index}" ${index === slots.length - 1 ? 'disabled' : ''} aria-label="Move source down"><i class="bi bi-arrow-down"></i></button></td><td><button type="button" class="btn btn-outline-danger btn-sm js-slot-remove" data-index="${index}" ${slots.length <= 1 ? 'disabled' : ''}>Remove</button></td></tr>`;
     }).join('');
     renderKeyCatalog();
   }
@@ -470,6 +474,9 @@
       if (!String(slot.templateId || '').trim()) return;
       const template = byTemplateId.get(String(slot.templateId));
       if (!template) return;
+      const slotGroup = String(slot.requirement || 'necessary').toLowerCase() === 'optional'
+        ? `${slot.slotKey} (Optional)`
+        : slot.slotKey;
       const options = template?.keyOptions || (template?.keyCatalog || []).map(key => ({ key, label: key }));
       const seen = new Set();
       options.forEach(option => {
@@ -480,7 +487,7 @@
         if (seen.has(catalogKey)) return;
         seen.add(catalogKey);
         rows.push({
-          group: slot.slotKey,
+          group: slotGroup,
           label: option.label || optionKey,
           origin: option.origin || 'available_value',
           key: catalogKey,
@@ -674,7 +681,7 @@
   }
 
   document.getElementById('btnAddSlot').addEventListener('click', () => {
-    slots.push({slotKey:`T${nextSlot}`,order:slots.length + 1,templateId:'',templateVersionAtSelection:1});
+    slots.push({slotKey:`T${nextSlot}`,order:slots.length + 1,templateId:'',templateVersionAtSelection:1,requirement:'necessary'});
     nextSlot += 1; renderSlots();
   });
   slotRows.addEventListener('click', async event => {
@@ -727,6 +734,14 @@
     if (button.classList.contains('js-slot-up') && index > 0) [slots[index - 1], slots[index]] = [slots[index], slots[index - 1]];
     if (button.classList.contains('js-slot-down') && index < slots.length - 1) [slots[index + 1], slots[index]] = [slots[index], slots[index + 1]];
     slots.forEach((slot, idx) => slot.order = idx + 1); renderSlots();
+  });
+  slotRows.addEventListener('change', event => {
+    const select = event.target.closest('.js-slot-requirement');
+    if (!select) return;
+    const index = Number(select.dataset.index);
+    if (!Number.isInteger(index) || index < 0 || index >= slots.length) return;
+    slots[index].requirement = String(select.value || 'necessary').toLowerCase() === 'optional' ? 'optional' : 'necessary';
+    renderKeyCatalog();
   });
   document.getElementById('btnAddField').addEventListener('click', () => openField(-1));
   document.getElementById('btnAddSection').addEventListener('click', () => openField(-1, 'section'));

@@ -293,6 +293,87 @@ function getSourceTemplateKeyCatalog(template = {}) {
     .sort((left, right) => left.localeCompare(right));
 }
 
+function isOptionalSlot(slot = {}) {
+  return String(slot?.requirement || 'necessary').trim().toLowerCase() === 'optional';
+}
+
+function buildEmptySourceSlotValues(sourceTemplate = {}) {
+  const keys = getSourceTemplateKeyCatalog(sourceTemplate);
+  const placeholders = {};
+  keys.forEach((key) => {
+    placeholders[key] = '';
+  });
+  return buildSourceValuesFromPlaceholders(sourceTemplate, placeholders);
+}
+
+async function resolveSourceSlotSelection({
+  slot,
+  requested,
+  templateOrgId,
+  studentId = '',
+  allowedStatuses,
+  sourceTemplateMap,
+  reqUser,
+  requireStudentMatch = false
+}) {
+  const instanceId = clean(requested?.instanceId || '');
+  const sourceTemplate = sourceTemplateMap?.get(slot.slotKey);
+  if (!instanceId) {
+    if (!isOptionalSlot(slot)) {
+      const studentLabel = requireStudentMatch && studentId ? ` for student ${studentId}` : '';
+      throw new Error(`Select a report for source slot ${slot.slotKey}${studentLabel}.`);
+    }
+    if (!sourceTemplate) {
+      throw new Error(`Source template for optional slot ${slot.slotKey} was not found in the active organization.`);
+    }
+    return {
+      sourceValuesEntry: buildEmptySourceSlotValues(sourceTemplate),
+      normalizedSelection: {
+        slotKey: slot.slotKey,
+        templateId: slot.templateId,
+        templateTitle: clean(sourceTemplate?.title || sourceTemplate?.name || slot.templateId),
+        templateVersion: Number(slot.templateVersionAtSelection || sourceTemplate?.version || 1),
+        instanceId: '',
+        instanceTitle: '',
+        instanceStatus: '',
+        skipped: true,
+        capturedAt: new Date().toISOString()
+      }
+    };
+  }
+
+  const sourceInstance = await schoolDataService.getDataById('reportInstances', instanceId, reqUser);
+  if (!sourceInstance || !idsEqual(sourceInstance.orgId, templateOrgId)) {
+    throw new Error(`Source report for slot ${slot.slotKey} was not found in the active organization.`);
+  }
+  if (!idsEqual(sourceInstance.templateId, slot.templateId)) {
+    throw new Error(`Source report ${sourceInstance.id} does not match template slot ${slot.slotKey}.`);
+  }
+  const instanceStudentId = clean(sourceInstance.studentId || sourceInstance.personId);
+  if (requireStudentMatch && instanceStudentId && studentId && instanceStudentId !== studentId) {
+    throw new Error(`Source report ${sourceInstance.id} does not belong to student ${studentId}.`);
+  }
+  const sourceStatus = String(sourceInstance.status || '').toLowerCase();
+  if (!allowedStatuses.has(sourceStatus)) {
+    throw new Error(`Source report ${sourceInstance.id} has status "${sourceStatus}" which is not allowed for this workspace.`);
+  }
+  const payload = await buildSourcePayload(sourceInstance, reqUser);
+  return {
+    sourceValuesEntry: payload.values,
+    normalizedSelection: {
+      slotKey: slot.slotKey,
+      templateId: sourceInstance.templateId,
+      templateTitle: clean(payload.template?.title || payload.template?.name || sourceInstance.templateId),
+      templateVersion: Number(sourceInstance.templateVersion || 1),
+      instanceId: sourceInstance.id,
+      instanceTitle: clean(sourceInstance.title || sourceInstance.name || sourceInstance.id),
+      instanceStatus: sourceStatus,
+      skipped: false,
+      capturedAt: new Date().toISOString()
+    }
+  };
+}
+
 async function validateTemplateReferences(template, reqUser) {
   const orgId = toPublicId(template?.orgId);
   const sourceTemplates = new Map();
@@ -469,40 +550,26 @@ async function createOverallInstance({
   if (String(template?.status || '').toLowerCase() !== 'active') {
     throw new Error('Only active overall report templates can create reports.');
   }
-  await validateTemplateReferences(template, reqUser);
+  const sourceTemplateMap = await validateTemplateReferences(template, reqUser);
   const selectionsBySlot = new Map(
     (Array.isArray(sourceSelections) ? sourceSelections : []).map((row) => [clean(row?.slotKey).toUpperCase(), row])
   );
   const sourceValues = {};
   const normalizedSelections = [];
   for (const slot of template.sourceSlots || []) {
-    const requested = selectionsBySlot.get(slot.slotKey);
-    if (!requested?.instanceId) throw new Error(`Select a completed report for source slot ${slot.slotKey}.`);
+    const requested = selectionsBySlot.get(slot.slotKey) || {};
     // eslint-disable-next-line no-await-in-loop
-    const sourceInstance = await schoolDataService.getDataById('reportInstances', requested.instanceId, reqUser);
-    if (!sourceInstance || !idsEqual(sourceInstance.orgId, template.orgId)) {
-      throw new Error(`Source report for slot ${slot.slotKey} was not found in the active organization.`);
-    }
-    if (!idsEqual(sourceInstance.templateId, slot.templateId)) {
-      throw new Error(`Source report ${sourceInstance.id} does not match template slot ${slot.slotKey}.`);
-    }
-    const sourceStatus = String(sourceInstance.status || '').toLowerCase();
-    if (!COMPLETED_SOURCE_STATUSES.has(sourceStatus)) {
-      throw new Error(`Source report ${sourceInstance.id} must be submitted or locked.`);
-    }
-    // eslint-disable-next-line no-await-in-loop
-    const payload = await buildSourcePayload(sourceInstance, reqUser);
-    sourceValues[slot.slotKey] = payload.values;
-    normalizedSelections.push({
-      slotKey: slot.slotKey,
-      templateId: sourceInstance.templateId,
-      templateTitle: clean(payload.template?.title || payload.template?.name || sourceInstance.templateId),
-      templateVersion: Number(sourceInstance.templateVersion || 1),
-      instanceId: sourceInstance.id,
-      instanceTitle: clean(sourceInstance.title || sourceInstance.name || sourceInstance.id),
-      instanceStatus: sourceStatus,
-      capturedAt: new Date().toISOString()
+    const resolved = await resolveSourceSlotSelection({
+      slot,
+      requested,
+      templateOrgId: template.orgId,
+      allowedStatuses: COMPLETED_SOURCE_STATUSES,
+      sourceTemplateMap,
+      reqUser,
+      requireStudentMatch: false
     });
+    sourceValues[slot.slotKey] = resolved.sourceValuesEntry;
+    normalizedSelections.push(resolved.normalizedSelection);
   }
   const requestedDocxKey = clean(selectedDocxKey || 'default') || 'default';
   const availableDocx = reportFunderDocxService.buildAvailableDocxOptions(template);
@@ -1084,9 +1151,11 @@ async function loadOverallCreateCandidates({
       templateId: slot.templateId,
       templateTitle: clean(sourceTemplate.title || sourceTemplate.name || slot.templateId),
       templateType: clean(sourceTemplate.type || ''),
-      templateVersion: Number(sourceTemplate.version || slot.templateVersionAtSelection || 1)
+      templateVersion: Number(sourceTemplate.version || slot.templateVersionAtSelection || 1),
+      requirement: String(slot.requirement || 'necessary').toLowerCase()
     };
   });
+  const necessarySlots = slots.filter((slot) => slot.requirement !== 'optional');
   const matching = (Array.isArray(allInstances) ? allInstances : [])
     .filter((row) => idsEqual(row?.orgId, orgId))
     .filter((row) => allowedStatuses.has(String(row.status || '').toLowerCase()))
@@ -1116,7 +1185,10 @@ async function loadOverallCreateCandidates({
   });
 
   const students = [...byStudent.values()]
-    .filter((row) => slots.some((slot) => (row.slots[slot.slotKey] || []).length > 0))
+    .filter((row) => {
+      const requiredSlots = necessarySlots.length ? necessarySlots : slots;
+      return requiredSlots.every((slot) => (row.slots[slot.slotKey] || []).length > 0);
+    })
     .sort((a, b) => String(a.studentName || a.studentId).localeCompare(String(b.studentName || b.studentId)));
 
   return {
@@ -1139,6 +1211,7 @@ async function resolveStudentEntrySelections({
   template,
   entry,
   allowedStatuses,
+  sourceTemplateMap,
   reqUser
 }) {
   const selectionsBySlot = new Map(
@@ -1148,39 +1221,20 @@ async function resolveStudentEntrySelections({
   const sourceValues = {};
   const normalizedSelections = [];
   for (const slot of template.sourceSlots || []) {
-    const requested = selectionsBySlot.get(slot.slotKey);
-    if (!requested?.instanceId) {
-      throw new Error(`Select a report for source slot ${slot.slotKey} for student ${entry?.studentId || ''}.`);
-    }
+    const requested = selectionsBySlot.get(slot.slotKey) || {};
     // eslint-disable-next-line no-await-in-loop
-    const sourceInstance = await schoolDataService.getDataById('reportInstances', requested.instanceId, reqUser);
-    if (!sourceInstance || !idsEqual(sourceInstance.orgId, template.orgId)) {
-      throw new Error(`Source report for slot ${slot.slotKey} was not found in the active organization.`);
-    }
-    if (!idsEqual(sourceInstance.templateId, slot.templateId)) {
-      throw new Error(`Source report ${sourceInstance.id} does not match template slot ${slot.slotKey}.`);
-    }
-    const studentId = clean(sourceInstance.studentId || sourceInstance.personId);
-    if (studentId && clean(entry.studentId) && studentId !== clean(entry.studentId)) {
-      throw new Error(`Source report ${sourceInstance.id} does not belong to student ${entry.studentId}.`);
-    }
-    const sourceStatus = String(sourceInstance.status || '').toLowerCase();
-    if (!allowedStatuses.has(sourceStatus)) {
-      throw new Error(`Source report ${sourceInstance.id} has status "${sourceStatus}" which is not allowed for this workspace.`);
-    }
-    // eslint-disable-next-line no-await-in-loop
-    const payload = await buildSourcePayload(sourceInstance, reqUser);
-    sourceValues[slot.slotKey] = payload.values;
-    normalizedSelections.push({
-      slotKey: slot.slotKey,
-      templateId: sourceInstance.templateId,
-      templateTitle: clean(payload.template?.title || payload.template?.name || sourceInstance.templateId),
-      templateVersion: Number(sourceInstance.templateVersion || 1),
-      instanceId: sourceInstance.id,
-      instanceTitle: clean(sourceInstance.title || sourceInstance.name || sourceInstance.id),
-      instanceStatus: sourceStatus,
-      capturedAt: new Date().toISOString()
+    const resolved = await resolveSourceSlotSelection({
+      slot,
+      requested,
+      templateOrgId: template.orgId,
+      studentId: clean(entry?.studentId),
+      allowedStatuses,
+      sourceTemplateMap,
+      reqUser,
+      requireStudentMatch: true
     });
+    sourceValues[slot.slotKey] = resolved.sourceValuesEntry;
+    normalizedSelections.push(resolved.normalizedSelection);
   }
   const calculated = calculateAnswers({
     template,
@@ -1253,6 +1307,7 @@ async function buildNormalizedStudentEntries({
   allowedStatuses,
   reqUser
 }) {
+  const sourceTemplateMap = await validateTemplateReferences(template, reqUser);
   const normalized = [];
   for (const entry of (Array.isArray(studentEntries) ? studentEntries : [])) {
     if (entry?.included === false) continue;
@@ -1261,10 +1316,11 @@ async function buildNormalizedStudentEntries({
       template,
       entry,
       allowedStatuses,
+      sourceTemplateMap,
       reqUser
     }));
   }
-  if (!normalized.length) throw new Error('Select at least one student with complete source reports.');
+  if (!normalized.length) throw new Error('Select at least one student with complete necessary source reports.');
   return normalized;
 }
 

@@ -345,15 +345,27 @@
     }));
   }
 
+  function isOptionalSlot(slot) {
+    return String(slot?.requirement || 'necessary').toLowerCase() === 'optional';
+  }
+
   function rowComplete(row) {
-    return sourceSlots.every((slot) => Boolean(row.selectedBySlot?.[slot.slotKey]));
+    return sourceSlots.every((slot) => {
+      if (isOptionalSlot(slot)) return true;
+      return Boolean(row.selectedBySlot?.[slot.slotKey]);
+    });
   }
 
   function renderTable() {
     const head = document.getElementById('workspaceStudentsHead');
     const body = document.getElementById('workspaceStudentsBody');
     if (!head || !body) return;
-    const slotHeaders = sourceSlots.map((slot) => `<th>${escapeHtml(slot.slotKey)}<div class="small fw-normal text-muted">${escapeHtml(slot.templateTitle || '')}</div></th>`).join('');
+    const slotHeaders = sourceSlots.map((slot) => {
+      const optionalBadge = isOptionalSlot(slot)
+        ? '<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1">Optional</span>'
+        : '';
+      return `<th>${escapeHtml(slot.slotKey)}${optionalBadge}<div class="small fw-normal text-muted">${escapeHtml(slot.templateTitle || '')}</div></th>`;
+    }).join('');
     head.innerHTML = `<tr>
       <th class="ps-3">Student</th>
       ${slotHeaders}
@@ -369,7 +381,10 @@
       const slotCells = sourceSlots.map((slot) => {
         const options = row.slots?.[slot.slotKey] || [];
         if (!options.length) {
-          return '<td><span class="text-muted small">No matches</span></td>';
+          const emptyLabel = isOptionalSlot(slot)
+            ? 'Optional — no report available'
+            : 'No matches';
+          return `<td><span class="text-muted small">${escapeHtml(emptyLabel)}</span></td>`;
         }
         return `<td>${options.map((item) => {
           const checked = String(row.selectedBySlot?.[slot.slotKey] || '') === String(item.id);

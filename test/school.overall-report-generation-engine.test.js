@@ -320,7 +320,7 @@ test('generateOverallFromSourceBatch filters students by studentIds', async () =
   });
 });
 
-test('generateOverallFromSourceBatch rejects missing slot template', async () => {
+test('generateOverallFromSourceBatch rejects missing necessary slot template', async () => {
   const sourceBatch = {
     sourceRuns: [{
       slotKey: 'T1',
@@ -349,6 +349,50 @@ test('generateOverallFromSourceBatch rejects missing slot template', async () =>
         }, reqUser),
         /Missing source batch for slot T2/
       );
+    });
+  });
+});
+
+test('generateOverallFromSourceBatch accepts missing optional source batch slot', async () => {
+  const optionalOverallTemplate = {
+    ...overallTemplate,
+    sourceSlots: [
+      { slotKey: 'T1', order: 1, templateId: 'SRC-1', templateVersionAtSelection: 1, requirement: 'necessary' },
+      { slotKey: 'T2', order: 2, templateId: 'SRC-2', templateVersionAtSelection: 1, requirement: 'optional' }
+    ]
+  };
+  const sourceBatch = {
+    sourceRuns: [{
+      slotKey: 'T1',
+      templateId: 'SRC-1',
+      engineResult: mockEngineResultForStudent('STU-1', 'Alice', 80, 0)
+    }],
+    students: [{ studentId: 'STU-1', studentName: 'Alice' }],
+    warnings: []
+  };
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'overallReportTemplates') return optionalOverallTemplate;
+      if (entityType === 'reportTemplates' && id === 'SRC-1') return reportTemplateT1;
+      if (entityType === 'reportTemplates' && id === 'SRC-2') return reportTemplateT2;
+      return null;
+    }
+  }, async () => {
+    await withPatched(overallReportService, {
+      validateTemplateReferences: async () => new Map([
+        ['T1', reportTemplateT1],
+        ['T2', reportTemplateT2]
+      ])
+    }, async () => {
+      const result = await overallReportGenerationEngineService.generateOverallFromSourceBatch({
+        overallTemplateId: 'OVERALL-1',
+        sourceBatch,
+        format: 'json'
+      }, reqUser);
+      assert.equal(result.students.length, 1);
+      assert.equal(result.students[0].answers.average_score, 80);
+      assert.equal(result.students[0].sourceValues.T2.score, '');
     });
   });
 });
@@ -495,4 +539,26 @@ test('generateOverallPipeline orchestrates source batch and overall json output'
       });
     });
   });
+});
+
+test('calculateAnswers averages only necessary source values when optional slot is empty', () => {
+  const template = {
+    ...overallTemplate,
+    sourceSlots: [
+      { slotKey: 'T1', order: 1, templateId: 'SRC-1', templateVersionAtSelection: 1, requirement: 'necessary' },
+      { slotKey: 'T2', order: 2, templateId: 'SRC-2', templateVersionAtSelection: 1, requirement: 'optional' }
+    ]
+  };
+  const calculated = overallReportService.calculateAnswers({
+    template,
+    sourceValues: {
+      T1: { score: '80', comments: 'Good' },
+      T2: { score: '', comments: '' }
+    },
+    currentAnswers: {},
+    derivedOverrides: {},
+    initialize: true
+  });
+  assert.equal(calculated.answers.average_score, 80);
+  assert.equal(calculated.diagnostics.length, 0);
 });

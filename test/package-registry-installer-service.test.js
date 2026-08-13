@@ -475,6 +475,33 @@ test('installer disable action deactivates package-owned entities and clears upl
   assert.equal(repos.accessRepo.getRows().find((row) => row.id === 'ACC1001').active, false);
 });
 
+test('installer disable action deactivates unmanaged manifest-linked sections', async () => {
+  const { deps, repos } = createInstallerDeps({
+    sections: [{
+      id: 'SEC2001',
+      name: 'IELTS',
+      category: 'IELTS',
+      active: true,
+      mainDashboardDisplay: true
+    }]
+  });
+
+  const summary = await packageRegistryInstallerService.removePackageRegistryDeclarations({
+    backendMode: 'json',
+    packageId: 'ielts',
+    manifest: {
+      id: 'ielts',
+      name: 'IELTS',
+      version: '0.1.0',
+      mountPath: '/ielts',
+      sections: [{ name: 'IELTS', category: 'IELTS', operations: [] }]
+    }
+  }, { ...deps, backendMode: 'json', action: 'disable' });
+
+  assert.equal(summary.entities.sections.deactivated, 1);
+  assert.equal(repos.sectionRepo.getRows().find((row) => row.id === 'SEC2001').active, false);
+});
+
 test('installer remove action deletes package-owned entities and package upload definitions', async () => {
   const { deps, repos, uploadMocks } = createInstallerDeps({
     operations: [{

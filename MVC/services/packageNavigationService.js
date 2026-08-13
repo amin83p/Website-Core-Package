@@ -454,6 +454,48 @@ function filterMenuItemsAgainstDisabledPackages(items = []) {
   return removeDisabledMountEntries(items, cache.disabledMountPaths);
 }
 
+function normalizeSectionPackageToken(value = '') {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
+}
+
+const SECTION_NAME_TO_PACKAGE_ID = Object.freeze({
+  ielts: 'ielts',
+  benchpath: 'benchpath',
+  credit_loans: 'credit',
+  pte: 'pte',
+  school: 'school'
+});
+
+function isSectionFromDisabledPackage(section = {}) {
+  if (!section || typeof section !== 'object') return false;
+  if (cache.disabledPackageIds.size === 0) return false;
+
+  const ownerPackageId = normalizePackageId(
+    section?.packageId || section?.package?.packageId || section?.package?.id || ''
+  );
+  if (ownerPackageId && cache.disabledPackageIds.has(ownerPackageId)) return true;
+
+  const homeURL = cleanMenuHref(section?.homeURL || '');
+  for (const mount of cache.disabledMountPaths) {
+    const normalizedMount = normalizeMountPath(mount);
+    if (!normalizedMount) continue;
+    if (homeURL === normalizedMount || homeURL.startsWith(`${normalizedMount}/`)) return true;
+  }
+
+  const nameToken = normalizeSectionPackageToken(section?.name);
+  const categoryToken = normalizeSectionPackageToken(section?.category);
+  const nameAlias = SECTION_NAME_TO_PACKAGE_ID[nameToken];
+  const categoryAlias = SECTION_NAME_TO_PACKAGE_ID[categoryToken];
+  if (nameAlias && cache.disabledPackageIds.has(nameAlias)) return true;
+  if (categoryAlias && cache.disabledPackageIds.has(categoryAlias)) return true;
+
+  return false;
+}
+
+function filterSectionsExcludingDisabledPackages(sections = []) {
+  return (Array.isArray(sections) ? sections : []).filter((section) => !isSectionFromDisabledPackage(section));
+}
+
 function resetCache() {
   cache = {
     refreshedAt: 0,
@@ -478,5 +520,7 @@ module.exports = {
   getDashboardEntries,
   getPrimaryDashboardHref,
   filterMenuItemsAgainstDisabledPackages,
+  isSectionFromDisabledPackage,
+  filterSectionsExcludingDisabledPackages,
   resetCache
 };

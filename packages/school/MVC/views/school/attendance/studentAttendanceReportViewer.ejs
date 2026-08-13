@@ -1410,26 +1410,34 @@
         const student = (sarExportPlan?.students || []).find((row) => String(row.personId || '').trim() === String(studentId || '').trim());
         if (!student?.overall?.defined) return { eligible: false, reason: 'No overall template configured.' };
 
+        const slotDefs = Array.isArray(student.overall?.slots) ? student.overall.slots : [];
+        const necessarySlots = slotDefs.filter((slot) => String(slot.requirement || 'necessary').toLowerCase() !== 'optional');
         const slotCount = Number(student.overall.slotCount) || 0;
-        if (!slotCount) return { eligible: false, reason: 'Overall template has no source slots.' };
+        if (!slotDefs.length && !slotCount) return { eligible: false, reason: 'Overall template has no source slots.' };
+        if (!necessarySlots.length && slotDefs.length) return { eligible: true, reason: '' };
 
         const panel = getSarExportRoot();
         if (!panel) return { eligible: false, reason: 'Export modal not ready.' };
 
-        for (let index = 0; index < slotCount; index += 1) {
+        const slotsToCheck = necessarySlots.length
+            ? necessarySlots
+            : Array.from({ length: slotCount }, (_, index) => ({ slotIndex: index, requirement: 'necessary' }));
+
+        for (const slotDef of slotsToCheck) {
+            const index = Number(slotDef.slotIndex);
             const classRow = (student.classes || []).find((row) => Number(row.slotIndex) === index);
             if (!classRow) {
-                return { eligible: false, reason: `Missing class for slot ${index + 1}.` };
+                return { eligible: false, reason: `Missing class for necessary slot ${slotDef.slotKey || index + 1}.` };
             }
             const checkbox = panel.querySelector(
                 `.js-sar-export-check[data-sar-export-type="class"][data-student-id="${CSS.escape(String(student.personId))}"][data-class-id="${CSS.escape(String(classRow.classId))}"]`
             );
             const checked = checkbox ? checkbox.checked : true;
             if (!checked) {
-                return { eligible: false, reason: 'Select all required class reports for the overall template.' };
+                return { eligible: false, reason: 'Select all necessary class reports for the overall template.' };
             }
             if (!classRow.exportable) {
-                return { eligible: false, reason: classRow.warning || 'A required class report is not exportable.' };
+                return { eligible: false, reason: classRow.warning || 'A necessary class report is not exportable.' };
             }
         }
         return { eligible: true, reason: '' };

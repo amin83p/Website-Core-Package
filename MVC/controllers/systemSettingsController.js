@@ -12,6 +12,7 @@ const dataBackendRuntimeService = require('../services/dataBackendRuntimeService
 const { registerCoreEntityQueryExecutors } = require('../models/queryExecutorBootstrap');
 const packageQueryExecutorService = require('../services/packageQueryExecutorService');
 const systemSettingsPackageManagerService = require('../services/systemSettingsPackageManagerService');
+const applicationRestartService = require('../services/applicationRestartService');
 const systemSettingsPackageBuilderService = require('../services/systemSettingsPackageBuilderService');
 const coreBootstrapBaselineService = require('../services/coreBootstrapBaselineService');
 const coreResetRebootstrapService = require('../services/coreResetRebootstrapService');
@@ -1246,6 +1247,7 @@ exports.showPackageManagerPage = async (req, res) => {
       localPackageModeState,
       organizations: Array.isArray(organizations) ? organizations : [],
       activeOrgId,
+      inAppApplicationRestartAllowed: applicationRestartService.evaluateRestartPermission(process.env).allowed,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -1600,6 +1602,54 @@ exports.syncPackageFromManager = async (req, res) => {
     });
   } catch (error) {
     return sendPackageManagerError(res, error, 'Package sync failed.');
+  }
+};
+
+exports.reloadPackageRuntimeFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const report = await systemSettingsPackageManagerService.reloadPackageRuntime(
+      packageId,
+      buildPackageManagerOptions(req)
+    );
+    removeStartupFailureForPackage(req.app, report?.packageId || packageId, report);
+    return res.json({
+      status: 'success',
+      message: `Package "${report.packageId}" runtime reload completed.`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Package runtime reload failed.');
+  }
+};
+
+exports.restartApplicationFromManager = async (req, res) => {
+  try {
+    const permission = applicationRestartService.evaluateRestartPermission(process.env);
+    if (!permission.allowed) {
+      return res.status(403).json({
+        status: 'error',
+        code: 'APPLICATION_RESTART_DISABLED',
+        message: permission.message
+      });
+    }
+
+    const httpServer = req.app?.locals?.httpServer || null;
+    res.json({
+      status: 'success',
+      message: 'Application restart scheduled. The connection may drop while the host starts a new process.',
+      restartRecommended: false,
+      report: {
+        action: 'restart-application',
+        scheduled: true,
+        httpServerAvailable: Boolean(httpServer)
+      }
+    });
+
+    applicationRestartService.scheduleGracefulRestart({ httpServer });
+    return undefined;
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Application restart failed.');
   }
 };
 

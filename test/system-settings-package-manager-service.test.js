@@ -178,6 +178,39 @@ function createBaseDeps() {
       },
       async readManifestFile() {
         return createManifest();
+      },
+      async loadEnabledPackages(options = {}) {
+        const packageIds = Array.isArray(options.packageIds)
+          ? options.packageIds
+          : (options.packageId ? [options.packageId] : []);
+        const loaded = packageIds.map((packageId) => ({
+          packageId: String(packageId || '').toLowerCase(),
+          mountPath: `/${String(packageId || '').toLowerCase()}`
+        }));
+        return {
+          loaded,
+          failed: [],
+          loadedCount: loaded.length,
+          failedCount: 0
+        };
+      },
+      mergePackageLoadSummary(baseSummary = {}, latestSummary = {}) {
+        const loaded = [
+          ...(Array.isArray(baseSummary.loaded) ? baseSummary.loaded : []),
+          ...(Array.isArray(latestSummary.loaded) ? latestSummary.loaded : [])
+        ];
+        const failed = [
+          ...(Array.isArray(baseSummary.failed) ? baseSummary.failed : []),
+          ...(Array.isArray(latestSummary.failed) ? latestSummary.failed : [])
+        ];
+        return {
+          ...baseSummary,
+          ...latestSummary,
+          loaded,
+          failed,
+          loadedCount: loaded.length,
+          failedCount: failed.length
+        };
       }
     },
     packageNavigationService: {
@@ -736,6 +769,69 @@ test('pausePackage is idempotent and returns restart recommendation', async () =
   assert.equal(second.action, 'pause');
   assert.equal(second.registry.enabled, false);
   assert.equal(setup.declarationCalls().some((row) => row.type === 'remove:disable'), true);
+});
+
+test('reloadPackageRuntime reloads enabled package runtime hooks and loader summary', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: {
+      packageName: 'PTE',
+      manifestPath: 'packages/pte/package.manifest.json',
+      mountPath: '/pte'
+    }
+  });
+
+  const app = {
+    use() {},
+    get() {},
+    set() {},
+    locals: {
+      packageLoadSummary: { loaded: [], failed: [] },
+      packageRuntimeRouter: { use() {} }
+    }
+  };
+
+  const report = await service.reloadPackageRuntime('pte', {
+    backendMode: 'json',
+    app
+  });
+
+  assert.equal(report.action, 'reload-runtime');
+  assert.equal(report.packageId, 'pte');
+  assert.equal(report.restartRecommended, false);
+  assert.equal(Array.isArray(report.loaderSummary?.loaded), true);
+  assert.equal(report.loaderSummary.loaded.length, 1);
+  assert.equal(setup.declarationCalls().some((row) => row.type === 'install'), true);
+  assert.equal(setup.navigationRefreshCount() >= 1, true);
+});
+
+test('reloadPackageRuntime rejects disabled packages', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: false,
+    installStatus: 'disabled',
+    metadata: {
+      packageName: 'PTE',
+      manifestPath: 'packages/pte/package.manifest.json',
+      mountPath: '/pte'
+    }
+  });
+
+  await assert.rejects(
+    () => service.reloadPackageRuntime('pte', { backendMode: 'json' }),
+    (error) => {
+      assert.equal(error?.code, 'PACKAGE_NOT_ENABLED');
+      return true;
+    }
+  );
 });
 
 test('removePackage is idempotent and refreshes navigation', async () => {

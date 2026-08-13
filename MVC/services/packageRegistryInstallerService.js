@@ -542,9 +542,15 @@ function buildUninstallSummaryMessage(action, category, reason) {
   return reason || 'Deactivated per uninstall action.';
 }
 
-function summarizeUninstallOwnershipResult(category, existing = {}, summary, identity = '') {
+function summarizeUninstallOwnershipResult(category, existing = {}, summary, identity = '', options = {}) {
   const owner = getOwnershipFromRow(existing);
+  const action = normalizeUninstallAction(options?.action);
+  const allowUnmanagedSectionDisable = action === 'disable' && category === 'sections';
+
   if (!owner.packageId) {
+    if (allowUnmanagedSectionDisable) {
+      return null;
+    }
     markResult(summary, category, {
       status: 'skipped',
       key: identity,
@@ -750,7 +756,7 @@ async function removeOrDisableEntityDeclarations(manifest, summary, deps, option
           continue;
         }
 
-        const blocked = summarizeUninstallOwnershipResult(category, existing, summary, identity);
+        const blocked = summarizeUninstallOwnershipResult(category, existing, summary, identity, options);
         if (blocked) continue;
 
         if (action === 'remove' && typeof entityDef.remove === 'function') {

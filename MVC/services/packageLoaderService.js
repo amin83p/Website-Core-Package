@@ -457,11 +457,55 @@ async function loadEnabledPackages(options = {}) {
   return summary;
 }
 
+function mergePackageLoadSummary(baseSummary = {}, latestSummary = {}) {
+  const existingLoaded = Array.isArray(baseSummary?.loaded) ? baseSummary.loaded : [];
+  const latestLoaded = Array.isArray(latestSummary?.loaded) ? latestSummary.loaded : [];
+  const loadedMap = new Map();
+  existingLoaded.forEach((row) => {
+    const packageId = normalizePackageId(row?.packageId || '');
+    if (!packageId) return;
+    loadedMap.set(packageId, row);
+  });
+  latestLoaded.forEach((row) => {
+    const packageId = normalizePackageId(row?.packageId || '');
+    if (!packageId) return;
+    loadedMap.set(packageId, row);
+  });
+
+  const loadedIds = new Set(Array.from(loadedMap.keys()));
+  const existingFailed = Array.isArray(baseSummary?.failed) ? baseSummary.failed : [];
+  const latestFailed = Array.isArray(latestSummary?.failed) ? latestSummary.failed : [];
+  const failedMap = new Map();
+
+  existingFailed.forEach((row) => {
+    const packageId = normalizePackageId(row?.packageId || '');
+    if (!packageId || loadedIds.has(packageId)) return;
+    failedMap.set(packageId, row);
+  });
+  latestFailed.forEach((row) => {
+    const packageId = normalizePackageId(row?.packageId || '');
+    if (!packageId || loadedIds.has(packageId)) return;
+    failedMap.set(packageId, row);
+  });
+
+  const loaded = Array.from(loadedMap.values());
+  const failed = Array.from(failedMap.values());
+  return {
+    ...baseSummary,
+    finishedAt: new Date().toISOString(),
+    loaded,
+    failed,
+    loadedCount: loaded.length,
+    failedCount: failed.length
+  };
+}
+
 module.exports = {
   DEFAULT_MANIFEST_FILES,
   createLoaderHooks,
   resolveManifestCandidates,
   resolveManifestPath,
   readManifestFile,
-  loadEnabledPackages
+  loadEnabledPackages,
+  mergePackageLoadSummary
 };

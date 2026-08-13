@@ -4,6 +4,7 @@ const accessService = require('../services/security/accessControl');
 const firstRunBootstrapService = require('../services/firstRunBootstrapService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const adminCheckersService = require('../services/adminChekersService');
+const packageNavigationService = require('../services/packageNavigationService');
 const { resolveSectionDisplayTitle } = require('../utils/sectionDisplay');
 
 const DASHBOARD_ALL_SECTIONS_CACHE_TTL_MS = 60 * 1000;
@@ -321,6 +322,7 @@ async function showDashboard(req, res) {
     ]);
     // 2. Filter Sections
     let accessibleSections = await filterMainDashboardSections(req.user, allSections);
+    accessibleSections = packageNavigationService.filterSectionsExcludingDisabledPackages(accessibleSections);
 
     const singleSectionRedirect = resolveSingleMainDashboardRedirect(accessibleSections);
     if (singleSectionRedirect) return res.redirect(302, singleSectionRedirect);

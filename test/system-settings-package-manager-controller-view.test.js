@@ -737,3 +737,52 @@ test('local package sync EJS compiles and includes sync actions', () => {
   assert.match(html, /\/systemSettings\/packages\/local-sync\/scan/);
   assert.match(html, /\/systemSettings\/packages\/local-sync\/sync/);
 });
+
+test('restartApplicationFromManager returns 403 when env gate is disabled', async () => {
+  const originalFlag = process.env.ALLOW_IN_APP_APPLICATION_RESTART;
+  delete process.env.ALLOW_IN_APP_APPLICATION_RESTART;
+  const res = makeRenderResponse();
+
+  try {
+    await systemSettingsController.restartApplicationFromManager(
+      {
+        user: { id: 'USER_1' },
+        app: { locals: { httpServer: { close() {} } } }
+      },
+      res
+    );
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.jsonPayload?.code, 'APPLICATION_RESTART_DISABLED');
+  } finally {
+    if (originalFlag === undefined) delete process.env.ALLOW_IN_APP_APPLICATION_RESTART;
+    else process.env.ALLOW_IN_APP_APPLICATION_RESTART = originalFlag;
+  }
+});
+
+test('package manager EJS includes runtime controls and reload action', () => {
+  const viewPath = path.join(process.cwd(), 'MVC', 'views', 'systemSettings', 'packageManagerSettings.ejs');
+  const template = fs.readFileSync(viewPath, 'utf8');
+  const render = ejs.compile(template, { filename: viewPath });
+  const html = render({
+    title: 'Package Manager',
+    runtimeBackend: { mode: 'json', mongo: { ready: false } },
+    installedPackages: [{ packageId: 'pte', version: '1.0.0', enabled: true, installStatus: 'enabled' }],
+    localManifestOptions: [],
+    localManifestWarnings: [],
+    actionStateId: 'STATE_RUNTIME_UI',
+    zipTrustedKeysConfigured: false,
+    zipTrustedKeysCount: 0,
+    localPackageDevModeEnabled: false,
+    inAppApplicationRestartAllowed: true,
+    activeMode: 'json',
+    storageRoot: '',
+    storageRootSource: '',
+    storageRootWarnings: [],
+    startupWarnings: []
+  });
+
+  assert.match(html, /Runtime Controls/);
+  assert.match(html, /Restart application/);
+  assert.match(html, /Reload runtime/);
+  assert.match(html, /reload-runtime/);
+});

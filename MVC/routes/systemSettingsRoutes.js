@@ -371,6 +371,26 @@ router.post('/packages/:packageId/sync',
           ),
           adminApproval,
           ctrl.syncPackageFromManager);
+router.post('/packages/:packageId/reload-runtime',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.reloadPackageRuntimeFromManager);
+router.post('/application/restart',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.restartApplicationFromManager);
 router.get('/packages/:packageId/transactions',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),

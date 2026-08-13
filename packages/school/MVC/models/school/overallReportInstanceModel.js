@@ -58,27 +58,58 @@ function sanitizeDerivedOverrides(value) {
   return derivedOverrides;
 }
 
-function sanitizeSourceSelection(row) {
+function isOptionalSnapshotSlot(slot) {
+  return String(slot?.requirement || 'necessary').trim().toLowerCase() === 'optional';
+}
+
+function sanitizeSourceSelection(row, { snapshotSlot = null } = {}) {
   const slotKey = clean(row?.slotKey, 30).toUpperCase();
   if (!SLOT_KEY_PATTERN.test(slotKey)) {
     throw new Error(`Invalid overall report source slot "${slotKey}".`);
+  }
+  const skipped = row?.skipped === true || String(row?.skipped || '').trim().toLowerCase() === 'true';
+  const instanceIdRaw = clean(row?.instanceId, 100);
+  const optionalSlot = isOptionalSnapshotSlot(snapshotSlot);
+  if (!instanceIdRaw) {
+    if (skipped && optionalSlot) {
+      return {
+        slotKey,
+        templateId: cleanId(row?.templateId),
+        templateTitle: clean(row?.templateTitle, 240),
+        templateVersion: Math.max(1, Number(row?.templateVersion || 1) || 1),
+        instanceId: '',
+        instanceTitle: '',
+        instanceStatus: '',
+        skipped: true,
+        capturedAt: clean(row?.capturedAt, 60) || new Date().toISOString()
+      };
+    }
+    throw new Error(`Overall report source slot "${slotKey}" requires a source report instance.`);
   }
   return {
     slotKey,
     templateId: cleanId(row?.templateId),
     templateTitle: clean(row?.templateTitle, 240),
     templateVersion: Math.max(1, Number(row?.templateVersion || 1) || 1),
-    instanceId: cleanId(row?.instanceId),
+    instanceId: cleanId(instanceIdRaw),
     instanceTitle: clean(row?.instanceTitle, 240),
     instanceStatus: clean(row?.instanceStatus, 20),
+    skipped: false,
     capturedAt: clean(row?.capturedAt, 60) || new Date().toISOString()
   };
 }
 
 function sanitizeSourceSelections(rows, snapshotSlots = []) {
   const seenSlots = new Set();
+  const snapshotSlotMap = new Map(
+    (Array.isArray(snapshotSlots) ? snapshotSlots : []).map((slot) => [
+      clean(slot?.slotKey, 30).toUpperCase(),
+      slot
+    ])
+  );
   const sourceSelections = (Array.isArray(rows) ? rows : []).map((row) => {
-    const selection = sanitizeSourceSelection(row);
+    const slotKey = clean(row?.slotKey, 30).toUpperCase();
+    const selection = sanitizeSourceSelection(row, { snapshotSlot: snapshotSlotMap.get(slotKey) });
     if (seenSlots.has(selection.slotKey)) {
       throw new Error(`Invalid or duplicate overall report source slot "${selection.slotKey}".`);
     }
@@ -89,14 +120,22 @@ function sanitizeSourceSelections(rows, snapshotSlots = []) {
     throw new Error('Overall reports require at least one source report instance.');
   }
   (Array.isArray(snapshotSlots) ? snapshotSlots : []).forEach((slot) => {
-    const selection = sourceSelections.find((row) => row.slotKey === clean(slot?.slotKey, 30).toUpperCase());
+    const slotKey = clean(slot?.slotKey, 30).toUpperCase();
+    const selection = sourceSelections.find((row) => row.slotKey === slotKey);
     if (!selection || !idsEqual(selection.templateId, slot?.templateId)) {
       throw new Error(`Overall report source selection does not match snapshot slot ${slot?.slotKey || ''}.`);
+    }
+    if (!selection.instanceId && !selection.skipped) {
+      throw new Error(`Overall report source slot "${slotKey}" requires a source report instance.`);
+    }
+    if (!selection.instanceId && selection.skipped && !isOptionalSnapshotSlot(slot)) {
+      throw new Error(`Overall report source slot "${slotKey}" cannot be skipped because it is necessary.`);
     }
   });
   const usedInstanceIds = new Set();
   sourceSelections.forEach((selection) => {
     const key = String(selection.instanceId || '');
+    if (!key) return;
     if (usedInstanceIds.has(key)) {
       throw new Error(`Source report ${selection.instanceId} cannot be used in more than one slot.`);
     }

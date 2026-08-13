@@ -190,6 +190,51 @@ test('buildOverallExportBlock is not eligible when a slot class is not exportabl
   assert.ok(block.missingSlots.length > 0);
 });
 
+test('buildOverallExportBlock is eligible when only necessary slots are satisfied', () => {
+  const overallTemplate = {
+    title: 'Overall Attendance',
+    sourceSlots: [
+      { slotKey: 'T1', order: 1, requirement: 'necessary' },
+      { slotKey: 'T2', order: 2, requirement: 'optional' }
+    ]
+  };
+  const classRows = [
+    { slotIndex: 0, exportable: true, warning: '' }
+  ];
+  const block = studentAttendanceReportGenerationService.buildOverallExportBlock(
+    { personId: 'PERSON-1' },
+    { overallReportTemplateId: 'OVR-1' },
+    overallTemplate,
+    classRows
+  );
+  assert.equal(block.eligible, true);
+  assert.equal(block.necessarySlotCount, 1);
+  assert.equal(block.missingSlots.length, 0);
+});
+
+test('buildSourceRunsForStudent skips optional slots without classes', () => {
+  const student = {
+    personId: 'PERSON-1',
+    classes: [{ classId: 'C1', className: 'Alpha', teacherId: 'TEACH-1' }]
+  };
+  const overallTemplate = {
+    sourceSlots: [
+      { slotKey: 'T1', order: 1, templateId: 'RPT-1', requirement: 'necessary' },
+      { slotKey: 'T2', order: 2, templateId: 'RPT-1', requirement: 'optional' }
+    ]
+  };
+  const { sourceRuns, warnings } = studentAttendanceReportGenerationService.buildSourceRunsForStudent({
+    student,
+    policy: { reportTemplateId: 'RPT-1' },
+    overallTemplate,
+    startDate: '2026-01-01',
+    endDate: '2026-01-31'
+  });
+  assert.equal(sourceRuns.length, 1);
+  assert.equal(warnings.length, 0);
+  assert.equal(sourceRuns[0].slotKey, 'T1');
+});
+
 test('buildSourceRunsForStudent respects selectedClassIds for overall slots', () => {
   const student = {
     personId: 'PERSON-1',

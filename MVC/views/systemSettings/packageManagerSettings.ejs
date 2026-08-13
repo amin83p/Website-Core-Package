@@ -83,6 +83,55 @@
     </div>
   <% } %>
 
+  <div id="pkgRestartRecommendedBanner" class="alert alert-warning border-0 shadow-sm py-2 px-3 mb-3 small d-none" role="alert">
+    <div class="fw-semibold mb-1">Application restart recommended</div>
+    <p class="mb-0" id="pkgRestartRecommendedText">
+      Pause or remove updated registry and section data, but paused package routes may remain mounted until you restart the application.
+    </p>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold small">Runtime Controls</div>
+    <div class="card-body p-3">
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+        <div class="flex-grow-1">
+          <div class="fw-semibold mb-1">Restart application</div>
+          <p class="small text-muted mb-2">
+            Stops the Node process so your host (Railway, Docker, PM2) starts a <strong>new</strong> process.
+            This is <strong>required</strong> to fully apply Pause/Remove because package routes cannot be unmounted in-process.
+            Expect brief downtime; active users may see errors until the new process is healthy.
+            On multi-instance deployments, behavior depends on your platform (instances may restart one at a time).
+            This is <strong>not</strong> a substitute for deploying new code from git — use your normal deploy pipeline for releases.
+          </p>
+          <% if (typeof inAppApplicationRestartAllowed !== 'undefined' && inAppApplicationRestartAllowed) { %>
+            <p class="small text-success mb-0">
+              In-app restart is enabled (<code>ALLOW_IN_APP_APPLICATION_RESTART=true</code>).
+            </p>
+          <% } else { %>
+            <p class="small text-warning mb-0">
+              In-app restart is disabled. Set <code>ALLOW_IN_APP_APPLICATION_RESTART=true</code> in deployment environment variables, or restart from your hosting dashboard.
+            </p>
+          <% } %>
+        </div>
+        <div class="text-end">
+          <button
+            type="button"
+            class="btn btn-outline-danger btn-sm"
+            id="pkgRestartApplicationBtn"
+            <% if (!(typeof inAppApplicationRestartAllowed !== 'undefined' && inAppApplicationRestartAllowed)) { %>disabled<% } %>>
+            <i class="bi bi-arrow-clockwise me-1"></i>Restart application
+          </button>
+        </div>
+      </div>
+      <hr class="my-3">
+      <div class="small text-muted mb-0">
+        <strong>Per-package Reload runtime</strong> (row actions) re-mounts routes, views, assets, and query executors for <em>enabled</em> packages only.
+        It refreshes navigation cache and syncs manifest declarations. It does <strong>not</strong> unmount paused packages and does <strong>not</strong> replace a full application restart after Pause/Remove.
+        Use it after a code deploy when package files changed on disk, or when startup recovery failed for one package.
+      </div>
+    </div>
+  </div>
+
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-header bg-white fw-bold small">Install / Enable Package</div>
     <div class="card-body p-3">
@@ -253,6 +302,9 @@
                       <button type="button" class="btn btn-outline-primary btn-sm pkg-action-btn" data-action="sync" data-package-id="<%= row.packageId %>">
                         <i class="bi bi-arrow-repeat me-2"></i>Sync Declarations
                       </button>
+                      <button type="button" class="btn btn-outline-info btn-sm pkg-action-btn" data-action="reload-runtime" data-package-id="<%= row.packageId %>">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Reload runtime
+                      </button>
                       <button type="button" class="btn btn-outline-secondary btn-sm pkg-action-btn" data-action="preview-remove" data-package-id="<%= row.packageId %>">
                         <i class="bi bi-exclamation-circle me-2"></i>Impact Preview
                       </button>
@@ -335,10 +387,21 @@
   const actionMap = {
     enable: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/enable`, label: 'Enable' },
     pause: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/pause`, label: 'Pause', dangerous: true },
+    'reload-runtime': { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/reload-runtime`, label: 'Reload runtime' },
     'preview-remove': { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/uninstall-preview`, label: 'Impact Preview', dangerous: true },
     remove: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/remove`, label: 'Remove', dangerous: true },
     sync: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/sync`, label: 'Sync Declarations' }
   };
+
+  const restartRecommendedBanner = document.getElementById('pkgRestartRecommendedBanner');
+  const restartRecommendedText = document.getElementById('pkgRestartRecommendedText');
+  const restartApplicationBtn = document.getElementById('pkgRestartApplicationBtn');
+
+  function showRestartRecommendedBanner(message) {
+    if (!restartRecommendedBanner) return;
+    if (restartRecommendedText && message) restartRecommendedText.textContent = message;
+    restartRecommendedBanner.classList.remove('d-none');
+  }
 
   function setOutput(title, payload) {
     const stamp = new Date().toISOString();
@@ -1445,6 +1508,12 @@
         return;
       }
       setOutput(`${actionMap[action]?.label || action} ${packageId}`, result.report || result);
+      if (result?.report?.restartRecommended === true) {
+        const pkgLabel = result?.report?.packageName || packageId;
+        showRestartRecommendedBanner(
+          `Package "${pkgLabel}" registry and sections were updated, but paused package routes may remain mounted until you restart the application.`
+        );
+      }
       await showSuccess(result.message || 'Package operation completed.');
       if (action === 'preview-remove') return;
       window.location.reload();
@@ -1466,6 +1535,51 @@
   document.getElementById('pkgRefreshSnapshotBtn')?.addEventListener('click', () => {
     window.location.reload();
   });
+
+  restartApplicationBtn?.addEventListener('click', async () => {
+    const confirmed = await showModal({
+      title: 'Restart application?',
+      icon: 'warning',
+      message: 'This stops the Node process so your host can start a new one. Active users may see errors during the brief downtime. Continue?',
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Restart application', class: 'btn-danger' }
+      ]
+    });
+    if (confirmed !== 'Restart application') return;
+    const original = restartApplicationBtn.innerHTML;
+    restartApplicationBtn.disabled = true;
+    restartApplicationBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    try {
+      await requireAdminVerification();
+      const result = await runWithWaiting('Restart Application', async () => fetchJson('/systemSettings/application/restart', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams({ actionStateId }).toString()
+      }), {
+        note: 'Scheduling graceful shutdown...',
+        operation: 'Restart Application',
+        progressSteps: [
+          { progress: 30, note: 'Validating restart permission...', operation: 'Validation' },
+          { progress: 70, note: 'Closing HTTP server...', operation: 'Shutdown' },
+          { progress: 95, note: 'Exit scheduled — connection may drop...', operation: 'Exit' }
+        ]
+      });
+      setOutput('Restart application', result.report || result);
+      await showWarning('Application restart was scheduled. This page may stop responding while the host starts a new process.');
+    } catch (error) {
+      setOutput('Restart Application Failed', { message: error.message || 'Unknown error', code: error?.code || '' });
+      await showError(error.message || 'Application restart failed.');
+      restartApplicationBtn.disabled = false;
+      restartApplicationBtn.innerHTML = original;
+    }
+  });
+
   document.getElementById('pkgClearOutputBtn')?.addEventListener('click', () => {
     outputEl.textContent = 'Ready.';
   });

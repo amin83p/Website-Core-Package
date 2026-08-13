@@ -42,6 +42,19 @@ function collectStudentsFromSourceBatch(sourceBatch = {}) {
   return [...studentMap.values()];
 }
 
+function isOptionalSlot(slot = {}) {
+  return String(slot?.requirement || 'necessary').trim().toLowerCase() === 'optional';
+}
+
+function buildEmptySourceSlotValues(sourceTemplate = {}) {
+  const keys = overallReportService.getSourceTemplateKeyCatalog(sourceTemplate);
+  const placeholders = {};
+  keys.forEach((key) => {
+    placeholders[key] = '';
+  });
+  return overallReportService.buildSourceValuesFromPlaceholders(sourceTemplate, placeholders);
+}
+
 function mapSourceRunsToSlots(template, sourceRuns = []) {
   const slots = Array.isArray(template?.sourceSlots) ? template.sourceSlots : [];
   if (!slots.length) throw new Error('Overall template has no source slots.');
@@ -56,6 +69,10 @@ function mapSourceRunsToSlots(template, sourceRuns = []) {
       return idsEqual(row?.templateId, slot?.templateId);
     });
     if (!run) {
+      if (isOptionalSlot(slot)) {
+        mapped.set(slotKey, null);
+        return;
+      }
       throw new Error(`Missing source batch for slot ${slotKey} (template ${slot.templateId}).`);
     }
     mapped.set(slotKey, run);
@@ -165,6 +182,18 @@ async function buildStudentSourceValues(template, slotMap, studentId, templateCa
   for (const slot of slots) {
     const slotKey = clean(slot.slotKey).toUpperCase();
     const run = slotMap.get(slotKey);
+    if (!run) {
+      if (isOptionalSlot(slot)) {
+        const reportTemplateId = slot.templateId;
+        if (!templateCache.has(reportTemplateId)) {
+          templateCache.set(reportTemplateId, await loadReportTemplate(reportTemplateId, reqUser));
+        }
+        const reportTemplate = templateCache.get(reportTemplateId);
+        sourceValues[slotKey] = buildEmptySourceSlotValues(reportTemplate);
+        continue;
+      }
+      throw new Error(`Missing source batch for slot ${slotKey}.`);
+    }
     const row = findEngineStudentRow(run?.engineResult, studentId);
     if (!row) {
       throw new Error(`No engine output found for student ${studentId || '(class)'} on slot ${slotKey}.`);

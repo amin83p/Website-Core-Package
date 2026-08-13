@@ -528,7 +528,7 @@ test('creation accepts only matching submitted or locked reports and persists a 
         selectedDocxKey: 'default',
         reqUser
       }),
-      /must be submitted or locked/
+      /not allowed for this workspace/
     );
 
     instances['REPORT-1'].status = 'submitted';
@@ -1114,12 +1114,20 @@ test('loadOverallCreateCandidates groups by student and respects sessionDate, st
       sessionDate: '2026-07-12', prefillSnapshot: { student_full_name: 'Bob', class_name: 'B', teacher_name: 'T' }
     },
     {
+      id: 'R6', orgId: 'ORG-1', templateId: 'SRC-2', status: 'submitted', studentId: 'STU-2',
+      sessionDate: '2026-07-13', prefillSnapshot: { student_full_name: 'Bob', class_name: 'B', teacher_name: 'T' }
+    },
+    {
       id: 'R4', orgId: 'ORG-1', templateId: 'SRC-1', status: 'draft', studentId: 'STU-1',
       sessionDate: '2026-07-10', prefillSnapshot: { student_full_name: 'Ada' }
     },
     {
       id: 'R5', orgId: 'ORG-1', templateId: 'SRC-1', status: 'submitted', studentId: 'STU-1',
       sessionDate: '2026-06-01', prefillSnapshot: { student_full_name: 'Ada' }
+    },
+    {
+      id: 'R7', orgId: 'ORG-1', templateId: 'SRC-2', status: 'submitted', studentId: 'STU-1',
+      sessionDate: '2026-07-11', prefillSnapshot: { student_full_name: 'Ada', class_name: 'A', teacher_name: 'T' }
     }
   ];
   await withPatched(schoolDataService, {
@@ -1145,7 +1153,7 @@ test('loadOverallCreateCandidates groups by student and respects sessionDate, st
     assert.ok(ada);
     assert.equal(ada.slots.T1.length, 1);
     assert.equal(ada.slots.T1[0].id, 'R1');
-    assert.equal(ada.slots.T2.length, 1);
+    assert.equal(ada.slots.T2.length, 2);
 
     const filtered = await overallReportService.loadOverallCreateCandidates({
       template,
@@ -1284,4 +1292,161 @@ test('createOverallWorkspace and saveOverallWorkspace persist multi-student entr
     assert.equal(wrapped.studentEntries.length, 1);
     assert.equal(wrapped.studentEntries[0].studentId, 'LEGACY');
   });
+});
+
+test('sanitizeSourceSlots stores requirement with necessary default', () => {
+  const template = overallTemplateModel.sanitizeTemplate({
+    orgId: 'ORG-1',
+    title: 'Requirement Test',
+    status: 'draft',
+    sourceSlots: [
+      { slotKey: 'T1', order: 1, templateId: 'SRC-1', templateVersionAtSelection: 1 },
+      { slotKey: 'T2', order: 2, templateId: 'SRC-2', templateVersionAtSelection: 1, requirement: 'optional' }
+    ],
+    schema: overallTemplate().schema,
+    placeholderMap: overallTemplate().placeholderMap
+  });
+  assert.equal(template.sourceSlots[0].requirement, 'necessary');
+  assert.equal(template.sourceSlots[1].requirement, 'optional');
+});
+
+test('createOverallInstance skips optional source slots and injects empty source values', async () => {
+  const template = {
+    ...overallTemplate(),
+    id: 'OVERALL-OPT',
+    sourceSlots: [
+      { slotKey: 'T1', order: 1, templateId: 'SRC-1', templateVersionAtSelection: 1, requirement: 'necessary' },
+      { slotKey: 'T2', order: 2, templateId: 'SRC-2', templateVersionAtSelection: 1, requirement: 'optional' }
+    ]
+  };
+  const templates = {
+    'SRC-1': sourceTemplate('SRC-1'),
+    'SRC-2': sourceTemplate('SRC-2')
+  };
+  const instances = {
+    'REPORT-1': {
+      id: 'REPORT-1', orgId: 'ORG-1', templateId: 'SRC-1', templateVersion: 1, status: 'submitted',
+      answers: { score: 80, comments: 'Good' }, prefillSnapshot: {}
+    }
+  };
+  let persisted = null;
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'reportTemplates') return templates[id] || null;
+      if (entityType === 'reportInstances') return instances[id] || null;
+      return null;
+    },
+    addData: async (_entityType, row) => {
+      persisted = { ...row, id: 'OVERALL-OPT-1' };
+      return persisted;
+    }
+  }, async () => {
+    const created = await overallReportService.createOverallInstance({
+      template,
+      sourceSelections: [{ slotKey: 'T1', instanceId: 'REPORT-1' }],
+      selectedDocxKey: 'default',
+      allowMissingDocx: true,
+      reqUser
+    });
+    assert.equal(created.id, 'OVERALL-OPT-1');
+    assert.equal(persisted.sourceValues.T1.score, '80');
+    assert.equal(persisted.sourceValues.T2.score, '');
+    assert.equal(persisted.sourceValues.T2.comments, '');
+    assert.equal(persisted.answers.average_score, 80);
+    const skipped = persisted.sourceSelections.find((row) => row.slotKey === 'T2');
+    assert.equal(skipped.skipped, true);
+    assert.equal(skipped.instanceId, '');
+
+    await assert.rejects(
+      () => overallReportService.createOverallInstance({
+        template,
+        sourceSelections: [],
+        selectedDocxKey: 'default',
+        allowMissingDocx: true,
+        reqUser
+      }),
+      /Select a report for source slot T1/
+    );
+  });
+});
+
+test('loadOverallCreateCandidates requires necessary slots but not optional slots', async () => {
+  const template = {
+    ...overallTemplate(),
+    id: 'OVERALL-OPT',
+    sourceSlots: [
+      { slotKey: 'T1', order: 1, templateId: 'SRC-1', templateVersionAtSelection: 1, requirement: 'necessary' },
+      { slotKey: 'T2', order: 2, templateId: 'SRC-2', templateVersionAtSelection: 1, requirement: 'optional' }
+    ]
+  };
+  const templates = {
+    'SRC-1': sourceTemplate('SRC-1'),
+    'SRC-2': sourceTemplate('SRC-2')
+  };
+  const instances = [
+    {
+      id: 'R1', orgId: 'ORG-1', templateId: 'SRC-1', status: 'submitted', studentId: 'STU-1',
+      sessionDate: '2026-07-10', prefillSnapshot: { student_full_name: 'Ada' }
+    },
+    {
+      id: 'R2', orgId: 'ORG-1', templateId: 'SRC-2', status: 'locked', studentId: 'STU-2',
+      sessionDate: '2026-07-11', prefillSnapshot: { student_full_name: 'Bob' }
+    }
+  ];
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'reportTemplates') return templates[id] || null;
+      return null;
+    },
+    fetchData: async (entityType) => {
+      if (entityType === 'reportInstances') return instances;
+      if (entityType === 'reportTemplates') return Object.values(templates);
+      return [];
+    }
+  }, async () => {
+    const result = await overallReportService.loadOverallCreateCandidates({
+      template,
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+      statuses: ['submitted', 'locked'],
+      reqUser
+    });
+    assert.equal(result.sourceSlots[1].requirement, 'optional');
+    assert.equal(result.students.length, 1);
+    assert.equal(result.students[0].studentId, 'STU-1');
+    assert.equal(result.students[0].slots.T1.length, 1);
+    assert.equal(result.students[0].slots.T2.length, 0);
+  });
+});
+
+test('sanitizeStudentEntry accepts skipped optional source selections', () => {
+  const snapshotSlots = [
+    { slotKey: 'T1', templateId: 'SRC-1', requirement: 'necessary' },
+    { slotKey: 'T2', templateId: 'SRC-2', requirement: 'optional' }
+  ];
+  const entry = overallInstanceModel.sanitizeStudentEntry({
+    studentId: 'STU-1',
+    sourceSelections: [
+      {
+        slotKey: 'T1',
+        templateId: 'SRC-1',
+        instanceId: 'R1',
+        instanceTitle: 'Report 1',
+        instanceStatus: 'submitted'
+      },
+      {
+        slotKey: 'T2',
+        templateId: 'SRC-2',
+        skipped: true,
+        instanceId: '',
+        instanceTitle: '',
+        instanceStatus: ''
+      }
+    ],
+    sourceValues: { T1: { score: '80' }, T2: { score: '' } },
+    answers: { summary: 'Initial' }
+  }, snapshotSlots);
+  assert.equal(entry.sourceSelections.length, 2);
+  assert.equal(entry.sourceSelections[1].skipped, true);
+  assert.equal(entry.sourceSelections[1].instanceId, '');
 });

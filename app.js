@@ -80,6 +80,7 @@ const DEFAULT_PACKAGE_RUNTIME_RECONCILE_INTERVAL_MS = 60000;
 
 const app = express();
 const server = http.createServer(app); // Create explicit server
+app.locals.httpServer = server;
 
 // Railway (and similar platforms) run Node behind a reverse proxy.
 // express-rate-limit requires trusted proxy headers for correct client IP detection.

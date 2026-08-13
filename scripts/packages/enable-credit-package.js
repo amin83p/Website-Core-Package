@@ -3,6 +3,7 @@ const path = require('path');
 
 const packageManifestService = require('../../MVC/services/packageManifestService');
 const packageRegistryService = require('../../MVC/services/packageRegistryService');
+const packageRegistryInstallerService = require('../../MVC/services/packageRegistryInstallerService');
 const dataBackendRuntimeService = require('../../MVC/services/dataBackendRuntimeService');
 const { disconnectMongo } = require('../../MVC/infrastructure/mongo/mongoConnection');
 
@@ -164,13 +165,23 @@ async function runEnableCreditPackage(argv = [], runtimeOptions = {}) {
         enabled: existing.enabled,
         installStatus: existing.installStatus
       } : null,
-      payload
+      payload,
+      declarationSummary: null
     };
 
     if (options.apply) {
       if (options.remove) {
         report.result = await packageRegistryService.removePackageRegistry(payload.packageId, { backendMode });
       } else if (options.disable) {
+        const context = {
+          backendMode,
+          packageId: manifest.id,
+          manifest
+        };
+        report.declarationSummary = await packageRegistryInstallerService.removePackageRegistryDeclarations(context, {
+          action: 'disable',
+          backendMode
+        });
         report.result = await packageRegistryService.setPackageEnabled(payload.packageId, false, {
           backendMode,
           actor: { id: 'SYSTEM', username: SCRIPT_ID }

@@ -3354,6 +3354,106 @@ function createService(overrides = {}) {
     return report;
   }
 
+  async function reloadPackageRuntime(packageIdInput = '', options = {}) {
+    const actor = buildActor(options.actor || null);
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const packageId = normalizePackageId(packageIdInput);
+    if (!packageId) throw new Error('Package id is required.');
+
+    const existing = await deps.packageRegistryService.getPackageRegistryById(packageId, { backendMode });
+    if (!existing) throw new Error('Package is not in registry. Install it first.');
+    if (existing.enabled !== true) {
+      const error = new Error(
+        'Package is not enabled. Reload runtime only applies to enabled packages. After Pause/Remove, use Restart application to unmount routes.'
+      );
+      error.code = 'PACKAGE_NOT_ENABLED';
+      throw error;
+    }
+
+    const resolved = await resolveManifestForRegistryRow(existing, options);
+    if (!resolved || !resolved.manifest) {
+      throw new Error('Manifest file was not found for this package.');
+    }
+
+    const manifest = resolved.manifest;
+    const context = {
+      backendMode,
+      packageId: manifest.id,
+      packageName: manifest.name,
+      manifest,
+      manifestPath: resolved.manifestPath
+    };
+    const warnings = [];
+    const packageRootDir = cleanText(options.packageRootDir, 2000)
+      || getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir });
+    const app = options.app || null;
+    const packageRuntimeRouter = options.packageRuntimeRouter
+      || app?.locals?.packageRuntimeRouter
+      || null;
+
+    const declarationSummary = await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(context, {
+      backendMode
+    });
+
+    let loaderSummary = null;
+    if (app && typeof app.use === 'function') {
+      const hooks = deps.packageRegistryInstallerService.createLoaderHooks({ backendMode });
+      loaderSummary = await deps.packageLoaderService.loadEnabledPackages({
+        app,
+        packageRuntimeRouter,
+        backendMode,
+        packageRootDir,
+        hooks,
+        packageIds: [packageId],
+        continueOnError: false
+      });
+      app.locals.packageLoadSummary = deps.packageLoaderService.mergePackageLoadSummary(
+        app.locals.packageLoadSummary || {},
+        loaderSummary
+      );
+    } else {
+      warnings.push('Package loader reload skipped because Express app context is unavailable in this request.');
+    }
+
+    const runtime = await applyRuntimeEnableHooks(context, {
+      backendMode,
+      app,
+      packageRuntimeRouter
+    });
+    try {
+      assertRuntimeRouteMountHealth(context, runtime, {
+        strict: Boolean(app && typeof app.use === 'function')
+      });
+    } catch (runtimeError) {
+      await deps.packageRegistryService.setPackageEnabled(packageId, false, {
+        backendMode,
+        actor
+      }).catch(() => null);
+      throw runtimeError;
+    }
+
+    const navigation = await refreshNavigationSnapshot({ backendMode });
+    warnings.push(...runtime.warnings);
+    if (navigation.warning) warnings.push(navigation.warning);
+
+    return {
+      action: 'reload-runtime',
+      packageId: manifest.id,
+      packageName: manifest.name,
+      version: manifest.version,
+      registry: {
+        enabled: true,
+        installStatus: cleanText(existing?.installStatus, 80)
+      },
+      declarationSummary,
+      loaderSummary,
+      runtime,
+      navigation,
+      restartRecommended: false,
+      warnings
+    };
+  }
+
   async function syncPackage(packageIdInput = '', options = {}) {
     const backendMode = cleanText(options.backendMode, 30) || undefined;
     const packageId = normalizePackageId(packageIdInput);
@@ -3452,6 +3552,7 @@ function createService(overrides = {}) {
     enablePackage,
     pausePackage,
     removePackage,
+    reloadPackageRuntime,
     syncPackage,
     cleanupFailedInstallAttempts,
     previewPackageUninstallImpact,

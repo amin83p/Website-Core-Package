@@ -42,6 +42,22 @@ function sortOverallSlots(overallTemplate = null) {
   return [...overallTemplate.sourceSlots].sort((a, b) => Number(a?.order || 0) - Number(b?.order || 0));
 }
 
+function isOptionalSlot(slot = {}) {
+  return String(slot?.requirement || 'necessary').trim().toLowerCase() === 'optional';
+}
+
+function countNecessarySlots(overallTemplate = null) {
+  return sortOverallSlots(overallTemplate).filter((slot) => !isOptionalSlot(slot)).length;
+}
+
+function buildOverallSlotSummaries(overallTemplate = null) {
+  return sortOverallSlots(overallTemplate).map((slot, index) => ({
+    slotKey: clean(slot.slotKey).toUpperCase(),
+    slotIndex: index,
+    requirement: isOptionalSlot(slot) ? 'optional' : 'necessary'
+  }));
+}
+
 function parseTargets(raw) {
   if (Array.isArray(raw)) return raw;
   if (typeof raw === 'string' && raw.trim()) {
@@ -81,18 +97,25 @@ function buildSourceRunsForStudent({
   if (slots.length) {
     slots.forEach((slot, index) => {
       const classRow = classes[index];
+      const optional = isOptionalSlot(slot);
       if (!classRow) {
-        warnings.push(`No class available for overall slot ${slot.slotKey || index + 1} (${student.name || personId}).`);
+        if (!optional) {
+          warnings.push(`No class available for overall slot ${slot.slotKey || index + 1} (${student.name || personId}).`);
+        }
         return;
       }
       const classId = clean(classRow.classId);
       if (selectedSet && !selectedSet.has(classId)) {
-        warnings.push(`Class ${classRow.className || classId} is not selected for overall slot ${slot.slotKey || index + 1}.`);
+        if (!optional) {
+          warnings.push(`Class ${classRow.className || classId} is not selected for overall slot ${slot.slotKey || index + 1}.`);
+        }
         return;
       }
       const teacherId = resolveTeacherIdForClass(classRow);
       if (!teacherId) {
-        warnings.push(`Class ${classRow.className || classRow.classId} has no teacher for slot ${slot.slotKey || index + 1}.`);
+        if (!optional) {
+          warnings.push(`Class ${classRow.className || classRow.classId} has no teacher for slot ${slot.slotKey || index + 1}.`);
+        }
         return;
       }
       sourceRuns.push({
@@ -210,6 +233,7 @@ function buildClassExportRowsForStudent(student, policy, overallTemplate, templa
         teacherId,
         slotKey: clean(slot.slotKey).toUpperCase(),
         slotIndex: index,
+        requirement: isOptionalSlot(slot) ? 'optional' : 'necessary',
         templateId,
         templateTitle: meta.templateTitle || templateId,
         hasDocx: Boolean(meta.hasDocx),
@@ -247,10 +271,13 @@ function buildOverallExportBlock(student, policy, overallTemplate, classRows) {
   if (!overallTemplate) return null;
 
   const slots = sortOverallSlots(overallTemplate);
+  const slotSummaries = buildOverallSlotSummaries(overallTemplate);
+  const necessarySlots = slots.filter((slot) => !isOptionalSlot(slot));
   const missingSlots = [];
   const warnings = [];
 
   slots.forEach((slot, index) => {
+    if (isOptionalSlot(slot)) return;
     const row = classRows.find((entry) => Number(entry.slotIndex) === index);
     if (!row) {
       missingSlots.push(clean(slot.slotKey) || String(index + 1));
@@ -264,8 +291,7 @@ function buildOverallExportBlock(student, policy, overallTemplate, classRows) {
   });
 
   const eligible = slots.length > 0
-    && missingSlots.length === 0
-    && classRows.length >= slots.length;
+    && (necessarySlots.length === 0 || missingSlots.length === 0);
 
   return {
     defined: true,
@@ -275,6 +301,8 @@ function buildOverallExportBlock(student, policy, overallTemplate, classRows) {
     eligible,
     missingSlots,
     warnings,
+    slots: slotSummaries,
+    necessarySlotCount: necessarySlots.length,
     slotCount: slots.length
   };
 }
@@ -452,11 +480,24 @@ async function exportOverallTarget(student, selectedClassIds, format, ctx, reqUs
     selectedClassIds: selectedSet
   });
 
-  const slotCount = sortOverallSlots(overallTemplate).length;
-  if (!sourceRuns.length || sourceRuns.length < slotCount) {
-    const error = new Error(buildWarnings[0] || 'Selected classes do not satisfy the overall report template.');
+  const slotCount = countNecessarySlots(overallTemplate);
+  if (!sourceRuns.length && slotCount > 0) {
+    const error = new Error(buildWarnings[0] || 'Selected classes do not satisfy the necessary overall report sources.');
     error.statusCode = 400;
     throw error;
+  }
+  if (slotCount > 0) {
+    const missingNecessary = sortOverallSlots(overallTemplate)
+      .filter((slot) => !isOptionalSlot(slot))
+      .filter((slot) => !sourceRuns.some((run) => clean(run.slotKey).toUpperCase() === clean(slot.slotKey).toUpperCase()));
+    if (missingNecessary.length) {
+      const error = new Error(
+        buildWarnings[0]
+        || `Necessary source slot ${missingNecessary[0].slotKey || ''} is not available for this student.`
+      );
+      error.statusCode = 400;
+      throw error;
+    }
   }
 
   const pipeline = await overallReportGenerationEngineService.generateOverallPipeline({

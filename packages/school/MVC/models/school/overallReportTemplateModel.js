@@ -13,6 +13,7 @@ if (!fsSync.existsSync(dataPath)) fsSync.writeFileSync(dataPath, '[]');
 const TEMPLATE_STATUSES = new Set(['draft', 'active', 'inactive', 'archived']);
 const OVERALL_VALUE_MODES = new Set(['manual', 'derived_editable', 'derived_locked']);
 const SLOT_KEY_PATTERN = /^T[1-9]\d*$/;
+const SLOT_REQUIREMENTS = new Set(['necessary', 'optional']);
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -45,6 +46,11 @@ function clonePlain(value, fallback = null) {
   }
 }
 
+function sanitizeSlotRequirement(raw) {
+  const token = String(raw || 'necessary').trim().toLowerCase();
+  return SLOT_REQUIREMENTS.has(token) ? token : 'necessary';
+}
+
 function sanitizeSourceSlots(rawSlots) {
   const rows = Array.isArray(rawSlots) ? rawSlots : [];
   if (rows.length < 1) throw new Error('Overall report templates require at least one source template slot.');
@@ -58,7 +64,8 @@ function sanitizeSourceSlots(rawSlots) {
       slotKey,
       order: cleanInteger(raw?.order, index + 1),
       templateId: cleanId(raw?.templateId),
-      templateVersionAtSelection: cleanInteger(raw?.templateVersionAtSelection || raw?.templateVersion, 1)
+      templateVersionAtSelection: cleanInteger(raw?.templateVersionAtSelection || raw?.templateVersion, 1),
+      requirement: sanitizeSlotRequirement(raw?.requirement)
     };
   }).sort((a, b) => a.order - b.order || a.slotKey.localeCompare(b.slotKey))
     .map((row, index) => ({ ...row, order: index + 1 }));
