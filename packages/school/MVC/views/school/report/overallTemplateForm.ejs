@@ -8,7 +8,6 @@
   .overall-field-row { cursor: move; }
   .overall-field-row.is-dragover { outline: 2px dashed #0d6efd; outline-offset: -2px; background: #f8fbff; }
   .overall-field-handle { cursor: grab; }
-  .overall-field-summary { white-space: normal; overflow-wrap: anywhere; }
   .overall-picker-summary { min-height: 38px; }
   .overall-field-visual { background: #fcfcff; }
   .overall-field-dropdown-menu-floating { z-index: 1080; }
@@ -88,7 +87,7 @@
       </div>
       <div class="table-responsive">
         <table class="table align-middle mb-0">
-          <thead class="table-light"><tr><th style="width:70px" class="text-center">Order</th><th>Field</th><th>Type</th><th>Flags</th><th>Details</th><th style="width:60px"></th></tr></thead>
+          <thead class="table-light"><tr><th style="width:70px" class="text-center">Order</th><th>Field</th><th>Type</th><th>Flags</th><th>System DOCX shortcut</th><th style="width:60px"></th></tr></thead>
           <tbody id="fieldRows"></tbody>
         </table>
       </div>
@@ -252,6 +251,21 @@
       }
     });
     return toggle;
+  }
+  function closeOverallFieldDropdowns() {
+    if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+      fieldRows.querySelectorAll('.js-overall-field-dropdown [data-bs-toggle="dropdown"]').forEach((toggle) => {
+        const instance = bootstrap.Dropdown.getInstance(toggle);
+        if (instance) instance.hide();
+      });
+    }
+    document.querySelectorAll('.overall-field-dropdown-menu-floating').forEach((menu) => {
+      menu.classList.remove('overall-field-dropdown-menu-floating', 'show');
+      delete menu.dataset.returnToParent;
+      if (menu.parentElement === document.body) {
+        menu.remove();
+      }
+    });
   }
   function bindOverallFieldDropdowns() {
     fieldRows.querySelectorAll('.js-overall-field-dropdown [data-bs-toggle="dropdown"]').forEach(bindOverallFieldDropdown);
@@ -418,6 +432,7 @@
     renderKeyCatalog();
   }
   function renderFields() {
+    closeOverallFieldDropdowns();
     if (!fields.length) {
       fieldRows.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No fields yet. Add a field or a visual grouping row.</td></tr>';
       renderKeyCatalog();
@@ -434,16 +449,11 @@
         !visual && mode !== 'manual' ? `<span class="badge ${mode === 'derived_locked' ? 'bg-secondary' : 'bg-warning text-dark'}">${escapeHtml(modeLabels[mode])}</span>` : '',
         !visual && fieldIsReadOnly(field) ? '<span class="badge bg-secondary-subtle text-secondary-emphasis border">Read-only</span>' : ''
       ].filter(Boolean).join(' ') || '<span class="text-muted">None</span>';
-      const details = visual
-        ? (field.helpText || 'Display-only organization row')
-        : [
-            mode === 'manual' && field.defaultValue !== '' ? `Start: ${String(field.defaultValue)}` : '',
-            mode !== 'manual' ? String(field.calculationRule?.expression || '') : '',
-            field.placeholder ? `Hint: ${field.placeholder}` : '',
-            field.helpText || '',
-            field.docxAlias ? `{{O.${field.docxAlias}}}` : ''
-          ].filter(Boolean).join(' | ');
-      return `<tr class="overall-field-row${visual ? ' overall-field-visual' : ''}" draggable="true" data-index="${index}"><td class="text-center"><span class="overall-field-handle text-muted"><i class="bi bi-grip-vertical"></i></span><span class="badge bg-light text-dark border ms-1">${index + 1}</span></td><td><strong>${escapeHtml(field.label || field.id)}</strong><div class="small text-muted font-monospace">${escapeHtml(field.id || '')}</div></td><td><span class="badge bg-light text-dark border">${escapeHtml(field.type)}</span></td><td>${flags}</td><td class="small overall-field-summary" title="${escapeHtml(details)}">${escapeHtml(details || '-')}</td><td><div class="dropdown js-overall-field-dropdown"><button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><button type="button" class="dropdown-item js-field-action" data-action="edit" data-index="${index}"><i class="bi bi-pencil me-2"></i>Edit</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="duplicate" data-index="${index}"><i class="bi bi-files me-2"></i>Duplicate</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up me-2"></i>Move Up</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="down" data-index="${index}" ${index === fields.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down me-2"></i>Move Down</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item text-danger js-field-action" data-action="delete" data-index="${index}"><i class="bi bi-trash me-2"></i>Delete</button></li></ul></div></td></tr>`;
+      const docxShortcut = visual ? '' : slotDocxShortcut('O', field.docxAlias);
+      const docxShortcutCell = docxShortcut
+        ? `<div class="d-flex align-items-center gap-2 flex-wrap"><span class="font-monospace">${escapeHtml(docxShortcut)}</span><button type="button" draggable="false" class="btn btn-outline-secondary btn-sm js-copy-key" data-key="${escapeHtml(docxShortcut)}" title="Copy DOCX shortcut"><i class="bi bi-clipboard"></i></button></div>`
+        : '<span class="text-muted">—</span>';
+      return `<tr class="overall-field-row${visual ? ' overall-field-visual' : ''}" draggable="true" data-index="${index}"><td class="text-center"><span class="overall-field-handle text-muted"><i class="bi bi-grip-vertical"></i></span><span class="badge bg-light text-dark border ms-1">${index + 1}</span></td><td><strong>${escapeHtml(field.label || field.id)}</strong><div class="small text-muted font-monospace">${escapeHtml(field.id || '')}</div></td><td><span class="badge bg-light text-dark border">${escapeHtml(field.type)}</span></td><td>${flags}</td><td class="small">${docxShortcutCell}</td><td><div class="dropdown js-overall-field-dropdown"><button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><button type="button" class="dropdown-item js-field-action" data-action="edit" data-index="${index}"><i class="bi bi-pencil me-2"></i>Edit</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="duplicate" data-index="${index}"><i class="bi bi-files me-2"></i>Duplicate</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up me-2"></i>Move Up</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="down" data-index="${index}" ${index === fields.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down me-2"></i>Move Down</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item text-danger js-field-action" data-action="delete" data-index="${index}"><i class="bi bi-trash me-2"></i>Delete</button></li></ul></div></td></tr>`;
     }).join('');
     renderKeyCatalog();
     bindOverallFieldDropdowns();
@@ -724,6 +734,7 @@
   document.getElementById('btnAddRowBreak').addEventListener('click', () => openField(-1, 'row_break'));
   async function handleOverallFieldAction(button) {
     if (!button || button.disabled) return;
+    closeOverallFieldDropdowns();
     const index = Number(button.dataset.index);
     const action = button.dataset.action;
     if (action === 'edit') openField(index);
@@ -899,7 +910,14 @@
     bootstrap.Modal.getOrCreateInstance(document.getElementById('previewModal')).show();
   });
   document.getElementById('keySearch').addEventListener('input', renderKeyCatalog);
-  document.getElementById('keyRows').addEventListener('click', event => { const button = event.target.closest('.js-copy-key'); if (button) navigator.clipboard?.writeText(button.dataset.key || ''); });
+  document.addEventListener('mousedown', event => {
+    if (event.target.closest('.js-copy-key')) event.stopPropagation();
+  });
+  document.addEventListener('click', event => {
+    const button = event.target.closest('.js-copy-key');
+    if (!button) return;
+    navigator.clipboard?.writeText(button.dataset.key || '');
+  });
   function download(name, content, type) { const url=URL.createObjectURL(new Blob([content],{type})); const link=document.createElement('a');link.href=url;link.download=name;link.click();URL.revokeObjectURL(url); }
   document.getElementById('btnKeysJson').addEventListener('click', () => download('overall-report-keys.json', JSON.stringify(keyCatalog(), null, 2), 'application/json'));
   document.getElementById('btnKeysCsv').addEventListener('click', () => download('overall-report-keys.csv', 'source,label,key,docxShortcut,origin,description\n' + keyCatalog().map(row => [row.group,row.label,row.key,row.docxShortcut,row.origin,row.description].map(value => `"${String(value || '').replaceAll('"','""')}"`).join(',')).join('\n'), 'text/csv'));

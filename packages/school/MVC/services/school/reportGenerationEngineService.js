@@ -173,18 +173,21 @@ async function resolveClassStudentPersonIds({
   classData,
   sessions = [],
   reqUser,
-  referenceDate = ''
+  startDate = '',
+  endDate = ''
 } = {}) {
   const classId = String(classData?.id || '').trim();
   if (!classId) return [];
+  const enrollmentStartDate = normalizeDateOnly(startDate) || normalizeDateOnly(endDate);
+  const enrollmentEndDate = normalizeDateOnly(endDate) || normalizeDateOnly(startDate);
   const snapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
     classId,
     classItem: classData,
     reqUser,
     activeOrgId: classData?.orgId,
     sessionDates: (Array.isArray(sessions) ? sessions : []).map((row) => String(row?.date || '').trim()).filter(Boolean),
-    startDate: referenceDate,
-    endDate: referenceDate,
+    startDate: enrollmentStartDate,
+    endDate: enrollmentEndDate,
     canonicalStatuses: classEnrollmentReadService.getReportRosterStatusesForClass(classData)
   });
   const activeStudentIds = snapshot?.studentIds instanceof Set ? [...snapshot.studentIds] : [];
@@ -227,7 +230,8 @@ async function resolveTargetStudentIds({
     classData,
     sessions,
     reqUser,
-    referenceDate
+    startDate: normalizeDateOnly(assignment?.reportStartDate) || referenceDate,
+    endDate: normalizeDateOnly(assignment?.reportDueDate) || referenceDate
   });
   const classStudentSet = new Set(classStudentIds);
 

@@ -353,7 +353,7 @@ test('report template editor renders valid client JavaScript with DOCX shortcuts
   scripts.forEach((source) => { new Function(source); });
 });
 
-test('buildPrefillSnapshot uses attendance matrix percent and counts missing marks as absent', async () => {
+test('buildPrefillSnapshot uses attendance matrix percent and counts unmarked sessions separately', async () => {
   const assignment = {
     id: 'ASN-1',
     orgId: '900000',
@@ -415,13 +415,13 @@ test('buildPrefillSnapshot uses attendance matrix percent and counts missing mar
           });
 
           assert.equal(snapshot.class_attendance_total, 4);
-          assert.equal(snapshot.class_attendance_present, 75);
+          assert.equal(snapshot.class_attendance_present, 83.33);
           assert.equal(snapshot.class_attendance_absent, 1);
           assert.equal(snapshot.student_attendance_span_total_sessions, 4);
           assert.equal(snapshot.student_attendance_span_present, 1);
           assert.equal(snapshot.student_attendance_span_late, 2);
           assert.equal(snapshot.student_attendance_span_absent, 1);
-          assert.equal(snapshot.student_attendance_span_percent, 75);
+          assert.equal(snapshot.student_attendance_span_percent, 83.33);
           assert.equal(snapshot.attendance_day_01, 1);
           assert.equal(snapshot.attendance_presence_01, 'X');
           assert.equal(snapshot.attendance_note_01, 'Not in the report date range');
@@ -435,8 +435,8 @@ test('buildPrefillSnapshot uses attendance matrix percent and counts missing mar
           assert.equal(snapshot.attendance_presence_17, 'Y');
           assert.equal(snapshot.attendance_note_17, 'Late Excused; Left Early Excused');
           assert.equal(snapshot.attendance_day_18, 18);
-          assert.equal(snapshot.attendance_presence_18, 'N');
-          assert.equal(snapshot.attendance_note_18, 'Absent');
+          assert.equal(snapshot.attendance_presence_18, '*');
+          assert.equal(snapshot.attendance_note_18, 'Not Marked');
           assert.equal(snapshot.attendance_day_19, 19);
           assert.equal(snapshot.attendance_presence_19, 'Y');
           assert.equal(snapshot.attendance_note_19, 'Left Early Excused');
@@ -707,7 +707,7 @@ test('buildReportDocxCollections builds students, sessions, and N/A-aware attend
             );
             assert.equal(
               collections.student_attendance_rows.find((row) => row.student_id === 'STUDENT-PERSON-2' && row.session_id === 'SES-2').attendance_status_label,
-              'Absent'
+              'Not Marked'
             );
             assert.ok(Array.isArray(collections.gradebook_skill_rows));
             const adaWriting = collections.gradebook_skill_rows.find(
@@ -936,7 +936,7 @@ test('report template prefill catalog keys are all produced with correct represe
           assert.equal(snapshot.student_org_member_role, 'student');
 
           assert.equal(snapshot.class_attendance_total, 3);
-          assert.equal(snapshot.class_attendance_present, 58.33);
+          assert.equal(snapshot.class_attendance_present, 87.5);
           assert.equal(snapshot.class_attendance_late, 1);
           assert.equal(snapshot.class_attendance_absent, 1);
           assert.equal(snapshot.class_attendance_span_sessions, 3);
@@ -947,7 +947,7 @@ test('report template prefill catalog keys are all produced with correct represe
           assert.equal(snapshot.class_attendance_span_absent, 1);
           assert.equal(snapshot.class_attendance_span_percent, 68.75);
           assert.equal(snapshot.student_attendance_span_total_sessions, 3);
-          assert.equal(snapshot.student_attendance_span_percent, 58.33);
+          assert.equal(snapshot.student_attendance_span_percent, 87.5);
 
           assert.equal(snapshot.class_gradebook_period_sessions_count, 3);
           assert.equal(snapshot.class_gradebook_period_activity_count, 3);

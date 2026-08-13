@@ -43,7 +43,7 @@ const STUDENT_PHONE_PREFILL_KEY_PATTERNS = Object.freeze([
  * - `examPeriodClass` / `examPeriodStudent`: Period-based exam stats
  * 
  * CRITICAL NOTES:
- * - Attendance Matrix percent treats missing/unmarked expected attendance marks as absent; N/A is excluded
+ * - Attendance Matrix percent excludes unmarked sessions by default; N/A is excluded
  * - All keys must be produced by buildPrefillSnapshot(); audit test verifies this
  * - Keys are validated at template save-time via validateTemplatePrefillKeys()
  * - Type conversion applied at runtime (checkbox to boolean, number to finite)
@@ -488,6 +488,7 @@ async function buildStudentAttendanceApplicabilityContext({ classData, sessions,
 }
 
 function incrementAttendanceStatusCount(summary, status) {
+  if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) return;
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) {
     summary.present += 1;
     return;
@@ -591,6 +592,13 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
       lateMinutes: row?.lateMinutes || 0,
       earlyLeaveMinutes: row?.earlyLeaveMinutes || 0
     }, matrixPolicy, enabledAttendanceStatuses);
+    if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) {
+      if (countMissingAsAbsent) {
+        out.totalSessions += 1;
+        out.absent += 1;
+      }
+      return;
+    }
     if (!row && status !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE && !countMissingAsAbsent) return;
     if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
       out.notApplicable += 1;
@@ -1402,10 +1410,16 @@ function resolveEffectiveAttendanceStatus({ session, rosterRow, statusMap, deriv
     return attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
   }
   if (rosterRow) {
+    if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(rosterRow?.attendance)) {
+      return '';
+    }
     return attendanceMatrixMetricsService.normalizeStatus(
       rosterRow?.attendance,
       attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
     );
+  }
+  if (expectedForSession) {
+    return '';
   }
   return attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT;
 }
@@ -1446,6 +1460,7 @@ function isDateWithinRange(dateKey, startDate, dueDate) {
 
 function buildOverallAttendanceNote(status, timing = {}) {
   if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) return '';
+  if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) return 'Not Marked';
 
   const lateMinutes = Number(timing?.lateMinutes || 0);
   const earlyLeaveMinutes = Number(timing?.earlyLeaveMinutes || 0);
@@ -1520,6 +1535,9 @@ function buildOverallAttendanceDayPrefill({ sessions, studentPersonId, statusMap
     } else if (!selectedEntry || selectedEntry.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
       out[`attendance_presence_${suffix}`] = 'X';
       out[`attendance_note_${suffix}`] = 'No Class';
+    } else if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(selectedEntry.status)) {
+      out[`attendance_presence_${suffix}`] = '*';
+      out[`attendance_note_${suffix}`] = 'Not Marked';
     } else {
       out[`attendance_presence_${suffix}`] = present ? 'Y' : 'N';
       out[`attendance_note_${suffix}`] = buildOverallAttendanceNote(selectedEntry.status, selectedEntry.timing);
@@ -1530,6 +1548,9 @@ function buildOverallAttendanceDayPrefill({ sessions, studentPersonId, statusMap
 }
 
 function attendanceStatusDetails(statusValue) {
+  if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(statusValue)) {
+    return { status: '', label: 'Not Marked' };
+  }
   const status = attendanceMatrixMetricsService.normalizeStatus(
     statusValue,
     attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT

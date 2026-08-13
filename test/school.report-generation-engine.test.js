@@ -210,6 +210,70 @@ test('generateReportOutput ad-hoc path builds json payload without persisted ins
   });
 });
 
+test('generateReportOutput selected_students uses full report date range for enrollment', async () => {
+  let capturedEnrollmentWindow = null;
+  await withPatched(reportIntegrityService, {
+    assertTemplateAccessible: async (templateId) => ({
+      ...baseTemplate,
+      id: templateId
+    })
+  }, async () => {
+    await withPatched(schoolDataService, {
+      getDataById: async (entityType, id) => {
+        if (entityType === 'classes' && id === 'CLASS-1') {
+          return { id: 'CLASS-1', orgId: '900000', title: 'Class One' };
+        }
+        return null;
+      },
+      getClassSessions: async () => [],
+      fetchAllData: async (entityType) => {
+        if (entityType === 'students') {
+          return [{ id: 'STU-1', orgId: '900000', personId: 'STUDENT-PERSON-1' }];
+        }
+        return [];
+      }
+    }, async () => {
+      await withPatched(reportService, {
+        buildPrefillSnapshot: async () => ({ ...basePrefill }),
+        buildReportDocxCollections: async () => ({ students: [] })
+      }, async () => {
+        const classEnrollmentReadService = require('../packages/school/MVC/services/school/classEnrollmentReadService');
+        await withPatched(classEnrollmentReadService, {
+          listActiveStudentIdsForClass: async (opts) => {
+            capturedEnrollmentWindow = {
+              startDate: opts.startDate,
+              endDate: opts.endDate
+            };
+            if (opts.startDate === '2026-07-01' && opts.endDate === '2026-07-31') {
+              return { studentIds: new Set(['STU-1']) };
+            }
+            return { studentIds: new Set() };
+          },
+          getReportRosterStatusesForClass: () => ['active']
+        }, async () => {
+          const result = await reportGenerationEngineService.generateReportOutput({
+            templateId: 'TPL-1',
+            classId: 'CLASS-1',
+            teacherId: 'TEACHER-1',
+            reportScope: 'selected_students',
+            targetStudentIds: ['STUDENT-PERSON-1'],
+            reportStartDate: '2026-07-01',
+            reportDueDate: '2026-07-31',
+            format: 'json'
+          }, {}, reqUser);
+
+          assert.deepEqual(capturedEnrollmentWindow, {
+            startDate: '2026-07-01',
+            endDate: '2026-07-31'
+          });
+          assert.equal(result.rows.length, 1);
+          assert.equal(result.rows[0].studentId, 'STUDENT-PERSON-1');
+        });
+      });
+    });
+  });
+});
+
 test('generateReportOutput assignment path uses resolveStartInstanceContext', async () => {
   const assignment = {
     id: 'ASN-1',

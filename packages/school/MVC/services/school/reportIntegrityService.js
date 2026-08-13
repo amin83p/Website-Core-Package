@@ -33,19 +33,23 @@ async function resolveClassStudentIds({
   classData,
   sessions = [],
   reqUser,
+  startDate = '',
+  endDate = '',
   referenceDate = '',
   strictCanonical = false
 } = {}) {
   const classId = String(classData?.id || '').trim();
   if (!classId) return [];
+  const enrollmentStartDate = normalizeDateOnly(startDate) || normalizeDateOnly(referenceDate) || normalizeDateOnly(endDate);
+  const enrollmentEndDate = normalizeDateOnly(endDate) || normalizeDateOnly(referenceDate) || normalizeDateOnly(startDate);
   const snapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
     classId,
     classItem: classData,
     reqUser,
     activeOrgId: classData?.orgId,
     sessionDates: (Array.isArray(sessions) ? sessions : []).map((row) => String(row?.date || '').trim()).filter(Boolean),
-    startDate: referenceDate,
-    endDate: referenceDate,
+    startDate: enrollmentStartDate,
+    endDate: enrollmentEndDate,
     canonicalStatuses: classEnrollmentReadService.getReportRosterStatusesForClass(classData)
   });
   const activeStudentIds = snapshot?.studentIds instanceof Set ? [...snapshot.studentIds] : [];
@@ -783,6 +787,8 @@ const reportIntegrityService = {
       classData,
       sessions,
       reqUser,
+      startDate: normalizeDateOnly(assignment?.reportStartDate) || referenceDate,
+      endDate: normalizeDateOnly(assignment?.reportDueDate) || referenceDate,
       referenceDate,
       strictCanonical: true
     });
