@@ -175,8 +175,8 @@ function buildNewPerson(body, reqUser, orgId) {
     organizations: [{
       orgId: Number.isFinite(Number(orgId)) ? Number(orgId) : orgId,
       name: String(activeOrg?.name || activeOrg?.orgName || '').trim(),
-      roles: ['school_funder'],
-      role: 'school_funder',
+      roles: ['member'],
+      role: 'member',
       memberStatus: 'active',
       joinedAt: now
     }],

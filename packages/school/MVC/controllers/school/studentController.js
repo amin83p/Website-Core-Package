@@ -10,9 +10,7 @@ const {
     getActiveOrgIdOrThrow: getActiveOrgIdOrThrowShared,
     assertCreateOrgContextOrThrow: assertCreateOrgContextOrThrowShared,
     canCreateOrgScopedItem,
-    assertOrgAccess,
-    normalizeOrgRoles,
-    getPrimaryOrgRole
+    assertOrgAccess
 } = requireCoreModule('MVC/utils/orgContextUtils');
 
 // File handling helpers (centralized)
@@ -365,17 +363,16 @@ function buildInlinePersonPayload(body, reqUser) {
     const activeOrgId = String(reqUser?.activeOrgId || '').trim();
     const allowedOrgs = Array.isArray(reqUser?.allowedOrgs) ? reqUser.allowedOrgs : [];
     const activeOrgMeta = allowedOrgs.find((o) => String(o?.orgId || '') === activeOrgId) || null;
-    const baseOrgRoles = normalizeOrgRoles(activeOrgMeta);
-  const initialOrganizations = activeOrgId
-    ? [{
-      orgId: Number.isFinite(Number(activeOrgId)) ? Number(activeOrgId) : activeOrgId,
-      name: String(activeOrgMeta?.name || activeOrgMeta?.orgName || '').trim(),
-      roles: baseOrgRoles,
-      role: getPrimaryOrgRole(activeOrgMeta),
-      memberStatus: 'active',
-      joinedAt: now
-    }]
-    : [];
+    const initialOrganizations = activeOrgId
+        ? [{
+            orgId: Number.isFinite(Number(activeOrgId)) ? Number(activeOrgId) : activeOrgId,
+            name: String(activeOrgMeta?.name || activeOrgMeta?.orgName || '').trim(),
+            roles: ['member'],
+            role: 'member',
+            memberStatus: 'active',
+            joinedAt: now
+        }]
+        : [];
 
     return {
         active,
