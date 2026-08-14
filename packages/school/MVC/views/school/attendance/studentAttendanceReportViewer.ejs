@@ -220,6 +220,9 @@
                             <button type="button" class="btn btn-outline-primary btn-sm" id="btn_openStudentPicker">
                                 <i class="bi bi-people me-1"></i> Select Students
                             </button>
+                            <button type="button" class="btn btn-outline-success btn-sm" id="btn_openSchoolStudentPicker" title="Browse students by department and class">
+                                <i class="bi bi-diagram-3 me-1"></i> Browse Classes
+                            </button>
                             <div class="dropdown" id="selectedStudentsDropdown">
                                 <button
                                     type="button"
@@ -316,9 +319,9 @@
                     </div>
                     <div class="col-md-6 d-none" id="sarExportOverallTemplateCardWrap">
                         <div class="sar-export-template-card overall-card h-100">
-                            <div class="small text-uppercase text-muted fw-semibold mb-1">Overall report template</div>
+                            <div class="small text-uppercase text-muted fw-semibold mb-1">Overall report templates</div>
                             <div class="fw-semibold" id="sarExportOverallTemplateTitle">—</div>
-                            <div class="small text-muted mt-1">Merged report when all required class sources are selected.</div>
+                            <div class="small text-muted mt-1">Per-student merged report choices when required class sources are selected.</div>
                         </div>
                     </div>
                 </div>
@@ -369,8 +372,8 @@
                 <div class="sar-export-bulk-panel overall-panel mt-3 d-none" id="sarExportOverallBulkPanel">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                         <div>
-                            <div class="fw-semibold small"><i class="bi bi-layers me-1 text-primary"></i>Overall report template</div>
-                            <div class="small text-muted">Bulk export checked overall reports only (DOCX and payload).</div>
+                            <div class="fw-semibold small"><i class="bi bi-layers me-1 text-primary"></i>Overall report templates</div>
+                            <div class="small text-muted">Bulk export checked overall reports using each student's selected template (DOCX and payload).</div>
                         </div>
                     </div>
                     <div class="sar-export-bulk-toolbar">
@@ -461,6 +464,7 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
+<%- include('school/partials/modal_SchoolEntityPicker') %>
 <%- include('../report/partials/reportMessageHelpers') %>
 <%- include('partials/tablePages-end') %>
 
@@ -832,7 +836,20 @@
     function studentDisplayName(item) {
         const first = String(item?.firstName || item?.name?.first || '').trim();
         const last = String(item?.lastName || item?.name?.last || '').trim();
-        return `${first} ${last}`.trim() || String(item?.name || item?.displayName || item?.id || '').trim();
+        return `${first} ${last}`.trim() || String(item?.name || item?.displayName || item?.label || item?.id || '').trim();
+    }
+
+    function normalizeSelectedStudentItems(items) {
+        const list = Array.isArray(items) ? items : (items ? [items] : []);
+        return list.map((item) => {
+            const studentRecordId = String(item?.studentRecordId || item?.studentId || item?.id || '').trim();
+            return {
+                id: studentRecordId,
+                studentRecordId,
+                personId: String(item?.personId || item?.meta?.personId || '').trim(),
+                name: studentDisplayName(item)
+            };
+        }).filter((row) => row.studentRecordId);
     }
 
     function renderSelectedStudents() {
@@ -1013,23 +1030,44 @@
             multiselect: true,
             selectedItems: selectedStudents.map((row) => ({
                 id: row.studentRecordId || row.id,
+                studentRecordId: row.studentRecordId || row.id,
+                personId: row.personId,
                 firstName: row.name,
                 name: row.name
             })),
             onSelect: (items) => {
-                const list = Array.isArray(items) ? items : (items ? [items] : []);
-                selectedStudents = list.map((item) => {
-                    const studentRecordId = String(item?.id || '').trim();
-                    return {
-                        id: studentRecordId,
-                        studentRecordId,
-                        personId: String(item?.personId || '').trim(),
-                        name: studentDisplayName(item)
-                    };
-                }).filter((row) => row.studentRecordId);
+                selectedStudents = normalizeSelectedStudentItems(items);
                 renderSelectedStudents();
             }
         }));
+    }
+
+    function openHierarchicalStudentPicker() {
+        if (!window.SchoolEntityPicker || typeof window.SchoolEntityPicker.open !== 'function') {
+            showReportMessage({ icon: 'warning', message: 'Class-based student picker is not available on this page yet.' });
+            return;
+        }
+        const referenceDate = document.getElementById('filter_startDate')?.value
+            || document.getElementById('filter_endDate')?.value
+            || '';
+        window.SchoolEntityPicker.open({
+            target: 'students',
+            title: 'Browse Students by Class',
+            multiselect: true,
+            referenceDate,
+            selectedItems: selectedStudents.map((row) => ({
+                id: row.studentRecordId || row.id,
+                studentId: row.studentRecordId || row.id,
+                studentRecordId: row.studentRecordId || row.id,
+                personId: row.personId,
+                label: row.name,
+                name: row.name
+            })),
+            onSelect: (items) => {
+                selectedStudents = normalizeSelectedStudentItems(items);
+                renderSelectedStudents();
+            }
+        });
     }
 
     function attendanceFlagIsTrue(value) {
@@ -1406,15 +1444,33 @@
         return `<div class="btn-group btn-group-sm flex-wrap mt-2">${buttons.join('')}</div>`;
     }
 
-    function evaluateOverallEligibilityForStudent(studentId) {
-        const student = (sarExportPlan?.students || []).find((row) => String(row.personId || '').trim() === String(studentId || '').trim());
-        if (!student?.overall?.defined) return { eligible: false, reason: 'No overall template configured.' };
+    function findSarExportStudent(studentId) {
+        return (sarExportPlan?.students || []).find((row) => String(row.personId || '').trim() === String(studentId || '').trim()) || null;
+    }
 
-        const slotDefs = Array.isArray(student.overall?.slots) ? student.overall.slots : [];
+    function getOverallOptionsForStudent(student = {}) {
+        const options = Array.isArray(student.overallOptions) ? student.overallOptions : [];
+        if (options.length) return options.filter((row) => row?.defined);
+        return student.overall?.defined ? [student.overall] : [];
+    }
+
+    function getOverallOptionById(student = {}, templateId = '') {
+        const id = String(templateId || '').trim();
+        return getOverallOptionsForStudent(student).find((row) => String(row.templateId || '').trim() === id) || null;
+    }
+
+    function evaluateOverallEligibilityForStudent(studentId, templateId) {
+        const student = findSarExportStudent(studentId);
+        const option = getOverallOptionById(student || {}, templateId)
+            || getOverallOptionsForStudent(student || {}).find((row) => row.eligible)
+            || getOverallOptionsForStudent(student || {})[0];
+        if (!student || !option?.defined) return { eligible: false, reason: 'No overall template configured.' };
+
+        const slotDefs = Array.isArray(option.slots) ? option.slots : [];
         const necessarySlots = slotDefs.filter((slot) => String(slot.requirement || 'necessary').toLowerCase() !== 'optional');
-        const slotCount = Number(student.overall.slotCount) || 0;
+        const slotCount = Number(option.slotCount) || 0;
         if (!slotDefs.length && !slotCount) return { eligible: false, reason: 'Overall template has no source slots.' };
-        if (!necessarySlots.length && slotDefs.length) return { eligible: true, reason: '' };
+        if (!necessarySlots.length && slotDefs.length) return { eligible: true, reason: '', option };
 
         const panel = getSarExportRoot();
         if (!panel) return { eligible: false, reason: 'Export modal not ready.' };
@@ -1427,20 +1483,31 @@
             const index = Number(slotDef.slotIndex);
             const classRow = (student.classes || []).find((row) => Number(row.slotIndex) === index);
             if (!classRow) {
-                return { eligible: false, reason: `Missing class for necessary slot ${slotDef.slotKey || index + 1}.` };
+                return { eligible: false, reason: `Missing class for necessary slot ${slotDef.slotKey || index + 1}.`, option };
+            }
+            const slotTemplateId = String(slotDef.templateId || '').trim();
+            if (slotTemplateId && String(classRow.templateId || '').trim() !== slotTemplateId) {
+                return { eligible: false, reason: `Class report template does not match slot ${slotDef.slotKey || index + 1}.`, option };
             }
             const checkbox = panel.querySelector(
                 `.js-sar-export-check[data-sar-export-type="class"][data-student-id="${CSS.escape(String(student.personId))}"][data-class-id="${CSS.escape(String(classRow.classId))}"]`
             );
             const checked = checkbox ? checkbox.checked : true;
             if (!checked) {
-                return { eligible: false, reason: 'Select all necessary class reports for the overall template.' };
+                return { eligible: false, reason: 'Select all necessary class reports for the overall template.', option };
             }
             if (!classRow.exportable) {
-                return { eligible: false, reason: classRow.warning || 'A necessary class report is not exportable.' };
+                return { eligible: false, reason: classRow.warning || 'A necessary class report is not exportable.', option };
             }
         }
-        return { eligible: true, reason: '' };
+        return { eligible: true, reason: '', option };
+    }
+
+    function getEligibleOverallOptionsForStudent(studentId) {
+        const student = findSarExportStudent(studentId);
+        return getOverallOptionsForStudent(student || {}).filter((option) => (
+            evaluateOverallEligibilityForStudent(studentId, option.templateId).eligible
+        ));
     }
 
     function updateOverallEligibilityUi(studentId) {
@@ -1449,27 +1516,48 @@
         const cell = panel.querySelector(`.js-sar-overall-cell[data-student-id="${CSS.escape(String(studentId))}"]`);
         if (!cell) return;
 
-        const student = (sarExportPlan?.students || []).find((row) => String(row.personId || '').trim() === String(studentId).trim());
-        if (!student?.overall?.defined) return;
-
-        const { eligible, reason } = evaluateOverallEligibilityForStudent(studentId);
+        const eligibleOptions = getEligibleOverallOptionsForStudent(studentId);
         const checkbox = cell.querySelector('.js-sar-export-check[data-sar-export-type="overall"]');
+        const selectEl = cell.querySelector('.js-sar-overall-template-select');
         const statusEl = cell.querySelector('.js-sar-overall-status');
         const actionsEl = cell.querySelector('.js-sar-overall-actions');
+        const badgesEl = cell.querySelector('.js-sar-overall-badges');
+        const previousSelection = String(selectEl?.value || '').trim();
+        const selectedOption = eligibleOptions.find((row) => String(row.templateId || '').trim() === previousSelection)
+            || eligibleOptions[0]
+            || null;
+        const eligible = Boolean(selectedOption);
+
+        if (selectEl) {
+            selectEl.innerHTML = eligibleOptions.length
+                ? eligibleOptions.map((option) => `<option value="${escapeHtml(option.templateId)}">${escapeHtml(option.templateTitle || option.templateId)}</option>`).join('')
+                : '<option value="">No satisfied overall template</option>';
+            selectEl.value = selectedOption?.templateId || '';
+            selectEl.disabled = eligibleOptions.length <= 1;
+        }
 
         if (checkbox) {
             checkbox.disabled = !eligible;
+            checkbox.setAttribute('data-overall-template-id', selectedOption?.templateId || '');
             if (!eligible) checkbox.checked = false;
             else if (!checkbox.hasAttribute('data-user-touched')) checkbox.checked = true;
         }
 
+        if (badgesEl) {
+            badgesEl.innerHTML = eligible ? buildSarFormatBadges({ hasDocx: selectedOption.hasDocx, hasPdf: false }, 'overall') : '';
+        }
+
         if (statusEl) {
-            statusEl.textContent = eligible ? '' : (reason || 'Overall report not available.');
+            const reason = eligible
+                ? ''
+                : (getOverallOptionsForStudent(findSarExportStudent(studentId) || {})[0]?.warnings || []).join(' ') || 'No configured overall template is satisfied.';
+            statusEl.textContent = reason;
             statusEl.classList.toggle('d-none', eligible);
         }
 
         if (actionsEl) {
             actionsEl.classList.toggle('d-none', !eligible);
+            actionsEl.innerHTML = eligible ? buildSarFormatButtons({ hasDocx: selectedOption.hasDocx, hasPdf: false }, 'overall') : '';
             actionsEl.querySelectorAll('.js-sar-row-export').forEach((btn) => {
                 btn.disabled = !eligible || !(checkbox && checkbox.checked);
             });
@@ -1495,13 +1583,18 @@
 
         loadingEl?.classList.add('d-none');
         const students = Array.isArray(plan.students) ? plan.students : [];
-        const hasOverall = Boolean(plan.overallReportTemplateId);
+        const hasOverall = Array.isArray(plan.overallReportTemplates)
+            ? plan.overallReportTemplates.length > 0
+            : Boolean(plan.overallReportTemplateId);
 
         if (reportTemplateTitleEl) {
             reportTemplateTitleEl.textContent = plan.reportTemplateTitle || plan.reportTemplateId || '—';
         }
         if (overallTemplateTitleEl) {
             overallTemplateTitleEl.textContent = plan.overallReportTemplateTitle || plan.overallReportTemplateId || '—';
+        }
+        if (overallTemplateTitleEl && plan.overallReportTemplateTitleList) {
+            overallTemplateTitleEl.textContent = plan.overallReportTemplateTitleList;
         }
         overallTemplateCardWrap?.classList.toggle('d-none', !hasOverall);
         if (dateRangeEl && plan.startDate && plan.endDate) {
@@ -1557,9 +1650,13 @@
 
             const overallCell = hasOverall
                 ? (() => {
-                    const overall = student.overall || {};
-                    const overallTitle = escapeHtml(overall.templateTitle || plan.overallReportTemplateTitle || '');
-                    const initialEligible = Boolean(overall.eligible);
+                    const options = getOverallOptionsForStudent(student);
+                    const eligibleOptions = options.filter((option) => option.eligible);
+                    const selectedOption = eligibleOptions[0] || null;
+                    const initialEligible = Boolean(selectedOption);
+                    const selectOptions = eligibleOptions.length
+                        ? eligibleOptions.map((option) => `<option value="${escapeHtml(option.templateId)}">${escapeHtml(option.templateTitle || option.templateId)}</option>`).join('')
+                        : '<option value="">No satisfied overall template</option>';
                     return `
                         <td class="sar-export-overall-cell js-sar-overall-cell" data-student-id="${escapeHtml(personId)}">
                             <div class="d-flex flex-wrap align-items-start gap-2">
@@ -1568,17 +1665,20 @@
                                     class="form-check-input mt-1 js-sar-export-check"
                                     data-sar-export-type="overall"
                                     data-student-id="${escapeHtml(personId)}"
+                                    data-overall-template-id="${escapeHtml(selectedOption?.templateId || '')}"
                                     ${initialEligible ? 'checked' : 'disabled'}
                                     aria-label="Include overall report for ${escapeHtml(student.name || personId)}">
                                 <div class="flex-grow-1 min-w-0">
-                                    <div class="sar-export-class-name">${overallTitle}</div>
+                                    <select class="form-select form-select-sm js-sar-overall-template-select mb-1" data-student-id="${escapeHtml(personId)}" ${eligibleOptions.length <= 1 ? 'disabled' : ''} aria-label="Overall template for ${escapeHtml(student.name || personId)}">
+                                        ${selectOptions}
+                                    </select>
                                     <div class="small text-muted">Overall merged report</div>
-                                    ${initialEligible ? buildSarFormatBadges({ hasDocx: overall.hasDocx, hasPdf: false }, 'overall') : ''}
+                                    <div class="js-sar-overall-badges">${initialEligible ? buildSarFormatBadges({ hasDocx: selectedOption.hasDocx, hasPdf: false }, 'overall') : ''}</div>
                                     <div class="small text-warning js-sar-overall-status ${initialEligible ? 'd-none' : ''}">
-                                        ${escapeHtml((overall.warnings || []).join(' ') || 'Overall report not available for this student.')}
+                                        ${escapeHtml((options[0]?.warnings || []).join(' ') || 'Overall report not available for this student.')}
                                     </div>
                                     <div class="js-sar-overall-actions ${initialEligible ? '' : 'd-none'}">
-                                        ${buildSarFormatButtons({ hasDocx: overall.hasDocx, hasPdf: false }, 'overall')}
+                                        ${initialEligible ? buildSarFormatButtons({ hasDocx: selectedOption.hasDocx, hasPdf: false }, 'overall') : ''}
                                     </div>
                                 </div>
                             </div>
@@ -1623,9 +1723,11 @@
             root.querySelectorAll('.js-sar-export-check[data-sar-export-type="overall"]:checked:not(:disabled)').forEach((checkbox) => {
                 const studentId = String(checkbox.getAttribute('data-student-id') || '').trim();
                 if (!studentId) return;
-                const student = (sarExportPlan?.students || []).find((row) => String(row.personId || '').trim() === studentId);
-                const overall = student?.overall;
-                if (!overall?.defined) return;
+                const cell = checkbox.closest('.js-sar-overall-cell');
+                const overallTemplateId = String(cell?.querySelector('.js-sar-overall-template-select')?.value || checkbox.getAttribute('data-overall-template-id') || '').trim();
+                const student = findSarExportStudent(studentId);
+                const overall = getOverallOptionById(student || {}, overallTemplateId);
+                if (!overall?.defined || !overallTemplateId) return;
                 if (normalizedFormat === 'pdf') return;
                 if (normalizedFormat === 'docx' && !overall.hasDocx) return;
                 const classIds = [];
@@ -1635,7 +1737,7 @@
                     const classId = String(classCheckbox.getAttribute('data-class-id') || '').trim();
                     if (classId) classIds.push(classId);
                 });
-                targets.push({ type: 'overall', studentId, classIds });
+                targets.push({ type: 'overall', studentId, overallTemplateId, classIds });
             });
         }
 
@@ -1784,6 +1886,7 @@
         openStudentAttendanceExportPanel().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Export failed.' }));
     });
     document.getElementById('btn_openStudentPicker').addEventListener('click', openStudentPicker);
+    document.getElementById('btn_openSchoolStudentPicker')?.addEventListener('click', openHierarchicalStudentPicker);
     document.getElementById('btn_clearStudents').addEventListener('click', () => {
         selectedStudents = [];
         renderSelectedStudents();
@@ -1816,6 +1919,8 @@
                 if (!studentId || !classId) return;
                 targets.push({ type: 'class', studentId, classId });
             } else if (exportType === 'overall') {
+                const overallTemplateId = String(rowHost?.querySelector('.js-sar-overall-template-select')?.value || checkbox.getAttribute('data-overall-template-id') || '').trim();
+                if (!overallTemplateId) return;
                 const classIds = [];
                 getSarExportRoot()?.querySelectorAll(
                     `.js-sar-export-check[data-sar-export-type="class"][data-student-id="${CSS.escape(studentId)}"]:checked`
@@ -1823,7 +1928,7 @@
                     const classId = String(classCheckbox.getAttribute('data-class-id') || '').trim();
                     if (classId) classIds.push(classId);
                 });
-                targets.push({ type: 'overall', studentId, classIds });
+                targets.push({ type: 'overall', studentId, overallTemplateId, classIds });
             }
             runSarExport(format, targets).catch((error) => {
                 showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
@@ -1849,6 +1954,11 @@
     });
 
     document.getElementById('sarExportModal')?.addEventListener('change', (event) => {
+        const select = event.target.closest('.js-sar-overall-template-select');
+        if (select) {
+            updateOverallEligibilityUi(String(select.getAttribute('data-student-id') || '').trim());
+            return;
+        }
         const checkbox = event.target.closest('.js-sar-export-check');
         if (!checkbox) return;
         const studentId = String(checkbox.getAttribute('data-student-id') || '').trim();

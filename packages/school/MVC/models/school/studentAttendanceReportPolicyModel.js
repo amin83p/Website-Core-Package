@@ -24,7 +24,8 @@ function pickStoredPolicyFields(row) {
   if (!row || typeof row !== 'object') return {};
   return {
     reportTemplateId: row.reportTemplateId,
-    overallReportTemplateId: row.overallReportTemplateId
+    overallReportTemplateId: row.overallReportTemplateId,
+    overallReportTemplateIds: row.overallReportTemplateIds
   };
 }
 
@@ -182,6 +183,7 @@ async function getStoredPolicyRowForOrg(activeOrgId) {
     orgId: key,
     reportTemplateId: resolved.reportTemplateId,
     overallReportTemplateId: resolved.overallReportTemplateId,
+    overallReportTemplateIds: resolved.overallReportTemplateIds,
     status: 'stored',
     updatedAt: String(stored?.audit?.lastUpdateDateTime || '').trim(),
     audit: stored.audit || null

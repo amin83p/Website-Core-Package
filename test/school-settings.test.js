@@ -218,6 +218,11 @@ test('settings page renders in editable and read-only modes with valid client Ja
   assert.match(editableHtml, /id="schoolSettingsSidebar"/);
   assert.match(editableHtml, /data-settings-target="conduct-rating-scale"/);
   assert.match(editableHtml, /id="attendance-matrix"[^>]*hidden/);
+  assert.match(editableHtml, /id="sarOverallTemplatesTable"/);
+  assert.match(editableHtml, /id="sarOverallTemplateIds"/);
+  assert.match(editableHtml, /Add Overall Template/);
+  assert.match(editableHtml, /js-sar-overall-up/);
+  assert.match(editableHtml, /overallReportTemplateIds/);
   const script = editableHtml.match(/<script>([\s\S]*?)<\/script>/)?.[1] || '';
   assert.doesNotThrow(() => new Function(script));
 
@@ -259,6 +264,7 @@ test('settings policy persistence remains organization-keyed for JSON and Mongo'
   const controller = read('packages/school/MVC/controllers/school/schoolSettingsController.js');
   const conductModel = read('packages/school/MVC/models/school/conductRatingScalePolicyModel.js');
   const attendanceModel = read('packages/school/MVC/models/school/attendanceMatrixPolicyModel.js');
+  const studentAttendanceReportModel = read('packages/school/MVC/models/school/studentAttendanceReportPolicyModel.js');
   assert.match(controller, /String\(user\?\.activeOrgId \|\| ''\)\.trim\(\)/);
   assert.doesNotMatch(controller, /primaryOrgId/);
   [conductModel, attendanceModel].forEach((source) => {
@@ -269,6 +275,7 @@ test('settings policy persistence remains organization-keyed for JSON and Mongo'
   });
   assert.match(attendanceModel, /thresholdsEnabled/);
   assert.match(attendanceModel, /getPolicyCatalogForOrg/);
+  assert.match(studentAttendanceReportModel, /overallReportTemplateIds/);
 });
 
 test('attendance settings reject empty, invalid, and ambiguous default rows', () => {

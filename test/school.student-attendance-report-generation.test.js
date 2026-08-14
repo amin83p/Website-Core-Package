@@ -111,7 +111,7 @@ test('buildClassExportRowsForStudent attaches template capability flags', () => 
   assert.equal(rows[0].exportable, true);
 });
 
-test('buildClassExportRowsForStudent maps overall slots to sorted classes', () => {
+test('buildClassExportRowsForStudent always uses configured class report template', () => {
   const student = {
     personId: 'PERSON-1',
     classes: [
@@ -126,6 +126,7 @@ test('buildClassExportRowsForStudent maps overall slots to sorted classes', () =
     ]
   };
   const templateMetaMap = new Map([
+    ['RPT-1', { templateTitle: 'Class Template', hasDocx: true, hasPdf: true }],
     ['RPT-A', { templateTitle: 'Template A', hasDocx: true, hasPdf: false }],
     ['RPT-B', { templateTitle: 'Template B', hasDocx: false, hasPdf: true }]
   ]);
@@ -137,12 +138,13 @@ test('buildClassExportRowsForStudent maps overall slots to sorted classes', () =
   );
   assert.equal(rows.length, 2);
   assert.equal(rows[0].classId, 'C1');
-  assert.equal(rows[0].slotKey, 'T1');
-  assert.equal(rows[0].templateId, 'RPT-A');
+  assert.equal(rows[0].slotKey, '');
+  assert.equal(rows[0].templateId, 'RPT-1');
+  assert.equal(rows[0].templateTitle, 'Class Template');
   assert.equal(rows[0].hasDocx, true);
-  assert.equal(rows[0].hasPdf, false);
+  assert.equal(rows[0].hasPdf, true);
   assert.equal(rows[1].classId, 'C2');
-  assert.equal(rows[1].templateId, 'RPT-B');
+  assert.equal(rows[1].templateId, 'RPT-1');
   assert.equal(rows[1].hasPdf, true);
 });
 
@@ -155,12 +157,12 @@ test('buildOverallExportBlock marks eligible when all slots are exportable', () 
     ]
   };
   const classRows = [
-    { slotIndex: 0, exportable: true, warning: '' },
-    { slotIndex: 1, exportable: true, warning: '' }
+    { slotIndex: 0, templateId: 'RPT-1', exportable: true, warning: '' },
+    { slotIndex: 1, templateId: 'RPT-1', exportable: true, warning: '' }
   ];
   const block = studentAttendanceReportGenerationService.buildOverallExportBlock(
     { personId: 'PERSON-1' },
-    { overallReportTemplateId: 'OVR-1' },
+    { reportTemplateId: 'RPT-1', overallReportTemplateId: 'OVR-1' },
     overallTemplate,
     classRows
   );
@@ -177,12 +179,12 @@ test('buildOverallExportBlock is not eligible when a slot class is not exportabl
     ]
   };
   const classRows = [
-    { slotIndex: 0, exportable: true, warning: '' },
-    { slotIndex: 1, exportable: false, warning: 'No teacher assigned for Beta.' }
+    { slotIndex: 0, templateId: 'RPT-1', exportable: true, warning: '' },
+    { slotIndex: 1, templateId: 'RPT-1', exportable: false, warning: 'No teacher assigned for Beta.' }
   ];
   const block = studentAttendanceReportGenerationService.buildOverallExportBlock(
     { personId: 'PERSON-1' },
-    { overallReportTemplateId: 'OVR-1' },
+    { reportTemplateId: 'RPT-1', overallReportTemplateId: 'OVR-1' },
     overallTemplate,
     classRows
   );
@@ -199,11 +201,11 @@ test('buildOverallExportBlock is eligible when only necessary slots are satisfie
     ]
   };
   const classRows = [
-    { slotIndex: 0, exportable: true, warning: '' }
+    { slotIndex: 0, templateId: 'RPT-1', exportable: true, warning: '' }
   ];
   const block = studentAttendanceReportGenerationService.buildOverallExportBlock(
     { personId: 'PERSON-1' },
-    { overallReportTemplateId: 'OVR-1' },
+    { reportTemplateId: 'RPT-1', overallReportTemplateId: 'OVR-1' },
     overallTemplate,
     classRows
   );
@@ -260,4 +262,58 @@ test('buildSourceRunsForStudent respects selectedClassIds for overall slots', ()
   assert.equal(sourceRuns.length, 1);
   assert.equal(sourceRuns[0].classId, 'C1');
   assert.match(warnings.join(' '), /not selected/i);
+});
+
+test('buildSourceRunsForStudent rejects necessary overall slots with mismatched class template', () => {
+  const student = {
+    personId: 'PERSON-1',
+    classes: [{ classId: 'C1', className: 'Alpha', teacherId: 'TEACH-1' }]
+  };
+  const overallTemplate = {
+    sourceSlots: [{ slotKey: 'T1', order: 1, templateId: 'RPT-OTHER', requirement: 'necessary' }]
+  };
+  const { sourceRuns, warnings } = studentAttendanceReportGenerationService.buildSourceRunsForStudent({
+    student,
+    policy: { reportTemplateId: 'RPT-1' },
+    overallTemplate,
+    startDate: '2026-01-01',
+    endDate: '2026-01-31'
+  });
+  assert.equal(sourceRuns.length, 0);
+  assert.match(warnings.join(' '), /requires RPT-OTHER/);
+});
+
+test('buildOverallExportOptions returns eligible templates in settings order', () => {
+  const student = { personId: 'PERSON-1' };
+  const classRows = [
+    { slotIndex: 0, classId: 'C1', templateId: 'RPT-1', exportable: true, warning: '' },
+    { slotIndex: 1, classId: 'C2', templateId: 'RPT-1', exportable: true, warning: '' }
+  ];
+  const templates = [
+    {
+      id: 'OVR-1',
+      title: 'First Overall',
+      sourceSlots: [
+        { slotKey: 'T1', order: 1, templateId: 'RPT-1' },
+        { slotKey: 'T2', order: 2, templateId: 'RPT-1' }
+      ]
+    },
+    {
+      id: 'OVR-2',
+      title: 'Second Overall',
+      sourceSlots: [
+        { slotKey: 'T1', order: 1, templateId: 'RPT-1' }
+      ]
+    }
+  ];
+  const options = studentAttendanceReportGenerationService.buildOverallExportOptions(
+    student,
+    { reportTemplateId: 'RPT-1' },
+    templates,
+    classRows
+  );
+
+  assert.deepEqual(options.map((row) => row.templateId), ['OVR-1', 'OVR-2']);
+  assert.equal(options.every((row) => row.eligible), true);
+  assert.deepEqual(options[0].matchedClassIds, ['C1', 'C2']);
 });

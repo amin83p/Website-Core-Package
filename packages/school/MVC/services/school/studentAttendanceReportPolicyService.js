@@ -11,20 +11,56 @@ function cleanId(value = '') {
 
 const DEFAULT_POLICY = Object.freeze({
   reportTemplateId: '',
-  overallReportTemplateId: ''
+  overallReportTemplateId: '',
+  overallReportTemplateIds: Object.freeze([])
 });
 
+function normalizeIdList(value, fallbackValue = '') {
+  let source = value;
+  if (source === undefined || source === null || source === '') {
+    source = fallbackValue ? [fallbackValue] : [];
+  }
+  if (typeof source === 'string') {
+    const text = source.trim();
+    if (!text) {
+      source = [];
+    } else if (text.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(text);
+        source = Array.isArray(parsed) ? parsed : [text];
+      } catch {
+        source = [text];
+      }
+    } else {
+      source = text.split(',');
+    }
+  }
+  const seen = new Set();
+  return (Array.isArray(source) ? source : [source])
+    .map((id) => cleanId(id))
+    .filter(Boolean)
+    .filter((id) => {
+      const key = id.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
 function normalizePolicyFromStored(input = {}) {
+  const overallReportTemplateIds = normalizeIdList(input.overallReportTemplateIds, input.overallReportTemplateId);
   return {
     reportTemplateId: cleanId(input.reportTemplateId),
-    overallReportTemplateId: cleanId(input.overallReportTemplateId)
+    overallReportTemplateId: overallReportTemplateIds[0] || '',
+    overallReportTemplateIds
   };
 }
 
 function normalizePolicyFromForm(input = {}) {
   return normalizePolicyFromStored({
     reportTemplateId: input.reportTemplateId,
-    overallReportTemplateId: input.overallReportTemplateId
+    overallReportTemplateId: input.overallReportTemplateId,
+    overallReportTemplateIds: input.overallReportTemplateIds || input.overallReportTemplateIdsJson
   });
 }
 
@@ -86,10 +122,20 @@ async function assertOverallTemplateAccessible(templateId, reqUser) {
   return template;
 }
 
+async function assertOverallTemplatesAccessible(templateIds = [], reqUser) {
+  const templates = [];
+  for (const templateId of normalizeIdList(templateIds)) {
+    // eslint-disable-next-line no-await-in-loop
+    const template = await assertOverallTemplateAccessible(templateId, reqUser);
+    if (template) templates.push(template);
+  }
+  return templates;
+}
+
 async function validatePolicyInput(input = {}, reqUser) {
   const normalized = normalizePolicyFromForm(input);
   await assertReportTemplateAccessible(normalized.reportTemplateId, reqUser, { required: false });
-  await assertOverallTemplateAccessible(normalized.overallReportTemplateId, reqUser);
+  await assertOverallTemplatesAccessible(normalized.overallReportTemplateIds, reqUser);
   return normalized;
 }
 
@@ -107,8 +153,10 @@ module.exports = {
   normalizePolicyFromStored,
   normalizePolicyFromForm,
   resolvePolicy,
+  normalizeIdList,
   validatePolicyInput,
   assertReportTemplateAccessible,
   assertOverallTemplateAccessible,
+  assertOverallTemplatesAccessible,
   formatTemplateLabel
 };

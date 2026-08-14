@@ -198,18 +198,26 @@ async function resolveStudentAttendanceReportLabels(policy = {}, reqUser) {
   const reportTemplate = policy.reportTemplateId
     ? await schoolDataService.getDataById('reportTemplates', policy.reportTemplateId, reqUser)
     : null;
-  const overallTemplate = policy.overallReportTemplateId
-    ? await schoolDataService.getDataById('overallReportTemplates', policy.overallReportTemplateId, reqUser)
-    : null;
+  const overallIds = studentAttendanceReportPolicyService.normalizeIdList(
+    policy.overallReportTemplateIds,
+    policy.overallReportTemplateId
+  );
+  const overallReportTemplateLabels = [];
+  for (const overallId of overallIds) {
+    // eslint-disable-next-line no-await-in-loop
+    const template = await schoolDataService.getDataById('overallReportTemplates', overallId, reqUser);
+    overallReportTemplateLabels.push({
+      id: overallId,
+      label: studentAttendanceReportPolicyService.formatTemplateLabel(template, overallId)
+    });
+  }
   return {
     reportTemplateLabel: studentAttendanceReportPolicyService.formatTemplateLabel(
       reportTemplate,
       policy.reportTemplateId
     ),
-    overallReportTemplateLabel: studentAttendanceReportPolicyService.formatTemplateLabel(
-      overallTemplate,
-      policy.overallReportTemplateId
-    )
+    overallReportTemplateLabel: overallReportTemplateLabels[0]?.label || '',
+    overallReportTemplateLabels
   };
 }
 
@@ -249,7 +257,8 @@ async function loadSettingsPageData(req) {
     autosaveSections: listAutosaveSections(),
     studentAttendanceReportPolicy,
     studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
-    studentAttendanceReportOverallLabel: studentAttendanceReportLabels.overallReportTemplateLabel
+    studentAttendanceReportOverallLabel: studentAttendanceReportLabels.overallReportTemplateLabel,
+    studentAttendanceReportOverallLabels: studentAttendanceReportLabels.overallReportTemplateLabels
   };
 }
 
@@ -393,7 +402,8 @@ async function saveStudentAttendanceReportSettings(req, res) {
       message: 'Student Attendance Report settings were updated.',
       policy,
       reportTemplateLabel: labels.reportTemplateLabel,
-      overallReportTemplateLabel: labels.overallReportTemplateLabel
+      overallReportTemplateLabel: labels.overallReportTemplateLabel,
+      overallReportTemplateLabels: labels.overallReportTemplateLabels
     });
   } catch (error) {
     return res.status(Number(error?.statusCode) || 500).json({

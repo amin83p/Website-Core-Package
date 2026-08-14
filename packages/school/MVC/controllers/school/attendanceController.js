@@ -1114,17 +1114,21 @@ async function showStudentAttendanceReportPage(req, res) {
             initialStudents = await studentAttendanceReportService.resolveSelectedStudents(req, initialStudentIds);
         }
         const activeOrgId = String(req.user?.activeOrgId || '').trim();
-        const policy = activeOrgId
+        const policy = studentAttendanceReportPolicyService.resolvePolicy(activeOrgId
             ? await studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId)
-            : studentAttendanceReportPolicyService.resolvePolicy();
-        const [reportTemplate, overallTemplate] = await Promise.all([
-            policy.reportTemplateId
-                ? schoolDataService.getDataById('reportTemplates', policy.reportTemplateId, req.user)
-                : null,
-            policy.overallReportTemplateId
-                ? schoolDataService.getDataById('overallReportTemplates', policy.overallReportTemplateId, req.user)
-                : null
-        ]);
+            : {});
+        const reportTemplate = policy.reportTemplateId
+            ? await schoolDataService.getDataById('reportTemplates', policy.reportTemplateId, req.user)
+            : null;
+        const overallTemplateLabels = [];
+        for (const overallTemplateId of policy.overallReportTemplateIds || []) {
+            // eslint-disable-next-line no-await-in-loop
+            const overallTemplate = await schoolDataService.getDataById('overallReportTemplates', overallTemplateId, req.user);
+            overallTemplateLabels.push(studentAttendanceReportPolicyService.formatTemplateLabel(
+                overallTemplate,
+                overallTemplateId
+            ));
+        }
         res.render('school/attendance/studentAttendanceReportViewer', {
             title: 'Student Attendance Report',
             includeModal: true,
@@ -1140,10 +1144,8 @@ async function showStudentAttendanceReportPage(req, res) {
                 reportTemplate,
                 policy.reportTemplateId
             ),
-            overallReportTemplateLabel: studentAttendanceReportPolicyService.formatTemplateLabel(
-                overallTemplate,
-                policy.overallReportTemplateId
-            )
+            overallReportTemplateLabel: overallTemplateLabels[0] || '',
+            overallReportTemplateLabels
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

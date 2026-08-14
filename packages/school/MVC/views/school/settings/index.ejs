@@ -4,7 +4,8 @@
   const attendanceItemsJson = JSON.stringify(attendanceItems || []).replace(/</g, '\\u003c');
   const autosavePolicyJson = JSON.stringify(typeof autosavePolicy !== 'undefined' ? autosavePolicy : { defaultMinutes: 5, sections: {} }).replace(/</g, '\\u003c');
   const autosaveSectionsJson = JSON.stringify(typeof autosaveSections !== 'undefined' ? autosaveSections : []).replace(/</g, '\\u003c');
-  const studentAttendanceReportPolicyJson = JSON.stringify(typeof studentAttendanceReportPolicy !== 'undefined' ? studentAttendanceReportPolicy : { reportTemplateId: '', overallReportTemplateId: '' }).replace(/</g, '\\u003c');
+  const studentAttendanceReportPolicyJson = JSON.stringify(typeof studentAttendanceReportPolicy !== 'undefined' ? studentAttendanceReportPolicy : { reportTemplateId: '', overallReportTemplateId: '', overallReportTemplateIds: [] }).replace(/</g, '\\u003c');
+  const studentAttendanceReportOverallLabelsJson = JSON.stringify(typeof studentAttendanceReportOverallLabels !== 'undefined' ? studentAttendanceReportOverallLabels : []).replace(/</g, '\\u003c');
   const attendanceThresholdsEnabledFlag = typeof attendanceThresholdsEnabled === 'undefined'
     ? true
     : attendanceThresholdsEnabled !== false;
@@ -567,17 +568,39 @@
                 </div>
                 <div class="form-text">Required to generate reports from the Student Attendance Report page.</div>
               </div>
-              <div class="col-lg-6">
-                <label class="form-label fw-semibold" for="sarOverallTemplateTitle">Overall report template (optional)</label>
-                <input type="hidden" name="overallReportTemplateId" id="sarOverallTemplateId" value="<%= typeof studentAttendanceReportPolicy !== 'undefined' && studentAttendanceReportPolicy?.overallReportTemplateId ? studentAttendanceReportPolicy.overallReportTemplateId : '' %>">
-                <div class="input-group">
-                  <input class="form-control" type="text" id="sarOverallTemplateTitle" readonly placeholder="No overall template selected" value="<%= typeof studentAttendanceReportOverallLabel !== 'undefined' ? studentAttendanceReportOverallLabel : '' %>">
+              <div class="col-12">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                  <div>
+                    <label class="form-label fw-semibold mb-1" for="sarOverallTemplateIds">Overall report templates (optional)</label>
+                    <div class="form-text mt-0">Ordered options for merged reports. Class report rows always use the selected class report template.</div>
+                  </div>
                   <% if (canUpdateFlag) { %>
-                    <button class="btn btn-outline-secondary" type="button" id="btnPickSarOverallTemplate"><i class="bi bi-search"></i></button>
-                    <button class="btn btn-outline-secondary" type="button" id="btnClearSarOverallTemplate" title="Clear overall template"><i class="bi bi-x-lg"></i></button>
+                    <div class="d-flex gap-2">
+                      <button class="btn btn-outline-secondary btn-sm" type="button" id="btnPickSarOverallTemplate">
+                        <i class="bi bi-search me-1"></i>Add Overall Template
+                      </button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" id="btnClearSarOverallTemplate" title="Clear overall templates">
+                        <i class="bi bi-x-lg me-1"></i>Clear
+                      </button>
+                    </div>
                   <% } %>
                 </div>
-                <div class="form-text">When set, classes are mapped to overall source slots by sorted class order.</div>
+                <input type="hidden" name="overallReportTemplateId" id="sarOverallTemplateId" value="<%= typeof studentAttendanceReportPolicy !== 'undefined' && studentAttendanceReportPolicy?.overallReportTemplateId ? studentAttendanceReportPolicy.overallReportTemplateId : '' %>">
+                <input type="hidden" name="overallReportTemplateIds" id="sarOverallTemplateIds" value="">
+                <div class="table-responsive border rounded">
+                  <table class="table table-sm align-middle mb-0 school-settings-table" id="sarOverallTemplatesTable">
+                    <thead class="table-light">
+                      <tr>
+                        <th style="width: 56px;">Order</th>
+                        <th>Overall template</th>
+                        <% if (canUpdateFlag) { %><th class="text-end" style="width: 190px;">Actions</th><% } %>
+                      </tr>
+                    </thead>
+                    <tbody id="sarOverallTemplatesBody">
+                      <tr><td colspan="<%= canUpdateFlag ? 3 : 2 %>" class="text-muted small py-3">No overall templates selected.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
             <% if (canUpdateFlag) { %>
@@ -606,6 +629,8 @@
   let autosavePolicy = <%- autosavePolicyJson %>;
   const autosaveSections = <%- autosaveSectionsJson %>;
   let studentAttendanceReportPolicy = <%- studentAttendanceReportPolicyJson %>;
+  const studentAttendanceReportOverallLabels = <%- studentAttendanceReportOverallLabelsJson %>;
+  let sarOverallTemplates = [];
   let attendanceThresholdsEnabled = <%= attendanceThresholdsEnabledFlag ? 'true' : 'false' %>;
   let rollupFormula = <%- rollupFormulaJson %>;
   const conductBody = document.getElementById('conductSettingsBody');
@@ -1144,6 +1169,86 @@
     return type ? `${title} | ${type} v${version}` : `${title} v${version}`;
   }
 
+  function normalizeSarOverallTemplateRows(rows = []) {
+    const seen = new Set();
+    return (Array.isArray(rows) ? rows : [])
+      .map((row) => {
+        const id = String(row?.id || row?.templateId || '').trim();
+        return {
+          id,
+          label: String(row?.label || row?.title || row?.templateTitle || id).trim() || id
+        };
+      })
+      .filter((row) => row.id)
+      .filter((row) => {
+        const key = row.id.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
+  function syncSarOverallTemplateInputs() {
+    const ids = sarOverallTemplates.map((row) => row.id).filter(Boolean);
+    const firstId = ids[0] || '';
+    const legacyInput = document.getElementById('sarOverallTemplateId');
+    const listInput = document.getElementById('sarOverallTemplateIds');
+    if (legacyInput) legacyInput.value = firstId;
+    if (listInput) listInput.value = JSON.stringify(ids);
+    studentAttendanceReportPolicy.overallReportTemplateId = firstId;
+    studentAttendanceReportPolicy.overallReportTemplateIds = ids;
+  }
+
+  function renderSarOverallTemplates() {
+    const body = document.getElementById('sarOverallTemplatesBody');
+    if (!body) return;
+    syncSarOverallTemplateInputs();
+    if (!sarOverallTemplates.length) {
+      body.innerHTML = `<tr><td colspan="${canUpdate ? 3 : 2}" class="text-muted small py-3">No overall templates selected.</td></tr>`;
+      return;
+    }
+    body.innerHTML = sarOverallTemplates.map((row, index) => {
+      const canMoveUp = index > 0;
+      const canMoveDown = index < sarOverallTemplates.length - 1;
+      return `
+        <tr data-sar-overall-index="${index}">
+          <td><span class="badge bg-secondary">${index + 1}</span></td>
+          <td>
+            <div class="fw-semibold">${escapeHtml(row.label || row.id)}</div>
+            <div class="small text-muted font-monospace">${escapeHtml(row.id)}</div>
+          </td>
+          ${canUpdate ? `
+            <td class="text-end text-nowrap">
+              <button type="button" class="btn btn-outline-secondary btn-sm js-sar-overall-up" data-index="${index}" ${canMoveUp ? '' : 'disabled'} title="Move up"><i class="bi bi-arrow-up"></i></button>
+              <button type="button" class="btn btn-outline-secondary btn-sm js-sar-overall-down" data-index="${index}" ${canMoveDown ? '' : 'disabled'} title="Move down"><i class="bi bi-arrow-down"></i></button>
+              <button type="button" class="btn btn-outline-danger btn-sm js-sar-overall-remove" data-index="${index}" title="Remove"><i class="bi bi-x-lg"></i></button>
+            </td>
+          ` : ''}
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function initializeSarOverallTemplates(labels = studentAttendanceReportOverallLabels) {
+    const labelMap = new Map(normalizeSarOverallTemplateRows(labels).map((row) => [row.id, row]));
+    const ids = Array.isArray(studentAttendanceReportPolicy?.overallReportTemplateIds)
+      ? studentAttendanceReportPolicy.overallReportTemplateIds
+      : (studentAttendanceReportPolicy?.overallReportTemplateId ? [studentAttendanceReportPolicy.overallReportTemplateId] : []);
+    sarOverallTemplates = normalizeSarOverallTemplateRows(ids.map((id) => {
+      const cleanId = String(id || '').trim();
+      return labelMap.get(cleanId) || { id: cleanId, label: cleanId };
+    }));
+    renderSarOverallTemplates();
+  }
+
+  function addSarOverallTemplate(item = {}) {
+    const id = String(item?.id || '').trim();
+    if (!id) return;
+    const label = formatSarTemplateLabel(item, id);
+    sarOverallTemplates = normalizeSarOverallTemplateRows([...sarOverallTemplates, { id, label }]);
+    renderSarOverallTemplates();
+  }
+
   document.getElementById('btnPickSarReportTemplate')?.addEventListener('click', () => {
     if (!window.GenericPicker || !window.GenericPickerPresets) return;
     GenericPicker.open(GenericPickerPresets.normalizeConfig({
@@ -1169,19 +1274,34 @@
       apiEndpoint: '/school/reports/overall-templates',
       placeholder: 'Search overall templates...',
       onSelect: (item) => {
-        const id = String(item?.id || '').trim();
-        if (!id) return;
-        document.getElementById('sarOverallTemplateId').value = id;
-        document.getElementById('sarOverallTemplateTitle').value = formatSarTemplateLabel(item, id);
-        studentAttendanceReportPolicy.overallReportTemplateId = id;
+        addSarOverallTemplate(item);
       }
     }));
   });
 
   document.getElementById('btnClearSarOverallTemplate')?.addEventListener('click', () => {
-    document.getElementById('sarOverallTemplateId').value = '';
-    document.getElementById('sarOverallTemplateTitle').value = '';
-    studentAttendanceReportPolicy.overallReportTemplateId = '';
+    sarOverallTemplates = [];
+    renderSarOverallTemplates();
+  });
+
+  document.getElementById('sarOverallTemplatesBody')?.addEventListener('click', (event) => {
+    const up = event.target.closest('.js-sar-overall-up');
+    const down = event.target.closest('.js-sar-overall-down');
+    const remove = event.target.closest('.js-sar-overall-remove');
+    const button = up || down || remove;
+    if (!button) return;
+    const index = Number(button.getAttribute('data-index'));
+    if (!Number.isInteger(index) || index < 0 || index >= sarOverallTemplates.length) return;
+    if (remove) {
+      sarOverallTemplates.splice(index, 1);
+    } else {
+      const delta = up ? -1 : 1;
+      const nextIndex = index + delta;
+      if (nextIndex < 0 || nextIndex >= sarOverallTemplates.length) return;
+      const [row] = sarOverallTemplates.splice(index, 1);
+      sarOverallTemplates.splice(nextIndex, 0, row);
+    }
+    renderSarOverallTemplates();
   });
 
   document.getElementById('studentAttendanceReportSettingsForm')?.addEventListener('submit', async (event) => {
@@ -1191,7 +1311,8 @@
     const result = await postSettings('/school/settings/student-attendance-report', {
       actionStateId: event.currentTarget.elements.actionStateId?.value || '',
       reportTemplateId: document.getElementById('sarReportTemplateId')?.value || '',
-      overallReportTemplateId: document.getElementById('sarOverallTemplateId')?.value || ''
+      overallReportTemplateId: document.getElementById('sarOverallTemplateId')?.value || '',
+      overallReportTemplateIds: document.getElementById('sarOverallTemplateIds')?.value || '[]'
     }, button, 'studentAttendanceReportSettingsError');
     if (!result) return;
     studentAttendanceReportPolicy = result.policy && typeof result.policy === 'object'
@@ -1200,9 +1321,7 @@
     if (result.reportTemplateLabel) {
       document.getElementById('sarReportTemplateTitle').value = result.reportTemplateLabel;
     }
-    if (result.overallReportTemplateLabel !== undefined) {
-      document.getElementById('sarOverallTemplateTitle').value = result.overallReportTemplateLabel || '';
-    }
+    if (Array.isArray(result.overallReportTemplateLabels)) initializeSarOverallTemplates(result.overallReportTemplateLabels);
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 
@@ -1226,5 +1345,6 @@
   renderRollupFormulaControls();
   renderRollupGraceItems();
   renderAutosaveSections();
+  initializeSarOverallTemplates();
 })();
 </script>

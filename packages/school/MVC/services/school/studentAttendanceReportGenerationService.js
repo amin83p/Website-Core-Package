@@ -54,6 +54,7 @@ function buildOverallSlotSummaries(overallTemplate = null) {
   return sortOverallSlots(overallTemplate).map((slot, index) => ({
     slotKey: clean(slot.slotKey).toUpperCase(),
     slotIndex: index,
+    templateId: clean(slot.templateId),
     requirement: isOptionalSlot(slot) ? 'optional' : 'necessary'
   }));
 }
@@ -98,6 +99,8 @@ function buildSourceRunsForStudent({
     slots.forEach((slot, index) => {
       const classRow = classes[index];
       const optional = isOptionalSlot(slot);
+      const classTemplateId = clean(policy.reportTemplateId);
+      const slotTemplateId = clean(slot.templateId) || classTemplateId;
       if (!classRow) {
         if (!optional) {
           warnings.push(`No class available for overall slot ${slot.slotKey || index + 1} (${student.name || personId}).`);
@@ -105,6 +108,12 @@ function buildSourceRunsForStudent({
         return;
       }
       const classId = clean(classRow.classId);
+      if (slotTemplateId && classTemplateId && slotTemplateId !== classTemplateId) {
+        if (!optional) {
+          warnings.push(`Class ${classRow.className || classId} uses template ${classTemplateId}, but slot ${slot.slotKey || index + 1} requires ${slotTemplateId}.`);
+        }
+        return;
+      }
       if (selectedSet && !selectedSet.has(classId)) {
         if (!optional) {
           warnings.push(`Class ${classRow.className || classId} is not selected for overall slot ${slot.slotKey || index + 1}.`);
@@ -120,7 +129,7 @@ function buildSourceRunsForStudent({
       }
       sourceRuns.push({
         slotKey: clean(slot.slotKey).toUpperCase(),
-        templateId: clean(slot.templateId) || clean(policy.reportTemplateId),
+        templateId: classTemplateId || slotTemplateId,
         classId,
         teacherId,
         reportStartDate: startDate,
@@ -164,7 +173,9 @@ async function loadGenerationContext(req, options = {}) {
     throw error;
   }
 
-  const policy = await studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId);
+  const policy = studentAttendanceReportPolicyService.resolvePolicy(
+    await studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId)
+  );
   if (!clean(policy.reportTemplateId)) {
     const error = new Error('Configure a report template in School Settings before generating reports.');
     error.statusCode = 400;
@@ -173,13 +184,9 @@ async function loadGenerationContext(req, options = {}) {
 
   await studentAttendanceReportPolicyService.assertReportTemplateAccessible(policy.reportTemplateId, req.user);
 
-  let overallTemplate = null;
-  if (clean(policy.overallReportTemplateId)) {
-    overallTemplate = await studentAttendanceReportPolicyService.assertOverallTemplateAccessible(
-      policy.overallReportTemplateId,
-      req.user
-    );
-  }
+  const overallTemplates = await studentAttendanceReportPolicyService.assertOverallTemplatesAccessible(policy.overallReportTemplateIds, req.user);
+  const overallTemplate = overallTemplates[0] || null;
+  const overallTemplateMap = new Map(overallTemplates.map((template) => [clean(template.id), template]));
 
   const payload = await studentAttendanceReportService.buildStudentAttendanceReportPayload(req, options);
   const students = Array.isArray(payload.students) ? payload.students : [];
@@ -192,6 +199,8 @@ async function loadGenerationContext(req, options = {}) {
   return {
     policy,
     overallTemplate,
+    overallTemplates,
+    overallTemplateMap,
     payload,
     students,
     startDate: payload.startDate,
@@ -216,35 +225,7 @@ async function loadTemplateMetaMap(templateIds = [], reqUser) {
 
 function buildClassExportRowsForStudent(student, policy, overallTemplate, templateMetaMap) {
   const classes = sortClasses(student.classes);
-  const slots = sortOverallSlots(overallTemplate);
   const rows = [];
-
-  if (slots.length) {
-    slots.forEach((slot, index) => {
-      const classRow = classes[index];
-      if (!classRow) return;
-      const classId = clean(classRow.classId);
-      const templateId = clean(slot.templateId) || clean(policy.reportTemplateId);
-      const meta = templateMetaMap.get(templateId) || {};
-      const teacherId = resolveTeacherIdForClass(classRow);
-      rows.push({
-        classId,
-        className: clean(classRow.className) || classId,
-        teacherId,
-        slotKey: clean(slot.slotKey).toUpperCase(),
-        slotIndex: index,
-        requirement: isOptionalSlot(slot) ? 'optional' : 'necessary',
-        templateId,
-        templateTitle: meta.templateTitle || templateId,
-        hasDocx: Boolean(meta.hasDocx),
-        hasPdf: Boolean(meta.hasPdf),
-        exportable: Boolean(teacherId),
-        warning: teacherId ? '' : `No teacher assigned for ${classRow.className || classId}.`
-      });
-    });
-    return rows;
-  }
-
   const templateId = clean(policy.reportTemplateId);
   const meta = templateMetaMap.get(templateId) || {};
   classes.forEach((classRow, index) => {
@@ -275,19 +256,33 @@ function buildOverallExportBlock(student, policy, overallTemplate, classRows) {
   const necessarySlots = slots.filter((slot) => !isOptionalSlot(slot));
   const missingSlots = [];
   const warnings = [];
+  const matchedClassIds = [];
+  const templateId = clean(overallTemplate.id || policy.overallReportTemplateId);
+  const templateTitle = clean(overallTemplate.title) || templateId;
 
   slots.forEach((slot, index) => {
-    if (isOptionalSlot(slot)) return;
+    const optional = isOptionalSlot(slot);
     const row = classRows.find((entry) => Number(entry.slotIndex) === index);
     if (!row) {
+      if (optional) return;
       missingSlots.push(clean(slot.slotKey) || String(index + 1));
       warnings.push(`No class available for slot ${slot.slotKey || index + 1}.`);
       return;
     }
     if (!row.exportable) {
+      if (optional) return;
       missingSlots.push(clean(slot.slotKey) || String(index + 1));
       warnings.push(row.warning || `Slot ${slot.slotKey || index + 1} is not exportable.`);
+      return;
     }
+    const slotTemplateId = clean(slot.templateId) || clean(policy.reportTemplateId);
+    if (slotTemplateId && clean(row.templateId) !== slotTemplateId) {
+      if (optional) return;
+      missingSlots.push(clean(slot.slotKey) || String(index + 1));
+      warnings.push(`Slot ${slot.slotKey || index + 1} requires template ${slotTemplateId}, but class ${row.className || row.classId} uses ${row.templateId}.`);
+      return;
+    }
+    if (clean(row.classId)) matchedClassIds.push(clean(row.classId));
   });
 
   const eligible = slots.length > 0
@@ -295,43 +290,51 @@ function buildOverallExportBlock(student, policy, overallTemplate, classRows) {
 
   return {
     defined: true,
-    templateId: clean(policy.overallReportTemplateId),
-    templateTitle: clean(overallTemplate.title) || clean(policy.overallReportTemplateId),
+    templateId,
+    templateTitle,
     hasDocx: overallReportService.templateHasAttachedDocx(overallTemplate),
     eligible,
     missingSlots,
     warnings,
+    matchedClassIds,
     slots: slotSummaries,
     necessarySlotCount: necessarySlots.length,
     slotCount: slots.length
   };
 }
 
+function buildOverallExportOptions(student, policy, overallTemplates = [], classRows = []) {
+  return (Array.isArray(overallTemplates) ? overallTemplates : [])
+    .map((template) => buildOverallExportBlock(student, policy, template, classRows))
+    .filter(Boolean);
+}
+
 async function buildStudentAttendanceReportExportPlan(req, options = {}) {
   const ctx = await loadGenerationContext(req, options);
-  const { policy, overallTemplate, students, startDate, endDate } = ctx;
+  const { policy, overallTemplates, students, startDate, endDate } = ctx;
 
   const templateIds = [policy.reportTemplateId];
-  if (overallTemplate) {
-    sortOverallSlots(overallTemplate).forEach((slot) => {
-      const slotTemplateId = clean(slot.templateId);
-      if (slotTemplateId) templateIds.push(slotTemplateId);
-    });
-  }
   const templateMetaMap = await loadTemplateMetaMap(templateIds, req.user);
 
   const planStudents = students.map((student) => {
-    const classRows = buildClassExportRowsForStudent(student, policy, overallTemplate, templateMetaMap);
-    const overall = buildOverallExportBlock(student, policy, overallTemplate, classRows);
+    const classRows = buildClassExportRowsForStudent(student, policy, null, templateMetaMap);
+    const overallOptions = buildOverallExportOptions(student, policy, overallTemplates, classRows);
+    const overall = overallOptions.find((option) => option.eligible) || overallOptions[0] || null;
     return {
       personId: clean(student.personId),
       name: clean(student.name) || clean(student.personId),
       classes: classRows,
-      overall
+      overall,
+      overallOptions
     };
   });
 
   const defaultReportMeta = templateMetaMap.get(clean(policy.reportTemplateId)) || {};
+  const overallTemplateSummaries = overallTemplates.map((template) => ({
+    id: clean(template.id),
+    title: clean(template.title) || clean(template.id),
+    hasDocx: overallReportService.templateHasAttachedDocx(template)
+  }));
 
   return {
     startDate,
@@ -339,9 +342,10 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
     reportTemplateId: clean(policy.reportTemplateId),
     reportTemplateTitle: defaultReportMeta.templateTitle || clean(policy.reportTemplateId),
     overallReportTemplateId: clean(policy.overallReportTemplateId),
-    overallReportTemplateTitle: overallTemplate
-      ? (clean(overallTemplate.title) || clean(policy.overallReportTemplateId))
-      : '',
+    overallReportTemplateIds: policy.overallReportTemplateIds || [],
+    overallReportTemplateTitle: overallTemplateSummaries[0]?.title || '',
+    overallReportTemplateTitleList: overallTemplateSummaries.map((row) => row.title).join(', '),
+    overallReportTemplates: overallTemplateSummaries,
     students: planStudents
   };
 }
@@ -411,18 +415,11 @@ function normalizeEngineResultToFile(engineResult, format, fileStem) {
 }
 
 function resolveClassTemplateId(student, classId, policy, overallTemplate) {
-  const classes = sortClasses(student.classes);
-  const slots = sortOverallSlots(overallTemplate);
-  if (!slots.length) return clean(policy.reportTemplateId);
-
-  const index = classes.findIndex((row) => clean(row.classId) === clean(classId));
-  if (index < 0) return clean(policy.reportTemplateId);
-  const slot = slots[index];
-  return clean(slot?.templateId) || clean(policy.reportTemplateId);
+  return clean(policy.reportTemplateId);
 }
 
 async function exportClassTarget(student, classId, format, ctx, reqUser) {
-  const { policy, overallTemplate, startDate, endDate } = ctx;
+  const { policy, startDate, endDate } = ctx;
   const classes = sortClasses(student.classes);
   const classRow = classes.find((row) => clean(row.classId) === clean(classId));
   if (!classRow) {
@@ -455,15 +452,30 @@ async function exportClassTarget(student, classId, format, ctx, reqUser) {
   return normalizeEngineResultToFile(engineResult, format, fileStem);
 }
 
-async function exportOverallTarget(student, selectedClassIds, format, ctx, reqUser) {
-  const { policy, overallTemplate, startDate, endDate } = ctx;
-  if (!overallTemplate) {
-    const error = new Error('No overall report template is configured.');
+function findMissingNecessarySourceSlots(overallTemplate, sourceRuns = []) {
+  return sortOverallSlots(overallTemplate)
+    .filter((slot) => !isOptionalSlot(slot))
+    .filter((slot) => !sourceRuns.some((run) => clean(run.slotKey).toUpperCase() === clean(slot.slotKey).toUpperCase()));
+}
+
+function resolveOverallTemplateCandidates(overallTemplateId, ctx) {
+  const requestedId = clean(overallTemplateId);
+  const templates = Array.isArray(ctx.overallTemplates) ? ctx.overallTemplates : [];
+  if (!requestedId) return templates;
+  const match = templates.find((template) => clean(template.id) === requestedId);
+  if (!match) {
+    const error = new Error(`Overall report template ${requestedId} is not configured for Student Attendance Report export.`);
     error.statusCode = 400;
     throw error;
   }
-  if (format === 'pdf') {
-    const error = new Error('Overall reports do not support PDF export.');
+  return [match];
+}
+
+function resolveEligibleOverallTemplateForTarget({ student, selectedClassIds, overallTemplateId, ctx }) {
+  const { policy, startDate, endDate } = ctx;
+  const candidates = resolveOverallTemplateCandidates(overallTemplateId, ctx);
+  if (!candidates.length) {
+    const error = new Error('No overall report template is configured.');
     error.statusCode = 400;
     throw error;
   }
@@ -471,41 +483,54 @@ async function exportOverallTarget(student, selectedClassIds, format, ctx, reqUs
   const selectedSet = Array.isArray(selectedClassIds)
     ? new Set(selectedClassIds.map((id) => clean(id)).filter(Boolean))
     : null;
-  const { sourceRuns, warnings: buildWarnings } = buildSourceRunsForStudent({
-    student,
-    policy,
-    overallTemplate,
-    startDate,
-    endDate,
-    selectedClassIds: selectedSet
-  });
+  const failures = [];
+  for (const template of candidates) {
+    const { sourceRuns, warnings: buildWarnings } = buildSourceRunsForStudent({
+      student,
+      policy,
+      overallTemplate: template,
+      startDate,
+      endDate,
+      selectedClassIds: selectedSet
+    });
+    const missingNecessary = findMissingNecessarySourceSlots(template, sourceRuns);
+    if (missingNecessary.length) {
+      failures.push(buildWarnings[0] || `Necessary source slot ${missingNecessary[0].slotKey || ''} is not available for this student.`);
+      continue;
+    }
+    if (!sourceRuns.length && countNecessarySlots(template) > 0) {
+      failures.push(buildWarnings[0] || 'Selected classes do not satisfy the necessary overall report sources.');
+      continue;
+    }
+    return { overallTemplate: template, sourceRuns, buildWarnings };
+  }
 
-  const slotCount = countNecessarySlots(overallTemplate);
-  if (!sourceRuns.length && slotCount > 0) {
-    const error = new Error(buildWarnings[0] || 'Selected classes do not satisfy the necessary overall report sources.');
+  const error = new Error(failures[0] || 'Selected classes do not satisfy any configured overall report template.');
+  error.statusCode = 400;
+  throw error;
+}
+
+async function exportOverallTarget(student, selectedClassIds, overallTemplateId, format, ctx, reqUser) {
+  const { startDate, endDate } = ctx;
+  if (format === 'pdf') {
+    const error = new Error('Overall reports do not support PDF export.');
     error.statusCode = 400;
     throw error;
   }
-  if (slotCount > 0) {
-    const missingNecessary = sortOverallSlots(overallTemplate)
-      .filter((slot) => !isOptionalSlot(slot))
-      .filter((slot) => !sourceRuns.some((run) => clean(run.slotKey).toUpperCase() === clean(slot.slotKey).toUpperCase()));
-    if (missingNecessary.length) {
-      const error = new Error(
-        buildWarnings[0]
-        || `Necessary source slot ${missingNecessary[0].slotKey || ''} is not available for this student.`
-      );
-      error.statusCode = 400;
-      throw error;
-    }
-  }
+
+  const {
+    overallTemplate,
+    sourceRuns,
+    buildWarnings
+  } = resolveEligibleOverallTemplateForTarget({ student, selectedClassIds, overallTemplateId, ctx });
+  const chosenTemplateId = clean(overallTemplate.id);
 
   const pipeline = await overallReportGenerationEngineService.generateOverallPipeline({
     filterStartDate: startDate,
     filterEndDate: endDate,
     studentIds: [clean(student.personId)],
     sourceRuns,
-    overallTemplateId: policy.overallReportTemplateId,
+    overallTemplateId: chosenTemplateId,
     format: format === 'json' ? 'json' : 'docx',
     docxMode: 'single'
   }, reqUser);
@@ -522,7 +547,7 @@ async function exportOverallTarget(student, selectedClassIds, format, ctx, reqUs
     return {
       buffer,
       contentType: 'application/json',
-      fileName: `${safeFileToken(student.name || student.personId)}_overall_payload.json`,
+      fileName: `${safeFileToken(`${student.name || student.personId}_${overallTemplate.title || chosenTemplateId}`)}_overall_payload.json`,
       warnings: mergedWarnings
     };
   }
@@ -531,7 +556,7 @@ async function exportOverallTarget(student, selectedClassIds, format, ctx, reqUs
     return {
       buffer: overall.file.buffer,
       contentType: overall.contentType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      fileName: overall.file.fileName || `${safeFileToken(student.name || student.personId)}_overall.docx`,
+      fileName: overall.file.fileName || `${safeFileToken(`${student.name || student.personId}_${overallTemplate.title || chosenTemplateId}`)}_overall.docx`,
       warnings: mergedWarnings
     };
   }
@@ -539,7 +564,7 @@ async function exportOverallTarget(student, selectedClassIds, format, ctx, reqUs
     return {
       buffer: overall.buffer,
       contentType: overall.contentType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      fileName: overall.fileName || `${safeFileToken(student.name || student.personId)}_overall.docx`,
+      fileName: overall.fileName || `${safeFileToken(`${student.name || student.personId}_${overallTemplate.title || chosenTemplateId}`)}_overall.docx`,
       warnings: mergedWarnings
     };
   }
@@ -668,7 +693,7 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
       const classIds = Array.isArray(target?.classIds)
         ? target.classIds.map((id) => clean(id)).filter(Boolean)
         : [];
-      files.push(await exportOverallTarget(student, classIds, format, ctx, req.user));
+      files.push(await exportOverallTarget(student, classIds, clean(target?.overallTemplateId), format, ctx, req.user));
       continue;
     }
 
@@ -756,7 +781,7 @@ async function generateDocxForStudentWithOverall(student, policy, overallTemplat
     filterEndDate: endDate,
     studentIds: [student.personId],
     sourceRuns,
-    overallTemplateId: policy.overallReportTemplateId,
+    overallTemplateId: clean(overallTemplate.id || policy.overallReportTemplateId),
     format: 'docx',
     docxMode: 'single'
   }, reqUser);
@@ -846,6 +871,7 @@ module.exports = {
   buildSourceRunsForStudent,
   buildClassExportRowsForStudent,
   buildOverallExportBlock,
+  buildOverallExportOptions,
   buildStudentAttendanceReportExportPlan,
   exportStudentAttendanceReportSelections,
   generateStudentAttendanceReports

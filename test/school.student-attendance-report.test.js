@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const studentAttendanceReportService = require('../packages/school/MVC/services/school/studentAttendanceReportService');
 
 test('buildDateRangeDays returns inclusive calendar days', () => {
@@ -62,4 +64,16 @@ test('buildClassDayCells serializes comments and detail fields', () => {
   assert.equal(cells[0].comments[0].authorName, 'Admin');
   assert.equal(cells[0].comments[0].mentions[0].name, 'Teacher');
   assert.equal(cells[0].excuseAttachment.name, 'note.pdf');
+});
+
+test('student attendance report export modal sends selected overall template ids', () => {
+  const view = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/views/school/attendance/studentAttendanceReportViewer.ejs'),
+    'utf8'
+  );
+  assert.match(view, /js-sar-overall-template-select/);
+  assert.match(view, /overallTemplateId/);
+  assert.match(view, /getOverallOptionsForStudent/);
+  assert.match(view, /getEligibleOverallOptionsForStudent/);
+  assert.match(view, /plan\.overallReportTemplates/);
 });
