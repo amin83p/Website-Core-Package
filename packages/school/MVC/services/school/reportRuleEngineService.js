@@ -8,7 +8,8 @@ const VALID_CONVERSION_ON_ERROR = new Set(['use_raw', 'empty']);
 const VALID_VALUE_MODES = new Set(['manual', 'calculated', 'derived_editable']);
 const VALID_CALC_ON_ERROR = new Set(['keep_last', 'empty']);
 const VALID_EXPORT_TEXT_CASES = new Set(['as_entered', 'upper', 'lower', 'title']);
-const DOCX_ALIAS_PATTERN = /^[a-z][a-z0-9]{3}$/;
+const DOCX_ALIAS_MAX_LENGTH = 32;
+const DOCX_ALIAS_PATTERN = /^[a-z][a-z0-9]{0,31}$/;
 const DOCX_ALIAS_FIRST_CHARS = 'abcdefghijklmnopqrstuvwxyz';
 const DOCX_ALIAS_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -643,7 +644,7 @@ function ensureTemplateDocxAliases(template) {
     const label = String(field?.label || field?.id || 'Field').trim();
     if (alias) {
       if (!DOCX_ALIAS_PATTERN.test(alias)) {
-        throw new Error(`Field "${label}" has an invalid DOCX shortcut. Expected one letter followed by three lowercase letters or numbers.`);
+        throw new Error(`Field "${label}" has an invalid DOCX shortcut. Expected a letter followed by lowercase letters or numbers (up to ${DOCX_ALIAS_MAX_LENGTH} characters).`);
       }
       if (reserved.has(alias)) {
         throw new Error(`Field "${label}" has a DOCX shortcut that conflicts with another placeholder token.`);

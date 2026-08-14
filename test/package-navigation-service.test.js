@@ -198,6 +198,64 @@ test('primary dashboard href resolves from enabled package dashboard entries', a
   });
 });
 
+test('filterSectionsExcludingDisabledPackages removes paused package sections by alias and mount path', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await Promise.all([
+      writeManifest(packageRootDir, 'ielts', {
+        id: 'ielts',
+        name: 'IELTS',
+        version: '1.0.0',
+        mountPath: '/ielts'
+      }),
+      writeManifest(packageRootDir, 'benchpath', {
+        id: 'benchpath',
+        name: 'BenchPath',
+        version: '1.0.0',
+        mountPath: '/benchpath'
+      }),
+      writeManifest(packageRootDir, 'credit', {
+        id: 'credit',
+        name: 'Credit',
+        version: '1.0.0',
+        mountPath: '/credit'
+      })
+    ]);
+
+    await Promise.all([
+      packageRegistryService.upsertPackageRegistry({
+        packageId: 'ielts',
+        enabled: false,
+        installStatus: 'disabled'
+      }, { backendMode: 'json' }),
+      packageRegistryService.upsertPackageRegistry({
+        packageId: 'benchpath',
+        enabled: false,
+        installStatus: 'disabled'
+      }, { backendMode: 'json' }),
+      packageRegistryService.upsertPackageRegistry({
+        packageId: 'credit',
+        enabled: false,
+        installStatus: 'disabled'
+      }, { backendMode: 'json' })
+    ]);
+
+    await packageNavigationService.refreshNavigationRegistry({
+      backendMode: 'json',
+      packageRootDir
+    });
+
+    const sections = [
+      { id: '1', name: 'IELTS', category: 'IELTS', homeURL: '/ielts' },
+      { id: '2', name: 'BENCHPATH', category: 'BENCHPATH', homeURL: '/benchpath' },
+      { id: '3', name: 'CREDIT_LOANS', category: 'CREDIT_LOANS', homeURL: '/credit' },
+      { id: '4', name: 'SCHOOL', category: 'SCHOOL', homeURL: '/school' }
+    ];
+
+    const filtered = packageNavigationService.filterSectionsExcludingDisabledPackages(sections);
+    assert.deepEqual(filtered.map((row) => row.name), ['SCHOOL']);
+  });
+});
+
 test('core dashboard redirects are package-navigation driven instead of PTE literals', async () => {
   const [authSource, dashboardRouteSource] = await Promise.all([
     fs.readFile(path.resolve(__dirname, '../MVC/controllers/authController.js'), 'utf8'),

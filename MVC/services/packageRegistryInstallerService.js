@@ -79,7 +79,8 @@ function defaultInstallSummary(packageId = '', packageName = '') {
       accesses: normalizeEntitySummary()
     },
     uploadFolders: normalizeUploadSummary(),
-    results: []
+    results: [],
+    sectionTopologyDrifts: []
   };
 }
 
@@ -106,6 +107,53 @@ function sameJsonShape(a, b) {
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function normalizeTopologyRefIds(rows = []) {
+  return safeArray(rows)
+    .map((row) => String(row?.id || row || '').trim())
+    .filter(Boolean);
+}
+
+function topologyRefsEqual(left = [], right = []) {
+  const a = normalizeTopologyRefIds(left);
+  const b = normalizeTopologyRefIds(right);
+  if (a.length !== b.length) return false;
+  return a.every((id, index) => id === b[index]);
+}
+
+function stripSectionTopologyFields(payload = {}) {
+  if (!payload || typeof payload !== 'object') return payload;
+  const next = { ...payload };
+  delete next.subsections;
+  delete next.related;
+  return next;
+}
+
+function describeSectionTopologyDrift(existing = {}, manifestNormalized = {}) {
+  const fields = [];
+  if (!topologyRefsEqual(existing?.subsections, manifestNormalized?.subsections)) {
+    fields.push('subsections');
+  }
+  if (!topologyRefsEqual(existing?.related, manifestNormalized?.related)) {
+    fields.push('related');
+  }
+  return fields;
+}
+
+function recordSectionTopologyDrift(summary, existing = {}, manifestNormalized = {}) {
+  const fields = describeSectionTopologyDrift(existing, manifestNormalized);
+  if (!fields.length) return;
+  if (!Array.isArray(summary.sectionTopologyDrifts)) summary.sectionTopologyDrifts = [];
+  summary.sectionTopologyDrifts.push({
+    sectionId: cleanText(existing?.id, 120),
+    sectionName: cleanText(existing?.name, 180),
+    fields,
+    runtimeSubsections: normalizeTopologyRefIds(existing?.subsections),
+    manifestSubsections: normalizeTopologyRefIds(manifestNormalized?.subsections),
+    runtimeRelated: normalizeTopologyRefIds(existing?.related),
+    manifestRelated: normalizeTopologyRefIds(manifestNormalized?.related)
+  });
 }
 
 function dedupeStrings(values = []) {
@@ -650,7 +698,13 @@ async function installEntityDeclarations(manifest, summary, context, deps, optio
           }
 
           if (isReadonlyExistingRow(category, existing)) {
-            const desired = mergeEntityPayload(existing, normalized, entityDef.updateFields);
+            const syncNormalized = category === 'sections'
+              ? stripSectionTopologyFields(normalized)
+              : normalized;
+            if (category === 'sections') {
+              recordSectionTopologyDrift(summary, existing, normalized);
+            }
+            const desired = mergeEntityPayload(existing, syncNormalized, entityDef.updateFields);
             if (sameJsonShape(existing, desired)) {
               markResult(summary, category, {
                 status: 'skipped',
@@ -669,7 +723,13 @@ async function installEntityDeclarations(manifest, summary, context, deps, optio
             continue;
           }
 
-          const patch = mergeEntityPayload(existing, normalized, entityDef.updateFields);
+          if (category === 'sections') {
+            recordSectionTopologyDrift(summary, existing, normalized);
+          }
+          const syncNormalized = category === 'sections'
+            ? stripSectionTopologyFields(normalized)
+            : normalized;
+          const patch = mergeEntityPayload(existing, syncNormalized, entityDef.updateFields);
           if (sameJsonShape(existing, patch)) {
             markResult(summary, category, {
               status: 'skipped',
@@ -1154,6 +1214,13 @@ function createLoaderHooks(options = {}) {
           symbols: summary.entities.symbols,
           accesses: summary.entities.accesses
         });
+        if (Array.isArray(summary.sectionTopologyDrifts) && summary.sectionTopologyDrifts.length) {
+          logger.info('PACKAGE_INSTALLER', 'SECTION_TOPOLOGY_DRIFT', `Runtime section topology differs from manifest for ${summary.sectionTopologyDrifts.length} section(s); runtime links were preserved.`, {
+            packageId: summary.packageId,
+            backendMode: summary.backendMode || '',
+            drifts: summary.sectionTopologyDrifts
+          });
+        }
       }
       return summary;
     },
@@ -1180,7 +1247,10 @@ module.exports = {
   installPackageRegistryDeclarations,
   removePackageRegistryDeclarations,
   createLoaderHooks,
-  createDefaultDependencies
+  createDefaultDependencies,
+  stripSectionTopologyFields,
+  describeSectionTopologyDrift,
+  normalizeTopologyRefIds
 };
 
 

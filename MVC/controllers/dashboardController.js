@@ -418,6 +418,7 @@ async function getQuickMenu(req, res) {
 
     let accessibleSections = await filterAccessibleSections(req.user, allSections);
     accessibleSections = mapSymbolsToSections(accessibleSections, contextSymbols, req.user);
+    accessibleSections = packageNavigationService.filterSectionsExcludingDisabledPackages(accessibleSections);
 
     const dashboardSections = sortMainDashboardSectionsForDisplay(accessibleSections);
 
@@ -603,6 +604,7 @@ async function getStartMenu(req, res) {
 
     let accessibleSections = await filterAccessibleSections(req.user, allSections);
     accessibleSections = mapSymbolsToSections(accessibleSections, contextSymbols, req.user);
+    accessibleSections = packageNavigationService.filterSectionsExcludingDisabledPackages(accessibleSections);
     const tree = buildStartMenuTreeNodes(accessibleSections);
 
     res.json({ status: 'success', sections: tree });

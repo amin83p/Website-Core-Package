@@ -685,6 +685,87 @@ test('installer preserves existing section subsections on package sync', async (
   assert.deepEqual(school.subsections, [{ id: '139382' }]);
 });
 
+test('installer preserves section topology across repeated mongo sync (restart simulation)', async () => {
+  const { deps, repos } = createInstallerDeps({
+    sections: [{
+      id: '122740',
+      name: 'SCHOOL',
+      category: 'SCHOOL',
+      description: 'School root',
+      active: true,
+      trackState: false,
+      minimumAccessRequirement: 1,
+      dashboardDisplay: true,
+      mainDashboardDisplay: true,
+      navigatorSection: true,
+      homeURL: '',
+      inactiveMessage: '',
+      message: '',
+      operations: [],
+      subsections: [{ id: '139382' }, { id: '446106' }],
+      related: [],
+      packageId: 'school',
+      packageName: 'SCHOOL'
+    }]
+  });
+
+  const context = {
+    backendMode: 'mongo',
+    packageId: 'school',
+    manifest: {
+      id: 'school',
+      name: 'School',
+      version: '1.0.0',
+      mountPath: '/school',
+      sections: [{
+        id: '122740',
+        name: 'SCHOOL',
+        category: 'SCHOOL',
+        description: 'School root from manifest',
+        active: true,
+        trackState: false,
+        minimumAccessRequirement: 1,
+        dashboardDisplay: true,
+        mainDashboardDisplay: true,
+        navigatorSection: true,
+        homeURL: '',
+        inactiveMessage: '',
+        message: '',
+        operations: [],
+        subsections: [{ id: '139382' }],
+        related: [],
+        adoptExisting: true
+      }]
+    }
+  };
+
+  const first = await packageRegistryInstallerService.installPackageRegistryDeclarations(context, deps);
+  const afterFirst = repos.sectionRepo.getRows().find((row) => row.name === 'SCHOOL');
+  assert.deepEqual(afterFirst.subsections, [{ id: '139382' }, { id: '446106' }]);
+  assert.equal(first.sectionTopologyDrifts.length, 1);
+  assert.deepEqual(first.sectionTopologyDrifts[0].fields, ['subsections']);
+
+  const second = await packageRegistryInstallerService.installPackageRegistryDeclarations(context, deps);
+  const afterSecond = repos.sectionRepo.getRows().find((row) => row.name === 'SCHOOL');
+  assert.deepEqual(afterSecond.subsections, [{ id: '139382' }, { id: '446106' }]);
+  assert.equal(second.sectionTopologyDrifts.length, 1);
+  assert.equal(afterSecond.description, 'School root from manifest');
+});
+
+test('stripSectionTopologyFields removes topology keys only', () => {
+  const input = {
+    name: 'SCHOOL',
+    subsections: [{ id: '1' }],
+    related: [{ id: '2' }],
+    description: 'Root'
+  };
+  const stripped = packageRegistryInstallerService.stripSectionTopologyFields(input);
+  assert.deepEqual(stripped, {
+    name: 'SCHOOL',
+    description: 'Root'
+  });
+});
+
 test('loader hooks include route registration and keep metadata-only routes non-mounted', async () => {
   packageRouteService.resetMountedRoutes();
   const hooks = packageRegistryInstallerService.createLoaderHooks({

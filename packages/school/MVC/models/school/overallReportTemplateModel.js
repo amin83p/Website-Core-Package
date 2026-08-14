@@ -127,6 +127,19 @@ function assertNoCalculationCycles(fields = []) {
   derived.forEach((_, fieldId) => visit(fieldId));
 }
 
+function sanitizeLegacyDocxAliases(rawList) {
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(rawList) ? rawList : []).forEach((row) => {
+    const alias = reportRuleEngineService.normalizeDocxAlias(row);
+    if (!reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) return;
+    if (seen.has(alias)) return;
+    seen.add(alias);
+    out.push(alias);
+  });
+  return out;
+}
+
 function sanitizeSchema(rawSchema, sourceSlots, inputPlaceholderMap = {}) {
   const raw = isObject(rawSchema) ? rawSchema : {};
   const rawFields = Array.isArray(raw.fields) ? raw.fields : [];
@@ -202,7 +215,8 @@ function sanitizeSchema(rawSchema, sourceSlots, inputPlaceholderMap = {}) {
               : 'keep_last'
           },
       calculationDependencies,
-      sourceReferences
+      sourceReferences,
+      legacyDocxAliases: visual ? [] : sanitizeLegacyDocxAliases(original.legacyDocxAliases)
     };
   });
   assertNoCalculationCycles(fields);

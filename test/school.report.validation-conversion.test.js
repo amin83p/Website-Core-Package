@@ -359,15 +359,24 @@ test('DOCX shortcuts are generated uniquely and reject invalid or conflicting va
   };
   reportRuleEngineService.ensureTemplateDocxAliases(template);
   const aliases = template.schema.fields.map((field) => field.docxAlias);
-  assert.match(aliases[0], /^[a-z][a-z0-9]{3}$/);
-  assert.match(aliases[1], /^[a-z][a-z0-9]{3}$/);
+  assert.match(aliases[0], /^[a-z][a-z0-9]{0,31}$/);
+  assert.match(aliases[1], /^[a-z][a-z0-9]{0,31}$/);
   assert.notEqual(aliases[0], aliases[1]);
   assert.notEqual(aliases[0], 'x6i4');
   assert.notEqual(aliases[1], 'x6i4');
 
+  const shortTemplate = {
+    schema: { fields: [
+      { id: 'day01', label: 'Day 1', type: 'text', docxAlias: 'd1' },
+      { id: 'day02', label: 'Day 2', type: 'text', docxAlias: 'd2' }
+    ] }
+  };
+  reportRuleEngineService.ensureTemplateDocxAliases(shortTemplate);
+  assert.deepEqual(shortTemplate.schema.fields.map((field) => field.docxAlias), ['d1', 'd2']);
+
   assert.throws(
     () => reportRuleEngineService.ensureTemplateDocxAliases({
-      schema: { fields: [{ id: 'name', label: 'Name', type: 'text', docxAlias: 'toolong' }] }
+      schema: { fields: [{ id: 'name', label: 'Name', type: 'text', docxAlias: '1invalid' }] }
     }),
     /Name.*invalid DOCX shortcut/i
   );

@@ -211,6 +211,27 @@ function createDocxWithTokens(tokens) {
   return { dir, filePath };
 }
 
+test('buildDocxPayloadDetailed emits legacy DOCX aliases for renamed shortcuts', () => {
+  const payload = overallReportService.buildDocxPayloadDetailed({
+    answers: { report_date: '2026-07-15', day01_yn: 'Y', day01_note: 'Present' },
+    templateSnapshot: {
+      schema: {
+        fields: [
+          { id: 'report_date', type: 'date', docxAlias: 'date', legacyDocxAliases: ['afdr'] },
+          { id: 'day01_yn', type: 'text', docxAlias: 'd1', legacyDocxAliases: ['b6tq'] },
+          { id: 'day01_note', type: 'text', docxAlias: 'n1', legacyDocxAliases: ['iqoz'] }
+        ]
+      }
+    }
+  });
+  assert.equal(payload.placeholders['O.date'], '2026-07-15');
+  assert.equal(payload.placeholders['O.afdr'], '2026-07-15');
+  assert.equal(payload.placeholders['O.d1'], 'Y');
+  assert.equal(payload.placeholders['O.b6tq'], 'Y');
+  assert.equal(payload.placeholders['O.n1'], 'Present');
+  assert.equal(payload.placeholders['O.iqoz'], 'Present');
+});
+
 test('safe formulas support namespaced source values, avg, concat, and overall dependencies', () => {
   const template = overallTemplate();
   const calculated = overallReportService.calculateAnswers({
@@ -360,6 +381,25 @@ test('overall template routes expose ensure-source-docx endpoint', () => {
   assert.match(routes, /overall-templates\/ensure-source-docx\/:templateId/);
   assert.match(controller, /async function ensureSourceTemplateDocx/);
   assert.match(controller, /docxAliasesEnsured/);
+});
+
+test('overall template form exposes overall fields JSON import/export controls', () => {
+  const source = read('packages/school/MVC/views/school/report/overallTemplateForm.ejs');
+  assert.match(source, /id="btnExportFieldsJson"/);
+  assert.match(source, /id="importFieldsJsonFile"/);
+  assert.match(source, /school-overall-template-fields/);
+  assert.match(source, /function importFieldsFromJsonText/);
+  assert.match(source, /Replace all \$\{fields\.length\} current field\(s\) with \$\{importedFields\.length\} imported field\(s\)\?/);
+});
+
+test('overall template form allows editable DOCX shortcuts with save-time uniqueness checks', () => {
+  const source = read('packages/school/MVC/views/school/report/overallTemplateForm.ejs');
+  assert.match(source, /id="fieldAlias"[^>]*maxlength="32"/);
+  assert.doesNotMatch(source, /id="fieldAlias"[^>]*readonly/);
+  assert.match(source, /js-field-docx-alias/);
+  assert.match(source, /function validateDocxAliases/);
+  assert.match(source, /'substr'/);
+  assert.match(source, /DOCX Shortcut Validation/);
 });
 
 test('overall fields retain relevant layout, guidance, styling, typed defaults, and modes', () => {

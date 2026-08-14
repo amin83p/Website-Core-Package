@@ -40,6 +40,32 @@ function getDataFields(template = {}) {
     .filter((field) => field?.id && !DATA_FIELD_EXCLUSIONS.has(String(field.type || '').toLowerCase()));
 }
 
+function listDocxPlaceholderAliases(field = {}) {
+  const aliases = new Set();
+  const primary = reportRuleEngineService.normalizeDocxAlias(field.docxAlias);
+  if (reportRuleEngineService.DOCX_ALIAS_PATTERN.test(primary)) aliases.add(primary);
+  (Array.isArray(field.legacyDocxAliases) ? field.legacyDocxAliases : []).forEach((row) => {
+    const alias = reportRuleEngineService.normalizeDocxAlias(row);
+    if (reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) aliases.add(alias);
+  });
+  return [...aliases];
+}
+
+function formatMissingDocxTokenError(template, missingTokens = [], placeholders = {}) {
+  const hints = missingTokens.map((token) => {
+    const legacyAlias = String(token || '').replace(/^O\./, '');
+    const field = getDataFields(template).find((row) => listDocxPlaceholderAliases(row).includes(legacyAlias));
+    if (field) {
+      const currentAlias = reportRuleEngineService.normalizeDocxAlias(field.docxAlias);
+      const currentToken = currentAlias ? `O.${currentAlias}` : `O.${field.id}`;
+      const hasCurrent = Object.prototype.hasOwnProperty.call(placeholders, currentToken);
+      return `${token} (field "${field.label || field.id}" now uses ${currentToken}${hasCurrent ? '' : ', value missing'})`;
+    }
+    return token;
+  });
+  return `DOCX export cancelled. Missing stored values for: ${hints.join(', ')}. Update the Word template shortcuts or add previous shortcuts under legacy DOCX aliases on the overall fields.`;
+}
+
 function snapshotDocxAliases(template = {}) {
   return new Map(
     getDataFields(template).map((field) => [String(field.id), String(field.docxAlias || '')])
@@ -933,8 +959,9 @@ function buildDocxPayloadDetailed(instance) {
     const value = reportRuleEngineService.applyExportTextCase(conversion.value, field.exportTextCase);
     if (conversion.diagnostic) conversionDiagnostics.push(conversion.diagnostic);
     placeholders[`O.${field.id}`] = value;
-    const alias = reportRuleEngineService.normalizeDocxAlias(field.docxAlias);
-    if (reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) placeholders[`O.${alias}`] = value;
+    listDocxPlaceholderAliases(field).forEach((alias) => {
+      placeholders[`O.${alias}`] = value;
+    });
   });
   return { placeholders, conversionDiagnostics };
 }
@@ -1020,7 +1047,7 @@ async function exportOverallReport(instance, reqUser) {
     : instance;
   const preview = await buildExportPreview(entryInstance);
   if (preview.missingTokens.length) {
-    throw new Error(`DOCX export cancelled. Missing stored values for: ${preview.missingTokens.join(', ')}.`);
+    throw new Error(formatMissingDocxTokenError(entryInstance.templateSnapshot, preview.missingTokens, preview.placeholders));
   }
   if (!preview.ready) {
     throw new Error('DOCX export cancelled because the overall report has validation or calculation errors.');
@@ -1527,7 +1554,7 @@ async function renderEntryDocx(instance, entry, docxKey, reqUser) {
   if (docxKey) virtual.selectedDocxKey = docxKey;
   const preview = await buildExportPreview(virtual);
   if (preview.missingTokens.length) {
-    throw new Error(`DOCX export cancelled for ${entry.studentName || entry.studentId}. Missing: ${preview.missingTokens.join(', ')}.`);
+    throw new Error(formatMissingDocxTokenError(virtual.templateSnapshot, preview.missingTokens, preview.placeholders));
   }
   if (hasBlockingValidationErrors(preview.validation) || preview.calculationMismatches.length || preview.calculationDiagnostics.length) {
     throw new Error(`DOCX export cancelled for ${entry.studentName || entry.studentId} because of validation or calculation errors.`);
@@ -1711,5 +1738,7 @@ module.exports = {
   findCalculationMismatches,
   buildExportPreview,
   buildOverallExportPayload,
-  exportOverallReport
+  exportOverallReport,
+  formatMissingDocxTokenError,
+  listDocxPlaceholderAliases
 };

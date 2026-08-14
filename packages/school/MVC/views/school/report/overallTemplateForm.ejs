@@ -78,6 +78,9 @@
           <div class="small text-muted">Derived fields can use <code>source("T1", "key")</code>, <code>avg(...)</code>, <code>concat(...)</code>, and <code>answers.field_id</code>.</div>
         </div>
         <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnExportFieldsJson"><i class="bi bi-download me-1"></i>Export JSON</button>
+          <label class="btn btn-outline-secondary btn-sm mb-0" for="importFieldsJsonFile"><i class="bi bi-upload me-1"></i>Import JSON</label>
+          <input type="file" id="importFieldsJsonFile" accept=".json,application/json" class="d-none">
           <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPreview"><i class="bi bi-eye me-1"></i>Preview</button>
           <button type="button" class="btn btn-outline-dark btn-sm" id="btnAddSection"><i class="bi bi-layout-text-window-reverse me-1"></i>Section</button>
           <button type="button" class="btn btn-outline-dark btn-sm" id="btnAddSubheader"><i class="bi bi-text-indent-left me-1"></i>Subheader</button>
@@ -186,7 +189,7 @@
       <div class="col-12" id="fieldValidationWrap"><label class="form-label fw-bold">Validation rules JSON <span class="text-muted">(advanced)</span></label><textarea class="form-control font-monospace" rows="4" id="fieldValidationRules" placeholder='[{"id":"positive","expression":"num(value) >= 0","message":"Must be zero or greater.","severity":"error"}]'></textarea></div>
       <div class="col-md-8" id="fieldConversionWrap"><label class="form-label fw-bold">DOCX conversion expression <span class="text-muted">(optional)</span></label><input class="form-control font-monospace" id="fieldConversionExpression" maxlength="240" placeholder="round(num(value), 2)"></div>
       <div class="col-md-4" id="fieldConversionErrorWrap"><label class="form-label fw-bold">Conversion error</label><select class="form-select" id="fieldConversionError"><option value="use_raw">Use stored value</option><option value="empty">Export empty</option></select></div>
-      <div class="col-md-6" id="fieldAliasWrap"><label class="form-label fw-bold">System DOCX shortcut</label><div class="input-group"><span class="input-group-text">O.</span><input class="form-control font-monospace" id="fieldAlias" maxlength="4" readonly></div><div class="form-text">Generated once and kept stable. The full key remains <code>{{O.field_id}}</code>.</div></div>
+      <div class="col-md-6" id="fieldAliasWrap"><label class="form-label fw-bold">System DOCX shortcut</label><div class="input-group"><span class="input-group-text">O.</span><input class="form-control font-monospace" id="fieldAlias" maxlength="32" autocomplete="off" spellcheck="false"></div><div class="form-text">Short token used in Word as <code>{{O.shortcut}}</code>. Must be unique in this template. The full key <code>{{O.field_id}}</code> also works.</div></div>
       <div class="col-md-6" id="fieldExportCaseWrap"><label class="form-label fw-bold">DOCX text case</label><select class="form-select" id="fieldExportCase"><option value="as_entered">As entered</option><option value="upper">UPPERCASE</option><option value="lower">lowercase</option><option value="title">Title Case</option></select></div>
 
       <div class="col-12" id="fieldVisualSettings"><div class="d-flex flex-wrap align-items-center gap-3 border rounded p-3 bg-light">
@@ -280,9 +283,69 @@
     derived_editable: 'Source/calculated, editable',
     derived_locked: 'Source/calculated, locked'
   };
-  const aliasPattern = /^[a-z][a-z0-9]{3}$/;
+  const DOCX_ALIAS_MAX_LENGTH = 32;
+  const aliasPattern = /^[a-z][a-z0-9]{0,31}$/;
   const aliasFirst = 'abcdefghijklmnopqrstuvwxyz';
   const aliasChars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+  function normalizeDocxAlias(rawValue) {
+    return String(rawValue || '').trim().toLowerCase();
+  }
+
+  function isValidDocxAlias(rawValue) {
+    const alias = normalizeDocxAlias(rawValue);
+    return Boolean(alias) && alias.length <= DOCX_ALIAS_MAX_LENGTH && aliasPattern.test(alias);
+  }
+
+  function validateDocxAliases() {
+    const used = new Map();
+    const reserved = new Set();
+    fields.forEach((field) => {
+      if (isVisual(field)) return;
+      const fieldId = String(field.id || '').trim().toLowerCase();
+      if (fieldId) reserved.add(fieldId);
+    });
+    fields.forEach((field) => {
+      if (isVisual(field)) return;
+      const label = field.label || field.id || 'Field';
+      const alias = normalizeDocxAlias(field.docxAlias);
+      if (!alias) throw new Error(`Field "${label}" is missing a DOCX shortcut.`);
+      if (!isValidDocxAlias(alias)) {
+        throw new Error(`Field "${label}" has an invalid DOCX shortcut "${alias}". Use a letter followed by lowercase letters or numbers (up to ${DOCX_ALIAS_MAX_LENGTH} characters).`);
+      }
+      if (reserved.has(alias)) {
+        throw new Error(`Field "${label}" uses DOCX shortcut "${alias}" which conflicts with another placeholder token.`);
+      }
+      if (used.has(alias)) {
+        throw new Error(`Field "${label}" has a duplicate DOCX shortcut "${alias}" (also used by "${used.get(alias)}").`);
+      }
+      used.set(alias, label);
+    });
+  }
+
+  function assertDocxAliasAvailable(alias, label, editingIndex = -1) {
+    const token = normalizeDocxAlias(alias);
+    if (!token) throw new Error(`Field "${label}" requires a DOCX shortcut.`);
+    if (!isValidDocxAlias(token)) {
+      throw new Error(`Field "${label}" has an invalid DOCX shortcut "${token}". Use a letter followed by lowercase letters or numbers (up to ${DOCX_ALIAS_MAX_LENGTH} characters).`);
+    }
+    const idConflict = fields.find((field, index) => (
+      index !== editingIndex
+      && !isVisual(field)
+      && String(field.id || '').trim().toLowerCase() === token
+    ));
+    if (idConflict) {
+      throw new Error(`DOCX shortcut "${token}" conflicts with field id "${idConflict.id}".`);
+    }
+    const duplicate = fields.find((field, index) => (
+      index !== editingIndex
+      && !isVisual(field)
+      && normalizeDocxAlias(field.docxAlias) === token
+    ));
+    if (duplicate) {
+      throw new Error(`DOCX shortcut "${token}" is already used by "${duplicate.label || duplicate.id}".`);
+    }
+  }
 
   function isVisual(fieldOrType) {
     return visualTypes.has(String(fieldOrType?.type || fieldOrType || '').toLowerCase());
@@ -414,11 +477,22 @@
   function ensureAliases() {
     const used = new Set();
     fields.forEach((field) => {
-      if (isVisual(field)) { field.docxAlias = ''; return; }
-      let alias = String(field.docxAlias || '').toLowerCase();
-      if (!aliasPattern.test(alias) || used.has(alias)) alias = generateAlias();
-      field.docxAlias = alias;
-      used.add(alias);
+      const alias = normalizeDocxAlias(field.docxAlias);
+      if (alias) used.add(alias);
+    });
+    fields.forEach((field) => {
+      if (isVisual(field)) {
+        field.docxAlias = '';
+        return;
+      }
+      let alias = normalizeDocxAlias(field.docxAlias);
+      if (!alias) {
+        alias = generateAlias();
+        field.docxAlias = alias;
+        used.add(alias);
+      } else {
+        field.docxAlias = alias;
+      }
     });
   }
 
@@ -454,9 +528,15 @@
         !visual && fieldIsReadOnly(field) ? '<span class="badge bg-secondary-subtle text-secondary-emphasis border">Read-only</span>' : ''
       ].filter(Boolean).join(' ') || '<span class="text-muted">None</span>';
       const docxShortcut = visual ? '' : slotDocxShortcut('O', field.docxAlias);
-      const docxShortcutCell = docxShortcut
-        ? `<div class="d-flex align-items-center gap-2 flex-wrap"><span class="font-monospace">${escapeHtml(docxShortcut)}</span><button type="button" draggable="false" class="btn btn-outline-secondary btn-sm js-copy-key" data-key="${escapeHtml(docxShortcut)}" title="Copy DOCX shortcut"><i class="bi bi-clipboard"></i></button></div>`
-        : '<span class="text-muted">—</span>';
+      const docxShortcutCell = visual
+        ? '<span class="text-muted">—</span>'
+        : `<div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="input-group input-group-sm" style="min-width:9rem;max-width:12rem;">
+              <span class="input-group-text">O.</span>
+              <input type="text" class="form-control font-monospace js-field-docx-alias" data-index="${index}" value="${escapeHtml(field.docxAlias || '')}" maxlength="${DOCX_ALIAS_MAX_LENGTH}" autocomplete="off" spellcheck="false" aria-label="DOCX shortcut for ${escapeHtml(field.label || field.id)}">
+            </div>
+            ${docxShortcut ? `<button type="button" draggable="false" class="btn btn-outline-secondary btn-sm js-copy-key" data-key="${escapeHtml(docxShortcut)}" title="Copy DOCX shortcut"><i class="bi bi-clipboard"></i></button>` : ''}
+          </div>`;
       return `<tr class="overall-field-row${visual ? ' overall-field-visual' : ''}" draggable="true" data-index="${index}"><td class="text-center"><span class="overall-field-handle text-muted"><i class="bi bi-grip-vertical"></i></span><span class="badge bg-light text-dark border ms-1">${index + 1}</span></td><td><strong>${escapeHtml(field.label || field.id)}</strong><div class="small text-muted font-monospace">${escapeHtml(field.id || '')}</div></td><td><span class="badge bg-light text-dark border">${escapeHtml(field.type)}</span></td><td>${flags}</td><td class="small">${docxShortcutCell}</td><td><div class="dropdown js-overall-field-dropdown"><button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><button type="button" class="dropdown-item js-field-action" data-action="edit" data-index="${index}"><i class="bi bi-pencil me-2"></i>Edit</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="duplicate" data-index="${index}"><i class="bi bi-files me-2"></i>Duplicate</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up me-2"></i>Move Up</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="down" data-index="${index}" ${index === fields.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down me-2"></i>Move Down</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item text-danger js-field-action" data-action="delete" data-index="${index}"><i class="bi bi-trash me-2"></i>Delete</button></li></ul></div></td></tr>`;
     }).join('');
     renderKeyCatalog();
@@ -464,8 +544,8 @@
   }
 
   function slotDocxShortcut(slotKey, alias = '') {
-    const cleanAlias = String(alias || '').toLowerCase();
-    return aliasPattern.test(cleanAlias) ? `{{${slotKey}.${cleanAlias}}}` : '';
+    const cleanAlias = normalizeDocxAlias(alias);
+    return isValidDocxAlias(cleanAlias) ? `{{${slotKey}.${cleanAlias}}}` : '';
   }
 
   function keyCatalog() {
@@ -775,6 +855,34 @@
     }
     renderFields();
   }
+  fieldRows.addEventListener('mousedown', event => {
+    if (event.target.closest('.js-field-docx-alias')) event.stopPropagation();
+  });
+  fieldRows.addEventListener('change', event => {
+    const input = event.target.closest('.js-field-docx-alias');
+    if (!input) return;
+    const index = Number(input.dataset.index);
+    const field = fields[index];
+    if (!field || isVisual(field)) return;
+    const label = field.label || field.id || 'Field';
+    const alias = normalizeDocxAlias(input.value);
+    try {
+      if (!alias) throw new Error(`Field "${label}" requires a DOCX shortcut.`);
+      assertDocxAliasAvailable(alias, label, index);
+      const priorAlias = normalizeDocxAlias(field.docxAlias);
+      if (priorAlias && priorAlias !== alias) {
+        const legacy = new Set(Array.isArray(field.legacyDocxAliases) ? field.legacyDocxAliases : []);
+        legacy.add(priorAlias);
+        field.legacyDocxAliases = [...legacy];
+      }
+      field.docxAlias = alias;
+      input.value = alias;
+      renderKeyCatalog();
+    } catch (error) {
+      input.value = field.docxAlias || '';
+      showReportModal({ title: 'Invalid DOCX Shortcut', message: error.message, icon: 'error' });
+    }
+  });
   fieldRows.addEventListener('click', async event => {
     const button = event.target.closest('.js-field-action');
     if (!button) return;
@@ -833,8 +941,17 @@
     const mode = visual ? 'manual' : document.getElementById('fieldMode').value;
     const expression = String(document.getElementById('fieldExpression').value || '').trim();
     if (mode !== 'manual' && !expression) { showFieldError('Source/calculated fields require a calculation expression.'); return; }
-    const alias = visual ? '' : (String(document.getElementById('fieldAlias').value || '').trim() || generateAlias());
-    if (!visual && !aliasPattern.test(alias)) { showFieldError('The generated DOCX shortcut is invalid. Reopen the field to generate a new one.'); return; }
+    const alias = visual ? '' : normalizeDocxAlias(document.getElementById('fieldAlias').value);
+    let resolvedAlias = '';
+    if (!visual) {
+      resolvedAlias = alias || generateAlias();
+      try {
+        assertDocxAliasAvailable(resolvedAlias, label, index);
+      } catch (error) {
+        showFieldError(error.message);
+        return;
+      }
+    }
     const options = modalOptions();
     if (type === 'select' && !options.length) { showFieldError('Select fields require at least one option.'); return; }
     let validationRules = [];
@@ -867,9 +984,20 @@
       validationRules: visual ? [] : validationRules,
       conversionRule: { enabled: !visual && Boolean(conversionExpression), expression: visual ? '' : conversionExpression, onError: document.getElementById('fieldConversionError').value },
       exportTextCase: visual ? 'as_entered' : document.getElementById('fieldExportCase').value,
-      docxAlias: alias
+      docxAlias: resolvedAlias
     };
-    if (index >= 0) fields[index] = {...fields[index],...field}; else fields.push(field);
+    if (index >= 0) {
+      const prior = fields[index];
+      const priorAlias = normalizeDocxAlias(prior.docxAlias);
+      if (priorAlias && priorAlias !== resolvedAlias) {
+        const legacy = new Set(Array.isArray(prior.legacyDocxAliases) ? prior.legacyDocxAliases : []);
+        legacy.add(priorAlias);
+        field.legacyDocxAliases = [...legacy];
+      } else if (Array.isArray(prior.legacyDocxAliases)) {
+        field.legacyDocxAliases = prior.legacyDocxAliases;
+      }
+      fields[index] = {...fields[index],...field};
+    } else fields.push(field);
     ensureAliases();
     showFieldError('');
     bootstrap.Modal.getInstance(document.getElementById('fieldModal'))?.hide();
@@ -934,6 +1062,198 @@
     navigator.clipboard?.writeText(button.dataset.key || '');
   });
   function download(name, content, type) { const url=URL.createObjectURL(new Blob([content],{type})); const link=document.createElement('a');link.href=url;link.download=name;link.click();URL.revokeObjectURL(url); }
+
+  const FIELD_TYPES = new Set(['text', 'textarea', 'number', 'date', 'select', 'checkbox', 'section', 'subheader', 'row_break']);
+  const EXPORT_TEXT_CASES = new Set(['as_entered', 'upper', 'lower', 'title']);
+
+  function serializeExportField(field) {
+    const out = JSON.parse(JSON.stringify(field || {}));
+    delete out.calculationDependencies;
+    delete out.sourceReferences;
+    delete out.valueMode;
+    return out;
+  }
+
+  function exportFieldsPayload() {
+    return {
+      format: 'school-overall-template-fields',
+      version: Number(initial.schema?.version || 1),
+      fields: fields.map(serializeExportField)
+    };
+  }
+
+  function parseImportedFieldsPayload(text) {
+    let parsed;
+    try {
+      parsed = JSON.parse(String(text || ''));
+    } catch (error) {
+      throw new Error(`JSON parse error: ${error.message}`);
+    }
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.fields)) return parsed.fields;
+    throw new Error('JSON must be a fields array or an object with a "fields" array.');
+  }
+
+  function normalizeImportedOptions(raw, fieldLabel) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map((row, index) => {
+      const source = row && typeof row === 'object' ? row : {};
+      const value = String(source.value ?? '').trim();
+      if (!value) throw new Error(`Field "${fieldLabel}" option ${index + 1} is missing a value.`);
+      const label = String(source.label ?? value).trim() || value;
+      return { value, label };
+    });
+  }
+
+  function normalizeImportedField(raw, index) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const type = String(source.type || 'text').toLowerCase();
+    if (!FIELD_TYPES.has(type)) throw new Error(`Field at index ${index + 1} has invalid type "${source.type}".`);
+    const visual = isVisual(type);
+    let id = String(source.id || '').trim();
+    const label = String(source.label || '').trim();
+    if (visual && !id) id = `__${type}_${Date.now()}_${index}`;
+    if (!label) throw new Error(`Field at index ${index + 1} is missing a label.`);
+    if (!visual && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(id)) {
+      throw new Error(`Field "${label}" has an invalid id "${id}".`);
+    }
+    const mode = visual ? 'manual' : normalizedMode(source);
+    if (!['manual', 'derived_editable', 'derived_locked'].includes(mode)) {
+      throw new Error(`Field "${label}" has invalid value mode.`);
+    }
+    const expression = mode === 'manual'
+      ? ''
+      : String(source?.calculationRule?.expression || source?.expression || '').trim();
+    if (mode !== 'manual' && !expression) {
+      throw new Error(`Field "${label}" requires a calculation expression.`);
+    }
+    const options = type === 'select' ? normalizeImportedOptions(source.options, label) : [];
+    if (type === 'select' && !options.length) {
+      throw new Error(`Field "${label}" requires at least one select option.`);
+    }
+    let validationRules = [];
+    if (!visual && source.validationRules !== undefined && source.validationRules !== null && source.validationRules !== '') {
+      if (!Array.isArray(source.validationRules)) {
+        throw new Error(`Field "${label}" validationRules must be an array.`);
+      }
+      validationRules = source.validationRules;
+    }
+    const conversionExpression = visual ? '' : String(source?.conversionRule?.expression || '').trim();
+    const calcOnError = ['empty', 'keep_last'].includes(String(source?.calculationRule?.onError || 'keep_last'))
+      ? String(source.calculationRule.onError || 'keep_last')
+      : 'keep_last';
+    const convOnError = ['empty', 'use_raw'].includes(String(source?.conversionRule?.onError || 'use_raw'))
+      ? String(source.conversionRule.onError || 'use_raw')
+      : 'use_raw';
+    const exportTextCase = EXPORT_TEXT_CASES.has(String(source.exportTextCase || 'as_entered'))
+      ? String(source.exportTextCase)
+      : 'as_entered';
+    const readOnly = visual
+      ? false
+      : (mode === 'derived_locked'
+        || source.readOnly === true
+        || String(source.readOnly).toLowerCase() === 'true');
+    const alias = visual ? '' : String(source.docxAlias || '').trim().toLowerCase();
+    if (!visual && alias && !isValidDocxAlias(alias)) {
+      throw new Error(`Field "${label}" has an invalid docxAlias "${alias}".`);
+    }
+    return {
+      id,
+      label,
+      type,
+      required: visual ? false : Boolean(source.required),
+      readOnly,
+      fullPageWidth: visual ? true : Boolean(source.fullPageWidth),
+      hasBorder: visual ? false : Boolean(source.hasBorder),
+      backgroundColor: visual ? '' : String(source.backgroundColor || '').trim(),
+      placeholder: visual ? '' : String(source.placeholder || '').trim(),
+      helpText: String(source.helpText || '').trim(),
+      overallValueMode: mode,
+      defaultValue: visual || mode !== 'manual' ? '' : (source.defaultValue ?? ''),
+      calculationRule: {
+        enabled: mode !== 'manual',
+        expression: mode === 'manual' ? '' : expression,
+        onError: calcOnError
+      },
+      options,
+      validationRules: visual ? [] : validationRules,
+      conversionRule: {
+        enabled: !visual && Boolean(conversionExpression),
+        expression: conversionExpression,
+        onError: convOnError
+      },
+      exportTextCase: visual ? 'as_entered' : exportTextCase,
+      docxAlias: alias
+    };
+  }
+
+  function validateImportedFieldsStructure(rawFields) {
+    if (!Array.isArray(rawFields)) throw new Error('Imported fields must be an array.');
+    const normalized = rawFields.map((row, index) => normalizeImportedField(row, index));
+    const seenIds = new Set();
+    normalized.forEach((field) => {
+      const token = String(field.id || '').toLowerCase();
+      if (!token) return;
+      if (seenIds.has(token)) throw new Error(`Duplicate field id "${field.id}".`);
+      seenIds.add(token);
+    });
+    return normalized;
+  }
+
+  async function importFieldsFromJsonText(text) {
+    const rawFields = parseImportedFieldsPayload(text);
+    const importedFields = validateImportedFieldsStructure(rawFields);
+    const confirmMessage = importedFields.length
+      ? `Replace all ${fields.length} current field(s) with ${importedFields.length} imported field(s)?`
+      : 'The imported JSON contains no fields. This will remove all current overall fields.';
+    const confirmed = await confirmReportModal({
+      title: importedFields.length ? 'Replace Overall Fields?' : 'Replace with Empty Field List?',
+      message: confirmMessage,
+      confirmText: 'Replace All',
+      confirmClass: 'btn-danger'
+    });
+    if (!confirmed) return;
+
+    const previousFields = fields.slice();
+    try {
+      fields = importedFields;
+      validateDesignerExpressions();
+    } catch (error) {
+      fields = previousFields;
+      await showReportModal({ title: 'Import Validation', message: error.message, icon: 'error' });
+      return;
+    }
+
+    fields = importedFields;
+    ensureAliases();
+    renderFields();
+    await showReportModal({
+      title: 'Fields Imported',
+      message: `${importedFields.length} overall field(s) were loaded. Save the template to keep these changes.`,
+      icon: 'success'
+    });
+  }
+
+  document.getElementById('btnExportFieldsJson').addEventListener('click', () => {
+    download('overall-template-fields.json', JSON.stringify(exportFieldsPayload(), null, 2), 'application/json');
+  });
+  document.getElementById('importFieldsJsonFile').addEventListener('change', async (event) => {
+    const input = event.target;
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      await importFieldsFromJsonText(text);
+    } catch (error) {
+      await showReportModal({
+        title: 'Import Failed',
+        message: error?.message || 'Unable to import overall fields JSON.',
+        icon: 'error'
+      });
+    }
+  });
+
   document.getElementById('btnKeysJson').addEventListener('click', () => download('overall-report-keys.json', JSON.stringify(keyCatalog(), null, 2), 'application/json'));
   document.getElementById('btnKeysCsv').addEventListener('click', () => download('overall-report-keys.csv', 'source,label,key,docxShortcut,origin,description\n' + keyCatalog().map(row => [row.group,row.label,row.key,row.docxShortcut,row.origin,row.description].map(value => `"${String(value || '').replaceAll('"','""')}"`).join(',')).join('\n'), 'text/csv'));
   document.getElementById('btnAddFunder').addEventListener('click', () => {
@@ -978,7 +1298,10 @@
     const dataFields = fields.filter(field => field.id && !['section','subheader','row_break'].includes(String(field.type)));
     const fieldIds = new Set(dataFields.map(field => field.id));
     const dependencies = new Map();
-    const allowedHelpers = new Set(['source','round','avg','concat','num','str','len','min','max','abs','clamp','ifelse','caseof']);
+    const allowedHelpers = new Set([
+      'source', 'round', 'avg', 'concat', 'num', 'str', 'len', 'min', 'max', 'abs', 'clamp', 'ifelse', 'caseof',
+      'digits', 'substr', 'phoneAt', 'phoneLabelAt', 'phoneTypeAt', 'phoneByType'
+    ]);
     dataFields.forEach(field => {
       const mode = normalizedMode(field);
       const expression = mode === 'manual' ? '' : String(field.calculationRule?.expression || '');
@@ -1021,6 +1344,12 @@
       validateDesignerExpressions();
     } catch (error) {
       await showReportModal({ title: 'Designer Validation', message: error.message });
+      return;
+    }
+    try {
+      validateDocxAliases();
+    } catch (error) {
+      await showReportModal({ title: 'DOCX Shortcut Validation', message: error.message, icon: 'error' });
       return;
     }
     ensureAliases();

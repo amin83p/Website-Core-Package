@@ -221,7 +221,7 @@ async function renderVirtualOverallDocx(virtualInstance, docxKey = '') {
   if (docxKey) instance.selectedDocxKey = docxKey;
   const preview = await overallReportService.buildExportPreview(instance);
   if (preview.missingTokens.length) {
-    throw new Error(`DOCX export cancelled. Missing stored values for: ${preview.missingTokens.join(', ')}.`);
+    throw new Error(overallReportService.formatMissingDocxTokenError(instance.templateSnapshot, preview.missingTokens, preview.placeholders));
   }
   if (!preview.ready) {
     throw new Error('DOCX export cancelled because the overall report has validation or calculation errors.');
