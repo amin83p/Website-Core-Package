@@ -1,0 +1,108 @@
+<div class="modal fade" id="schoolEntityPickerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg school-entity-picker">
+      <div class="modal-header border-bottom bg-light">
+        <div class="d-flex align-items-center gap-3 min-w-0">
+          <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="sep-back-btn" title="Back to classes">
+            <i class="bi bi-arrow-left"></i>
+          </button>
+          <div class="min-w-0">
+            <h5 class="modal-title fw-bold text-dark mb-0" id="sep-title">
+              <i class="bi bi-diagram-3-fill me-2 text-primary"></i>Select School Records
+            </h5>
+            <div class="small text-muted text-truncate" id="sep-breadcrumb">Choose a department</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body p-0">
+        <div class="border-bottom bg-white p-3">
+          <div class="d-flex flex-column flex-lg-row gap-2 align-items-lg-center">
+            <div class="position-relative flex-grow-1">
+              <i class="bi bi-search position-absolute text-muted" style="left: 14px; top: 50%; transform: translateY(-50%);"></i>
+              <input type="text" class="form-control ps-5" id="sep-search-input" placeholder="Search..." autocomplete="off">
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-primary d-none" id="sep-select-all-btn">
+                <i class="bi bi-check2-square me-1"></i>Select All
+              </button>
+              <button type="button" class="btn btn-outline-secondary d-none" id="sep-clear-class-btn">
+                <i class="bi bi-eraser me-1"></i>Clear Class
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-light p-3" id="sep-results" style="min-height: 420px;">
+          <div class="text-center text-muted py-5">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <div class="fw-semibold">Loading picker...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer bg-white border-top d-flex justify-content-between">
+        <div class="small text-muted" id="sep-summary">
+          <i class="bi bi-info-circle me-1"></i>Ready
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-primary d-none" id="sep-load-more-btn">
+            <i class="bi bi-plus-circle me-1"></i>Load More
+          </button>
+          <button type="button" class="btn btn-primary d-none" id="sep-confirm-btn">
+            <i class="bi bi-check2-circle me-1"></i>Confirm <span id="sep-selected-count">(0)</span>
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .school-entity-picker {
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .school-entity-picker .sep-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .school-entity-picker .sep-card,
+  .school-entity-picker .sep-row {
+    border: 1px solid #e6e9ef;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .school-entity-picker .sep-card {
+    min-height: 118px;
+    text-align: left;
+  }
+
+  .school-entity-picker .sep-card:hover,
+  .school-entity-picker .sep-row:hover {
+    border-color: #86b7fe;
+    box-shadow: 0 0.25rem 0.75rem rgba(13, 110, 253, 0.08);
+  }
+
+  .school-entity-picker .sep-card-title,
+  .school-entity-picker .sep-row-title {
+    overflow-wrap: anywhere;
+  }
+
+  .school-entity-picker .sep-row {
+    width: 100%;
+    text-align: left;
+  }
+
+  .school-entity-picker .sep-picked-badge {
+    min-width: 2.1rem;
+  }
+</style>
+
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/schoolEntityPicker.js') : '/scripts/schoolEntityPicker.js' %>"></script>
