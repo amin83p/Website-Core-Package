@@ -27,12 +27,18 @@
   .school-master-hub .hub-page-header {
     padding-left: var(--hub-left-safe);
     padding-right: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  body.school-master-hub-page main {
+    padding-top: 2rem;
+    padding-bottom: 0;
   }
 
   .school-master-hub .hub-section-panel {
     margin-left: var(--hub-left-safe);
     margin-right: 1rem;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     padding: 0;
     border: 1px solid rgba(15, 23, 42, 0.09);
     border-radius: 1rem;
@@ -271,6 +277,8 @@
   }
 .school-master-hub .hub-main {
     min-width: 0;
+    margin-top: 0;
+    padding-top: 0;
     border: 0;
     border-radius: 0;
     background: #ffffff;
@@ -291,7 +299,8 @@
 
   .school-master-hub .hub-workspace {
     min-height: calc(100vh - 92px);
-    padding: 1.25rem;
+    margin-top: 0;
+    padding: 0 1.25rem 1.25rem;
     background:
       radial-gradient(circle at 15% 15%, rgba(14, 165, 233, 0.08), transparent 28%),
       radial-gradient(circle at 85% 20%, rgba(34, 197, 94, 0.08), transparent 30%),
@@ -441,6 +450,75 @@
     background: rgba(248, 250, 252, 0.85);
   }
 
+  .school-master-hub .hub-schedule-person-tab-card {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .school-master-hub .hub-schedule-person-tab-close {
+    position: absolute;
+    top: -0.35rem;
+    right: -0.35rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(15, 23, 42, 0.15);
+    background: #ffffff;
+    color: #64748b;
+    font-size: 0.8rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+  }
+
+  .school-master-hub .hub-schedule-person-tab-close:hover {
+    color: #dc3545;
+    border-color: #dc3545;
+  }
+
+  .school-master-hub .hub-schedule-toolbar-grid {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 0.5rem 0.75rem;
+    align-items: end;
+  }
+
+  .school-master-hub .hub-schedule-toolbar-people {
+    grid-column: 1 / span 2;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .school-master-hub .hub-schedule-toolbar-date-start {
+    grid-column: 3 / span 2;
+  }
+
+  .school-master-hub .hub-schedule-toolbar-date-end {
+    grid-column: 5 / span 2;
+  }
+
+  .school-master-hub .hub-schedule-toolbar-role {
+    grid-column: 7 / span 2;
+  }
+
+  .school-master-hub .hub-schedule-toolbar-cases {
+    grid-column: 9 / span 2;
+  }
+
+  .school-master-hub .hub-schedule-toolbar-shortcut {
+    grid-column: 3 / span 4;
+  }
+
+  .school-master-hub .hub-schedule-toolbar-loads {
+    grid-column: 9 / span 2;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
   .school-master-hub .hub-schedule-person-tab {
     border-radius: 999px;
     display: inline-flex;
@@ -498,6 +576,24 @@
     padding: 0.8rem 1.15rem;
     border-bottom: 1px solid rgba(15, 23, 42, 0.08);
     background: rgba(255, 255, 255, 0.88);
+    text-align: right;
+  }
+
+  .school-master-hub .hub-schedule-legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    margin-left: auto;
+  }
+
+  .school-master-hub .hub-schedule-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
   }
 
   .school-master-hub .timeline-container {
@@ -917,20 +1013,20 @@
   }
 </style>
 
-<div class="container-fluid school-master-hub hub-sidebar-collapsed py-3"
+<div class="container-fluid school-master-hub hub-sidebar-collapsed py-0"
      data-master-hub
      data-modules='<%- JSON.stringify(safeModules) %>'
      data-default-type="<%= initialType %>"
      data-can-manage-all-tasks="<%= canManageAllTasksFlag ? 'true' : 'false' %>">
-  <div class="hub-page-header d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-    <div>
-      <div class="text-uppercase text-muted small fw-bold">School Package</div>
-      <h1 class="h3 mb-1">Master Academia Hub</h1>
-      <p class="text-muted mb-0">Review school people records from one full-width workspace.</p>
+  <div class="hub-page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <h1 class="page-heading size-md text-start m-0">Master Academia Hub</h1>
     </div>
-    <a href="<%= schoolSectionDashboardHref || '/school' %>" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-speedometer2 me-1"></i> Academia Dashboard
-    </a>
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <a href="<%= schoolSectionDashboardHref || '/school' %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-speedometer2 me-1"></i> School Dashboard
+      </a>
+    </div>
   </div>
 
   <div class="hub-section-panel" aria-label="School Master Hub sections">
@@ -1697,7 +1793,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-list-task') + ' me-2"></i>' + escapeHtml(section.label || 'School Tasks') + '</h2>',
       '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' ' + escapeHtml(taskScopeText) + '. Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
       '</div>',
@@ -1816,7 +1911,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-easel-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Classes') + '</h2>',
       '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' class(es). Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
       '</div>',
@@ -2108,7 +2202,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-list-check') + ' me-2"></i>' + escapeHtml(section.label || 'Activities') + '</h2>',
       '<p class="text-muted mb-0">' + (notLoaded ? 'Review school activities from the hub when ready.' : escapeHtml(String(rows.length)) + ' activity record(s), ' + escapeHtml(String(postedCount)) + ' posted, ' + escapeHtml(totalHours.toFixed(2)) + ' total hour(s). Last refreshed: ' + escapeHtml(refreshed) + '.') + '</p>',
       '</div>',
@@ -3178,7 +3271,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar2-week-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Sessions') + '</h2>',
       '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' session(s). Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
       '</div>',
@@ -3600,7 +3692,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-exclamation-triangle-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Session Issues') + '</h2>',
       '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' case(s). Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
       '</div>',
@@ -3788,6 +3879,19 @@
     }) || null;
   }
 
+  function removeHubSchedulePerson(personId) {
+    const id = String(personId || '').trim();
+    if (!id) return;
+    hubScheduleState.persons = hubScheduleState.persons.filter(function (person) { return person.id !== id; });
+    delete hubScheduleState.eventsByPersonId[id];
+    delete hubScheduleState.statusMetaByPersonId[id];
+    hubScheduleState.loadedPersonIds.delete(id);
+    if (hubScheduleState.activePersonId === id) {
+      hubScheduleState.activePersonId = hubScheduleState.persons[0]?.id || '';
+    }
+    refreshHubScheduleActiveView();
+  }
+
   function renderHubScheduleTabs() {
     const host = document.getElementById('hubSchedulePersonTabs');
     if (!host) return;
@@ -3798,11 +3902,14 @@
     host.innerHTML = hubScheduleState.persons.map(function (person) {
       const active = person.id === hubScheduleState.activePersonId;
       return [
+        '<div class="hub-schedule-person-tab-card">',
         '<button type="button" class="btn btn-sm ' + (active ? 'btn-primary' : 'btn-outline-primary') + ' hub-schedule-person-tab" data-hub-schedule-person-tab="' + escapeHtml(person.id) + '">',
         '<i class="bi bi-person-circle"></i>',
         '<span>' + escapeHtml(person.name || person.id) + '</span>',
         '<span class="badge ' + (active ? 'text-bg-light' : 'text-bg-primary') + '">' + escapeHtml((person.availableRoles || []).length || 'All') + '</span>',
-        '</button>'
+        '</button>',
+        '<button type="button" class="hub-schedule-person-tab-close" data-hub-schedule-remove-person="' + escapeHtml(person.id) + '" aria-label="Close tab" title="Close tab">&times;</button>',
+        '</div>'
       ].join('');
     }).join('');
   }
@@ -3898,19 +4005,48 @@
   function renderHubScheduleLegend(mode) {
     const host = document.getElementById('hubScheduleLegend');
     if (!host) return;
+    const wrapLegend = function (itemsHtml) {
+      return '<div class="hub-schedule-legend-items">' + itemsHtml + '</div>';
+    };
     if (mode === 'calendar') {
-      host.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</div><div class="text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</div><div class="text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> M = Make-up required</div><div class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</div><div class="text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</div><div class="text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</div><div class="text-muted small">Click any day to load its day view</div><button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-timeline aria-label="Switch to day view" title="Show scheduled sessions in the colored time timeline"><i class="bi bi-calendar-day me-1"></i>Switch to day view</button>';
+      host.innerHTML = wrapLegend([
+        '<span class="hub-schedule-legend-item text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</span>',
+        '<span class="hub-schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</span>',
+        '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</span>',
+        '<span class="hub-schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> M = Make-up required</span>',
+        '<span class="hub-schedule-legend-item text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</span>',
+        '<span class="hub-schedule-legend-item text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</span>',
+        '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</span>',
+        '<span class="hub-schedule-legend-item text-muted small">Click any day to load its day view</span>',
+        '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-timeline aria-label="Switch to day view" title="Show scheduled sessions in the colored time timeline"><i class="bi bi-calendar-day me-1"></i>Switch to day view</button>'
+      ].join(''));
       return;
     }
     if (mode === 'timeline') {
-      host.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-calendar-day me-1"></i> Day view</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</div><div class="text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</div><div class="text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</div><button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-month aria-label="Switch to month view" title="Show the calendar month view"><i class="bi bi-calendar3 me-1"></i>Switch to month view</button>';
+      host.innerHTML = wrapLegend([
+        '<span class="hub-schedule-legend-item text-primary fw-bold"><i class="bi bi-calendar-day me-1"></i> Day view</span>',
+        '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</span>',
+        '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</span>',
+        '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</span>',
+        '<span class="hub-schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</span>',
+        '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</span>',
+        '<span class="hub-schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</span>',
+        '<span class="hub-schedule-legend-item text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</span>',
+        '<span class="hub-schedule-legend-item text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</span>',
+        '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-month aria-label="Switch to month view" title="Show the calendar month view"><i class="bi bi-calendar3 me-1"></i>Switch to month view</button>'
+      ].join(''));
       return;
     }
     if (mode === 'single') {
-      host.innerHTML = '<div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</div><div class="text-muted small">Vertical full-detail day view</div>';
+      host.innerHTML = wrapLegend([
+        '<span class="hub-schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</span>',
+        '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</span>',
+        '<span class="hub-schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</span>',
+        '<span class="hub-schedule-legend-item text-muted small">Vertical full-detail day view</span>'
+      ].join(''));
       return;
     }
-    host.innerHTML = '<div class="text-muted small">Vertical full-detail view for selected day</div>';
+    host.innerHTML = wrapLegend('<span class="hub-schedule-legend-item text-muted small">Vertical full-detail view for selected day</span>');
   }
 
   function renderHubScheduleSingleDayView(eventsByDate, statusMap) {
@@ -4356,29 +4492,31 @@
       hubScheduleState.viewMode = 'auto';
       refreshHubScheduleActiveView();
     });
+    const shortcutsBtn = document.getElementById('hubScheduleOpenShortcuts');
+    if (shortcutsBtn) shortcutsBtn.addEventListener('click', function () {
+      const modalEl = document.getElementById('hubScheduleShortcutsModal');
+      if (modalEl && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    });
     root.querySelectorAll('[data-hub-schedule-range]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         setHubScheduleRange(btn.getAttribute('data-hub-schedule-range') || 'day');
+        const modalEl = document.getElementById('hubScheduleShortcutsModal');
+        if (modalEl && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
       });
     });
     const tabs = document.getElementById('hubSchedulePersonTabs');
     if (tabs) {
       tabs.addEventListener('click', function (event) {
+        const closeBtn = event.target && event.target.closest('[data-hub-schedule-remove-person]');
+        if (closeBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          removeHubSchedulePerson(closeBtn.getAttribute('data-hub-schedule-remove-person') || '');
+          return;
+        }
         const tab = event.target && event.target.closest('[data-hub-schedule-person-tab]');
         if (!tab) return;
         hubScheduleState.activePersonId = tab.getAttribute('data-hub-schedule-person-tab') || hubScheduleState.activePersonId;
-        refreshHubScheduleActiveView();
-      });
-    }
-    const removeBtn = document.getElementById('hubScheduleRemoveActive');
-    if (removeBtn) {
-      removeBtn.addEventListener('click', function () {
-        const activeId = hubScheduleState.activePersonId;
-        hubScheduleState.persons = hubScheduleState.persons.filter(function (person) { return person.id !== activeId; });
-        delete hubScheduleState.eventsByPersonId[activeId];
-        delete hubScheduleState.statusMetaByPersonId[activeId];
-        hubScheduleState.loadedPersonIds.delete(activeId);
-        hubScheduleState.activePersonId = hubScheduleState.persons[0]?.id || '';
         refreshHubScheduleActiveView();
       });
     }
@@ -4411,6 +4549,40 @@
     }
   }
 
+  function renderHubScheduleShortcutsModal() {
+    const shortcuts = [
+      { range: 'day', label: 'Today' },
+      { range: 'week', label: 'This Week' },
+      { range: 'first15', label: 'First 15 Days' },
+      { range: 'second15', label: 'Second 15 Days' },
+      { range: 'month', label: 'This Month' },
+      { range: 'twoMonth', label: 'Two-month' },
+      { range: 'threeMonth', label: 'Three-month' },
+      { range: 'lastMonth', label: 'Last Month' },
+      { range: 'lastTwoMonth', label: 'Last Two-month' },
+      { range: 'lastThreeMonth', label: 'Last Three-month' }
+    ];
+    return [
+      '<div class="modal fade" id="hubScheduleShortcutsModal" tabindex="-1" aria-hidden="true">',
+      '<div class="modal-dialog modal-sm modal-dialog-centered">',
+      '<div class="modal-content">',
+      '<div class="modal-header py-2 px-3">',
+      '<h6 class="modal-title mb-0 fw-semibold">Shortcut Dates</h6>',
+      '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>',
+      '</div>',
+      '<div class="modal-body p-2">',
+      '<div class="d-grid gap-2">',
+      shortcuts.map(function (item) {
+        return '<button type="button" class="btn btn-sm btn-outline-secondary" data-hub-schedule-range="' + escapeHtml(item.range) + '">' + escapeHtml(item.label) + '</button>';
+      }).join(''),
+      '</div>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
   function renderScheduleWorkspace(payload) {
     const section = payload && payload.section ? payload.section : {};
     const todayDate = new Date();
@@ -4424,36 +4596,24 @@
     els.workspace.innerHTML = [
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
-      '<div><div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-check-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Schedule') + '</h2>',
       '<p class="text-muted mb-0">Select multiple school people, then review each person schedule on its own tab.</p></div>',
       '<div class="d-flex gap-2"><a href="' + escapeHtml(section.sourceUrl || '/school/schedules') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Master Schedule</a></div>',
       '</div>',
       '<div class="hub-workspace-toolbar">',
-      '<div class="row g-3 align-items-end">',
-      '<div class="col-md-4"><div class="d-flex gap-2"><button type="button" id="hubScheduleAddPeople" class="btn btn-outline-primary btn-sm flex-fill"><i class="bi bi-people-fill me-1"></i>Select People</button><button type="button" id="hubScheduleAllActiveTeachers" class="btn btn-outline-info btn-sm flex-fill"><i class="bi bi-person-video3 me-1"></i>All Active Teacher</button></div></div>',
-      '<div class="col-md-2"><label class="form-label fw-bold small">Start Date</label><input type="date" id="hubScheduleStartDate" class="form-control form-control-sm" value="' + escapeHtml(defaultStart) + '"></div>',
-      '<div class="col-md-2"><label class="form-label fw-bold small">End Date</label><input type="date" id="hubScheduleEndDate" class="form-control form-control-sm" value="' + escapeHtml(defaultEnd) + '"></div>',
-      '<div class="col-md-2"><label class="form-label fw-bold small">Role</label><select id="hubScheduleRole" class="form-select form-select-sm"><option value="">All Roles</option></select></div>',
-      '<div class="col-md-2"><label class="form-label fw-bold small">Cases</label><div class="form-check form-switch pt-1"><input class="form-check-input" type="checkbox" role="switch" id="hubScheduleHasCases"><label class="form-check-label small fw-semibold" for="hubScheduleHasCases">With cases only</label></div></div>',
-      '<div class="col-md-2 d-flex gap-2"><button type="button" id="hubScheduleLoadActive" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-arrow-clockwise me-1"></i>Load Tab</button><button type="button" id="hubScheduleLoadAll" class="btn btn-outline-primary btn-sm flex-fill">Load All</button></div>',
-      '</div>',
-      '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="day">Today</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="week">This Week</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="first15">First 15 Days</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="second15">Second 15 Days</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="month">This Month</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="twoMonth">Two-month</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="threeMonth">Three-month</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="lastMonth">Last Month</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="lastTwoMonth">Last Two-month</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="lastThreeMonth">Last Three-month</button>',
-      '<button type="button" id="hubScheduleRemoveActive" class="btn btn-sm btn-outline-danger py-0 ms-auto">Remove Active Tab</button>',
+      '<div class="hub-schedule-toolbar-grid">',
+      '<div class="hub-schedule-toolbar-people"><button type="button" id="hubScheduleAddPeople" class="btn btn-outline-primary btn-sm flex-fill"><i class="bi bi-people-fill me-1"></i>Select People</button><button type="button" id="hubScheduleAllActiveTeachers" class="btn btn-outline-info btn-sm flex-fill"><i class="bi bi-person-video3 me-1"></i>All Active Teacher</button></div>',
+      '<div class="hub-schedule-toolbar-date-start"><label class="form-label fw-bold small mb-1" for="hubScheduleStartDate">Start Date</label><input type="date" id="hubScheduleStartDate" class="form-control form-control-sm" value="' + escapeHtml(defaultStart) + '"></div>',
+      '<div class="hub-schedule-toolbar-date-end"><label class="form-label fw-bold small mb-1" for="hubScheduleEndDate">End Date</label><input type="date" id="hubScheduleEndDate" class="form-control form-control-sm" value="' + escapeHtml(defaultEnd) + '"></div>',
+      '<div class="hub-schedule-toolbar-role"><label class="form-label fw-bold small" for="hubScheduleRole">Role</label><select id="hubScheduleRole" class="form-select form-select-sm"><option value="">All Roles</option></select></div>',
+      '<div class="hub-schedule-toolbar-cases"><label class="form-label fw-bold small">Cases</label><div class="form-check form-switch pt-1"><input class="form-check-input" type="checkbox" role="switch" id="hubScheduleHasCases"><label class="form-check-label small fw-semibold" for="hubScheduleHasCases">With cases only</label></div></div>',
+      '<div class="hub-schedule-toolbar-shortcut"><button type="button" id="hubScheduleOpenShortcuts" class="btn btn-outline-secondary btn-sm w-100"><i class="bi bi-calendar-range me-1"></i>Shortcut Dates</button></div>',
+      '<div class="hub-schedule-toolbar-loads"><button type="button" id="hubScheduleLoadActive" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-arrow-clockwise me-1"></i>Load Tab</button><button type="button" id="hubScheduleLoadAll" class="btn btn-outline-primary btn-sm flex-fill">Load All</button></div>',
       '</div>',
       '</div>',
+      renderHubScheduleShortcutsModal(),
       '<div class="hub-schedule-tabs" id="hubSchedulePersonTabs"></div>',
-      '<div class="p-3 border-bottom bg-white" id="hubScheduleSummary"></div>',
       '<div class="hub-schedule-legend" id="hubScheduleLegend"></div>',
       '<div id="hubScheduleEvents"></div>',
       '</div>'
@@ -4704,7 +4864,7 @@
     els.workspace.innerHTML = [
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
-      '<div><div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-clipboard-check-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Attendance') + '</h2>',
       '<p class="text-muted mb-0">Select a class or load all active classes, then review attendance matrices inside Master Hub. Open cells in the full Attendance page for deeper editing.</p></div>',
       '<div class="d-flex gap-2"><a href="' + escapeHtml(section.sourceUrl || '/school/attendances') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Attendance</a></div>',
@@ -4796,7 +4956,7 @@
     els.workspace.innerHTML = [
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
-      '<div><div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-journal-bookmark-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Academic Ledger') + '</h2>',
       '<p class="text-muted mb-0">Select students, then open each student\'s registration overview from the Academic Ledger.</p></div>',
       '<div class="d-flex gap-2"><a href="' + escapeHtml(section.sourceUrl || '/school/academic-ledger') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Ledger</a></div>',
@@ -5684,7 +5844,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-clipboard2-check-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Report Assignments') + '</h2>',
       '<p class="text-muted mb-0">Review assignment status, class targeting, and templates in one place. Use actions to open assignment workflows.</p>',
       '</div>',
@@ -6101,7 +6260,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-file-earmark-text-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Report Instances') + '</h2>',
       '<p class="text-muted mb-0">Review generated and pending report instances. Open item-level actions to continue reporting workflows.</p>',
       '</div>',
@@ -6170,7 +6328,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-heart') + ' me-2"></i>' + escapeHtml(section.label || 'Leave Requests') + '</h2>',
       '<p class="text-muted mb-0">Review visible leave requests inside Master Hub. Use actions to open request workflows in a new browser tab.</p>',
       '</div>',
@@ -6411,7 +6568,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-week-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Timesheet Periods') + '</h2>',
       '<p class="text-muted mb-0">Review and define timesheet periods from the hub while using the existing protected forms for changes.</p>',
       '</div>',
@@ -6651,7 +6807,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-table') + ' me-2"></i>' + escapeHtml(section.label || 'Timesheet Management') + '</h2>',
       '<p class="text-muted mb-0">Select a timesheet period, load eligible teachers and staff, open their timesheets, or review department-hour summaries.</p>',
       '</div>',
@@ -6921,7 +7076,6 @@
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
-      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-event-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Holidays') + '</h2>',
       '<p class="text-muted mb-0">Review school holidays and off days inside Master Hub. Open the full page for add, edit, and delete workflows.</p>',
       '</div>',

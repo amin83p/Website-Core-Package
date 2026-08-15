@@ -2,6 +2,7 @@
 
 const schoolDataService = require('./schoolDataService');
 const overallReportService = require('./overallReportService');
+const studentAttendanceReportExportFormatService = require('./studentAttendanceReportExportFormatService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -12,7 +13,11 @@ function cleanId(value = '') {
 const DEFAULT_POLICY = Object.freeze({
   reportTemplateId: '',
   overallReportTemplateId: '',
-  overallReportTemplateIds: Object.freeze([])
+  overallReportTemplateIds: Object.freeze([]),
+  templateExportFormats: Object.freeze({
+    report: Object.freeze({}),
+    overall: Object.freeze({})
+  })
 });
 
 function normalizeIdList(value, fallbackValue = '') {
@@ -49,19 +54,33 @@ function normalizeIdList(value, fallbackValue = '') {
 
 function normalizePolicyFromStored(input = {}) {
   const overallReportTemplateIds = normalizeIdList(input.overallReportTemplateIds, input.overallReportTemplateId);
-  return {
+  const base = {
     reportTemplateId: cleanId(input.reportTemplateId),
     overallReportTemplateId: overallReportTemplateIds[0] || '',
     overallReportTemplateIds
   };
+  return {
+    ...base,
+    templateExportFormats: studentAttendanceReportExportFormatService.sanitizeTemplateExportFormats(
+      input.templateExportFormats,
+      base
+    )
+  };
 }
 
 function normalizePolicyFromForm(input = {}) {
-  return normalizePolicyFromStored({
+  const base = normalizePolicyFromStored({
     reportTemplateId: input.reportTemplateId,
     overallReportTemplateId: input.overallReportTemplateId,
     overallReportTemplateIds: input.overallReportTemplateIds || input.overallReportTemplateIdsJson
   });
+  return {
+    ...base,
+    templateExportFormats: studentAttendanceReportExportFormatService.sanitizeTemplateExportFormats(
+      input.templateExportFormats,
+      base
+    )
+  };
 }
 
 function resolvePolicy(input = {}) {
@@ -158,5 +177,8 @@ module.exports = {
   assertReportTemplateAccessible,
   assertOverallTemplateAccessible,
   assertOverallTemplatesAccessible,
-  formatTemplateLabel
+  formatTemplateLabel,
+  sanitizeTemplateExportFormats: studentAttendanceReportExportFormatService.sanitizeTemplateExportFormats,
+  resolveTemplateExportFormats: studentAttendanceReportExportFormatService.resolveTemplateExportFormats,
+  isSarExportFormatEnabled: studentAttendanceReportExportFormatService.isSarExportFormatEnabled
 };

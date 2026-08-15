@@ -25,7 +25,8 @@
   <script>
     (function () {
       try {
-        if (localStorage.getItem('app_header_compact') === '1') {
+        const storedHeaderCompact = localStorage.getItem('app_header_compact');
+        if (storedHeaderCompact !== '0') {
           document.documentElement.classList.add('header-pref-compact');
         }
         const pageWidth = String(localStorage.getItem('app_page_width') || '').trim().toLowerCase();

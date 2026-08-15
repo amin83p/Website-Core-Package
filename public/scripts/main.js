@@ -932,9 +932,11 @@ function initAppFontControls() {
 
 function getStoredHeaderCompactPreference() {
     try {
-        return localStorage.getItem(HEADER_COMPACT_STORAGE_KEY) === '1';
+        const stored = localStorage.getItem(HEADER_COMPACT_STORAGE_KEY);
+        if (stored === null) return true;
+        return stored === '1';
     } catch (_) {
-        return false;
+        return true;
     }
 }
 

@@ -11,6 +11,7 @@ const reportPdfRenderService = require('./reportPdfRenderService');
 const reportFunderDocxService = require('./reportFunderDocxService');
 const reportFunderPdfService = require('./reportFunderPdfService');
 const overallReportService = require('./overallReportService');
+const studentAttendanceReportExportFormatService = require('./studentAttendanceReportExportFormatService');
 
 function clean(value = '') {
   return String(value ?? '').trim();
@@ -208,16 +209,25 @@ async function loadGenerationContext(req, options = {}) {
   };
 }
 
-async function loadTemplateMetaMap(templateIds = [], reqUser) {
+async function loadTemplateMetaMap(templateIds = [], reqUser, policy = {}) {
   const map = new Map();
   const uniqueIds = [...new Set(templateIds.map((id) => clean(id)).filter(Boolean))];
   for (const templateId of uniqueIds) {
     const template = await schoolDataService.getDataById('reportTemplates', templateId, reqUser);
     if (!template) continue;
-    map.set(templateId, {
+    const rawMeta = {
       templateTitle: studentAttendanceReportPolicyService.formatTemplateLabel(template, templateId),
       hasDocx: reportFunderDocxService.templateHasAnyDocx(template),
       hasPdf: reportFunderPdfService.templateHasAnyPdf(template)
+    };
+    const effective = studentAttendanceReportExportFormatService.resolveEffectiveClassExportFlags(
+      policy,
+      templateId,
+      rawMeta
+    );
+    map.set(templateId, {
+      ...rawMeta,
+      ...effective
     });
   }
   return map;
@@ -241,6 +251,7 @@ function buildClassExportRowsForStudent(student, policy, overallTemplate, templa
       templateTitle: meta.templateTitle || templateId,
       hasDocx: Boolean(meta.hasDocx),
       hasPdf: Boolean(meta.hasPdf),
+      hasPayload: meta.hasPayload !== false,
       exportable: Boolean(teacherId),
       warning: teacherId ? '' : `No teacher assigned for ${classRow.className || classId}.`
     });
@@ -287,12 +298,21 @@ function buildOverallExportBlock(student, policy, overallTemplate, classRows) {
 
   const eligible = slots.length > 0
     && (necessarySlots.length === 0 || missingSlots.length === 0);
+  const rawOverallMeta = {
+    hasDocx: overallReportService.templateHasAttachedDocx(overallTemplate)
+  };
+  const effectiveOverall = studentAttendanceReportExportFormatService.resolveEffectiveOverallExportFlags(
+    policy,
+    templateId,
+    rawOverallMeta
+  );
 
   return {
     defined: true,
     templateId,
     templateTitle,
-    hasDocx: overallReportService.templateHasAttachedDocx(overallTemplate),
+    hasDocx: effectiveOverall.hasDocx,
+    hasPayload: effectiveOverall.hasPayload,
     eligible,
     missingSlots,
     warnings,
@@ -314,7 +334,7 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
   const { policy, overallTemplates, students, startDate, endDate } = ctx;
 
   const templateIds = [policy.reportTemplateId];
-  const templateMetaMap = await loadTemplateMetaMap(templateIds, req.user);
+  const templateMetaMap = await loadTemplateMetaMap(templateIds, req.user, policy);
 
   const planStudents = students.map((student) => {
     const classRows = buildClassExportRowsForStudent(student, policy, null, templateMetaMap);
@@ -330,22 +350,43 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
   });
 
   const defaultReportMeta = templateMetaMap.get(clean(policy.reportTemplateId)) || {};
-  const overallTemplateSummaries = overallTemplates.map((template) => ({
-    id: clean(template.id),
-    title: clean(template.title) || clean(template.id),
-    hasDocx: overallReportService.templateHasAttachedDocx(template)
-  }));
+  const overallTemplateSummaries = overallTemplates.map((template) => {
+    const templateId = clean(template.id);
+    const rawOverallMeta = {
+      hasDocx: overallReportService.templateHasAttachedDocx(template)
+    };
+    const effectiveOverall = studentAttendanceReportExportFormatService.resolveEffectiveOverallExportFlags(
+      policy,
+      templateId,
+      rawOverallMeta
+    );
+    return {
+      id: templateId,
+      title: clean(template.title) || templateId,
+      hasDocx: effectiveOverall.hasDocx,
+      hasPayload: effectiveOverall.hasPayload
+    };
+  });
 
   return {
     startDate,
     endDate,
     reportTemplateId: clean(policy.reportTemplateId),
     reportTemplateTitle: defaultReportMeta.templateTitle || clean(policy.reportTemplateId),
+    reportTemplateExportFormats: {
+      hasDocx: Boolean(defaultReportMeta.hasDocx),
+      hasPdf: Boolean(defaultReportMeta.hasPdf),
+      hasPayload: defaultReportMeta.hasPayload !== false
+    },
     overallReportTemplateId: clean(policy.overallReportTemplateId),
     overallReportTemplateIds: policy.overallReportTemplateIds || [],
     overallReportTemplateTitle: overallTemplateSummaries[0]?.title || '',
     overallReportTemplateTitleList: overallTemplateSummaries.map((row) => row.title).join(', '),
     overallReportTemplates: overallTemplateSummaries,
+    overallBulkExportFormats: {
+      hasDocx: overallTemplateSummaries.some((row) => row.hasDocx),
+      hasPayload: overallTemplateSummaries.some((row) => row.hasPayload !== false)
+    },
     students: planStudents
   };
 }
@@ -436,6 +477,12 @@ async function exportClassTarget(student, classId, format, ctx, reqUser) {
   }
 
   const templateId = resolveClassTemplateId(student, classId, policy, overallTemplate);
+  studentAttendanceReportExportFormatService.assertSarExportFormatAllowed(
+    policy,
+    'report',
+    templateId,
+    format
+  );
   const engineResult = await reportGenerationEngineService.generateReportOutput({
     templateId,
     classId: clean(classId),
@@ -524,6 +571,12 @@ async function exportOverallTarget(student, selectedClassIds, overallTemplateId,
     buildWarnings
   } = resolveEligibleOverallTemplateForTarget({ student, selectedClassIds, overallTemplateId, ctx });
   const chosenTemplateId = clean(overallTemplate.id);
+  studentAttendanceReportExportFormatService.assertSarExportFormatAllowed(
+    ctx.policy,
+    'overall',
+    chosenTemplateId,
+    format
+  );
 
   const pipeline = await overallReportGenerationEngineService.generateOverallPipeline({
     filterStartDate: startDate,

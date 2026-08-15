@@ -6,6 +6,9 @@ const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
+const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
+const reportFunderPdfService = require('../../services/school/reportFunderPdfService');
+const overallReportService = require('../../services/school/overallReportService');
 const { listSchoolSettingsGroups } = require('../../config/schoolSettingsCatalog');
 const { listAutosaveSections } = require('../../config/autosaveSectionCatalog');
 const { userCanUpdateSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
@@ -208,7 +211,8 @@ async function resolveStudentAttendanceReportLabels(policy = {}, reqUser) {
     const template = await schoolDataService.getDataById('overallReportTemplates', overallId, reqUser);
     overallReportTemplateLabels.push({
       id: overallId,
-      label: studentAttendanceReportPolicyService.formatTemplateLabel(template, overallId)
+      label: studentAttendanceReportPolicyService.formatTemplateLabel(template, overallId),
+      hasDocx: overallReportService.templateHasAttachedDocx(template)
     });
   }
   return {
@@ -216,6 +220,10 @@ async function resolveStudentAttendanceReportLabels(policy = {}, reqUser) {
       reportTemplate,
       policy.reportTemplateId
     ),
+    reportTemplateCapabilities: {
+      hasDocx: reportFunderDocxService.templateHasAnyDocx(reportTemplate),
+      hasPdf: reportFunderPdfService.templateHasAnyPdf(reportTemplate)
+    },
     overallReportTemplateLabel: overallReportTemplateLabels[0]?.label || '',
     overallReportTemplateLabels
   };
@@ -257,6 +265,7 @@ async function loadSettingsPageData(req) {
     autosaveSections: listAutosaveSections(),
     studentAttendanceReportPolicy,
     studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
+    studentAttendanceReportTemplateCapabilities: studentAttendanceReportLabels.reportTemplateCapabilities,
     studentAttendanceReportOverallLabel: studentAttendanceReportLabels.overallReportTemplateLabel,
     studentAttendanceReportOverallLabels: studentAttendanceReportLabels.overallReportTemplateLabels
   };
@@ -402,6 +411,7 @@ async function saveStudentAttendanceReportSettings(req, res) {
       message: 'Student Attendance Report settings were updated.',
       policy,
       reportTemplateLabel: labels.reportTemplateLabel,
+      reportTemplateCapabilities: labels.reportTemplateCapabilities,
       overallReportTemplateLabel: labels.overallReportTemplateLabel,
       overallReportTemplateLabels: labels.overallReportTemplateLabels
     });

@@ -4,7 +4,8 @@
   const attendanceItemsJson = JSON.stringify(attendanceItems || []).replace(/</g, '\\u003c');
   const autosavePolicyJson = JSON.stringify(typeof autosavePolicy !== 'undefined' ? autosavePolicy : { defaultMinutes: 5, sections: {} }).replace(/</g, '\\u003c');
   const autosaveSectionsJson = JSON.stringify(typeof autosaveSections !== 'undefined' ? autosaveSections : []).replace(/</g, '\\u003c');
-  const studentAttendanceReportPolicyJson = JSON.stringify(typeof studentAttendanceReportPolicy !== 'undefined' ? studentAttendanceReportPolicy : { reportTemplateId: '', overallReportTemplateId: '', overallReportTemplateIds: [] }).replace(/</g, '\\u003c');
+  const studentAttendanceReportPolicyJson = JSON.stringify(typeof studentAttendanceReportPolicy !== 'undefined' ? studentAttendanceReportPolicy : { reportTemplateId: '', overallReportTemplateId: '', overallReportTemplateIds: [], templateExportFormats: { report: {}, overall: {} } }).replace(/</g, '\\u003c');
+  const studentAttendanceReportTemplateCapabilitiesJson = JSON.stringify(typeof studentAttendanceReportTemplateCapabilities !== 'undefined' ? studentAttendanceReportTemplateCapabilities : { hasDocx: false, hasPdf: false }).replace(/</g, '\\u003c');
   const studentAttendanceReportOverallLabelsJson = JSON.stringify(typeof studentAttendanceReportOverallLabels !== 'undefined' ? studentAttendanceReportOverallLabels : []).replace(/</g, '\\u003c');
   const attendanceThresholdsEnabledFlag = typeof attendanceThresholdsEnabled === 'undefined'
     ? true
@@ -567,6 +568,24 @@
                   <% } %>
                 </div>
                 <div class="form-text">Required to generate reports from the Student Attendance Report page.</div>
+                <div class="border rounded p-3 mt-3 <%= typeof studentAttendanceReportPolicy !== 'undefined' && studentAttendanceReportPolicy?.reportTemplateId ? '' : 'd-none' %>" id="sarReportExportFormatsPanel">
+                  <div class="fw-semibold small mb-2">Export formats for Student Attendance Report</div>
+                  <div class="d-flex flex-wrap gap-3">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="sarReportExportDocx" <%= typeof studentAttendanceReportTemplateCapabilities !== 'undefined' && studentAttendanceReportTemplateCapabilities?.hasDocx ? '' : 'disabled' %>>
+                      <label class="form-check-label" for="sarReportExportDocx">DOCX</label>
+                    </div>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="sarReportExportPdf" <%= typeof studentAttendanceReportTemplateCapabilities !== 'undefined' && studentAttendanceReportTemplateCapabilities?.hasPdf ? '' : 'disabled' %>>
+                      <label class="form-check-label" for="sarReportExportPdf">PDF</label>
+                    </div>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="sarReportExportPayload" checked>
+                      <label class="form-check-label" for="sarReportExportPayload">Payload</label>
+                    </div>
+                  </div>
+                  <div class="form-text mt-2 mb-0">DOCX and PDF toggles require matching template files. These settings apply only to Student Attendance Report exports.</div>
+                </div>
               </div>
               <div class="col-12">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
@@ -593,11 +612,13 @@
                       <tr>
                         <th style="width: 56px;">Order</th>
                         <th>Overall template</th>
+                        <th style="width: 7rem;">DOCX</th>
+                        <th style="width: 7rem;">Payload</th>
                         <% if (canUpdateFlag) { %><th class="text-end" style="width: 190px;">Actions</th><% } %>
                       </tr>
                     </thead>
                     <tbody id="sarOverallTemplatesBody">
-                      <tr><td colspan="<%= canUpdateFlag ? 3 : 2 %>" class="text-muted small py-3">No overall templates selected.</td></tr>
+                      <tr><td colspan="<%= canUpdateFlag ? 5 : 4 %>" class="text-muted small py-3">No overall templates selected.</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -630,6 +651,7 @@
   const autosaveSections = <%- autosaveSectionsJson %>;
   let studentAttendanceReportPolicy = <%- studentAttendanceReportPolicyJson %>;
   const studentAttendanceReportOverallLabels = <%- studentAttendanceReportOverallLabelsJson %>;
+  let sarReportTemplateCapabilities = <%- studentAttendanceReportTemplateCapabilitiesJson %>;
   let sarOverallTemplates = [];
   let attendanceThresholdsEnabled = <%= attendanceThresholdsEnabledFlag ? 'true' : 'false' %>;
   let rollupFormula = <%- rollupFormulaJson %>;
@@ -1176,7 +1198,8 @@
         const id = String(row?.id || row?.templateId || '').trim();
         return {
           id,
-          label: String(row?.label || row?.title || row?.templateTitle || id).trim() || id
+          label: String(row?.label || row?.title || row?.templateTitle || id).trim() || id,
+          hasDocx: row?.hasDocx === true
         };
       })
       .filter((row) => row.id)
@@ -1186,6 +1209,113 @@
         seen.add(key);
         return true;
       });
+  }
+
+  function defaultReportExportFormats() {
+    return { docx: true, pdf: true, payload: true };
+  }
+
+  function defaultOverallExportFormats() {
+    return { docx: true, payload: true };
+  }
+
+  function ensureSarTemplateExportFormats() {
+    if (!studentAttendanceReportPolicy.templateExportFormats || typeof studentAttendanceReportPolicy.templateExportFormats !== 'object') {
+      studentAttendanceReportPolicy.templateExportFormats = { report: {}, overall: {} };
+    }
+    if (!studentAttendanceReportPolicy.templateExportFormats.report) studentAttendanceReportPolicy.templateExportFormats.report = {};
+    if (!studentAttendanceReportPolicy.templateExportFormats.overall) studentAttendanceReportPolicy.templateExportFormats.overall = {};
+  }
+
+  function getSarReportExportFormats(templateId = '') {
+    ensureSarTemplateExportFormats();
+    const id = String(templateId || studentAttendanceReportPolicy.reportTemplateId || '').trim();
+    if (!id) return defaultReportExportFormats();
+    return {
+      ...defaultReportExportFormats(),
+      ...(studentAttendanceReportPolicy.templateExportFormats.report[id] || {})
+    };
+  }
+
+  function getSarOverallExportFormats(templateId = '') {
+    ensureSarTemplateExportFormats();
+    const id = String(templateId || '').trim();
+    if (!id) return defaultOverallExportFormats();
+    return {
+      ...defaultOverallExportFormats(),
+      ...(studentAttendanceReportPolicy.templateExportFormats.overall[id] || {})
+    };
+  }
+
+  function setSarReportExportFormats(templateId = '', formats = {}) {
+    ensureSarTemplateExportFormats();
+    const id = String(templateId || '').trim();
+    if (!id) return;
+    studentAttendanceReportPolicy.templateExportFormats.report[id] = {
+      docx: formats.docx !== false,
+      pdf: formats.pdf !== false,
+      payload: formats.payload !== false
+    };
+  }
+
+  function setSarOverallExportFormats(templateId = '', formats = {}) {
+    ensureSarTemplateExportFormats();
+    const id = String(templateId || '').trim();
+    if (!id) return;
+    studentAttendanceReportPolicy.templateExportFormats.overall[id] = {
+      docx: formats.docx !== false,
+      payload: formats.payload !== false
+    };
+  }
+
+  function collectSarTemplateExportFormats() {
+    ensureSarTemplateExportFormats();
+    const reportId = String(document.getElementById('sarReportTemplateId')?.value || '').trim();
+    if (reportId) {
+      setSarReportExportFormats(reportId, {
+        docx: document.getElementById('sarReportExportDocx')?.checked === true,
+        pdf: document.getElementById('sarReportExportPdf')?.checked === true,
+        payload: document.getElementById('sarReportExportPayload')?.checked === true
+      });
+    }
+    sarOverallTemplates.forEach((row) => {
+      const docxInput = document.querySelector(`.js-sar-overall-export-docx[data-template-id="${CSS.escape(row.id)}"]`);
+      const payloadInput = document.querySelector(`.js-sar-overall-export-payload[data-template-id="${CSS.escape(row.id)}"]`);
+      setSarOverallExportFormats(row.id, {
+        docx: docxInput ? docxInput.checked : getSarOverallExportFormats(row.id).docx !== false,
+        payload: payloadInput ? payloadInput.checked : getSarOverallExportFormats(row.id).payload !== false
+      });
+    });
+    const pruned = { report: {}, overall: {} };
+    if (reportId) pruned.report[reportId] = getSarReportExportFormats(reportId);
+    sarOverallTemplates.forEach((row) => {
+      pruned.overall[row.id] = getSarOverallExportFormats(row.id);
+    });
+    return pruned;
+  }
+
+  function renderSarReportExportFormatControls() {
+    const panel = document.getElementById('sarReportExportFormatsPanel');
+    const reportId = String(document.getElementById('sarReportTemplateId')?.value || '').trim();
+    if (!panel) return;
+    panel.classList.toggle('d-none', !reportId);
+    if (!reportId) return;
+    const formats = getSarReportExportFormats(reportId);
+    const docxInput = document.getElementById('sarReportExportDocx');
+    const pdfInput = document.getElementById('sarReportExportPdf');
+    const payloadInput = document.getElementById('sarReportExportPayload');
+    if (docxInput) {
+      docxInput.checked = formats.docx !== false;
+      docxInput.disabled = !canUpdate || !sarReportTemplateCapabilities?.hasDocx;
+    }
+    if (pdfInput) {
+      pdfInput.checked = formats.pdf !== false;
+      pdfInput.disabled = !canUpdate || !sarReportTemplateCapabilities?.hasPdf;
+    }
+    if (payloadInput) {
+      payloadInput.checked = formats.payload !== false;
+      payloadInput.disabled = !canUpdate;
+    }
   }
 
   function syncSarOverallTemplateInputs() {
@@ -1204,18 +1334,29 @@
     if (!body) return;
     syncSarOverallTemplateInputs();
     if (!sarOverallTemplates.length) {
-      body.innerHTML = `<tr><td colspan="${canUpdate ? 3 : 2}" class="text-muted small py-3">No overall templates selected.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="${canUpdate ? 5 : 4}" class="text-muted small py-3">No overall templates selected.</td></tr>`;
       return;
     }
     body.innerHTML = sarOverallTemplates.map((row, index) => {
       const canMoveUp = index > 0;
       const canMoveDown = index < sarOverallTemplates.length - 1;
+      const formats = getSarOverallExportFormats(row.id);
       return `
         <tr data-sar-overall-index="${index}">
           <td><span class="badge bg-secondary">${index + 1}</span></td>
           <td>
             <div class="fw-semibold">${escapeHtml(row.label || row.id)}</div>
             <div class="small text-muted font-monospace">${escapeHtml(row.id)}</div>
+          </td>
+          <td>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input js-sar-overall-export-docx" type="checkbox" data-template-id="${escapeHtml(row.id)}" ${formats.docx !== false ? 'checked' : ''} ${canUpdate && row.hasDocx ? '' : 'disabled'}>
+            </div>
+          </td>
+          <td>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input js-sar-overall-export-payload" type="checkbox" data-template-id="${escapeHtml(row.id)}" ${formats.payload !== false ? 'checked' : ''} ${canUpdate ? '' : 'disabled'}>
+            </div>
           </td>
           ${canUpdate ? `
             <td class="text-end text-nowrap">
@@ -1245,7 +1386,12 @@
     const id = String(item?.id || '').trim();
     if (!id) return;
     const label = formatSarTemplateLabel(item, id);
-    sarOverallTemplates = normalizeSarOverallTemplateRows([...sarOverallTemplates, { id, label }]);
+    sarOverallTemplates = normalizeSarOverallTemplateRows([...sarOverallTemplates, {
+      id,
+      label,
+      hasDocx: item?.hasDocx === true || item?.hasAttachedDocx === true || Boolean(item?.docxTemplate?.path)
+    }]);
+    setSarOverallExportFormats(id, defaultOverallExportFormats());
     renderSarOverallTemplates();
   }
 
@@ -1262,6 +1408,12 @@
         document.getElementById('sarReportTemplateId').value = id;
         document.getElementById('sarReportTemplateTitle').value = formatSarTemplateLabel(item, id);
         studentAttendanceReportPolicy.reportTemplateId = id;
+        sarReportTemplateCapabilities = {
+          hasDocx: Boolean(item?.hasDocxTemplate || item?.docxTemplate?.path),
+          hasPdf: Boolean(item?.hasPdfTemplate || item?.pdfTemplate?.path)
+        };
+        setSarReportExportFormats(id, defaultReportExportFormats());
+        renderSarReportExportFormatControls();
       }
     }));
   });
@@ -1312,7 +1464,8 @@
       actionStateId: event.currentTarget.elements.actionStateId?.value || '',
       reportTemplateId: document.getElementById('sarReportTemplateId')?.value || '',
       overallReportTemplateId: document.getElementById('sarOverallTemplateId')?.value || '',
-      overallReportTemplateIds: document.getElementById('sarOverallTemplateIds')?.value || '[]'
+      overallReportTemplateIds: document.getElementById('sarOverallTemplateIds')?.value || '[]',
+      templateExportFormats: JSON.stringify(collectSarTemplateExportFormats())
     }, button, 'studentAttendanceReportSettingsError');
     if (!result) return;
     studentAttendanceReportPolicy = result.policy && typeof result.policy === 'object'
@@ -1321,7 +1474,11 @@
     if (result.reportTemplateLabel) {
       document.getElementById('sarReportTemplateTitle').value = result.reportTemplateLabel;
     }
+    if (result.reportTemplateCapabilities) {
+      sarReportTemplateCapabilities = result.reportTemplateCapabilities;
+    }
     if (Array.isArray(result.overallReportTemplateLabels)) initializeSarOverallTemplates(result.overallReportTemplateLabels);
+    renderSarReportExportFormatControls();
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 
@@ -1346,5 +1503,6 @@
   renderRollupGraceItems();
   renderAutosaveSections();
   initializeSarOverallTemplates();
+  renderSarReportExportFormatControls();
 })();
 </script>

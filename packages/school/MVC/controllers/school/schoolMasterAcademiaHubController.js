@@ -10,6 +10,8 @@ exports.showMasterAcademiaHubPage = async (req, res) => {
 
     res.render('school/masterAcademiaHub', {
       title: 'Master Academia Hub',
+      bodyClass: 'school-master-hub-page',
+      mainClass: 'p-0 my-0',
       modules,
       defaultType: defaultModule ? defaultModule.type : '',
       canManageAllTasks: taskService.isAdminViewer(req.user),
